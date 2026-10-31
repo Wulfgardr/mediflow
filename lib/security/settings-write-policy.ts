@@ -57,7 +57,7 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     aiPatientInsightKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-patient-insight-kill-switch.ts)' },
     aiDocumentSynthesisKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-document-synthesis-kill-switch.ts)' },
     aiSmartImportKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-smart-import-kill-switch.ts)' },
-    aiTreatmentReasoningKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-treatment-reasoning-kill-switch.ts)' },
+    aiTreatmentReasoningKillSwitch: { write: [], note: 'Treatment Reasoning non disponibile nella 0.9.1; valore storico conservato' },
     aiOcrKillSwitch: { write: [], note: 'retired historical OCR toggle; HTTP writes denied' },
 
     // --- UI / accessibility preferences (per-operator, web session). ---

@@ -12,6 +12,8 @@ HOST="$(node -e "const u=new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3
 PORT="$(node -e "const u=new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3100'); console.log(u.port || (u.protocol === 'https:' ? '443' : '80'))")"
 
 mkdir -p "$E2E_DATA_DIR" "$LOG_DIR"
+export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1
+printf '%s\n' 'Synthetic E2E fixture' > "$E2E_DATA_DIR/SYNTHETIC_ONLY"
 export MEDIFLOW_DATA_DIR="$E2E_DATA_DIR"
 export E2E_BASE_URL="$BASE_URL"
 export MEDIFLOW_NEXT_DIST_DIR="${MEDIFLOW_NEXT_DIST_DIR:-.next-e2e}"

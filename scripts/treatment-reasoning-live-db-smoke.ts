@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { assertFunctionAvailableInRelease } from '../lib/ai-function-availability.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -725,6 +726,7 @@ async function buildReport(args: CliArgs): Promise<SmokeReport> {
 }
 
 async function main(): Promise<void> {
+    assertFunctionAvailableInRelease('treatment_reasoning');
     const args = parseArgs(process.argv);
     if (args.help) {
         process.stdout.write(`${usage()}\n`);

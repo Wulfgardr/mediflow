@@ -31,7 +31,7 @@ export const FUNCTION_META: Readonly<Record<FunctionId, Readonly<{ title: string
     patient_insight: { title: 'Quadro paziente', purpose: 'Prepara una sintesi da rivedere.', href: '/settings/ai/modelli', action: 'Configura il modello' },
     smart_import: { title: 'Importazione assistita', purpose: 'Propone dati dai documenti prima della conferma.', href: '/settings/ai/modelli', action: 'Configura il modello' },
     document_synthesis: { title: 'Sintesi dei documenti', purpose: 'Prepara una sintesi delle fonti selezionate.', href: '/settings/ai/modelli', action: 'Configura il modello' },
-    treatment_reasoning: { title: 'Revisione del trattamento', purpose: 'Prepara una proposta con il percorso locale ATHENA.', href: '/settings/ai/modelli', action: 'Configura ATHENA' },
+    treatment_reasoning: { title: 'Revisione del trattamento', purpose: 'Le proposte salvate restano consultabili.', href: '/settings/ai/funzioni', action: 'Consulta lo stato' },
     icd11: { title: 'Terminologia WHO', purpose: 'Consulta ICD-11, release 2026-01 MMS in inglese.', href: '/settings/repertori#who-setup', action: 'Apri configurazione WHO' },
 };
 export const FUNCTION_STATE_LABELS: Readonly<Record<FunctionState, string>> = {
@@ -62,9 +62,7 @@ export function buildFunctionStatus(sources: FunctionStatusSources, checkedAt: s
         const result = generativeState(sources.enabled[id], sources.ollamaLifecycle, binding.state);
         functions.push(row(id, result.state, result.reason, 'Ollama', binding.model));
     }
-    const treatmentBinding = sources.functionBindings?.treatment_reasoning;
-    const treatment = generativeState(sources.enabled.treatment_reasoning, sources.athenaLifecycle, treatmentBinding?.state ?? (sources.athenaArtifact ? 'configured' : 'invalid'));
-    functions.push(row('treatment_reasoning', treatment.state, treatment.reason, 'ATHENA / MLX', treatmentBinding?.model ?? null));
+    functions.push(row('treatment_reasoning', 'unavailable', 'Non disponibile in questa versione. Le nuove proposte terapeutiche sono rinviate a una versione successiva.', '', null));
     const who: Record<FunctionStatusSources['who'], [FunctionState, string]> = {
         disabled: ['off', 'Il servizio WHO è disattivato sul server.'],
         credentials_absent: ['needs_setup', 'Mancano le credenziali WHO sul server.'],

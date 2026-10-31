@@ -1,3 +1,4 @@
+import { assertFunctionAvailableInRelease } from '../ai-function-availability';
 import { isAiLaneEnabledValue } from '../ai-lane-kill-switch';
 import { createOrdinaryBrowser, type OrdinaryBrowserView } from './ordinary-browser';
 /* a request-local model selection, never clinical authority or persistence. */
@@ -48,6 +49,7 @@ export function createModelPreviewClient(functionId: FunctionModelId, request: t
             emit({ consumed: false, choice: id ? { modelOptionId: id, expectedCatalogRevision: dto.catalogRevision } : null, blocked: false, error: null });
         },
         async begin() {
+            assertFunctionAvailableInRelease(functionId);
             if (remoteMode) {
                 if (!active || view.blocked || view.loading || view.consumed || remote.getSnapshot().loading) throw new ModelUiError('stale');
                 abort(false); const token = generation; await remote.read(); current(token);

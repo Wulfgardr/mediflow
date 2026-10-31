@@ -107,6 +107,7 @@ export async function installFunctionsMocks(page: Page, baseURL: string, scenari
                 ? route.fulfill({ status: 503, json: { error: 'Synthetic setting read failed' } })
                 : route.fulfill({ json: { key, value: config[key] ?? null } });
             if (path !== '/api/settings' || method !== 'POST' || !Object.hasOwn(initialConfig, key) || typeof body?.value !== 'string') return deny();
+            if (key === 'aiTreatmentReasoningKillSwitch') return deny();
             settingsWrites.push(structuredClone(body));
             if (state.failSave) return route.fulfill({ status: 503, json: { error: 'Synthetic save not confirmed' } });
             config[key] = body.value;

@@ -62,6 +62,7 @@ for (const functionId of FUNCTION_MODEL_IDS) test(`${functionId}: explicit OpenA
     await assert.rejects(picker.begin());
     assert.deepEqual([prepareCalls, providerCalls, clinicalWrites], [0, 0, 0]);
     const command = { ...activation(source), functionId };
+    if (functionId === 'treatment_reasoning') { assert.throws(() => service.preview(command), /Non disponibile/); assert.throws(() => service.apply(command), /Non disponibile/); assert.equal(settingsWrites, 0); assert.deepEqual([prepareCalls, providerCalls, clinicalWrites], [0,0,0]); return; }
     assert.equal(service.preview(command).writesPerformed, 0); assert.equal(settingsWrites, 0);
     const applied = service.apply(command); assert.equal(applied.functions.find(row => row.id === functionId)!.enabled, true);
     assert.deepEqual(applied.functions.map(row => row.defaultModelOptionId), before.functions.map(row => row.defaultModelOptionId));
@@ -84,24 +85,24 @@ for (const functionId of FUNCTION_MODEL_IDS) test(`${functionId}: explicit OpenA
 
 test('activation retains stale saved binding and enforces revision/catalog CAS and closed v2 shape', () => {
     let source = sources();
-    const admitted = { ...source, athenaAvailable: true, athenaLifecycle: { status: 'available', record: { lifecycle: {
-        status: 'available_unqualified', provider: 'athena_mlx', credentialClass: 'local_model' } } } };
+    const admitted = { ...source, athenaAvailable: true, ollamaLifecycle: { status: 'available', record: { lifecycle: {
+        status: 'available_unqualified', provider: 'ollama', credentialClass: 'local_model' } } } };
     const view = readFunctionModelPreferences(admitted, 'v2');
-    const saved = planFunctionModelUpdate(admitted, { ...activation(admitted), action: 'set', functionId: 'treatment_reasoning', enabled: true,
-        defaultModelOptionId: view.functions[3].defaultModelOptionId });
+    const saved = planFunctionModelUpdate(admitted, { ...activation(admitted), action: 'set', functionId: 'patient_insight', enabled: true,
+        defaultModelOptionId: view.functions[0].defaultModelOptionId });
     source = { ...source, settings: { ...source.settings, ...saved.writes } };
     const before = JSON.parse(source.settings[FUNCTION_PREFERENCES_KEY]!).defaults;
-    const command = { ...activation(source), functionId: 'treatment_reasoning' };
+    const command = { ...activation(source), functionId: 'patient_insight' };
     const plan = planFunctionModelUpdate(source, command);
     assert.deepEqual(JSON.parse(plan.writes[FUNCTION_PREFERENCES_KEY]).defaults, before);
-    assert.equal(plan.view.functions[3].bindingState, 'stale');
+    assert.equal(plan.view.functions[0].bindingState, 'stale');
     assert.throws(() => parseFunctionModelCommand({ ...command, defaultModelOptionId: null }), /input_invalid/u);
     assert.throws(() => parseFunctionModelCommand({ ...command, schemaVersion: 'mediflow.function-preferences-command.v1' }), /input_invalid/u);
     assert.throws(() => planFunctionModelUpdate(source, { ...command, expectedRevision: 'sha256_' + '0'.repeat(64) }), /revision_conflict/u);
     assert.throws(() => planFunctionModelUpdate(source, { ...command, expectedCatalogRevision: 'sha256_' + '0'.repeat(64) }), /catalog_stale/u);
     const after = { ...source, settings: { ...source.settings, ...plan.writes } };
     assert.throws(() => planFunctionModelUpdate(after, { ...command, enabled: false }), /command_conflict/u);
-    assert.throws(() => resolveFunctionModelDispatch(after, 'treatment_reasoning'), /catalog_stale/u);
+    assert.throws(() => resolveFunctionModelDispatch(after, 'patient_insight'), /catalog_stale/u);
 });
 
 test('unavailable local preview is guarded before dispatch; prior list survives client and server denials', async () => {
@@ -142,11 +143,27 @@ test('browser activation requires preview/apply/reread and never changes local p
         return Response.json(path.endsWith('/preview') ? service.preview(command) : service.apply(command));
     }) as typeof fetch);
     await client.read();
-    await client.preview({ action: 'set_activation', functionId: 'treatment_reasoning', enabled: true });
+    await client.preview({ action: 'set_activation', functionId: 'patient_insight', enabled: true });
     assert.equal(writes, 0); assert.ok(client.getSnapshot().proposed); assert.equal(client.getSnapshot().error, null);
     await client.apply(); assert.equal(writes, 1); assert.equal(client.getSnapshot().saved, true);
-    assert.equal(client.getSnapshot().dto!.functions[3].enabled, true);
-    assert.equal(client.getSnapshot().dto!.functions[3].options[0].state, 'unavailable');
+    assert.equal(client.getSnapshot().dto!.functions[0].enabled, true);
+    assert.equal(client.getSnapshot().dto!.functions[0].options[0].state, 'unavailable');
     assert.deepEqual(paths, ['/api/settings/ai/functions', '/api/settings/ai/functions/preview', '/api/settings/ai/functions', '/api/settings/ai/functions']);
     assert.equal(source.settings['ai.fabric.chatgptOrdinary'], undefined, 'activation cannot grant OpenAI policy');
+});
+
+test('Treatment Reasoning client never proposes activation, including a saved enabled switch', async () => {
+    const baseline = sources();
+    const source = { ...baseline, settings: { ...baseline.settings, aiTreatmentReasoningKillSwitch: 'enabled' } };
+    let posts = 0;
+    const client = createPreferencesClient((async (_input, init) => {
+        if (init?.method === 'POST') posts++;
+        return Response.json(readFunctionModelPreferences(source, 'v2'));
+    }) as typeof fetch);
+    await client.read();
+    await client.preview({ action: 'set_activation', functionId: 'treatment_reasoning', enabled: true });
+    assert.equal(posts, 0); assert.equal(client.getSnapshot().proposed, null);
+    assert.equal(client.getSnapshot().error, 'Non disponibile in questa versione');
+    await client.apply(); assert.equal(posts, 0);
+    assert.equal(source.settings.aiTreatmentReasoningKillSwitch, 'enabled');
 });

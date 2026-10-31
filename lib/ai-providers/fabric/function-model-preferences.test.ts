@@ -68,14 +68,14 @@ test('persisted per-function default differs from request override, which never 
 test('unsupported functions, free model IDs, stale catalog, disabled and unavailable providers fail without fallback', () => {
     const sources = fixture(); const view = readFunctionModelPreferences(sources); const option = view.functions[0].options[0].modelOptionId;
     for (const id of FUNCTION_MODEL_IDS) {
-        assert.throws(() => resolveFunctionModelDispatch({ ...sources, settings: { ...sources.settings, [FUNCTION_SWITCH_KEYS[id]]: 'disabled' } }, id), /function_disabled/);
+        assert.throws(() => resolveFunctionModelDispatch({ ...sources, settings: { ...sources.settings, [FUNCTION_SWITCH_KEYS[id]]: 'disabled' } }, id), id === 'treatment_reasoning' ? /Non disponibile/ : /function_disabled/);
     }
     assert.throws(() => resolveFunctionModelDispatch(sources, 'ocr' as never), /unsupported/);
-    assert.throws(() => resolveFunctionModelDispatch(sources, 'treatment_reasoning', { modelOptionId: option, expectedCatalogRevision: view.catalogRevision }), /unsupported/);
+    assert.throws(() => resolveFunctionModelDispatch(sources, 'treatment_reasoning', { modelOptionId: option, expectedCatalogRevision: view.catalogRevision }), /Non disponibile/);
     assert.throws(() => resolveFunctionModelDispatch(sources, 'patient_insight', { modelOptionId: 'arbitrary-model', expectedCatalogRevision: view.catalogRevision }), /input_invalid/);
     assert.throws(() => resolveFunctionModelDispatch(sources, 'patient_insight', { modelOptionId: `model_option_${'0'.repeat(32)}`, expectedCatalogRevision: view.catalogRevision }), /model_not_cataloged/);
     assert.throws(() => resolveFunctionModelDispatch(sources, 'patient_insight', { modelOptionId: option, expectedCatalogRevision: `sha256_${'0'.repeat(64)}` }), /catalog_stale/);
-    assert.throws(() => resolveFunctionModelDispatch({ ...sources, athenaAvailable: false }, 'treatment_reasoning'), /provider_unavailable/);
+    assert.throws(() => resolveFunctionModelDispatch({ ...sources, athenaAvailable: false }, 'treatment_reasoning'), /Non disponibile/);
     for (const status of ['degraded', 'revoked']) {
         const unavailable = { ...sources, ollamaLifecycle: { status: 'available', record: { lifecycle: { provider: 'ollama', credentialClass: 'local_model', status } } } };
         assert.throws(() => resolveFunctionModelDispatch(unavailable, 'smart_import'), /provider_unavailable/);
@@ -121,7 +121,7 @@ test('SQLite preset preview/apply/reread is atomic, idempotent and durable acros
         const before = service.read(); const command = preset(readSources(), 'all_off');
         const preview = service.preview(command); assert.equal(preview.writesPerformed, 0); assert.deepEqual(service.read(), before);
         const applied = service.apply(command); assert.deepEqual(service.read(), applied); assert.deepEqual(service.apply(command), applied);
-        assert.ok(applied.functions.every(row => !row.enabled));
+        assert.ok(applied.functions.every(row => row.id === 'treatment_reasoning' ? row.enabled : !row.enabled));
         const child = spawnSync(process.execPath, ['scripts/run-strip-types.mjs', '--input-type=module', '-e',
             `import Database from 'better-sqlite3'; import {readFunctionModelPreferences} from './lib/ai-providers/fabric/function-model-preferences.ts';
             const db=new Database(${JSON.stringify(file)},{readonly:true});
@@ -129,7 +129,7 @@ test('SQLite preset preview/apply/reread is atomic, idempotent and durable acros
             process.stdout.write(JSON.stringify(readFunctionModelPreferences({...${JSON.stringify(source)},settings})));db.close();`], { encoding: 'utf8' });
         assert.equal(child.status, 0, child.stderr); assert.deepEqual(JSON.parse(child.stdout), applied);
         const reset = preset(readSources(), 'host_defaults'); service.apply(reset);
-        assert.ok(service.read().functions.every(row => row.defaultSource === 'host_configuration' && !row.enabled));
+        assert.ok(service.read().functions.every(row => row.defaultSource === 'host_configuration' && (row.id === 'treatment_reasoning' ? row.enabled : !row.enabled)));
         // A failed reread rolls all writes back inside the same transaction.
         const rollbackService = createFunctionModelPreferencesService({ readSources, immediate: cb => database.transaction(cb).immediate(),
             writeSettings(writes) { for (const [key,value] of Object.entries(writes)) database.prepare('INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,value);
@@ -207,10 +207,10 @@ test('authenticated settings HTTP is bounded, read-only on GET/preview, and rech
     let authCalls = 0;
     const locked = createFunctionModelPreferencesHttp({ authenticate: async () => ++authCalls === 1 ? session : null, service });
     assert.equal((await locked.POST(post(command))).status, 401); assert.equal(writes, 0);
-    assert.equal((await handlers.POST(post(command))).status, 200); assert.equal(writes, 6);
+    assert.equal((await handlers.POST(post(command))).status, 200); assert.equal(writes, 5);
     const reread = await handlers.GET(new Request('http://localhost/api/settings/ai/functions'));
     assert.deepEqual(await reread.json(), service.read());
-    assert.equal((await handlers.POST(post(command))).status, 200); assert.equal(writes, 6);
+    assert.equal((await handlers.POST(post(command))).status, 200); assert.equal(writes, 5);
     authenticated = false; assert.equal((await handlers.GET(new Request('http://localhost/api/settings/ai/functions'))).status, 401);
 });
 
@@ -227,9 +227,9 @@ test('invalid explicit model roles and remote provider configuration do not fall
     assert.throws(() => resolveFunctionModelDispatch(remote, 'patient_insight'), /model_not_cataloged/);
 });
 
-test('all four functions can persist their admitted binding and disable independently', () => {
+test('the three available functions can persist their admitted binding and disable independently', () => {
     let sources = fixture();
-    for (const functionId of FUNCTION_MODEL_IDS) {
+    for (const functionId of FUNCTION_MODEL_IDS.filter(id => id !== 'treatment_reasoning')) {
         const row = readFunctionModelPreferences(sources).functions.find(item => item.id === functionId)!;
         const enabled = planFunctionModelUpdate(sources, setCommand(sources, { functionId, enabled: true, defaultModelOptionId: row.options[0].modelOptionId }));
         sources = { ...sources, settings: { ...sources.settings, ...enabled.writes } };
@@ -240,14 +240,10 @@ test('all four functions can persist their admitted binding and disable independ
     }
 });
 
-test('ATHENA named dispatch accepts only its dedicated binding and preserves terminal checks', async () => {
-    const sources = fixture(); let calls = 0;
-    const handler = createFunctionModelDispatch({ authenticate: async () => 'synthetic-session', readSources: () => sources })('treatment_reasoning', async () => {
-        const verify = captureFunctionModelTransportGuard('athena_mlx'); await verify(); calls++; await verify();
-        return Response.json({ apply: 'denied' });
-    });
-    const result = await handler(request()); assert.equal(result.status, 200); assert.equal(calls, 1);
-    assert.equal(result.headers.get('x-mediflow-model-source'), 'host_configuration');
+test('ATHENA dispatch denies even with its configured binding', async () => {
+const sources = fixture(); let calls=0;
+const handler=createFunctionModelDispatch({ authenticate:async()=> 'synthetic-session', readSources:()=>sources })('treatment_reasoning',async()=>{ calls++; return Response.json({}); });
+const response=await handler(request()); assert.equal(response.status,403); assert.equal((await response.json()).code,'treatment_reasoning_unavailable_in_release'); assert.equal(calls,0);
 });
 
 /* ordinary request streams; all session state is synthetic and process-local. */
@@ -337,28 +333,10 @@ test('HTTP reread checks owner again before publishing the response', async (t) 
 });
 
 
-test('activation-only v2 uses the authenticated HTTP owner and reauthentication before CAS/apply', async t => {
-    const session = issueSyntheticWebSession({ id: `synthetic-${randomUUID()}`, username: 'synthetic', role: 'admin' }, randomUUID());
-    t.after(() => retireSyntheticWebSession(session));
-    let sources: FunctionModelSources = { ...fixture(), athenaAvailable: false, athenaLifecycle: { status: 'denied' } };
-    sources = { ...sources, settings: { ...sources.settings, [FUNCTION_SWITCH_KEYS.treatment_reasoning]: 'disabled' } };
-    let writes = 0;
-    const service = createFunctionModelPreferencesService({ readSources: () => sources, immediate: fn => fn(), writeSettings(next) {
-        writes++; sources = { ...sources, settings: { ...sources.settings, ...next } };
-    } });
-    const dto = service.read('v2');
-    const command = { schemaVersion: 'mediflow.function-preferences-command.v2', commandId: randomUUID(), action: 'set_activation',
-        functionId: 'treatment_reasoning', enabled: true, expectedRevision: dto.revision, expectedCatalogRevision: dto.catalogRevision };
-    const request = () => new Request('http://localhost/api/settings/ai/functions', { method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-mediflow-function-preferences': '2' }, body: JSON.stringify(command) });
-    let authCalls = 0;
-    const revoked = createFunctionModelPreferencesHttp({ service, authenticate: async () => ++authCalls === 1 ? session : null });
-    assert.equal((await revoked.POST(request())).status, 401); assert.equal(writes, 0);
-    const allowed = createFunctionModelPreferencesHttp({ service, authenticate: async () => session });
-    assert.equal((await allowed.PREVIEW(request())).status, 200); assert.equal(writes, 0);
-    const reply = await allowed.POST(request()); assert.equal(reply.status, 200); assert.equal(writes, 1);
-    assert.equal((await reply.json()).functions.find((row: { id: string }) => row.id === 'treatment_reasoning').enabled, true);
-    assert.throws(() => resolveFunctionModelDispatch(sources, 'treatment_reasoning'), /provider_unavailable/u);
-    const stale = { ...command, commandId: randomUUID() };
-    assert.equal((await allowed.POST(new Request(request(), { body: JSON.stringify(stale) }))).status, 409); assert.equal(writes, 1);
+test('activation-only v2 denies Treatment Reasoning without writes', async t => {
+const f=httpFixture(t); const dto=f.service.read('v2');
+const command={schemaVersion:'mediflow.function-preferences-command.v2',commandId:randomUUID(),action:'set_activation',functionId:'treatment_reasoning',enabled:true,expectedRevision:dto.revision,expectedCatalogRevision:dto.catalogRevision};
+const handlers=createFunctionModelPreferencesHttp({service:f.service,authenticate:async()=>f.session});
+const request=()=>new Request('http://localhost/api/settings/ai/functions',{method:'POST',headers:{'content-type':'application/json','x-mediflow-function-preferences':'2'},body:JSON.stringify(command)});
+for(const handler of [handlers.PREVIEW,handlers.POST]) { const response=await handler(request()); assert.equal(response.status,403); assert.equal((await response.json()).code,'treatment_reasoning_unavailable_in_release'); } assert.equal(f.writes(),0);
 });

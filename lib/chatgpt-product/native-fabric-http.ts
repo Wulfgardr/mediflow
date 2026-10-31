@@ -1,4 +1,5 @@
 import 'server-only';
+import { AiFunctionUnavailableError } from '../ai-function-availability';
 import { requirePairedNativeSession } from '../security/paired-native-session';
 import * as native from '../security/native-inference-lifecycle';
 import { readBoundedJsonBody } from '../bounded-request-body';
@@ -63,6 +64,7 @@ export async function handleNativeFabricHttp(request: Request, operation: Operat
             return response;
         } finally { native.abortResourceUse(use); }
     } catch (error) {
+        if (error instanceof AiFunctionUnavailableError) return Response.json({ error: error.code, code: error.code }, { status: 403 });
         if (error instanceof FunctionModelError) return functionModelErrorResponse(error);
         const code = error instanceof ProductError ? error.code : 'unavailable';
         return Response.json({ code, error: 'Funzione locale non disponibile. Nessuna alternativa avviata.' },

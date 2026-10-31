@@ -1,3 +1,4 @@
+import * as availability from '../../lib/ai-function-availability.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mountContract, flatten, text } from '../settings/settings-presentation.test-support.ts';
@@ -9,7 +10,7 @@ function render(remote?: object, choice: object | null = null) {
         choice, loading: false, blocked: true, consumed: false, error: null, ...(remote ? { remote } : {}) };
     return mountContract('components/function-models/function-model-picker.tsx', 'FunctionModelPicker', { states: { 0: true },
         props: { picker: { client: { remote: {} }, view, active: true, functionId: 'document_synthesis', needsReprepare: false } },
-        imports: { '@/components/choice-field': { ChoiceField: (props: Record<string, unknown>) => ({ type: 'select', props }) },
+        imports: { '@/lib/ai-function-availability': availability, '@/components/choice-field': { ChoiceField: (props: Record<string, unknown>) => ({ type: 'select', props }) },
             '@/lib/ai-lane-kill-switch': { isAiLaneEnabledValue: (v: unknown) => v === 'enabled' },
             '@/lib/function-models/browser': { providerName }, '@/components/security-provider': {}, '@/lib/function-models/preview-client': {},
             '@/components/settings/settings-ui': { SETTINGS_SECONDARY_BUTTON_CLASS: '' }, '../treatment-reasoning-portable-setup': {} },

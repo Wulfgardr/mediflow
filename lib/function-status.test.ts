@@ -13,7 +13,7 @@ const row = (input: FunctionStatusSources, id: string) => buildFunctionStatus(in
 test('a complete configuration never becomes an observed clinical execution', () => {
     const result = buildFunctionStatus(sources, time);
     assert.deepEqual(result.functions.map(item => item.id), FUNCTION_IDS);
-    assert.ok(result.functions.every(item => item.state === 'unverified' && item.lastExecutionAt === null));
+    assert.ok(result.functions.every(item => item.state === (item.id === 'treatment_reasoning' ? 'unavailable' : 'unverified') && item.lastExecutionAt === null));
     assert.equal(result.check, 'configuration_only');
     assert.deepEqual(parseFunctionStatus(JSON.parse(JSON.stringify(result))), result);
 });
@@ -24,7 +24,7 @@ test('off overrides provider configuration; missing and revoked providers stay d
         assert.equal(row({ ...sources, ollamaLifecycle: lifecycle }, 'smart_import').state, 'blocked');
     }
     assert.equal(row({ ...sources, clinicalBinding: { state: 'invalid', model: null } }, 'document_synthesis').state, 'needs_setup');
-    assert.equal(row({ ...sources, athenaArtifact: false }, 'treatment_reasoning').state, 'needs_setup');
+    assert.equal(row({ ...sources, athenaArtifact: false }, 'treatment_reasoning').state, 'unavailable');
 });
 test('OCR platform support and WHO configuration do not imply successful probes', () => {
     assert.equal(row({ ...sources, platform: 'linux' }, 'document_ocr').state, 'manual');

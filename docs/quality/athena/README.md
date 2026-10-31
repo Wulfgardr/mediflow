@@ -1,7 +1,7 @@
-# Banco sintetico ATHENA I-3b/I-7
+# Banco sintetico ATHENA, rinviato oltre la 0.9.1
 
 Corpus e soglie **approvati da Leonardo il 30/10/2026**. ADR 0166 resta Proposed.
-Nessuna misura clinica è stata eseguita su questo corpus. I casi sono inventati,
+Le misure sintetiche storiche non qualificano la funzione. I casi sono inventati,
 non derivano da cartelle reali e non sono un holdout cieco: sono visibili nel repo.
 
 ## Corpus approvato
@@ -123,3 +123,31 @@ invariato. I pesi, il corpus, il decoding e le soglie restano invariati.
 Il primo rapporto conserva valore storico e non viene sovrascritto. I nuovi
 esiti sono nel dossier del secondo giro collegato dal registro intelligence.
 ADR 0166 resta Proposed; nessun diniego identico accetta l'equivalenza.
+
+## Decisione del 30 ottobre 2026
+
+ATHENA e Treatment Reasoning escono dalla 0.9.1; I-3, I-3b e I-7 non sono
+requisiti di release. Il corpus e tutte le 18 soglie restano approvati e
+invariati. I due giri storici falliscono 10 soglie su 18 ciascuno; il replay
+deterministico successivo nega 32/32 risposte, zero estratti e zero nuove
+invocazioni. La revisione umana dei grezzi resta da svolgere (0/32).
+Il nuovo prompt libero non è stato misurato. Nessuna equivalenza dimostrata.
+
+La [PR #747](https://github.com/Wulfgardr/mediflow/pull/747) è chiusa e non
+entra; il ramo `codex/athena-two-step` resta recuperabile. ADR 0166 resta
+Proposed e descrive le tre opzioni per una ripresa. Il progetto ATHENA
+originale vieta l'uso per la cura diretta dei pazienti. Le istruzioni di
+esecuzione sopra sono conservate per una futura ripresa autorizzata.
+
+## Verifica del prodotto sul sorgente del 30 ottobre 2026
+
+Il blocco di release è implementato nei confini di esecuzione locali,
+portabili e ChatGPT, anche con interruttore salvato attivo e modello presente.
+Il catalogo terapeutico segnala indisponibilità; Web e GPUI conservano in sola
+lettura la configurazione salvata senza offrire attivazione o disattivazione.
+Il salvataggio AI comune non riscrive l'interruttore terapeutico.
+
+W-8 resta in attesa dell'accettazione sulle superfici. Il campo
+`runtimeUnavailabilityVerified` resta false: il blocco implementato e i test
+sintetici non sostituiscono l'accettazione Web e GPUI. Nessuna prova su
+archivio clinico o inferenza eseguita.

@@ -26,7 +26,7 @@ const initialSettings = {
     documentRouterControlFlow: 'active', aiInsightMode: 'manual',
     aiInsightManualConfig: JSON.stringify({ maxDocuments: 7, maxDocumentSummaryChars: 300, maxDocumentContextChars: 2400, outputMaxTokens: 600 }),
     aiPatientInsightKillSwitch: 'disabled', aiDocumentSynthesisKillSwitch: 'disabled',
-    aiSmartImportKillSwitch: 'disabled', aiTreatmentReasoningKillSwitch: 'disabled',
+    aiSmartImportKillSwitch: 'disabled', aiTreatmentReasoningKillSwitch: 'enabled',
 };
 
 function harness(events: EventTarget) {
@@ -92,7 +92,9 @@ async function scenario(t: TestContext, failure?: { key: string; status: number;
     t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, options?: RequestInit) => {
         const url = String(input);
         if (url === '/api/settings' && options?.method === 'POST') {
-            const row = JSON.parse(String(options.body)); writes.push(row); settings.set(row.key, row.value);
+            const row = JSON.parse(String(options.body));
+            assert.notEqual(row.key, 'aiTreatmentReasoningKillSwitch');
+            writes.push(row); settings.set(row.key, row.value);
             return Response.json(row);
         }
         assert.ok(url.startsWith('/api/settings/'), `Unexpected network: ${url}`);
@@ -139,6 +141,8 @@ test('successful reads preserve the stored mode and model configuration on save'
     await ready.saveAiConfig();
     assert.equal(fixture.settings.get('documentRouterControlFlow'), 'active');
     assert.equal(fixture.settings.get('aiModel_clinical'), 'synthetic:clinical');
+    assert.equal(fixture.settings.get('aiTreatmentReasoningKillSwitch'), 'enabled');
+    assert.ok(fixture.writes.some(row => row.key === 'aiInsightManualConfig'));
     assert.equal(fixture.toasts.at(-1)?.tone, 'success');
 });
 

@@ -19,7 +19,7 @@ test('catalog is lazy; strict DTO excludes remote options and execution claims',
     const remote = dto(); (remote.functions[0].options[0] as { provider: string }).provider = 'chatgpt'; assert.throws(() => parsePreferences(remote));
     assert.throws(() => parsePreferences({ ...dto(), check: 'live' })); assert.throws(() => parsePreferences({ ...dto(), functions: [] }));
 });
-for (const id of ['patient_insight','smart_import','document_synthesis','treatment_reasoning'] as const) test(`${id}: override only on matching preview; joint catalog and ID; once only`, async () => {
+for (const id of ['patient_insight','smart_import','document_synthesis'] as const) test(`${id}: override only on matching preview; joint catalog and ID; once only`, async () => {
     const { client, calls } = fixture(id); await client.read(); client.choose(optionId('b')); const token = await client.begin();
     await client.fetch(`/api/ai/${id.replaceAll('_','-')}/ingest`, { method: 'POST', headers: { 'x-mediflow-function-model': 'must-strip' }, body: '{}' });
     assert.equal(new Headers(calls.at(-1)!.init!.headers).has('x-mediflow-function-model'), false);
@@ -108,4 +108,14 @@ test('a successful reread after failure still requires a new explicit model deci
     client.reset(true); await client.read(); client.choose(optionId('b')); healthy = false; await client.read();
     healthy = true; await client.read(); assert.equal(client.getSnapshot().blocked, true); assert.equal(client.getSnapshot().choice, null);
     await assert.rejects(client.begin()); client.choose(''); assert.equal(client.getSnapshot().blocked, false); await client.begin();
+});
+
+test('treatment_reasoning: enabled salvato nega begin e preview senza trasporto', async () => {
+    const { client, calls } = fixture('treatment_reasoning');
+    await client.read(); client.choose(optionId('b'));
+    const before = calls.length;
+    await assert.rejects(client.begin(), { name: 'AiFunctionUnavailableError', message: 'Non disponibile in questa versione' });
+    await assert.rejects(client.fetch('/api/ai/treatment-reasoning/preview', { method: 'POST', body: '{}' }), { message: 'stale' });
+    assert.equal(calls.length, before);
+    assert.ok(calls.every(call => call.path.includes('/settings/')));
 });

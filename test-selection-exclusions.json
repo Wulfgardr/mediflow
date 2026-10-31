@@ -50,8 +50,13 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "e2e/fixtures/treatment-reasoning-denial.ts",
+    "reason": "Fixture sintetica con seed e asserzioni condivise, consumata dalle spec selezionate treatment-proposal-composition, treatment-reasoning-fabric-review, treatment-reasoning-kill-switch e ordinary-chatgpt-four-functions; nessuna registrazione autonoma di test.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "e2e/fixtures/treatment-reasoning.ts",
-    "reason": "Synthetic catalog, publication and patient factories consumed by treatment-proposal-composition.spec.ts and treatment-reasoning-fabric-review.spec.ts; no standalone test registration.",
+    "reason": "Synthetic patient and therapy factories consumed by e2e/fixtures/treatment-reasoning-denial.ts; no standalone test registration.",
     "owner": "@Wulfgardr"
   },
   {

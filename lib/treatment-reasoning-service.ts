@@ -1,3 +1,4 @@
+import { assertFunctionAvailableInRelease } from './ai-function-availability';
 import { AIService, type AIStats, type ChatMessage } from './ai-service';
 import { ATHENA_R1_QWEN3_8B_MODEL_ID } from './athena-model-identity';
 import {
@@ -179,6 +180,8 @@ export async function generateTreatmentReasoningDraftFromContext(
     ai: TreatmentReasoningAiRuntime,
     options: Pick<GenerateTreatmentReasoningOptions, 'signal' | 'maxTokens'> = {},
 ): Promise<TreatmentReasoningDraft> {
+    assertFunctionAvailableInRelease('treatment_reasoning');
+
     if (context.sources.length === 0) {
         throw new Error('Nessuna sorgente disponibile per il ragionamento terapeutico');
     }
@@ -216,6 +219,8 @@ export async function generatePatientTreatmentReasoningDraft(
     options: GenerateTreatmentReasoningOptions = {},
     deps: TreatmentReasoningServiceDeps = {},
 ): Promise<TreatmentReasoningDraft> {
+    assertFunctionAvailableInRelease('treatment_reasoning');
+
     const killSwitchValue = deps.getKillSwitchValue
         ? await deps.getKillSwitchValue()
         : await defaultGetKillSwitchValue();
