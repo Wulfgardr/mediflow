@@ -425,6 +425,13 @@ impl ClinicalApp {
             }
             let result = worker_session
                 .patient_document_execute(&worker_scope, &stage.command_id, &pin, &original.bytes)
+                .or_else(|_| {
+                    worker_session.patient_document_recover(
+                        &worker_scope,
+                        &stage.command_id,
+                        PatientDocumentOperation::Receipt,
+                    )
+                })
                 .ok();
             if let Some(result) = &result
                 && result.may_forget()
@@ -602,7 +609,7 @@ impl ClinicalApp {
                 !*opened && *resolution != ChatWriteResolution::Confirmed(ChatWriteOutcome::Retired)
             });
         Some(div().id("document-create-recovery").flex().flex_col().gap(px(8.)).p(px(16.))
-            .child(notice("document-create-recovery-warning", if unresolved { "Una lavorazione da PDF richiede verifica. Rileggi l’esito prima di creare un’altra scheda." } else { "Esiti verificati delle lavorazioni da PDF." }, self.theme, unresolved))
+            .child(notice("document-create-recovery-warning", if unresolved { "Una lavorazione da PDF richiede verifica. Rileggi l’esito o ritirala prima di creare un’altra scheda." } else { "Esiti verificati delle lavorazioni da PDF." }, self.theme, unresolved))
             .children(outcomes.iter().map(|(id,(resolution,opened))|notice(format!("document-create-recovery-{id}"),format!("Comando {id}. {}",readback_message(Some(&PatientDocumentReadback{resolution:*resolution,attachment_opened:*opened}))),self.theme,!*opened && *resolution != ChatWriteResolution::Confirmed(ChatWriteOutcome::Retired))))
             .when(storage_error,|el|el.child(notice("document-create-storage-error","Problema di conservazione dei riferimenti. Non eliminare i comandi da verificare.",self.theme,true)))
             .child(button("document-create-reread","Rileggi esito e allegato",self.theme,false,!self.patient_document.recovery_busy).on_click(cx.listener(|this,_,_,cx|this.reread_patient_documents(false,cx))))
@@ -699,7 +706,7 @@ fn readback_message(result: Option<&PatientDocumentReadback>) -> &'static str {
             "La scrittura risulta applicata, ma l’allegato non si apre o non corrisponde. Verifica incompleta. Il riferimento resta conservato."
         }
         Some(r) if r.resolution == ChatWriteResolution::Confirmed(ChatWriteOutcome::Retired) => {
-            "Ritiro confermato. Nessuna scheda creata."
+            "Ritiro confermato. Nessuna scheda creata. Puoi scegliere di nuovo il PDF e riprovare."
         }
         _ => "Esito da verificare. Non ripetere la creazione. Il riferimento resta conservato.",
     }
@@ -758,6 +765,86 @@ mod tests {
             .editor
             .update(cx, |input, cx| input.set_content("2468", cx));
     }
+    #[gpui::test]
+    fn execute_denial_releases_the_deposit_only_after_authoritative_retirement(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use serde_json::json;
+        for outcome in ["retired", "unknown"] {
+            let host = super::super::notes_recovery_tests::Host::new();
+            let route = "POST /api/auth/native/patient-document";
+            host.plan(route)
+                .send((200, json!({"commandId":ID,"status":"preview"})))
+                .unwrap();
+            host.plan(route)
+                .send((403, json!({"status":"denied"})))
+                .unwrap();
+            host.plan(route)
+                .send((200, json!({"outcome":outcome})))
+                .unwrap();
+            let (app, cx) =
+                cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+            let directory = std::env::temp_dir().canonicalize().unwrap().join(format!(
+                "mf-document-denied-{}-{}-{outcome}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            app.update(cx, |app, cx| {
+                seed(app, &host.session, Phase::Preview, cx);
+                app.patient_document.references = CommandReferences::new(Some(directory.clone()));
+                app.patient_document
+                    .references
+                    .for_session(&host.session)
+                    .remember(ID)
+                    .unwrap();
+                app.patient_document
+                    .pin
+                    .editor
+                    .update(cx, |input, cx| input.set_content("0000", cx));
+                app.execute_patient_document(cx);
+            });
+            cx.run_until_parked();
+            app.update(cx, |app, cx| {
+                let work = app.patient_document.work.as_ref().unwrap();
+                assert_eq!(work.phase, Phase::Outcome);
+                assert!(work.stage.is_none() && work.original.is_none());
+                assert!(
+                    app.patient_document.fields.iter().all(|f| f
+                        .editor
+                        .read(cx)
+                        .value()
+                        .is_empty())
+                );
+                assert!(app.patient_document.pin.editor.read(cx).value().is_empty());
+                let pending = app
+                    .patient_document
+                    .references
+                    .for_session(&host.session)
+                    .pending()
+                    .unwrap();
+                if outcome == "retired" {
+                    assert!(pending.is_empty());
+                    assert!(work.message.contains("riprovare"));
+                } else {
+                    assert_eq!(pending, [ID]);
+                    assert!(work.message.contains("Esito da verificare"));
+                }
+                app.patient_document.work = None;
+                app.open_patient_document(cx);
+                assert_eq!(app.patient_document.work.is_some(), outcome == "retired");
+                app.patient_document.detach(cx);
+            });
+            assert_eq!(
+                host.routes().iter().filter(|r| r.as_str() == route).count(),
+                3
+            );
+            std::fs::remove_dir_all(directory).unwrap();
+        }
+    }
+
     #[gpui::test]
     fn every_phase_withdrawal_clears_pdf_text_pin_and_fields_but_keeps_unresolved_reference(
         cx: &mut gpui::TestAppContext,

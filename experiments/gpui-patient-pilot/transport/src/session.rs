@@ -987,7 +987,7 @@ impl RuntimeSession {
         scope: Option<&str>,
         body: Option<&Value>,
         mutation: bool,
-        limit: usize,
+        limit: impl Into<crate::http::JsonLimits>,
     ) -> Result<Value> {
         self.request_with_profile_intent(method, path, query, scope, body, mutation, limit, None)
     }
@@ -1001,7 +1001,7 @@ impl RuntimeSession {
         scope: Option<&str>,
         body: Option<&Value>,
         mutation: bool,
-        limit: usize,
+        limit: impl Into<crate::http::JsonLimits>,
         intent: Option<&ProfileQueryIntent>,
     ) -> Result<Value> {
         self.ensure_open()?;

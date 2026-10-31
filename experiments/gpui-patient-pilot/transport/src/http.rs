@@ -13,6 +13,19 @@ use zeroize::{Zeroize, Zeroizing};
 
 pub(crate) const JSON_LIMIT: usize = 8 * 1024 * 1024;
 pub(crate) const DOCUMENT_LIMIT: usize = 24 * 1024 * 1024;
+#[derive(Clone, Copy)]
+pub(crate) struct JsonLimits {
+    pub request: usize,
+    pub response: usize,
+}
+impl From<usize> for JsonLimits {
+    fn from(limit: usize) -> Self {
+        Self {
+            request: limit,
+            response: limit,
+        }
+    }
+}
 const AUTH_LIMIT: usize = 64 * 1024;
 
 #[derive(Clone)]
@@ -238,15 +251,16 @@ impl RuntimeClient {
         cookie: &str,
         body: Option<&Value>,
         mutation: bool,
-        limit: usize,
+        limit: impl Into<JsonLimits>,
         archive_generation: Option<&str>,
     ) -> Result<Value> {
+        let limits = limit.into();
         let encoded = body
             .map(serde_json::to_vec)
             .transpose()
             .map_err(|_| RuntimeError::InvalidInput)?
             .map(Zeroizing::new);
-        if encoded.as_ref().is_some_and(|v| v.len() > limit) {
+        if encoded.as_ref().is_some_and(|v| v.len() > limits.request) {
             return Err(RuntimeError::TooLarge);
         }
         let response = self.raw(
@@ -258,7 +272,7 @@ impl RuntimeClient {
             Some(cookie),
             encoded.as_deref().map(Vec::as_slice),
             mutation,
-            limit,
+            limits.response,
             archive_generation,
         )?;
         if response.body.is_empty() {
@@ -334,7 +348,7 @@ impl RuntimeClient {
                 if let Some(body) = body {
                     request = request
                         .header("content-type", "application/json")
-                        .body(body.to_owned());
+                        .body(bytes::Bytes::from_owner(Zeroizing::new(body.to_owned())));
                 }
                 let response = request.send().await.map_err(|_| uncertain(mutation))?;
                 let status = response.status().as_u16();

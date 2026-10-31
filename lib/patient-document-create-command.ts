@@ -7,7 +7,7 @@ import { ambulatories, attachments, auditEvents, patients, patientsToAmbulatorie
 import { activePatients } from './patient-lifecycle';
 import { assertArchiveGeneration } from './archive-generation';
 import { createHostAttachmentCurrentness } from './attachment-currentness-host';
-import { createNativeChatWriteApprovals } from './native-chat-write-approval';
+import { createNativeChatWriteApprovals, NativeChatWriteDenied } from './native-chat-write-approval';
 import { normalizePatientCreateInput } from './patient-write-normalization';
 import { writeAuditEventInTransaction } from './security/audit';
 import { COMMAND_UUID } from './therapy-status-command-contract';
@@ -47,7 +47,8 @@ type Command = Readonly<{
 export class PatientDocumentDuplicateReviewRequired extends Error {
     constructor() { super('Possible duplicate: review the separate creation choice'); }
 }
-const deny = (): never => { throw new Error('Patient document create denied'); };
+class PatientDocumentCreateDenied extends Error {}
+const deny = (): never => { throw new PatientDocumentCreateDenied('Patient document create denied'); };
 const sealed = (value: unknown): value is string => typeof value === 'string' && /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/u.test(value);
 function snapshot(port: PatientDocumentSourcePort, tx: Tx, host: PatientDocumentCreateHost): PreparedPatientDocument {
     if (port.session !== host.session || port.ambulatoryId !== host.ambulatoryId) return deny();
@@ -179,10 +180,11 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
             const known = database.transaction(tx => { admit(tx, host); return receipt(tx, host, commandId); }, { behavior: 'immediate' });
             if (known.outcome !== 'unknown') return known;
             const preview = approvals.consume(commandId, { session: host.session, scope: host.ambulatoryId });
+            let terminal = false;
             try {
                 approvals.check(preview);
                 if (!await host.confirm(pin)) return deny();
-                return database.transaction(tx => {
+                const result = database.transaction(tx => {
                     admit(tx, host);
                     const known = receipt(tx, host, commandId);
                     if (known.outcome !== 'unknown') return known;
@@ -218,7 +220,24 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
                     approvals.check(preview);
                     return { outcome: 'applied' as const };
                 }, { behavior: 'immediate' });
-            } finally { approvals.finish(commandId); pending.get(commandId)?.release(); }
+                terminal = true;
+                return result;
+            } catch (error) {
+                if (error instanceof PatientDocumentCreateDenied || error instanceof NativeChatWriteDenied) {
+                    try {
+                        database.transaction(tx => {
+                            admit(tx, host);
+                            if (receipt(tx, host, commandId).outcome === 'unknown') audit(tx, host, commandId);
+                            admit(tx, host);
+                        }, { behavior: 'immediate' });
+                        terminal = true;
+                    } catch { /* A failed terminal write must remain recoverable through revoke. */ }
+                }
+                throw error;
+            } finally {
+                approvals.finish(commandId);
+                if (terminal) pending.get(commandId)?.release();
+            }
         },
         revoke(host: PatientDocumentCreateHost, commandId: string) {
             return database.transaction(tx => {
