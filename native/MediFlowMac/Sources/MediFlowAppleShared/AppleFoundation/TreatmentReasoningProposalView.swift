@@ -14,8 +14,9 @@ struct TreatmentReasoningProposalView: View {
                 HStack(spacing: 8) {
                     Circle().stroke(PlatformColors.pencil, lineWidth: 1.5).frame(width: 10, height: 10)
                         .accessibilityHidden(true)
-                    Text("Proposta").inkRegister(weight: .semibold).foregroundStyle(PlatformColors.pencil)
+                    Text("Proposta conservata in sola lettura").inkRegister(weight: .semibold).foregroundStyle(PlatformColors.pencil)
                 }
+                Text(NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.safeReason).chartMetadata()
                 Text("Da verificare sulle fonti. Nessuna modifica alla cartella.").chartMetadata()
             }
             .padding(.vertical, 16)

@@ -27,7 +27,13 @@ struct NativeSmartImportView: View {
 }
 struct NativeTreatmentReasoningView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
-    var body: some View { NativeFabricExperience(workspaceModel: workspaceModel, function: .treatmentReasoning) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(NativeOrdinaryFunction.treatmentReasoning.title).chartGroupHeading()
+            Text(NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.safeReason)
+                .accessibilityIdentifier("clinical-workspace-treatment_reasoning-status")
+        }
+    }
 }
 struct NativeDocumentSynthesisView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
