@@ -12,7 +12,8 @@ mkdir -p "$OUT_DIR"
 
 MEDIFLOW_DATA_DIR="$DATA_DIR" MEDIFLOW_E2E_DATA_DIR="$DATA_DIR" node "$ROOT_DIR/scripts/prepare-e2e-db.mjs"
 
-DATA_DIR="$DATA_DIR" node --input-type=module <<'NODE'
+DATA_DIR="$DATA_DIR" OUT_DIR="$OUT_DIR" node --input-type=module <<'NODE'
+import fs from 'node:fs';
 import Database from 'better-sqlite3';
 import path from 'path';
 
@@ -34,9 +35,11 @@ db.prepare(`
   version: 1,
   config: {
     enabled: true,
+    volumeProtectionAcknowledged: true,
+    volumeProtectionIdentity: `${fs.realpathSync(process.env.OUT_DIR)}:${fs.statSync(process.env.OUT_DIR).dev}`,
     hour: 2,
     minute: 0,
-    destinationDir: path.join(dataDir, 'backups'),
+    destinationDir: process.env.OUT_DIR,
     retentionKeepArtifacts: 1,
   },
   run: { lastRetentionAt: '2026-01-01T00:00:00.000Z', lastRetentionDeletedCount: 7, lastRetentionDeletedBytes: 123, lastRetentionMode: 'manual' },

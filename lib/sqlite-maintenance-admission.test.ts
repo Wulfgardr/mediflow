@@ -1,3 +1,4 @@
+import { prepareSyntheticBackupDestination } from './scheduled-backup.test-support.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -576,6 +577,7 @@ function schedulerFixture() {
         config: { enabled: true, destinationDir: path.join(f.dir, 'backups') }, run: { lastRunStatus: null },
     }));
     db.close();
+    prepareSyntheticBackupDestination(f.dir, path.join(f.dir, 'backups'));
     return f;
 }
 
@@ -654,7 +656,7 @@ test('scheduler admission denial never reaches its error-path writer or changes 
             assert.match(w.output(), /SQLITE_MAINTENANCE_HOLD: maintenance_pending/);
             assert.match(w.output(), /NATIVE_HANDLES:\{"opened":0,"closed":0,"stillOpen":0\}/);
             assert.deepEqual(fs.readFileSync(f.target), before);
-            assert.equal(fs.existsSync(path.join(f.dir, 'backups')), false);
+            assert.deepEqual(fs.readdirSync(path.join(f.dir, 'backups')), []);
             assert.deepEqual(fs.readdirSync(path.join(store(f.target), 'leases')), []);
         });
     } finally { f.cleanup(); }
@@ -664,7 +666,10 @@ for (const fault of ['destination-file', 'missing-settings']) {
     test(`scheduler ${fault} closes the initial native handle without a second open`, async () => {
         const f = schedulerFixture();
         try {
-            if (fault === 'destination-file') fs.writeFileSync(path.join(f.dir, 'backups'), 'synthetic obstruction');
+            if (fault === 'destination-file') {
+                fs.rmdirSync(path.join(f.dir, 'backups'));
+                fs.writeFileSync(path.join(f.dir, 'backups'), 'synthetic obstruction');
+            }
             else { const db = new Database(f.target); db.exec('DROP TABLE settings'); db.close(); }
             const w = schedulerChild(f.dir);
             assert.equal(await w.terminal, 1, w.output());

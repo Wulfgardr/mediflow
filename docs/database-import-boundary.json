@@ -480,7 +480,8 @@
       "capability": "server:lib/db-server.ts",
       "form": "import",
       "symbols": [
-        "dbServer"
+        "dbServer",
+        "runDbServerImmediateTransaction"
       ],
       "count": 1,
       "classification": "legacy-node-http"

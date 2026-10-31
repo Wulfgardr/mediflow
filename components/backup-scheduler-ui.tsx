@@ -1,5 +1,6 @@
 'use client';
 
+import { VOLUME_ACKNOWLEDGEMENT } from '@/scripts/backup-destination-policy-text';
 import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle, FolderArchive, RefreshCw, Save } from 'lucide-react';
@@ -14,12 +15,14 @@ type BackupSchedulerResponse = {
     observationMessage?: string;
     plistPath: string | null;
     state: {
+        revision: string;
         config: {
             enabled: boolean;
             hour: number;
             minute: number;
             destinationDir: string;
             retentionKeepArtifacts: number;
+            volumeProtectionAcknowledged?: boolean;
         };
         run: {
             lastRunAt: string | null;
@@ -72,19 +75,24 @@ export default function BackupSchedulerUI({ primary = true }: { primary?: boolea
     const [isPreviewingRetention, setIsPreviewingRetention] = useState(false);
     const [isApplyingRetention, setIsApplyingRetention] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+    const [volumeAcknowledged, setVolumeAcknowledged] = useState(false);
+    const [conflicted, setConflicted] = useState(false);
     const [enabled, setEnabled] = useState(false);
     const [time, setTime] = useState('02:00');
     const [destinationDir, setDestinationDir] = useState('');
     const [retentionKeepArtifacts, setRetentionKeepArtifacts] = useState(14);
     const [retentionPreview, setRetentionPreview] = useState<BackupRetentionPreview | null>(null);
 
-    const load = async () => {
+    const load = async (preserveDraft = false) => {
         setIsLoading(true);
         try {
             const response = await fetch('/api/system/backup-scheduler', { cache: 'no-store' });
             const payload = await response.json();
             if (!response.ok) throw new Error(payload?.error || 'Failed to load backup scheduler status.');
             setStatus(payload);
+            setConflicted(false);
+            if (preserveDraft) return;
+            setVolumeAcknowledged(false);
             setEnabled(Boolean(payload.state.config.enabled));
             setTime(toTimeValue(payload.state.config.hour, payload.state.config.minute));
             setDestinationDir(payload.state.config.destinationDir);
@@ -119,16 +127,23 @@ export default function BackupSchedulerUI({ primary = true }: { primary?: boolea
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'save',
+                    expectedRevision: status?.state.revision,
                     config: {
                         enabled,
                         hour: timeParts.hour,
                         minute: timeParts.minute,
                         destinationDir,
                         retentionKeepArtifacts,
+                        volumeProtectionAcknowledged: volumeAcknowledged,
                     },
                 }),
             });
             const payload = await response.json();
+            if (response.status === 409) {
+                setConflicted(true);
+                setMessage({ type: 'error', text: payload.error });
+                return;
+            }
             if (!response.ok) {
                 throw new Error(payload?.error || 'Esito non confermato. Rileggi lo stato prima di ripetere il salvataggio.');
             }
@@ -205,6 +220,7 @@ export default function BackupSchedulerUI({ primary = true }: { primary?: boolea
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'apply-retention',
+                    expectedRevision: status?.state.revision,
                     config: {
                         enabled,
                         hour: timeParts.hour,
@@ -293,7 +309,7 @@ export default function BackupSchedulerUI({ primary = true }: { primary?: boolea
                     <input
                         type="text"
                         value={destinationDir}
-                        onChange={(event) => setDestinationDir(event.target.value)}
+                        onChange={(event) => { setDestinationDir(event.target.value); setVolumeAcknowledged(false); }}
                         placeholder="Percorso assoluto della cartella backup"
                         className={INPUT_CLASS}
                     />
@@ -316,13 +332,18 @@ export default function BackupSchedulerUI({ primary = true }: { primary?: boolea
                 <p>La retention automatica e limitata ai file `mediflow-backup-v1-*.mediflow` e ai `.tmp` orfani nella cartella configurata. Nessun allegato clinico o file arbitrario viene toccato.</p>
             </Disclosure>
 
+            <label className="flex items-start gap-3 text-sm">
+                <input type="checkbox" checked={volumeAcknowledged} onChange={event => setVolumeAcknowledged(event.target.checked)} />
+                <span>{VOLUME_ACKNOWLEDGEMENT}</span>
+            </label>
+            <p className="text-sm">Scegli una cartella già esistente, locale e non sincronizzata. La destinazione e il volume vengono controllati dal server e a ogni esecuzione.</p>
             <div className={styles.backupActions}>
-                {status ? <button type="button" onClick={() => void load()} disabled={isLoading || isSaving || isRunning} className={SECONDARY_BUTTON_CLASS}>
+                {status ? <button type="button" onClick={() => void load(conflicted)} disabled={isLoading || isSaving || isRunning} className={SECONDARY_BUTTON_CLASS}>
                     <RefreshCw className="w-4 h-4" /> Rileggi stato
                 </button> : null}
                 <button
                     onClick={save}
-                    disabled={isSaving || isLoading || !status || status.installed === null || schedulingUnsupported}
+                    disabled={conflicted || isSaving || isLoading || !status || status.installed === null || schedulingUnsupported}
                     className={primary ? PRIMARY_BUTTON_CLASS : SECONDARY_BUTTON_CLASS}
                     data-backup-primary={primary || undefined}
                 >

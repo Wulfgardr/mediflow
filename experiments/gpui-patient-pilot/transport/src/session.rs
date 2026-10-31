@@ -9024,7 +9024,7 @@ mod g2_settings_tests {
     }
     fn backup_schedule_wire(enabled: bool, installed: Value) -> Value {
         json!({"supported":true,"installed":installed,"plistPath":null,"scheduleKind":"launchd",
-            "schedulePath":null,"state":{"version":1,"config":{"enabled":enabled,"hour":2,"minute":0,
+            "schedulePath":null,"state":{"version":1,"revision":"synthetic-revision","config":{"enabled":enabled,"hour":2,"minute":0,
             "destinationDir":std::env::temp_dir().join("synthetic-backups").to_string_lossy(),"retentionKeepArtifacts":14},"run":{"lastRunAt":null,
             "lastRunStatus":null,"lastRunMessage":"synthetic status ".repeat(6000),"lastArtifactPath":null,
             "lastRetentionAt":null,"lastRetentionDeletedCount":null,"lastRetentionDeletedBytes":null,"lastRetentionMode":null}}})
@@ -9037,6 +9037,7 @@ mod g2_settings_tests {
             "lost",
             "unconfirmed",
             "read-failed",
+            "post-conflict",
             "conflict",
             "replaced",
         ] {
@@ -9054,10 +9055,16 @@ mod g2_settings_tests {
                         steps.push(("GET", 200, before));
                         steps.push((
                             "POST",
-                            if outcome == "lost" { 0 } else { 200 },
+                            if outcome == "lost" {
+                                0
+                            } else if outcome == "post-conflict" {
+                                409
+                            } else {
+                                200
+                            },
                             backup_schedule_wire(true, json!(true)),
                         ));
-                        if outcome != "lost" {
+                        if outcome != "lost" && outcome != "post-conflict" {
                             steps.push((
                                 "GET",
                                 if outcome == "read-failed" { 500 } else { 200 },
@@ -9088,7 +9095,7 @@ mod g2_settings_tests {
                                 .unwrap();
                         assert_eq!(
                             body,
-                            json!({"action":"save","config":{"enabled":true,"hour":2,"minute":0,
+                            json!({"action":"save","expectedRevision":"synthetic-revision","config":{"enabled":true,"hour":2,"minute":0,"volumeProtectionAcknowledged":false,
                             "destinationDir":std::env::temp_dir().join("synthetic-backups").to_string_lossy(),"retentionKeepArtifacts":14}})
                         );
                     }
@@ -9112,7 +9119,9 @@ mod g2_settings_tests {
                 let result = access.apply_backup_schedule(&command);
                 match outcome {
                     "ok" => assert_eq!(result.unwrap().installed, Some(true)),
-                    "conflict" => assert!(matches!(result, Err(RuntimeError::Conflict))),
+                    "conflict" | "post-conflict" => {
+                        assert!(matches!(result, Err(RuntimeError::Conflict)))
+                    }
                     "replaced" => assert!(matches!(result, Err(RuntimeError::ArchiveReplaced))),
                     _ => assert!(matches!(result, Err(RuntimeError::Indeterminate))),
                 }

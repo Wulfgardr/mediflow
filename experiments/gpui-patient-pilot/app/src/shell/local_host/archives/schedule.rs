@@ -11,6 +11,8 @@ pub(super) struct ScheduleArea {
     fields: [Entity<TextInput>; 3],
     snapshot: Option<BackupScheduleStatus>,
     enabled: bool,
+    volume_acknowledged: bool,
+    conflicted: bool,
     operation: ScheduleOperation,
     message: Option<String>,
     _subscriptions: Vec<Subscription>,
@@ -31,6 +33,8 @@ impl ScheduleArea {
             fields,
             snapshot: None,
             enabled: false,
+            volume_acknowledged: false,
+            conflicted: false,
             operation: ScheduleOperation::Idle,
             message: None,
             _subscriptions: subscriptions,
@@ -42,6 +46,8 @@ impl ScheduleArea {
     pub(super) fn withdraw(&mut self, cx: &mut App) {
         self.snapshot = None;
         self.enabled = false;
+        self.volume_acknowledged = false;
+        self.conflicted = false;
         self.operation = ScheduleOperation::Idle;
         self.message = None;
         for field in &self.fields {
@@ -64,6 +70,7 @@ impl ScheduleArea {
             .config
             .clone();
         config.enabled = self.enabled;
+        config.volume_protection_acknowledged = self.volume_acknowledged;
         config.hour = self.fields[0]
             .read(cx)
             .value()
@@ -146,6 +153,14 @@ impl ClinicalApp {
             for field in &area.fields {
                 pane = pane.child(crate::text_input::themed(field.clone(), theme));
             }
+            pane = pane.child(text!("Il backup portabile contiene identificativi in chiaro. Se la cifratura non è verificabile da MediFlow, confermo di aver verificato che la destinazione è su un volume cifrato e di conservare separatamente la chiave di ripristino. La conferma non è una verifica di MediFlow."))
+                .child(button("backup-volume-acknowledgement", if area.volume_acknowledged { "Requisito del volume confermato" } else { "Confermo il requisito del volume cifrato" }, theme, true, available)
+                    .aria_selected(area.volume_acknowledged)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        let area = &mut this.local_host.archives.schedule;
+                        area.volume_acknowledged = !area.volume_acknowledged;
+                        cx.notify();
+                    })));
             pane = pane.child(
                 button(
                     "backup-schedule-prepare",
@@ -196,23 +211,28 @@ impl ClinicalApp {
         let Some(access) = self.local_host.access() else {
             return;
         };
+        let preserve_draft = self.local_host.archives.schedule.conflicted;
         self.local_host.archives.schedule.operation = ScheduleOperation::Reading;
         self.local_host.archives.schedule.snapshot = None;
         self.run_local_host(
             move || access.read_backup_schedule(),
-            |this, result, cx| {
+            move |this, result, cx| {
                 this.local_host.archives.schedule.operation = ScheduleOperation::Idle;
                 match result {
                     Ok(status) => {
                         let area = &mut this.local_host.archives.schedule;
-                        area.enabled = status.state.config.enabled;
-                        for (field, value) in area.fields.iter().zip([
-                            status.state.config.hour.to_string(),
-                            status.state.config.minute.to_string(),
-                            status.state.config.destination_dir.clone(),
-                        ]) {
-                            field.update(cx, |input, cx| input.set_content(value, cx));
+                        if !preserve_draft {
+                            area.volume_acknowledged = false;
+                            area.enabled = status.state.config.enabled;
+                            for (field, value) in area.fields.iter().zip([
+                                status.state.config.hour.to_string(),
+                                status.state.config.minute.to_string(),
+                                status.state.config.destination_dir.clone(),
+                            ]) {
+                                field.update(cx, |input, cx| input.set_content(value, cx));
+                            }
                         }
+                        area.conflicted = false;
                         area.snapshot = Some(status);
                         area.message = None;
                     }
@@ -275,13 +295,13 @@ impl ClinicalApp {
             return;
         };
         self.local_host.archives.schedule.operation = ScheduleOperation::Applying;
-        self.local_host.archives.schedule.snapshot = None;
         self.run_local_host(move || access.apply_backup_schedule(&command), |this, result, cx| {
             let area = &mut this.local_host.archives.schedule;
             area.operation = ScheduleOperation::Idle;
             area.message = Some(match result {
                 Ok(status) => { area.snapshot = Some(status); "Programmazione salvata e riletta dal sistema.".into() },
-                Err(error) => format!("{} Salvataggio non confermato. Nessun reinvio automatico: rileggi la programmazione prima di procedere.", ui_error(error)),
+                Err(error) => { area.conflicted = matches!(error, RuntimeError::Conflict);
+                    if !area.conflicted { area.snapshot = None; } format!("{} Bozza conservata. Salvataggio non confermato. Nessun reinvio automatico: rileggi la programmazione prima di procedere.", ui_error(error)) },
             });
             cx.notify();
         }, cx);
@@ -293,7 +313,7 @@ mod tests {
     use super::*;
     use serde_json::{Value, json};
     fn wire(enabled: bool, installed: Value) -> Value {
-        json!({"supported":true,"installed":installed,"state":{"version":1,"config":{
+        json!({"supported":true,"installed":installed,"state":{"version":1,"revision":"synthetic-revision","config":{
             "enabled":enabled,"hour":2,"minute":0,"destinationDir":std::env::temp_dir().join("synthetic-backups").to_string_lossy(),"retentionKeepArtifacts":14},
             "run":{"lastRunAt":null,"lastRunStatus":null,"lastRunMessage":null,"lastArtifactPath":null}}})
     }
@@ -410,6 +430,65 @@ mod tests {
             for field in &app.local_host.archives.schedule.fields {
                 assert!(field.read(cx).value().is_empty());
             }
+        });
+    }
+    #[gpui::test]
+    fn backup_schedule_post_conflict_preserves_draft_after_reread(cx: &mut gpui::TestAppContext) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, _| {
+            app.session = Some(host.session.clone());
+            app.area = Area::Settings;
+            app.settings_page = SettingsPage::Archives;
+            app.local_host.authority = Authority::Open(access);
+        });
+        plan(&host, "GET", 200, wire(false, json!(false)));
+        view.update(cx, |app, cx| app.read_backup_schedule(cx));
+        cx.run_until_parked();
+        plan(&host, "GET", 200, wire(false, json!(false)));
+        view.update(cx, |app, cx| {
+            app.local_host.archives.schedule.fields[0]
+                .update(cx, |input, cx| input.set_content("4".to_string(), cx));
+            app.prepare_backup_schedule(cx);
+        });
+        cx.run_until_parked();
+        plan(&host, "GET", 200, wire(false, json!(false)));
+        plan(
+            &host,
+            "POST",
+            409,
+            json!({"code":"backup_scheduler_conflict"}),
+        );
+        view.update(cx, |app, cx| app.confirm_backup_schedule(cx));
+        cx.run_until_parked();
+        view.read_with(cx, |app, cx| {
+            let area = &app.local_host.archives.schedule;
+            assert!(area.conflicted);
+            assert!(area.snapshot.is_some());
+            assert_eq!(area.fields[0].read(cx).value(), "4");
+        });
+        let mut newer = wire(false, json!(false));
+        newer["state"]["revision"] = json!("synthetic-newer-revision");
+        plan(&host, "GET", 200, newer);
+        view.update(cx, |app, cx| app.read_backup_schedule(cx));
+        cx.run_until_parked();
+        view.read_with(cx, |app, cx| {
+            let area = &app.local_host.archives.schedule;
+            assert_eq!(area.fields[0].read(cx).value(), "4");
+            assert_eq!(
+                area.snapshot.as_ref().unwrap().state.revision,
+                "synthetic-newer-revision"
+            );
+            assert!(!area.conflicted);
         });
     }
     #[gpui::test]
