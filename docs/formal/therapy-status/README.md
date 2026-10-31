@@ -8,7 +8,7 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 8 e i predecessori canonici 4, 5, 6 e 7; le 38 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 7 e i predecessori canonici 4, 5 e 6; le 31 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
 ## Raccordo PR #739 del 30 ottobre 2026: lettura degli allegati ENC2
 
@@ -641,7 +641,7 @@ nelle sorgenti fissate: consulta esclusivamente il registro locale `portable_imp
 cambiare le righe originali. Il ripristino assegna la provenienza solo alle
 righe nuove nella stessa transazione. I marcatori del file restano storia:
 non riclassificano righe locali, neppure dopo il percorso A → B → A. La
-migrazione allo schema 8 fissa come non attestate le righe preesistenti non
+migrazione allo schema 7 fissa come non attestate le righe preesistenti non
 indicizzate soltanto negli archivi con ricevuta portabile o traccia legacy
 di ripristino. Non ricostruisce l’origine dai riferimenti dei marcatori.
 La conservazione nel vero owner trasferisce anche indice ed eventi necessari
@@ -652,7 +652,7 @@ migrazioni. Il nuovo vincolo del controller durevole è coperto dai test del
 client, della conferma e da un vero ripristino di ledger ostile, incluso il
 caso di 650 audit importati con budget di lettura locale separato. Tale
 prova entra nel gruppo `code-current` del verificatore insieme alla migrazione
-6/7 → 8 e al suo rollback, insieme ai 19 casi del vero owner. Le prove HTTP su due server e l’aggiornamento da
+6 → 7 e al suo rollback, insieme ai 19 casi del vero owner. Le prove HTTP su due server e l’aggiornamento da
 v0.9.0 restano evidenze separate dal modello. Modello, invarianti,
 assunzioni, mutanti e testimoni legacy restano invariati. Le impronte vengono
 aggiornate dopo questo confronto; `verify:therapy-status` deve ancora

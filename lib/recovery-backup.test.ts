@@ -343,20 +343,18 @@ test('GPUI and Web share the authenticated recovery envelope golden', async () =
     assert.deepEqual(Buffer.from(decrypted), Buffer.from(golden.database, 'base64'));
 });
 
-for (const alteration of ['none', 'column', 'index', 'view', 'authority-table']) for (const version of [6, 7]) test(`encrypted v${version} predecessor ${alteration} preserves its immutable schema contract`, async () => {
+for (const alteration of ['none', 'column', 'index', 'view', 'authority-table']) test(`encrypted v6 predecessor ${alteration} preserves its immutable schema contract`, async () => {
     const f = await fixture();
     try {
-        const file = path.join(f.root, `canonical${version}.db`); fs.writeFileSync(file, f.snapshot);
+        const file = path.join(f.root, 'canonical6.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
         old.exec('DROP TABLE synthetic_extension');
-        if (version === 6) old.exec('DROP TABLE portable_import_origins');
-        else old.exec('ALTER TABLE portable_import_origins DROP COLUMN origin');
-        old.pragma(`user_version=${version}`);
+        old.exec('DROP TABLE portable_import_origins');
+        old.pragma('user_version=6');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN drift TEXT');
         if (alteration === 'index') old.exec('CREATE INDEX drift ON therapies(status)');
         if (alteration === 'view') old.exec('CREATE VIEW drift AS SELECT id FROM therapies');
         if (alteration === 'authority-table') {
-            if (version === 7) old.exec('DROP TABLE portable_import_origins');
             old.exec('CREATE TABLE portable_import_origins (kind TEXT, ref TEXT, import_event_id TEXT)');
         }
         const expected = contents(old); old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE'); old.close();
@@ -368,10 +366,8 @@ for (const alteration of ['none', 'column', 'index', 'view', 'authority-table'])
                 assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
                 for (const table of ['users','patients','therapy_status_commands','ambulatory_destructive_commands']) assert.deepEqual(contents(restored)[table], expected[table]);
                 const origins = restored.prepare('SELECT * FROM portable_import_origins').all() as { kind: string; ref: string; origin: string; import_event_id: string }[];
-                const known = version === 7 ? expected.portable_import_origins as { kind: string; ref: string; import_event_id: string }[] : [];
-                for (const row of known) assert.deepEqual(origins.find(candidate => candidate.kind === row.kind && candidate.ref === row.ref), { ...row, origin: 'imported' });
                 const unknown = origins.filter(row => row.origin === 'unattested');
-                assert.equal(unknown.length, (expected.audit_events as unknown[]).length + (expected.therapy_status_commands as unknown[]).length - known.length);
+                assert.equal(unknown.length, (expected.audit_events as unknown[]).length + (expected.therapy_status_commands as unknown[]).length);
                 assertPredecessorAuditHistory(contents(restored).audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
             } finally { restored.close(); }
         }
