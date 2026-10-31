@@ -420,3 +420,31 @@ compatibile con lo stesso servizio. Lo schema dati non cambia. Una modifica
 con esito incerto va riletta prima di qualsiasi nuovo invio. Il downgrade
 del servizio richiede di considerare gli abbinamenti Windows/Linux che i
 parser precedenti non riconoscono.
+
+### Amministrazione dei repertori
+
+Impostazioni → Repertori usa la sessione dedicata `LocalHostAccess`, solo
+sull'host loopback. AIFA permette di rivedere un file locale e la provenienza
+prima dell'import multipart; il server valida il file e richiede una seconda
+conferma se riduce il catalogo. L'aggiornamento dalla fonte ufficiale richiede
+un gesto separato. Esenzioni e Protesica riusano anteprima, proof e commit Web;
+WHO riusa acquisizione e attivazione separate, senza import da file o clear.
+Le acquisizioni esterne non sono necessarie ai test, che usano solo fixture.
+
+Stato, ricevute e fonti sono riletti dopo il commit; una ricevuta conservata
+resta distinta da una rilettura fallita o da un catalogo cambiato nel frattempo.
+La chiusura dell'autorità ritira file, anteprime e snapshot. Le fonti Protesica
+possono fallire senza nascondere il conteggio del catalogo.
+
+Non è ancora parità completa dei pannelli Web: restano mappatura delle colonne,
+metadati aggiuntivi e gestione degli originali Protesica; configurazione,
+readiness e verifica del servizio WHO opzionale; controllo della pubblicazione
+remota e avanzamento/annullamento del download AIFA. Clear AIFA e rollback WHO
+restano esclusi dai comandi ordinari in attesa del raccordo amministrativo G-3d.
+I pannelli Controlli non sono implementati da questa estensione.
+
+Le risposte di `/api/exemptions/import/{status,preview,commit}`,
+`/api/prosthetics/catalog/{status,preview,commit,sources}` e `/api/icd/catalog`
+hanno un budget esplicito di 8 MiB nel trasporto dedicato. Il default delle altre
+route resta 64 KiB. I test includono risposte sintetiche oltre 64 KiB e le
+richieste mantengono i vincoli del servizio Web.
