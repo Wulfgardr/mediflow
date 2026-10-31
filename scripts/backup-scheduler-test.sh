@@ -9,6 +9,15 @@ OUT_DIR="$TMP_DIR/out"
 
 rm -rf "$TMP_DIR"
 mkdir -p "$OUT_DIR"
+PRELOAD=$(ROOT_DIR="$ROOT_DIR" TMP_DIR="$TMP_DIR" node --input-type=module <<'NODE'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const { createSyntheticBackupVolumePreload } = await import(pathToFileURL(path.join(process.env.ROOT_DIR, 'lib/scheduled-backup.test-support.ts')).href);
+console.log(createSyntheticBackupVolumePreload(process.env.TMP_DIR));
+NODE
+)
+export NODE_OPTIONS="${NODE_OPTIONS:-} --import=$PRELOAD"
+export MEDIFLOW_DATA_DIR="$DATA_DIR" MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1
 
 MEDIFLOW_DATA_DIR="$DATA_DIR" MEDIFLOW_E2E_DATA_DIR="$DATA_DIR" node "$ROOT_DIR/scripts/prepare-e2e-db.mjs"
 

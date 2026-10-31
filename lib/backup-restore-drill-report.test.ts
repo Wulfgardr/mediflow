@@ -1,3 +1,4 @@
+import { createSyntheticBackupVolumePreload } from './scheduled-backup.test-support.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -19,6 +20,7 @@ function runDrill(workDir: string, reportPath: string, options: { keep?: boolean
     for (const key of Object.keys(env)) {
         if (key.startsWith('MEDIFLOW_') || key.startsWith('NODE_TEST') || key === 'NODE_OPTIONS') delete env[key];
     }
+    env.NODE_OPTIONS = `--import=${createSyntheticBackupVolumePreload(path.dirname(workDir))}`;
     env.PATH = `${path.dirname(process.execPath)}${path.delimiter}${env.PATH || ''}`;
     if (options.callerDataDir) env.MEDIFLOW_DATA_DIR = options.callerDataDir;
     const result = spawnSync(process.execPath, [
@@ -106,6 +108,7 @@ test('the drill never lets the database preparer copy a database from the checko
     for (const key of Object.keys(env)) {
         if (key.startsWith('MEDIFLOW_') || key.startsWith('NODE_TEST') || key === 'NODE_OPTIONS') delete env[key];
     }
+    env.NODE_OPTIONS = `--import=${createSyntheticBackupVolumePreload(root)}`;
     env.PATH = `${bin}${path.delimiter}${env.PATH || ''}`;
     // The caller asks for the legacy copy; the drill must not pass that on.
     env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY = '0';
