@@ -1,5 +1,6 @@
 mod archives;
 mod chatgpt;
+mod controls;
 mod governance;
 mod models;
 mod parameters;
@@ -38,6 +39,7 @@ pub(super) struct LocalAdministration {
     pub(super) retirement: RetirementNotice,
     archives: ArchiveArea,
     governance: governance::GovernanceArea,
+    controls: controls::ControlsArea,
     references: references::ReferencesArea,
     security: security::SecurityArea,
     chatgpt: chatgpt::ChatGptArea,
@@ -81,6 +83,7 @@ impl LocalAdministration {
                 cx,
             ),
             governance: governance::GovernanceArea::default(),
+            controls: controls::ControlsArea::default(),
             references: references::ReferencesArea::new(theme, cx),
             security: security::SecurityArea::new(theme, cx),
             chatgpt: chatgpt::ChatGptArea::default(),
@@ -134,6 +137,7 @@ impl LocalAdministration {
             .expect("local authority generation exhausted");
         self.archives.withdraw(cx);
         self.governance.withdraw();
+        self.controls = controls::ControlsArea::default();
         self.references.withdraw(cx);
         self.security.withdraw(cx);
         self.models.withdraw(cx);
@@ -267,6 +271,9 @@ impl ClinicalApp {
                     };
                     if this.settings_page == SettingsPage::Functions {
                         this.read_local_switches(cx);
+                    }
+                    if this.settings_page == SettingsPage::Controls {
+                        this.read_controls(cx);
                     }
                     if this.settings_page == SettingsPage::Governance {
                         this.read_governance(cx);
@@ -488,6 +495,7 @@ impl ClinicalApp {
                         SettingsPage::Archives
                             | SettingsPage::Access
                             | SettingsPage::Models
+                            | SettingsPage::Controls
                             | SettingsPage::Governance
                             | SettingsPage::References
                     )

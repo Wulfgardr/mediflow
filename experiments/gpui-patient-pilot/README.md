@@ -460,10 +460,31 @@ metadati aggiuntivi e gestione degli originali Protesica; configurazione,
 readiness e verifica del servizio WHO opzionale; controllo della pubblicazione
 remota e avanzamento/annullamento del download AIFA. Clear AIFA e rollback WHO
 restano esclusi dai comandi ordinari in attesa del raccordo amministrativo G-3d.
-I pannelli Controlli non sono implementati da questa estensione.
+I controlli in lettura sono descritti nella sezione seguente.
 
 Le risposte di `/api/exemptions/import/{status,preview,commit}`,
 `/api/prosthetics/catalog/{status,preview,commit,sources}` e `/api/icd/catalog`
 hanno un budget esplicito di 8 MiB nel trasporto dedicato. Il default delle altre
 route resta 64 KiB. I test includono risposte sintetiche oltre 64 KiB e le
 richieste mantengono i vincoli del servizio Web.
+
+### Controlli in lettura
+
+Impostazioni → Controlli espone l'inventario Compliance con gli stessi limiti,
+responsabili e fonti del Web, senza attestazione legale. Il confronto
+`comparison/governance.mjs --check` impedisce divergenze dall'inventario sorgente.
+Con `LocalHostAccess` su loopback legge `/api/system/update-awareness`,
+`/api/system/revision`, `/api/system/audit` e `/api/system/redaction`.
+Non cerca aggiornamenti remoti, non installa software e non invia testi al
+servizio di redazione. L'health non prova l'accuratezza della redazione.
+
+Audit e update-awareness hanno un budget esplicito di 8 MiB, provato con
+risposte sintetiche valide oltre 64 KiB. Revision e redaction mantengono il
+limite ordinario di 64 KiB. Ogni sezione conserva il proprio errore; il blocco
+ritira gli snapshot e scarta le risposte tardive tramite la generazione
+esistente dell'autorità locale. L'audit mostra la finestra predefinita del
+servizio di massimo 50 eventi, senza inferire completezza o assenza di eventi
+nello storico. Restano filtri, riepilogo e metadati redatti di dettaglio.
+Diagnostic Hub e architettura servizi restano da raccordare; i pannelli Modelli
+e Repertori esistenti conservano le proprie letture. Nessun comando di sviluppo,
+seeding, distruttivo o Treatment Reasoning viene aggiunto.

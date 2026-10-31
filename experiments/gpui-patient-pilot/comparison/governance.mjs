@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { COMPLIANCE_EVIDENCE_INVENTORY } from '../../../lib/compliance-evidence-inventory.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -5,6 +7,13 @@ import { buildFabricStatusSnapshot } from '../../../lib/ai-providers/fabric/stat
 import { buildObservabilitySnapshot, observeVenue } from '../../../lib/ai-providers/fabric/routing-observability.ts';
 import { ensureAiModelParliamentArtifactDirectory, readAiModelParliamentArtifact } from '../../../lib/ai-model-parliament-storage.ts';
 import { ensureAiRolloutReadinessArtifactDirectory, buildAiRolloutReadinessArtifactsPayload } from '../../../lib/ai-rollout-readiness-storage.ts';
+
+const complianceFixture = new URL('./compliance.json', import.meta.url);
+if (process.argv.includes('--check')) {
+    assert.deepEqual(JSON.parse(fs.readFileSync(complianceFixture, 'utf8')), COMPLIANCE_EVIDENCE_INVENTORY);
+} else {
+    fs.writeFileSync(complianceFixture, `${JSON.stringify(COMPLIANCE_EVIDENCE_INVENTORY, null, 2)}\n`);
+}
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-g2-governance-'));
 const previous = process.env.MEDIFLOW_DATA_DIR;

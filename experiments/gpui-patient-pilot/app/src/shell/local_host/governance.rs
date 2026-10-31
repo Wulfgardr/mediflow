@@ -11,7 +11,7 @@ impl GovernanceArea {
         *self = Self::default();
     }
 }
-fn fact(label: &str, value: impl AsRef<str>, theme: Theme) -> Div {
+pub(super) fn fact(label: &str, value: impl AsRef<str>, theme: Theme) -> Div {
     div().min_w_0().text_color(theme.secondary).child({
         let text = text!(format!("{label}: {}", value.as_ref()));
         #[cfg(test)]
@@ -92,7 +92,7 @@ fn label(value: &str) -> &str {
         _ => value,
     }
 }
-fn section_state<T>(
+pub(super) fn section_state<T>(
     id: &'static str,
     result: &Result<T, RuntimeError>,
     theme: Theme,
