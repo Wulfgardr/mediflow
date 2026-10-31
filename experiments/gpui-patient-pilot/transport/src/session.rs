@@ -8750,7 +8750,7 @@ mod g2_settings_tests {
                 (
                     "/api/drugs",
                     200,
-                    json!({"count":1,"state":"ready","manifest":{}}),
+                    json!({"count":1,"state":"ready","manifest":{},"rejectedRecords":0,"totalRecords":1}),
                 ),
                 (
                     "/api/icd/catalog",
@@ -8764,7 +8764,17 @@ mod g2_settings_tests {
                 ),
             ] {
                 let (mut stream, _) = listener.accept().unwrap();
-                let request = read_request(&mut stream);
+                let mut request = read_request(&mut stream);
+                while request.starts_with("GET /api/drugs?count=1 ") {
+                    local_host_reply(
+                        &mut stream,
+                        200,
+                        json!({"count":100,"state":"ready","manifest":{"version":"synthetic-before"}}),
+                        "",
+                    );
+                    (stream, _) = listener.accept().unwrap();
+                    request = read_request(&mut stream);
+                }
                 assert!(
                     request.starts_with(&format!("POST {path} HTTP/1.1")),
                     "{request}"
@@ -8793,7 +8803,7 @@ mod g2_settings_tests {
                 crate::RetirementNotice::new(None),
             )
             .unwrap();
-        let first=access.prepare_reference_file(ReferenceCatalog::Aifa,"synthetic.csv",b"AIC;FARMACO\n000000001;Inventato",json!({"sourceUrl":"https://aifa.example/synthetic.csv","downloadedAt":"2026-10-31","version":"synthetic"})).unwrap();
+        let first=access.prepare_reference_file(ReferenceCatalog::Aifa,"synthetic.csv",b"AIC;DENOMINAZIONE;ATC;PRINCIPIO_ATTIVO\n000000001;Inventato;X;Inventato",json!({"sourceUrl":"https://aifa.example/synthetic.csv","downloadedAt":"2026-10-31","version":"synthetic"})).unwrap();
         let ReferenceImportResult::Reduction(second) =
             access.commit_reference_import(&first).unwrap()
         else {
@@ -8820,6 +8830,102 @@ mod g2_settings_tests {
         assert!(listener.accept().is_err());
     }
     #[test]
+    fn g2_references_aifa_review_partial_and_stale_draft() {
+        use crate::{ReferenceCatalog, ReferenceImportResult};
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            for version in ["initial", "concurrent", "initial"] {
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/drugs?count=1 "));
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"count":10,"state":"ready","manifest":{"version":version}}),
+                    "",
+                );
+            }
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_request(&mut stream);
+            assert!(request.starts_with("POST /api/drugs "));
+            assert!(request.contains("bad;Invalido"));
+            local_host_reply(
+                &mut stream,
+                200,
+                json!({"count":9,"state":"ready","rejectedRecords":1,"totalRecords":10,"manifest":{"version":"synthetic"}}),
+                "",
+            );
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let mut csv = String::from("AIC;DENOMINAZIONE;ATC;PRINCIPIO_ATTIVO\n");
+        for i in 1..=9 {
+            csv.push_str(&format!("{i:09};Inventato;X;Inventato\n"));
+        }
+        csv.push_str("bad;Invalido;X;Inventato");
+        let draft = access.prepare_reference_file(ReferenceCatalog::Aifa, "synthetic.csv", csv.as_bytes(), json!({"sourceUrl":"https://aifa.example/synthetic.csv","downloadedAt":"2026-10-31","version":"synthetic"})).unwrap();
+        assert_eq!(draft.data()["review"]["rejectedRecords"], 1);
+        assert_eq!(draft.data()["review"]["totalRecords"], 10);
+        assert_eq!(draft.data()["review"]["count"], 9);
+        assert_eq!(
+            draft.data()["review"]["diagnostics"][0]["message"],
+            "AIC non valido"
+        );
+        assert!(matches!(
+            access.commit_reference_import(&draft),
+            Ok(ReferenceImportResult::CatalogChanged)
+        ));
+        assert!(draft.can_commit());
+        let ReferenceImportResult::Recorded(receipt) =
+            access.commit_reference_import(&draft).unwrap()
+        else {
+            panic!("not recorded");
+        };
+        assert_eq!(receipt["rejectedRecords"], 1);
+        assert_eq!(receipt["review"]["diagnostics"][0]["row"], 11);
+        assert!(matches!(
+            access.commit_reference_import(&draft),
+            Err(RuntimeError::ReadRequired)
+        ));
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(listener.accept().is_err());
+    }
+    #[test]
+    fn g2_references_aifa_missing_receipt_counts_is_not_recorded() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with("POST /api/drugs/update "));
+            local_host_reply(
+                &mut stream,
+                200,
+                json!({"count":9,"state":"ready","manifest":{}}),
+                "",
+            );
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let draft = access.prepare_aifa_update().unwrap();
+        assert!(matches!(
+            access.commit_reference_import(&draft),
+            Err(RuntimeError::Indeterminate)
+        ));
+        worker.join().unwrap();
+    }
+    #[test]
     fn g2_references_sources_failure_keeps_the_catalog_and_never_invents_a_receipt() {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
@@ -8844,7 +8950,7 @@ mod g2_settings_tests {
                 (
                     "/api/drugs/update",
                     200,
-                    json!({"state":"ready","count":1,"manifest":{"version":"synthetic"}}),
+                    json!({"state":"ready","count":1,"manifest":{"version":"synthetic"},"rejectedRecords":0,"totalRecords":1}),
                 ),
             ] {
                 let (mut stream, _) = listener.accept().unwrap();

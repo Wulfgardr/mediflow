@@ -59,10 +59,61 @@ fn line(label: &str, value: impl AsRef<str>, theme: Theme) -> Div {
         text
     })
 }
+fn exemption_sample(value: &Value) -> Vec<(&'static str, String)> {
+    let mut rows = Vec::new();
+    for (key, label) in [
+        ("type", "Tipo"),
+        ("isPharma", "Ambito farmaceutico"),
+        ("isSpecialist", "Ambito specialistico"),
+        ("isNational", "Nazionale"),
+    ] {
+        let text = match &value[key] {
+            Value::Bool(true) => "Sì".into(),
+            Value::Bool(false) => "No".into(),
+            Value::String(s) if !s.is_empty() => s.clone(),
+            _ => "Non indicato".into(),
+        };
+        rows.push((label, text));
+    }
+    for (key, label) in [
+        ("startDate", "Inizio validità dichiarata"),
+        ("endDate", "Fine validità dichiarata"),
+    ] {
+        let text = value[key]
+            .as_i64()
+            .and_then(|t| chrono::DateTime::from_timestamp(t, 0))
+            .map(|d| d.format("%d/%m/%Y").to_string())
+            .unwrap_or_else(|| "Non indicata".into());
+        rows.push((label, text));
+    }
+    rows
+}
+fn aifa_outcome(receipt: &Value) -> &'static str {
+    if receipt["rejectedRecords"].as_u64().is_some_and(|n| n > 0) {
+        "Importazione AIFA parziale registrata. Verifica le righe scartate e i motivi nella ricevuta."
+    } else if receipt["review"]["duplicateRows"]
+        .as_u64()
+        .is_some_and(|n| n > 0)
+    {
+        "Importazione AIFA con duplicati registrata. Per ogni AIC è stata conservata l’ultima riga."
+    } else {
+        "Operazione registrata."
+    }
+}
 fn details(value: &Value, theme: Theme) -> Div {
     let mut pane = div().min_w_0().flex().flex_col().gap(px(6.));
+    let exemption = value.get("isPharma").is_some()
+        || value.get("isSpecialist").is_some()
+        || value.get("isNational").is_some();
+    if exemption {
+        for (label, text) in exemption_sample(value) {
+            pane = pane.child(line(label, text, theme));
+        }
+    }
     for (key, label) in [
         ("state", "Stato"),
+        ("totalRecords", "Righe totali"),
+        ("rejectedRecords", "Righe scartate"),
         ("count", "Voci"),
         ("sourceCount", "Fonti locali"),
         ("revision", "Revisione"),
@@ -117,6 +168,9 @@ fn details(value: &Value, theme: Theme) -> Div {
         ("size", "Byte"),
         ("page", "Pagina o sezione"),
     ] {
+        if exemption && matches!(key, "startDate" | "endDate") {
+            continue;
+        }
         let v = &value[key];
         let text = match v {
             Value::String(s) => Some(
@@ -143,6 +197,7 @@ fn details(value: &Value, theme: Theme) -> Div {
         "latestReceipt",
         "receipt",
         "reduction",
+        "review",
     ] {
         if value[key].is_object() {
             pane = pane.child(details(&value[key], theme));
@@ -316,6 +371,7 @@ impl ClinicalApp {
         let catalog = command.catalog();
         self.local_host.references.busy = true;
         self.local_host.references.message = None;
+        let retained = command.clone();
         self.run_local_host(move || {
             let result=access.commit_reference_import(&command)?;
             let status=if matches!(result,ReferenceImportResult::Recorded(_)) {Some(access.read_reference_catalog(catalog))} else {None};
@@ -323,6 +379,10 @@ impl ClinicalApp {
         },move |this,result,cx| {
             let area=&mut this.local_host.references;area.busy=false;
             match result {
+                Ok((ReferenceImportResult::CatalogChanged,_)) => {
+                    area.preview=Some(retained);
+                    area.message=Some("Il catalogo AIFA è cambiato dopo l’anteprima. Importazione non inviata; bozza conservata. Scarta l’anteprima e preparala di nuovo sul catalogo corrente.".into());
+                },
                 Ok((ReferenceImportResult::Reduction(p),_))=> {area.preview=Some(Arc::new(p));area.message=Some("Il file riduce il catalogo. Verifica i conteggi e conferma di nuovo solo se intendi applicare la riduzione.".into());},
                 Ok((ReferenceImportResult::Recorded(receipt),reread))=> {
                     area.receipt=Some(receipt.clone());
@@ -331,10 +391,10 @@ impl ClinicalApp {
                             let same=if catalog==ReferenceCatalog::Aifa {s.data["manifest"]==receipt["manifest"]}
                                 else if catalog==ReferenceCatalog::Who {s.data["revision"]==receipt["revision"]}
                                 else {s.data["revision"]==receipt["receipt"]["revision"] && s.data["latestReceipt"]["operationKey"]==receipt["receipt"]["operationKey"]};
-                            area.snapshot=Some(s);area.message=Some(if same {"Operazione registrata e stato riletto."}else{"Operazione registrata; il repertorio è cambiato dopo l’import. Verifica lo stato corrente."}.into());
+                            area.snapshot=Some(s);area.message=Some(if same {format!("{} Stato riletto.", aifa_outcome(&receipt))}else{format!("{} Il repertorio è cambiato dopo l’import. Verifica lo stato corrente.", aifa_outcome(&receipt))});
                         },
                         Some(Err(e)) if e.retires_session()=> { this.disconnect(cx);this.message=Some((ui_error(e),true));cx.notify();return; },
-                        _=>{area.snapshot=None;area.message=Some("Operazione registrata; rilettura non riuscita. Rileggi lo stato.".into());}
+                        _=>{area.snapshot=None;area.message=Some(format!("{} Rilettura non riuscita. Rileggi lo stato.", aifa_outcome(&receipt)));}
                     }
                 },
                 Err(e)=>{area.snapshot=None;area.message=Some(format!("{} L’esito potrebbe non essere noto. Rileggi lo stato prima di una nuova anteprima.",ui_error(e)));}
@@ -465,7 +525,7 @@ impl ClinicalApp {
             pane = pane
                 .child(section("reference-preview", "Anteprima", theme))
                 .child(details(preview.data(), theme));
-            pane=pane.child(text!(if preview.data()["acquisition"]==true {"Scarica il feed ufficiale AIFA via Internet. Nessun dato clinico viene inviato. Il catalogo viene validato e sostituito al completamento; una riduzione richiede una seconda conferma."}else if area.catalog==ReferenceCatalog::Aifa {"Campione del file locale e provenienza dichiarata. Non è una validazione AIFA: il servizio valida il CSV al momento dell’import e sostituisce il catalogo solo al completamento."}else if area.catalog==ReferenceCatalog::Exemptions {"Sono importate solo le otto colonne previste. I campi esclusi non sono interpretati. I codici assenti restano; le esenzioni dei pazienti non cambiano."}else{"Verifica fonte, versione, ambito e campi. Cambia solo il repertorio; i dati clinici salvati non cambiano."}));
+            pane=pane.child(text!(if preview.data()["acquisition"]==true {"Scarica il feed ufficiale AIFA via Internet. Nessun dato clinico viene inviato. Il catalogo viene validato e sostituito al completamento; una riduzione richiede una seconda conferma."}else if area.catalog==ReferenceCatalog::Aifa {"Verifica righe scartate, motivi e duplicati. Le righe scartate non vengono importate. Il servizio sostituisce il catalogo con le righe importabili. Il catalogo viene riletto prima dell’invio; il servizio manuale non offre un controllo atomico della versione: una modifica concorrente durante l’invio può essere sovrascritta."}else if area.catalog==ReferenceCatalog::Exemptions {"Sono importate solo le otto colonne previste. I campi esclusi non sono interpretati. I codici assenti restano; le esenzioni dei pazienti non cambiano."}else{"Verifica fonte, versione, ambito e campi. Cambia solo il repertorio; i dati clinici salvati non cambiano."}));
             if preview.data()["diagnosticsTruncated"] == true {
                 pane = pane.child(text!(
                     "Mostrati i primi 200 errori. Correggi il file e ripeti l’anteprima."
@@ -475,7 +535,12 @@ impl ClinicalApp {
                 pane = pane.child(
                     button(
                         "references-confirm",
-                        if preview.data()["reduction"].is_object() {
+                        if preview.data()["review"]["rejectedRecords"]
+                            .as_u64()
+                            .is_some_and(|n| n > 0)
+                        {
+                            "Conferma importazione parziale con gli scarti indicati"
+                        } else if preview.data()["reduction"].is_object() {
                             "Conferma riduzione e importazione"
                         } else {
                             "Confermo fonte e campi: applica al repertorio"
@@ -584,6 +649,84 @@ impl ClinicalApp {
 mod tests {
     use super::*;
     #[gpui::test]
+    fn references_render_partial_counts_reasons_and_exemption_fields(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        struct Fixture;
+        impl Render for Fixture {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                details(
+                    &json!({
+                        "count":9,"rejectedRecords":1,"totalRecords":10,
+                        "diagnostics":[{"row":11,"message":"AIC non valido"}],
+                        "sample":[{"code":"SYN","description":"Sintetica","type":"TYPE_A","isPharma":true,"isSpecialist":false,"isNational":null,"startDate":1767225600,"endDate":1798675200}]
+                    }),
+                    Theme::for_dark(false),
+                )
+            }
+        }
+        let (_, cx) = cx.add_window_view(|_, _| Fixture);
+        rendered_command::take_text_nodes();
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let texts = rendered_command::take_text_nodes()
+            .into_iter()
+            .map(|(_, node)| node.value().unwrap_or_default().to_owned())
+            .collect::<Vec<_>>();
+        for expected in [
+            "Righe scartate: 1",
+            "Righe totali: 10",
+            "Messaggio: AIC non valido",
+            "Codice: SYN",
+            "Descrizione: Sintetica",
+            "Tipo: TYPE_A",
+            "Ambito farmaceutico: Sì",
+            "Ambito specialistico: No",
+            "Nazionale: Non indicato",
+            "Inizio validità dichiarata: 01/01/2026",
+            "Fine validità dichiarata: 31/12/2026",
+        ] {
+            assert!(
+                texts.iter().any(|s| s == expected),
+                "missing {expected}: {texts:?}"
+            );
+        }
+    }
+    #[test]
+    fn references_exemption_sample_shows_every_field_and_calendar_dates() {
+        let rows = exemption_sample(
+            &json!({"type":"TYPE_A","isPharma":true,"isSpecialist":false,"isNational":null,"startDate":1767225600,"endDate":1798675200}),
+        );
+        assert_eq!(
+            rows,
+            vec![
+                ("Tipo", "TYPE_A".into()),
+                ("Ambito farmaceutico", "Sì".into()),
+                ("Ambito specialistico", "No".into()),
+                ("Nazionale", "Non indicato".into()),
+                ("Inizio validità dichiarata", "01/01/2026".into()),
+                ("Fine validità dichiarata", "31/12/2026".into())
+            ]
+        );
+        let other = exemption_sample(
+            &json!({"type":"TYPE_B","isPharma":false,"isSpecialist":true,"isNational":true}),
+        );
+        assert_ne!(rows, other);
+        assert_eq!(other[3].1, "Sì");
+        assert_eq!(other[4].1, "Non indicata");
+    }
+    #[test]
+    fn references_aifa_partial_receipt_cannot_claim_complete() {
+        assert!(
+            aifa_outcome(&json!({"rejectedRecords":1,"totalRecords":10,"count":9}))
+                .contains("parziale")
+        );
+        assert!(aifa_outcome(&json!({"rejectedRecords":1})).contains("scartate"));
+        assert!(!aifa_outcome(&json!({"rejectedRecords":0})).contains("parziale"));
+    }
+    #[gpui::test]
     fn references_draws_file_review_sources_failures_and_withdraws_on_lock(
         cx: &mut gpui::TestAppContext,
     ) {
@@ -629,9 +772,10 @@ mod tests {
                 commands.iter().collect::<HashSet<_>>().len()
             );
         }
-        view.update(cx,|app,_|{
-            let area=&mut app.local_host.references;area.catalog=ReferenceCatalog::Aifa;
-            area.preview=Some(Arc::new(access.prepare_reference_file(ReferenceCatalog::Aifa,"synthetic.csv",b"AIC;FARMACO\n000000001;Inventato",json!({"sourceUrl":"https://aifa.example/synthetic.csv","downloadedAt":"2026-10-31","version":"synthetic"})).unwrap()));
+        view.update(cx, |app, _| {
+            let area = &mut app.local_host.references;
+            area.catalog = ReferenceCatalog::Aifa;
+            area.preview = Some(Arc::new(access.prepare_aifa_update().unwrap()));
         });
         let commands = rendered_command::button_ids(|| {
             cx.update(|window, cx| {
