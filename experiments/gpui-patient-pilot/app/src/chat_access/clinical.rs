@@ -36,6 +36,13 @@ pub(super) fn known_identifiers(profile: &PatientDetail) -> serde_json::Value {
                 4
             }
     });
+    // The length floor is for fragments and metadata: a short surname is still a surname.
+    names.extend(
+        [&profile.first_name, &profile.last_name]
+            .into_iter()
+            .filter(|v| !v.trim().is_empty())
+            .cloned(),
+    );
     names.sort();
     names.dedup();
     let birth_dates: Vec<_> = profile.birth_date.iter().collect();
