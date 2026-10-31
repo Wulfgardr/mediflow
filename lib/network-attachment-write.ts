@@ -1,3 +1,5 @@
+import { attachmentCollectionSchema } from './api-schemas/attachments';
+import { attachmentCollectionMatches } from './attachment-collection-currentness';
 import { archiveGenerationForSession } from './security/archive-session-generation';
 import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
@@ -22,7 +24,7 @@ type NetworkAttachmentMutationContext = NetworkWriteContext & {
 
 type NetworkAttachmentMutationResponse =
     | { status: 201; value: { id: string } }
-    | { status: 400 | 404 | 413; value: Record<string, unknown> };
+    | { status: 400 | 404 | 409 | 413; value: Record<string, unknown> };
 
 // D2/D3 (ADR 0076, Classe A): the paired create payload is a projection of the
 // web payload, not a replica. patientId comes from the path; the boundary
@@ -30,7 +32,7 @@ type NetworkAttachmentMutationResponse =
 // (server-controlled, document-derived and unknown fields alike), matching the
 // OpenAPI additionalProperties: false contract. An allowlist, not a denylist:
 // a field added to the host schema later cannot silently slip through here.
-const NETWORK_ALLOWED_ATTACHMENT_CREATE_FIELDS = ['name', 'path', 'data', 'type', 'size'] as const;
+const NETWORK_ALLOWED_ATTACHMENT_CREATE_FIELDS = ['name', 'path', 'data', 'type', 'size', 'expectedCollection'] as const;
 
 const NETWORK_SEALED_ATTACHMENT_CREATE_FIELDS = ['name', 'path', 'data'] as const;
 
@@ -155,6 +157,9 @@ export async function createNetworkScopedAttachment(
         return { status: 413, value: { error: 'Attachment payload too large' } };
     }
 
+    const collection = attachmentCollectionSchema.optional().safeParse(body.expectedCollection);
+    if (!collection.success) return { status: 400, value: { error: 'Invalid attachment collection precondition' } };
+
     const newId = randomUUID();
     const now = new Date();
     const name = body.name as string;
@@ -168,6 +173,9 @@ export async function createNetworkScopedAttachment(
     return dbServer.transaction((tx): NetworkAttachmentMutationResponse => {
         if (!patientIsActiveAndInScope(tx, context.patientId, context.scopeAmbulatoryId)) {
             return { status: 404, value: { error: 'Not found' } };
+        }
+        if (!attachmentCollectionMatches(tx, context.patientId, collection.data)) {
+            return { status: 409, value: { error: 'Attachment collection changed. Review the documents again.' } };
         }
         const currentness = createHostAttachmentCurrentness();
 
@@ -194,7 +202,7 @@ export async function createNetworkScopedAttachment(
         writeNetworkAttachmentAuditEvent(tx, {
             context,
             subjectRef: newId,
-            metadata: { changedFields: listChangedFields(body) },
+            metadata: { changedFields: listChangedFields(Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'expectedCollection'))) },
         });
         return { status: 201, value: { id: newId } };
     }, { behavior: 'immediate' });

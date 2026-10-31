@@ -13,7 +13,17 @@ import {
 const ocrQueueStateSchema = z.enum(DOCUMENT_OCR_QUEUE_STATES).optional();
 const ocrQueueReasonSchema = z.enum(DOCUMENT_OCR_QUEUE_REASONS).optional();
 
+export const attachmentCollectionSchema = z.array(z.object({
+    id: z.string().min(1).max(256),
+    currentness: z.object({
+        sourceRef: z.string().regex(/^[0-9a-f]{64}$/u),
+        revision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+        freshnessEpoch: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+    }).strict(),
+}).strict()).max(10_000).refine(rows => new Set(rows.map(row => row.id)).size === rows.length);
+
 export const attachmentCreateSchema = z.object({
+    expectedCollection: attachmentCollectionSchema.optional(),
     id: requiredTextSchema.optional(),
     patientId: requiredTextSchema,
     name: requiredTextSchema,

@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { attachmentCollectionMatches } from './attachment-collection-currentness';
+
 import { NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
@@ -51,10 +53,11 @@ export async function createWebAttachment(
         }
 
         const id = body.id ?? uuidv4();
-        const created = dbServer.transaction((tx): 'created' | 'missing' | 'duplicate' => {
+        const created = dbServer.transaction((tx): 'created' | 'missing' | 'duplicate' | 'stale' => {
             const patient = tx.select({ id: patients.id }).from(patients)
                 .where(and(eq(patients.id, body.patientId), activePatients())).get();
             if (!patient) return 'missing';
+            if (!attachmentCollectionMatches(tx, body.patientId, body.expectedCollection)) return 'stale';
             if (tx.select({ id: attachments.id }).from(attachments).where(eq(attachments.id, id)).get()) return 'duplicate';
             const currentness = mintHostAttachmentCurrentness();
             const inserted = tx.insert(attachments).values({
@@ -79,6 +82,7 @@ export async function createWebAttachment(
             writeAttachmentWebAudit(tx, request, session, 'attachment.created', id);
             return 'created';
         }, { behavior: 'immediate' });
+        if (created === 'stale') return NextResponse.json({ error: 'Attachment collection changed. Review the documents again.' }, { status: 409 });
         if (created === 'duplicate') return NextResponse.json({ error: 'Attachment already exists' }, { status: 409 });
         if (created === 'missing') return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
         return NextResponse.json({ id }, { status: 201 });
