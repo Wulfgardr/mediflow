@@ -503,6 +503,36 @@ impl RuntimeSession {
         }
     }
 
+    pub fn chat_agenda(&self, context: &ChatAccessContext) -> Result<Value> {
+        self.revalidate_chat_access_context(context)?;
+        let (rows, received) = self.agenda_page(
+            &context.scope,
+            &AgendaFilter {
+                limit: Some(AGENDA_PAGE as u16),
+                ..Default::default()
+            },
+        )?;
+        self.revalidate_chat_access_context(context)?;
+        if received > AGENDA_PAGE {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        let live: Vec<_> = rows.iter().filter(|r| r.deleted_at.is_none()).collect();
+        let truncated = agenda_truncated(live.len(), received);
+        let rows: Vec<_> = live
+            .into_iter()
+            .take(CHAT_AGENDA_ROWS)
+            .map(|r| {
+                if chrono::DateTime::parse_from_rfc3339(&r.date).is_err()
+                    || !["pending", "completed", "cancelled"].contains(&r.status.as_str())
+                {
+                    return Err(RuntimeError::InvalidResponse);
+                }
+                Ok(json!({"date":r.date,"status":r.status}))
+            })
+            .collect::<Result<_>>()?;
+        Ok(json!({"rows":rows,"truncated":truncated}))
+    }
+
     pub fn chat_prosthetics_search(
         &self,
         context: &ChatAccessContext,
@@ -2647,6 +2677,11 @@ impl RuntimeSession {
         scope: &str,
         filter: &AgendaFilter,
     ) -> Result<Vec<Checkup>> {
+        self.agenda_page(scope, filter).map(|(rows, _)| rows)
+    }
+    /// Also returns how many rows the host sent, tombstones included: only that
+    /// count can tell whether the host stopped at the requested limit.
+    fn agenda_page(&self, scope: &str, filter: &AgendaFilter) -> Result<(Vec<Checkup>, usize)> {
         let mut query = aggregate_query(&filter.date_from, &filter.date_to, filter.limit, 500)?;
         for status in &filter.statuses {
             query.push((
@@ -2669,7 +2704,8 @@ impl RuntimeSession {
             &pairs,
             JSON_LIMIT,
         )?;
-        self.decode_clinical_list(
+        let received = response.value.as_array().map_or(0, Vec::len);
+        let rows = self.decode_clinical_list(
             response,
             scope,
             None,
@@ -2684,7 +2720,8 @@ impl RuntimeSession {
                     row.deleted_at.is_some(),
                 )
             },
-        )
+        )?;
+        Ok((rows, received))
     }
     pub fn read_checkup(&self, scope: &str, patient_id: &str, id: &str) -> Result<Checkup> {
         self.read_clinical(
@@ -3441,8 +3478,27 @@ fn require_bound_scope_identity(identity: &Value, scope: &str, user_id: &str) ->
     Ok(())
 }
 
+const CHAT_AGENDA_ROWS: usize = 20;
+const AGENDA_PAGE: usize = 500;
+
+/// Tombstones are removed after the host applies its limit, so a full page may
+/// hide live rows even when few of them are left.
+fn agenda_truncated(live: usize, received: usize) -> bool {
+    live > CHAT_AGENDA_ROWS || received == AGENDA_PAGE
+}
+
 #[cfg(test)]
 mod tests {
+    use super::{AGENDA_PAGE, agenda_truncated};
+
+    #[test]
+    fn chat_agenda_reports_truncation_hidden_by_tombstones() {
+        assert!(!agenda_truncated(0, 20));
+        assert!(!agenda_truncated(20, 20));
+        assert!(agenda_truncated(21, 21));
+        assert!(agenda_truncated(0, AGENDA_PAGE));
+    }
+
     use super::*;
     use std::{
         io::{Read, Write},
