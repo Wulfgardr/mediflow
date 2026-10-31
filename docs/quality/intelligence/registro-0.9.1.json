@@ -824,5 +824,14 @@
     "branch": "codex/athena-two-step",
     "corpusAnd18Thresholds": "approved_unchanged",
     "runtimeBlocker": "release_denial_implemented_surface_acceptance_pending"
+  },
+  "localRunMeasurementI2Causes": {
+    "sourceRevision": "d3e6ee265dcf1954d62f2f431f0ea993a8eb54d1",
+    "evidence": "docs/quality/intelligence/2026-10-31-i2-causes/misura.json",
+    "report": "docs/quality/intelligence/2026-10-31-i2-causes/README.md",
+    "status": "three_executed_resource_coverage_incomplete",
+    "qualification": false,
+    "semanticReview": "pending",
+    "rssCoverage": "missing_patient_insight_and_smart_import_partial_document_synthesis"
   }
 }
