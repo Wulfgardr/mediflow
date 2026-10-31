@@ -25,6 +25,7 @@ export const AUDIT_EVENT_TYPES = [
     'auth.checkup_active_role.revoked',
     'patient.created',
     'patient.create.retired',
+    'patient.create.issued',
     'patient.updated',
     'patient.deleted',
     'patient.restored',
@@ -372,11 +373,11 @@ function buildAuditEventRow(input: AuditWriteInput): typeof auditEvents.$inferIn
     if (create && (journal || input.actorType !== 'user' || input.requestId !== create.commandId
         || input.archiveGeneration !== create.archiveGeneration || !['native', 'web'].includes(input.sourceSurface)
         || input.outcome !== 'success' || (create.patientId === null
-            ? input.eventType !== 'patient.create.retired' || input.subjectType !== 'agent_operation' || input.subjectRef != null
+            ? !['patient.create.retired', 'patient.create.issued'].includes(input.eventType) || input.subjectType !== 'agent_operation' || input.subjectRef != null
             : input.eventType !== 'patient.created' || input.subjectType !== 'patient' || input.subjectRef !== create.patientId))) {
         throw new Error('Invalid patient document create audit event');
     }
-    const eventId = create?.commandId ?? journal?.receipt.reference ?? uuidv4();
+    const eventId = create ? (input.eventType === 'patient.create.issued' ? `${create.commandId}:issued` : create.commandId) : journal?.receipt.reference ?? uuidv4();
     return {
         eventId,
         schemaVersion: AUDIT_SCHEMA_VERSION,

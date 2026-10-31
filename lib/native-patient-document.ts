@@ -191,9 +191,10 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
             const owner = await host(context);
             const entry = sources.get(commandId);
             const result = commands.revoke(owner, commandId);
+            if (result.outcome === 'unknown') return result;
             const read = reread(owner, commandId);
             if (read.outcome !== result.outcome) return deny();
-            if (read.outcome !== 'unknown') entry?.release();
+            entry?.release();
             return read;
         },
     };

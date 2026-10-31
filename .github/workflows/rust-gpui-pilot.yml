@@ -23,6 +23,7 @@ on:
       - 'scripts/*chat-therapy*'
       - 'scripts/fixtures/chat-card-owned-tree.mjs'
       - 'scripts/native-tool-test-selection.mjs'
+      - 'scripts/probe-patient-document-key-erasure.mjs'
       - 'scripts/check-test-selection.test.mjs'
       - '.github/workflows/rust-gpui-pilot.yml'
   push:
@@ -48,6 +49,7 @@ on:
       - 'scripts/*chat-therapy*'
       - 'scripts/fixtures/chat-card-owned-tree.mjs'
       - 'scripts/native-tool-test-selection.mjs'
+      - 'scripts/probe-patient-document-key-erasure.mjs'
       - 'scripts/check-test-selection.test.mjs'
       - '.github/workflows/rust-gpui-pilot.yml'
   workflow_dispatch:
@@ -107,6 +109,12 @@ jobs:
       # checks do not exercise a window, input methods, accessibility or GPU UI.
       - name: Compile all native targets and run synthetic tests
         run: cargo test --manifest-path experiments/gpui-patient-pilot/Cargo.toml --workspace --all-targets --locked
+      - name: Build the optimized patient document memory probe
+        if: runner.os == 'Linux'
+        run: cargo rustc --manifest-path experiments/gpui-patient-pilot/Cargo.toml -p mediflow-runtime-client --example patient_document_key_erasure --locked -- -C opt-level=2
+      - name: Check file key erasure on a 5 MiB denied upload
+        if: runner.os == 'Linux'
+        run: node scripts/probe-patient-document-key-erasure.mjs experiments/gpui-patient-pilot/target/debug/examples/patient_document_key_erasure key-erasure-ci --ci
       - name: Install real route dependencies for withdrawal regression
         if: runner.os == 'macOS'
         run: npm ci

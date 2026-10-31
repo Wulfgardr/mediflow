@@ -59,3 +59,27 @@ test('native PIN denial killed before terminal durability: new process retires t
         assert.equal((db.prepare('SELECT count(*) n FROM patients').get() as { n: number }).n, 1);
     } finally { db.close(); }
 });
+
+for (const phase of ['prepared', 'in-flight']) for (const foreign of ['invented', 'device', 'scope', 'operator', 'archive']) {
+    test(`${phase}: ${foreign} in a separate process cannot retire or change any table; legitimate command still applies`, () => {
+        const data = mkdtempSync(path.join(tmpdir(), 'mediflow-patient-create-owner-'));
+        const run = spawnSync(process.execPath, ['--experimental-strip-types', '--import',
+            pathToFileURL(path.resolve('scripts/register-strip-types-loader.mjs')).href,
+            'lib/patient-document-create-ownership.fixture.ts', 'owner', randomUUID(), '', foreign, phase], {
+            env: { ...process.env, MEDIFLOW_DATA_DIR: data, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1' },
+            encoding: 'utf8', timeout: 60_000, killSignal: 'SIGKILL',
+        });
+        assert.equal(run.status, 0, run.stderr);
+        const frame = run.stdout.split('\n').find(line => line.startsWith('{"scenario"')); assert(frame, run.stdout);
+        const result = JSON.parse(frame);
+        assert.equal(result.child.code, 0, result.child.stderr);
+        const childFrame = result.child.stdout.split('\n').find((line: string) => line.startsWith('{"before"'));
+        assert(childFrame, result.child.stdout);
+        const child = JSON.parse(childFrame);
+        assert.equal(child.error, undefined);
+        assert.deepEqual(child.receipt, { outcome: 'unknown' });
+        assert.deepEqual(child.revoked, { outcome: 'unknown' });
+        assert.deepEqual(child.after, child.before);
+        for (const outcome of [result.executed, result.receipt, result.replay]) assert.deepEqual(outcome, { outcome: 'applied' });
+    });
+}
