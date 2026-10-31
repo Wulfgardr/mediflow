@@ -513,3 +513,19 @@ test('manual runner cannot publish reassuring JSON when its process failed', (t)
     assert.deepEqual(runBackupSchedulerScript(), { ok: false, uncertain: true,
         message: 'Esito del backup non confermato. Rileggi l’ultimo backup prima di ripetere l’operazione.' });
 });
+
+
+test('synthetic volume preload reaches named builtin imports without invoking host probes', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'backup-probe-fixture-'));
+    try {
+        const db = new Database(path.join(root, 'medical.db'));
+        db.exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)'); db.close();
+        const preload = prepareSyntheticBackupDestination(root, path.join(root, 'backups'));
+        const result = spawnSync(process.execPath, ['--import', preload, '--input-type=module', '-e',
+            "import { spawnSync } from 'node:child_process'; console.log(spawnSync('/bin/df', ['-P', process.env.SYNTHETIC_DESTINATION]).stderr);"], {
+            encoding: 'utf8', env: { ...process.env, SYNTHETIC_DESTINATION: path.join(root, 'backups') },
+        });
+        assert.ifError(result.error); assert.equal(result.status, 0);
+        assert.equal(result.stdout.trim(), 'Synthetic unavailable volume probe');
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
