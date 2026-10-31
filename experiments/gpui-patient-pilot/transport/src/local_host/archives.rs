@@ -138,6 +138,7 @@ impl LocalHostAccess {
         &self,
         command: &PreparedArchiveRestore,
         _confirmation: RestoreConfirmation,
+        passphrase: &str,
     ) -> Result<()> {
         if !command.owner.ptr_eq(&Arc::downgrade(&self.owner)) {
             return Err(RuntimeError::ReadRequired);
@@ -146,6 +147,30 @@ impl LocalHostAccess {
         if command.submitted.swap(true, Ordering::AcqRel) {
             return Err(RuntimeError::ReadRequired);
         }
+        let checked = self.client.dedicated_web_raw(
+            Method::GET,
+            &["api", "auth", "check"],
+            headers.clone(),
+            None,
+            false,
+        )?;
+        let check: Value =
+            serde_json::from_slice(&checked.body).map_err(|_| RuntimeError::InvalidResponse)?;
+        if check["archiveGeneration"] != self.generation
+            || check["unlock"]["credential"] != "passphrase"
+            || check["unlock"]["kdfVersion"] != 3
+        {
+            return Err(RuntimeError::UnsupportedUnlock);
+        }
+        let salt = check["unlock"]["salt"]
+            .as_str()
+            .ok_or(RuntimeError::InvalidResponse)?;
+        let material = crate::crypto::derive_v3(passphrase, salt)?;
+        let credential = Zeroizing::new(format!(r#"{{"verifier":"{}"}}"#, &*material.verifier));
+        headers.insert(
+            "x-mediflow-restore-credential",
+            sensitive_header(&credential)?,
+        );
         headers.insert(
             "x-mediflow-restore-id",
             sensitive_header(&command.lookup.id)?,

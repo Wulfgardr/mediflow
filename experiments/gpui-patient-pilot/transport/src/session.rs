@@ -7506,10 +7506,10 @@ mod tests {
             for phase in 0..3 {
                 let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
-                let body: Value =
-                    serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
-                assert_eq!(body, expected);
                 if phase < 2 {
+                    let body: Value =
+                        serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+                    assert_eq!(body, expected);
                     assert!(request.starts_with("POST /api/system/backup-restore/verify "));
                     local_host_reply(
                         &mut stream,
@@ -7518,6 +7518,17 @@ mod tests {
                         "",
                     );
                 } else {
+                    assert!(request.starts_with("GET /api/auth/check "));
+                    local_host_reply(
+                        &mut stream,
+                        200,
+                        json!({"archiveGeneration":"synthetic-generation","unlock":{"credential":"passphrase","kdfVersion":3,"salt":"AwMDAwMDAwMDAwMDAwMDAw=="}}),
+                        "",
+                    );
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                    let request = read_request(&mut stream);
+                    assert!(request.contains("x-mediflow-restore-credential:"));
+                    assert!(!request.contains("Local host synthetic passphrase"));
                     assert!(request.starts_with("POST /api/system/backup-restore "));
                     let id = request
                         .lines()
@@ -7554,6 +7565,7 @@ mod tests {
             .restore_archive(
                 &prepared,
                 crate::RestoreConfirmation::new("RIPRISTINA").unwrap(),
+                "Local host synthetic passphrase",
             )
             .unwrap();
         let expected = Value::String(format!(
@@ -7610,6 +7622,14 @@ mod tests {
                 );
                 if status != 0 {
                     let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                    assert!(read_request(&mut stream).starts_with("GET /api/auth/check "));
+                    local_host_reply(
+                        &mut stream,
+                        200,
+                        json!({"archiveGeneration":"synthetic-generation","unlock":{"credential":"passphrase","kdfVersion":3,"salt":"AwMDAwQFBgcICQoLDA0ODw=="}}),
+                        "",
+                    );
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     let request = read_request(&mut stream);
                     assert!(request.starts_with("POST /api/system/backup-restore "));
                     let lower = request.to_ascii_lowercase();
@@ -7649,6 +7669,7 @@ mod tests {
                 let result = access.restore_archive(
                     &prepared,
                     crate::RestoreConfirmation::new("RIPRISTINA").unwrap(),
+                    "Local host synthetic passphrase",
                 );
                 assert_eq!(
                     result,
@@ -7661,7 +7682,8 @@ mod tests {
                 assert_eq!(
                     access.restore_archive(
                         &prepared,
-                        crate::RestoreConfirmation::new("RIPRISTINA").unwrap()
+                        crate::RestoreConfirmation::new("RIPRISTINA").unwrap(),
+                        "Local host synthetic passphrase"
                     ),
                     Err(RuntimeError::ReadRequired)
                 );
@@ -7713,7 +7735,8 @@ mod tests {
         assert_eq!(
             access.restore_archive(
                 &prepared,
-                crate::RestoreConfirmation::new("RIPRISTINA").unwrap()
+                crate::RestoreConfirmation::new("RIPRISTINA").unwrap(),
+                "Local host synthetic passphrase"
             ),
             Err(RuntimeError::Locked)
         );

@@ -36,6 +36,7 @@ pub(super) struct ArchiveArea {
     journal_error: bool,
     status: Option<String>,
     receipt_verified: bool,
+    export_confirmed: bool,
     focus_review: bool,
     _subscription: Subscription,
 }
@@ -69,6 +70,7 @@ impl ArchiveArea {
             journal_error,
             status: None,
             receipt_verified: false,
+            export_confirmed: false,
             focus_review: false,
             _subscription: subscription,
         }
@@ -184,7 +186,14 @@ impl ClinicalApp {
             .child(button("archive-recovery-verify", "Verifica il file cifrato", theme, false, available).on_click(cx.listener(|this, _, _, cx| this.pick_archive_file(FilePurpose::VerifyRecovery, cx))))
             .child(section("archive-portable-heading", "Esportazione portabile", theme))
             .child(text!("Pazienti, voci, allegati e storico esportabile. Account e chiavi restano nell’archivio corrente. Limite del client: 8 MiB. Una copia già avviata può completarsi dopo il blocco; un errore può lasciare un file parziale. Le destinazioni esistenti non vengono sovrascritte."))
-            .child(button("archive-export", "Scarica Backup", theme, false, available).on_click(cx.listener(|this, _, _, cx| this.pick_archive_export(false, cx))))
+            .child(text!("Il file portabile contiene categorie leggibili in chiaro: nomi, codici fiscali, date di nascita, farmaci e dosaggi, valori di laboratorio e titoli dei controlli. Scegli una destinazione locale protetta, senza sincronizzazione o condivisione non autorizzata."))
+            .child(button("archive-export-confirmation", if area.export_confirmed { "Destinazione protetta confermata" } else { "Confermo la destinazione protetta" }, theme, true, available)
+                .aria_selected(area.export_confirmed)
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.local_host.archives.export_confirmed = !this.local_host.archives.export_confirmed;
+                    cx.notify();
+                })))
+            .child(button("archive-export", "Scarica Backup", theme, false, available && area.export_confirmed).on_click(cx.listener(|this, _, _, cx| this.pick_archive_export(false, cx))))
             .child(button("archive-select", "Seleziona file .mediflow v1", theme, false, available && area.pending.is_none() && area.journal.is_some()).on_click(cx.listener(|this, _, _, cx| this.pick_archive_file(FilePurpose::Restore, cx))));
         if area.journal_error || area.journal.is_none() {
             pane = pane.child(notice("archive-journal-error", "Registro del ripristino non disponibile. Conserva gli eventuali file di stato e verifica la cartella di recupero dell’interfaccia prima di iniziare un ripristino.", theme, true));
@@ -193,9 +202,11 @@ impl ClinicalApp {
             pane = pane.child(div().id("archive-review").flex().flex_col().gap(px(12.))
                 .child(text!(format!("File: {} ({} byte).", review.name, review.bytes)))
                 .child(text!(format!("Ripristino del file portabile: {} record. I dati esportabili verranno sostituiti. Account e chiavi restano invariati; lo storico protetto viene conservato. L’operazione non è reversibile. I dispositivi abbinati dovranno essere abbinati di nuovo.", review.command.records())))
+                .child(text!("Reinserisci la passphrase amministrativa prima di sostituire i dati. Le attestazioni attive tornano inattive; gli eventi importati sono identificati nello storico locale."))
+                .child(crate::text_input::themed(self.local_host.secret.clone(), theme))
                 .child(crate::text_input::themed(area.confirmation.clone(), theme))
                 .child(button("archive-cancel", "Annulla", theme, true, true).on_click(cx.listener(|this, _, _, cx| this.cancel_archive_restore(cx))))
-                .child(button("archive-confirm", "Ripristina adesso", theme, false, RestoreConfirmation::new(area.confirmation.read(cx).value()).is_ok()).on_click(cx.listener(|this, _, _, cx| this.confirm_archive_restore(cx)))));
+                .child(button("archive-confirm", "Ripristina adesso", theme, false, RestoreConfirmation::new(area.confirmation.read(cx).value()).is_ok() && !self.local_host.secret.read(cx).value().is_empty()).on_click(cx.listener(|this, _, _, cx| this.confirm_archive_restore(cx)))));
         }
         if matches!(
             area.operation,
@@ -234,7 +245,7 @@ impl ClinicalApp {
         pane.child(self.backup_schedule_view(cx))
     }
     fn pick_archive_export(&mut self, recovery: bool, cx: &mut Context<Self>) {
-        if !self.archive_available() {
+        if !self.archive_available() || (!recovery && !self.local_host.archives.export_confirmed) {
             return;
         }
         let chosen = cx.prompt_for_new_path(
@@ -332,6 +343,9 @@ impl ClinicalApp {
         ) {
             self.local_host.archives.operation = ArchiveOperation::Idle;
             self.local_host
+                .secret
+                .update(cx, |input, cx| input.retire(cx));
+            self.local_host
                 .archives
                 .confirmation
                 .update(cx, |input, cx| input.set_content("", cx));
@@ -346,6 +360,13 @@ impl ClinicalApp {
         let Ok(confirmation) = RestoreConfirmation::new(area.confirmation.read(cx).value()) else {
             return;
         };
+        let passphrase = Zeroizing::new(self.local_host.secret.read(cx).value().to_owned());
+        if passphrase.is_empty() {
+            return;
+        }
+        self.local_host
+            .secret
+            .update(cx, |input, cx| input.retire(cx));
         let command = review.command.clone();
         let Some(access) = self.local_host.access() else {
             return;
@@ -367,9 +388,9 @@ impl ClinicalApp {
         self.local_host.archives.pending = Some(lookup);
         self.local_host.archives.operation = ArchiveOperation::Applying;
         self.run_local_host(
-            move || access.restore_archive(&command, confirmation),
+            move || access.restore_archive(&command, confirmation, &passphrase),
             |this, result, cx| {
-                let rejected = matches!(result, Err(RuntimeError::Conflict | RuntimeError::Forbidden | RuntimeError::Rejected(400 | 412)));
+                let rejected = matches!(result, Err(RuntimeError::Conflict | RuntimeError::Forbidden | RuntimeError::Authentication | RuntimeError::Rejected(400 | 401 | 412 | 423)));
                 let released = rejected && this.local_host.archives.clear_journal().is_ok();
                 this.local_host.archives.journal_error |= rejected && !released;
                 this.disconnect(cx);
@@ -474,6 +495,9 @@ mod tests {
                 .archives
                 .confirmation
                 .update(cx, |input, cx| input.set_content("RIPRISTINA", cx));
+            app.local_host.secret.update(cx, |input, cx| {
+                input.set_content("Synthetic scales fixture passphrase", cx)
+            });
             app.confirm_archive_restore(cx);
             assert!(journal.exists());
         });

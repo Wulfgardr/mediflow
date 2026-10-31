@@ -355,6 +355,8 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
         job: 0,
     });
     assert.deepEqual(summary.subjectTypes, {
+        backup: 0,
+        audit_event: 0,
         session: 1,
         active_role_attestation: 0,
         patient: 2,
