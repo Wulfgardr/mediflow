@@ -8,6 +8,8 @@ mod demo_app;
 mod documents;
 mod editing;
 mod icons;
+#[cfg(unix)]
+mod local_voice;
 mod native_lock;
 mod navigation;
 mod patient_forms;

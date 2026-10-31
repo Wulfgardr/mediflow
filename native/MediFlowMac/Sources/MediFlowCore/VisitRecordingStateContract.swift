@@ -1,4 +1,8 @@
+#if canImport(Crypto)
 import Crypto
+#else
+import CryptoKit
+#endif
 import Foundation
 public struct VisitRecordingBinding: Equatable, Sendable {
     public let patientRef: String

@@ -54,6 +54,7 @@ class BundleTests(unittest.TestCase):
         info = plistlib.loads(plistlib.dumps(bundle.bundle_info(config, "0.1.0", "abcdef")))
         self.assertEqual(info["LSMinimumSystemVersion"], bundle.contract_minimum_macos())
         self.assertEqual(info["LSMinimumSystemVersion"], "11.0")
+        self.assertIn("microfono", info["NSMicrophoneUsageDescription"])
         config["minimum_macos"] = "27.2"
         with self.assertRaisesRegex(ValueError, "GPUI"):
             bundle.bundle_info(config, "0.1.0", "abcdef")
