@@ -204,7 +204,10 @@ impl ClinicalApp {
         }
     }
     pub(super) fn open_patient_document(&mut self, cx: &mut Context<Self>) {
-        if self.form.is_some() || self.patient_document.work.is_some() {
+        if self.form.is_some()
+            || self.patient_document.work.is_some()
+            || self.chat_access.voice.is_open()
+        {
             return;
         }
         let (Some(session), Some(scope)) = (&self.session, &self.scope) else {

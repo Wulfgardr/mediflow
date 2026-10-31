@@ -16,6 +16,8 @@ mod document_library;
 mod local_host;
 pub(crate) mod local_preferences;
 mod local_settings;
+#[cfg(unix)]
+mod local_voice;
 #[cfg(test)]
 mod notes_recovery_tests;
 #[cfg(unix)]
@@ -2103,6 +2105,10 @@ impl ClinicalApp {
     }
 
     fn open_form(&mut self, kind: FormKind, _window: &mut Window, cx: &mut Context<Self>) {
+        #[cfg(unix)]
+        if self.chat_access.voice.is_open() {
+            return;
+        }
         if self.local_host.has_work()
             || self.edit_pending
             || self.document_operation != DocumentOperation::Idle
@@ -5315,6 +5321,8 @@ impl Render for ClinicalApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         #[cfg(unix)]
         self.prepare_patient_document(window, cx);
+        #[cfg(unix)]
+        self.poll_chat_voice(cx);
         self.prepare_local_appearance(window);
         if self.privacy_shield {
             return self.privacy_view(cx);
@@ -5456,7 +5464,13 @@ impl Render for ClinicalApp {
         let document_recovery = self.patient_document_recovery_view(cx);
         #[cfg(not(unix))]
         let document_recovery: Option<Stateful<Div>> = None;
-        let content = if let Some(document) = document_create {
+        #[cfg(unix)]
+        let voice = self.chat_voice_view(cx);
+        #[cfg(not(unix))]
+        let voice: Option<Stateful<Div>> = None;
+        let content = if let Some(voice) = voice {
+            voice.into_any_element()
+        } else if let Some(document) = document_create {
             document.into_any_element()
         } else if let Some(access) = chat_access {
             access.into_any_element()
