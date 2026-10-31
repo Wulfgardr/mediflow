@@ -1,10 +1,11 @@
+import { AiFunctionUnavailableError, assertFunctionAvailableInRelease } from '../ai-function-availability';
 /* browser projection of ADR0129; the server remains the catalog authority. */
 import type { FunctionModelPreferences, FunctionModelCommand, FunctionModelId, FunctionModelChoice, FunctionModelOption, FunctionPreferenceRow, LegacyFunctionModelOption } from '../ai-providers/fabric/function-model-preferences';
 export type { FunctionModelPreferences, FunctionModelCommand, FunctionModelId, FunctionModelChoice, FunctionModelOption, FunctionPreferenceRow, LegacyFunctionModelOption };
 export const names: Record<FunctionModelId, string> = { patient_insight: 'Quadro paziente', smart_import: 'Importazione assistita', document_synthesis: 'Sintesi dei documenti', treatment_reasoning: 'Ragionamento terapeutico' };
 export const providerName = (provider: string) => provider === 'ollama' ? 'Ollama · locale' : provider === 'athena_mlx' ? 'ATHENA MLX · locale' : provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Provider non supportato';
 export class ModelUiError extends Error { constructor(readonly code: 'unavailable' | 'provider_unavailable' | 'invalid' | 'conflict' | 'stale' | 'locked') { super(code); } }
-export const errorText = (error: unknown) => error instanceof ModelUiError && error.code === 'conflict'
+export const errorText = (error: unknown) => error instanceof AiFunctionUnavailableError ? error.message : error instanceof ModelUiError && error.code === 'conflict'
     ? 'Le impostazioni sono cambiate. Rileggi e decidi di nuovo; nulla viene ritentato automaticamente.'
     : error instanceof ModelUiError && error.code === 'stale' ? 'La scelta del modello non è più attuale. Rileggi e scegli di nuovo: nessun modello alternativo viene usato.'
     : error instanceof ModelUiError && error.code === 'provider_unavailable' ? 'provider_unavailable: il provider locale selezionato non è disponibile. Nessuna modifica e nessun fallback. Scegli esplicitamente OpenAI oppure rendi disponibile il provider locale.'
@@ -89,6 +90,7 @@ export type FunctionPreferenceAction =
     | { action: 'preset'; presetId: 'host_defaults' | 'all_off' };
 /** A local preview is not permission to probe an unavailable provider. */
 function guardLocalPreview(dto: FunctionModelPreferences, action: FunctionPreferenceAction): void {
+    if (action.action !== 'preset') assertFunctionAvailableInRelease(action.functionId);
     if (action.action === 'set_activation') {
         if (dto.schemaVersion !== 'mediflow.function-preferences.v2') throw new ModelUiError('invalid');
         return;
@@ -96,6 +98,7 @@ function guardLocalPreview(dto: FunctionModelPreferences, action: FunctionPrefer
     if (action.action === 'preset' && action.presetId === 'all_off') return;
     const rows = action.action === 'set' ? dto.functions.filter(row => row.id === action.functionId) : dto.functions;
     for (const row of rows) {
+        if (row.id === 'treatment_reasoning') continue;
         if (!(action.action === 'set' ? action.enabled : row.enabled)) continue;
         const id = action.action === 'set' ? action.defaultModelOptionId : null;
         // A saved preference does not disclose the host default. Only the

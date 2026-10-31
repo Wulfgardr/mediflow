@@ -1,5 +1,6 @@
-/* same authenticated projection lease; no local/ATHENA attestation. */
 import 'server-only';
+import { assertFunctionAvailableInRelease } from '../../ai-function-availability';
+/* same authenticated projection lease; no local/ATHENA attestation. */
 import { types } from 'node:util';
 import { isOrdinaryFunctionSelected, executeOwnedOrdinaryProfile, ordinaryResultMetadata, ordinaryApplicationIsCurrent } from '../../chatgpt-product/ordinary-flow';
 import { createTreatmentReasoningOrdinaryTaskProfile } from '../../chatgpt-execution/ordinary-task-profile';
@@ -11,6 +12,7 @@ export function createTreatmentReasoningChatGptService(sources: Readonly<{
     killSwitch: Readonly<{ read(): Promise<Readonly<{ status: 'enabled' }> | Readonly<{ status: 'denied'; code: 'disabled' | 'unavailable' }>> }>;
 }>) {
     return Object.freeze({ async acquirePreview() {
+        assertFunctionAvailableInRelease('treatment_reasoning');
         if (!isOrdinaryFunctionSelected('treatment_reasoning')) throw new Error('ordinary_scope_missing');
         const operation = await sources.projectionBroker.acquirePreview();
         return Object.freeze({ async preview(input: unknown) {

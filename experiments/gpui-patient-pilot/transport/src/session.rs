@@ -7728,6 +7728,35 @@ mod tests {
         }
     }
     #[test]
+    fn local_host_treatment_switch_denied_before_read_for_both_directions() {
+        use std::net::TcpListener;
+        use std::thread;
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        for enabled in [false, true] {
+            assert!(matches!(
+                access.prepare_switch(crate::HostSettingKey::TreatmentReasoning, enabled),
+                Err(RuntimeError::Forbidden)
+            ));
+        }
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(
+            listener.accept().is_err(),
+            "denied switch cannot read or write settings"
+        );
+    }
+    #[test]
     fn local_host_switch_changed_since_review_stops_before_put() {
         use std::net::TcpListener;
         use std::thread;

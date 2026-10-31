@@ -107,7 +107,7 @@ test('preview performs zero writes; apply rereads and exact replay performs no s
         const preview = await f.http.PREVIEW(f.request(command)); assert.equal(preview.status, 200);
         assert.equal((await preview.json()).writesPerformed, 0); assert.equal(f.writes(), 0);
         const applied = await f.http.POST(f.request(command)); assert.equal(applied.status, 200);
-        const view = await applied.json(); assert.ok(view.functions.every((v: { enabled: boolean }) => !v.enabled)); assert.equal(f.writes(), 1);
+        const view = await applied.json(); assert.ok(view.functions.every((v: { id: string; enabled: boolean }) => v.id === 'treatment_reasoning' ? v.enabled : !v.enabled)); assert.equal(f.writes(), 1);
         assert.equal((await f.http.POST(f.request(command))).status, 200); assert.equal(f.writes(), 1);
         const read = await f.http.GET(new Request('https://localhost/api/v1/network/ai/functions'));
         assert.equal((await read.json()).revision, view.revision); assert.equal(read.headers.get('Cache-Control'), 'no-store');
@@ -162,11 +162,11 @@ test('set accepts only catalog option and host_defaults preserves switches', asy
         delete command.presetId;
         assert.equal((await f.http.POST(f.request(command))).status, 200);
         assert.equal(f.service.read().functions[0].enabled, false);
-        assert.equal((await f.http.POST(f.request({ ...f.command(), presetId: 'host_defaults' }))).status, 503,
-            'unavailable enabled ATHENA cannot be admitted by a preset');
+        assert.equal((await f.http.POST(f.request({ ...f.command(), presetId: 'host_defaults' }))).status, 200,
+            'the preset preserves Treatment Reasoning without admitting it');
         const allOff = f.command(); assert.equal((await f.http.POST(f.request(allOff))).status, 200);
         assert.equal((await f.http.POST(f.request({ ...f.command(), presetId: 'host_defaults' }))).status, 200);
-        assert.ok(f.service.read().functions.every(v => !v.enabled));
+        assert.ok(f.service.read().functions.every(v => v.id === 'treatment_reasoning' ? v.enabled : !v.enabled));
         assert.ok(f.service.read().functions.every(v => v.defaultSource === 'host_configuration'));
     } finally { f.cleanup(); }
 });

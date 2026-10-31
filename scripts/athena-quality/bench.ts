@@ -1,3 +1,4 @@
+import { assertFunctionAvailableInRelease } from '../../lib/ai-function-availability.ts';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -103,6 +104,7 @@ async function runCell(item: SyntheticCase, runner: Runner, fabric: boolean): Pr
     } catch (error) { if (runnerFailed) throw error; return denied('provider_failed'); }
 }
 export async function runComparison(corpus: Corpus, directRunner: Runner, fabricRunner: Runner): Promise<Comparison[]> {
+    assertFunctionAvailableInRelease('treatment_reasoning');
     const rows: Comparison[] = [];
     for (const item of corpus.cases) {
         const direct = await runCell(item, directRunner, false);

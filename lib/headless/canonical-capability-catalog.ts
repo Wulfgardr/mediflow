@@ -2,6 +2,8 @@ export type HeadlessCanonicalCapabilityDescriptor = Readonly<{
   schema: 'mediflow.headless.canonical-capability-descriptor.v1';
   anchorId: string;
   sourceRow: number;
+  availability?: 'unavailable_in_release';
+  reason?: string;
   manualDisposition: 'manual_only';
   grantability: 'not_grantable';
   stage: 'unresolved';
@@ -117,6 +119,7 @@ for (const [sourceRow, anchorId] of ANCHORS) {
     schema: 'mediflow.headless.canonical-capability-descriptor.v1' as const,
     anchorId, sourceRow, manualDisposition: 'manual_only' as const,
     grantability: 'not_grantable' as const, stage: 'unresolved' as const,
+    ...(sourceRow === 9 ? { availability: 'unavailable_in_release' as const, reason: 'Non disponibile in questa versione. Le proposte salvate restano consultabili.' } : {}),
     unresolved: UNRESOLVED, operationId: null, applicationServiceRef: null,
     applyPolicy: 'none' as const, writesPerformed: 0 as const, evidence: EVIDENCE,
   });

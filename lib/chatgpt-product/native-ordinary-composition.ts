@@ -1,5 +1,6 @@
 /* fixed native application composition, never a request-defined callback. */
 import 'server-only';
+import { assertFunctionAvailableInRelease } from '../ai-function-availability';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import * as native from '../security/native-inference-lifecycle';
@@ -184,6 +185,7 @@ export async function prepareNativeFabric(request: Request, session: PairedNativ
 }
 async function prepareNativeFunction(request: Request, session: PairedNativeSession, input: NativeOrdinaryPreparation, local: boolean): Promise<Response> {
     input = parseNativeOrdinaryPreparation(input);
+    assertFunctionAvailableInRelease(input.functionId);
     const selectionModel = local ? fabric.capture(input.functionId) : null;
     const port = native.mintResourcePort(session);
     if (!port) throw new ProductError('session_expired');

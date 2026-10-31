@@ -13,11 +13,18 @@ undici deterministici. AnyDoc e Apple Vision sono estrazione/OCR separati,
 non altre celle generative. Ricerca e navigazione sono requisiti aggiuntivi
 espliciti: non vengono inventati due descriptor per far tornare un conteggio.
 La loro presenza nel catalogo headless non prova un servizio operativo.
-Ogni capacità è collegata a C-7/C-8, ma nessuna prova di consumo è dedotta
+Ogni capacità nel perimetro è collegata a C-7/C-8, ma nessuna prova di consumo è dedotta
 dal solo collegamento. Le superfici senza prova restano `not_verified`.
 
-Le 13 celle contrattuali sono distinte dalle tre Treatment Reasoning remote
-condizionate. `null` per modello o prova significa dato non fissato, non scelta
+Dal 30/10/2026 le 12 celle contrattuali sono distinte dalle quattro celle
+Treatment Reasoning rinviate oltre la 0.9.1, incluse le tre remote prima
+condizionate. I-3, I-3b e I-7 non sono requisiti della release. Il campo
+`deferredCells` conserva quelle celle; `conditionalCells` è vuoto. Corpus e
+18 soglie ATHENA restano approvati e invariati. Il campo `deferral` registra
+lo stop: il blocco di esecuzione è implementato, ma
+l’accettazione dell’indisponibilità sulle superfici resta da completare. Nessuna generazione Treatment Reasoning è ammessa dal
+contratto di release. Le misure e le tabelle successive sono storiche e non
+riaprono quei requisiti. `null` per modello o prova significa dato non fissato, non scelta
 libera o permesso di esecuzione. Gli alias non valgono come identità immutabili.
 Le venue delle celle descrivono il percorso contrattuale, mentre `venues` nei
 descriptor fotografa il catalogo Fabric attuale: i due elenchi non attestano

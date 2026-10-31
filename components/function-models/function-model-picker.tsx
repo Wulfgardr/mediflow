@@ -1,4 +1,5 @@
 'use client';
+import { TREATMENT_REASONING_UNAVAILABLE_LABEL, TREATMENT_REASONING_UNAVAILABLE_REASON } from '@/lib/ai-function-availability';
 import { Disclosure } from '@/components/disclosure';
 import { ChoiceField } from '@/components/choice-field';
 import { isAiLaneEnabledValue } from '@/lib/ai-lane-kill-switch';
@@ -9,10 +10,9 @@ import { createModelPreviewClient } from '@/lib/function-models/preview-client';
 import { providerName, type FunctionModelId } from '@/lib/function-models/browser';
 import { SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import styles from './model-picker.module.css';
-import { TreatmentReasoningPortableSetup } from '../treatment-reasoning-portable-setup';
 export function useFunctionModelPicker(functionId: FunctionModelId, context: unknown, selection?: unknown, enabled = true) {
     const security = useSecurity();
-    const active = enabled && security.isAuthenticated && !security.isLocked && security.authRecoveryState === 'ready';
+    const active = functionId !== 'treatment_reasoning' && enabled && security.isAuthenticated && !security.isLocked && security.authRecoveryState === 'ready';
     const [client] = useState(() => createModelPreviewClient(functionId));
     const view = useSyncExternalStore(client.subscribe, client.getSnapshot, client.getSnapshot);
     useLayoutEffect(() => { client.reset(active); return () => client.reset(false); }, [client, active, context, selection, security.user]);
@@ -23,7 +23,7 @@ export function useFunctionModelPicker(functionId: FunctionModelId, context: unk
     const selected = !view.remote ? row?.options.find(o => o.modelOptionId === (view.choice?.modelOptionId ?? row.defaultModelOptionId)) : undefined;
     const canGenerate = view.remote ? active && !view.blocked && !view.loading && !view.consumed && !view.remote.loading && !view.remote.completed && view.remote.settings?.enabled === true && isAiLaneEnabledValue(view.remote.settings.lanes[functionId]) : active && !view.blocked && !view.loading && !view.consumed && (!row || (row.enabled && (view.choice !== null || row.bindingState === 'current') && selected?.state === 'available_unqualified'));
     const needsReprepare = !!view.remote && !view.remote.state && (view.consumed || view.remote.completed || !!view.remote.error);
-    const canReprepare = active && functionId !== 'treatment_reasoning' && needsReprepare && !view.loading && !view.remote?.loading;
+    const canReprepare = active && needsReprepare && !view.loading && !view.remote?.loading;
     return { client, view, active, functionId, canGenerate, selected, needsReprepare, canReprepare };
 }
 export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useFunctionModelPicker> }) {
@@ -40,6 +40,7 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
     const confirmDefault = !view.remote && (view.blocked || view.consumed) && !!f?.enabled && f.bindingState === 'current' && defaultModel?.state === 'available_unqualified';
     const needsRefresh = !view.remote && (!!view.error || (active && !!blockingStatus) || (view.blocked && !confirmDefault));
     const recoveryStatus = blockingStatus ?? (needsRefresh && !view.error ? 'Rileggi i modelli prima di preparare la proposta.' : null);
+    if (functionId === 'treatment_reasoning') return <div className={styles.picker}><p>{TREATMENT_REASONING_UNAVAILABLE_LABEL}</p><p>{TREATMENT_REASONING_UNAVAILABLE_REASON}</p></div>;
     if (f && !f.enabled && !view.remote) return <div className={styles.picker} data-testid={`model-picker-${functionId}`}>
         <p role="status">Esperienza spenta nelle impostazioni. <a href="/settings/ai/funzioni">Apri le funzioni cliniche</a></p>
     </div>;
@@ -88,7 +89,6 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
             </div>
             </Disclosure>
         {view.remote && <OrdinaryFunctionControls client={client} view={view.remote} needsReprepare={picker.needsReprepare} canReprepare={picker.canReprepare} />}
-        {!view.remote && functionId === 'treatment_reasoning' && <TreatmentReasoningPortableSetup option={selected?.provider === 'athena_transformers' ? selected : f?.options.find(o => o.provider === 'athena_transformers')} />}
 
     </div>;
 }

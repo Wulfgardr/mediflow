@@ -1,3 +1,4 @@
+import { assertFunctionAvailableInRelease } from '../../ai-function-availability';
 import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY, nextFunctionModelConfigurationGeneration, readFunctionModelConfigurationGeneration } from './function-model-configuration-generation';
 import { createHash } from 'node:crypto';
 import type { PortableStatus } from './treatment-reasoning-portable-provisioning';
@@ -82,11 +83,11 @@ export function buildFunctionModelCatalog(sources: FunctionModelSources): Functi
         }
     } catch { /* Invalid provider/endpoint is not a local candidate. */ }
     hostDefaults.treatment_reasoning = add('ATHENA / MLX', 'athena_mlx', null, Object.freeze(['treatment_reasoning']),
-        admitted(sources.athenaLifecycle, 'athena_mlx') && sources.athenaAvailable);
+        false);
     if (sources.portable) {
         const portable = sources.portable;
         const id = add(portable.model, 'athena_transformers', null, Object.freeze(['treatment_reasoning']),
-            portable.provider === 'athena_transformers' && portable.selected && portable.state === 'admitted' && portable.releaseDigest !== null);
+            false);
         // This is a host-selected binding, never a fallback from an unavailable MLX choice.
         hostDefaults.treatment_reasoning = portable.selected ? id : null;
     }
@@ -184,6 +185,8 @@ export function parseFunctionModelChoice(value: unknown): FunctionModelChoice {
     return Object.freeze({ modelOptionId: input.modelOptionId, expectedCatalogRevision: input.expectedCatalogRevision });
 }
 export function resolveFunctionModelDispatch(sources: FunctionModelSources, id: FunctionModelId, choiceValue?: unknown) {
+    assertFunctionAvailableInRelease(id);
+
     if (!isFunctionModelId(id)) return fail('unsupported');
     const state = readState(sources.settings[FUNCTION_PREFERENCES_KEY]); const catalog = buildFunctionModelCatalog(sources);
     if (!isAiLaneEnabledValue(sources.settings[FUNCTION_SWITCH_KEYS[id]])) return fail('function_disabled');
@@ -220,7 +223,9 @@ export function parseFunctionModelCommand(value: unknown): FunctionModelCommand 
     return Object.freeze(input) as FunctionModelCommand;
 }
 export function planFunctionModelUpdate(sources: FunctionModelSources, value: unknown) {
-    const command = parseFunctionModelCommand(value); const catalog = buildFunctionModelCatalog(sources);
+    const command = parseFunctionModelCommand(value);
+    if (command.action !== 'preset') assertFunctionAvailableInRelease(command.functionId);
+    const catalog = buildFunctionModelCatalog(sources);
     const version: FunctionPreferencesVersion = command.schemaVersion === 'mediflow.function-preferences-command.v2' ? 'v2' : 'v1';
     const state = readState(sources.settings[FUNCTION_PREFERENCES_KEY]); const digest = functionModelDigest(command);
     if (command.expectedCatalogRevision !== catalog.revision) return fail('catalog_stale');
@@ -253,6 +258,7 @@ export function planFunctionModelUpdate(sources: FunctionModelSources, value: un
         writes[FUNCTION_SWITCH_KEYS[command.functionId]] = command.enabled ? 'enabled' : 'disabled';
     } else if (command.action === 'set') set(command.functionId, command.enabled, command.defaultModelOptionId);
     else for (const id of FUNCTION_MODEL_IDS) {
+        if (id === 'treatment_reasoning') continue;
         if (command.presetId === 'all_off') writes[FUNCTION_SWITCH_KEYS[id]] = 'disabled';
         else set(id, isAiLaneEnabledValue(sources.settings[FUNCTION_SWITCH_KEYS[id]]), null);
     }

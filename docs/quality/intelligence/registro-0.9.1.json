@@ -3,7 +3,7 @@
   "release": "0.9.1",
   "sourceRevision": "498658cbf596b96811eecb843a3a60e3ea8ea458",
   "contract": "docs/releases/0.9.1-contract.md",
-  "contractSha256": "1f2c03f90cc576832337833773bcd78451aacc0fa67167fa5083f3f54396e45d",
+  "contractSha256": "c1f31345db64bf8ae662b0044bb4a18cf8889fdecaadb7264d74cbdc4366b88d",
   "purpose": "coverage_only_no_runtime_admission",
   "capabilities": [
     {
@@ -117,11 +117,9 @@
         "contractSchema": "mediflow.treatment_reasoning.v1",
         "entryPoint": "app/api/ai/treatment-reasoning/preview/route.ts"
       },
-      "chatCriteria": [
-        "C-7",
-        "C-8"
-      ],
-      "runtimeProof": null
+      "chatCriteria": [],
+      "runtimeProof": null,
+      "releaseDisposition": "deferred_beyond_0.9.1"
     },
     {
       "descriptor": {
@@ -408,8 +406,7 @@
       "blockedBy": [
         "disk_below_25_GiB",
         "register_model_identity_unassigned",
-        "I-2",
-        "I-7"
+        "I-2"
       ]
     },
     {
@@ -429,8 +426,7 @@
       },
       "proof": null,
       "blockedBy": [
-        "Leonardo API pause 2026-10-26",
-        "I-7"
+        "Leonardo API pause 2026-10-26"
       ]
     },
     {
@@ -450,8 +446,7 @@
       },
       "proof": null,
       "blockedBy": [
-        "Leonardo API pause 2026-10-26",
-        "I-7"
+        "Leonardo API pause 2026-10-26"
       ]
     },
     {
@@ -472,8 +467,7 @@
       "proof": null,
       "blockedBy": [
         "local_only_task",
-        "I-4",
-        "I-7"
+        "I-4"
       ]
     },
     {
@@ -495,8 +489,7 @@
       "blockedBy": [
         "disk_below_25_GiB",
         "register_model_identity_unassigned",
-        "I-2",
-        "I-7"
+        "I-2"
       ]
     },
     {
@@ -516,8 +509,7 @@
       },
       "proof": null,
       "blockedBy": [
-        "Leonardo API pause 2026-10-26",
-        "I-7"
+        "Leonardo API pause 2026-10-26"
       ]
     },
     {
@@ -537,8 +529,7 @@
       },
       "proof": null,
       "blockedBy": [
-        "Leonardo API pause 2026-10-26",
-        "I-7"
+        "Leonardo API pause 2026-10-26"
       ]
     },
     {
@@ -559,8 +550,7 @@
       "proof": null,
       "blockedBy": [
         "local_only_task",
-        "I-4",
-        "I-7"
+        "I-4"
       ]
     },
     {
@@ -582,8 +572,7 @@
       "blockedBy": [
         "disk_below_25_GiB",
         "register_model_identity_unassigned",
-        "I-2",
-        "I-7"
+        "I-2"
       ]
     },
     {
@@ -603,8 +592,7 @@
       },
       "proof": null,
       "blockedBy": [
-        "Leonardo API pause 2026-10-26",
-        "I-7"
+        "Leonardo API pause 2026-10-26"
       ]
     },
     {
@@ -624,8 +612,7 @@
       },
       "proof": null,
       "blockedBy": [
-        "Leonardo API pause 2026-10-26",
-        "I-7"
+        "Leonardo API pause 2026-10-26"
       ]
     },
     {
@@ -646,102 +633,11 @@
       "proof": null,
       "blockedBy": [
         "local_only_task",
-        "I-4",
-        "I-7"
-      ]
-    },
-    {
-      "id": "treatment_reasoning/athena_mlx",
-      "functionId": "treatment_reasoning",
-      "provider": "athena_mlx",
-      "venue": "local_process",
-      "conditional": false,
-      "modelIdentity": null,
-      "dataClass": "synthetic_only",
-      "qualification": "not_qualified",
-      "surfaces": {
-        "web": "not_verified",
-        "gpui": "not_verified",
-        "chat": "not_verified",
-        "headless": "not_verified"
-      },
-      "proof": null,
-      "blockedBy": [
-        "disk_below_25_GiB",
-        "register_model_identity_unassigned",
-        "I-3",
-        "I-7"
+        "I-4"
       ]
     }
   ],
-  "conditionalCells": [
-    {
-      "id": "treatment_reasoning/openai.responses.v1",
-      "functionId": "treatment_reasoning",
-      "provider": "openai.responses.v1",
-      "venue": "remote_api",
-      "conditional": true,
-      "modelIdentity": null,
-      "dataClass": "synthetic_only",
-      "qualification": "not_qualified",
-      "surfaces": {
-        "web": "not_verified",
-        "gpui": "not_verified",
-        "chat": "not_verified",
-        "headless": "not_verified"
-      },
-      "proof": null,
-      "blockedBy": [
-        "I-3b",
-        "I-7",
-        "ADR0166"
-      ]
-    },
-    {
-      "id": "treatment_reasoning/anthropic.messages.v1",
-      "functionId": "treatment_reasoning",
-      "provider": "anthropic.messages.v1",
-      "venue": "remote_api",
-      "conditional": true,
-      "modelIdentity": null,
-      "dataClass": "synthetic_only",
-      "qualification": "not_qualified",
-      "surfaces": {
-        "web": "not_verified",
-        "gpui": "not_verified",
-        "chat": "not_verified",
-        "headless": "not_verified"
-      },
-      "proof": null,
-      "blockedBy": [
-        "I-3b",
-        "I-7",
-        "ADR0166"
-      ]
-    },
-    {
-      "id": "treatment_reasoning/chatgpt",
-      "functionId": "treatment_reasoning",
-      "provider": "chatgpt",
-      "venue": "host_subscription",
-      "conditional": true,
-      "modelIdentity": null,
-      "dataClass": "synthetic_only",
-      "qualification": "not_qualified",
-      "surfaces": {
-        "web": "not_verified",
-        "gpui": "not_verified",
-        "chat": "not_verified",
-        "headless": "not_verified"
-      },
-      "proof": null,
-      "blockedBy": [
-        "I-3b",
-        "I-7",
-        "ADR0166"
-      ]
-    }
-  ],
+  "conditionalCells": [],
   "extraction": [
     {
       "id": "anydoc",
@@ -826,5 +722,107 @@
     "qualification": false,
     "semanticReview": "pending",
     "maxProcessMemoryBytes": 32212254720
+  },
+  "deferredCells": [
+    {
+      "id": "treatment_reasoning/athena_mlx",
+      "functionId": "treatment_reasoning",
+      "provider": "athena_mlx",
+      "venue": "local_process",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "Leonardo deferral 2026-10-30"
+      ],
+      "releaseDisposition": "deferred_beyond_0.9.1"
+    },
+    {
+      "id": "treatment_reasoning/openai.responses.v1",
+      "functionId": "treatment_reasoning",
+      "provider": "openai.responses.v1",
+      "venue": "remote_api",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "Leonardo deferral 2026-10-30"
+      ],
+      "releaseDisposition": "deferred_beyond_0.9.1"
+    },
+    {
+      "id": "treatment_reasoning/anthropic.messages.v1",
+      "functionId": "treatment_reasoning",
+      "provider": "anthropic.messages.v1",
+      "venue": "remote_api",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "Leonardo deferral 2026-10-30"
+      ],
+      "releaseDisposition": "deferred_beyond_0.9.1"
+    },
+    {
+      "id": "treatment_reasoning/chatgpt",
+      "functionId": "treatment_reasoning",
+      "provider": "chatgpt",
+      "venue": "host_subscription",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "Leonardo deferral 2026-10-30"
+      ],
+      "releaseDisposition": "deferred_beyond_0.9.1"
+    }
+  ],
+  "deferral": {
+    "date": "2026-10-30",
+    "criteria": [
+      "I-3",
+      "I-3b",
+      "I-7"
+    ],
+    "status": "deferred_beyond_0.9.1",
+    "runtimeAdmission": false,
+    "runtimeUnavailabilityVerified": false,
+    "reason": "deterministic_replay_0_of_32_and_upstream_research_only",
+    "pullRequest": "https://github.com/Wulfgardr/mediflow/pull/747",
+    "branch": "codex/athena-two-step",
+    "corpusAnd18Thresholds": "approved_unchanged",
+    "runtimeBlocker": "release_denial_implemented_surface_acceptance_pending"
   }
 }

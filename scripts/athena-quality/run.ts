@@ -1,3 +1,4 @@
+import { assertFunctionAvailableInRelease } from '../../lib/ai-function-availability.ts';
 import { accessSync, constants, createReadStream, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -7,6 +8,7 @@ import { approveRun, evaluateThresholds, fakeRunner, loadInputs, requireLocalVen
 import { describeAthenaMlxModelArtifact, generateWithAthenaMlx, resolveAthenaMlxLauncher } from '../../lib/athena-mlx-runtime.ts';
 
 async function main() {
+    assertFunctionAvailableInRelease('treatment_reasoning');
     const args = process.argv.slice(2);
     const mode = args.shift();
     if (!['--self-test', '--run', '--preflight'].includes(mode ?? '')) throw new Error('Usare --self-test, --preflight o --run');

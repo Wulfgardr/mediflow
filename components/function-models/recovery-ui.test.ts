@@ -1,3 +1,4 @@
+import * as availability from '../../lib/ai-function-availability.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mountContract, text, type TestNode } from '../settings/settings-presentation.test-support.ts';
@@ -28,7 +29,7 @@ for (const scenario of [
             props: { picker: { functionId: 'patient_insight', active: true,
                 client: { read: () => calls.push('read'), choose: (value: string) => calls.push(`choose:${value}`) },
                 view: { ...scenario, choice: null, loading: false } } },
-            imports: {
+            imports: { '@/lib/ai-function-availability': availability,
                 '@/components/choice-field': { ChoiceField: (props: Record<string, unknown>) => ({ type: 'select', props }) },
                 '@/lib/ai-lane-kill-switch': {},
                 '@/components/security-provider': {},

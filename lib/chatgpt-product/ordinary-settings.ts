@@ -1,6 +1,7 @@
+import 'server-only';
+import { assertFunctionAvailableInRelease } from '../ai-function-availability';
 import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY, readFunctionModelConfigurationGeneration } from '../ai-providers/fabric/function-model-configuration-generation';
 /* named setting, default OFF; no bearer capabilities are persisted. */
-import 'server-only';
 import * as owner from '../security/web-auth-lifecycle-owner-adapter';
 import { createHash } from 'node:crypto';
 import { FUNCTION_MODEL_IDS, FUNCTION_SWITCH_KEYS, isFunctionModelId, type FunctionModelId } from '../ai-providers/fabric/function-model-preferences';
@@ -68,7 +69,9 @@ export async function captureOrdinarySettings(functionId: FunctionModelId) {
 /** Caller is the authenticated named HTTP controller. It must retain the original
  * resource use across this await, then commit its response. No generic settings writer. */
 export async function writeOrdinaryCloudSettings(session: owner.WebSessionProjection, expectedRevision: string, change: Readonly<{ enabled?: boolean; preference?: Readonly<{ functionId: FunctionModelId; value: OrdinaryPreference }> }>, signal?: AbortSignal): Promise<void> {
+    if (change.preference) assertFunctionAvailableInRelease(change.preference.functionId);
     const port = owner.mintResourcePort(session);
+
     if (!port) throw new ProductError('session_expired');
     try {
     if (signal?.aborted) throw new ProductError('revoked');
