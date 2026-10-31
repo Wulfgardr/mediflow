@@ -109,7 +109,7 @@ pub(super) mod tests {
                 let mut entries = HashMap::<String, Value>::new();
                 let mut epoch = 2;
                 loop {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     if stopping.load(Ordering::Acquire) {
                         break;
                     }
