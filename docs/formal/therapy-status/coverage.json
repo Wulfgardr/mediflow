@@ -1,5 +1,5 @@
 {
-  "syncCommit": "4be9f54c3bbaaff13bd6e444eb359cb93f3ffb7c",
+  "syncCommit": "1c6fdef4ff091d8c912bbc5a2f08fe8a3ebb868d",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -44,15 +44,15 @@
     "lib/therapy-status-command-contract.ts": "3432124d9b5f8b3113265d9779fa12e1411e508b0964cfd2e1bc532f49f4a7fe",
     "lib/therapy-status-command-client.ts": "e2f833b062db819108f9ffddc6443e4bfce321a7d8a359666b84bc6b9b4ad30f",
     "lib/therapy-status-command-http.ts": "7b0a7a7780d5c98973a14f17fba32b722a3cb962cc2787c7e5edcf9789b43423",
-    "lib/therapy-status-command-backup.ts": "17bfa8c096092e5d62829a750b66e25cb64f149516e94bacbca38b67c16a2ee3",
+    "lib/therapy-status-command-backup.ts": "1606ac41684c18ed2f7ff6de19e378e0ef1baac5645d1a160c4906faba4bab92",
     "lib/therapy-status-command-schema.ts": "98c0aba0a361ef83655a632be41a257f8b9e99a950591113683a8094e26f4c87",
     "lib/therapy-status-command-recovery-schema.ts": "8231c04d505139c63f36f9657e2a2a0c964cd48b39d4ae4b2d2a0f2c552f5f4a",
-    "lib/ambulatory-destructive-command-recovery-schema.ts": "711da8179e8c0485047dab48dccd9b4845097f6ca77c0840d40912254054f5f7",
+    "lib/ambulatory-destructive-command-recovery-schema.ts": "a61f0d6f31854f516f3ed25eccae5561d251ccc99fbbde07e65ff594e5934c53",
     "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
     "lib/backup-encrypted-fields.json": "27d036cb546f048f96ac4f8f9a5eca6f8360a798ba8cf7d173deb19328ac77e3",
-    "lib/backup-import-provenance.ts": "08fcb18af678adccfdc485623febcb4cc8507e01c0dc310554433b1082a0824c",
+    "lib/backup-import-provenance.ts": "13eb1cc6083b5a07489d64cc9d195b82b6b8b660cb9874e4dc46b93fdf25999e",
     "lib/sqlite-schema.ts": "66f2641796c558334f1aa90346b4c936949cd4abce2d0b30dd06e3a284fcaea1",
-    "lib/sqlite-schema-open.ts": "b2a81d2ac4d09d2b3ecf87c7b3c1f74ce22e23d9d8d1a4e2be1249cadca7466e",
+    "lib/sqlite-schema-open.ts": "c02714ffe295b36dd297e9417605382a41566a8d68afe67c96d99568f0c32362",
     "lib/backup-restore-executor.ts": "227af5f5806ab46a081e660b4462a628db9e3f44ecfeff30ea3e14cf9dbe03ea",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802"
   },
@@ -92,7 +92,7 @@
     "baseRevision": "3828bb17d4883b28a646c16af10f9505fddded38",
     "proof": "causal controller/client/HTTP tests and real SQLite crashes/races/restore; TLC remains legacy ADR0156",
     "recoveryCompatibility": {
-      "reviewedRevision": "623c71a3af9d3eb31c55a21c72381be13128545e",
+      "reviewedRevision": "1c6fdef4ff091d8c912bbc5a2f08fe8a3ebb868d",
       "contract": {
         "adrs": [
           "0168",
@@ -102,10 +102,9 @@
         "predecessorVersions": [
           4,
           5,
-          6,
-          7
+          6
         ],
-        "currentVersion": 8,
+        "currentVersion": 7,
         "exactPredecessorOnly": true,
         "currentPhysicalExtensions": "preserved"
       },
@@ -114,13 +113,12 @@
       "canonicalSchemaFingerprints": {
         "4": "a998dad7b46c831f283032144f43cd690f68e962b199256ecd68c11736f867ed",
         "5": "33ce371c41f4cb51033af18ef9a0f06bf8c81a248bca29f18b21d3db9f24ea46",
-        "6": "4becef1521ec507b3da31047e01ab3e25562197c8a518472bb4cdef93ed3867b",
-        "7": "6f070ea8f87e6bb9ac4e03caa9e6b679c9ff6a1c66de5e23b6945fb235812d90"
+        "6": "4becef1521ec507b3da31047e01ab3e25562197c8a518472bb4cdef93ed3867b"
       },
       "unitTestCases": {
         "v4Wrapper": 8,
-        "v4v5v6v7Helper": 30,
-        "portableImportMigration": 8,
+        "v4v5v6Helper": 23,
+        "portableImportMigration": 5,
         "managedOwner": 19
       },
       "validatorFiles": [
