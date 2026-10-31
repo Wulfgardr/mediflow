@@ -9128,4 +9128,173 @@ mod g2_settings_tests {
         listener.set_nonblocking(true).unwrap();
         assert!(listener.accept().is_err());
     }
+    fn backup_schedule_wire(enabled: bool, installed: Value) -> Value {
+        json!({"supported":true,"installed":installed,"plistPath":null,"scheduleKind":"launchd",
+            "schedulePath":null,"state":{"version":1,"revision":"synthetic-revision","config":{"enabled":enabled,"hour":2,"minute":0,
+            "destinationDir":std::env::temp_dir().join("synthetic-backups").to_string_lossy(),"retentionKeepArtifacts":14},"run":{"lastRunAt":null,
+            "lastRunStatus":null,"lastRunMessage":"synthetic status ".repeat(6000),"lastArtifactPath":null,
+            "lastRetentionAt":null,"lastRetentionDeletedCount":null,"lastRetentionDeletedBytes":null,"lastRetentionMode":null}}})
+    }
+    #[test]
+    fn backup_schedule_confirmation_reread_conflict_lost_response_and_archive_replacement() {
+        use std::{net::TcpListener, thread};
+        for outcome in [
+            "ok",
+            "lost",
+            "unconfirmed",
+            "read-failed",
+            "post-conflict",
+            "conflict",
+            "replaced",
+        ] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                let before = backup_schedule_wire(false, json!(false));
+                assert!(before.to_string().len() > 64 * 1024);
+                let mut steps = vec![("GET", 200, before.clone()), ("GET", 200, before.clone())];
+                match outcome {
+                    "conflict" => steps.push(("GET", 200, backup_schedule_wire(true, json!(true)))),
+                    "replaced" => steps.push(("GET", 409, json!({"code":"ARCHIVE_REPLACED"}))),
+                    _ => {
+                        steps.push(("GET", 200, before));
+                        steps.push((
+                            "POST",
+                            if outcome == "lost" {
+                                0
+                            } else if outcome == "post-conflict" {
+                                409
+                            } else {
+                                200
+                            },
+                            backup_schedule_wire(true, json!(true)),
+                        ));
+                        if outcome != "lost" && outcome != "post-conflict" {
+                            steps.push((
+                                "GET",
+                                if outcome == "read-failed" { 500 } else { 200 },
+                                backup_schedule_wire(
+                                    true,
+                                    if outcome == "unconfirmed" {
+                                        Value::Null
+                                    } else {
+                                        json!(true)
+                                    },
+                                ),
+                            ));
+                        }
+                    }
+                }
+                for (method, status, body) in steps {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let request = read_request(&mut stream);
+                    assert!(
+                        request.starts_with(&format!("{method} /api/system/backup-scheduler "))
+                    );
+                    assert!(
+                        request.contains("x-mediflow-archive-generation: synthetic-generation")
+                    );
+                    if method == "POST" {
+                        let body: Value =
+                            serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1)
+                                .unwrap();
+                        assert_eq!(
+                            body,
+                            json!({"action":"save","expectedRevision":"synthetic-revision","config":{"enabled":true,"hour":2,"minute":0,"volumeProtectionAcknowledged":false,
+                            "destinationDir":std::env::temp_dir().join("synthetic-backups").to_string_lossy(),"retentionKeepArtifacts":14}})
+                        );
+                    }
+                    if status != 0 {
+                        local_host_reply(&mut stream, status, body, "");
+                    }
+                }
+                listener
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap();
+            let expected = access.read_backup_schedule().unwrap().state.config;
+            let mut after = expected.clone();
+            after.enabled = true;
+            let command = access.prepare_backup_schedule(&expected, after).unwrap();
+            {
+                let result = access.apply_backup_schedule(&command);
+                match outcome {
+                    "ok" => assert_eq!(result.unwrap().installed, Some(true)),
+                    "conflict" | "post-conflict" => {
+                        assert!(matches!(result, Err(RuntimeError::Conflict)))
+                    }
+                    "replaced" => assert!(matches!(result, Err(RuntimeError::ArchiveReplaced))),
+                    _ => assert!(matches!(result, Err(RuntimeError::Indeterminate))),
+                }
+                {
+                    assert!(matches!(
+                        access.apply_backup_schedule(&command),
+                        Err(RuntimeError::ReadRequired)
+                    ));
+                }
+            }
+            let listener = worker.join().unwrap();
+            listener.set_nonblocking(true).unwrap();
+            assert!(
+                listener.accept().is_err(),
+                "no retry or unconfirmed second submission"
+            );
+        }
+    }
+    #[test]
+    fn backup_schedule_rejects_stale_draft_unknown_installation_and_invalid_time() {
+        use std::{net::TcpListener, thread};
+        for outcome in ["stale", "unknown", "unsupported"] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/system/backup-scheduler "));
+                let mut status = backup_schedule_wire(
+                    outcome == "stale",
+                    if outcome == "unknown" {
+                        Value::Null
+                    } else {
+                        json!(false)
+                    },
+                );
+                if outcome == "unsupported" {
+                    status["supported"] = json!(false);
+                }
+                local_host_reply(&mut stream, 200, status, "");
+                listener
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap();
+            let expected: BackupScheduleConfig = serde_json::from_value(
+                backup_schedule_wire(false, json!(false))["state"]["config"].clone(),
+            )
+            .unwrap();
+            let mut after = expected.clone();
+            after.enabled = true;
+            assert!(matches!(
+                access.prepare_backup_schedule(&expected, after),
+                Err(RuntimeError::Conflict | RuntimeError::ReadRequired | RuntimeError::Forbidden)
+            ));
+            let mut invalid = expected.clone();
+            invalid.hour = 24;
+            assert!(matches!(
+                access.prepare_backup_schedule(&expected, invalid),
+                Err(RuntimeError::InvalidInput)
+            ));
+            let listener = worker.join().unwrap();
+            listener.set_nonblocking(true).unwrap();
+            assert!(listener.accept().is_err());
+        }
+    }
 }
