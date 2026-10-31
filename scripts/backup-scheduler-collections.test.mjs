@@ -140,9 +140,11 @@ test('scheduled publication never overwrites an artifact or an interrupted tempo
     fs.writeFileSync(target, 'previous artifact');
     assert.throws(() => publishScheduledBackup(target, 'new artifact'), { code: 'EEXIST' });
     assert.equal(fs.readFileSync(target, 'utf8'), 'previous artifact');
-    assert.equal(fs.readFileSync(`${target}.tmp`, 'utf8'), 'new artifact');
+    assert.equal(fs.existsSync(`${target}.tmp`), false);
+    fs.writeFileSync(`${target}.tmp`, 'interrupted artifact');
     assert.throws(() => publishScheduledBackup(target, 'third artifact'), { code: 'EEXIST' });
-    assert.equal(fs.readFileSync(`${target}.tmp`, 'utf8'), 'new artifact');
+    assert.equal(fs.readFileSync(`${target}.tmp`, 'utf8'), 'interrupted artifact');
+    assert.equal(fs.readFileSync(target, 'utf8'), 'previous artifact');
     const fresh = path.join(directory, 'fresh.mediflow');
     publishScheduledBackup(fresh, 'complete synthetic artifact');
     assert.equal(fs.readFileSync(fresh, 'utf8'), 'complete synthetic artifact');
