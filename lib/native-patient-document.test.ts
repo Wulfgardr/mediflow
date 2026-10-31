@@ -176,12 +176,12 @@ test('native route rejects URLs, source IDs and caller candidates; returns only 
     assert.deepEqual(await send({ operation: 'execute', commandId: staged.body.commandId, pin }), { status: 200, body: expectedReceipt(staged.body.commandId) });
     assert.deepEqual(await send({ operation: 'receipt', commandId: staged.body.commandId }), { status: 200, body: expectedReceipt(staged.body.commandId) });
 });
-test('unknown after service restart stays unknown, including retirement', async () => {
+test('unknown receipt is pure and explicit retirement works across service instances', async () => {
     const context = fixture(), api = createNativePatientDocumentService(dbServer);
     const view = await api.stage(context, await document());
     const restarted = createNativePatientDocumentService(dbServer);
     assert.deepEqual(await restarted.receipt(context, view.commandId), { outcome: 'unknown' });
-    assert.deepEqual(await restarted.revoke(context, view.commandId), { outcome: 'unknown' });
+    assert.deepEqual(await restarted.revoke(context, view.commandId), { outcome: 'retired' });
     await api.revoke(context, view.commandId);
 });
 test('duplicate requires a separate explicit choice and never changes the existing patient', async () => {
@@ -492,7 +492,7 @@ test('durable native receipt permits only the same operator device archive and s
     await assert.rejects(restart.preview(fresh, view.commandId, view.viewId, review()));
     const unknown = randomUUID();
     assert.deepEqual(await restart.receipt(fresh, unknown), { outcome: 'unknown' });
-    assert.deepEqual(await restart.revoke(fresh, unknown), { outcome: 'unknown' });
+    assert.deepEqual(await restart.revoke(fresh, unknown), { outcome: 'retired' });
     const otherOperator = () => {
         const other = fixture(context.scopeAmbulatoryId);
         const user = { id: randomUUID(), username: randomUUID(), role: 'admin' };

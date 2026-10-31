@@ -97,7 +97,21 @@ impl RuntimeSession {
             return Err(RuntimeError::InvalidInput);
         }
         let _guard = self.begin_write()?;
-        let body = {
+        #[derive(serde::Serialize)]
+        struct Source<'a> {
+            name: String,
+            path: String,
+            data: String,
+            #[serde(rename = "fileKey")]
+            file_key: &'a [u8],
+            original: &'a str,
+        }
+        #[derive(serde::Serialize)]
+        struct Stage<'a> {
+            operation: &'a str,
+            source: Source<'a>,
+        }
+        let (data, key, sealed_name, sealed_path) = {
             let secrets = self
                 .inner
                 .secrets
@@ -105,22 +119,36 @@ impl RuntimeSession {
                 .map_err(|_| RuntimeError::Locked)?;
             let master = secrets.master.as_ref().ok_or(RuntimeError::Locked)?;
             let (data, key) = crypto::seal_patient_document(bytes, master)?;
-            PrivateJson(json!({"operation":"stage", "source": {
-                "name":crypto::seal(&json!(name), master)?, "path":crypto::seal(&json!(name), master)?,
-                "data": data, "fileKey":key.as_slice(), "original":BASE64.encode(bytes)
-            }}))
+            (
+                data,
+                key,
+                crypto::seal(&json!(name), master)?,
+                crypto::seal(&json!(name), master)?,
+            )
         };
-        let mut result = PrivateJson(self.request(
+        let original = Zeroizing::new(BASE64.encode(bytes));
+        let body = Stage {
+            operation: "stage",
+            source: Source {
+                name: sealed_name,
+                path: sealed_path,
+                data,
+                file_key: key.as_slice(),
+                original: &original,
+            },
+        };
+        let mut result = PrivateJson(self.request_serializable(
             Method::POST,
             PATH,
             &[],
             Some(scope),
-            Some(&body.0),
+            Some(&body),
             true,
             crate::http::JsonLimits {
                 request: STAGE_JSON_LIMIT,
                 response: JSON_LIMIT,
             },
+            None,
         )?);
         let r = &mut result.0;
         if r["identity"] != "ambiguous"

@@ -1,7 +1,7 @@
 import { isSealedAttachmentData } from './attachment-payload';
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import type { dbServer } from './db-server';
 import { ambulatories, attachments, auditEvents, patients, patientsToAmbulatories, users } from './schema';
 import { activePatients } from './patient-lifecycle';
@@ -100,11 +100,21 @@ function duplicateSet(tx: Tx, values: typeof patients.$inferInsert): string {
         .map(row => row.id).sort().join(',');
 }
 
+type PendingCommand = { owner: PatientDocumentCreateHost; release: () => void };
+const liveCommands = new WeakMap<typeof dbServer, {
+    pending: Map<string, PendingCommand>; executing: Map<string, PatientDocumentCreateHost>;
+}>();
+
 /** The host supplies its current session/scope and source owners, never capabilities decoded from JSON. */
 export function createPatientDocumentCommandService(database: typeof dbServer, clock: () => number = Date.now) {
     const approvals = createNativeChatWriteApprovals<Command>(clock);
     const views = new Map<string, { commandId: string; source: PreparedPatientDocument; port: PatientDocumentSourcePort; at: number }>();
-    const pending = new Map<string, { owner: PatientDocumentCreateHost; release: () => void }>();
+    let live = liveCommands.get(database);
+    if (!live) {
+        live = { pending: new Map(), executing: new Map() };
+        liveCommands.set(database, live);
+    }
+    const { pending, executing } = live;
     const binding = (host: PatientDocumentCreateHost, sourceId: string) => ({ session: host.session, scope: host.ambulatoryId, selection: host.epoch, resource: sourceId });
     function admit(tx: Tx, host: PatientDocumentCreateHost) {
         host.assertCurrent(tx);
@@ -180,6 +190,7 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
             const known = database.transaction(tx => { admit(tx, host); return receipt(tx, host, commandId); }, { behavior: 'immediate' });
             if (known.outcome !== 'unknown') return known;
             const preview = approvals.consume(commandId, { session: host.session, scope: host.ambulatoryId });
+            executing.set(commandId, host);
             let terminal = false;
             try {
                 approvals.check(preview);
@@ -235,6 +246,7 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
                 }
                 throw error;
             } finally {
+                executing.delete(commandId);
                 approvals.finish(commandId);
                 if (terminal) pending.get(commandId)?.release();
             }
@@ -245,13 +257,21 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
                 const known = receipt(tx, host, commandId);
                 if (known.outcome !== 'unknown') return known;
                 const active = pending.get(commandId);
-                if (!active) return { outcome: 'unknown' as const };
-                if (!sameOwner(active.owner, host) || (active.owner.session !== host.session
-                    && (host.surface !== 'native' || active.owner.surface !== 'native' || !host.pairedClientId))) return deny();
-                approvals.revoke(commandId, { session: active.owner.session, scope: active.owner.ambulatoryId });
+                const owner = active?.owner ?? executing.get(commandId);
+                if (owner && (!sameOwner(owner, host) || (owner.session !== host.session
+                    && (host.surface !== 'native' || owner.surface !== 'native' || !host.pairedClientId)))) return deny();
+                if (!owner) {
+                    if (host.surface !== 'native' || !host.pairedClientId) return { outcome: 'unknown' as const };
+                    const recent = tx.select({ count: sql<number>`count(*)` }).from(auditEvents).where(and(
+                        eq(auditEvents.eventType, 'patient.create.retired'), eq(auditEvents.actorRef, host.actorRef),
+                        gte(auditEvents.occurredAt, new Date(Date.now() - 3_600_000)),
+                    )).get();
+                    if (!recent || recent.count >= 128) return deny();
+                }
+                if (active) approvals.revoke(commandId, { session: active.owner.session, scope: active.owner.ambulatoryId });
                 audit(tx, host, commandId);
                 admit(tx, host);
-                active.release();
+                active?.release();
                 return { outcome: 'retired' as const };
             }, { behavior: 'immediate' });
         },
