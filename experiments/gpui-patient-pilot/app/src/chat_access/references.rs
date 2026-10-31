@@ -100,6 +100,8 @@ impl CommandReferences {
             return Ok(ReferenceScan::default());
         }
         let path = self.directory()?;
+        let lock = fs::File::open(path)?;
+        lock.lock()?;
         let mut scan = ReferenceScan::default();
         for entry in fs::read_dir(path)? {
             let name = entry?.file_name();
@@ -163,6 +165,8 @@ impl CommandReferences {
             return Err(io::ErrorKind::InvalidInput.into());
         }
         let directory = self.directory()?;
+        let lock = fs::File::open(directory)?;
+        lock.lock()?;
         match fs::symlink_metadata(directory.join(id)) {
             Ok(_) => return self.verify(id),
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
@@ -176,6 +180,8 @@ impl CommandReferences {
         if !Self::valid(id) {
             return Err(io::ErrorKind::InvalidInput.into());
         }
+        let lock = fs::File::open(self.directory()?)?;
+        lock.lock()?;
         fs::remove_file(self.directory()?.join(id))?;
         fs::File::open(self.directory()?)?.sync_all()
     }
@@ -184,6 +190,37 @@ impl CommandReferences {
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
+    #[test]
+    fn scan_waits_for_atomic_publication_instead_of_deleting_its_temporary_file() {
+        let store = CommandReferences::default();
+        let directory = store.directory().unwrap().to_owned();
+        let lock = fs::File::open(&directory).unwrap();
+        lock.lock().unwrap();
+        let id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+        let temporary = store.stage(id).unwrap();
+        let (send, receive) = std::sync::mpsc::channel();
+        let reader = store.clone();
+        let worker = std::thread::spawn(move || {
+            send.send(reader.scan().unwrap().ids).unwrap();
+        });
+        assert!(
+            receive
+                .recv_timeout(std::time::Duration::from_millis(100))
+                .is_err()
+        );
+        fs::rename(&temporary, directory.join(id)).unwrap();
+        fs::File::open(&directory).unwrap().sync_all().unwrap();
+        drop(lock);
+        assert_eq!(
+            receive
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap(),
+            [id]
+        );
+        worker.join().unwrap();
+        fs::remove_dir_all(directory).unwrap();
+    }
+
     #[test]
     fn unconfigured_store_has_no_recovery_but_cannot_authorize() {
         let store = CommandReferences::new(None);

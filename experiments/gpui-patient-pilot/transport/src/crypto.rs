@@ -227,6 +227,56 @@ pub(crate) fn is_ciphertext(value: &str) -> bool {
     value.starts_with("ENC:") || value.starts_with("ENC2:")
 }
 
+pub(crate) fn seal_patient_document(
+    bytes: &[u8],
+    master: &MasterKey,
+) -> Result<(String, MasterKey)> {
+    let mut key = Zeroizing::new([0u8; 32]);
+    let mut wrap_iv = [0u8; 12];
+    let mut iv = [0u8; 12];
+    getrandom::fill(key.as_mut()).map_err(|_| RuntimeError::Crypto)?;
+    getrandom::fill(&mut wrap_iv).map_err(|_| RuntimeError::Crypto)?;
+    getrandom::fill(&mut iv).map_err(|_| RuntimeError::Crypto)?;
+    let data = seal_patient_document_with_material(bytes, master, &key, &wrap_iv, &iv)?;
+    Ok((data, key))
+}
+
+fn seal_patient_document_with_material(
+    bytes: &[u8],
+    master: &MasterKey,
+    key: &MasterKey,
+    wrap_iv: &[u8; 12],
+    iv: &[u8; 12],
+) -> Result<String> {
+    let wrapped = Aes256Gcm::new_from_slice(master.as_ref())
+        .map_err(|_| RuntimeError::Crypto)?
+        .encrypt(
+            Nonce::from_slice(wrap_iv),
+            Payload {
+                msg: key.as_ref(),
+                aad: b"mediflow.attachment.file-key.v2",
+            },
+        )
+        .map_err(|_| RuntimeError::Crypto)?;
+    let data = Aes256Gcm::new_from_slice(key.as_ref())
+        .map_err(|_| RuntimeError::Crypto)?
+        .encrypt(
+            Nonce::from_slice(iv),
+            Payload {
+                msg: bytes,
+                aad: b"mediflow.attachment.data.v2",
+            },
+        )
+        .map_err(|_| RuntimeError::Crypto)?;
+    Ok(format!(
+        "ENC2:{}:{}:{}:{}",
+        BASE64.encode(wrap_iv),
+        BASE64.encode(wrapped),
+        BASE64.encode(iv),
+        BASE64.encode(data)
+    ))
+}
+
 fn open_file(value: &str, master: &MasterKey) -> Result<Value> {
     let parts: Vec<&str> = value.split(':').collect();
     if parts.len() != 5 || parts[0] != "ENC2" {
@@ -311,6 +361,27 @@ mod tests {
                 .unwrap(),
         );
         let data = vector["data"].as_str().unwrap();
+        let file_key = Zeroizing::new(serde_json::from_value(vector["fileKey"].clone()).unwrap());
+        let original = BASE64.decode(vector["original"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            seal_patient_document_with_material(
+                &original,
+                &master,
+                &file_key,
+                &std::array::from_fn(|i| 40 + i as u8),
+                &std::array::from_fn(|i| 80 + i as u8)
+            )
+            .unwrap(),
+            data
+        );
+        let (first, first_key) = seal_patient_document(&original, &master).unwrap();
+        let (second, second_key) = seal_patient_document(&original, &master).unwrap();
+        assert_ne!(first, second);
+        assert_ne!(first_key.as_ref(), second_key.as_ref());
+        assert_eq!(
+            open(&first, &master).unwrap(),
+            open(&second, &master).unwrap()
+        );
         let expected = Value::String(format!(
             "data:application/pdf;base64,{}",
             vector["original"].as_str().unwrap()
