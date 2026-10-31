@@ -3,15 +3,8 @@
 // name the current /api/v1/network contract; names are kept verbatim for now
 // (the future GRDB persistence layer may introduce separate domain models). The
 // URLSession transport stays in the Apple layer. Payload encoders use PatchValue
-// (same module). No CryptoKit/URLSession here.
+// (same module). Foundation-only: no CryptoKit/URLSession here.
 import Foundation
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif os(Windows)
-import WinSDK
-#endif
 
 public struct HomeBaseConnectionConfiguration: Hashable, Sendable {
     public var serverURLString: String
@@ -54,25 +47,53 @@ public struct HomeBaseConnectionConfiguration: Hashable, Sendable {
             host.removeLast()
         }
         if host == "localhost" { return true }
-        guard !host.utf8.contains(0) else { return false }
-        for family in [Int32(AF_INET), Int32(AF_INET6)] {
-            var bytes = [UInt8](repeating: 0, count: 16)
-            let valid = host.withCString { literal in
-                bytes.withUnsafeMutableBytes { address in
-                    #if os(Windows)
-                    InetPtonA(family, literal, address.baseAddress) == 1
-                    #else
-                    inet_pton(family, literal, address.baseAddress) == 1
-                    #endif
-                }
-            }
-            guard valid else { continue }
-            if family == Int32(AF_INET) { return bytes[0] == 127 }
-            return (bytes.prefix(15).allSatisfy { $0 == 0 } && bytes[15] == 1)
-                || (bytes.prefix(10).allSatisfy { $0 == 0 } && bytes[10] == 255
-                    && bytes[11] == 255 && bytes[12] == 127)
+        if let octets = ipv4Octets(host) { return octets[0] == 127 }
+        guard let bytes = ipv6Bytes(host) else { return false }
+        return (bytes.prefix(15).allSatisfy { $0 == 0 } && bytes[15] == 1)
+            || (bytes.prefix(10).allSatisfy { $0 == 0 } && bytes[10] == 255
+                && bytes[11] == 255 && bytes[12] == 127)
+    }
+
+    private static func ipv4Octets(_ literal: String) -> [UInt8]? {
+        let fields = literal.split(separator: ".", omittingEmptySubsequences: false)
+        guard fields.count == 4 else { return nil }
+        let octets = fields.compactMap { field -> UInt8? in
+            guard (1...3).contains(field.utf8.count),
+                  field.utf8.allSatisfy({ (48...57).contains($0) }) else { return nil }
+            return UInt8(field)
         }
-        return false
+        return octets.count == 4 ? octets : nil
+    }
+
+    private static func ipv6Bytes(_ literal: String) -> [UInt8]? {
+        let halves = literal.components(separatedBy: "::")
+        guard halves.count <= 2 else { return nil }
+        let compressed = halves.count == 2
+        guard let head = ipv6Groups(halves[0], allowsIPv4Tail: !compressed),
+              let tail = compressed ? ipv6Groups(halves[1], allowsIPv4Tail: true) : [] else { return nil }
+        if compressed {
+            guard head.count + tail.count <= 14 else { return nil }
+            return head + [UInt8](repeating: 0, count: 16 - head.count - tail.count) + tail
+        }
+        return head.count == 16 ? head : nil
+    }
+
+    private static func ipv6Groups(_ part: String, allowsIPv4Tail: Bool) -> [UInt8]? {
+        if part.isEmpty { return [] }
+        let fields = part.split(separator: ":", omittingEmptySubsequences: false)
+        var bytes: [UInt8] = []
+        for (index, field) in fields.enumerated() {
+            if allowsIPv4Tail, index == fields.count - 1, field.contains(".") {
+                guard let octets = ipv4Octets(String(field)) else { return nil }
+                bytes += octets
+                continue
+            }
+            guard (1...4).contains(field.utf8.count), field.utf8.allSatisfy({ byte in
+                (48...57).contains(byte) || (97...102).contains(byte)
+            }), let group = UInt16(field, radix: 16) else { return nil }
+            bytes += [UInt8(group >> 8), UInt8(group & 0xff)]
+        }
+        return bytes
     }
 
     public func apiBaseURL() throws -> URL {
