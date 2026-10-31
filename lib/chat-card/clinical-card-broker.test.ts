@@ -272,3 +272,12 @@ test('missing, malformed or unnormalizable native identifiers fail closed', asyn
         await assert.rejects(b.owner.prepare(all, known as never));
     }
 });
+
+test('clinical exemptions are closed terms, never generated dosage patterns', async () => {
+    const { isClosedClinicalTerm } = await import('./clinical-terms');
+    assert.equal(isClosedClinicalTerm('Vitamina D3 1000 UI'), true);
+    assert.equal(isClosedClinicalTerm('Vitamina D3 123456 UI'), false);
+    assert.equal(isClosedClinicalTerm('Vitamina D3 1000 UI in Marta Valli'), false);
+    const b = broker(); await b.owner.selectPatient('homonym');
+    await assert.rejects(b.owner.prepare({ diagnoses: ['Vitamina D3 1000 UI'], noteExcerpts: [] }, { names: ['Vitamina'], birthDates: [] }));
+});
