@@ -34,6 +34,14 @@ fn validate(value: Value, section: &str) -> Result<Value> {
     }
 }
 impl LocalHostAccess {
+    pub fn read_authentication_health(&self) -> Result<Value> {
+        let value = self.request(Method::GET, &["api", "auth", "check"], None, false)?;
+        if value["status"].is_string() {
+            Ok(value)
+        } else {
+            Err(RuntimeError::InvalidResponse)
+        }
+    }
     pub fn read_controls(&self) -> Result<ControlsSnapshot> {
         let read = |section| {
             retain_section(
