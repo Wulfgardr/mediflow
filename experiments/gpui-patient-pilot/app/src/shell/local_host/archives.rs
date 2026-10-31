@@ -1,3 +1,4 @@
+mod schedule;
 use super::*;
 use mediflow_runtime_client::{PreparedArchiveRestore, RestoreConfirmation, RestoreLookup};
 use std::{
@@ -28,6 +29,7 @@ enum FileResult {
 }
 pub(super) struct ArchiveArea {
     operation: ArchiveOperation,
+    schedule: schedule::ScheduleArea,
     confirmation: Entity<TextInput>,
     pending: Option<RestoreLookup>,
     journal: Option<PathBuf>,
@@ -60,6 +62,7 @@ impl ArchiveArea {
         };
         Self {
             operation: ArchiveOperation::Idle,
+            schedule: schedule::ScheduleArea::new(theme, cx),
             confirmation,
             pending,
             journal,
@@ -86,10 +89,11 @@ impl ArchiveArea {
         Ok(())
     }
     pub(super) fn has_work(&self) -> bool {
-        !matches!(self.operation, ArchiveOperation::Idle)
+        !matches!(self.operation, ArchiveOperation::Idle) || self.schedule.has_work()
     }
     pub(super) fn withdraw(&mut self, cx: &mut App) {
         self.operation = ArchiveOperation::Idle;
+        self.schedule.withdraw(cx);
         self.confirmation.update(cx, |input, cx| input.retire(cx));
         self.status = None;
         self.receipt_verified = false;
@@ -101,6 +105,7 @@ impl ArchiveArea {
         window: &mut Window,
         cx: &mut Context<ClinicalApp>,
     ) {
+        self.schedule.configure(theme, cx);
         let focus_review = std::mem::take(&mut self.focus_review);
         self.confirmation.update(cx, |input, cx| {
             if focus_review {
@@ -226,7 +231,7 @@ impl ClinicalApp {
         if let Some(message) = &area.status {
             pane = pane.child(notice("archive-status", message.clone(), theme, false));
         }
-        pane
+        pane.child(self.backup_schedule_view(cx))
     }
     fn pick_archive_export(&mut self, recovery: bool, cx: &mut Context<Self>) {
         if !self.archive_available() {

@@ -298,12 +298,12 @@ async function main() {
     });
 
     const retention = {
-      staleArtifactRemoved: !fs.existsSync(staleArtifact),
-      staleTempRemoved: !fs.existsSync(staleTemp),
+      staleArtifactPreserved: fs.existsSync(staleArtifact),
+      staleTempPreserved: fs.existsSync(staleTemp),
       unrelatedFilePreserved: fs.existsSync(unrelatedFile),
     };
-    if (!retention.staleArtifactRemoved || !retention.staleTempRemoved || !retention.unrelatedFilePreserved) {
-      failures.push({ step: 'retention', message: 'Retention evidence did not match keep-last-N expectations.', remediation: 'Check applyBackupRetention before trusting cleanup.' });
+    if (!retention.staleArtifactPreserved || !retention.staleTempPreserved || !retention.unrelatedFilePreserved) {
+      failures.push({ step: 'retention', message: 'Scheduled backup removed earlier recovery artifacts.', remediation: 'Preserve earlier backups and temporary artifacts.' });
     }
     const realRestoreStartedAt = process.hrtime.bigint();
     const realRestore = await (async () => {

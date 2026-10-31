@@ -198,3 +198,153 @@ impl LocalHostAccess {
         Ok(receipt)
     }
 }
+
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupScheduleConfig {
+    pub enabled: bool,
+    pub hour: u8,
+    pub minute: u8,
+    pub destination_dir: String,
+    pub retention_keep_artifacts: u64,
+}
+impl BackupScheduleConfig {
+    pub fn validate(&self) -> Result<()> {
+        if self.hour > 23
+            || self.minute > 59
+            || self.destination_dir.trim().is_empty()
+            || self.destination_dir.chars().any(char::is_control)
+            || self.destination_dir.len() > 3000
+            || self.destination_dir.trim() != self.destination_dir
+            || !std::path::Path::new(&self.destination_dir).is_absolute()
+            || !(1..=365).contains(&self.retention_keep_artifacts)
+        {
+            return Err(RuntimeError::InvalidInput);
+        }
+        Ok(())
+    }
+}
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupScheduleRun {
+    pub last_run_at: Option<String>,
+    pub last_run_status: Option<String>,
+    pub last_run_message: Option<String>,
+    pub last_artifact_path: Option<String>,
+}
+#[derive(Clone, Deserialize, Debug)]
+pub struct BackupScheduleState {
+    pub version: u64,
+    pub config: BackupScheduleConfig,
+    pub run: BackupScheduleRun,
+}
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupScheduleStatus {
+    pub supported: bool,
+    pub installed: Option<bool>,
+    pub observation_message: Option<String>,
+    pub state: BackupScheduleState,
+}
+impl BackupScheduleStatus {
+    fn parse(value: Value) -> Result<Self> {
+        let status: Self =
+            serde_json::from_value(value).map_err(|_| RuntimeError::InvalidResponse)?;
+        status
+            .state
+            .config
+            .validate()
+            .map_err(|_| RuntimeError::InvalidResponse)?;
+        if status.state.version != 1
+            || !matches!(
+                status.state.run.last_run_status.as_deref(),
+                None | Some("success" | "error")
+            )
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        Ok(status)
+    }
+}
+pub struct PreparedBackupSchedule {
+    owner: Weak<()>,
+    before: BackupScheduleConfig,
+    after: BackupScheduleConfig,
+    installed: bool,
+    submitted: AtomicBool,
+}
+impl PreparedBackupSchedule {
+    pub fn config(&self) -> &BackupScheduleConfig {
+        &self.after
+    }
+}
+impl LocalHostAccess {
+    pub fn read_backup_schedule(&self) -> Result<BackupScheduleStatus> {
+        let value = self.request(
+            Method::GET,
+            &["api", "system", "backup-scheduler"],
+            None,
+            false,
+        )?;
+        BackupScheduleStatus::parse(value)
+    }
+    pub fn prepare_backup_schedule(
+        &self,
+        expected: &BackupScheduleConfig,
+        after: BackupScheduleConfig,
+    ) -> Result<PreparedBackupSchedule> {
+        after.validate()?;
+        let before = self.read_backup_schedule()?;
+        if &before.state.config != expected {
+            return Err(RuntimeError::Conflict);
+        }
+        if after.enabled && !before.supported {
+            return Err(RuntimeError::Forbidden);
+        }
+        Ok(PreparedBackupSchedule {
+            owner: Arc::downgrade(&self.owner),
+            before: before.state.config,
+            after,
+            installed: before.installed.ok_or(RuntimeError::ReadRequired)?,
+            submitted: AtomicBool::new(false),
+        })
+    }
+    pub fn apply_backup_schedule(
+        &self,
+        command: &PreparedBackupSchedule,
+    ) -> Result<BackupScheduleStatus> {
+        if !command.owner.ptr_eq(&Arc::downgrade(&self.owner)) {
+            return Err(RuntimeError::ReadRequired);
+        }
+        self.headers()?;
+        if command.submitted.swap(true, Ordering::AcqRel) {
+            return Err(RuntimeError::ReadRequired);
+        }
+        let before = self.read_backup_schedule()?;
+        if before.state.config != command.before || before.installed != Some(command.installed) {
+            return Err(RuntimeError::Conflict);
+        }
+        if command.after.enabled && !before.supported {
+            return Err(RuntimeError::Forbidden);
+        }
+        self.request(
+            Method::POST,
+            &["api", "system", "backup-scheduler"],
+            Some(&json!({"action":"save", "config":command.after})),
+            true,
+        )?;
+        let observed = self.read_backup_schedule().map_err(|error| {
+            if error.retires_session() {
+                error
+            } else {
+                RuntimeError::Indeterminate
+            }
+        })?;
+        if observed.state.config != command.after
+            || observed.installed != Some(command.after.enabled)
+        {
+            return Err(RuntimeError::Indeterminate);
+        }
+        Ok(observed)
+    }
+}
