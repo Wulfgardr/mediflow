@@ -62,12 +62,16 @@ pub(super) fn partial_notes(notes: &str, excerpts: &[String]) -> bool {
     if excerpts.is_empty() {
         return true;
     }
+    let compact = |text: &str| text.chars().filter(|c| !c.is_whitespace()).count();
     let mut covered = vec![false; notes.len()];
     for text in excerpts {
-        let Some(start) = notes.find(text) else {
+        // An edited local copy is no longer in the notes, but it cannot be as long as all of them.
+        if compact(text) >= compact(notes) {
             return false;
-        };
-        covered[start..start + text.len()].fill(true);
+        }
+        if let Some(start) = notes.find(text) {
+            covered[start..start + text.len()].fill(true);
+        }
     }
     notes
         .char_indices()
@@ -77,6 +81,17 @@ pub(super) fn partial_notes(notes: &str, excerpts: &[String]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn an_edited_copy_cannot_bring_back_the_whole_note() {
+        let notes = "Asma stabile. Terapia invariata.";
+        assert!(!partial_notes(notes, &[notes.into()]));
+        assert!(!partial_notes(
+            notes,
+            &["Asma stabile. Terapia invariata!".into()]
+        ));
+        assert!(partial_notes(notes, &["Asma stabile, migliorata.".into()]));
+        assert!(partial_notes(notes, &["Asma stabile.".into()]));
+    }
     #[test]
     fn known_identifiers_include_identity_contacts_caregiver_and_metadata() {
         let profile: PatientDetail = serde_json::from_value(serde_json::json!({"id":"synthetic-id", "firstName":"Marta", "lastName":"Valli", "taxCode":"RSSMRA80D12F205X", "birthDate":"1972-04-17", "phone":"3471234567", "address":"Via Fittizia 42", "caregiver":"Ada Lattesi ada@example.test", "ambulatoryId":"synthetic-scope", "createdAt":"2026-01-01", "version":1})).unwrap();
