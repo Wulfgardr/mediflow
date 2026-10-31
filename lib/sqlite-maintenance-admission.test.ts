@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
@@ -22,7 +23,7 @@ function fixture() {
     return { dir, target, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 function child(script: string, dir: string, preloads: string[] = []) {
-    const worker = spawn(process.execPath, ['--import', './scripts/register-strip-types-loader.mjs', ...preloads.flatMap(file => ['--import', file]), '--input-type=module', '-e', script], {
+    const worker = spawn(process.execPath, ['--import', './scripts/register-strip-types-loader.mjs', ...preloads.flatMap(file => ['--import', pathToFileURL(file).href]), '--input-type=module', '-e', script], {
         cwd: root, env: { ...process.env, MEDIFLOW_DATA_DIR: dir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1' },
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     });
@@ -103,6 +104,7 @@ test('a maintenance owner in another process excludes a second maintenance callb
     const f = fixture();
     const w = child(`
         import path from 'node:path';
+import { pathToFileURL } from 'node:url';
         import { runWithSqliteMaintenance } from './lib/sqlite-maintenance-admission.mjs';
         await runWithSqliteMaintenance(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'), {}, async () => {
             const done = new Promise(resolve => process.once('message', resolve));
@@ -134,6 +136,7 @@ test('intent first denies native open and cannot create a missing target', async
             const w = child(`
                 import assert from 'node:assert/strict';
                 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
                 import { openAdmittedSqlite } from './lib/sqlite-maintenance-admission.mjs';
                 assert.throws(() => openAdmittedSqlite(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db')), /maintenance_pending/);
                 process.disconnect();
@@ -148,6 +151,7 @@ test('another process admitted first drains before snapshot; subsequent open is 
     const f = fixture();
     const w = child(`
         import path from 'node:path';
+import { pathToFileURL } from 'node:url';
         import { openAdmittedSqlite } from './lib/sqlite-maintenance-admission.mjs';
         const lease = openAdmittedSqlite(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));
         lease.database.pragma('journal_mode = WAL');
@@ -192,6 +196,7 @@ test('drain polling does not hold the gate while another process closes its nati
     const w = child(`
         import fs from 'node:fs';
         import path from 'node:path';
+import { pathToFileURL } from 'node:url';
         import { setTimeout as delay } from 'node:timers/promises';
         import { openAdmittedSqlite } from './lib/sqlite-maintenance-admission.mjs';
         const dir = process.env.MEDIFLOW_DATA_DIR;
@@ -305,6 +310,7 @@ test('final zero-lease verification excludes admission between counting and main
             try {
                 const contender = spawnSync(process.execPath, ['--input-type=module', '-e', `
                     import path from 'node:path';
+import { pathToFileURL } from 'node:url';
                     import { openAdmittedSqlite } from './lib/sqlite-maintenance-admission.mjs';
                     try {
                         const lease = openAdmittedSqlite(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));
@@ -439,6 +445,7 @@ test('interrupted participant is never reaped from PID or mtime', async () => {
     const f = fixture();
     const w = child(`
         import path from 'node:path';
+import { pathToFileURL } from 'node:url';
         import { openAdmittedSqlite } from './lib/sqlite-maintenance-admission.mjs';
         openAdmittedSqlite(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));
         process.exit(86);
@@ -559,6 +566,7 @@ test('process exit after callback entry leaves intent and never grants a new own
     const f = fixture();
     const w = child(`
         import path from 'node:path';
+import { pathToFileURL } from 'node:url';
         import { runWithSqliteMaintenance } from './lib/sqlite-maintenance-admission.mjs';
         await runWithSqliteMaintenance(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'), {}, () => process.exit(87));
     `, f.dir);
@@ -584,6 +592,7 @@ function schedulerFixture() {
 const schedulerWorker = `
     import fs from 'node:fs';
     import path from 'node:path';
+import { pathToFileURL } from 'node:url';
     import Database from 'better-sqlite3';
     const target = fs.realpathSync(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));
     const seen = new Set(), closed = new Set();
