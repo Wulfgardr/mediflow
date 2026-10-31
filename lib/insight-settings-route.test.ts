@@ -13,6 +13,7 @@ function route() {
         '@/lib/backup-restore-receipt-contract': { RESTORE_RECEIPT_PREFIX: 'restore.' },
         '@/lib/ai-providers/fabric/function-model-settings-write': { writeSettingWithFunctionModelGeneration: (...args: unknown[]) => writes.push(args) },
         '@/lib/security/archive-write-request': { archiveWriteRequestDenial: () => null },
+        '@/lib/security/network-mode-write': { networkModeWriteDenial: () => null },
         'next/server': { NextResponse: Response },
         '@/lib/db-server': { dbServer: { select: () => ({ from: () => ({ where: () => ({ get: () => ({ key: 'aiInsightManualConfig', value: '{"maxDocuments":99}' }) }) }) }) } },
         '@/lib/schema': { settings: { key: 'key' } }, 'drizzle-orm': { eq: () => null },

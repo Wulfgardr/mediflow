@@ -37,7 +37,7 @@ const dataDirectory = path.join(owned, 'data-candidate');
 const logDirectory = path.join(owned, 'logs');
 const privatePath = path.join(owned, 'candidate-private.json');
 const clientPath = path.join(owned, 'candidate-client-private.json');
-const sourceEntries = ['app', 'components', 'lib', 'public', 'drizzle', 'packages', 'package.json', 'package-lock.json', 'tsconfig.json', 'postcss.config.mjs'];
+const sourceEntries = ['app', 'components', 'instrumentation.ts', 'lib', 'public', 'drizzle', 'packages', 'package.json', 'package-lock.json', 'tsconfig.json', 'postcss.config.mjs'];
 let server;
 let phase = 'prepare';
 let result;
