@@ -704,7 +704,6 @@ pub(crate) fn prepare_clinical(pending: &Pending) {
         if diagnoses.len() > 16
             || excerpts.len() > 8
             || diagnoses.len() + excerpts.len() == 0
-            || !super::clinical::partial_notes(profile.notes.as_deref().unwrap_or(""), &excerpts)
         {
             return None;
         }
@@ -712,6 +711,10 @@ pub(crate) fn prepare_clinical(pending: &Pending) {
             .map(|(i, t)| c.copies.get(&i).unwrap_or(t).clone()).collect();
         let excerpts: Vec<_> = c.excerpts.iter().enumerate().filter(|(i, _)| c.selected.contains(&(i + c.diagnoses.len())))
             .map(|(i, t)| c.copies.get(&(i + c.diagnoses.len())).unwrap_or(t).clone()).collect();
+        // Checked on the outgoing text: an edited copy must not bring the whole note back.
+        if !super::clinical::partial_notes(profile.notes.as_deref().unwrap_or(""), &excerpts) {
+            return None;
+        }
         let b = p.binding.as_ref()?;
         let result = (
             b.session.clone(),
