@@ -20,6 +20,7 @@ const VIEW_IDLE: Duration = Duration::from_secs(300);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum State {
     Requested,
+    DocumentOpened,
     Preparing,
     Challenge,
     Approving,
@@ -33,6 +34,7 @@ impl State {
     pub(crate) fn wire(self) -> &'static str {
         match self {
             Self::Requested => "requested",
+            Self::DocumentOpened => "document-opened",
             Self::Preparing => "preparing",
             Self::Challenge => "challenge",
             Self::Approving => "approving",
@@ -76,6 +78,7 @@ pub(crate) struct Request {
     card: Option<super::card::Card>,
     cancelled: Arc<AtomicBool>,
     therapy: Option<TherapyWrite>,
+    document: bool,
     recovery: Option<ChatWriteRecovery>,
     pub(crate) references: super::references::CommandReferences,
 }
@@ -105,9 +108,25 @@ impl Request {
             card: None,
             cancelled: Arc::new(AtomicBool::new(false)),
             therapy: None,
+            document: false,
             recovery: None,
             references: super::references::CommandReferences::default(),
         })))
+    }
+    pub(super) fn for_document(peer: Peer, stream: UnixStream) -> Option<Pending> {
+        let request = Self::new(peer, stream)?;
+        request.lock().ok()?.document = true;
+        Some(request)
+    }
+    pub(crate) fn document_requested(&mut self) -> bool {
+        self.document && self.status() == State::Requested
+    }
+    pub(crate) fn finish_document_open(&mut self, opened: bool) {
+        if !self.document_requested() || !opened {
+            self.withdraw();
+            return;
+        }
+        self.state = State::DocumentOpened;
     }
     pub(super) fn for_therapy(peer: Peer, stream: UnixStream, target: &str) -> Option<Pending> {
         let request = Self::new(peer, stream)?;
@@ -239,6 +258,15 @@ impl Request {
         self.card = card;
         self.deadline = Some((self.clock)() + CHALLENGE);
         self.state = State::Challenge;
+    }
+    pub(crate) fn begin_confirmation(
+        &mut self,
+        with_pin: bool,
+    ) -> Option<(RuntimeSession, ChatAccessContext, Attempt)> {
+        if self.therapy.is_some() && !with_pin {
+            return None;
+        }
+        self.begin()
     }
     pub(crate) fn begin(&mut self) -> Option<(RuntimeSession, ChatAccessContext, Attempt)> {
         if self.status() != State::Challenge
@@ -678,6 +706,11 @@ pub(crate) mod tests {
         session
     }
 
+    pub(crate) fn document_request() -> (Pending, UnixStream) {
+        let (a, b) = UnixStream::pair().unwrap();
+        (Request::for_document(Peer::test_peer(), a).unwrap(), b)
+    }
+
     pub(crate) fn unresolved_request(
         session: RuntimeSession,
         references: super::super::references::CommandReferences,
@@ -695,6 +728,48 @@ pub(crate) mod tests {
             p.state = State::Write(ChatWriteResolution::Uncertain);
         }
         (pending, remote)
+    }
+
+    #[test]
+    fn document_handoff_has_no_grant_payload_or_receipt_and_cannot_be_consumed() {
+        let (a, _remote) = UnixStream::pair().unwrap();
+        let request = Request::for_document(Peer::test_peer(), a).unwrap();
+        let mut p = request.lock().unwrap();
+        assert!(p.document_requested());
+        assert!(p.begin_confirmation(true).is_none());
+        p.finish_document_open(true);
+        assert_eq!(p.status(), State::DocumentOpened);
+        assert_eq!(p.status().wire(), "document-opened");
+        assert!(!p.document_requested());
+        assert!(p.safe_result().is_none());
+        assert!(p.review().is_none());
+        assert!(p.begin_consume().is_none());
+        assert_eq!(p.status(), State::Withdrawn);
+    }
+
+    #[test]
+    fn document_handoff_denial_and_revocation_never_report_opened() {
+        for revoke in [false, true] {
+            let (a, _remote) = UnixStream::pair().unwrap();
+            let request = Request::for_document(Peer::test_peer(), a).unwrap();
+            let mut p = request.lock().unwrap();
+            if revoke {
+                p.revoke();
+            }
+            p.finish_document_open(revoke);
+            assert_eq!(p.status(), State::Withdrawn);
+            assert!(p.safe_result().is_none());
+        }
+    }
+
+    #[test]
+    fn unsupported_therapy_biometric_does_not_consume_the_pin_attempt() {
+        let (a, _remote) = UnixStream::pair().unwrap();
+        let request = Request::for_therapy(Peer::test_peer(), a, "suspended").unwrap();
+        let mut p = request.lock().unwrap();
+        p.state = State::Challenge;
+        assert!(p.begin_confirmation(false).is_none());
+        assert_eq!(p.status(), State::Challenge);
     }
 
     #[test]

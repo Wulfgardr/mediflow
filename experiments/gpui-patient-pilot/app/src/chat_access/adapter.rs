@@ -33,6 +33,7 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
     let state = value["status"].as_str().filter(|s| {
         [
             "requested",
+            "document-opened",
             "preparing",
             "challenge",
             "approving",
@@ -122,11 +123,11 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["model"]}}},
                 {"name": CONTROL, "description":"Scheda sintetica monouso dopo consenso nella GPUI; payload riservato alla vista.",
-                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","receipt"]},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
+                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","receipt"]},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
                     "annotations":{"readOnlyHint":false,"destructiveHint":true,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["app"]}}}]}),
             "resources/list" => {
-                json!({"resources":[{"uri":URI,"name":"MediFlow — accesso nativo","mimeType":"text/html;profile=mcp-app"}]})
+                json!({"resources":[{"uri":URI,"name":"MediFlow: accesso nativo","mimeType":"text/html;profile=mcp-app"}]})
             }
             "resources/templates/list" => json!({"resourceTemplates":[]}),
             "resources/read" if params["uri"] == URI && !issued => {
@@ -175,6 +176,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     && args["command"].as_str().is_some_and(|s| {
                         [
                             "request",
+                            "patient-document",
                             "status",
                             "consume",
                             "revoke",
