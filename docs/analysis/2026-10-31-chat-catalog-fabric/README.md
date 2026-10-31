@@ -73,22 +73,113 @@ generazione ChatGPT o inferenza locale è eseguita da questa tranche.
 
 | Cella | Servizio comune da riusare | Vista/azione e permesso chat | Prova chat | Residuo |
 | --- | --- | --- | --- | --- |
-| `patient_insight/ollama` | `patient-insight-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | Raccordo locale, identità modello, fonti e negativi C-7; I-2 non qualificata |
-| `patient_insight/openai.responses.v1` | `patient-insight-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
-| `patient_insight/anthropic.messages.v1` | `patient-insight-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
-| `patient_insight/chatgpt` | `patient-insight-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | D-I1 e I-4 prima di generare; raccordo e negativi C-7 |
-| `smart_import/ollama` | `smart-import-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | Raccordo locale, identità modello, fonti e negativi C-7; I-2 non qualificata |
-| `smart_import/openai.responses.v1` | `smart-import-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
-| `smart_import/anthropic.messages.v1` | `smart-import-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
-| `smart_import/chatgpt` | `smart-import-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | D-I1 e I-4 prima di generare; raccordo e negativi C-7 |
-| `document_synthesis/ollama` | `document-synthesis-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | Raccordo locale, identità modello, fonti e negativi C-7; I-2 non qualificata |
-| `document_synthesis/openai.responses.v1` | `document-synthesis-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
-| `document_synthesis/anthropic.messages.v1` | `document-synthesis-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
-| `document_synthesis/chatgpt` | `document-synthesis-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | D-I1 e I-4 prima di generare; raccordo e negativi C-7 |
+| `patient_insight/ollama` | `lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | Raccordo locale, identità modello, fonti e negativi C-7; I-2 non qualificata |
+| `patient_insight/openai.responses.v1` | `lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
+| `patient_insight/anthropic.messages.v1` | `lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
+| `patient_insight/chatgpt` | `lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | D-I1 e I-4 prima di generare; raccordo e negativi C-7 |
+| `smart_import/ollama` | `lib/domain/documents/patient-smart-import-fabric.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | Raccordo locale, identità modello, fonti e negativi C-7; I-2 non qualificata |
+| `smart_import/openai.responses.v1` | `lib/domain/documents/patient-smart-import-fabric.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
+| `smart_import/anthropic.messages.v1` | `lib/domain/documents/patient-smart-import-fabric.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
+| `smart_import/chatgpt` | `lib/domain/documents/patient-smart-import-fabric.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | D-I1 e I-4 prima di generare; raccordo e negativi C-7 |
+| `document_synthesis/ollama` | `lib/ai-providers/fabric/document-synthesis-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | Raccordo locale, identità modello, fonti e negativi C-7; I-2 non qualificata |
+| `document_synthesis/openai.responses.v1` | `lib/ai-providers/fabric/document-synthesis-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
+| `document_synthesis/anthropic.messages.v1` | `lib/ai-providers/fabric/document-synthesis-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
+| `document_synthesis/chatgpt` | `lib/ai-providers/fabric/document-synthesis-production-operation.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | D-I1 e I-4 prima di generare; raccordo e negativi C-7 |
 
 Le quattro celle Treatment Reasoning (`athena_mlx`, `openai.responses.v1`,
 `anthropic.messages.v1`, `chatgpt`) sono rinviate separatamente nel registro.
 Non entrano nelle dodici celle né possono riattivarsi con pesi o credenziali.
+
+## Comandi del catalogo applicativo
+
+Tutti i 66 anchor del catalogo **corrente nel codice** sono elencati sotto.
+I titoli provengono dal crosswalk congelato e non sono nuova ammissione runtime.
+`applicationServiceRef` e `operationId` sono `null` su ogni descriptor;
+`manual_only`, `not_grantable` e `applyPolicy: none` restano effettivi. Per ogni
+riga il servizio operativo è quindi **non risolto**, la vista/azione canonica
+chat è **assente**, il permesso è **negato** e la prova chat è **mancante nei due
+host**. Le azioni native terapia/PDF nella prima tabella hanno il proprio
+raccordo nominato e non rendono operativi questi anchor. Non si usa una CLI
+storica per concedere un'azione chat.
+
+| Riga | Funzione censita | Comando Mini associato dal registro operativo | Residuo |
+| --- | --- | --- | --- |
+| 1 | Anagrafica paziente: lista, ricerca, view, create, update | patient search; patient show | Servizio, azione, permesso e prova chat da risolvere |
+| 2 | Archivia / soft-delete / ripristina paziente (stato scheda) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 3 | Diario clinico: view/list, create, update, soft-delete+restore, filtri | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 4 | Nuova voce clinica avanzata (S/O/A/P, allegati OCR, sessione visita, elabora bozza AI) | draft preview | Servizio, azione, permesso e prova chat da risolvere |
+| 5 | Editor rich-text clinico (formattazione S/O/A/P) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 6 | Somministrazione scale cliniche (runner + salvataggio come voce diario) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 7 | Libreria/catalogo scale standalone con storico e scorciatoie | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 8 | Gestione terapie farmacologiche (CRUD + stato + collegamento diagnosi) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 9 | Ragionamento terapeutico AI (Treatment Reasoning, review-only) | Nessuno | Diniego di release da provare nei due host |
+| 10 | Controlli/checkup follow-up (CRUD + stato) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 11 | Suggerimenti follow-up proiettati da documenti | open-loops | Servizio, azione, permesso e prova chat da risolvere |
+| 12 | Osservazioni/parametri clinici (CRUD LOINC/UCUM + trend/sparkline) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 13 | Prestazioni prescritte (Service Prescriptions, CRUD ricco + stato) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 14 | Diario ausili e prescrizioni protesiche (CRUD + collaudo) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 15 | Upload documenti + OCR + sintesi clinica (Archivio documenti) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 16 | Archivio Intelligente / Document Insights (view estrazioni + delete) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 17 | Smart Import (candidati diagnosi/terapie da documenti, applica in scheda) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 18 | Referti recenti (Evidence Stack tile, view sintesi) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 19 | AI Patient Insight (sintesi/follow-up/alert generati) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 20 | Foglio sinottico / Identity Lens / Review Queue (viste sintetiche cockpit) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 21 | Export FHIR paziente (con pre-check validazione FSE) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 22 | Report PDF paziente | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 23 | Esenzioni paziente (selezione/gestione codici cifrati) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 24 | Catalogo farmaci AIFA (ricerca/validazione prontuario) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 25 | Ricerca ICD in-app per codifica diagnosi | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 26 | Ricerca terminologica generale (ICD/systems oltre in-app) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 27 | Selezione scope ambulatorio attivo | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 28 | Gestione anagrafica ambulatori (create/update/predefinita/svuota/elimina) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 29 | Cruscotto analytics locale (popolazione, età, diagnosi, ADI) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 30 | Pannello audit operativo locale | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 31 | Apertura portali regionali SISS/FSE (context panel + handoff diary) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 32 | Cockpit shell / rail navigazione globale + toolbar + deep-link | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 33 | Agenda di oggi / turno + bridge candidati agenda clinica | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 34 | Diario clinico globale cross-paziente (ultime 50 voci) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 35 | Cruscotto repertori clinici (AIFA/esenzioni/ICD freschezza) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 36 | Wizard nuova scheda da documento (PdfImporter + review + form) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 37 | Pairing + login operatore + PIN (deriva master key) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 38 | Cambio PIN / gestione ciclo di vita chiave (rewrap/reset) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 39 | Blocco sessione immediato / stato sessione | whoami | Servizio, azione, permesso e prova chat da risolvere |
+| 40 | Profilo medico/ambulatorio (nome mostrato su documenti) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 41 | Preferenze UI: tema light/dark/system, riduci movimento | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 42 | Modalità Privacy / redazione dati | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 43 | Conversazioni AI e messaggi | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 44 | Configurazione/invocazione runtime AI (Ollama/modelli/kill switch) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 45 | Cache pazienti cifrata offline (consultazione degradata) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 46 | Backup: schedulazione automatica + ripristino manuale | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 47 | Diagnostica: architettura servizi + Diagnostic Hub + service health | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 48 | Update Awareness (aggiornamenti software) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 49 | Repertori: import CSV AIFA + gestione DB esenzioni | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 50 | Modelli AI: pull modello Ollama + profilo hardware | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 51 | Kill switch funzioni AI (stato read-only rilevante al client) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 52 | Network Operating Mode (gestione modalità boundary) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 53 | Zona pericolo: reset onboarding + sviluppo (seeder, apri app nativa, DB repair/purge) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 54 | Hub Impostazioni / governance (dashboard navigazione settings) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 55 | POST/GET /api/context (imposta/legge ambulatory_id come cookie di sessione) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 56 | Validazione documento FSE singolo (profilo->payload) via v1 | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 57 | GET /api/service-catalog (catalogo prestazioni) + famiglie distinte /api/service-prescriptions e /api/service-prescription-items | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 58 | POST /api/proxy/ollama/chat e POST /api/proxy/ollama/generate (proxy invocazione modello AI locale via Ollama), distinti da /api/conversations e /api/messages (CRUD storico) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 59 | GET /api/system/mlx (stato/gestione generico runtime MLX via PM2, admin-only, solo macOS), distinto da /api/system/treatment-reasoning/athena-mlx (generazione ragionamento terapeutico specifico, kill-switch dedicato) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 60 | GET /api/system/redaction (stato/health provider OpenMed per redazione PII) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 61 | GET /api/system/revision (fingerprint/branch/revisione build corrente, usato per rilevare mismatch versione) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 62 | POST/GET /api/system/fix-orphans (conteggio+riparazione righe cliniche orfane, admin-only) e POST /api/system/migrate-m2m (migrazione relazione paziente-ambulatorio da 1:1 a many-to-many, admin-only); DISTINTI dal generico /api/system/migrate (setup ambulatorio di default) e da repair-db/purge | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 63 | GET /api/v1/network/capabilities, /api/v1/network/identity, /api/v1/network/node (negoziazione capability host, identità di rete, sommario nodo); famiglie boundary distinte da pairing-intents/confirm e session | capabilities | Servizio, azione, permesso e prova chat da risolvere |
+| 64 | /settings/ai (hub); redirect al registro Fabric, vista reale in sola lettura | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 65 | Registro Intelligence Fabric: 16 capability, 4 venue osservate e profili egress | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 66 | Governance AI: parliament dei modelli e prontezza al rollout | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+
+| Host obbligatorio | Ruolo/versione/capacità | Fonti | Tastiera | Vuoto | Stale | Revocato |
+| --- | --- | --- | --- | --- | --- | --- |
+| Claude Desktop | Non osservato sul candidato | Non osservato | Non osservato | Non osservato | Non osservato | Non osservato |
+| Codex desktop | Non osservato sul candidato | Non osservato | Non osservato | Non osservato | Non osservato | Non osservato |
+
+Questa matrice di accettazione si applica a ciascuna funzione, capability,
+cella I e comando sopra: i test del frame non trasformano alcuna casella host
+in PASS. Per funzioni non collegate il primo esito atteso è l'indisponibilità
+esplicita, con nessuna concessione o ripiego.
 
 ## Prima tranche
 
