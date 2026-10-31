@@ -15,7 +15,7 @@ tornano inattive; le revoche locali restano terminali. SOAP mantiene ADR 0097.
 
 ## Provenienza assegnata dalla postazione
 
-Lo schema SQLite 8 estende `portable_import_origins`: chiave composta
+Lo schema SQLite 7 introduce `portable_import_origins`: chiave composta
 `kind, ref`, origine `imported` / `unattested`, riferimento all’evento locale
 d’importazione o migrazione e divieto di UPDATE
 e DELETE. La tabella è autorità locale, non una collezione del portabile.
@@ -44,7 +44,7 @@ di distinguere quali righe siano importate. Gli archivi senza ripristini
 conservano l’origine locale; le righe già indicizzate conservano la propria
 origine. Gli avvii successivi non estendono l’insieme storico. Il recupero completo autenticato conserva l'indice insieme al
 resto dello snapshot; il portabile non lo esporta e non può ripristinarlo.
-I predecessori canonici 4, 5, 6 e 7 mantengono le proprie impronte immutabili e
+I predecessori canonici 4, 5 e 6 mantengono le proprie impronte immutabili e
 sono controllati prima della migrazione di recupero.
 
 ## Letture e presentazione

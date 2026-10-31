@@ -91,9 +91,8 @@ type PreservedOrigin = { kind: 'audit' | 'therapy_command'; ref: string; importE
 export function captureTherapyStatusCommands(current: Database.Database): { rows: TherapyCommandRow[]; audits: BackupAuditRow[]; origins: PreservedOrigin[] } {
     return current.transaction(() => {
         const audits = readTherapyCommandAudits(current);
-        const columns = current.pragma('table_info(portable_import_origins)') as { name: string }[];
-        const origin = columns.some(column => column.name === 'origin') ? 'origin' : "'imported' AS origin";
-        const origins = columns.length ? current.prepare(`SELECT kind, ref, import_event_id AS importEventId, ${origin} FROM portable_import_origins`).all() as PreservedOrigin[] : [];
+        const hasOrigins = current.prepare("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='portable_import_origins'").get();
+        const origins = hasOrigins ? current.prepare('SELECT kind, ref, import_event_id AS importEventId, origin FROM portable_import_origins').all() as PreservedOrigin[] : [];
         return { rows: validateTherapyStatusCommandRows(readTherapyStatusCommandRows(current), audits), audits, origins };
     })();
 }

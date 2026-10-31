@@ -13,8 +13,6 @@ export function ensurePortableImportOriginsSchema(db: Database.Database): void {
         origin TEXT NOT NULL DEFAULT 'imported' CHECK (origin IN ('imported', 'unattested')),
         PRIMARY KEY (kind, ref)
     );`);
-    if (!(db.pragma('table_info(portable_import_origins)') as { name: string }[]).some(column => column.name === 'origin'))
-        db.exec("ALTER TABLE portable_import_origins ADD COLUMN origin TEXT NOT NULL DEFAULT 'imported' CHECK (origin IN ('imported', 'unattested'))");
     db.exec(`CREATE TRIGGER IF NOT EXISTS portable_import_origins_no_update BEFORE UPDATE ON portable_import_origins
         BEGIN SELECT RAISE(ABORT, 'portable import origins is append-only'); END;
     CREATE TRIGGER IF NOT EXISTS portable_import_origins_no_delete BEFORE DELETE ON portable_import_origins

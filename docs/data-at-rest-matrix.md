@@ -97,7 +97,7 @@ locali salvano ciò che ricevono.
 - In chiaro: `event_id`, `schema_version`, `event_type`, `occurred_at`, `outcome`, `actor_type`, `actor_ref`, `subject_type`, `subject_ref`, `source_surface`, `request_id`, `redacted_metadata`, `created_at`
 - Leggibile senza chiave: tipo di evento, attore, identificativo del soggetto e metadati minimizzati.
 
-### `portable_import_origins`: provenienza assegnata dall'archivio
+### `portable_import_origins`: provenienza assegnata dall'archivio (schema 7)
 
 - In chiaro: `kind`, `ref`, `import_event_id`, `origin`.
 - Leggibile senza chiave: identificativi degli audit e dei comandi, legame con l'evento locale d'importazione o migrazione e classificazione `imported` / `unattested`. Non contiene il testo clinico, ma rivela legami tra eventi dello storico.
