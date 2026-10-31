@@ -362,6 +362,7 @@ pub struct Checkup {
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Attachment {
+    pub currentness: Option<serde_json::Value>,
     pub id: String,
     pub patient_id: String,
     pub name: String,
