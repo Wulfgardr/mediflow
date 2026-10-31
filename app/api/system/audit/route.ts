@@ -63,10 +63,12 @@ export async function GET(request: Request) {
         if (view === 'summary') {
             const importedRows = origin === 'local' ? await listAuditEvents({ limit, origin: 'imported', eventType: eventType || undefined,
                 outcome: outcome || undefined, subjectType: subjectType || undefined, actorRef, occurredAfter }) : [];
+            const localRows = origin === 'local' ? rows : [];
+            const importedSample = origin === 'imported' ? rows : importedRows;
             return NextResponse.json({
                 days,
-                ...summarizeAuditEvents([...rows, ...importedRows], rows.length >= limit),
-                importedIsTruncated: importedRows.length >= limit,
+                ...summarizeAuditEvents([...localRows, ...importedSample], localRows.length >= limit),
+                importedIsTruncated: importedSample.length >= limit,
             });
         }
 

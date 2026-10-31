@@ -93,6 +93,8 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
         expect(listed).toHaveLength(1); expect(listed[0].eventId).toBe(execute.json.auditEventId); expect(listed[0].origin).toBe('local');
         const summary = await (await fetch(baseURL + '/api/system/audit?view=summary&eventType=therapy.updated', { headers: readHeaders })).json();
         expect(summary.totalEvents).toBe(1); expect(summary.sourceSurfaces.native).toBe(1); expect(summary.importedEvents).toBe(200); expect(summary.importedIsTruncated).toBe(true);
+        const importedSummary = await (await fetch(baseURL + '/api/system/audit?view=summary&origin=imported&eventType=therapy.updated', { headers: readHeaders })).json();
+        expect(importedSummary.totalEvents).toBe(0); expect(importedSummary.sourceSurfaces.native).toBe(0); expect(importedSummary.importedEvents).toBe(200); expect(importedSummary.importedIsTruncated).toBe(true);
         const { commandId: importedCommandId, protocol, archiveGeneration, patientId: importedPatientId, therapyId: importedTherapyId, expectedVersion } = forgedCommand;
         const query = new URLSearchParams({ commandId: importedCommandId, protocol, archiveGeneration, patientId: importedPatientId, therapyId: importedTherapyId, expectedVersion: String(expectedVersion) });
         const readReceipt = await fetch(baseURL + `/api/therapy-status-commands/${importedCommandId}/receipt?${query}`, { headers: readHeaders });
