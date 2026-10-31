@@ -398,3 +398,10 @@ test('separate host processes racing the same reviewed collection commit one att
     assert.equal(dbServer.select().from(attachments).all().length, 1);
     assert.equal(dbServer.select().from(auditEvents).all().length, before + 1);
 });
+
+test('the collection precondition admits every id the writers admit', async () => {
+    const { attachmentCollectionSchema } = await import('./api-schemas/attachments');
+    const row = { id: 'x'.repeat(257), currentness: { sourceRef: 'a'.repeat(64), revision: 1, freshnessEpoch: 1 } };
+    assert.equal(attachmentCollectionSchema.safeParse([row]).success, true);
+    assert.equal(attachmentCollectionSchema.safeParse([{ ...row, id: '' }]).success, false);
+});
