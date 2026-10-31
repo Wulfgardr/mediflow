@@ -85,6 +85,7 @@ pub(crate) struct Request {
     recovery: Option<ChatWriteRecovery>,
     catalog: Option<(String, String, String)>,
     catalog_query: Option<String>,
+    prosthetics: bool,
     pub(crate) references: super::references::CommandReferences,
 }
 pub(crate) type Pending = Arc<Mutex<Request>>;
@@ -118,6 +119,7 @@ impl Request {
             recovery: None,
             catalog: None,
             catalog_query: None,
+            prosthetics: false,
             references: super::references::CommandReferences::default(),
         })))
     }
@@ -129,8 +131,16 @@ impl Request {
         request.lock().ok()?.catalog_query = Some(query.to_owned());
         Some(request)
     }
+    pub(super) fn for_prosthetics(peer: Peer, stream: UnixStream, query: &str) -> Option<Pending> {
+        let request = Self::for_drugs(peer, stream, query)?;
+        request.lock().ok()?.prosthetics = true;
+        Some(request)
+    }
     pub(crate) fn is_catalog(&self) -> bool {
         self.catalog_query.is_some()
+    }
+    pub(crate) fn is_prosthetics_catalog(&self) -> bool {
+        self.prosthetics
     }
     pub(super) fn for_document(peer: Peer, stream: UnixStream) -> Option<Pending> {
         let request = Self::new(peer, stream)?;
@@ -456,25 +466,42 @@ pub(crate) fn prepare_card(pending: &Pending) {
         Some((b.session.clone(), b.context.clone(), query))
     });
     if let Some((session, context, query)) = catalog_binding {
-        let result = session.chat_drug_search(&context, &query);
+        let prosthetics = pending.lock().is_ok_and(|p| p.prosthetics);
+        let result = if prosthetics {
+            session.chat_prosthetics_search(&context, &query)
+        } else {
+            session.chat_drug_search(&context, &query).map(|rows| serde_json::json!({"rows": rows.iter().map(|r| serde_json::json!({
+                "aic":r.aic, "name":r.name, "activePrinciple":r.active_principle, "packaging":r.packaging, "atc":r.atc
+            })).collect::<Vec<_>>(), "truncated":rows.len() == 20}))
+        };
         if let Ok(mut p) = pending.lock() {
             if p.status() != State::Preparing {
                 return;
             }
             if let Ok(rows) = result {
                 use sha2::{Digest, Sha256};
-                let payload = serde_json::json!({"profile":"mediflow.drug-catalog.v1", "query":query,
-                    "freshness":"unverified", "limit":20, "rows": rows.iter().enumerate().map(|(index, r)| serde_json::json!({
-                        "sourceRef": format!("src_{}", &format!("{:x}", Sha256::digest([p.attempt.0.as_slice(), &index.to_le_bytes()].concat()))[..32]),
-                        "aic":r.aic, "name":r.name, "activePrinciple":r.active_principle,
-                        "packaging":r.packaging, "atc":r.atc
-                    })).collect::<Vec<_>>()}).to_string();
+                let mut projected = rows["rows"].as_array().cloned().unwrap_or_default();
+                for (index, row) in projected.iter_mut().enumerate() {
+                    row["sourceRef"] = serde_json::json!(format!(
+                        "src_{}",
+                        &format!(
+                            "{:x}",
+                            Sha256::digest([p.attempt.0.as_slice(), &index.to_le_bytes()].concat())
+                        )[..32]
+                    ));
+                }
+                let mut value = serde_json::json!({"profile":if prosthetics {"mediflow.prosthetics-catalog.v1"} else {"mediflow.drug-catalog.v1"}, "query":query,
+                    "freshness":"unverified", "limit":20, "rows":projected});
+                if prosthetics {
+                    value["truncated"] = rows["truncated"].clone();
+                }
+                let payload = value.to_string();
                 if payload.len() > 60000 {
                     p.withdraw();
                     return;
                 }
                 let digest = format!("{:x}", Sha256::digest(payload.as_bytes()));
-                p.catalog = Some((payload, digest, "Catalogo AIFA locale. Data di aggiornamento non verificata. Massimo 20 risultati; affinare la ricerca se il limite è raggiunto.".into()));
+                p.catalog = Some((payload, digest, "Catalogo locale. Data di aggiornamento non verificata. Massimo 20 risultati; affinare la ricerca se il limite è raggiunto.".into()));
                 p.deadline = Some((p.clock)() + CHALLENGE);
                 p.state = State::Challenge;
             } else {
@@ -692,6 +719,15 @@ pub(crate) mod tests {
                         json!({"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},
                         "operator":{"userId":user,"authChannel":"native"}}),
                     )
+                } else if first.starts_with("GET /api/v1/network/prosthetics-catalog?q=") {
+                    if current.load(Ordering::Acquire) == 5 {
+                        (409, json!({"error":"CATALOG_UNAVAILABLE"}))
+                    } else {
+                        (
+                            200,
+                            json!({"rows":[{"codeSystem":"DEMO","code":"DEMO-1","description":"Ausilio inventato", "version":"demo-1","source":"Fonte sintetica","scope":"Dimostrazione"}], "truncated":false}),
+                        )
+                    }
                 } else if first.starts_with("GET /api/v1/network/drugs?count=1 ") {
                     (
                         200,
@@ -929,6 +965,93 @@ pub(crate) mod tests {
         let context = session.chat_access_context("scope-a", "patient-a").unwrap();
         let (a, _remote) = UnixStream::pair().unwrap();
         let pending = Request::for_drugs(Peer::test_peer(), a, "synthetic").unwrap();
+        assert!(pending.lock().unwrap().bind(session, context));
+        prepare_card(&pending);
+        assert_eq!(pending.lock().unwrap().status(), State::Withdrawn);
+        assert!(pending.lock().unwrap().review().is_none());
+        assert_eq!(consume_card(&pending), (State::Withdrawn, None));
+    }
+
+    #[test]
+    fn native_confirmation_names_the_catalog_it_is_approving() {
+        let (a, _) = UnixStream::pair().unwrap();
+        let (b, _) = UnixStream::pair().unwrap();
+        let drugs = Request::for_drugs(Peer::test_peer(), a, "synthetic").unwrap();
+        let prosthetics = Request::for_prosthetics(Peer::test_peer(), b, "synthetic").unwrap();
+        assert!(!drugs.lock().unwrap().is_prosthetics_catalog());
+        assert!(prosthetics.lock().unwrap().is_prosthetics_catalog());
+    }
+    #[test]
+    fn prosthetics_catalog_read_requires_confirmation_and_retires_bytes_on_revoke() {
+        for confirm in [false, true] {
+            let (session, _host) = native_session();
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            let (a, _remote) = UnixStream::pair().unwrap();
+            let pending = Request::for_prosthetics(Peer::test_peer(), a, "synthetic").unwrap();
+            assert!(pending.lock().unwrap().bind(session, context));
+            prepare_card(&pending);
+            {
+                let mut p = pending.lock().unwrap();
+                assert_eq!(p.status(), State::Challenge);
+                let (payload, digest, _) = p.review().unwrap();
+                assert_eq!(digest.len(), 64);
+                let payload: Value = serde_json::from_str(payload).unwrap();
+                assert_eq!(payload["rows"][0]["code"], "DEMO-1");
+                assert_eq!(payload["profile"], "mediflow.prosthetics-catalog.v1");
+                assert!(payload.get("pseudonym").is_none());
+                if confirm {
+                    p.state = State::Approved;
+                }
+            }
+            let result = consume_card(&pending);
+            assert_eq!(
+                result.0,
+                if confirm {
+                    State::Consumed
+                } else {
+                    State::Withdrawn
+                }
+            );
+            assert_eq!(result.1.is_some(), confirm);
+            assert_eq!(consume_card(&pending), (State::Withdrawn, None));
+            let mut p = pending.lock().unwrap();
+            p.revoke();
+            assert!(p.review().is_none());
+        }
+    }
+    #[test]
+    fn prosthetics_catalog_bytes_do_not_survive_revocation_expiry_or_selection_change() {
+        for scenario in ["revoked", "expired", "selection"] {
+            let (session, _host) = native_session();
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            let (a, _remote) = UnixStream::pair().unwrap();
+            let pending = Request::for_prosthetics(Peer::test_peer(), a, "synthetic").unwrap();
+            assert!(pending.lock().unwrap().bind(session.clone(), context));
+            prepare_card(&pending);
+            {
+                let mut p = pending.lock().unwrap();
+                assert_eq!(p.status(), State::Challenge);
+                p.state = State::Approved;
+                match scenario {
+                    "revoked" => p.revoke(),
+                    "expired" => p.deadline = Some((p.clock)() - Duration::from_millis(1)),
+                    _ => session
+                        .select_profile_patient("scope-a", "patient-b")
+                        .unwrap(),
+                }
+            }
+            assert_eq!(consume_card(&pending), (State::Withdrawn, None));
+            assert!(pending.lock().unwrap().review().is_none());
+        }
+    }
+
+    #[test]
+    fn prosthetics_catalog_absent_is_unavailable_instead_of_an_empty_search() {
+        let (session, host) = native_session();
+        host.state.store(5, Ordering::Release);
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        let (a, _remote) = UnixStream::pair().unwrap();
+        let pending = Request::for_prosthetics(Peer::test_peer(), a, "synthetic").unwrap();
         assert!(pending.lock().unwrap().bind(session, context));
         prepare_card(&pending);
         assert_eq!(pending.lock().unwrap().status(), State::Withdrawn);
