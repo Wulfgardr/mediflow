@@ -75,6 +75,8 @@ test('a short known surname is compared whole, without hiding ordinary words', (
 test('a typo of a known name is still that name', () => {
     for (const text of ['Terapia invariata in Mqrta Vqlli.', 'Terapia invariata in Mrata.', 'Controllo di Valii.']) assert.equal(flagged(text, ['Marta', 'Valli']), true, text);
     assert.equal(flagged('Terapia invariata, dispnea stabile.', ['Marta', 'Valli']), false);
+    for (const text of ['Terapia in Mq/rta.', 'Terapia in Va-lli.', "Terapia in Ma'rta."]) assert.equal(flagged(text, ['Marta', 'Valli']), true, text);
+    for (const [text, name] of [['Marcia regolare.', 'Maria'], ['Aria ambiente.', 'Maria'], ['Esito varia nel tempo.', 'Maria'], ['Dolore ai fianchi.', 'Bianchi'], ['Colorito roseo.', 'Rossi']] as const) assert.equal(flagged(text, [name]), false, text);
 });
 for (const text of [
     'Assumere apixaban 5 mg alle 8.00 e alle 20.00. Evitare FANS e segnalare sanguinamenti.',
