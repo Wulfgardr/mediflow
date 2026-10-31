@@ -1,3 +1,39 @@
+use mediflow_runtime_client::PatientDetail;
+
+pub(super) fn known_identifiers(profile: &PatientDetail) -> serde_json::Value {
+    let mut names = vec![
+        profile.id.clone(),
+        profile.first_name.clone(),
+        profile.last_name.clone(),
+        profile.tax_code.raw_for_editor().to_owned(),
+    ];
+    for value in [
+        profile.address.as_ref(),
+        profile.phone.as_ref(),
+        profile.caregiver.as_ref(),
+        profile.ambulatory_id.as_ref(),
+        profile.created_at.as_ref(),
+        profile.updated_at.as_ref(),
+        profile.deleted_at.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        names.push(value.clone());
+        names.extend(
+            value
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|v| v.chars().count() >= 2)
+                .map(str::to_owned),
+        );
+    }
+    names.retain(|v| !v.trim().is_empty());
+    names.sort();
+    names.dedup();
+    let birth_dates: Vec<_> = profile.birth_date.iter().collect();
+    serde_json::json!({"names":names, "birthDates":birth_dates})
+}
+
 pub(super) fn valid_excerpt(notes: &str, text: &str, existing: &[String]) -> bool {
     !text.trim().is_empty()
         && text.encode_utf16().count() <= 2048
@@ -26,6 +62,30 @@ pub(super) fn partial_notes(notes: &str, excerpts: &[String]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn known_identifiers_include_identity_contacts_caregiver_and_metadata() {
+        let profile: PatientDetail = serde_json::from_value(serde_json::json!({"id":"synthetic-id", "firstName":"Marta", "lastName":"Valli", "taxCode":"RSSMRA80D12F205X", "birthDate":"1972-04-17", "phone":"3471234567", "address":"Via Fittizia 42", "caregiver":"Ada Lattesi ada@example.test", "ambulatoryId":"synthetic-scope", "createdAt":"2026-01-01", "version":1})).unwrap();
+        let known = known_identifiers(&profile);
+        let names = known["names"].as_array().unwrap();
+        for value in [
+            "synthetic-id",
+            "Marta",
+            "Valli",
+            "RSSMRA80D12F205X",
+            "3471234567",
+            "Via Fittizia 42",
+            "Ada",
+            "Lattesi",
+            "Ada Lattesi ada@example.test",
+            "synthetic-scope",
+            "2026-01-01",
+        ] {
+            assert!(names.contains(&serde_json::json!(value)), "{value}");
+        }
+        assert_eq!(known["birthDates"], serde_json::json!(["1972-04-17"]));
+        assert!(known.get("diagnoses").is_none());
+        assert!(known.get("notes").is_none());
+    }
     #[test]
     fn manual_passages_are_exact_bounded_and_never_the_whole_note() {
         assert!(!partial_notes(

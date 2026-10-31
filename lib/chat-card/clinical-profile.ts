@@ -1,3 +1,4 @@
+import { clinicalIdentifierSpans, ClinicalRowDenied, type KnownClinicalIdentifiers } from './clinical-identifiers';
 import { z } from 'zod';
 import { jsonEmissionPlan } from '../ai-preparation/emission-plan';
 import type { PreparedContentRead } from '../ai-preparation/preparation-core';
@@ -17,13 +18,20 @@ export function clinicalEmissionPlan(value: ClinicalProfile) {
     clinicalSchema.parse(value);
     return jsonEmissionPlan(value, path => path.at(-1) !== 'text');
 }
-export function assertClinicalBoundary(read: PreparedContentRead, expected: ClinicalProfile): void {
+export function assertClinicalBoundary(read: PreparedContentRead, expected: ClinicalProfile, known: KnownClinicalIdentifiers): void {
     const got = clinicalSchema.parse(JSON.parse(read.payload));
     if (Buffer.byteLength(read.payload, 'utf8') > 16384 || JSON.stringify(got) !== read.payload
         || JSON.stringify(read.content) !== read.payload || got.pseudonym !== expected.pseudonym) return fail();
     for (const key of ['diagnoses', 'noteExcerpts'] as const) {
         if (got[key].length !== expected[key].length) return fail();
         got[key].forEach((row, i) => {
+            for (const match of row.text.matchAll(/\{\{MF_PII_[a-f0-9]{32}_[1-9][0-9]{0,3}\}\}/gu)) {
+                const original = read.restoreText(match[0]);
+                const spans = clinicalIdentifierSpans(original, known);
+                if ([...original.matchAll(/[\p{L}\p{N}]/gu)].some(m => !spans.some(s => s.start <= m.index && s.end >= m.index + m[0].length))) throw new ClinicalRowDenied(key, i + 1);
+            }
+            const visible = row.text.replace(/\{\{MF_PII_[a-f0-9]{32}_[1-9][0-9]{0,3}\}\}/gu, ' ');
+            if (!/\p{L}{2}/u.test(visible) || clinicalIdentifierSpans(visible, known).length) throw new ClinicalRowDenied(key, i + 1);
             if (row.sourceRef !== expected[key][i].sourceRef || (row.text.includes('MF_PII') ? read.restoreText(row.text) : row.text) !== expected[key][i].text) return fail();
         });
     }

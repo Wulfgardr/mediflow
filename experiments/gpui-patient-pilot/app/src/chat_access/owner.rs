@@ -87,6 +87,7 @@ pub(crate) struct Request {
     binding: Option<Binding>,
     card: Option<super::card::Card>,
     pub(crate) clinical: Option<ClinicalSelection>,
+    pub(crate) clinical_denial: Option<String>,
     cancelled: Arc<AtomicBool>,
     therapy: Option<TherapyWrite>,
     document: bool,
@@ -122,6 +123,7 @@ impl Request {
             binding: None,
             card: None,
             clinical: None,
+            clinical_denial: None,
             cancelled: Arc::new(AtomicBool::new(false)),
             therapy: None,
             document: false,
@@ -345,6 +347,14 @@ impl Request {
         self.status() == State::Preparing
     }
     fn install_card(&mut self, card: Option<super::card::Card>) {
+        if self.clinical.is_some() && self.status() == State::Preparing {
+            if card.as_ref().is_none_or(|c| c.denial.is_some()) {
+                self.clinical_denial = Some(card.as_ref().and_then(|c| c.denial.clone()).unwrap_or_else(|| "Condivisione negata. Togli o riformula una delle righe selezionate: possibili identificativi, testo svuotato o rilevatore non disponibile. Nessun byte condiviso.".into()));
+                self.state = State::Selecting;
+                return;
+            }
+            self.clinical_denial = None;
+        }
         if self.status() != State::Preparing || card.is_none() {
             self.withdraw();
             return;
@@ -667,7 +677,7 @@ pub(crate) fn prepare_clinical(pending: &Pending) {
             b.context.clone(),
             profile.version,
             p.cancelled.clone(),
-            serde_json::json!({"diagnoses":diagnoses, "noteExcerpts":excerpts}),
+            serde_json::json!({"selection":{"diagnoses":diagnoses, "noteExcerpts":excerpts}, "knownIdentifiers":super::clinical::known_identifiers(profile)}),
         );
         p.state = State::Preparing;
         Some(result)
@@ -950,6 +960,24 @@ pub(crate) mod tests {
                 worker: Some(worker),
             },
         )
+    }
+
+    #[test]
+    fn clinical_denial_keeps_selection_local_and_never_enables_consent() {
+        let (pending, _remote, _session, _host) = clinical_request();
+        let mut p = pending.lock().unwrap();
+        p.state = State::Preparing;
+        p.install_card(None);
+        assert_eq!(p.status(), State::Selecting);
+        assert!(p.card.is_none());
+        assert!(
+            p.clinical_denial
+                .as_ref()
+                .unwrap()
+                .contains("Nessun byte condiviso")
+        );
+        assert!(p.begin().is_none());
+        assert!(p.clinical.is_some());
     }
 
     pub(crate) fn clinical_request() -> (Pending, UnixStream, RuntimeSession, Host) {

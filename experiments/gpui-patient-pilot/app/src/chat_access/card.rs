@@ -17,6 +17,7 @@ pub(super) struct Card {
     output: Receiver<Value>,
     cancelled: Arc<AtomicBool>,
     pub(super) payload: String,
+    pub(super) denial: Option<String>,
     pub(super) digest: String,
     pub(super) native_source: String,
 }
@@ -64,11 +65,23 @@ impl Card {
         command.arg(supervisor).arg(script).arg(installation);
         let mut card = Self::spawn(&mut command, cancelled)?;
         let request = if let Some(selection) = selection {
-            json!({"command":"prepare", "selection":selection})
+            json!({"command":"prepare", "selection":selection["selection"], "knownIdentifiers":selection["knownIdentifiers"]})
         } else {
             json!({"command":"prepare"})
         };
         let review = card.exchange_value(&request, Duration::from_secs(90))?;
+        if review["status"] == "denied" {
+            let section = match review["section"].as_str()? {
+                "diagnoses" => "diagnosi",
+                "noteExcerpts" => "passo",
+                _ => return None,
+            };
+            let row = review["row"].as_u64().filter(|v| (1..=16).contains(v))?;
+            card.denial = Some(format!(
+                "Condivisione negata per la riga selezionata: {section} n. {row}. La redazione ha svuotato il testo o restano possibili identificativi. Togli questa riga o riformula la selezione, poi riprova. Nessun byte condiviso."
+            ));
+            return Some(card);
+        }
         if review.as_object()?.len() != 3 {
             return None;
         }
@@ -117,6 +130,7 @@ impl Card {
             input: Some(input),
             output,
             payload: String::new(),
+            denial: None,
             digest: String::new(),
             native_source: String::new(),
         })
