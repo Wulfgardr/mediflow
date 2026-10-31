@@ -68,7 +68,7 @@ const BACKUP_TABLES = {
 } as const;
 
 function runNode(args: string[], env: Record<string, string> = {}): string {
-    if (env.MEDIFLOW_BACKUP_DEST_DIR) prepareSyntheticBackupDestination(env.MEDIFLOW_DATA_DIR, env.MEDIFLOW_BACKUP_DEST_DIR);
+    if (env.MEDIFLOW_BACKUP_DEST_DIR) args = ['--import', prepareSyntheticBackupDestination(env.MEDIFLOW_DATA_DIR, env.MEDIFLOW_BACKUP_DEST_DIR), ...args];
     return execFileSync(process.execPath, args, {
         cwd: ROOT,
         env: { ...process.env, ...env },

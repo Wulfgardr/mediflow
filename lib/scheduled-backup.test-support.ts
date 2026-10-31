@@ -4,7 +4,7 @@ import os from 'node:os';
 import Database from 'better-sqlite3';
 import { backupDestinationIdentity } from '../scripts/backup-destination-policy.mjs';
 
-export function prepareSyntheticBackupDestination(dataDir: string, destination: string): void {
+export function prepareSyntheticBackupDestination(dataDir: string, destination: string): string {
     const roots = [fs.realpathSync(os.tmpdir()), ...(process.platform === 'win32' ? [] : [fs.realpathSync('/tmp')])];
     const ancestor = fs.realpathSync(dataDir);
     if (!roots.some(root => ancestor.startsWith(`${root}${path.sep}`))) throw new Error('Synthetic temporary archive required');
@@ -16,4 +16,13 @@ export function prepareSyntheticBackupDestination(dataDir: string, destination: 
         state.config = { ...state.config, destinationDir: destination, volumeProtectionAcknowledged: true, volumeProtectionIdentity: backupDestinationIdentity(fs.realpathSync(destination)) };
         db.prepare('INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run('backupScheduler', JSON.stringify(state));
     } finally { db.close(); }
+    const preload = path.join(dataDir, 'synthetic-backup-volume.mjs');
+    fs.writeFileSync(preload, `import cp from 'node:child_process';
+const spawn = cp.spawnSync;
+cp.spawnSync = (file, args, ...options) => {
+    const volumeProbe = ['/bin/df', '/usr/sbin/diskutil', '/usr/bin/plutil', 'findmnt', 'lsblk'].includes(file)
+        || (file === 'powershell.exe' && args.some(arg => String(arg).includes('Get-BitLockerVolume')));
+    return volumeProbe ? { status: 1, stdout: '', stderr: 'Synthetic unavailable volume probe' } : spawn(file, args, ...options);
+};`);
+    return preload;
 }

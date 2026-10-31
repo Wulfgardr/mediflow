@@ -145,6 +145,13 @@ test('tracing roster contains every approved source and the explicit native/impo
   assert.ok(SCHEDULED_BACKUP_TRACING_INCLUDES.includes('./node_modules/better-sqlite3/build/Release/better_sqlite3.node'));
 });
 
+test('every hash-pinned source retains LF bytes on Windows checkouts', () => {
+  const attributes = new Set(fs.readFileSync(path.join(sourceRoot, '.gitattributes'), 'utf8').split(/\r?\n/u));
+  for (const item of SCHEDULED_BACKUP_RUNTIME_ROSTER) {
+    assert.ok(attributes.has(`${item.path} text eol=lf`), item.path);
+  }
+});
+
 test('Next config contains each canonical scheduler path exactly once as a route /* literal without executing it', () => {
   const source = fs.readFileSync(path.join(sourceRoot, 'next.config.ts'), 'utf8');
   assertSchedulerTraceLiterals(source);

@@ -183,8 +183,8 @@ test('scheduled export from a historical SQLite without the receipt table produc
         legacy.exec("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT); CREATE TABLE exemptions (code TEXT PRIMARY KEY, description TEXT); INSERT INTO exemptions VALUES ('ZZ_HISTORIC', 'Esenzione inventata storica');");
         assert.equal(legacy.prepare("SELECT 1 FROM sqlite_master WHERE name = 'exemption_import_receipts'").get(), undefined);
         legacy.close();
-        prepareSyntheticBackupDestination(historic, path.join(historic, 'backups'));
-        const output = execFileSync(process.execPath, ['scripts/run-scheduled-backup.mjs'], {
+        const preload = prepareSyntheticBackupDestination(historic, path.join(historic, 'backups'));
+        const output = execFileSync(process.execPath, ['--import', preload, 'scripts/run-scheduled-backup.mjs'], {
             cwd: process.cwd(), encoding: 'utf8', timeout: 10_000,
             env: { ...process.env, MEDIFLOW_BACKUP_FORCE: '1', MEDIFLOW_DATA_DIR: historic, MEDIFLOW_BACKUP_DEST_DIR: path.join(historic, 'backups') },
         });
