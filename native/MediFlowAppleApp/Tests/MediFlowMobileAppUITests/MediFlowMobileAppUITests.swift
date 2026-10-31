@@ -1601,6 +1601,22 @@ final class MediFlowMobileAppUITests: XCTestCase {
         attachScreenshot(named: "issue-145-alphabetical-sort")
     }
 
+    func testTreatmentReasoningIsUnavailableOnIPhone() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "iPhone clinical surface")
+        app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+        launch()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-cell-")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.tap()
+        openPatientSection(.therapies)
+        let status = app.staticTexts["clinical-workspace-treatment_reasoning-status"]
+        XCTAssertTrue(scrollDown(to: status, requireHittable: true))
+        XCTAssertEqual(status.label, "Non disponibile in questa versione")
+        for action in ["prepare", "generate", "consent", "model", "venue"] {
+            XCTAssertFalse(app.descendants(matching: .any)["clinical-workspace-treatment_reasoning-" + action].exists)
+        }
+    }
+
     func testTherapyStatusFilterNarrowsList() {
         launch(seedPatients: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))

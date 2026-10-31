@@ -2,10 +2,12 @@ import Foundation
 
 public struct NativeFabricFailure: Error, Sendable {
     public enum Code: String, Sendable {
+        case treatmentReasoningUnavailableInRelease = "treatment_reasoning_unavailable_in_release"
         case functionDisabled = "function_disabled", providerUnavailable = "provider_unavailable", bindingStale = "binding_stale"
         case catalogStale = "catalog_stale", sessionExpired = "session_expired", revoked, unavailable
         var message: String {
             switch self {
+            case .treatmentReasoningUnavailableInRelease: return NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.safeReason
             case .functionDisabled: return "Funzione disabilitata sull’host."
             case .providerUnavailable, .unavailable: return "Esecuzione locale non disponibile sull’host."
             case .bindingStale, .catalogStale: return "Le impostazioni del modello sono cambiate. Prepara una nuova proposta."
