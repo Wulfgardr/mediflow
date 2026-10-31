@@ -34,6 +34,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { backupArtifactInputChecksum, stableStringify } from './backup-artifact';
 import { runBackupRestorePreflight } from './backup-restore-preflight';
@@ -41,7 +42,7 @@ import { canonicalizeBackupAuditRows, type BackupAuditRow } from './backup-audit
 import { serializeBackupArtifact as serializeScheduledBackupArtifact } from '../scripts/run-scheduled-backup.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const LOADER = path.join(ROOT, 'scripts/register-strip-types-loader.mjs');
+const LOADER = pathToFileURL(path.join(ROOT, 'scripts/register-strip-types-loader.mjs')).href;
 const checksum = (payload: unknown) => createHash('sha256').update(stableStringify(payload)).digest('hex');
 
 function runNode(dataDir: string, args: string[], extra: Record<string, string> = {}): string {
