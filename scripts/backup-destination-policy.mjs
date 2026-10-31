@@ -8,6 +8,7 @@ export const SYNC_DIRECTORY_NAMES = Object.freeze([
   'GoogleDrive', 'iCloud Drive', 'iCloudDrive', 'com~apple~CloudDocs',
   'Nextcloud', 'ownCloud', 'pCloud', 'Box', 'Box Sync', 'MEGA', 'SynologyDrive',
 ]);
+export const LINUX_SINGLE_DEVICE_FILESYSTEMS = Object.freeze(['ext2', 'ext3', 'ext4', 'xfs', 'ntfs', 'ntfs3', 'vfat', 'exfat']);
 export const MOUNT_ROOTS = Object.freeze(['/Volumes', '/mnt', '/media', '/run/media']);
 
 export class BackupDestinationError extends Error {}
@@ -67,12 +68,13 @@ export function probeBackupVolume(destination, { platform = process.platform, ru
       const drive = path.win32.parse(destination).root.slice(0, 2);
       if (!/^[a-z]:$/iu.test(drive)) return 'unverified';
       const info = JSON.parse(run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; Get-BitLockerVolume -MountPoint '${drive}' | Select-Object VolumeStatus,ProtectionStatus | ConvertTo-Json -Compress`]));
-      if (info.VolumeStatus === 0) return 'unencrypted';
+      if (info.ProtectionStatus === 0 || [0, 2, 3, 4, 5].includes(info.VolumeStatus)) return 'unencrypted';
       return info.VolumeStatus === 1 && info.ProtectionStatus === 1 ? 'verified' : 'unverified';
     }
     if (platform === 'linux') {
-      const mount = JSON.parse(run('findmnt', ['--json', '--target', destination, '--output', 'SOURCE'])).filesystems?.[0]?.source;
-      if (typeof mount !== 'string' || !mount.startsWith('/dev/')) return 'unverified';
+      const filesystem = JSON.parse(run('findmnt', ['--json', '--target', destination, '--output', 'SOURCE,FSTYPE'])).filesystems?.[0];
+      const mount = filesystem?.source;
+      if (typeof mount !== 'string' || !mount.startsWith('/dev/') || !LINUX_SINGLE_DEVICE_FILESYSTEMS.includes(filesystem.fstype)) return 'unverified';
       const devices = JSON.parse(run('lsblk', ['--json', '--inverse', '--output', 'NAME,TYPE', mount.split('[')[0]])).blockdevices;
       const encrypted = nodes => Array.isArray(nodes) && nodes.length > 0 && nodes.every(node => node.type === 'crypt' || encrypted(node.children));
       if (encrypted(devices)) return 'verified';
