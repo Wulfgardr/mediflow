@@ -5,9 +5,9 @@ import Database from 'better-sqlite3';
 import { backupDestinationIdentity } from '../scripts/backup-destination-policy.mjs';
 
 export function prepareSyntheticBackupDestination(dataDir: string, destination: string): void {
-    const root = fs.realpathSync(os.tmpdir());
+    const roots = [fs.realpathSync(os.tmpdir()), ...(process.platform === 'win32' ? [] : [fs.realpathSync('/tmp')])];
     const ancestor = fs.realpathSync(dataDir);
-    if (!ancestor.startsWith(`${root}${path.sep}`)) throw new Error('Synthetic temporary archive required');
+    if (!roots.some(root => ancestor.startsWith(`${root}${path.sep}`))) throw new Error('Synthetic temporary archive required');
     fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
     const db = new Database(path.join(dataDir, 'medical.db'));
     try {
