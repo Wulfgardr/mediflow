@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { recordPortableImportOrigin } from './backup-import-provenance';
 import { restoreSnapshot, writeRestoreReceipt, type RestoreIntent, type RestoreReceipt } from './backup-restore-receipt';
 import { planAmbulatoryCommandUnion, insertAmbulatoryCommandUnion } from './ambulatory-destructive-command-backup';
 import { planTherapyStatusCommandUnion, insertTherapyStatusCommandUnion } from './therapy-status-command-backup';
@@ -401,15 +402,14 @@ function recordPortableImport(plan: AuditRestorePlan, checksum: string, imported
     };
     dbServer.insert(auditEvents).values({ ...base, eventId, eventType: 'backup.portable.imported',
         subjectType: 'backup', subjectRef: checksum }).run();
-    const origin = openDbServer().prepare('INSERT INTO portable_import_origins (kind, ref, import_event_id) VALUES (?, ?, ?)');
     for (const commandId of importedCommands) {
-        if (origin.run('therapy_command', commandId, eventId).changes !== 1) throw new Error('Command origin did not persist');
+        recordPortableImportOrigin(openDbServer(), 'therapy_command', commandId, eventId);
         dbServer.insert(auditEvents).values({ ...base, eventId: randomUUID(), eventType: 'backup.therapy-command.imported',
             subjectType: 'therapy_command', subjectRef: commandId }).run();
     }
     for (const { row, reused } of plan) {
         if (reused) continue;
-        if (origin.run('audit', row.eventId, eventId).changes !== 1) throw new Error('Audit origin did not persist');
+        recordPortableImportOrigin(openDbServer(), 'audit', row.eventId, eventId);
         dbServer.insert(auditEvents).values({ ...base, eventId: randomUUID(), eventType: 'backup.audit.imported',
             subjectType: 'audit_event', subjectRef: row.eventId }).run();
     }

@@ -25,3 +25,8 @@ export function therapyCommandOrigin(db: Database.Database, commandId: string): 
     return db.prepare("SELECT 1 FROM portable_import_origins WHERE kind = 'therapy_command' AND ref = ?").get(commandId)
         ? 'imported' : 'local';
 }
+
+export function recordPortableImportOrigin(db: Database.Database, kind: 'audit' | 'therapy_command', ref: string, importEventId: string): void {
+    const result = db.prepare('INSERT INTO portable_import_origins (kind, ref, import_event_id) VALUES (?, ?, ?)').run(kind, ref, importEventId);
+    if (result.changes !== 1) throw new Error('Import origin did not persist');
+}
