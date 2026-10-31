@@ -3,7 +3,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 import { createGlinerRedactionRunner, readGlinerRuntimeObservation } from '../gliner-redaction-runner';
-import { createRedactionSession, type PreparedRedaction, type RedactionSessionInput } from '../ai-redaction-session';
+import { createRedactionSession, type PreparedRedaction, type RedactionSessionInput, type RedactionSessionEntity } from '../ai-redaction-session';
 import type { RedactionRuntimeIdentity } from '../redaction-runtime-identity';
 import { renderEmissionPlan, type EmissionUnit, type EmissionPlan } from './emission-plan';
 
@@ -77,7 +77,8 @@ function freezeContent(value: Record<string, unknown>): Readonly<Record<string, 
 /** close is available synchronously, before the first neural await. */
 export function createContentPreparation(plan: EmissionPlan, configuration: PreparationRunnerConfiguration,
     buildContent: (text: string, expansion: number) => Readonly<Record<string, unknown>>,
-    signal?: AbortSignal, knownIdentifiers?: RedactionSessionInput['knownIdentifiers']): Readonly<{ ready: Promise<PreparedContent>; close(): Promise<void> }> {
+    signal?: AbortSignal, knownIdentifiers?: RedactionSessionInput['knownIdentifiers'],
+    localEntities?: (text: string) => readonly RedactionSessionEntity[]): Readonly<{ ready: Promise<PreparedContent>; close(): Promise<void> }> {
     const known = snapshotKnown(knownIdentifiers);
     const units = [...new Set(plan.flatMap(part => typeof part === 'string' ? [] : [part.kind === 'data' ? part : part.unit]))];
     const original = renderEmissionPlan(plan);
@@ -116,7 +117,7 @@ export function createContentPreparation(plan: EmissionPlan, configuration: Prep
             let expansion = 1;
             for (const batch of work) {
                 guard();
-                const entities = await runner.extract(batch.text, signal);
+                const entities = [...await runner.extract(batch.text, signal), ...(localEntities?.(batch.text) ?? [])];
                 guard();
                 for (const entity of entities) slotForSpan(batch, entity);
                 const prepared = session.prepare({ text: batch.text, entities, knownIdentifiers: known });

@@ -23,6 +23,7 @@ pub(crate) enum State {
     DocumentOpened,
     VoiceOpened,
     Preparing,
+    Selecting,
     Challenge,
     Approving,
     Approved,
@@ -38,6 +39,7 @@ impl State {
             Self::DocumentOpened => "document-opened",
             Self::VoiceOpened => "voice-opened",
             Self::Preparing => "preparing",
+            Self::Selecting => "selecting",
             Self::Challenge => "challenge",
             Self::Approving => "approving",
             Self::Approved => "approved",
@@ -67,6 +69,14 @@ pub(crate) struct TherapyWrite {
     pub(crate) selected: Option<(usize, String)>,
     pub(crate) result: Option<serde_json::Value>,
 }
+pub(crate) struct ClinicalSelection {
+    pub(crate) copies: std::collections::BTreeMap<usize, String>,
+    pub(crate) editing: Option<usize>,
+    pub(crate) profile: Option<mediflow_runtime_client::PatientDetail>,
+    pub(crate) diagnoses: Vec<String>,
+    pub(crate) excerpts: Vec<String>,
+    pub(crate) selected: Vec<usize>,
+}
 pub(crate) struct Request {
     attempt: Attempt,
     state: State,
@@ -78,6 +88,8 @@ pub(crate) struct Request {
     deadline: Option<Instant>,
     binding: Option<Binding>,
     card: Option<super::card::Card>,
+    pub(crate) clinical: Option<ClinicalSelection>,
+    pub(crate) clinical_denial: Option<String>,
     cancelled: Arc<AtomicBool>,
     therapy: Option<TherapyWrite>,
     document: bool,
@@ -113,6 +125,8 @@ impl Request {
             deadline: None,
             binding: None,
             card: None,
+            clinical: None,
+            clinical_denial: None,
             cancelled: Arc::new(AtomicBool::new(false)),
             therapy: None,
             document: false,
@@ -219,6 +233,7 @@ impl Request {
         self.cancelled.store(true, Ordering::Release);
         native::cancel_biometric(&self.attempt.0);
         self.card = None;
+        self.clinical = None;
         self.catalog = None;
         self.attempt.0.fill(0);
         if self.therapy.as_ref().is_some_and(|t| t.selected.is_some()) {
@@ -305,10 +320,88 @@ impl Request {
         let card = self.card.as_ref()?;
         Some((&card.payload, &card.digest, &card.native_source))
     }
+    pub(super) fn request_clinical(&mut self) {
+        self.clinical = Some(ClinicalSelection {
+            copies: Default::default(),
+            editing: None,
+            profile: None,
+            diagnoses: Vec::new(),
+            excerpts: Vec::new(),
+            selected: Vec::new(),
+        });
+    }
+    pub(crate) fn add_excerpt(&mut self, text: &str) -> bool {
+        if self.status() != State::Selecting {
+            return false;
+        }
+        let Some(c) = self.clinical.as_mut() else {
+            return false;
+        };
+        let Some(notes) = c.profile.as_ref().and_then(|p| p.notes.as_deref()) else {
+            return false;
+        };
+        if !super::clinical::valid_excerpt(notes, text, &c.excerpts) {
+            return false;
+        }
+        c.excerpts.push(text.into());
+        true
+    }
+    pub(crate) fn edit_clinical(&mut self, index: usize) -> Option<String> {
+        if self.status() != State::Selecting {
+            return None;
+        }
+        let c = self.clinical.as_mut()?;
+        let text = c
+            .copies
+            .get(&index)
+            .or_else(|| c.diagnoses.iter().chain(c.excerpts.iter()).nth(index))?
+            .clone();
+        c.editing = Some(index);
+        Some(text)
+    }
+    pub(crate) fn save_clinical_copy(&mut self, text: &str) -> bool {
+        if self.status() != State::Selecting
+            || text.trim().is_empty()
+            || text.encode_utf16().count() > 2048
+        {
+            return false;
+        }
+        let Some(c) = self.clinical.as_mut() else {
+            return false;
+        };
+        let Some(index) = c.editing.take() else {
+            return false;
+        };
+        c.copies.insert(index, text.to_owned());
+        self.clinical_denial = None;
+        true
+    }
+    pub(crate) fn toggle_clinical(&mut self, index: usize) {
+        if self.status() != State::Selecting {
+            return;
+        }
+        if let Some(c) = self.clinical.as_mut()
+            && index < c.diagnoses.len() + c.excerpts.len()
+        {
+            if c.selected.contains(&index) {
+                c.selected.retain(|i| *i != index);
+            } else {
+                c.selected.push(index);
+            }
+        }
+    }
     pub(crate) fn needs_card(&mut self) -> bool {
         self.status() == State::Preparing
     }
     fn install_card(&mut self, card: Option<super::card::Card>) {
+        if self.clinical.is_some() && self.status() == State::Preparing {
+            if card.as_ref().is_none_or(|c| c.denial.is_some()) {
+                self.clinical_denial = Some(card.as_ref().and_then(|c| c.denial.clone()).unwrap_or_else(|| "Condivisione negata. Togli o riformula una delle righe selezionate: possibili identificativi o rilevatore non disponibile. Nessun byte condiviso.".into()));
+                self.state = State::Selecting;
+                return;
+            }
+            self.clinical_denial = None;
+        }
         if self.status() != State::Preparing || card.is_none() {
             self.withdraw();
             return;
@@ -572,7 +665,95 @@ pub(crate) fn prepare_card(pending: &Pending) {
         }
         return;
     }
-    let card = super::card::Card::prepare(cancelled);
+    let clinical = pending.lock().ok().and_then(|p| {
+        p.clinical.as_ref()?;
+        let b = p.binding.as_ref()?;
+        Some((b.session.clone(), b.context.clone()))
+    });
+    if let Some((session, context)) = clinical {
+        let profile = session.chat_clinical_profile(&context);
+        if let Ok(mut p) = pending.lock() {
+            if p.status() != State::Preparing {
+                return;
+            }
+            if let Ok(profile) = profile {
+                let c = p.clinical.as_mut().unwrap();
+                c.diagnoses = profile
+                    .diagnoses
+                    .as_deref()
+                    .unwrap_or("")
+                    .lines()
+                    .filter(|t| !t.trim().is_empty())
+                    .map(str::to_owned)
+                    .collect();
+                c.profile = Some(profile);
+                p.state = State::Selecting;
+            } else {
+                p.withdraw();
+            }
+        }
+        return;
+    }
+    let card = super::card::Card::prepare(cancelled, None);
+    if let Ok(mut p) = pending.lock() {
+        p.install_card(card);
+    }
+}
+
+pub(crate) fn prepare_clinical(pending: &Pending) {
+    let work = pending.lock().ok().and_then(|mut p| {
+        if p.status() != State::Selecting {
+            return None;
+        }
+        let c = p.clinical.as_ref()?;
+        let profile = c.profile.as_ref()?;
+        let diagnoses: Vec<_> = c
+            .diagnoses
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| c.selected.contains(i))
+            .map(|(_, t)| t.clone())
+            .collect();
+        let excerpts: Vec<_> = c
+            .excerpts
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| c.selected.contains(&(i + c.diagnoses.len())))
+            .map(|(_, t)| t.clone())
+            .collect();
+        if diagnoses.len() > 16
+            || excerpts.len() > 8
+            || diagnoses.len() + excerpts.len() == 0
+        {
+            return None;
+        }
+        let diagnoses: Vec<_> = c.diagnoses.iter().enumerate().filter(|(i, _)| c.selected.contains(i))
+            .map(|(i, t)| c.copies.get(&i).unwrap_or(t).clone()).collect();
+        let excerpts: Vec<_> = c.excerpts.iter().enumerate().filter(|(i, _)| c.selected.contains(&(i + c.diagnoses.len())))
+            .map(|(i, t)| c.copies.get(&(i + c.diagnoses.len())).unwrap_or(t).clone()).collect();
+        // Checked on the outgoing text: an edited copy must not bring the whole note back.
+        if !super::clinical::partial_notes(profile.notes.as_deref().unwrap_or(""), &excerpts) {
+            return None;
+        }
+        let b = p.binding.as_ref()?;
+        let result = (
+            b.session.clone(),
+            b.context.clone(),
+            profile.version,
+            p.cancelled.clone(),
+            serde_json::json!({"selection":{"diagnoses":diagnoses, "noteExcerpts":excerpts}, "knownIdentifiers":super::clinical::known_identifiers(profile)}),
+        );
+        p.state = State::Preparing;
+        Some(result)
+    });
+    let Some((session, context, revision, cancelled, selection)) = work else {
+        return;
+    };
+    let card = session
+        .chat_clinical_profile(&context)
+        .ok()
+        .filter(|p| p.version == revision)
+        .and_then(|_| super::card::Card::prepare(cancelled, Some(selection)));
     if let Ok(mut p) = pending.lock() {
         p.install_card(card);
     }
@@ -584,6 +765,18 @@ pub(crate) fn consume_card(pending: &Pending) -> (State, Option<String>) {
     let valid = binding.as_ref().is_some_and(|(s, c)| {
         s.revalidate_chat_access_context(c).is_ok() && (!agenda || s.chat_agenda(c).is_ok())
     });
+    let revision = pending.lock().ok().and_then(|p| {
+        p.clinical
+            .as_ref()
+            .and_then(|c| c.profile.as_ref().map(|p| p.version))
+    });
+    let valid = valid
+        && revision.is_none_or(|revision| {
+            binding.as_ref().is_some_and(|(s, c)| {
+                s.chat_clinical_profile(c)
+                    .is_ok_and(|p| p.version == revision)
+            })
+        });
     let mut payload = None;
     if valid
         && let Ok(mut p) = pending.lock()
@@ -596,7 +789,13 @@ pub(crate) fn consume_card(pending: &Pending) -> (State, Option<String>) {
         };
     }
     let valid = payload.is_some()
-        && binding.is_some_and(|(s, c)| s.revalidate_chat_access_context(&c).is_ok());
+        && binding.as_ref().is_some_and(|(s, c)| {
+            s.revalidate_chat_access_context(c).is_ok()
+                && revision.is_none_or(|revision| {
+                    s.chat_clinical_profile(c)
+                        .is_ok_and(|p| p.version == revision)
+                })
+        });
     let state = pending
         .lock()
         .map(|mut p| {
@@ -835,6 +1034,58 @@ pub(crate) mod tests {
                 worker: Some(worker),
             },
         )
+    }
+
+    #[test]
+    fn clinical_copy_changes_only_the_local_selection_and_requires_an_edit_target() {
+        let (pending, _remote, _session, _host) = clinical_request();
+        let mut p = pending.lock().unwrap();
+        let original = p.clinical.as_ref().unwrap().diagnoses[0].clone();
+        assert!(!p.save_clinical_copy("Diabete mellito"));
+        assert_eq!(p.edit_clinical(0), Some(original.clone()));
+        assert!(!p.save_clinical_copy(""));
+        assert!(p.save_clinical_copy("Diabete mellito"));
+        let c = p.clinical.as_ref().unwrap();
+        assert_eq!(c.diagnoses[0], original);
+        assert_eq!(c.copies[&0], "Diabete mellito");
+        assert!(c.selected.is_empty());
+        assert!(p.review().is_none());
+        assert!(!p.save_clinical_copy("altra copia"));
+        assert!(p.edit_clinical(999).is_none());
+    }
+    #[test]
+    fn clinical_denial_keeps_selection_local_and_never_enables_consent() {
+        let (pending, _remote, _session, _host) = clinical_request();
+        let mut p = pending.lock().unwrap();
+        p.state = State::Preparing;
+        p.install_card(None);
+        assert_eq!(p.status(), State::Selecting);
+        assert!(p.card.is_none());
+        assert!(
+            p.clinical_denial
+                .as_ref()
+                .unwrap()
+                .contains("Nessun byte condiviso")
+        );
+        assert!(p.begin().is_none());
+        assert!(p.clinical.is_some());
+    }
+
+    pub(crate) fn clinical_request() -> (Pending, UnixStream, RuntimeSession, Host) {
+        let (session, host) = native_session();
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        let (a, remote) = UnixStream::pair().unwrap();
+        let request = Request::new(Peer::test_peer(), a).unwrap();
+        {
+            let mut p = request.lock().unwrap();
+            p.request_clinical();
+            assert!(p.bind(session.clone(), context));
+            let c = p.clinical.as_mut().unwrap();
+            c.profile = Some(serde_json::from_value(serde_json::json!({"id":"patient-a", "firstName":"Amina", "lastName":"Sintetica", "taxCode":"SYNTHETIC", "notes":"Passo clinico.\nAltra nota.", "version":1})).unwrap());
+            c.diagnoses = vec!["Diagnosi sintetica".into()];
+            p.state = State::Selecting;
+        }
+        (request, remote, session, host)
     }
 
     pub(crate) fn relogin(previous: &RuntimeSession) -> RuntimeSession {

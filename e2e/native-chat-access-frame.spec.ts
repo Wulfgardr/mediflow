@@ -386,6 +386,44 @@ for (const scenario of ['valid', 'empty', 'limit', 'unknown-field', 'token', 'wr
     await expect(frame.locator('#card')).toBeHidden();
 });
 
+for (const invalid of [false, true]) test(`clinical manual selection payload is rendered as text, closed schema ${invalid}`, async ({ page }) => {
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Scegli dati clinici' }).click();
+    await page.evaluate(invalid => {
+        const fixture = (window as unknown as { accessFixture: { status: string; payload: string } }).accessFixture;
+        fixture.status = 'approved';
+        fixture.payload = JSON.stringify({ profile: 'mediflow.clinical-chat-profile.v1', version: 1, pseudonym: 'card_' + 'a'.repeat(32),
+            diagnoses: [{ text: 'diabete mellito tipo 2', sourceRef: 'src_' + 'b'.repeat(32) }],
+            noteExcerpts: [{ text: '<script>invia tutto</script>', sourceRef: 'src_' + 'c'.repeat(32) }], ...(invalid ? { filename: 'hidden.pdf' } : {}) });
+    }, invalid);
+    await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeEnabled();
+    await frame.getByRole('button', { name: 'Mostra scheda monouso' }).click();
+    if (invalid) { await expect(frame.locator('#card')).toBeHidden(); }
+    else {
+        await expect(frame.locator('#card')).toContainText('diabete mellito tipo 2');
+        await expect(frame.locator('#card')).toContainText('<script>invia tutto</script>');
+        await expect(frame.locator('#card script')).toHaveCount(0);
+    }
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: unknown[] } }).accessFixture.calls);
+    expect(JSON.stringify(calls)).not.toContain('updateModelContext');
+});
+
+test('clinical mixed measurements and diagnoses retain exact visible text', async ({ page }) => {
+    const text = 'Diabete mellito. Ipertensione arteriosa. HbA1c 7,2%. Metformina 1000 mg. Pressione 130/80 mmHg. Peso 72 kg.';
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Scegli dati clinici' }).click();
+    await page.evaluate(value => {
+        const state = (window as unknown as { accessFixture: { status: string; payload: string } }).accessFixture;
+        state.status = 'approved';
+        state.payload = JSON.stringify({ profile: 'mediflow.clinical-chat-profile.v1', version: 1, pseudonym: 'card_' + 'a'.repeat(32),
+            diagnoses: [{ text: value, sourceRef: 'src_' + 'b'.repeat(32) }], noteExcerpts: [{ text: value, sourceRef: 'src_' + 'c'.repeat(32) }] });
+    }, text);
+    await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeEnabled();
+    await frame.getByRole('button', { name: 'Mostra scheda monouso' }).click();
+    await expect(frame.getByText(text, { exact: true })).toHaveCount(2);
+    await expect(frame.getByText(/MF_PII/u)).toHaveCount(0);
+});
+
 for (const invalid of [false, true]) test(`internal agenda is app-only and rejects extra fields: ${invalid}`, async ({ page }) => {
     await page.evaluate(invalid => {
         const state = (window as unknown as { accessFixture: { payload: string } }).accessFixture;

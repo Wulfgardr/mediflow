@@ -241,6 +241,23 @@ Le celle generative e C-7 restano aperti. Treatment Reasoning indisponibile,
 Provider API fermi. Prove desktop e review indipendente del diff finale richieste
 prima dell'integrazione. Nessuna qualifica clinica implicita.
 
+## Proiezioni cliniche dell'archivio
+
+La ricognizione del raccordo clinico conferma il confine della terza tranche.
+L'[estensione di ADR 0165](../../adr/0165-native-chat-access-channel.md#proiezioni-cliniche-dellarchivio-confine-e-selezione-da-approvare)
+esplicita il profilo distinto necessario e la selezione dei campi ancora da
+approvare. Non introduce codice o un'abilitazione clinica.
+
+| Funzione | Servizio da raccordare | Vista e autorità | Prova del nuovo percorso | Stato |
+| --- | --- | --- | --- | --- |
+| Scheda archivio | `readPatientProfile`, query scoped `patient-profile.read.v1`, `RuntimeSession.open_patient_profile` | Proiezione clinica distinta, redazione locale e revisione dei byte nella UI nativa; solo pseudonimi nel frame app-only | Non eseguita: nessun raccordo implementato | Selezione dei campi da approvare; verticale non consegnata |
+| Terapie archivio | Servizio terapie e `RuntimeSession.list_therapies` già usati dal client nativo | Lettura clinica separata dalla scrittura stato; nessuna uscita diretta dei DTO | Non eseguita: nessun raccordo implementato | Non collegata al broker clinico |
+| Prescrizioni protesiche | Servizio prescrizioni e relativo client nativo; distinto da `chat_prosthetics_search` | Dati del paziente, non risultati del repertorio | Non eseguita: nessun raccordo implementato | Non collegate; ricerca del repertorio resta distinta |
+| Riassunto | Percorso Fabric ammesso dalla release, con controllo anche del risultato locale | Proposta con fonti, consenso e token validati; nessuna nuova autorità del modello | Non eseguita: nessun raccordo implementato | Non collegato; celle generative C-7 aperte |
+
+Le prove della grammatica sintetica, dei repertori e del cambio stato terapia
+non qualificano queste quattro letture. La matrice non attesta parità né
+accettazione C-B/C-3/C-4/C-7/C-8 sui due desktop.
 
 ## C-9b: agenda e prenotazione
 
