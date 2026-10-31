@@ -263,7 +263,7 @@ impl LocalHostAccess {
         {
             return Err(RuntimeError::InvalidInput);
         }
-        let (payload, preview, file) = if catalog == ReferenceCatalog::Aifa {
+        let (mut payload, preview, file) = if catalog == ReferenceCatalog::Aifa {
             if !name.to_ascii_lowercase().ends_with(".csv")
                 || ["sourceUrl", "downloadedAt", "version"].iter().any(|k| {
                     metadata[k].as_str().is_none_or(|v| {
@@ -307,7 +307,19 @@ impl LocalHostAccess {
         };
         self.headers()?;
         let baseline = if catalog == ReferenceCatalog::Aifa {
-            Some(self.read_reference_catalog(catalog)?.data)
+            {
+                let data = self.read_reference_catalog(catalog)?.data;
+                let snapshot = data["snapshot"]
+                    .as_str()
+                    .filter(|s| {
+                        s.len() == 64
+                            && s.bytes()
+                                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+                    })
+                    .ok_or(RuntimeError::InvalidResponse)?;
+                payload["expectedSnapshot"] = json!(snapshot);
+                Some(data)
+            }
         } else {
             None
         };
@@ -385,6 +397,7 @@ impl LocalHostAccess {
                     "downloadedAt",
                     "version",
                     "reductionConfirmation",
+                    "expectedSnapshot",
                 ] {
                     if let Some(value) = command.payload[key].as_str() {
                         body.extend_from_slice(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{key}\"\r\n\r\n{value}\r\n").as_bytes());
@@ -415,6 +428,13 @@ impl LocalHostAccess {
             };
             let value: Value =
                 serde_json::from_slice(&raw.body).map_err(|_| RuntimeError::Indeterminate)?;
+            if raw.status == 409
+                && command.file.is_some()
+                && value["code"] == "AIFA_CATALOG_CHANGED"
+            {
+                command.submitted.store(false, Ordering::Release);
+                return Ok(ReferenceImportResult::CatalogChanged);
+            }
             if raw.status == 409 {
                 if value["code"] != "AIFA_REDUCTION_CONFIRMATION_REQUIRED"
                     || value["confirmation"].as_str().is_none_or(|v| {
@@ -484,5 +504,23 @@ impl LocalHostAccess {
         }
         self.headers()?;
         Ok(ReferenceImportResult::Recorded(value))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn aifa_review_truncation_keeps_the_complete_total() {
+        let mut csv = String::from(
+            "AIC;DENOMINAZIONE;ATC;PRINCIPIO_ATTIVO\n000000001;Inventato;X;Inventato\n",
+        );
+        csv.push_str(&"bad;Inventato;X;Inventato\n".repeat(201));
+        let review = aifa_file_review(&csv).unwrap();
+        assert_eq!(review["rejectedRecords"], 201);
+        assert_eq!(review["count"], 1);
+        assert_eq!(review["diagnosticsTruncated"], true);
+        assert_eq!(review["diagnostics"].as_array().unwrap().len(), 200);
     }
 }
