@@ -841,7 +841,7 @@ export async function main(args = process.argv.slice(2)) {
     chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state, runtimeOwner: leases?.receipt.owner ?? null }), choose,
       navigate, cancelNavigation,
       install: () => installApproval?.(true), stop: () => { if (!leases.requestStop()) return false; void shutdown(); }, nativeAvailable: !!native, development: dirty,
-      version: identity.version, folder: path.basename(ROOT) });
+      version: identity.version, folder: path.basename(ROOT), webPort: Number(process.env.PORT || 3000) });
     leases = await createRuntimeLeases({ directory: archiveOwnership?.directory ?? lockDirectory,
       identity: runtimeProcessIdentity, initialPlugin: pluginChannel, onIdle: shutdown,
       binding: { choiceUrl: chooser.url, dataDir, checkoutPath: identity.checkoutPath } });
