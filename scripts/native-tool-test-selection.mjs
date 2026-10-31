@@ -195,6 +195,11 @@ export function collectGpuiBundleSelection(root) {
   if (binding.jobIf !== null || binding.stepIf !== "runner.os == 'Linux'"
     || binding.runsOn !== '${{ matrix.os }}'
     || JSON.stringify(binding.matrix) !== JSON.stringify({ os: ['ubuntu-24.04', 'macos-latest', 'windows-latest'] })) throw new Error('GPUI bundle test CI binding changed');
+  const packaging = collectLiteralCiBinding(root, {
+    workflow: gpuiWorkflow, job: 'native-tests', triggers: gpuiTriggers,
+    ciCall: `python3 ${gpuiDirectory}/scripts/bundle_macos.py --staging "$RUNNER_TEMP/gpui-bundle" --target-dir "$RUNNER_TEMP/gpui-release"\n"$RUNNER_TEMP/gpui-bundle/MediFlow GPUI.app/Contents/MacOS/mediflow-gpui-patient-pilot" --verify-bundled-assets`,
+  });
+  if (packaging.stepIf !== "runner.os == 'macOS'" || packaging.jobIf !== null) throw new Error('GPUI package build CI binding changed');
   return { files: [file], errors: [], mode: 'conditional', conditional: true, binding };
 }
 

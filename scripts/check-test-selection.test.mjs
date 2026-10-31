@@ -104,7 +104,7 @@ test('GPUI bundle tests bind to CI and reject a removed, masked or conditional i
   const selected = collectNativeToolSelections(sourceRoot)[key];
   assert.deepEqual(selected.errors, []);
   assert.deepEqual(selected.files, [`${pilot}/scripts/test_bundle_macos.py`]);
-  for (const [before, replacement] of [[call, 'echo skipped'], [call, `${call} || true`], [`if: runner.os == 'Linux'\n        run: ${call}`, `if: false\n        run: ${call}`]]) {
+  for (const [before, replacement] of [['bundle_macos.py --staging', 'bundle_macos_removed.py --staging'], ['--verify-bundled-assets', '--skip-assets'], [call, 'echo skipped'], [call, `${call} || true`], [`if: runner.os == 'Linux'\n        run: ${call}`, `if: false\n        run: ${call}`]]) {
     const root = pilotFixture(t);
     const file = `${pilot}/scripts/test_bundle_macos.py`;
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
