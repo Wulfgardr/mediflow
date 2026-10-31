@@ -157,3 +157,63 @@ soltanto testo. Non interpreta token PII e non aggiorna il contesto del modello.
 Il broker clinico conserva il proprio confine sintetico e la propria autorità.
 Il grant non autorizza prescrizioni, scritture o inferenza. Le prove sui due
 desktop reali restano alla qualifica, così come la negoziazione delle capacità.
+
+## Proiezioni cliniche dell'archivio: confine e selezione da approvare
+
+La grammatica `mediflow.synthetic-chat-card.v1` rimane riservata alle fixture.
+Non ammette letture dell'archivio né testo clinico arbitrario. Un raccordo ai
+servizi comuni richiede un profilo distinto, versionato e a schema chiuso;
+aggiungere valori al profilo sintetico non costituisce tale raccordo.
+
+Per una proiezione clinica valgono C-B, C-3a, C-3b, C-4, C-7 e C-8 del
+[contratto 0.9.1](../releases/0.9.1-contract.md). La selezione precede la
+redazione: ogni campo clinico ammesso è testo con una fonte opaca, legata
+localmente alla revisione letta. Identità, ID dell'archivio, filename, percorsi
+e riferimenti originali non sono fonti esportabili. Campi o varianti di schema
+non classificati devono negare l'intera uscita, senza omissioni silenziose.
+
+Il broker posseduto dalla GPUI deve comporre la proiezione dal servizio comune,
+il runner GLiNER locale reale e il controllo del payload serializzato completo.
+Runner assente o non qualificato, output invalido, residui identificanti e
+contesto cambiato negano l'uscita senza ripieghi. Il corpus sintetico annotato
+deve coprire CF da OCR, terzi, luoghi, nascita, filename e campi ignoti nella
+nuova proiezione, con zero falsi negativi; un'evidenza legata
+alla sola grammatica sintetica non qualifica prosa clinica diversa. La conferma
+autenticata nella finestra nativa riguarda gli esatti byte finali. La chat
+riceve soltanto pseudonimi; mappe e ricomposizione rimangono RAM dell'owner
+locale. Token estranei, altra sessione, lock, refresh e riavvio negano l'uso.
+Il frame app-only non aggiorna il contesto del modello. Questo raccordo non
+amplia le uscite già ammesse al modello, non modifica writer o claim crittografici.
+
+### Decisione sulla prima scheda
+
+Il contratto ammette farmaci, condizioni, storia e misure quando necessari,
+ma non stabilisce l'elenco dei campi della prima scheda archivio. La proiezione
+interna `mediflow.patient.profile-view.v1` contiene anche identità, caregiver,
+esenzioni e ragioni di stato o archiviazione: il suo schema chiuso regola la
+lettura locale, non l'uscita verso l'host della chat. In particolare, il campo
+`notes` non prova da solo che tutto il suo contenuto sia storia clinica ammessa.
+
+La proposta per la prima verticale è un nuovo profilo
+`mediflow.clinical-chat-profile.v1`, limitato a diagnosi e storia clinica
+selezionata dalle note. Le due liste conterrebbero esclusivamente oggetti
+`{ text, sourceRef }`, oltre a versione e pseudonimo al livello principale.
+Il nome del profilo e questi campi sono una proposta, non uno schema attivo.
+Limiti, selezione temporale e trasformazioni dei formati strutturati vanno
+fissati insieme alla selezione, prima dell'implementazione.
+
+| Campo del servizio comune | Trattamento proposto nella prima verticale |
+| --- | --- |
+| `diagnoses` | Solo testo clinico selezionato, senza ID o date originali; fonte opaca per voce |
+| `notes` | Solo storia clinica selezionata e classificata; non trasferimento integrale del campo |
+| `firstName`, `lastName`, `taxCode`, `birthDate`, `address`, `phone`, `caregiver` | Esclusi dall'uscita; identità e ricomposizione solo native |
+| `exemptions`, `isAdi`, `isArchived`, `statusReason`, `archiveReason`, `archiveNote` | Esclusi dalla proposta iniziale; nessuna ammissione implicita dalla loro presenza nella scheda locale |
+
+Le alternative sono partire dalle sole diagnosi, con una vista dichiaratamente
+parziale, oppure includere ulteriori gruppi clinico-assistenziali con una
+decisione esplicita su ciascuno. La proposta diagnosi e storia mantiene separati
+i successivi raccordi di terapie, prescrizioni protesiche e risultati Fabric.
+La selezione richiede approvazione di prodotto: finché manca, nessuna lettura
+clinica dell'archivio è collegata al frame. C-8 resta aperto e la scheda completa
+rimane nella UI nativa. Queste esclusioni proposte non riducono il requisito
+di parità della release e non attestano una verticale implementata o qualificata.
