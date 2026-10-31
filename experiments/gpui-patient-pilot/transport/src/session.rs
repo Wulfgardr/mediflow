@@ -500,6 +500,23 @@ impl RuntimeSession {
         }
     }
 
+    pub fn chat_drug_search(
+        &self,
+        context: &ChatAccessContext,
+        query: &str,
+    ) -> Result<Vec<crate::DrugCatalogItem>> {
+        if !(2..=80).contains(&query.chars().count()) || query.chars().any(char::is_control) {
+            return Err(RuntimeError::InvalidInput);
+        }
+        self.revalidate_chat_access_context(context)?;
+        if self.drug_count(&context.scope)? == 0 {
+            return Err(RuntimeError::ReadRequired);
+        }
+        let rows = self.search_drugs(&context.scope, query, 20)?;
+        self.revalidate_chat_access_context(context)?;
+        Ok(rows)
+    }
+
     pub fn chat_therapy_rows(&self, context: &ChatAccessContext) -> Result<(Vec<Therapy>, String)> {
         self.revalidate_chat_access_context(context)?;
         let rows = self.list_therapies(&context.scope, &context.patient)?;
