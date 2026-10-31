@@ -287,3 +287,14 @@ clinici. La responsabilità di ciò che esce resta del medico, che vede i byte
 esatti prima del consenso. Revocare non cancella dati già acquisiti dall'host.
 Le prove sintetiche non attestano anonimato universale, qualifica dei desktop o
 accettazione clinica. I claim su cifratura e zero-knowledge restano invariati.
+
+### Limiti dichiarati del controllo
+
+Il confronto con gli identificativi noti riconosce il valore intero, i prefissi,
+gli errori di battitura e OCR che sostituiscono o scambiano lettere a parità di
+lunghezza e iniziale, e i separatori dentro una parola. Non riconosce un nome
+noto con più refusi di questi, né una variante con iniziale diversa: allargare
+la tolleranza bloccherebbe parole ordinarie come «aria» o «fianchi». È una scelta
+di bilanciamento, non una copertura completa. Il medico vede i byte esatti e ne
+resta responsabile; il controllo è un aiuto e non è anonimizzazione.
+

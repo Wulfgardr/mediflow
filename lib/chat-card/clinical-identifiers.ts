@@ -63,12 +63,17 @@ export function clinicalIdentifierSpans(text: string, known: KnownClinicalIdenti
         const minimum = /\p{N}/u.test(full.compact) ? 6 : 4;
         // A known name is compared whole at any length; a typo of it is still that name.
         if (!/\p{N}/u.test(full.compact) && !/[^\p{L}\p{M}]/u.test(identifier.normalize('NFKC'))) {
+            // Typing and OCR errors replace or swap letters: same length and same first letter.
+            // Wider tolerance would block ordinary words such as aria or fianchi.
             const edits = full.folded.length >= 8 ? 2 : full.folded.length >= 5 ? 1 : 0;
-            for (const word of text.normalize('NFKC').matchAll(/[\p{L}\p{M}\p{N}]+/gu)) {
-                const candidate = normalized(word[0]);
-                if (candidate.compact === full.compact || candidate.folded === full.folded && full.folded.length >= minimum
-                    || (edits > 0 && withinEdits(candidate.folded, full.folded, edits))) add(0, text.length);
-            }
+            const nameLike = (candidate: ReturnType<typeof normalized>) => candidate.compact === full.compact
+                || (candidate.folded === full.folded && full.folded.length >= minimum)
+                || (edits > 0 && candidate.folded.length === full.folded.length && candidate.folded[0] === full.folded[0]
+                    && withinEdits(candidate.folded, full.folded, edits));
+            const source = text.normalize('NFKC');
+            for (const word of source.matchAll(/[\p{L}\p{M}\p{N}]+/gu)) if (nameLike(normalized(word[0]))) add(0, text.length);
+            // A separator cannot hide a name inside a compound: Mq/rta, Va-lli.
+            for (const word of source.matchAll(/[\p{L}\p{M}\p{N}]+(?:['’/-][\p{L}\p{M}\p{N}]+)+/gu)) if (nameLike(normalized(word[0]))) add(0, text.length);
         }
         if (full.folded.length < minimum) continue;
         const needle = full.folded.slice(0, minimum);
