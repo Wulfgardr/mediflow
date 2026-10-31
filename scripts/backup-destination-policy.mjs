@@ -11,7 +11,12 @@ export const SYNC_DIRECTORY_NAMES = Object.freeze([
 export const LINUX_SINGLE_DEVICE_FILESYSTEMS = Object.freeze(['ext2', 'ext3', 'ext4', 'xfs', 'ntfs', 'ntfs3', 'vfat', 'exfat']);
 export const MOUNT_ROOTS = Object.freeze(['/Volumes', '/mnt', '/media', '/run/media']);
 
-export class BackupDestinationError extends Error {}
+export class BackupDestinationError extends Error {
+  constructor(userMessage) {
+    super(userMessage);
+    this.userMessage = userMessage;
+  }
+}
 
 export function isSynchronizedBackupPath(value, { platform = process.platform, homeDir = os.homedir() } = {}) {
   const api = platform === 'win32' ? path.win32 : path.posix;
