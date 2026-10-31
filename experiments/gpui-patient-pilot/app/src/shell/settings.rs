@@ -15,6 +15,8 @@ pub(super) enum SettingsPage {
     Governance,
     References,
     Controls,
+    Host,
+    Danger,
 }
 
 impl SettingsPage {
@@ -32,6 +34,8 @@ impl SettingsPage {
             Self::Governance => 9,
             Self::References => 10,
             Self::Controls => 11,
+            Self::Host => 12,
+            Self::Danger => 13,
         }
     }
 }
@@ -57,6 +61,9 @@ impl ClinicalApp {
         self.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
         if page == SettingsPage::Profile {
             self.ensure_account_profile_loaded(cx);
+        }
+        if page == SettingsPage::Host {
+            self.read_network_mode(cx);
         }
         if page == SettingsPage::Controls {
             self.read_controls(cx);
@@ -121,6 +128,8 @@ impl ClinicalApp {
         }
         match self.settings_page {
             SettingsPage::Access => view.child(self.access_view(cx)),
+            SettingsPage::Danger => view.child(self.danger_view(cx)),
+            SettingsPage::Host => view.child(self.network_mode_view(cx)),
             SettingsPage::Governance => view.child(self.governance_view(cx)),
             SettingsPage::Controls => view.child(self.controls_view(cx)),
             SettingsPage::Archives => view.child(self.archives_view(cx)),
@@ -169,6 +178,8 @@ impl ClinicalApp {
                         (SettingsPage::Access, "Accesso", "Passphrase, PIN e blocco della sessione"),
                         (SettingsPage::Appearance, "Aspetto", "Tema, dimensione del testo e privacy"),
                         (SettingsPage::Ambulatories, "Ambulatori", "Sedi e contesti clinici"),
+                        (SettingsPage::Host, "Modo host", "Accesso locale o nodo della rete fidata"),
+                        (SettingsPage::Danger, "Zona pericolo", "Credenziali e recupero dell’accesso"),
                         (SettingsPage::Archives, "Archivi e backup", "Esportazione, verifica e ripristino"),
                         (SettingsPage::Controls, "Controlli", "Evidenze, aggiornamenti, audit e redazione"),
                         (SettingsPage::References, "Repertori", "Stato, fonti e importazione dei cataloghi"),
@@ -259,7 +270,7 @@ mod tests {
                 window.draw(cx).clear(cx);
             });
             let nodes = rendered_command::take_text_nodes();
-            assert_eq!(nodes.len(), 10);
+            assert_eq!(nodes.len(), 12);
             let mut unique = HashSet::new();
             for (id, node) in nodes {
                 assert!(
@@ -287,6 +298,8 @@ mod tests {
                     SettingsPage::Ambulatories,
                     SettingsPage::AiPreferences,
                     SettingsPage::Functions,
+                    SettingsPage::Host,
+                    SettingsPage::Danger,
                     SettingsPage::Archives,
                     SettingsPage::Governance,
                     SettingsPage::Controls,

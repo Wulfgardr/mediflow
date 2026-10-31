@@ -25,6 +25,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/ci-disposition-selection.test.mjs',
   // Explicit route registration; do not discover every app/** test.
   'app/api/patients/route.test.ts',
+  'app/api/settings/network-mode.test.ts',
   'scripts/admin-route-auth-boundary.test.mjs',
   'scripts/check-never-regress-icd-who.test.mjs',
   'scripts/check-never-regress-ocr-retirement.test.mjs',
