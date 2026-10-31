@@ -199,6 +199,7 @@ struct HostAdminWorkspaceView: View {
                 InfoRow("Finestra", "\(audit.days ?? 30) giorni")
                 InfoRow("Eventi locali esaminati", String(audit.totalEvents ?? 0))
                 InfoRow("Importati, esaminati separatamente", "\(audit.importedEvents ?? 0)\(audit.importedIsTruncated == true ? " o più" : "")")
+                InfoRow("Origine non attestata, esaminati separatamente", "\(audit.unattestedEvents ?? 0)\(audit.unattestedIsTruncated == true ? " o più" : "")")
                 InfoRow("Operatori distinti", String(audit.distinctActors ?? 0))
                 if let outcomes = audit.outcomes {
                     InfoRow(

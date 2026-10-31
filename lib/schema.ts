@@ -602,8 +602,10 @@ export const portableImportOrigins = sqliteTable('portable_import_origins', {
     kind: text('kind').notNull(),
     ref: text('ref').notNull(),
     importEventId: text('import_event_id').notNull().references(() => auditEvents.eventId),
+    origin: text('origin').notNull().default('imported'),
 }, table => [
     primaryKey({ columns: [table.kind, table.ref] }),
     check('portable_import_origin_kind', sql`${table.kind} IN ('audit', 'therapy_command')`),
+    check('portable_import_origin_origin', sql`${table.origin} IN ('imported', 'unattested')`),
     check('portable_import_origin_ref', sql`length(${table.ref}) > 0`),
 ]);

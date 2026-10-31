@@ -259,6 +259,13 @@ test(`initialized destination rejects ${mutation} without changing any bytes`, a
     } finally { f.cleanup(); }
 });
 
+function assertPredecessorAuditHistory(actual: Record<string, unknown>[], expected: Record<string, unknown>[]): void {
+    const originalIds = new Set(expected.map(row => row.event_id));
+    for (const row of expected) assert.deepEqual(actual.find(candidate => candidate.event_id === row.event_id), row);
+    const added = actual.filter(row => !originalIds.has(row.event_id));
+    assert.deepEqual(added.map(row => row.event_type).sort(), ['backup.provenance.unattested', 'territorial.packs.preserved']);
+}
+
 for (const alteration of ['none', 'column', 'index', 'trigger', 'extra-table', 'wrong-version', 'v5-missing-ledger'] as const)
 test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async () => {
     const f = await fixture();
@@ -289,7 +296,7 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
                 assert.deepEqual(result.users, expected.users);
                 assert.deepEqual(result.patients, expected.patients);
                 assert.deepEqual(result.durable_review_command_operations, expected.durable_review_command_operations);
-                assert.deepEqual((result.audit_events as unknown[]).slice(0, -1), expected.audit_events);
+                assertPredecessorAuditHistory(result.audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
                 assert.equal(installed.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             } finally { installed.close(); }
         }
@@ -320,7 +327,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
                 const actual = contents(restored);
                 assert.deepEqual(actual.ambulatory_destructive_commands, []);
                 for (const key of ['users','patients','therapy_status_commands','durable_review_command_operations']) assert.deepEqual(actual[key], expected[key]);
-                assert.deepEqual((actual.audit_events as unknown[]).slice(0, -1), expected.audit_events);
+                assertPredecessorAuditHistory(actual.audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
                 assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             } finally { restored.close(); }
         }
@@ -336,25 +343,36 @@ test('GPUI and Web share the authenticated recovery envelope golden', async () =
     assert.deepEqual(Buffer.from(decrypted), Buffer.from(golden.database, 'base64'));
 });
 
-for (const alteration of ['none', 'column', 'index', 'view', 'authority-table']) test(`encrypted v6 predecessor ${alteration} preserves its immutable schema contract`, async () => {
+for (const alteration of ['none', 'column', 'index', 'view', 'authority-table']) for (const version of [6, 7]) test(`encrypted v${version} predecessor ${alteration} preserves its immutable schema contract`, async () => {
     const f = await fixture();
     try {
-        const file = path.join(f.root, 'canonical6.db'); fs.writeFileSync(file, f.snapshot);
+        const file = path.join(f.root, `canonical${version}.db`); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
-        old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; PRAGMA user_version=6;');
+        old.exec('DROP TABLE synthetic_extension');
+        if (version === 6) old.exec('DROP TABLE portable_import_origins');
+        else old.exec('ALTER TABLE portable_import_origins DROP COLUMN origin');
+        old.pragma(`user_version=${version}`);
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN drift TEXT');
         if (alteration === 'index') old.exec('CREATE INDEX drift ON therapies(status)');
         if (alteration === 'view') old.exec('CREATE VIEW drift AS SELECT id FROM therapies');
-        if (alteration === 'authority-table') old.exec('CREATE TABLE portable_import_origins (kind TEXT, ref TEXT, import_event_id TEXT)');
+        if (alteration === 'authority-table') {
+            if (version === 7) old.exec('DROP TABLE portable_import_origins');
+            old.exec('CREATE TABLE portable_import_origins (kind TEXT, ref TEXT, import_event_id TEXT)');
+        }
         const expected = contents(old); old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE'); old.close();
         const bytes = fs.readFileSync(file), artifact = await encryptRecoveryBackup(bytes, f.key);
         if (alteration !== 'none') { await assert.rejects(f.restore({ artifact })); assert.equal(fs.existsSync(f.destination), false); }
         else {
             await f.restore({ artifact }); const restored = openVersionedSqliteDatabase(f.destination);
             try {
-                assert.equal(restored.pragma('user_version', { simple: true }), 7);
+                assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
                 for (const table of ['users','patients','therapy_status_commands','ambulatory_destructive_commands']) assert.deepEqual(contents(restored)[table], expected[table]);
-                assert.deepEqual(restored.prepare('SELECT * FROM portable_import_origins').all(), []);
+                const origins = restored.prepare('SELECT * FROM portable_import_origins').all() as { kind: string; ref: string; origin: string; import_event_id: string }[];
+                const known = version === 7 ? expected.portable_import_origins as { kind: string; ref: string; import_event_id: string }[] : [];
+                for (const row of known) assert.deepEqual(origins.find(candidate => candidate.kind === row.kind && candidate.ref === row.ref), { ...row, origin: 'imported' });
+                const unknown = origins.filter(row => row.origin === 'unattested');
+                assert.equal(unknown.length, (expected.audit_events as unknown[]).length + (expected.therapy_status_commands as unknown[]).length - known.length);
+                assertPredecessorAuditHistory(contents(restored).audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
             } finally { restored.close(); }
         }
         assert.deepEqual(fs.readFileSync(file), bytes);

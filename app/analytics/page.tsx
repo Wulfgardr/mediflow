@@ -22,6 +22,8 @@ type AuditSummary = {
     days: number;
     totalEvents: number;
     importedEvents: number;
+    unattestedEvents: number;
+    unattestedIsTruncated: boolean;
     importedIsTruncated: boolean;
     distinctActors: number;
     outcomes: Record<'success' | 'failure' | 'denied', number>;
@@ -361,6 +363,10 @@ export default function AnalyticsPage() {
                             <div className={styles.factRow}>
                                 <dt>Eventi importati, esaminati separatamente</dt>
                                 <dd>{auditSummary.importedEvents}{auditSummary.importedIsTruncated ? ' o più' : ''}</dd>
+                            </div>
+                            <div className={styles.factRow}>
+                                <dt>Origine non attestata, esaminati separatamente</dt>
+                                <dd>{auditSummary.unattestedEvents}{auditSummary.unattestedIsTruncated ? ' o più' : ''}</dd>
                             </div>
                             <div className={styles.factRow}>
                                 <dt>Attori distinti</dt>

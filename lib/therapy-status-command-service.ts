@@ -86,7 +86,7 @@ export function readTherapyStatusReceipt(session: ServerSession, command: Therap
         const existing = existingReceipt(tx, command, actorRef);
         if (existing) {
             const origin = therapyCommandOrigin(dbServer.$client, existing.commandId);
-            return { outcome: 'terminal' as const, origin, historical: origin === 'imported' || existing.archiveGeneration !== readSqliteArchiveGeneration(dbServer.$client), receipt: receipt(existing) };
+            return { outcome: 'terminal' as const, origin, historical: origin !== 'local' || existing.archiveGeneration !== readSqliteArchiveGeneration(dbServer.$client), receipt: receipt(existing) };
         }
         assertArchiveGeneration(tx, command.archiveGeneration);
         admitResource(tx, command);

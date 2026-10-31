@@ -322,6 +322,8 @@ public struct HostAuditSummary: Decodable, Equatable, Sendable {
     public let totalEvents: Int?
     public let importedEvents: Int?
     public let importedIsTruncated: Bool?
+    public let unattestedEvents: Int?
+    public let unattestedIsTruncated: Bool?
     public let distinctActors: Int?
     public let outcomes: Outcomes?
     public let sourceSurfaces: SourceSurfaces?

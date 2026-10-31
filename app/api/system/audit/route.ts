@@ -39,7 +39,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const view = searchParams.get('view');
         const origin = searchParams.get('origin') ?? 'local';
-        if (origin !== 'local' && origin !== 'imported') return NextResponse.json({ error: 'Invalid audit origin' }, { status: 400 });
+        if (origin !== 'local' && origin !== 'imported' && origin !== 'unattested') return NextResponse.json({ error: 'Invalid audit origin' }, { status: 400 });
         const eventType = searchParams.get('eventType') as AuditEventType | null;
         const outcome = searchParams.get('outcome') as AuditOutcome | null;
         const subjectType = searchParams.get('subjectType') as AuditSubjectType | null;
@@ -61,14 +61,17 @@ export async function GET(request: Request) {
         });
 
         if (view === 'summary') {
-            const importedRows = origin === 'local' ? await listAuditEvents({ limit, origin: 'imported', eventType: eventType || undefined,
-                outcome: outcome || undefined, subjectType: subjectType || undefined, actorRef, occurredAfter }) : [];
+            const sample = async (requested: 'local' | 'imported' | 'unattested') => origin === requested ? rows
+                : origin === 'local' ? listAuditEvents({ limit, origin: requested, eventType: eventType || undefined,
+                    outcome: outcome || undefined, subjectType: subjectType || undefined, actorRef, occurredAfter }) : [];
             const localRows = origin === 'local' ? rows : [];
-            const importedSample = origin === 'imported' ? rows : importedRows;
+            const importedSample = await sample('imported');
+            const unattestedSample = await sample('unattested');
             return NextResponse.json({
                 days,
-                ...summarizeAuditEvents([...localRows, ...importedSample], localRows.length >= limit),
+                ...summarizeAuditEvents([...localRows, ...importedSample, ...unattestedSample], localRows.length >= limit),
                 importedIsTruncated: importedSample.length >= limit,
+                unattestedIsTruncated: unattestedSample.length >= limit,
             });
         }
 

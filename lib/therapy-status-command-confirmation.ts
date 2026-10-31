@@ -1,3 +1,4 @@
+import type { BackupOrigin } from './backup-import-provenance';
 import { createTherapyStatusConfirmation, type StatusTherapy, type StatusWriteJournal, type Status } from './therapy-status-confirmation';
 import { THERAPY_STATUS_PROTOCOL, parseTherapyStatusCommand, type TherapyStatusCommand, type TherapyStatusReceipt } from './therapy-status-command-contract';
 import type { TherapyCommandResponse } from './therapy-status-command-client';
@@ -6,7 +7,7 @@ export type DurableStatusState<T> = {
     phase: 'confirm' | 'writing' | 'reading' | 'conflict' | 'rejected' | 'uncertain' | 'reviewed' | 'registered' | 'unavailable';
     patientLabel: string; original?: T; target?: Status; current?: T; conflict: boolean;
     reason?: 'admission' | 'journal' | 'therapy'; newAttemptNotSent?: boolean; checking?: boolean;
-    origin?: 'local' | 'imported';
+    origin?: BackupOrigin;
     readFailed?: boolean; writePending?: boolean; historical?: boolean; legacy?: boolean;
     receipt?: TherapyStatusReceipt; command?: TherapyStatusCommand;
 };
