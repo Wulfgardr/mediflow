@@ -39,6 +39,16 @@ import type { ServerSession } from './security/server-session';
 export const NETWORK_PROSTHETIC_PRESCRIPTION_READ_CAPABILITY = 'network.replica.readonly-prosthetic-prescriptions';
 export const NETWORK_PROSTHETIC_PRESCRIPTION_WRITE_CAPABILITY = 'network.replica.write-prosthetic-prescriptions';
 
+export function readProstheticsCatalog(query: string) {
+    const service = createProstheticsCatalog(dbServer.$client);
+    if (service.status().count === 0) return null;
+    const result = service.search(query);
+    return { rows: result.entries.slice(0, 20).map(row => ({
+        codeSystem: row.codeSystem, code: row.code, description: row.description,
+        version: row.version, source: row.source, scope: row.scope,
+    })), truncated: result.truncated || result.entries.length > 20 };
+}
+
 type MutationResponse =
     | { status: 200; value: { success: true } }
     | { status: 201; value: { id: string; version: number } }

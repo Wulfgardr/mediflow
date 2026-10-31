@@ -234,6 +234,7 @@ impl Drop for WriteGuard<'_> {
 /// Private closed routing for the typed, read-only catalog API. These values
 /// cannot select another origin, HTTP method, clinical route or credential.
 pub(crate) enum CatalogRoute {
+    Prosthetics,
     Drugs,
     Exemptions,
     TerminologySystems,
@@ -245,6 +246,7 @@ pub(crate) enum CatalogRoute {
 impl CatalogRoute {
     fn path(&self) -> &'static [&'static str] {
         match self {
+            Self::Prosthetics => &["api", "v1", "network", "prosthetics-catalog"],
             Self::Drugs => &["api", "v1", "network", "drugs"],
             Self::Exemptions => &["api", "v1", "network", "exemptions"],
             Self::TerminologySystems => &["api", "v1", "network", "terminology", "systems"],
@@ -256,6 +258,7 @@ impl CatalogRoute {
     }
     fn allows_query(&self, key: &str) -> bool {
         match self {
+            Self::Prosthetics => key == "q",
             Self::Drugs => matches!(key, "q" | "limit" | "count"),
             Self::Exemptions => matches!(key, "q" | "limit" | "count" | "codes"),
             Self::TerminologySystems => false,
@@ -498,6 +501,27 @@ impl RuntimeSession {
         } else {
             Err(RuntimeError::Forbidden)
         }
+    }
+
+    pub fn chat_prosthetics_search(
+        &self,
+        context: &ChatAccessContext,
+        query: &str,
+    ) -> Result<Value> {
+        if !(2..=80).contains(&query.chars().count()) || query.chars().any(char::is_control) {
+            return Err(RuntimeError::InvalidInput);
+        }
+        self.revalidate_chat_access_context(context)?;
+        let result: Value =
+            self.read_catalog(&context.scope, CatalogRoute::Prosthetics, &[("q", query)])?;
+        if !result["rows"].is_array()
+            || result["rows"].as_array().is_some_and(|r| r.len() > 20)
+            || !result["truncated"].is_boolean()
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        self.revalidate_chat_access_context(context)?;
+        Ok(result)
     }
 
     pub fn chat_drug_search(
