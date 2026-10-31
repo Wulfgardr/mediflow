@@ -95,18 +95,18 @@ for (const field of ['drugName', 'dosage', 'status'] as const) test(`ENC2 in the
     assert.equal(h.state()?.phase, 'unavailable'); assert.equal(h.calls(), 0);
 });
 
-test('an imported applied receipt is shown as imported history even when the current therapy matches', async () => {
+for (const origin of ['imported', 'unattested'] as const) test(`an ${origin} applied receipt is shown as history even when the current therapy matches`, async () => {
     const f = fixture(), owner = f.make();
     owner.begin(therapy, 'active', 'Persona sintetica');
     const command = f.state()!.command!;
     f.setVersion(4);
-    f.setResponse({ outcome: 'terminal', origin: 'imported', historical: true, receipt: {
+    f.setResponse({ outcome: 'terminal', origin, historical: true, receipt: {
         ...command, actorRef: 'synthetic-actor', target: 'active', outcome: 'applied', reason: null,
         committedAt: 10, resultVersion: 4, resultEndDate: null, auditEventId: 'synthetic-imported-audit',
     } });
     await owner.confirm();
     assert.equal(f.state()?.phase, 'reviewed');
-    assert.equal(f.state()?.origin, 'imported');
+    assert.equal(f.state()?.origin, origin);
     assert.equal(f.state()?.historical, true);
     const source = readFileSync(new URL('../components/therapy-manager.tsx', import.meta.url), 'utf8');
     assert.match(source, /Ricevuta importata da un file portabile/);

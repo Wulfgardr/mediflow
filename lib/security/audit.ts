@@ -1,8 +1,8 @@
-import { importedAuditPredicate, type BackupOrigin } from '../backup-import-provenance';
+import { auditOrigin, type BackupOrigin } from '../backup-import-provenance';
 import { buildAifaCatalogManifest, parseStoredAifaCatalogManifest, type AifaCatalogManifest } from '../aifa-catalog';
 import { assertArchiveRequestInTransaction } from './archive-request-context';
 import crypto from 'crypto';
-import { and, desc, eq, gte, ne, not } from 'drizzle-orm';
+import { and, desc, eq, gte, ne } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { hasValidLocalApiToken } from './local-api-auth';
 import { auditEvents } from '../schema';
@@ -18,6 +18,7 @@ export const AUDIT_SCHEMA_VERSION = 1 as const;
 
 export const AUDIT_EVENT_TYPES = [
     'backup.portable.imported',
+    'backup.provenance.unattested',
     'backup.audit.imported',
     'backup.therapy-command.imported',
     'auth.login.succeeded',
@@ -179,6 +180,7 @@ export type AuditRecord = {
 
 export type AuditSummary = {
     importedEvents: number;
+    unattestedEvents: number;
     totalEvents: number;
     distinctActors: number;
     outcomes: Record<AuditOutcome, number>;
@@ -427,8 +429,8 @@ export async function writeAuditEvent(input: AuditWriteInput): Promise<string> {
 export async function listAuditEvents(filters: AuditListFilters = {}): Promise<AuditRecord[]> {
     const { dbServer } = await import('../db-server');
     const limit = normalizeLimit(filters.limit);
-    const imported = importedAuditPredicate(auditEvents.eventId);
-    const clauses = [filters.origin === 'imported' ? imported : not(imported)];
+    const origin = filters.origin ?? 'local';
+    const clauses = [eq(auditOrigin(auditEvents.eventId), origin)];
     if (!filters.eventType) clauses.push(ne(auditEvents.eventType, 'backup.audit.imported'), ne(auditEvents.eventType, 'backup.therapy-command.imported'));
 
     if (filters.eventType) clauses.push(eq(auditEvents.eventType, filters.eventType));
@@ -443,7 +445,7 @@ export async function listAuditEvents(filters: AuditListFilters = {}): Promise<A
         : await dbServer.select().from(auditEvents).orderBy(desc(auditEvents.occurredAt)).limit(limit);
 
     return rows.map((row) => ({
-        origin: filters.origin === 'imported' ? 'imported' as const : 'local' as const,
+        origin,
         schemaVersion: row.schemaVersion,
         eventId: row.eventId,
         eventType: row.eventType as AuditEventType,
@@ -513,7 +515,8 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
 
     return {
         totalEvents: localRecords.length,
-        importedEvents: records.length - localRecords.length,
+        importedEvents: records.filter(record => record.origin === 'imported').length,
+        unattestedEvents: records.filter(record => record.origin === 'unattested').length,
         distinctActors: actors.size,
         outcomes,
         sourceSurfaces,

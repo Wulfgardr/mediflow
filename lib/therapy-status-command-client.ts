@@ -13,7 +13,7 @@ export async function requestTherapyStatusCommand(operation: 'execute' | 'receip
     const result = await response.json() as TherapyCommandResponse;
     signal.throwIfAborted();
     if (result?.outcome === 'unknown' && operation === 'receipt' && Object.keys(result).length === 1) return result;
-    if (result?.outcome !== 'terminal' || Object.keys(result).length !== 4 || typeof result.historical !== 'boolean' || !['local', 'imported'].includes(result.origin) || (result.origin === 'imported' && !result.historical) || !parseTherapyStatusReceipt(result.receipt)) throw new Error('Invalid therapy receipt');
+    if (result?.outcome !== 'terminal' || Object.keys(result).length !== 4 || typeof result.historical !== 'boolean' || !['local', 'imported', 'unattested'].includes(result.origin) || (result.origin !== 'local' && !result.historical) || !parseTherapyStatusReceipt(result.receipt)) throw new Error('Invalid therapy receipt');
     const row = result.receipt;
     const binding = { commandId: row.commandId, protocol: row.protocol, archiveGeneration: row.archiveGeneration, patientId: row.patientId, therapyId: row.therapyId, expectedVersion: row.expectedVersion };
     if (!parseTherapyStatusCommand(binding, false) || !Object.keys(binding).every(key => binding[key as keyof typeof binding] === command[key as keyof TherapyStatusCommand])

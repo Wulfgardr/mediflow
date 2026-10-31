@@ -96,7 +96,7 @@ l'import e dell'ammissione di qualsiasi database vuoto.
 | Storia e dichiarazioni ORM | `drizzle/*.sql` resta immutato e non viene replayato dal runtime; `lib/schema.ts` descrive l'ORM e viene confrontato con il bootstrap reale. |
 | Riparazione e swap | Il protocollo esistente riconcilia i propri artefatti prima dell'apertura; il reopen usa la stessa ammissione versionata. Il lifecycle della sostituzione appartiene a C15 e ADR0142. |
 
-La versione SQLite corrente è `user_version=7` (vedi [Versioni dello schema](#versioni-dello-schema)). La prima installazione ammette
+La versione SQLite corrente è `user_version=8` (vedi [Versioni dello schema](#versioni-dello-schema)). La prima installazione ammette
 un file creato esclusivamente dal processo in una directory senza residui di
 un database precedente (sidecar, originali conservati, artefatti di swap),
 oppure la prenotazione nativa riconoscibile. Un file preesistente di zero byte o un
@@ -137,6 +137,7 @@ lock persistente o schema non riconosciuto impediscono l'apertura operativa.
 | 5 | ottobre 2026 | Ledger del comando durevole di stato terapia, ADR 0168. |
 | 6 | ottobre 2026 | Ledger dei comandi distruttivi ambulatorio, ADR 0169. |
 | 7 | 31 ottobre 2026 | `portable_import_origins`, indice locale append-only escluso dall'export portabile, ADR 0173. Nessun backfill dai marcatori di un file. |
+| 8 | 31 ottobre 2026 | Origine non attestata nell’indice locale. All’upgrade, gli archivi con ricevuta portabile o traccia legacy fissano le righe preesistenti non indicizzate nella stessa transazione dello stamp. |
 
 Poiché la versione corrente è validata senza DDL, **ogni modifica allo schema
 canonico richiede un numero nuovo**: altrimenti gli archivi già marcati con il

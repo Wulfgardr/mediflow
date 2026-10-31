@@ -87,15 +87,42 @@ export function insertTherapyStatusCommandUnion(db: Database.Database, rows: The
         if (result.changes !== 1) throw new Error('Therapy command preservation failed');
     }
 }
-export function captureTherapyStatusCommands(current: Database.Database): { rows: TherapyCommandRow[]; audits: BackupAuditRow[] } {
+type PreservedOrigin = { kind: 'audit' | 'therapy_command'; ref: string; importEventId: string; origin: 'imported' | 'unattested' };
+export function captureTherapyStatusCommands(current: Database.Database): { rows: TherapyCommandRow[]; audits: BackupAuditRow[]; origins: PreservedOrigin[] } {
     return current.transaction(() => {
         const audits = readTherapyCommandAudits(current);
-        return { rows: validateTherapyStatusCommandRows(readTherapyStatusCommandRows(current), audits), audits };
+        const columns = current.pragma('table_info(portable_import_origins)') as { name: string }[];
+        const origin = columns.some(column => column.name === 'origin') ? 'origin' : "'imported' AS origin";
+        const origins = columns.length ? current.prepare(`SELECT kind, ref, import_event_id AS importEventId, ${origin} FROM portable_import_origins`).all() as PreservedOrigin[] : [];
+        return { rows: validateTherapyStatusCommandRows(readTherapyStatusCommandRows(current), audits), audits, origins };
     })();
 }
 export function preserveTherapyStatusCommands(snapshot: ReturnType<typeof captureTherapyStatusCommands>, replacement: Database.Database): void {
     replacement.transaction(() => {
         const rows = planTherapyStatusCommandUnion(replacement, snapshot.rows, snapshot.audits);
+        const newCommands = snapshot.rows.filter(row => !replacement.prepare('SELECT 1 FROM therapy_status_commands WHERE command_id=?').get(row.commandId));
+        const newAudits = newCommands.map(row => row.auditEventId).filter(id => id !== null && !replacement.prepare('SELECT 1 FROM audit_events WHERE event_id=?').get(id));
         insertTherapyStatusCommandUnion(replacement, rows);
+        const origins = new Map(snapshot.origins.map(row => [`${row.kind}:${row.ref}`, row]));
+        const audits = new Map(snapshot.audits.map(row => [row.eventId, row]));
+        const stored = new Map(readTherapyCommandAudits(replacement).map(row => [row.eventId, row]));
+        const preserveOrigin = (kind: PreservedOrigin['kind'], ref: string) => {
+            const origin = origins.get(`${kind}:${ref}`);
+            if (!origin) return;
+            const root = audits.get(origin.importEventId);
+            if (!root) throw new Error('Preserved origin event missing');
+            const previous = stored.get(root.eventId);
+            if (previous && !backupAuditsEqual(previous, root)) throw new Error('Preserved origin event collision');
+            if (!previous) {
+                const keys = Object.keys(root) as (keyof BackupAuditRow)[];
+                replacement.prepare(`INSERT INTO audit_events (${keys.map(snake).join(',')}) VALUES (${keys.map(() => '?').join(',')})`).run(...keys.map(key => root[key]));
+                stored.set(root.eventId, root);
+                preserveOrigin('audit', root.eventId);
+            }
+            const result = replacement.prepare('INSERT INTO portable_import_origins(kind,ref,import_event_id,origin) VALUES (?,?,?,?)').run(kind, ref, origin.importEventId, origin.origin);
+            if (result.changes !== 1) throw new Error('Origin preservation failed');
+        };
+        for (const row of newCommands) preserveOrigin('therapy_command', row.commandId as string);
+        for (const id of newAudits) preserveOrigin('audit', id as string);
     }).immediate();
 }

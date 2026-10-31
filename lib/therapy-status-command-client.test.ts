@@ -31,6 +31,11 @@ test('receipt provenance is required and imported results cannot claim current l
         answer = { outcome: 'terminal', origin, historical: true, receipt: applied };
         await assert.rejects(requestTherapyStatusCommand('receipt', command, new AbortController().signal), /Invalid therapy receipt/);
     }
+    answer = { outcome: 'terminal', origin: 'unattested', historical: true, receipt: applied };
+    const unattested = await requestTherapyStatusCommand('receipt', command, new AbortController().signal);
+    assert.equal(unattested.outcome === 'terminal' && unattested.origin, 'unattested');
+    answer = { outcome: 'terminal', origin: 'unattested', historical: false, receipt: applied };
+    await assert.rejects(requestTherapyStatusCommand('receipt', command, new AbortController().signal), /Invalid therapy receipt/);
     answer = { outcome: 'terminal', origin: 'imported', historical: false, receipt: applied };
     await assert.rejects(requestTherapyStatusCommand('receipt', command, new AbortController().signal), /Invalid therapy receipt/);
 });

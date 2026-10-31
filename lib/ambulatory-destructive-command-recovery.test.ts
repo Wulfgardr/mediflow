@@ -13,11 +13,13 @@ const canonical = new Map([
     [4, 'a998dad7b46c831f283032144f43cd690f68e962b199256ecd68c11736f867ed'],
     [5, '33ce371c41f4cb51033af18ef9a0f06bf8c81a248bca29f18b21d3db9f24ea46'],
     [6, '4becef1521ec507b3da31047e01ab3e25562197c8a518472bb4cdef93ed3867b'],
+    [7, '6f070ea8f87e6bb9ac4e03caa9e6b679c9ff6a1c66de5e23b6945fb235812d90'],
 ]);
-for (const version of [4, 5, 6]) {
+for (const version of [4, 5, 6, 7]) {
     function predecessor() {
         const db = new Database(':memory:'); initializeSqliteSchema(db);
-        db.exec('DROP TABLE portable_import_origins');
+        if (version === 7) db.exec('ALTER TABLE portable_import_origins DROP COLUMN origin');
+        else db.exec('DROP TABLE portable_import_origins');
         if (version < 6) db.exec('DROP TABLE ambulatory_destructive_commands');
         if (version === 4) db.exec('DROP TABLE therapy_status_commands');
         db.pragma(`user_version=${version}`); return db;
