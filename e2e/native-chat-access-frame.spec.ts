@@ -291,6 +291,14 @@ async function readDrugs(page: import('@playwright/test').Page, payload = drugsP
     return frame;
 }
 
+test('drug search keeps the short AIC identifiers accepted by the catalog importer', async ({ page }) => {
+    const value = JSON.parse(drugsPayload());
+    value.rows[0].aic = '123456';
+    const frame = await readDrugs(page, JSON.stringify(value));
+    await expect(frame.locator('body')).toContainText('123456');
+    await expect(frame.getByRole('status')).not.toContainText('Accesso ritirato');
+});
+
 test('drug search reads the local catalog as text with keyboard sources and unverified freshness', async ({ page }) => {
     const frame = await readDrugs(page);
     await expect(frame.getByRole('heading', { name: 'Farmaci · metformina' })).toBeVisible();
