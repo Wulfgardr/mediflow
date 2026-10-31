@@ -27,6 +27,7 @@
     "SQLitePatientStoreTests.swift",
     "SQLiteVendorTests.swift",
     "ServicePrescriptionParsingTests.swift",
+    "SyntheticSQLiteFixtureTestCase.swift",
     "VisitRecordingStateContractTests.swift"
   ],
   "MediFlowAppleSharedTests": [

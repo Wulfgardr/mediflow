@@ -222,6 +222,23 @@ def make_icon(source, stage, resources):
     shutil.rmtree(iconset)
 
 
+def verify_system_linkage(linkage, commands):
+    dependencies = [line.strip().split(" (", 1)[0] for line in linkage.splitlines()[1:]]
+    concurrency = "@rpath/libswift_Concurrency.dylib"
+    blocks = commands.split("Load command ")[1:]
+    rpaths = [match.group(1) for block in blocks if "cmd LC_RPATH\n" in block
+              for match in [re.search(r"path (.+) \(offset", block)] if match]
+    if any(path != "/usr/lib/swift" for path in rpaths):
+        raise ValueError("Non-system rpath requires explicit packaging")
+    for dependency in dependencies:
+        if dependency.startswith(("/System/Library/", "/usr/lib/")):
+            continue
+        weak = any("cmd LC_LOAD_WEAK_DYLIB\n" in block
+                   and f"name {concurrency} (offset" in block for block in blocks)
+        if dependency != concurrency or not weak or "/usr/lib/swift" not in rpaths:
+            raise ValueError("Non-system dynamic dependency requires explicit packaging")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--staging", required=True, type=Path,
@@ -286,9 +303,9 @@ def main():
     make_icon(ROOT / config["icon"], stage, resources)
     collect_licenses(metadata, resources / "Licenses")
     collect_rust_licenses(resources / "Licenses")
-    linkage = run("otool", "-L", str(executable)).stdout.splitlines()[1:]
-    if any(not line.strip().startswith(("/System/Library/", "/usr/lib/")) for line in linkage):
-        raise ValueError("Non-system dynamic dependency requires explicit packaging")
+    linkage_output = run("otool", "-L", str(executable)).stdout
+    verify_system_linkage(linkage_output, run("otool", "-l", str(executable)).stdout)
+    linkage = linkage_output.splitlines()[1:]
     toolchain = {"rustc": run("rustc", "-Vv").stdout.strip(),
                  "cargo": run("cargo", "-V").stdout.strip(),
                  "xcode": run("xcodebuild", "-version").stdout.strip(),

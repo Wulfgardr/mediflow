@@ -46,52 +46,19 @@ test('canonical prebuild reaches the real metadata CLI and denies a synthetic pr
   assert.equal(fs.existsSync(path.join(temp, 'dependency-code-loaded')), false);
 });
 
-test('production sparse checkouts omit one exact file while retaining committed identity and other test sources', t => {
-  const checkouts = [['web-core.yml', 'web-core'], ['e2e.yml', 'e2e-shard'], ['cross-platform.yml', 'build-start']].map(([file, job]) => {
+test('production builds use complete checkouts and explicitly exercise prebuild', () => {
+  for (const [file, job] of [['web-core.yml', 'web-core'], ['e2e.yml', 'e2e-shard'], ['cross-platform.yml', 'build-start'], ['fhir-r4.yml', 'fhir-r4']]) {
     const workflow = loadYaml(fs.readFileSync(path.join(root, '.github/workflows', file), 'utf8'));
-    const steps = workflow.jobs[job].steps;
-    const checkout = steps.filter(step => step.uses?.startsWith('actions/checkout@'));
-    assert.equal(checkout.length, 1);
-    assert.ok(checkout[0].with, `${file}/${job} requires the production sparse checkout`);
-    assert.equal(checkout[0].with['sparse-checkout-cone-mode'], false);
-    const patterns = checkout[0].with['sparse-checkout'].trim().split('\n');
-    const verify = steps.find(step => step.name === 'Verify sparse production source identity');
-    assert.ok(verify, `${file}/${job} checks committed identity and materialization before building`);
-    assert.deepEqual(verify.run.trim().split('\n'), [
-      'test "$(git rev-parse HEAD)" = "$GITHUB_SHA"',
-      'test -z "$(git status --porcelain --untracked-files=normal)"',
-      `test ! -e ${patterns[1].slice(2)}`,
-    ]);
-    if (job === 'build-start') assert.equal(verify.shell, 'bash', 'the identity guard must also run on Windows');
-    assert.ok(steps.indexOf(verify) < steps.findIndex(step => step.uses?.startsWith('actions/setup-node@')));
-    return patterns;
-  });
-  assert.deepEqual(checkouts[0], checkouts[1]);
-  assert.deepEqual(checkouts[0], checkouts[2]);
-  const patterns = checkouts[0];
-  assert.equal(patterns.length, 2); assert.equal(patterns[0], '/*');
-  assert.ok(patterns[1].startsWith('!/')); assert.doesNotMatch(patterns[1].slice(2), /[*!?\[\]{}\\]/u);
-  const omitted = patterns[1].slice(2);
-  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'production-sparse-source-'));
-  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
-  const neighboringTest = path.posix.join(path.posix.dirname(omitted), 'synthetic-contract.swift');
-  for (const file of [omitted, neighboringTest, 'app/synthetic-source.ts']) {
-    fs.mkdirSync(path.dirname(path.join(temp, file)), { recursive: true });
-    fs.writeFileSync(path.join(temp, file), 'Synthetic sparse checkout fixture only.');
+    const jobs = job === 'fhir-r4' ? Object.values(workflow.jobs) : [workflow.jobs[job]];
+    for (const entry of jobs) {
+      for (const step of entry.steps.filter(step => step.uses?.startsWith('actions/checkout@'))) {
+        assert.equal(step.with?.['sparse-checkout'], undefined);
+        assert.equal(step.with?.['sparse-checkout-cone-mode'], undefined);
+      }
+    }
   }
-  const git = (...args) => execFileSync('git', args, { cwd: temp, encoding: 'utf8' }).trim();
-  git('init', '--quiet', '--initial-branch=main'); git('add', '.');
-  git('-c', 'user.name=Synthetic fixture', '-c', 'user.email=synthetic@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'synthetic source');
-  const identity = git('rev-parse', 'HEAD', 'HEAD^{tree}');
-  const tracked = git('ls-files', '--stage');
-  execFileSync('git', ['sparse-checkout', 'set', '--no-cone', '--stdin'], { cwd: temp, input: patterns.join('\n') + '\n' });
-  assert.equal(fs.existsSync(path.join(temp, omitted)), false);
-  assert.equal(fs.existsSync(path.join(temp, neighboringTest)), true);
-  assert.equal(fs.existsSync(path.join(temp, 'app/synthetic-source.ts')), true);
-  assert.equal(git('status', '--porcelain', '--untracked-files=normal'), '');
-  assert.equal(git('rev-parse', 'HEAD', 'HEAD^{tree}'), identity);
-  assert.equal(git('ls-files', '--stage'), tracked);
-  assert.ok(git('ls-files', '-t', '--', omitted).startsWith('S '));
+  const web = loadYaml(fs.readFileSync(path.join(root, '.github/workflows/web-core.yml'), 'utf8'));
+  assert.ok(web.jobs['web-core'].steps.some(step => step.run === 'npm run prebuild'));
 });
 
 test('shared group selections have actual ordinary or Apple conditional CI consumers', () => {

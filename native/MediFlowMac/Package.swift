@@ -49,7 +49,7 @@ var targets: [Target] = [
     .testTarget(
         name: "MediFlowCoreTests",
         dependencies: ["MediFlowCore"],
-        // The fixture DB + its generator are read via #filePath, not bundled.
+        // Synthetic SQL is read via #filePath and materialized only in temporary storage.
         exclude: ["Fixtures"],
         sources: testSources["MediFlowCoreTests"]!
     )
