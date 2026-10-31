@@ -44,6 +44,7 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
             "document-opened",
             "voice-opened",
             "preparing",
+            "selecting",
             "challenge",
             "approving",
             "approved",
@@ -132,7 +133,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["model"]}}},
                 {"name": CONTROL, "description":"Scheda sintetica monouso dopo consenso nella GPUI; payload riservato alla vista.",
-                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","receipt","drugs","prosthetics","agenda"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
+                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","clinical-profile","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","receipt","drugs","prosthetics","agenda"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
                     "annotations":{"readOnlyHint":false,"destructiveHint":true,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["app"]}}}]}),
             "resources/list" => {
@@ -207,6 +208,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     && args["command"].as_str().is_some_and(|s| {
                         [
                             "request",
+                            "clinical-profile",
                             "agenda",
                             "patient-document",
                             "local-voice",

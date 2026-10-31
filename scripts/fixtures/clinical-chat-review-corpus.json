@@ -1,0 +1,410 @@
+[
+  {
+    "id": "review-name-lower",
+    "inputText": "Diabete mellito in marta valli, terapia invariata.",
+    "gold": {
+      "redactedText": "Diabete mellito in [IDENTIFIER], terapia invariata.",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "marta valli",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "marta valli"
+      ]
+    }
+  },
+  {
+    "id": "review-name-upper",
+    "inputText": "Diabete mellito in MARTA VALLI, terapia invariata.",
+    "gold": {
+      "redactedText": "Diabete mellito in [IDENTIFIER], terapia invariata.",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "MARTA VALLI",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "MARTA VALLI"
+      ]
+    }
+  },
+  {
+    "id": "review-name-initials",
+    "inputText": "Diabete mellito in M. Valli, terapia invariata.",
+    "gold": {
+      "redactedText": "Diabete mellito in [IDENTIFIER], terapia invariata.",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "M. Valli",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "M. Valli"
+      ]
+    }
+  },
+  {
+    "id": "review-name-spaced",
+    "inputText": "Diabete mellito in M A R T A  V A L L I, terapia invariata.",
+    "gold": {
+      "redactedText": "Diabete mellito in [IDENTIFIER], terapia invariata.",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "M A R T A  V A L L I",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "M A R T A  V A L L I"
+      ]
+    }
+  },
+  {
+    "id": "review-name-zwsp",
+    "inputText": "Diabete mellito in Mar​ta Val​li, terapia invariata.",
+    "gold": {
+      "redactedText": "Diabete mellito in [IDENTIFIER], terapia invariata.",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "Mar​ta Val​li",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "Mar​ta Val​li"
+      ]
+    }
+  },
+  {
+    "id": "review-name-confusable",
+    "inputText": "Diabete mellito in Mаrtа Vаlli, terapia invariata.",
+    "gold": {
+      "redactedText": "Diabete mellito in [IDENTIFIER], terapia invariata.",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "Mаrtа Vаlli",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "Mаrtа Vаlli"
+      ]
+    }
+  },
+  {
+    "id": "review-name-ocr",
+    "inputText": "Diabete mellito in M4rta Va11i, terapia invariata.",
+    "gold": {
+      "redactedText": "Diabete mellito in [IDENTIFIER], terapia invariata.",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "M4rta Va11i",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "M4rta Va11i"
+      ]
+    }
+  },
+  {
+    "id": "review-cf-ocr",
+    "inputText": "Diabete mellito. CF da scansione RSSMRA8ODI2F2O5X.",
+    "gold": {
+      "redactedText": "Diabete mellito. CF da scansione [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "RSSMRA8ODI2F2O5X",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "RSSMRA8ODI2F2O5X"
+      ]
+    }
+  },
+  {
+    "id": "review-cf-spaces",
+    "inputText": "Diabete mellito. CF R S S M R A 8 0 D 1 2 F 2 0 5 X.",
+    "gold": {
+      "redactedText": "Diabete mellito. CF [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "R S S M R A 8 0 D 1 2 F 2 0 5 X",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "R S S M R A 8 0 D 1 2 F 2 0 5 X"
+      ]
+    }
+  },
+  {
+    "id": "review-cf-group",
+    "inputText": "Diabete mellito. CF RSS MRA 80 D12 F205 X.",
+    "gold": {
+      "redactedText": "Diabete mellito. CF [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "RSS MRA 80 D12 F205 X",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "RSS MRA 80 D12 F205 X"
+      ]
+    }
+  },
+  {
+    "id": "review-cf-zwsp",
+    "inputText": "Diabete mellito. CF RSSMRA​80D12F205X.",
+    "gold": {
+      "redactedText": "Diabete mellito. CF [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "RSSMRA​80D12F205X",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "RSSMRA​80D12F205X"
+      ]
+    }
+  },
+  {
+    "id": "review-cf-fullwidth",
+    "inputText": "Diabete mellito. CF ＲＳＳＭＲＡ８０Ｄ１２Ｆ２０５Ｘ.",
+    "gold": {
+      "redactedText": "Diabete mellito. CF [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "ＲＳＳＭＲＡ８０Ｄ１２Ｆ２０５Ｘ",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "ＲＳＳＭＲＡ８０Ｄ１２Ｆ２０５Ｘ"
+      ]
+    }
+  },
+  {
+    "id": "review-dob-spaces",
+    "inputText": "Diabete mellito. Nato il 17 / 04 / 1972.",
+    "gold": {
+      "redactedText": "Diabete mellito. Nato il [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "17 / 04 / 1972",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "17 / 04 / 1972"
+      ]
+    }
+  },
+  {
+    "id": "review-dob-numeric",
+    "inputText": "Diabete mellito. Nato il 17041972.",
+    "gold": {
+      "redactedText": "Diabete mellito. Nato il [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "17041972",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "17041972"
+      ]
+    }
+  },
+  {
+    "id": "review-dob-words",
+    "inputText": "Diabete mellito. Nato il diciassette aprile millenovecentosettantadue.",
+    "gold": {
+      "redactedText": "Diabete mellito. Nato il [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "diciassette aprile millenovecentosettantadue",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "diciassette aprile millenovecentosettantadue"
+      ]
+    }
+  },
+  {
+    "id": "review-phone-spaces",
+    "inputText": "Diabete mellito. Tel: 3 4 7 1 2 3 4 5 6 7.",
+    "gold": {
+      "redactedText": "Diabete mellito. Tel: [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "3 4 7 1 2 3 4 5 6 7",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "3 4 7 1 2 3 4 5 6 7"
+      ]
+    }
+  },
+  {
+    "id": "review-phone-unicode",
+    "inputText": "Diabete mellito. Tel: ３４７１２３４５６７.",
+    "gold": {
+      "redactedText": "Diabete mellito. Tel: [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "３４７１２３４５６７",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "３４７１２３４５６７"
+      ]
+    }
+  },
+  {
+    "id": "review-address",
+    "inputText": "Diabete mellito. Abita in v.le delle Prove 127/B, Borgo Fittizio.",
+    "gold": {
+      "redactedText": "Diabete mellito. Abita in v.le [IDENTIFIER], Borgo Fittizio.",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "delle Prove 127/B",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "delle Prove 127/B"
+      ]
+    }
+  },
+  {
+    "id": "review-third",
+    "inputText": "Diabete mellito, accompagnata dalla figlia Ada Lattesi e dal vicino Dario Fermi.",
+    "gold": {
+      "redactedText": "Diabete mellito, accompagnata dalla figlia Ada Lattesi e dal vicino [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "Dario Fermi",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "Dario Fermi"
+      ]
+    }
+  },
+  {
+    "id": "review-filename",
+    "inputText": "Diabete mellito. Allegato a123_Marta-Valli_17041972_scan.pdf.",
+    "gold": {
+      "redactedText": "Diabete mellito. Allegato [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "a123_Marta-Valli_17041972_scan.pdf",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "a123_Marta-Valli_17041972_scan.pdf"
+      ]
+    }
+  },
+  {
+    "id": "review-patient-id",
+    "inputText": "Diabete mellito. Identificativo paziente PT-ALFA-729143.",
+    "gold": {
+      "redactedText": "Diabete mellito. Identificativo paziente [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "PT-ALFA-729143",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "PT-ALFA-729143"
+      ]
+    }
+  },
+  {
+    "id": "review-clinical-date",
+    "inputText": "Diabete mellito. Visita 7 ottobre 2026.",
+    "gold": {
+      "redactedText": "Diabete mellito. Visita [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "7 ottobre 2026",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "7 ottobre 2026"
+      ]
+    }
+  },
+  {
+    "id": "review-email-words",
+    "inputText": "Diabete mellito. Contatto marta punto valli chiocciola esempio punto it.",
+    "gold": {
+      "redactedText": "Diabete mellito. Contatto [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "marta punto valli chiocciola esempio punto it",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "marta punto valli chiocciola esempio punto it"
+      ]
+    }
+  },
+  {
+    "id": "review-bare-id",
+    "inputText": "Diabete mellito. riferimento 89746120358.",
+    "gold": {
+      "redactedText": "Diabete mellito. riferimento [IDENTIFIER].",
+      "entities": [
+        {
+          "type": "identifier",
+          "text": "89746120358",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "89746120358"
+      ]
+    }
+  }
+]

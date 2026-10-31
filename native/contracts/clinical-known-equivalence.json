@@ -1,0 +1,242 @@
+{
+  "profile": {
+    "id": "PT-ALFA-729143",
+    "firstName": "Marta",
+    "lastName": "Valli",
+    "taxCode": "RSSMRA80D12F205X",
+    "birthDate": "1972-04-17",
+    "address": "Via Fittizia 42",
+    "phone": "3471234567",
+    "caregiver": "Ada Lattesi",
+    "ambulatoryId": "patient-synthetic",
+    "version": 1
+  },
+  "nativeKnown": {
+    "names": [
+      "3471234567",
+      "42",
+      "Ada",
+      "Ada Lattesi",
+      "Fittizia",
+      "Lattesi",
+      "Marta",
+      "PT-ALFA-729143",
+      "RSSMRA80D12F205X",
+      "Valli",
+      "Via",
+      "Via Fittizia 42",
+      "patient",
+      "patient-synthetic",
+      "synthetic"
+    ],
+    "birthDates": [
+      "1972-04-17"
+    ]
+  },
+  "comparison": [
+    {
+      "id": "new-name-dots",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-hyphens",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-reversed",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-cyrillic",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-greek",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-roman",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-symbol-registered-bars",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-symbol-triangles",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-zero-width",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-combining",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-prefix-first",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-prefix-last",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-id-prefix",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-cf-prefix",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-nickname",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-cf-newline",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-cf-spoken",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-cf-spoken-full",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-dob-words",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-dob-inverted",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-phone-punctuation",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-phone-words",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-phone-digits-words",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-email-chiocciola",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-health-card",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-health-card-spoken",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-matricola-unknown",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-caregiver-known",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-family-unknown",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-doctor-unknown",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-address-known-no-number",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-address-unknown-no-number",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-in-diagnosis",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-split",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-name-split-pair",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-cf-split",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    },
+    {
+      "id": "new-cf-spoken-split",
+      "equalLocalSpans": true,
+      "extraNativeIdentifiersAbsentFromText": true
+    }
+  ],
+  "currentNativeKnown": {
+    "names": [
+      "3471234567",
+      "Ada Lattesi",
+      "Fittizia",
+      "Lattesi",
+      "Marta",
+      "PT-ALFA-729143",
+      "RSSMRA80D12F205X",
+      "Valli",
+      "Via Fittizia 42",
+      "patient",
+      "patient-synthetic",
+      "synthetic"
+    ],
+    "birthDates": [
+      "1972-04-17"
+    ]
+  }
+}

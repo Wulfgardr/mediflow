@@ -1,8 +1,8 @@
 # ADR 0165 — Canale di accesso della chat alla sessione GPUI
 
-Stato: **Proposed**. Data: 26 ottobre 2026. Refs WUL-788.
+Stato: **Accepted** per il contratto del canale, con qualificazione desktop separata. Data: 26 ottobre 2026. Refs WUL-788.
 
-## Decisione candidata
+## Decisione
 
 C4a aggiunge soltanto il protocollo e l'esito di accesso, senza proiezioni
 cliniche, mapping, inferenza o writer. Non completa C4 né il broker di ADR 0160.
@@ -110,7 +110,7 @@ nativa; non emette proof trasferibili né nuove sessioni.
 Il [rapporto del contributo](../analysis/2026-10-30-chat-native-broker/README.md)
 distingue prove automatiche, GLiNER reale e prove desktop ancora aperte.
 Questa composizione resta esplicitamente sintetica, non modifica writer,
-ammissione clinica o stato Proposed dell'ADR.
+ammissione clinica o qualificazione desktop del canale.
 
 ## Estensione del 31 ottobre 2026: dettatura locale
 
@@ -157,3 +157,144 @@ soltanto testo. Non interpreta token PII e non aggiorna il contesto del modello.
 Il broker clinico conserva il proprio confine sintetico e la propria autorità.
 Il grant non autorizza prescrizioni, scritture o inferenza. Le prove sui due
 desktop reali restano alla qualifica, così come la negoziazione delle capacità.
+
+## Proiezioni cliniche dell'archivio: decisione del 31 ottobre 2026
+
+La grammatica `mediflow.synthetic-chat-card.v1` rimane riservata alle fixture.
+Non ammette letture dell'archivio né testo clinico arbitrario. Un raccordo ai
+servizi comuni richiede un profilo distinto, versionato e a schema chiuso;
+aggiungere valori al profilo sintetico non costituisce tale raccordo.
+
+Per una proiezione clinica valgono C-B, C-3a, C-3b, C-4, C-7 e C-8 del
+[contratto 0.9.1](../releases/0.9.1-contract.md). La selezione precede la
+redazione: ogni campo clinico ammesso è testo con una fonte opaca, legata
+localmente alla revisione letta. Identità, ID dell'archivio, filename, percorsi
+e riferimenti originali non sono fonti esportabili. Campi o varianti di schema
+non classificati devono negare l'intera uscita, senza omissioni silenziose.
+
+Il broker posseduto dalla GPUI deve comporre la proiezione dal servizio comune,
+il runner GLiNER locale reale e il controllo del payload serializzato completo.
+Runner assente o non qualificato, output invalido, residui identificanti e
+contesto cambiato negano l'uscita senza ripieghi. Il corpus sintetico annotato
+deve coprire CF da OCR, terzi, luoghi, nascita, filename e campi ignoti nella
+nuova proiezione, con zero falsi negativi; un'evidenza legata
+alla sola grammatica sintetica non qualifica prosa clinica diversa. La conferma
+autenticata nella finestra nativa riguarda gli esatti byte finali. La chat
+riceve soltanto pseudonimi; mappe e ricomposizione rimangono RAM dell'owner
+locale. Token estranei, altra sessione, lock, refresh e riavvio negano l'uso.
+Il frame app-only non aggiorna il contesto del modello. Questo raccordo non
+amplia le uscite già ammesse al modello, non modifica writer o claim crittografici.
+
+### Prima scheda clinica
+
+Leonardo ha deciso il 31 ottobre 2026: la prima scheda comprende diagnosi e
+passi delle note che il medico spunta a mano nella finestra nativa. Nessun
+estrattore automatico, nessuna nota intera. La selezione delle diagnosi usa le
+righe non vuote del campo comune; i passi sono sottostringhe esatte aggiunte dal
+medico e poi spuntate. La nota intera o l'insieme dei passi
+che copre tutta la nota sono negati. Il testo ostile resta dato, senza istruzioni
+eseguite o interpretazione HTML.
+
+Il comando app-only `clinical-profile` apre questa selezione nella GPUI.
+`RuntimeSession.chat_clinical_profile` compone `open_patient_profile`, che usa
+il servizio comune `readPatientProfile` sul canale paired, senza nuovi accessi
+al database. Sessione, selezione ed epoch vengono rivalidati prima e dopo le
+attese; la revisione del profilo è controllata anche prima e dopo il consumo.
+
+Il profilo attivo è `mediflow.clinical-chat-profile.v1`: oggetto chiuso con
+`profile`, `version: 1`, `pseudonym`, `diagnoses` e `noteExcerpts`. Le due liste
+contengono solo `{ text, sourceRef }`. Limiti: 16 diagnosi, 8 passi, 2048 unità
+UTF-16 per testo selezionato, 6000 complessive nella selezione, 4096 per
+voce e 16384 byte UTF-8 per il JSON finale canonico. Il superamento
+nega l'uscita, senza troncamenti. Le fonti sono casuali e opache, con testo
+originale e revisione disponibili soltanto all'owner nativo in RAM.
+
+Sono esclusi nome, codice fiscale, nascita, contatti, caregiver, esenzioni,
+ADI e stato amministrativo. La decisione di prodotto esclude le date complete,
+comprese quelle cliniche: una riga che le contiene viene bloccata prima del consenso.
+Non si riscrive mai il testo clinico: ogni riga esce esattamente come il medico
+la vede nella finestra nativa oppure non esce. Non vengono creati token PII.
+Il medico può togliere la spunta o modificare una copia locale nella stessa
+finestra; la cartella resta invariata e la copia deve superare tutti i controlli.
+
+La GPUI avvia `chat-card-clinical-owner.mjs` sul canale privato posseduto.
+`MEDIFLOW_CHAT_CLINICAL_INSTALLATION` indica il file locale di runner ed evidenze
+per questo profilo; non sostituisce la qualifica sintetica in
+`MEDIFLOW_CHAT_CARD_INSTALLATION`. Node e directory dell'owner restano quelli
+configurati esplicitamente per il processo GPUI. Il
+broker usa lo stesso runner GLiNER reale e gli stessi controlli di identità ed
+evidenza di #726, ma richiede il digest del nuovo corpus clinico. Una qualifica
+del solo corpus sintetico non basta. Esamina ciascun testo e il
+payload serializzato completo, valida schema e identità esatta di ogni voce e
+nega entità non esentate dalla lista clinica chiusa. Il secondo esame non riscrive i byte revisionati.
+
+La conferma nativa PIN o Touch ID autorizza una sola lettura entro 30 secondi.
+Il frame valida il profilo distinto e mostra soltanto testo; non aggiorna il
+contesto del modello. Refresh, altra sessione, token estranei, lock, revoca e
+riavvio negano il riuso. Nessun ripiego quando runner, qualifica, schema o
+contesto non sono validi. La grammatica sintetica resta intatta.
+
+Terapie, prescrizioni protesiche e riassunto restano nella matrice C-8 per la
+tranche successiva. La consultazione dei cataloghi già consegnata resta distinta
+dalle prescrizioni. Questa decisione non ammette uso clinico o qualifica dei due
+desktop, non amplia l'autorità del modello e non modifica claim crittografici.
+
+### Controlli locali della proiezione clinica
+
+Gli identificativi strutturati del profilo letto dalla sessione nativa alimentano
+`knownIdentifiers` sul solo canale privato GPUI-Node: nome, cognome, CF, nascita,
+indirizzo, telefono, caregiver, identificativi e date dei metadati disponibili.
+Il broker riceve i valori nel campo storico `names` e le date in `birthDates`;
+non sono campi del payload condiviso. Valori fuori limite negano la preparazione.
+
+Il confronto degli identificativi noti precede ogni esenzione clinica. Usa NFKC,
+case folding, rimozione di spazi, punteggiatura, accenti e invisibili, omoglifi
+cirillici e greci ed equivalenze OCR cifra-lettera. Blocca prefissi di almeno
+quattro caratteri dei nomi e sei di CF e altri ID, all'inizio di una parola.
+I frammenti più corti dei metadati, come `01`, non partecipano. Un paziente di
+cognome Diabete blocca anche «Diabete mellito»: l'omonimia non è una deroga.
+
+Il controllo strutturale blocca lettere mescolate a cifre o simboli, lettere
+singole spaziate o puntate, CF separati, OCR e pronunciati, contatti anche a voce,
+date complete, tessera e matricola etichettate, quattro o più numeri in lettere
+e parole composte per numeri di almeno tre cifre. Una lista chiusa ammette forme
+cliniche come HbA1c, FEV1, CD4, T4, B12 e D3; numeri con unità cliniche ammesse
+non vengono trattati come telefoni. La verifica si ripete sulle righe e sulla
+loro concatenazione, anche per frammenti divisi tra righe. Nessuna trasformazione
+è applicata ai byte clinici emessi.
+
+GLiNER esamina i testi e il JSON finale. Soltanto uno span che coincide con un
+termine clinico locale chiuso viene esentato. Il repo contiene ICD-11 MMS 2026-01
+in inglese (`assets/reference-data/icd11`), non un dizionario italiano di diagnosi;
+LOINC e UCUM locali sono riusati tramite `searchStaticTerminology`, con uguaglianza
+esatta, e `clinical-terms.ts` aggiunge poche diagnosi italiane comuni e abbreviazioni.
+Non vengono lette diagnosi del paziente per generare esenzioni. Un identificativo
+noto non può essere esentato. L'identità qualificata e la sentinella sintetica
+nome/nascita devono essere valide; rilevatore, identificativi o normalizzazione
+degradati negano l'uscita. La sentinella non dimostra recall universale.
+
+Il diniego indica sezione e riga nella finestra nativa, quando localizzabile.
+Nessuna causa dettagliata o riga originale viene consegnata alla chat, il consenso
+resta disabilitato. Le regressioni delle due review e i positivi clinici sono in
+`clinical-chat-exact-corpus.json`, distinti dal corpus di qualifica neurale.
+
+### Modello di minaccia e responsabilità
+
+Il testo viene dalle note del medico, con possibili refusi ed errori OCR. Non è
+un avversario. Il controllo è un aiuto e non è anonimizzazione. Un dato sconosciuto
+offuscato di proposito può sfuggire, così come un riferimento indiretto nei fatti
+clinici. La responsabilità di ciò che esce resta del medico, che vede i byte
+esatti prima del consenso. Revocare non cancella dati già acquisiti dall'host.
+Le prove sintetiche non attestano anonimato universale, qualifica dei desktop o
+accettazione clinica. I claim su cifratura e zero-knowledge restano invariati.
+
+### Limiti dichiarati del controllo
+
+Il confronto con gli identificativi noti riconosce il valore intero, i prefissi,
+gli errori di battitura e OCR che sostituiscono o scambiano lettere a parità di
+lunghezza e iniziale, e i separatori dentro una parola. Non riconosce un nome
+noto con più refusi di questi, né una variante con iniziale diversa: allargare
+la tolleranza bloccherebbe parole ordinarie come «aria» o «fianchi». È una scelta
+di bilanciamento, non una copertura completa. Il medico vede i byte esatti e ne
+resta responsabile; il controllo è un aiuto e non è anonimizzazione.
+

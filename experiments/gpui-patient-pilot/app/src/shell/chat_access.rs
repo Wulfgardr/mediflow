@@ -21,6 +21,7 @@ pub(super) struct ChatAccess {
     patient: mediflow_patient_client::PersonName,
     archive: String,
     pin: Entity<TextInput>,
+    excerpt: Entity<TextInput>,
     task: Option<gpui::Task<()>>,
     message: Option<String>,
     last_state: Option<(State, bool)>,
@@ -45,6 +46,16 @@ impl ChatAccess {
             pending: None,
             patient: mediflow_patient_client::PersonName::default(),
             archive: String::new(),
+            excerpt: cx.new(|cx| {
+                TextInput::new(
+                    "chat-clinical-excerpt",
+                    "Copia qui un passo delle note",
+                    "Passo delle note",
+                    true,
+                    theme,
+                    cx,
+                )
+            }),
             pin: cx.new(|cx| {
                 TextInput::new(
                     "chat-access-pin",
@@ -111,6 +122,8 @@ impl ChatAccess {
         }
         self.patient = mediflow_patient_client::PersonName::default();
         self.archive.clear();
+        self.excerpt
+            .update(cx, |input, cx| input.set_content("", cx));
         self.last_state = None;
         self.recovery_messages.clear();
         self.recovery_namespace = None;
@@ -471,6 +484,24 @@ impl ClinicalApp {
                 )
             })
         });
+        let clinical = pending.lock().ok().and_then(|p| {
+            p.clinical.as_ref().map(|c| {
+                (
+                    c.profile
+                        .as_ref()
+                        .and_then(|p| p.notes.clone())
+                        .unwrap_or_default(),
+                    c.diagnoses
+                        .iter()
+                        .chain(c.excerpts.iter())
+                        .enumerate()
+                        .map(|(i, t)| c.copies.get(&i).unwrap_or(t).clone())
+                        .collect::<Vec<_>>(),
+                    c.selected.clone(),
+                )
+            })
+        });
+        let clinical_mode = clinical.is_some();
         let enabled = state == State::Challenge
             && (review.is_some() || therapy.as_ref().is_some_and(|t| t.2.is_some()));
         let therapy_mode = therapy.is_some();
@@ -488,11 +519,45 @@ impl ClinicalApp {
             .aria_label("Conferma accesso della chat").flex_1().min_h_0().overflow_y_scroll()
             .p(px(20.)).border_1().border_color(theme.rule)
             .flex().flex_col().gap(px(12.))
-            .child(heading("native-chat-access-title", if therapy_mode { "Conferma il cambio di stato della terapia" } else if catalog_mode { catalog_title } else { "Condividi la scheda di prova nella chat?" }, theme))
+            .child(heading("native-chat-access-title", if therapy_mode { "Conferma il cambio di stato della terapia" } else if catalog_mode { catalog_title } else if clinical_mode { "Scegli diagnosi e passi delle note" } else { "Condividi la scheda di prova nella chat?" }, theme))
             .child(text!(format!("App richiedente: {app}")).with_id("native-chat-access-app"))
             .child(text!(format!("Archivio: {}", self.chat_access.archive)).with_id("native-chat-access-archive"))
             .child(div().id("native-chat-access-patient").child(crate::title::title(crate::title::TitleText::patient_question("Paziente: ", self.chat_access.patient.clone(), ""), theme)))
-            .child(notice("native-chat-access-operation", if therapy_mode { "Scegli la terapia della cartella selezionata e controlla il nuovo stato. La scrittura usa il PIN nativo, una sola volta entro 30 secondi. I nomi restano qui. Touch ID per questa scrittura non è ancora abilitato." } else if catalog_mode { catalog_notice } else { "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico." }, theme, false))
+            .child(notice("native-chat-access-operation", if therapy_mode { "Scegli la terapia della cartella selezionata e controlla il nuovo stato. La scrittura usa il PIN nativo, una sola volta entro 30 secondi. I nomi restano qui. Touch ID per questa scrittura non è ancora abilitato." } else if catalog_mode { catalog_notice } else if clinical_mode { "Spunta le diagnosi e i passi da condividere. Copia un passo esatto delle note nel campo sotto e aggiungilo, poi spuntalo. La nota intera non è ammessa. Il testo viene dalle tue note, anche con refusi o errori OCR. Il controllo è un aiuto e non è anonimizzazione. Un dato sconosciuto offuscato di proposito può sfuggire. Sei responsabile di ciò che esce: controlla i byte esatti prima della conferma. Il testo non viene riscritto. Puoi togliere la spunta o modificare una copia qui, senza cambiare la cartella. Le date complete sono escluse." } else { "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico." }, theme, false))
+            .when_some(clinical.filter(|_| state == State::Selecting), |mut el, (notes, rows, selected)| {
+                el = el.child(notice("chat-clinical-notes", notes, theme, false)).child(self.chat_access.excerpt.clone());
+                el = el.child(button("chat-clinical-add", "Aggiungi passo", theme, false, true)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        let text = this.chat_access.excerpt.read(cx).value().to_owned();
+                        let added = this.chat_access.pending.as_ref().is_some_and(|p| p.lock().is_ok_and(|mut p| p.add_excerpt(&text)));
+                        this.chat_access.message = if added { None } else { Some("Scegli un passo esatto e più breve della nota intera, massimo 2048 caratteri.".into()) };
+                        if added { this.chat_access.excerpt.update(cx, |input, cx| input.set_content("", cx)); }
+                        cx.notify();
+                    })));
+                el = el.child(button("chat-clinical-save-copy", "Usa il campo come copia modificata", theme, false, true)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        let text = this.chat_access.excerpt.read(cx).value().to_owned();
+                        let saved = this.chat_access.pending.as_ref().is_some_and(|p| p.lock().is_ok_and(|mut p| p.save_clinical_copy(&text)));
+                        this.chat_access.message = if saved { None } else { Some("Scegli prima Modifica copia sulla riga, poi inserisci un testo da 1 a 2048 caratteri.".into()) };
+                        cx.notify();
+                    })));
+                for (index, row) in rows.into_iter().enumerate() {
+                    let request = pending.clone();
+                    el = el.child(button(format!("chat-clinical-select-{index}"), format!("{} {}", if selected.contains(&index) { "☑" } else { "☐" }, row), theme, false, true)
+                        .on_click(cx.listener(move |_, _, _, cx| { if let Ok(mut p) = request.lock() { p.toggle_clinical(index); } cx.notify(); })));
+                    let request = pending.clone();
+                    el = el.child(button(format!("chat-clinical-edit-{index}"), "Modifica copia", theme, false, true)
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            if let Some(text) = request.lock().ok().and_then(|mut p| p.edit_clinical(index)) {
+                                this.chat_access.excerpt.update(cx, |input, cx| input.set_content(&text, cx));
+                            }
+                            cx.notify();
+                        })));
+                }
+                let request = pending.clone();
+                el.child(button("chat-clinical-prepare", "Prepara selezione", theme, true, !selected.is_empty())
+                    .on_click(cx.listener(move |_, _, _, cx| { let request = request.clone(); std::thread::spawn(move || crate::chat_access::owner::prepare_clinical(&request)); cx.notify(); })))
+            })
             .when_some(therapy, |mut el, (target, rows, selected, result)| {
                 el = el.child(text!(format!("Nuovo stato: {target}")).with_id("native-chat-therapy-target"));
                 for (index, row) in rows.iter().enumerate() {
@@ -511,8 +576,9 @@ impl ClinicalApp {
                 if let Some(result) = result { el = el.child(notice("native-chat-therapy-receipt", format!("Ricevuta e rilettura: {result}"), theme, false)); }
                 el
             })
+            .when_some(pending.lock().ok().and_then(|p| p.clinical_denial.clone()), |el, message| el.child(notice("chat-clinical-denial", message, theme, true)))
             .when_some(review, |el, (payload, digest, source)| el
-                .child(notice("native-chat-card-source", format!("Fonte locale sintetica: {source}"), theme, false))
+                .child(notice("native-chat-card-source", format!("Fonte locale: {source}"), theme, false))
                 .child(notice("native-chat-card-payload", payload, theme, false))
                 .child(text!(format!("SHA-256: {digest}")).with_id("native-chat-card-digest")))
             .when_some(self.chat_access.message.clone(), |el, message| el.child(notice("native-chat-access-error", message, theme, true)))
@@ -626,6 +692,76 @@ mod tests {
             );
         });
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(target_os = "macos")]
+    #[gpui::test]
+    fn manual_clinical_selection_adds_exact_passages_and_requires_a_separate_check(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (pending, _remote, session, _host) =
+            crate::chat_access::owner::tests::clinical_request();
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+        app.update(cx, |app, cx| {
+            app.scope = Some("scope-a".into());
+            app.chat_access.owner =
+                Some((session.chat_write_reference_namespace(), session.clone()));
+            app.session = Some(session);
+            app.chat_access.pending = Some(pending.clone());
+            app.chat_access
+                .excerpt
+                .update(cx, |input, cx| input.set_content("Passo clinico.", cx));
+        });
+        super::super::notes_recovery_tests::draw(cx);
+        let button = cx
+            .debug_bounds("control-label:Aggiungi passo")
+            .expect("native selection rendered");
+        cx.simulate_click(button.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        {
+            let p = pending.lock().unwrap();
+            let c = p.clinical.as_ref().unwrap();
+            assert_eq!(c.excerpts, ["Passo clinico."]);
+            assert!(c.selected.is_empty());
+            assert!(p.review().is_none());
+        }
+        super::super::notes_recovery_tests::draw(cx);
+        let check = cx
+            .debug_bounds("control-label:☐ Passo clinico.")
+            .expect("manual passage check rendered");
+        cx.simulate_click(check.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        assert_eq!(
+            pending.lock().unwrap().clinical.as_ref().unwrap().selected,
+            [1]
+        );
+        assert_eq!(
+            pending.lock().unwrap().edit_clinical(1),
+            Some("Passo clinico.".into())
+        );
+        app.update(cx, |app, cx| {
+            app.chat_access.excerpt.update(cx, |input, cx| {
+                input.set_content("Passo clinico senza nomi.", cx)
+            })
+        });
+        super::super::notes_recovery_tests::draw(cx);
+        let save = cx
+            .debug_bounds("control-label:Usa il campo come copia modificata")
+            .expect("native copy action rendered");
+        cx.simulate_click(save.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        {
+            let p = pending.lock().unwrap();
+            let c = p.clinical.as_ref().unwrap();
+            assert_eq!(c.excerpts, ["Passo clinico."]);
+            assert_eq!(c.copies[&1], "Passo clinico senza nomi.");
+            assert!(p.review().is_none());
+        }
+        app.update(cx, |app, cx| app.disconnect(cx));
+        assert_eq!(pending.lock().unwrap().status(), State::Withdrawn);
+        assert!(pending.lock().unwrap().clinical.is_none());
     }
 
     #[gpui::test]
