@@ -22,7 +22,7 @@ export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['lib/reference-data/prosthetics-catalog-backup.ts', '5e267385e6a62d0eb3bb2151234f46c2dbf054d18a88bca20f45d965d494808b'],
   ['lib/reference-data/prosthetics-import-options.ts', '65140db5ea1d443573f9c7badbdd20ec0b2d0daa25bff5f364bf8f2b06418c50'],
   ['lib/reference-data/prosthetics-snapshot.ts', 'a32dbdc57e1991eccd9a28324718fb280cde9364e015e7694e7d1522bb638b94'],
-  ['lib/attachment-path.ts', 'd9f3b7edb6ae32a4a66f85f691c071f63d1381a8d7221fdeed9776923d90b968'],
+  ['lib/attachment-path.ts', '845962ee6c8ea23479ee58090d48ddc77d20bd5364ca3d5fd2d5c5de0c8183bd'],
   ['lib/reference-data/prosthetics-catalog-contract.ts', '2ad9638759dd09ee76aea62bf4d53986d13ad818e38aeefb97b2b415f875318d'],
 ].map(([file, sha256]) => Object.freeze({ path: file, sha256 })));
 
