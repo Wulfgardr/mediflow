@@ -489,7 +489,7 @@ mod tests {
         let started = Instant::now();
         let deadline = started + Duration::from_secs(if step == Some(2) { 120 } else { 30 });
         loop {
-            match listener.accept() {
+            match crate::test_loopback::accept(listener) {
                 Ok((s, _)) => {
                     s.set_nonblocking(false).unwrap();
                     s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
