@@ -139,7 +139,8 @@ final class HomeBaseLoopbackHostTests: XCTestCase {
         }
         for host in ["", "127.0.0.1.attacker", "localhost.invalid", "127.0.0.999",
                      "192.0.2.1", "::2", "::ffff:192.0.2.1", "[[::1]]", "[::1",
-                     "127.0.0.1\u{0}invalid"] {
+                     "127.0.0.1\u{0}invalid", ":::1", "1::1", "::+1", "::g", "::1%lo0",
+                     "0:0:0:0:0:0:1", "0:0:0:0:0:0:0:0:1", "1::1::1"] {
             XCTAssertFalse(HomeBaseConnectionConfiguration.isLoopbackHost(host), host)
         }
     }
