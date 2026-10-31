@@ -792,7 +792,7 @@ mod tests {
                     assert!(app.form.is_none());
                 });
                 assert_eq!(
-                    listener.accept().unwrap_err().kind(),
+                    crate::test_loopback::accept(&listener).unwrap_err().kind(),
                     std::io::ErrorKind::WouldBlock
                 );
             }

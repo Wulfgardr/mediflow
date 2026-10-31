@@ -65,7 +65,7 @@ impl Host {
         let worker = thread::spawn(move || {
             let mut workers = Vec::new();
             loop {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 if stopping.load(Ordering::Acquire) {
                     break;
                 }
