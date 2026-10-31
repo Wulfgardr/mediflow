@@ -1,3 +1,4 @@
+import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 import { archiveGenerationForSession } from './security/archive-session-generation';
 /* paired therapy boundary remains specific to this capability and routes. */
 import { v4 as uuidv4 } from 'uuid';
@@ -12,7 +13,7 @@ export const NETWORK_THERAPY_WRITE_CAPABILITY = 'network.replica.write-therapies
 type NetworkTherapyMutationResponse =
     | { status: 200; value: { success: true } }
     | { status: 201; value: { id: string; version: number } }
-    | { status: 400 | 403 | 404 | 409; value: Record<string, unknown> };
+    | { status: 400 | 401 | 403 | 404 | 409; value: Record<string, unknown> };
 type NetworkTherapyMutationContext = NetworkWriteContext & { patientId: string };
 type NetworkTherapyUpdateContext = NetworkTherapyMutationContext & { therapyId: string };
 
@@ -91,6 +92,7 @@ export async function createNetworkScopedTherapy(
     const normalized = normalizeTherapyCreateInput(body, { id: newId, patientId: context.patientId });
     if (!normalized.ok) return { status: 400, value: { error: normalized.error } };
     return createTherapyOperation({
+        authorizeCommit: await prepareNetworkPatientCommitGuard(context, NETWORK_THERAPY_WRITE_CAPABILITY),
         patientId: context.patientId, therapyId: newId, values: normalized.values,
         changedFields: therapyChangedFields(normalized.values, body),
         mode: 'network', scopeAmbulatoryId: context.scopeAmbulatoryId,
@@ -111,6 +113,7 @@ export async function updateNetworkScopedTherapy(
     const normalized = normalizeTherapyUpdateInput(body);
     if (!normalized.ok) return { status: 400, value: { error: normalized.error } };
     return updateTherapyOperation({
+        authorizeCommit: await prepareNetworkPatientCommitGuard(context, NETWORK_THERAPY_WRITE_CAPABILITY),
         patientId: context.patientId, therapyId: context.therapyId,
         expectedVersion, values: normalized.values,
         changedFields: therapyChangedFields(normalized.values, body),

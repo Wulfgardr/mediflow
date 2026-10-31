@@ -1,3 +1,4 @@
+import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
 import { NextResponse } from 'next/server';
 import { requiresLocalUiDocumentLease } from '@/lib/security/plugin-local-ui-runtime';
 import fs from 'fs';
@@ -117,7 +118,7 @@ export async function GET(request: Request) {
         console.error('[auth-check]', dbHealthClassification.code, dbHealthClassification.message);
     }
     const sessionId = webAuthSessionIdFromRequest(request);
-    const resolution = sessionId ? resolveWebAuthControlSession(sessionId, control.controlId) : null;
+    const resolution = sessionId && hasAttestedLoopbackIngress(request) ? resolveWebAuthControlSession(sessionId, control.controlId) : null;
     const hasSession = resolution?.status === 'active';
     if (!dbHealth) {
         const response = NextResponse.json({

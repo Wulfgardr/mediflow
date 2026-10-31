@@ -333,6 +333,17 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(paths, ["/api/auth/check", "/api/auth/native/login", "/api/auth/native/logout"])
     }
 
+    func testRemoteOriginRequiresConfirmedValidPin() throws {
+        for host in ["192.0.2.1", "homebase.local"] {
+            for pin in ["", "aa", String(repeating: "z", count: 64)] {
+                XCTAssertThrowsError(try HomeBaseConnectionConfiguration(serverURLString: ["https:", "", "\(host):3443"].joined(separator: "/"), tlsPin: pin).serverURL())
+            }
+            XCTAssertNoThrow(try HomeBaseConnectionConfiguration(serverURLString: ["https:", "", "\(host):3443"].joined(separator: "/"), tlsPin: String(repeating: "a", count: 64)).serverURL())
+        }
+        XCTAssertNoThrow(try HomeBaseConnectionConfiguration(serverURLString: "https://127.0.0.1:3443").serverURL())
+        XCTAssertNoThrow(try HomeBaseConnectionConfiguration(serverURLString: ["https:", "", "[::1]:3443"].joined(separator: "/")).serverURL())
+    }
+
     private func v3Vector() throws -> [String: String] {
         let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

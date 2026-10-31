@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest } from './loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { randomUUID, webcrypto } from 'node:crypto';
@@ -61,7 +62,7 @@ function responseCookie(response: Response, name: string): string {
 
 const control = bootstrapWebAuthControl(null);
 assert.ok(control);
-const setupResponse = await setup(new Request('http://127.0.0.1/api/auth/setup', {
+const setupResponse = await setup(syntheticLoopbackRequest('http://127.0.0.1/api/auth/setup', {
     method: 'POST',
     headers: {
         'content-type': 'application/json',
@@ -82,7 +83,8 @@ const requestCookies = RequestCookiesAdapter.seal(new RequestCookies(new Headers
 })));
 const requestStore = {
     type: 'request', phase: 'render', cookies: requestCookies,
-    asyncApiPromises: { cookies: Promise.resolve(requestCookies) },
+    headers: syntheticLoopbackRequest('http://127.0.0.1').headers,
+    asyncApiPromises: { cookies: Promise.resolve(requestCookies), headers: Promise.resolve(syntheticLoopbackRequest('http://127.0.0.1').headers) },
 };
 const workStore = { route: '/h10-evidence', page: '/h10-evidence/page', isStaticGeneration: false };
 function inRequest<Value>(operation: () => Promise<Value>): Promise<Value> {

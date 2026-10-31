@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest as localRequest } from './loopback-ingress-test-fixture';
 /* ADR 0143, step 2: the real check and login routes on a real archive, for an account that
    unlocks with a passphrase. The migration that writes such an account arrives with step 3:
    here the test writes the columns itself, with what the browser primitives produce. */
@@ -35,14 +36,14 @@ const filesHolding = (text: string) => [archive, `${archive}-wal`]
 const rawKey = async (key: CryptoKey) => Buffer.from(await globalThis.crypto.subtle.exportKey('raw', key)).toString('hex');
 
 async function readCheck() {
-    const response = await check(new Request('http://127.0.0.1/api/auth/check'));
+    const response = await check(localRequest('http://127.0.0.1/api/auth/check'));
     const controlId = response.headers.getSetCookie().find((cookie) => cookie.startsWith('mediflow_auth_control='))!.split(/[=;]/u)[1];
     return { body: await response.json() as Record<string, unknown>, controlId, etag: response.headers.get('etag')! };
 }
 
 async function post(route: (request: Request) => Promise<Response>, pathname: string, body: Record<string, unknown>) {
     const control = await readCheck();
-    const response = await route(new Request(new URL(pathname, 'http://127.0.0.1'), {
+    const response = await route(localRequest(new URL(pathname, 'http://127.0.0.1'), {
         method: 'POST',
         headers: {
             'content-type': 'application/json', cookie: `mediflow_auth_control=${control.controlId}`,
@@ -61,7 +62,7 @@ async function nativeLogin(password: string) {
         createNativeSession: (() => { sessions += 1; return { id: `synthetic-native-session-${randomUUID()}`, expiresAt: Date.now() + 60000 }; }) as never,
         audit: async () => undefined,
     });
-    const response = await handler(new Request('http://127.0.0.1/api/auth/native/login', { method: 'POST' }), {}, { username: USERNAME, password });
+    const response = await handler(localRequest('http://127.0.0.1/api/auth/native/login', { method: 'POST' }), {}, { username: USERNAME, password });
     return { status: response.status, sessions };
 }
 
@@ -142,7 +143,7 @@ test('auth check returns the current control fence after retiring a session from
     const issued = transport.issueWebAuthControl(attempt, { id: account().id, username: USERNAME, role: 'admin' })!;
     assert.ok(issued);
     dbServer.$client.transaction(() => rotateSqliteArchiveGeneration(dbServer.$client)).immediate();
-    const response = await check(new Request('http://127.0.0.1/api/auth/check', {
+    const response = await check(localRequest('http://127.0.0.1/api/auth/check', {
         headers: { cookie: `mediflow_auth_control=${control.controlId}; mediflow_session=${issued.sessionId}` },
     }));
     assert.equal((await response.json()).hasSession, false);

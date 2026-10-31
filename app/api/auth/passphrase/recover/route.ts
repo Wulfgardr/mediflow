@@ -1,3 +1,4 @@
+import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
 import { currentArchiveGeneration } from '@/lib/security/archive-session-generation';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { NextResponse } from 'next/server';
@@ -33,6 +34,7 @@ const unavailable = (etag?: string) => jsonResponse({ error: 'Recupero non dispo
  * never set.
  */
 export async function POST(request: Request) {
+    if (!hasAttestedLoopbackIngress(request)) return NextResponse.json({ error: 'Local access required' }, { status: 403 });
     if (!isTrustedWebMutationRequest(request)) {
         return jsonResponse({ error: 'Richiesta non ammessa.', code: 'PASSPHRASE_RECOVERY_UNTRUSTED_REQUEST' }, 403);
     }

@@ -1,3 +1,4 @@
+import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
 /* one ordinary observation create/update authority; no generic clinical CRUD or headless path. */
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
@@ -8,15 +9,15 @@ import { buildObservationVersionConflictPayload } from './observation-concurrenc
 
 type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 type Mode = 'web' | 'v1' | 'network';
-type Result = { status: 200 | 201 | 404 | 409 | 422; value: Record<string, unknown> };
+type Result = { status: 200 | 201 | 401 | 403 | 404 | 409 | 422; value: Record<string, unknown> };
 type CreateInput = {
     patientId: string; observationId: string; values: typeof observations.$inferInsert; changedFields: string[];
-    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext;
+    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext; authorizeCommit?: NetworkPatientCommitGuard;
 };
 type UpdateInput = {
     patientId?: string; observationId: string; expectedVersion: number;
     values: Partial<typeof observations.$inferInsert>; changedFields: string[];
-    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext;
+    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext; authorizeCommit?: NetworkPatientCommitGuard;
 };
 
 function networkScopeContains(tx: Tx, patientId: string, ambulatoryId: string): boolean {
@@ -41,6 +42,8 @@ function webLinkError(tx: Tx, patientId: string, servicePrescriptionItemId: stri
 /* IMMEDIATE serializes the admission, duplicate check, row insert and required audit. */
 export function createObservationOperation(input: CreateInput): Result {
     return dbServer.transaction((tx): Result => {
+        const denial = input.authorizeCommit?.(tx);
+        if (denial) return denial;
         const admitted = input.mode === 'network'
             ? networkScopeContains(tx, input.patientId, input.scopeAmbulatoryId!)
                 && activeParentExists(tx, input.patientId)
@@ -70,6 +73,8 @@ export function createObservationOperation(input: CreateInput): Result {
 /* a matched UPDATE IGNORE is an integrity fault, not an optimistic 409. */
 export function updateObservationOperation(input: UpdateInput): Result {
     return dbServer.transaction((tx): Result => {
+        const denial = input.authorizeCommit?.(tx);
+        if (denial) return denial;
         const existing = input.mode === 'network'
             ? tx.select({ observation: observations }).from(observations)
                 .innerJoin(patientsToAmbulatories, eq(observations.patientId, patientsToAmbulatories.patientId))

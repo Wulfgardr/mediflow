@@ -1729,8 +1729,11 @@ private final class HomeBaseTLSSessionDelegate: NSObject, URLSessionDelegate {
             return
         }
 
-        if !expectedPin.isEmpty,
-           let certificate = (SecTrustCopyCertificateChain(serverTrust) as? [SecCertificate])?.first {
+        if !expectedPin.isEmpty {
+            guard let certificate = (SecTrustCopyCertificateChain(serverTrust) as? [SecCertificate])?.first else {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+            }
             let pin = SHA256.hash(data: SecCertificateCopyData(certificate) as Data)
                 .map { String(format: "%02x", $0) }
                 .joined()
