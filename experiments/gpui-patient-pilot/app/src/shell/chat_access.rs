@@ -175,6 +175,10 @@ impl ClinicalApp {
             .as_ref()
             .and_then(|l| l.incoming.try_recv().ok());
         if let Some(pending) = incoming {
+            if pending.lock().is_ok_and(|mut p| p.document_requested()) {
+                self.open_chat_patient_document(&pending, cx);
+                return;
+            }
             self.chat_access.retire(cx);
             if self.chat_access.pending.as_ref().is_some_and(|p| {
                 p.lock()
@@ -235,18 +239,32 @@ impl ClinicalApp {
         }
     }
 
+    fn open_chat_patient_document(&mut self, pending: &Pending, cx: &mut Context<Self>) {
+        let available = pending.lock().is_ok_and(|mut p| p.document_requested())
+            && !self.patient_document.is_open()
+            && self.chat_access.pending.is_none()
+            && !self.privacy_shield;
+        if available {
+            self.open_patient_document(cx);
+        }
+        if let Ok(mut p) = pending.lock() {
+            p.finish_document_open(available && self.patient_document.is_open());
+        }
+        cx.notify();
+    }
+
     fn approve_chat_access(&mut self, with_pin: bool, cx: &mut Context<Self>) {
         let Some(pending) = self.chat_access.pending.clone() else {
             return;
         };
-        let Some((session, context, attempt)) = pending.lock().ok().and_then(|mut p| p.begin())
+        let Some((session, context, attempt)) = pending
+            .lock()
+            .ok()
+            .and_then(|mut p| p.begin_confirmation(with_pin))
         else {
             return;
         };
         let therapy_write = pending.lock().is_ok_and(|p| p.therapy().is_some());
-        if therapy_write && !with_pin {
-            return;
-        }
         if !with_pin && !pending.lock().is_ok_and(|mut p| p.prepare_biometric()) {
             if let Ok(mut p) = pending.lock() {
                 p.withdraw();
@@ -487,6 +505,46 @@ impl ClinicalApp {
 mod tests {
     use super::*;
     use gpui::EntityInputHandler;
+
+    #[cfg(target_os = "macos")]
+    #[gpui::test]
+    fn document_handoff_opens_existing_flow_once_without_staging_or_writing(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = super::super::notes_recovery_tests::Host::new();
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        app.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            let before = host.request_count();
+            let (pending, _peer) = crate::chat_access::owner::tests::document_request();
+            app.open_chat_patient_document(&pending, cx);
+            assert_eq!(pending.lock().unwrap().status(), State::DocumentOpened);
+            assert!(app.patient_document.is_open());
+            assert_eq!(host.request_count(), before);
+            let (second, _other) = crate::chat_access::owner::tests::document_request();
+            app.open_chat_patient_document(&second, cx);
+            assert_eq!(second.lock().unwrap().status(), State::Withdrawn);
+            assert!(app.patient_document.is_open());
+            assert_eq!(host.request_count(), before);
+            app.withdraw_patient_document(cx);
+        });
+    }
+
+    #[cfg(target_os = "macos")]
+    #[gpui::test]
+    fn document_handoff_cannot_open_without_native_authority(cx: &mut gpui::TestAppContext) {
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        app.update(cx, |app, cx| {
+            let (pending, _peer) = crate::chat_access::owner::tests::document_request();
+            app.open_chat_patient_document(&pending, cx);
+            assert_eq!(pending.lock().unwrap().status(), State::Withdrawn);
+            assert!(!app.patient_document.is_open());
+            assert!(app.chat_access.pending.is_none());
+        });
+    }
 
     #[cfg(target_os = "macos")]
     #[gpui::test]

@@ -43,6 +43,9 @@ pub(super) struct PatientDocument {
     _subscriptions: Vec<gpui::Subscription>,
 }
 impl PatientDocument {
+    pub(super) fn is_open(&self) -> bool {
+        self.work.is_some()
+    }
     pub(super) fn new(
         theme: Theme,
         directory: Option<PathBuf>,

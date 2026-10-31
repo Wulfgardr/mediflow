@@ -164,3 +164,21 @@ for (const status of ['consumed', 'withdrawn', 'retired']) test(`unknown receipt
     await expect(frame.locator('#command-id')).toHaveValue('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     await expect(frame.locator('#therapy-receipt')).not.toContainText('aaaaaaaa');
 });
+
+for (const status of ['document-opened', 'withdrawn', 'applied']) test(`PDF handoff ${status} sends no document or credential and never confirms creation`, async ({ page }) => {
+    const frame = page.frameLocator('#access');
+    await page.evaluate(status => {
+        (window as unknown as { accessFixture: { status: string } }).accessFixture.status = status;
+    }, status);
+    await frame.getByRole('button', { name: 'Nuovo paziente da PDF' }).click();
+    await expect(frame.getByRole('status')).toContainText(status === 'document-opened' ? 'L’apertura non conferma la creazione' : 'Nessuna creazione confermata dalla chat');
+    await expect(frame.getByRole('button', { name: 'Nuovo paziente da PDF' })).toBeDisabled();
+    await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeDisabled();
+    await expect(frame.getByRole('region', { name: 'Scheda sintetica' })).toBeHidden();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: unknown[] } }).accessFixture.calls);
+    expect(calls).toEqual([
+        { name: 'mediflow_native_access', arguments: { command: 'attach' } },
+        { name: 'mediflow_native_access', arguments: { command: 'patient-document' } },
+    ]);
+    await expect(frame.locator('body')).toContainText('Gli allegati del compositore restano nella chat');
+});
