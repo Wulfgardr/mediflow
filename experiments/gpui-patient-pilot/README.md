@@ -421,6 +421,25 @@ con esito incerto va riletta prima di qualsiasi nuovo invio. Il downgrade
 del servizio richiede di considerare gli abbinamenti Windows/Linux che i
 parser precedenti non riconoscono.
 
+### Backup programmato
+
+Impostazioni → Archivi e backup permette di leggere, modificare e confermare
+la programmazione attraverso la sessione amministrativa locale. Il client
+rilegge configurazione e presenza della programmazione dopo il salvataggio.
+Stato non osservabile, conflitto e risposta persa richiedono una nuova lettura;
+non viene eseguito alcun reinvio automatico. Le letture precedenti e successive
+non costituiscono un confronto atomico fra amministratori concorrenti: la route
+Web mantiene il proprio contratto attuale.
+
+Il runner conserva le copie precedenti e i temporanei interrotti, anche quando
+la vecchia impostazione di retention è presente. Pubblica ogni copia senza
+sovrascrivere file esistenti, sincronizza il file e, su Unix, la directory, poi
+rilegge i byte. La destinazione deve supportare hard link; in caso contrario
+il backup fallisce e il temporaneo rimane disponibile. La copia pianificata è
+portabile e non comprende account e chiavi: resta distinta dal backup completo
+cifrato. Selezione e creazione dell'archivio locale, modo host, recupero completo
+dalla UI e zona pericolo restano da completare.
+
 ### Amministrazione dei repertori
 
 Impostazioni → Repertori usa la sessione dedicata `LocalHostAccess`, solo

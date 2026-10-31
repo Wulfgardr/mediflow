@@ -19,13 +19,11 @@ const SETTINGS_KEY = 'backupScheduler';
 const BACKUP_ARTIFACT_FORMAT = 'mediflow-backup';
 const BACKUP_ARTIFACT_VERSION = 1;
 const BACKUP_ARTIFACT_SCOPE = 'mediflow-web-local-backup';
-const DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS = 14;
 const BACKUP_ARTIFACT_FILE_PREFIX = 'mediflow-backup-v1-';
 const BACKUP_ARTIFACT_FILE_SUFFIX = '.mediflow';
 const BACKUP_ARTIFACT_TEMP_SUFFIX = '.mediflow.tmp';
 const BACKUP_LOCK_FILE_NAME = '.mediflow-backup.lock';
 const BACKUP_LOCK_STALE_MS = 6 * 60 * 60 * 1000;
-const BACKUP_TEMP_MIN_AGE_MS = 15 * 60 * 1000;
 const PATIENT_AMBULATORY_TABLE = 'patients_to_ambulatories';
 
 /* @Codex */
@@ -198,12 +196,6 @@ export async function serializeBackupArtifact(payload, createdAt = new Date()) {
   return JSON.stringify(normalizeJson(artifact), null, 2);
 }
 
-function clampRetentionKeepArtifacts(value, fallback = DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS) {
-  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10);
-  if (Number.isNaN(parsed)) return fallback;
-  return Math.min(Math.max(parsed, 1), 365);
-}
-
 function classifyManagedBackupFile(name) {
   if (name.startsWith(BACKUP_ARTIFACT_FILE_PREFIX) && name.endsWith(BACKUP_ARTIFACT_TEMP_SUFFIX)) {
     return 'temp';
@@ -233,11 +225,6 @@ function listManagedBackupFiles(destinationDir) {
   });
 }
 
-function isRecentTemp(file, nowMs = Date.now()) {
-  return file.kind === 'temp' && nowMs - file.modifiedAtMs < BACKUP_TEMP_MIN_AGE_MS;
-}
-
-/* @Codex */
 function readBackupLock(lockPath) {
   try {
     const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
@@ -313,71 +300,26 @@ function restrictManagedBackupFiles(destinationDir) {
   }
 }
 
-function applyBackupRetention(config, options = {}) {
-  const preservePaths = new Set((options.preservePaths ?? []).map((value) => path.resolve(value)));
-  const nowMs = options.nowMs ?? Date.now();
-  const activeBackupLock = !options.ignoreBackupLock && isBackupLockActive(config.destinationDir, nowMs);
-  const managedFiles = listManagedBackupFiles(config.destinationDir).sort((left, right) => {
-    if (left.modifiedAtMs !== right.modifiedAtMs) return right.modifiedAtMs - left.modifiedAtMs;
-    return right.name.localeCompare(left.name);
-  });
-  const artifacts = managedFiles.filter((file) => file.kind === 'artifact');
-  const orphanTemps = managedFiles
-    .filter((file) => file.kind === 'temp')
-    .filter((file) => !preservePaths.has(path.resolve(file.path)))
-    .filter((file) => !isRecentTemp(file, nowMs))
-    .filter(() => !activeBackupLock);
-  const staleArtifacts = artifacts
-    .slice(clampRetentionKeepArtifacts(config.retentionKeepArtifacts))
-    .filter((file) => !preservePaths.has(path.resolve(file.path)));
-  const items = [
-    ...staleArtifacts.map((file) => ({
-      path: file.path,
-      kind: file.kind,
-      reason: 'keep-last-n',
-      sizeBytes: file.sizeBytes,
-      modifiedAt: file.modifiedAt,
-    })),
-    ...orphanTemps.map((file) => ({
-      path: file.path,
-      kind: file.kind,
-      reason: 'orphan-temp',
-      sizeBytes: file.sizeBytes,
-      modifiedAt: file.modifiedAt,
-    })),
-  ];
-  for (const item of items) {
-    if (fs.existsSync(item.path)) fs.unlinkSync(item.path);
-  }
-  return {
-    destinationDir: config.destinationDir,
-    keepArtifacts: clampRetentionKeepArtifacts(config.retentionKeepArtifacts),
-    artifactCount: artifacts.length,
-    orphanTempCount: orphanTemps.length,
-    deleteCount: items.length,
-    deleteBytes: items.reduce((sum, item) => sum + item.sizeBytes, 0),
-    items,
-    deletedCount: items.length,
-    deletedBytes: items.reduce((sum, item) => sum + item.sizeBytes, 0),
-  };
+function syncBackupDirectory(directory) {
+  if (process.platform === 'win32') return;
+  const descriptor = fs.openSync(directory, 'r');
+  try { fs.fsyncSync(descriptor); } finally { fs.closeSync(descriptor); }
 }
 
-function applyRetentionResultToState(current, result, mode, occurredAt = new Date()) {
-  const retainedArtifactPath = current.run.lastArtifactPath
-    && result.items.some((item) => item.path === current.run.lastArtifactPath)
-    ? null
-    : current.run.lastArtifactPath;
-  return {
-    ...current,
-    run: {
-      ...current.run,
-      lastArtifactPath: retainedArtifactPath,
-      lastRetentionAt: occurredAt.toISOString(),
-      lastRetentionDeletedCount: result.deletedCount,
-      lastRetentionDeletedBytes: result.deletedBytes,
-      lastRetentionMode: mode,
-    },
-  };
+export function publishScheduledBackup(finalPath, artifact) {
+  const tempPath = `${finalPath}.tmp`;
+  const descriptor = fs.openSync(tempPath, 'wx', 0o600);
+  try {
+    fs.writeFileSync(descriptor, artifact, { encoding: 'utf8' });
+    fs.fsyncSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  fs.linkSync(tempPath, finalPath);
+  syncBackupDirectory(path.dirname(finalPath));
+  fs.unlinkSync(tempPath);
+  syncBackupDirectory(path.dirname(finalPath));
+  if (fs.readFileSync(finalPath, 'utf8') !== artifact) throw new Error('Backup non confermato dalla rilettura.');
 }
 
 function saveState(db, state) {
@@ -530,10 +472,7 @@ async function main() {
     const artifact = await serializeBackupArtifact(payload, createdAt);
     const fileName = `mediflow-backup-v1-${formatTimestamp(createdAt)}.mediflow`;
     const finalPath = path.join(destinationDir, fileName);
-    const tempPath = `${finalPath}.tmp`;
-
-    fs.writeFileSync(tempPath, artifact, { encoding: 'utf8', mode: 0o600 });
-    fs.renameSync(tempPath, finalPath);
+    publishScheduledBackup(finalPath, artifact);
     restrictManagedBackupFiles(destinationDir);
 
     const backedUpState = {
@@ -543,23 +482,14 @@ async function main() {
         destinationDir,
       },
       run: {
+        ...currentState.run,
         lastRunAt: createdAt.toISOString(),
         lastRunStatus: 'success',
         lastRunMessage: 'Backup completato.',
         lastArtifactPath: finalPath,
       },
     };
-    const retentionResult = applyBackupRetention(
-      {
-        destinationDir,
-        retentionKeepArtifacts: currentState.config.retentionKeepArtifacts,
-      },
-      { preservePaths: [finalPath], ignoreBackupLock: true },
-    );
-    const nextState = applyRetentionResultToState(backedUpState, retentionResult, 'auto', createdAt);
-    nextState.run.lastRunMessage = retentionResult.deletedCount > 0
-      ? `Backup completato. Retention: rimossi ${retentionResult.deletedCount} file.`
-      : 'Backup completato.';
+    const nextState = backedUpState;
     saveState(db, nextState);
 
     result = {
@@ -580,6 +510,7 @@ async function main() {
           ...currentState,
           config: { ...currentState.config, destinationDir },
           run: {
+            ...currentState.run,
             lastRunAt: new Date().toISOString(),
             lastRunStatus: 'error',
             lastRunMessage: message,

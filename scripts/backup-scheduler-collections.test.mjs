@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { serializeBackupArtifact } from './run-scheduled-backup.mjs';
+import os from 'node:os';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { pathToFileURL } from 'node:url';
+import { publishScheduledBackup, serializeBackupArtifact } from './run-scheduled-backup.mjs';
 
 const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -127,3 +131,64 @@ test('scheduled serialization preserves audit seconds, NULL, text and determinis
   await assert.rejects(() => serializeBackupArtifact({ ...empty, auditEvents: [],
     headlessSoapEntryCommits: [{ auditSnapshot: JSON.stringify(first) }] }), /missing or divergent/);
 });
+
+
+test('scheduled publication never overwrites an artifact or an interrupted temporary file', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-g3-publish-'));
+  try {
+    const target = path.join(directory, 'mediflow-backup-v1-synthetic.mediflow');
+    fs.writeFileSync(target, 'previous artifact');
+    assert.throws(() => publishScheduledBackup(target, 'new artifact'), { code: 'EEXIST' });
+    assert.equal(fs.readFileSync(target, 'utf8'), 'previous artifact');
+    assert.equal(fs.readFileSync(`${target}.tmp`, 'utf8'), 'new artifact');
+    assert.throws(() => publishScheduledBackup(target, 'third artifact'), { code: 'EEXIST' });
+    assert.equal(fs.readFileSync(`${target}.tmp`, 'utf8'), 'new artifact');
+    const fresh = path.join(directory, 'fresh.mediflow');
+    publishScheduledBackup(fresh, 'complete synthetic artifact');
+    assert.equal(fs.readFileSync(fresh, 'utf8'), 'complete synthetic artifact');
+    assert.equal(fs.existsSync(`${fresh}.tmp`), false);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+for (const phase of ['before-link', 'after-link', 'after-unlink']) {
+  test(`real process kill ${phase} preserves earlier artifacts and a complete recovery copy`, async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-g3-crash-'));
+    const target = path.join(directory, 'new.mediflow');
+    const previous = path.join(directory, 'previous.mediflow');
+    fs.writeFileSync(previous, 'previous backup');
+    const artifact = 'synthetic backup content '.repeat(9000);
+    const moduleUrl = pathToFileURL(path.join(ROOT_DIR, 'scripts/run-scheduled-backup.mjs')).href;
+    const child = spawn(process.execPath, ['--input-type=module', '-e', `
+      import fs from 'node:fs';
+      const { publishScheduledBackup } = await import(${JSON.stringify(moduleUrl)});
+      const wait = () => { process.stdout.write('READY\\n'); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0); };
+      const link = fs.linkSync, unlink = fs.unlinkSync;
+      fs.linkSync = (...args) => { if (${JSON.stringify(phase)} === 'before-link') wait(); link(...args); if (${JSON.stringify(phase)} === 'after-link') wait(); };
+      fs.unlinkSync = (...args) => { unlink(...args); if (${JSON.stringify(phase)} === 'after-unlink') wait(); };
+      publishScheduledBackup(${JSON.stringify(target)}, 'synthetic backup content '.repeat(9000));
+    `], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    const exited = once(child, 'exit');
+    try {
+      const ready = await Promise.race([
+        once(child.stdout, 'data').then(([chunk]) => chunk.toString()),
+        exited.then(() => { throw new Error(`child exited before checkpoint: ${stderr}`); }),
+        new Promise((_, reject) => { const timer = setTimeout(() => reject(new Error('crash checkpoint timed out')), 10000); timer.unref(); }),
+      ]);
+      assert.match(ready, /READY/);
+      assert.equal(child.kill('SIGKILL'), true);
+      const [code, signal] = await exited;
+      assert.notEqual(code, 0);
+      assert.ok(signal || process.platform === 'win32');
+      assert.equal(fs.readFileSync(previous, 'utf8'), 'previous backup');
+      const completePath = phase === 'before-link' ? `${target}.tmp` : target;
+      assert.equal(fs.readFileSync(completePath, 'utf8'), artifact);
+      assert.throws(() => publishScheduledBackup(target, 'replacement'), { code: 'EEXIST' });
+      assert.equal(fs.readFileSync(completePath, 'utf8'), artifact);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) { child.kill('SIGKILL'); await exited; }
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
