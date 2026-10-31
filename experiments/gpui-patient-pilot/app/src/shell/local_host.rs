@@ -462,10 +462,9 @@ impl ClinicalApp {
                 }) {
                     pane = pane.children(rows.iter().map(|&(key, enabled)| {
                         if key == HostSettingKey::TreatmentReasoning {
-                            return div().debug_selector(|| "local-host-treatment-unavailable".into()).child(text!(format!(
-                                "Ragionamento terapeutico · Non disponibile in questa versione. Interruttore salvato: {}. Non viene usato in questa versione.",
-                                if enabled { "attivo" } else { "spento" }
-                            )));
+                            return div()
+                                .debug_selector(|| "local-host-treatment-unavailable".into())
+                                .child(text!(retired_switch_summary(enabled)));
                         }
                         div()
                             .min_w_0()
@@ -652,6 +651,13 @@ impl ClinicalApp {
     }
 }
 
+fn retired_switch_summary(saved: bool) -> String {
+    format!(
+        "Ragionamento terapeutico · Non disponibile in questa versione. Interruttore salvato: {}. Non viene usato in questa versione.",
+        if saved { "attivo" } else { "spento" }
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -685,6 +691,11 @@ mod tests {
                     window.draw(cx).clear(cx);
                 })
             });
+            assert!(retired_switch_summary(saved).contains(if saved {
+                "Interruttore salvato: attivo."
+            } else {
+                "Interruttore salvato: spento."
+            }));
             assert!(
                 cx.debug_bounds("local-host-treatment-unavailable")
                     .is_some()
