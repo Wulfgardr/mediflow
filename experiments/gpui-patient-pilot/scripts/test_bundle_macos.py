@@ -9,6 +9,20 @@ import bundle_macos as bundle
 
 
 class BundleTests(unittest.TestCase):
+    def test_only_weak_concurrency_with_system_rpath_is_admitted(self):
+        dependency = "@rpath/libswift_Concurrency.dylib"
+        linkage = f"client:\n\t/usr/lib/libSystem.B.dylib (compatibility version 1)\n\t{dependency} (weak)\n"
+        commands = f"Load command 0\n cmd LC_LOAD_WEAK_DYLIB\n name {dependency} (offset 24)\nLoad command 1\n cmd LC_RPATH\n path /usr/lib/swift (offset 12)\n"
+        bundle.verify_system_linkage(linkage, commands)
+        for invalid in (commands.replace('LC_LOAD_WEAK_DYLIB', 'LC_LOAD_DYLIB'),
+                        commands.split('Load command 1')[0],
+                        commands.replace('/usr/lib/swift', '/tmp/swift')):
+            with self.assertRaises(ValueError):
+                bundle.verify_system_linkage(linkage, invalid)
+        with self.assertRaises(ValueError):
+            bundle.verify_system_linkage(linkage.replace(dependency, '@rpath/other.dylib'), commands)
+        bundle.verify_system_linkage('client:\n\t/usr/lib/libSystem.B.dylib (compatibility version 1)\n', '')
+
     def test_staging_preserves_existing_artifacts_and_rejects_installation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

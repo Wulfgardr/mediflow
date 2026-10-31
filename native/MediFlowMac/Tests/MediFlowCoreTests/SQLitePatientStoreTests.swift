@@ -4,21 +4,14 @@ import Crypto
 
 /// ADR 0071 Fase 2: the read-only SQLitePatientStore opens a real medical.db,
 /// reads the active patients, and decrypts ENCRYPTED_FIELDS with the operator
-/// master key. The fixture (Fixtures/medical_fixture.db) was sealed with the
+/// master key. The fixture (Fixtures/medical_fixture.sql) was sealed with the
 /// golden-vector master key, so the test decrypts without an operator PIN and
 /// proves the on-device store reads + decrypts byte-equal with the web.
-final class SQLitePatientStoreTests: XCTestCase {
+final class SQLitePatientStoreTests: SyntheticSQLiteFixtureTestCase {
 
     // Same raw key the fixture (and the crypto golden vectors) were sealed with.
     private let masterKey = SymmetricKey(
         data: Data(hexString: "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"))
-
-    private func fixturePath() -> String {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .appendingPathComponent("Fixtures/medical_fixture.db")
-            .path
-    }
 
     func testListPatientsReadsPlaintextSummary() throws {
         let store = SQLitePatientStore(path: fixturePath())
