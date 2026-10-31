@@ -1,3 +1,4 @@
+import { prepareSyntheticBackupDestination } from '../scheduled-backup.test-support.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -100,6 +101,7 @@ test('canonical web backup, scheduled CLI and restore preserve repertory bytes, 
     const exported = await parseBackupArtifact(await response.json());
     assert.equal(exported.payload.prostheticsCatalogEntries!.length, 1);
     const root = process.env.MEDIFLOW_DATA_DIR!;
+    prepareSyntheticBackupDestination(root, path.join(root, 'backups-synthetic'));
     const output = execFileSync(process.execPath, ['scripts/run-scheduled-backup.mjs'], {
         cwd: process.cwd(), encoding: 'utf8', timeout: 10_000,
         env: { ...process.env, MEDIFLOW_BACKUP_FORCE: '1', MEDIFLOW_BACKUP_DEST_DIR: path.join(root, 'backups-synthetic') },
@@ -153,6 +155,7 @@ test('originali autenticati: nome sicuro, integrità, negazione senza sessione e
     const artifact = await parseBackupArtifact(await (await backupRoute.GET()).json());
     const snapshotBefore = service.sources();
     assert.equal(artifact.payload.prostheticsCatalogDocuments!.length, 1);
+    prepareSyntheticBackupDestination(directory, path.join(directory, 'originals-backup'));
     const output = execFileSync(process.execPath, ['scripts/run-scheduled-backup.mjs'], {
         cwd: process.cwd(), encoding: 'utf8', timeout: 10_000,
         env: { ...process.env, MEDIFLOW_BACKUP_FORCE: '1', MEDIFLOW_BACKUP_DEST_DIR: path.join(directory, 'originals-backup') },
