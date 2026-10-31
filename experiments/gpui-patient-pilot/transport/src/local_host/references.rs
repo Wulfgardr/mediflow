@@ -48,6 +48,7 @@ pub struct PreparedReferenceImport {
     payload: Value,
     file: Option<Vec<u8>>,
     submitted: AtomicBool,
+    baseline: Option<Value>,
 }
 impl PreparedReferenceImport {
     pub fn catalog(&self) -> ReferenceCatalog {
@@ -58,7 +59,12 @@ impl PreparedReferenceImport {
     }
     pub fn can_commit(&self) -> bool {
         match self.catalog {
-            ReferenceCatalog::Aifa => true,
+            ReferenceCatalog::Aifa => {
+                self.file.is_none()
+                    || self.preview["review"]["count"]
+                        .as_u64()
+                        .is_some_and(|n| n > 0)
+            }
             ReferenceCatalog::Who => self.preview["previewId"].is_string(),
             _ => self.preview["valid"] == true && self.preview["proof"].is_string(),
         }
@@ -67,6 +73,7 @@ impl PreparedReferenceImport {
 pub enum ReferenceImportResult {
     Recorded(Value),
     Reduction(PreparedReferenceImport),
+    CatalogChanged,
 }
 fn status(catalog: ReferenceCatalog, value: Value) -> Result<Value> {
     let valid = match catalog {
@@ -97,6 +104,109 @@ fn status(catalog: ReferenceCatalog, value: Value) -> Result<Value> {
     } else {
         Err(RuntimeError::InvalidResponse)
     }
+}
+fn aifa_file_review(text: &str) -> Result<Value> {
+    use unicode_normalization::UnicodeNormalization;
+    let delimiter = if text.lines().next().unwrap_or("").contains(';') {
+        ';'
+    } else {
+        ','
+    };
+    let mut records = Vec::new();
+    let mut record = Vec::new();
+    let mut field = String::new();
+    let mut quoted = false;
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '"' {
+            if quoted && chars.peek() == Some(&'"') {
+                chars.next();
+                field.push('"');
+            } else {
+                quoted = !quoted;
+            }
+        } else if !quoted && (c == delimiter || c == '\n' || c == '\r') {
+            record.push(field.trim().to_owned());
+            field.clear();
+            if c != delimiter {
+                if c == '\r' && chars.peek() == Some(&'\n') {
+                    chars.next();
+                }
+                if record.iter().any(|s| !s.is_empty()) {
+                    records.push(record);
+                }
+                record = Vec::new();
+            }
+        } else {
+            field.push(c);
+        }
+    }
+    record.push(field.trim().to_owned());
+    if record.iter().any(|s| !s.is_empty()) {
+        records.push(record);
+    }
+    if quoted || records.len() < 2 {
+        return Err(RuntimeError::InvalidInput);
+    }
+    let headers = records[0]
+        .iter()
+        .map(|s| {
+            s.trim_start_matches('\u{feff}')
+                .nfkd()
+                .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
+                .collect::<String>()
+                .to_ascii_lowercase()
+                .split(|c: char| !c.is_ascii_alphanumeric())
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join("_")
+        })
+        .collect::<Vec<_>>();
+    let column = |aliases: &[&str]| {
+        aliases
+            .iter()
+            .find_map(|a| headers.iter().position(|h| h == a))
+            .ok_or(RuntimeError::InvalidInput)
+    };
+    let aic = column(&["codice_aic", "aic"])?;
+    let name = column(&["denominazione", "nome_commerciale"])?;
+    column(&["codice_atc", "atc"])?;
+    column(&["pa_associati", "principio_attivo", "principi_attivi"])?;
+    let mut rejected = 0;
+    let mut duplicates = 0;
+    let mut seen = std::collections::HashSet::new();
+    let mut diagnostics = Vec::new();
+    for (i, row) in records.iter().enumerate().skip(1) {
+        let code = row
+            .get(aic)
+            .map(|s| s.chars().filter(|c| !c.is_whitespace()).collect::<String>())
+            .unwrap_or_default();
+        let invalid_code =
+            !(6..=9).contains(&code.len()) || !code.bytes().all(|b| b.is_ascii_digit());
+        let missing_name = row.get(name).is_none_or(|s| s.is_empty());
+        let message = if invalid_code || missing_name {
+            rejected += 1;
+            Some(match (invalid_code, missing_name) {
+                (true, true) => "AIC non valido e denominazione assente",
+                (true, false) => "AIC non valido",
+                _ => "Denominazione assente",
+            })
+        } else if !seen.insert(code) {
+            duplicates += 1;
+            Some("AIC duplicato: viene conservata l’ultima riga")
+        } else {
+            None
+        };
+        if let Some(message) = message
+            && diagnostics.len() < 200
+        {
+            diagnostics.push(json!({"row":i+1,"message":message}));
+        }
+    }
+    Ok(
+        json!({"totalRecords":records.len()-1,"rejectedRecords":rejected,"duplicateRows":duplicates,
+        "count":seen.len(),"diagnosticsTruncated":rejected+duplicates>200,"diagnostics":diagnostics}),
+    )
 }
 impl LocalHostAccess {
     pub fn read_reference_catalog(&self, catalog: ReferenceCatalog) -> Result<ReferenceStatus> {
@@ -163,6 +273,9 @@ impl LocalHostAccess {
             {
                 return Err(RuntimeError::InvalidInput);
             }
+            let review = aifa_file_review(
+                std::str::from_utf8(bytes).map_err(|_| RuntimeError::InvalidInput)?,
+            )?;
             let sample = std::str::from_utf8(bytes)
                 .map_err(|_| RuntimeError::InvalidInput)?
                 .lines()
@@ -171,7 +284,7 @@ impl LocalHostAccess {
                 .collect::<Vec<_>>();
             (
                 metadata.clone(),
-                json!({"sourceName":name,"bytes":bytes.len(),"metadata":metadata,"sample":sample}),
+                json!({"sourceName":name,"bytes":bytes.len(),"metadata":metadata,"sample":sample,"review":review}),
                 Some(bytes.to_vec()),
             )
         } else {
@@ -193,6 +306,11 @@ impl LocalHostAccess {
             (payload, preview, None)
         };
         self.headers()?;
+        let baseline = if catalog == ReferenceCatalog::Aifa {
+            Some(self.read_reference_catalog(catalog)?.data)
+        } else {
+            None
+        };
         Ok(PreparedReferenceImport {
             owner: Arc::downgrade(&self.owner),
             catalog,
@@ -200,6 +318,7 @@ impl LocalHostAccess {
             payload,
             file,
             submitted: AtomicBool::new(false),
+            baseline,
         })
     }
     pub fn prepare_aifa_update(&self) -> Result<PreparedReferenceImport> {
@@ -211,6 +330,7 @@ impl LocalHostAccess {
             payload: json!({}),
             file: None,
             submitted: AtomicBool::new(false),
+            baseline: None,
         })
     }
     pub fn prepare_who_acquisition(&self) -> Result<PreparedReferenceImport> {
@@ -234,6 +354,7 @@ impl LocalHostAccess {
             preview,
             file: None,
             submitted: AtomicBool::new(false),
+            baseline: None,
         })
     }
     pub fn commit_reference_import(
@@ -244,6 +365,14 @@ impl LocalHostAccess {
             return Err(RuntimeError::ReadRequired);
         }
         self.headers()?;
+        if command.submitted.load(Ordering::Acquire) {
+            return Err(RuntimeError::ReadRequired);
+        }
+        if let Some(baseline) = &command.baseline
+            && self.read_reference_catalog(command.catalog)?.data != *baseline
+        {
+            return Ok(ReferenceImportResult::CatalogChanged);
+        }
         if command.submitted.swap(true, Ordering::AcqRel) {
             return Err(RuntimeError::ReadRequired);
         }
@@ -313,7 +442,18 @@ impl LocalHostAccess {
                     payload,
                     file: command.file.clone(),
                     submitted: AtomicBool::new(false),
+                    baseline: command.baseline.clone(),
                 }));
+            }
+            if !value["rejectedRecords"].is_u64() || !value["totalRecords"].is_u64() {
+                return Err(RuntimeError::Indeterminate);
+            }
+            if command.file.is_some()
+                && ["count", "rejectedRecords", "totalRecords"]
+                    .iter()
+                    .any(|key| value[key] != command.preview["review"][key])
+            {
+                return Err(RuntimeError::Indeterminate);
             }
             status(ReferenceCatalog::Aifa, value).map_err(|_| RuntimeError::Indeterminate)?
         } else {
@@ -338,6 +478,10 @@ impl LocalHostAccess {
                 return Err(RuntimeError::Indeterminate);
             }
         };
+        let mut value = value;
+        if command.catalog == ReferenceCatalog::Aifa && command.file.is_some() {
+            value["review"] = command.preview["review"].clone();
+        }
         self.headers()?;
         Ok(ReferenceImportResult::Recorded(value))
     }
