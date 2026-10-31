@@ -12,6 +12,7 @@ pub(super) enum SettingsPage {
     AiPreferences,
     Functions,
     Archives,
+    Governance,
 }
 
 impl SettingsPage {
@@ -26,6 +27,7 @@ impl SettingsPage {
             Self::Functions => 5,
             Self::Archives => 7,
             Self::Access => 8,
+            Self::Governance => 9,
         }
     }
 }
@@ -51,6 +53,9 @@ impl ClinicalApp {
         self.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
         if page == SettingsPage::Profile {
             self.ensure_account_profile_loaded(cx);
+        }
+        if page == SettingsPage::Governance {
+            self.read_governance(cx);
         }
         if page == SettingsPage::Models {
             self.read_model_configuration(cx);
@@ -106,6 +111,7 @@ impl ClinicalApp {
         }
         match self.settings_page {
             SettingsPage::Access => view.child(self.access_view(cx)),
+            SettingsPage::Governance => view.child(self.governance_view(cx)),
             SettingsPage::Archives => view.child(self.archives_view(cx)),
             SettingsPage::Profile => view.child(self.account_profile_view(cx)),
             SettingsPage::Appearance => view.child(heading("clinical-workspace-settings-heading", "Aspetto", theme))
@@ -157,6 +163,7 @@ impl ClinicalApp {
                     .children([
                         (SettingsPage::Models, "Modelli", "Stato della configurazione sull’host"),
                         (SettingsPage::Functions, "Funzioni AI", "Preferenze e scelta del modello per funzione"),
+                        (SettingsPage::Governance, "Governo Fabric", "Registro, sedi e verifiche salvate"),
                     ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)))
                     .child(section("clinical-workspace-connection-heading", "Archivio collegato", theme))
                     .child(text!(origin))
@@ -238,7 +245,7 @@ mod tests {
                 window.draw(cx).clear(cx);
             });
             let nodes = rendered_command::take_text_nodes();
-            assert_eq!(nodes.len(), 7);
+            assert_eq!(nodes.len(), 8);
             let mut unique = HashSet::new();
             for (id, node) in nodes {
                 assert!(
@@ -266,6 +273,7 @@ mod tests {
                     SettingsPage::AiPreferences,
                     SettingsPage::Functions,
                     SettingsPage::Archives,
+                    SettingsPage::Governance,
                 ] {
                     app.settings_page = page;
                     let layout = Layout::for_window(1200., 1.);

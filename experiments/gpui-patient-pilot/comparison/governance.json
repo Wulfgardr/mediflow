@@ -1,0 +1,549 @@
+{
+  "registry": {
+    "schemaVersion": "mediflow.ai.fabric-status.v1",
+    "contractVersion": "mediflow.ai.fabric.v1",
+    "egressGateOpen": false,
+    "readinessNote": "available_unqualified",
+    "providerDisclosure": {
+      "schemaVersion": "mediflow.ai.provider-disclosure.v1",
+      "providers": [
+        {
+          "id": "ollama",
+          "label": "Ollama",
+          "declared": {
+            "lifecycle": "host_managed",
+            "runtimeObservation": "operation_receipt_required",
+            "venue": "local_process",
+            "egress": "none",
+            "credentialClass": "local_model",
+            "executionDisposition": "proposal_only_candidate",
+            "accessBoundary": "not_applicable"
+          },
+          "effective": {
+            "lifecycle": "unavailable",
+            "runtimeObservation": "not_observed",
+            "venue": null,
+            "egress": null,
+            "credentialClass": null,
+            "executionDisposition": "denied_by_contract"
+          }
+        },
+        {
+          "id": "athena_mlx",
+          "label": "ATHENA",
+          "declared": {
+            "lifecycle": "host_managed",
+            "runtimeObservation": "operation_receipt_required",
+            "venue": "local_process",
+            "egress": "none",
+            "credentialClass": "local_model",
+            "executionDisposition": "proposal_only_candidate",
+            "accessBoundary": "not_applicable"
+          },
+          "effective": {
+            "lifecycle": "unavailable",
+            "runtimeObservation": "not_observed",
+            "venue": null,
+            "egress": null,
+            "credentialClass": null,
+            "executionDisposition": "denied_by_contract"
+          }
+        },
+        {
+          "id": "openai",
+          "label": "OpenAI",
+          "declared": {
+            "lifecycle": "informational_only",
+            "runtimeObservation": "disabled",
+            "venue": "cloud",
+            "egress": "disabled",
+            "credentialClass": "separate_api_access_required",
+            "executionDisposition": "execution_disabled",
+            "accessBoundary": "consumer_subscription_is_not_api_access"
+          },
+          "effective": {
+            "lifecycle": "not_applicable",
+            "runtimeObservation": "not_observed",
+            "venue": null,
+            "egress": null,
+            "credentialClass": null,
+            "executionDisposition": "execution_disabled"
+          }
+        },
+        {
+          "id": "anthropic",
+          "label": "Anthropic",
+          "declared": {
+            "lifecycle": "informational_only",
+            "runtimeObservation": "disabled",
+            "venue": "cloud",
+            "egress": "disabled",
+            "credentialClass": "separate_api_access_required",
+            "executionDisposition": "execution_disabled",
+            "accessBoundary": "consumer_subscription_is_not_api_access"
+          },
+          "effective": {
+            "lifecycle": "not_applicable",
+            "runtimeObservation": "not_observed",
+            "venue": null,
+            "egress": null,
+            "credentialClass": null,
+            "executionDisposition": "execution_disabled"
+          }
+        }
+      ]
+    },
+    "capabilities": [
+      {
+        "id": "aifa_drug_search",
+        "class": "deterministic",
+        "operation": "lookup",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": "mediflow.aifa-catalog-manifest.v1"
+      },
+      {
+        "id": "document_classification",
+        "class": "deterministic",
+        "operation": "classification",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": null
+      },
+      {
+        "id": "document_identity_resolution",
+        "class": "deterministic",
+        "operation": "extraction",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": null
+      },
+      {
+        "id": "document_synthesis",
+        "class": "generative",
+        "operation": "synthesis",
+        "review": "review_first",
+        "availabilityDisposition": "proposal_only",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": "aiDocumentSynthesisKillSwitch",
+        "contractSchema": "mediflow.ai.extract.v1"
+      },
+      {
+        "id": "evidence_absorption",
+        "class": "deterministic",
+        "operation": "extraction",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": "mediflow.evidence_queue.v1"
+      },
+      {
+        "id": "fhir_export",
+        "class": "deterministic",
+        "operation": "export",
+        "review": "informational",
+        "availabilityDisposition": "available",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": null
+      },
+      {
+        "id": "fse_document_validation",
+        "class": "deterministic",
+        "operation": "validation",
+        "review": "informational",
+        "availabilityDisposition": "available",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": null
+      },
+      {
+        "id": "icd_lookup",
+        "class": "deterministic",
+        "operation": "lookup",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": null
+      },
+      {
+        "id": "observation_range_classification",
+        "class": "deterministic",
+        "operation": "classification",
+        "review": "informational",
+        "availabilityDisposition": "available",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": null
+      },
+      {
+        "id": "ocr",
+        "class": "generative",
+        "operation": "ocr",
+        "review": "review_first",
+        "availabilityDisposition": "unavailable",
+        "venues": [],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": null
+      },
+      {
+        "id": "patient_insight",
+        "class": "generative",
+        "operation": "synthesis",
+        "review": "review_first",
+        "availabilityDisposition": "proposal_only",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": "aiPatientInsightKillSwitch",
+        "contractSchema": "mediflow.ai.extract.v1"
+      },
+      {
+        "id": "patient_open_loops",
+        "class": "deterministic",
+        "operation": "projection",
+        "review": "informational",
+        "availabilityDisposition": "available",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": null
+      },
+      {
+        "id": "pii_redaction_layer1",
+        "class": "deterministic",
+        "operation": "redaction",
+        "review": "informational",
+        "availabilityDisposition": "available",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": null
+      },
+      {
+        "id": "service_prescription_matching",
+        "class": "deterministic",
+        "operation": "matching",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": null,
+        "contractSchema": null
+      },
+      {
+        "id": "smart_import",
+        "class": "generative",
+        "operation": "extraction",
+        "review": "review_first",
+        "availabilityDisposition": "proposal_only",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": "aiSmartImportKillSwitch",
+        "contractSchema": "mediflow.ai.extract.v1"
+      },
+      {
+        "id": "treatment_reasoning",
+        "class": "generative",
+        "operation": "reasoning",
+        "review": "review_first",
+        "availabilityDisposition": "proposal_only",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "killSwitch": "aiTreatmentReasoningKillSwitch",
+        "contractSchema": "mediflow.treatment_reasoning.v1"
+      }
+    ]
+  },
+  "observations": {
+    "schemaVersion": "mediflow.ai.fabric-observability.v1",
+    "fallback": "denied_by_contract",
+    "observations": [
+      {
+        "venue": "local_process",
+        "state": "available",
+        "reason": null
+      },
+      {
+        "venue": "home_base",
+        "state": "unknown",
+        "reason": "not_probed"
+      },
+      {
+        "venue": "on_device",
+        "state": "unknown",
+        "reason": "not_implemented"
+      },
+      {
+        "venue": "cloud",
+        "state": "offline",
+        "reason": "egress_profile_closed"
+      }
+    ]
+  },
+  "parliament": {
+    "updatedAt": "2026-10-31T00:00:00.000Z",
+    "jsonPath": "synthetic/latest.json",
+    "markdownPath": "synthetic/latest.md",
+    "report": {
+      "parliament": {
+        "readiness": "hold",
+        "baselineModel": "synthetic-model",
+        "challengerModels": [
+          "synthetic-alternative"
+        ],
+        "rationale": "Prove sintetiche da completare.",
+        "protectedModels": [
+          "synthetic-model"
+        ],
+        "recommendedPruneModels": []
+      },
+      "scorecard": {
+        "lanes": [
+          {
+            "lane": "patient_insight",
+            "capability": "synthesis",
+            "state": "hold",
+            "tasks": [
+              "synthetic-task"
+            ],
+            "totalCandidates": 2,
+            "runnableCandidates": 1,
+            "benchmarkedCandidates": 1,
+            "focusCandidateLabel": "Modello sintetico",
+            "focusCandidateModel": "synthetic-model",
+            "blockers": [
+              "Accettazione ancora aperta."
+            ],
+            "focusNote": "Nessuna sostituzione automatica."
+          }
+        ]
+      }
+    }
+  },
+  "rollout": {
+    "lanes": [
+      {
+        "lane": "patient_insight",
+        "available": true,
+        "updatedAt": "2026-10-31T00:00:00.000Z",
+        "jsonPath": "synthetic/latest.json",
+        "markdownPath": "synthetic/latest.md",
+        "markdown": null,
+        "report": {
+          "status": "shadow-ready",
+          "currentState": "hold",
+          "selectedModel": "synthetic-model",
+          "blockers": [],
+          "warnings": [
+            {
+              "id": "synthetic-warning",
+              "message": "Solo osservazione."
+            }
+          ],
+          "evidence": {
+            "benchmarkFresh": true,
+            "owner": "synthetic-owner"
+          }
+        },
+        "error": null
+      },
+      {
+        "lane": "smart_import",
+        "available": false,
+        "updatedAt": null,
+        "jsonPath": null,
+        "markdownPath": null,
+        "markdown": null,
+        "report": null,
+        "error": null
+      },
+      {
+        "lane": "redaction",
+        "available": false,
+        "updatedAt": null,
+        "jsonPath": null,
+        "markdownPath": null,
+        "markdown": null,
+        "report": null,
+        "error": null
+      },
+      {
+        "lane": "clinical_entities",
+        "available": false,
+        "updatedAt": null,
+        "jsonPath": null,
+        "markdownPath": null,
+        "markdown": null,
+        "report": null,
+        "error": null
+      },
+      {
+        "lane": "generative_challenger",
+        "available": false,
+        "updatedAt": null,
+        "jsonPath": null,
+        "markdownPath": null,
+        "markdown": null,
+        "report": null,
+        "error": null
+      }
+    ],
+    "localControls": [
+      {
+        "lane": "patient_insight",
+        "label": "Patient Insight",
+        "key": "aiPatientInsightKillSwitch",
+        "uiDriven": true,
+        "state": "disabled"
+      },
+      {
+        "lane": "smart_import",
+        "label": "Smart Import",
+        "key": "aiSmartImportKillSwitch",
+        "uiDriven": true,
+        "state": "disabled"
+      },
+      {
+        "lane": "document_synthesis",
+        "label": "Document Synthesis",
+        "key": "aiDocumentSynthesisKillSwitch",
+        "uiDriven": true,
+        "state": "disabled"
+      },
+      {
+        "lane": "treatment_reasoning",
+        "label": "Treatment Reasoning",
+        "key": "aiTreatmentReasoningKillSwitch",
+        "uiDriven": true,
+        "state": "disabled"
+      }
+    ]
+  }
+}
