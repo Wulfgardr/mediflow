@@ -138,7 +138,7 @@ Base64 RFC 4648 canonico; i due ciphertext comprendono il tag GCM di 16 byte. L�
 
 Aggiornamento del 30 ottobre 2026: **il client cifra, il server verifica**. `stage.source` ha esattamente `name`, `path`, `original`, `data`, `fileKey`. `fileKey` è un array JSON mutabile di 32 interi 0–255: il client conforme vi inserisce la chiave del file, non la master key; il server non può distinguerle dal solo valore ricevuto. Il server verifica GCM e uguaglianza byte per byte col PDF ricevuto, prima di AnyDoc, OCR o creazione della fonte. Rifiuta payload illeggibili, chiavi errate e originali diversi. Nei percorsi gestiti azzera i chunk HTTP e il buffer assemblato dopo il parsing, l’array della chiave e i buffer del verificatore prima dell’estrazione, anche in errore. Non conserva intenzionalmente la chiave né la riporta in log, errori o ricevute. L’azzeramento riguarda i buffer posseduti dal codice: non garantisce la cancellazione delle stringhe JS prodotte da JSON o delle copie interne a V8 e OpenSSL. Un arresto del processo può impedire la pulizia.
 
-Il server non apre l’involucro sotto la master key. Un involucro falso può rendere il file illeggibile, ma non sostituirlo con un PDF differente da quello verificato. `execute` e `receipt`, anche dopo riavvio, restituiscono `outcome: applied` insieme a `attachmentReadback: client-verification-required`: attestano la scrittura, non l’apertura. Il futuro client GPUI deve rileggere `attachments.data`, aprire l’involucro con la master key e confrontare i byte con lo snapshot originale prima di presentare un esito completo; se fallisce deve mostrare l’allegato come non leggibile. Non esiste ancora una UI GPUI di questo comando. Il produttore `sealPatientDocumentFile` è esercitato da un client sintetico attraverso stage, revisione, execute e rilettura effettiva; il vettore condiviso è `native/contracts/attachment-file-golden.v2.json`.
+Il server non apre l’involucro sotto la master key. Un involucro falso può rendere il file illeggibile, ma non sostituirlo con un PDF differente da quello verificato. `execute` e `receipt`, anche dopo riavvio, restituiscono `outcome: applied` insieme a `attachmentReadback: client-verification-required`: attestano la scrittura, non l’apertura. Il client GPUI rilegge `attachments.data`, apre l’involucro con la master key e confronta i byte con lo snapshot originale prima di presentare un esito completo; se fallisce mostra la verifica incompleta e conserva il comando. Il recupero senza snapshot locale segue l’appendice GPUI. Il produttore `sealPatientDocumentFile` è esercitato da un client sintetico attraverso stage, revisione, execute e rilettura effettiva; il vettore condiviso è `native/contracts/attachment-file-golden.v2.json`.
 
 Non sono ammessi URL, percorsi da aprire, identificativi di allegati della chat, candidati, opzioni di parser o provider.
 
@@ -161,17 +161,17 @@ nessun writer o deposito aggiuntivo; la ricevuta nativa distingue la verifica di
 il PIN nativo, poi rilegge ricevuta, paziente attivo, appartenenza
 all'ambulatorio e fonte prima di rispondere `applied`. Il recupero senza
 stato RAM conserva `unknown`; il ritiro non lo converte in `retired`.
-La ricevuta espone soltanto l'esito. Touch ID non è collegato a questo ingresso.
+La ricevuta del comando comune espone soltanto l’esito; la sola route nativa aggiunge i riferimenti verificati descritti nell’appendice GPUI. Touch ID non è collegato a questo ingresso.
 
 Le prove chiamano l'handler autenticato e SQLite sintetico reale; non provano
-un percorso desktop installato. Mancano chiamante e revisione GPUI, avvio
-dalla chat e avviso del compositore, collegamento al deposito opaco Rust,
-Smart Import e uso Web dello stesso writer. C-6 resta aperta.
+un percorso desktop installato. Il chiamante GPUI e il collegamento al deposito
+opaco Rust sono descritti nell’appendice. Mancano avvio dalla chat e avviso
+del compositore, Smart Import e uso Web dello stesso writer. C-6 resta aperta.
 
 Il comando riceve due porte interne dell'host, mai ricostruite da JSON: l'owner
 della sessione e dello scope «nuovo paziente», e la fonte preparata corrente.
-Il futuro punto di composizione deve collegare gli owner reali, controllare
-upload e tipo sui byte originali e produrre evidenze AnyDoc/OCR prima di
+Il punto di composizione nativo collega gli owner reali, controlla
+upload e tipo sui byte originali e produce evidenze AnyDoc/OCR prima di
 emettere la fonte. Il comando non esegue estrazione né accetta URL o file ID
 della chat. Le prove del comando usano una porta fonte sintetica; non
 qualificano estrattori o custodia degli originali.
@@ -209,13 +209,29 @@ paziente/fonte nulli. La chiave primaria dell'audit e la rilettura sotto lo
 stesso lock rendono durevoli idempotenza e ritiro. Anche il riuso di una fonte
 già consumata viene rifiutato. Non nasce un secondo deposito o enum degli
 esiti: il servizio restituisce `applied`, `retired` o `unknown`, compatibili
-con il `ChatWriteResolution` comune. La ricevuta non contiene campi paziente,
-filename, percorso, testo o identificativo della fonte.
+con il `ChatWriteResolution` comune. La ricevuta comune non contiene campi paziente,
+filename, percorso, testo o identificativo della fonte. La sola risposta
+nativa può aggiungere i riferimenti verificati secondo l’appendice GPUI.
 
 Un processo riavviato legge l'audit prima di cercare la conferma RAM. Senza
 ricevuta, `unknown` resta incerto e non rinnova il comando. Il ritiro di un
-comando sconosciuto resta `unknown`; il servizio non attribuisce un esito a
-uno stato perso. Le ricevute seguono l'audit esistente nei backup: la
+comando sconosciuto richiede una richiesta esplicita: la ricevuta resta lettura
+pura e restituisce `unknown`. Per il solo ingresso nativo paired, la revoca
+ricontrolla il journal sotto transazione `IMMEDIATE` e può registrare `retired`
+anche senza pending. Paziente e journal sono atomici: una creazione concorrente
+committa prima del ritiro e restituisce `applied`, oppure trova `retired` prima
+di scrivere e non crea nulla. Il terminale non rinnova alcuna approvazione.
+
+Le istanze nello stesso processo condividono i proprietari pending e in volo,
+anche durante la verifica asincrona del PIN: un altro operatore, dispositivo o
+ambulatorio non può ritirarli. Dopo un arresto non rimangono approvazioni
+eseguibili. Il journal di ritiro è legato all'operatore autenticato, al dispositivo,
+alla generazione e all'ambulatorio correnti. Per limitare identificativi inventati,
+i ritiri senza proprietario RAM sono ammessi solo finché gli audit di ritiro
+dell'operatore nell'ultima ora sono meno di 128, su tutti i dispositivi e ambulatori.
+La verifica del limite e l'inserimento sono nella stessa transazione; il limite
+persiste al riavvio, non limita letture e replay e non introduce tabelle.
+Un comando con journal di altro proprietario resta negato senza scritture. Le ricevute seguono l'audit esistente nei backup: la
 conservazione non concede autorità nella generazione successiva al restore.
 Il deposito opaco e il recupero nativo esistenti restano da collegare a questo
 comando; nessun comando paziente viene ancora aperto dalla chat.
@@ -227,3 +243,154 @@ rileggono dal nuovo processo. La conferma di queste sole fixture di crash è
 simulata: non è una prova aggiuntiva di autenticazione. Il rapporto di consegna conserva separatamente lo script delle mutazioni
 e i log: lo script modifica temporaneamente le sorgenti e non viene eseguito
 insieme alle suite ordinarie.
+
+## Appendice: client GPUI e riferimenti nativi, 30 ottobre 2026
+
+La finestra GPUI acquisisce un solo PDF, tramite selettore o trascinamento,
+fino a 10 MiB. Il client produce ENC2 con una chiave casuale per file custodita
+in `Zeroizing`; l'involucro sotto la master e il payload usano gli AAD e il
+vettore condiviso descritti sopra. Tutti i campi sono inseriti dal medico con
+`correct`; nessun candidato è precompilato. L'anteprima locale conserva la
+bozza quando si torna alla revisione. Il PIN nativo autorizza il comando;
+la biometria è esplicitamente non disponibile per questa operazione.
+Il collegamento GPUI usa attualmente il deposito nativo Unix: il pannello è
+disponibile su macOS/Linux. La compilazione Windows del trasporto non attesta
+la disponibilità di questo pannello su Windows.
+
+Questa modifica cambia la risposta della sola route nativa. Dopo le verifiche
+correnti di operatore, dispositivo abbinato, generazione di archivio,
+ambulatorio, paziente attivo e allegato, `execute`, `receipt` e `revoke`
+restituiscono, solo per `applied`, `patientId` e `attachmentId` insieme a
+`attachmentReadback: client-verification-required`. Non aggiungono nome file,
+percorso, testo, anteprima o campi del paziente. `unknown` e `retired` restano
+privi di riferimenti. Il comando comune conserva la ricevuta opaca: chat e
+MCP non ricevono questi identificativi.
+
+Il journal di audit esistente può includere `pairedClientId`, un identificativo
+opaco del dispositivo già autenticato. Nessuna nuova tabella o deposito è
+introdotto. La verifica di proprietà riusa operatore, generazione e ambulatorio
+del comando comune e aggiunge il confronto del dispositivo. Un journal senza
+quel vincolo non autorizza la divulgazione dei riferimenti nativi.
+
+Una nuova sessione autenticata e sbloccata dello stesso proprietario può
+soltanto rileggere la ricevuta o richiedere la revoca idempotente. Deve
+corrispondere per operatore, dispositivo, archivio e ambulatorio. Non può
+riprendere `preview` o `execute`; tali operazioni richiedono la lavorazione
+in RAM della sessione originale. Un comando sconosciuto resta `unknown`.
+Se la lavorazione originale è ancora in RAM, la revoca confronta lo stesso
+proprietario usato dalla ricevuta e ritira l’approvazione della sessione
+originale. Non trasferisce l’approvazione alla nuova sessione. Senza stato RAM
+né esito durevole, il ritiro conserva `unknown`.
+
+GPUI riusa `CommandReferences` e `ChatWriteResolution`, conservando soltanto
+il codice opaco prima della conferma. Alla riapertura avvisa e offre la
+rilettura. `applied` non completa il controllo: il client rilegge l'allegato
+indicato dalla ricevuta e apre ENC2 con la master. Verifica tipo, dimensione,
+firma PDF e, quando ancora disponibile, uguaglianza con lo snapshot originale.
+Se l'apertura fallisce, mostra scrittura applicata ma verifica incompleta e
+conserva il comando. Dopo un crash lo snapshot non è persistito: l'apertura
+verifica GCM sul documento individuato dalla ricevuta durevole, senza inventare
+un confronto con byte locali non più presenti.
+
+Ritiro, errore, blocco e cambio di contesto svuotano PDF, testo estratto,
+campi e PIN dalla UI; nessun ritiro incerto elimina il riferimento. Restano
+riservate a Leonardo la prova Touch ID sul client reale e la qualificazione.
+Una risposta asincrona deve anche conservare il contesto locale non cancellato:
+annullare e riaprire nello stesso ambulatorio non riabilita il vecchio selettore
+o il risultato di una precedente acquisizione.
+
+
+### Correzioni di recupero e trasporto, 31 ottobre 2026
+
+Dopo il consumo dell'approvazione, un rifiuto definitivo noto senza effetti
+(PIN errato, approvazione scaduta, fonte o insieme dei duplicati cambiato)
+registra `retired` sotto transazione e con autorità corrente prima di liberare
+lo stato. Un secondo invio durante la verifica non ritira la prima esecuzione.
+Se la scrittura del terminale fallisce, il pending rimane disponibile alla
+revoca del proprietario; nessun errore HTTP autorizza da solo la cancellazione
+del riferimento locale. Dopo un errore GPUI rilegge la ricevuta autorevole.
+`unknown` conserva il deposito e consente rilettura o ritiro.
+
+Il corpo HTTP Rust è posseduto da `Bytes::from_owner(Zeroizing<Vec<u8>>)`:
+l'ultima copia condivisa ne azzera l'allocazione alla distruzione, compresi
+errore e cancellazione. I buffer interni di hyper e TLS restano fuori da
+questa garanzia. Lo stage riserva 28 MiB al JSON in uscita, separati dagli
+8 MiB della risposta e dai limiti delle letture ordinarie. Il file resta
+limitato a 10 MiB; il server limita il corpo JSON a 35 MiB.
+
+La doppia rappresentazione `original` e `data` resta nel protocollo corrente:
+il verificatore confronta il PDF ricevuto con quello decifrato prima
+dell'estrazione. Non è un requisito crittografico generale: estrarre dal solo
+PDF decifrato potrebbe eliminare `original`, ma cambierebbe questo contratto
+e le prove di corrispondenza. È un candidato al debloating successivo, senza
+modifiche al formato ENC2 o ai claim di cifratura.
+
+### Recupero e memoria del corpo GPUI, 31 ottobre 2026
+
+La prova nativa di processo interrompe davvero con SIGKILL l'inserimento di
+`patient.create.retired` dopo il rifiuto del PIN reale. Un processo nuovo con lo
+stesso operatore e dispositivo legge `unknown`, ritira esplicitamente, rifiuta
+l'esecuzione del vecchio comando e crea una nuova scheda: alla fine paziente,
+membership e allegato sono esattamente uno. I test concorrenti verificano anche
+il ritiro durante il PIN e la precedenza di `applied` dopo il commit.
+
+Il corpo stage Rust è tipizzato e prende in prestito i 32 byte custoditi in
+`Zeroizing`, senza copiarli in un array `serde_json::Value` o in una stringa
+base64 della chiave. ENC2 codifica in base64 soltanto la chiave già avvolta.
+La serializzazione conta i byte senza conservarli, applica il budget, poi scrive
+in una slice di lunghezza esatta dentro `Zeroizing<Vec<u8>>`. Lo scrittore non
+può crescere: un errore o una seconda serializzazione diversa distrugge e azzera
+anche un corpo parziale. Il trasporto mantiene il proprietario azzerabile fino
+alla distruzione dell'ultimo riferimento.
+
+Il probe eseguibile `patient_document_key_erasure` usa un allocatore che forza
+lo spostamento di realloc e osserva anche la liberazione del vecchio blocco.
+Una calibrazione positiva controlla il rilevatore prima delle prove. Avvio:
+
+```sh
+cd experiments/gpui-patient-pilot
+cargo rustc -p mediflow-runtime-client --example patient_document_key_erasure --locked -- -C opt-level=2
+cd ../..
+node scripts/probe-patient-document-key-erasure.mjs /percorso/target/debug/examples/patient_document_key_erasure /percorso/nuove-evidenze
+```
+
+L'host sintetico loopback prova 5 e 10 MiB con 403 e cancellazione e non stampa
+la chiave. Il probe cerca il frammento JSON con tutti i 32 byte numerici non
+interamente nulli, nei blocchi da 1 a meno di 32 MiB inizializzati dal suo allocatore.
+Non verifica buffer interni di hyper o TLS, registri e stack delle librerie
+crittografiche, dump o memoria dopo l'arresto del processo. Non è una prova
+di esfiltrazione o una garanzia sulla pulizia dell'intero processo.
+
+
+### Autorità durevole della revoca, 31 ottobre 2026
+
+La preparazione registra una sola riga `patient.create.issued` in `audit_events`
+prima che `open` restituisca il riferimento. Il commit IMMEDIATE precede quindi
+la conservazione del codice sul client e qualsiasi uso del PIN. Un arresto prima
+del commit non può aver consegnato il codice; dopo il commit la prova sopravvive
+alla perdita dello stato RAM. Non contiene dati clinici o identificativi personali
+in chiaro: conserva gli stessi riferimenti opachi dei terminali, senza paziente
+o fonte. La chiave `${commandId}:issued` consente la ricerca sul primary key
+esistente, separata dal terminale con chiave `commandId`. Nessuna migrazione.
+
+Senza pending la revoca ammette solo il proprietario nativo paired corrente che
+coincide con emissione, archivio, operatore, dispositivo e ambulatorio. UUID
+inventati e comandi di altri proprietari restituiscono entrambi `unknown`, senza
+scrivere audit o bloccare il comando legittimo. La lettura resta pura, l'emissione
+non concede preview o execute a una nuova sessione, e il controllo del terminale
+nella stessa transazione conserva la precedenza di `applied`.
+
+Il limite di 128 ritiri per ora non serve più: un chiamante non può fabbricare
+righe con UUID casuali. Restano il massimo di 128 viste vive del servizio comune
+e, nella route autenticata, due preparazioni simultanee, sedici fonti conservate
+e una prenotazione per sessione. Nessuna scrittura di emissione prima del controllo
+dell'autorità; il superamento del limite delle viste non scrive. Ogni preparazione
+ammessa aggiunge una riga append-only anche se abbandonata; non si introduce qui
+una cancellazione dello storico o una nuova policy di conservazione.
+
+La CI Linux esegue il caso 5 MiB con risposta 403 in un eseguibile Rust separato,
+compilato con `cargo rustc` e `-C opt-level=2`, attraverso il runner con `--ci`.
+Il runner completo senza opzioni mantiene cancellazione e 10 MiB nella procedura
+manuale sopra. L'inventario verifica build ottimizzata e invocazione successiva,
+senza dichiarare copertura automatica dei tre casi manuali. Restano invariati
+ambito e limiti della prova di memoria.

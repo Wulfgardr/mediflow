@@ -46,6 +46,7 @@ pub use local_host::*;
 pub use profile_query::{ProfileCurrentness, ProfileProjection};
 pub use retirement_notice::{RETIREMENT_WARNING, RetirementNotice};
 pub use scales::*;
+pub use session::patient_document::*;
 pub use session::{
     AiPreferencesContext, AmbulatoryCommandContext, ChatAccessContext, ChatWriteRecovery,
     FirstAmbulatoryContext, ProfileQueryIntent, RuntimeSession,

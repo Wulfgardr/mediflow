@@ -19,7 +19,7 @@ import { activePatients } from './patient-lifecycle';
 import { parsePatientDocumentCreateJournal } from './patient-document-create-journal';
 import type { LocalExtractionFailureDetail } from './domain/documents/anydoc-local-extraction-contract';
 
-const CAPABILITIES = ['network.replica.write-patient-lifecycle', 'network.replica.write-documents'] as const;
+const CAPABILITIES = ['network.replica.write-patient-lifecycle', 'network.replica.write-documents', 'network.replica.readonly-documents'] as const;
 const MAX_BYTES = 10 * 1024 * 1024;
 const deny = (): never => { throw new Error('Native patient document denied'); };
 const sealed = (value: unknown): value is string => typeof value === 'string'
@@ -44,7 +44,7 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
         const guard = await prepareNetworkPatientCommitGuard(context, CAPABILITIES);
         const result: PatientDocumentCreateHost = {
             session: context.session, actorRef: context.session.userId, ambulatoryId: context.scopeAmbulatoryId,
-            archiveGeneration: archiveGenerationForSession(context.session) ?? deny(), epoch: lifecycle.epoch, surface: 'native',
+            archiveGeneration: archiveGenerationForSession(context.session) ?? deny(), epoch: lifecycle.epoch, surface: 'native', pairedClientId: context.pairedClient.clientId,
             assertCurrent: tx => {
                 if (!lifecycle.current() || guard(tx)) {
                     lifecycle.retire();
@@ -90,10 +90,12 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
         return database.transaction(tx => {
             owner.assertCurrent(tx);
             const receipt = commands.receipt(owner, commandId);
+            let references: { patientId: string; attachmentId: string } | undefined;
             if (receipt.outcome === 'applied') {
                 const row = tx.select().from(auditEvents).where(eq(auditEvents.eventId, commandId)).get();
                 const journal = parsePatientDocumentCreateJournal(JSON.parse(row?.redactedMetadata ?? '{}').patientDocumentCreate);
-                if (!journal?.patientId || !journal.sourceId) return deny();
+                if (!journal?.patientId || !journal.sourceId || journal.pairedClientId !== owner.pairedClientId) return deny();
+                references = { patientId: journal.patientId, attachmentId: journal.sourceId };
                 const patient = tx.select({ id: patients.id }).from(patients)
                     .where(and(activePatients(), eq(patients.id, journal.patientId))).get();
                 const membership = tx.select().from(patientsToAmbulatories).where(and(
@@ -103,7 +105,7 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
                 if (!patient || !membership || !source) return deny();
             }
             owner.assertCurrent(tx);
-            return receipt.outcome === 'applied' ? { ...receipt, attachmentReadback: 'client-verification-required' as const } : receipt;
+            return receipt.outcome === 'applied' ? { ...receipt, ...references, attachmentReadback: 'client-verification-required' as const } : receipt;
         }, { behavior: 'immediate' });
     }
     return {
@@ -178,6 +180,7 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
         async execute(context: NetworkWriteContext, commandId: string, pin: string) {
             const owner = await host(context);
             const entry = owned(owner, commandId);
+            if (!entry) return deny();
             try {
                 await commands.execute(owner, commandId, pin);
                 return reread(owner, commandId);
@@ -186,11 +189,12 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
         async receipt(context: NetworkWriteContext, commandId: string) { return reread(await host(context), commandId); },
         async revoke(context: NetworkWriteContext, commandId: string) {
             const owner = await host(context);
-            const entry = owned(owner, commandId);
+            const entry = sources.get(commandId);
             const result = commands.revoke(owner, commandId);
+            if (result.outcome === 'unknown') return result;
             const read = reread(owner, commandId);
             if (read.outcome !== result.outcome) return deny();
-            if (read.outcome !== 'unknown') entry?.release();
+            entry?.release();
             return read;
         },
     };
