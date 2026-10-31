@@ -77,6 +77,32 @@ La demo ripristina le fixture alla chiusura. Il client collegato registra
 invece vere operazioni sul servizio selezionato: per una prova usare un
 archivio sintetico creato esplicitamente.
 
+## Governo Fabric
+
+In Impostazioni → Governo Fabric, il client legge registro delle capacità,
+sedi osservate e uscita dati, confronto modelli e verifiche di rollout salvate.
+La gestione richiede una home-base loopback e la sessione Web locale dedicata
+con cookie già usata dalle altre pagine amministrative. Le quattro route Web
+esistenti restano l’autorità; questa pagina esegue soltanto GET.
+Un report mancante o non leggibile rimane distinto dalle sezioni disponibili.
+Rileggere non esegue benchmark, non rimuove modelli e non abilita funzioni.
+Treatment Reasoning è sempre non disponibile nella pagina.
+
+La fixture di confronto deriva dai builder Fabric e dal deposito dei report
+con una directory temporanea sintetica. Si rigenera dalla radice con:
+
+```bash
+node --import ./scripts/register-strip-types-loader.mjs experiments/gpui-patient-pilot/comparison/governance.mjs
+```
+
+Questa tranche G-2e non chiude G-2: accesso legacy, guida del profilo di lavoro,
+preferenze di accessibilità OS, amministrazione dei repertori e controlli di
+sistema restano da completare. Nella pagina Governo restano da allineare il
+dettaglio dichiarato/effettivo dei provider, il riepilogo qualità/costo del
+confronto e la lettura integrale dei resoconti tecnici. I consensi sulle
+proposte e la DEMO OpenAI richiedono percorsi propri; il client `--demo` non
+sostituisce la DEMO OpenAI.
+
 ## Interfaccia e registrazione
 
 La shell riprende Punto d'inchiostro dal contratto pubblicato: piano clinico

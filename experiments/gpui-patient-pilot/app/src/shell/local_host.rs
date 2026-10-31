@@ -1,5 +1,6 @@
 mod archives;
 mod chatgpt;
+mod governance;
 mod models;
 mod parameters;
 mod security;
@@ -35,6 +36,7 @@ enum Operation {
 pub(super) struct LocalAdministration {
     pub(super) retirement: RetirementNotice,
     archives: ArchiveArea,
+    governance: governance::GovernanceArea,
     security: security::SecurityArea,
     chatgpt: chatgpt::ChatGptArea,
     models: models::ModelsArea,
@@ -76,6 +78,7 @@ impl LocalAdministration {
                     .map(|p| p.with_file_name("archive-restore-pending.json")),
                 cx,
             ),
+            governance: governance::GovernanceArea::default(),
             security: security::SecurityArea::new(theme, cx),
             chatgpt: chatgpt::ChatGptArea::default(),
             models: models::ModelsArea::new(theme, cx),
@@ -124,6 +127,7 @@ impl LocalAdministration {
             .checked_add(1)
             .expect("local authority generation exhausted");
         self.archives.withdraw(cx);
+        self.governance.withdraw();
         self.security.withdraw(cx);
         self.models.withdraw(cx);
         self.chatgpt.withdraw();
@@ -255,6 +259,9 @@ impl ClinicalApp {
                     };
                     if this.settings_page == SettingsPage::Functions {
                         this.read_local_switches(cx);
+                    }
+                    if this.settings_page == SettingsPage::Governance {
+                        this.read_governance(cx);
                     }
                     if this.settings_page == SettingsPage::Models {
                         this.read_model_configuration(cx);
@@ -457,7 +464,10 @@ impl ClinicalApp {
                 if let Some(rows) = self.local_host.switches.ready().filter(|_| {
                     !matches!(
                         self.settings_page,
-                        SettingsPage::Archives | SettingsPage::Access | SettingsPage::Models
+                        SettingsPage::Archives
+                            | SettingsPage::Access
+                            | SettingsPage::Models
+                            | SettingsPage::Governance
                     )
                 }) {
                     pane = pane.children(rows.iter().map(|&(key, enabled)| {

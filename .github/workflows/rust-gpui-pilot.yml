@@ -132,6 +132,8 @@ jobs:
         run: npm ci
       - name: Install source-pinned Rust toolchain
         run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy
+      - name: Check governance fixtures against host builders and report storage
+        run: node --import ./scripts/register-strip-types-loader.mjs experiments/gpui-patient-pilot/comparison/governance.mjs --check
       - name: Build the optimized paired client probe
         run: cargo build --manifest-path experiments/gpui-patient-pilot/Cargo.toml -p mediflow-runtime-client --bin mediflow-runtime-probe --locked --release
       - name: Compare decrypted reads, guarded writes and diagnostic timings
