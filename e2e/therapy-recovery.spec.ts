@@ -24,7 +24,7 @@ async function fixture(page: Page): Promise<Fixture> {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   return page.evaluate(async () => {
     const marker = crypto.randomUUID();
-    for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch', 'aiTreatmentReasoningKillSwitch']) {
+    for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch']) {
       const response = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value: 'disabled' }) });
       if (!response.ok) throw new Error(`No-AI setting: ${response.status}`);
     }

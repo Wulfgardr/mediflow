@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { openDocumentActions, bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
 import { finishOrdinaryChatGpt, installOrdinaryChatGptTransport, remoteMetadata, selectOrdinaryChatGpt } from './ordinary-chatgpt-ui-fixture';
-import { snapshotTreatmentReasoningProjectionAttachment, type TreatmentReasoningProjectionAttachment } from '../lib/ai-providers/fabric/treatment-reasoning-projection';
+import { openTreatmentReasoningDenial } from './fixtures/treatment-reasoning-denial';
 
 const HEX = { session: '1'.repeat(32), patient: '2'.repeat(32), ambulatory: '3'.repeat(32), lease: '4'.repeat(32), projection: '5'.repeat(32) };
 const AMBULATORY = { id: 'ambulatory.synthetic', name: 'Ambulatorio di prova', address: '', version: 1 };
@@ -184,60 +184,16 @@ test('Document Synthesis ordinary ChatGPT: encrypted fixture, source citation an
   remote.assertCompleted(2);
 });
 
-test('Treatment Reasoning ordinary ChatGPT: source bindings and remote trace remain review-only', async ({ page }) => {
-  let projection: TreatmentReasoningProjectionAttachment | null = null;
-  const { receipt, provenance } = remoteMetadata('treatment_reasoning');
-  const remote = await installOrdinaryChatGptTransport(page, 'treatment_reasoning', () => {
-    if (!projection) throw new Error('Missing original Treatment Reasoning projection');
-    const source = projection.evidenceRefs[0] ?? projection.therapyRefs[0];
-    if (!source) throw new Error('Missing synthetic source reference');
-    const summary = 'Sintesi terapeutica remota sintetica da rivedere.';
-    const recommendation = 'Rivedere la terapia sintetica con la fonte corrente.';
-    return { schemaVersion: 'mediflow.ai.treatment-reasoning-publication.chatgpt.v1', capability: 'treatment_reasoning',
-      stage: 'preview', review: 'required', status: 'available',
-      value: { schemaVersion: 'mediflow.treatment_reasoning.v1', task: 'treatment_reasoning', summary,
-        data: { recommendation, keyEvidence: [], reasoning: [], caveats: [], safetyFlags: [], suggestedActions: [],
-          trace: { mode: 'chatgpt_subscription', toolsUsed: [], limitations: ['Solo fonti sintetiche selezionate.'] } } },
-      sourceBindings: [{ claimPath: 'summary', claim: summary, evidenceRefs: [source] },
-        { claimPath: 'data.recommendation', claim: recommendation, evidenceRefs: [source] }],
-      attestation: receipt, fabricReceipt: receipt, provenance, sourceRevision: projection.sourceRevision,
-      capturedAt: projection.capturedAt, writesPerformed: 0, applyPolicy: 'none' };
-  });
-  await installSelectionFixture(page);
-  await page.route('**/api/ai/treatment-reasoning/ingest', route => {
-    const body = route.request().postDataJSON() as { projection: unknown };
-    projection = snapshotTreatmentReasoningProjectionAttachment(body.projection, new Date().toISOString());
-    return json(route, { handle: `trp_${'a'.repeat(32)}` });
-  });
-  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await setAiLaneKillSwitch(page, 'aiTreatmentReasoningKillSwitch', 'enabled');
-  const patientId = await createPatient(page, 'Treatment');
-  const therapy = await page.evaluate(async id => {
-    const response = await fetch('/api/therapies', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-      id: `therapy.synthetic.${Date.now()}`, patientId: id, drugName: 'Farmaco sintetico', activePrinciple: 'Principio sintetico',
-      dosage: '5 mg una volta al giorno', status: 'active', startDate: '2026-08-20T08:00:00.000Z',
-    }) }); return response.ok;
-  }, patientId);
-  expect(therapy).toBe(true);
-  await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'terapie');
-  const proposals = page.locator('#terapie').getByRole('button', { name: 'Proposte', exact: true });
-  await expect(proposals).toHaveAttribute('aria-expanded', 'false');
-  await proposals.click();
-  await expect(proposals).toHaveAttribute('aria-expanded', 'true');
-  const panel = page.getByTestId('treatment-reasoning-panel');
-  await panel.getByRole('button', { name: 'Prepara proposta' }).click();
-  await panel.getByLabel('Ambulatorio per questa proposta').selectOption(AMBULATORY.id);
-  await panel.getByRole('checkbox', { name: /Confermo paziente e ambulatorio/u }).check();
-  const controls = await selectOrdinaryChatGpt(panel);
-  remote.arm(); await panel.getByRole('button', { name: 'Conferma e genera proposta' }).click();
-  await finishOrdinaryChatGpt(controls);
-  await expect(panel).toContainText('Sintesi terapeutica remota sintetica da rivedere.');
-  await expect(panel).toContainText('0 scritture');
-  await panel.getByText('Fonti della proposta').click();
-  await expect(panel).toContainText('data.recommendation');
-  await panel.getByText('Origine e dettagli della generazione').click();
-  await expect(panel).toContainText('OpenAI · synthetic-current-model · medium');
-  remote.assertCompleted();
+test('Treatment Reasoning ordinary ChatGPT: diniego senza preparazione, consenso o provider', async ({ page }) => {
+  const remote = await installOrdinaryChatGptTransport(page, 'treatment_reasoning', () => { throw new Error('Generazione vietata'); });
+  const run = await openTreatmentReasoningDenial(page);
+  try {
+    remote.arm();
+    await run.proposals.click(); await run.proposals.click();
+    await run.assertDenied();
+    expect(remote.previews).toEqual([]);
+    expect(remote.operations).toEqual([]);
+  } finally { run.restore(); }
 });
 
 test('ordinary ChatGPT preparation closes on patient-context navigation before consent', async ({ page }) => {
