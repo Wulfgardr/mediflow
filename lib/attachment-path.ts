@@ -1,3 +1,5 @@
+import { isSealedAttachmentValue } from './attachment-payload.ts';
+
 /* @Codex */
 function toSafeFileToken(value: string): string {
     const trimmed = value.trim();
@@ -25,6 +27,7 @@ function isCanonicalAttachmentPath(input: string, id: string): boolean {
 
 /* @Codex */
 export function buildAttachmentPath(input: unknown, name: string, id: string): string {
+    if (isSealedAttachmentValue(input)) return input;
     if (typeof input === 'string' && isCanonicalAttachmentPath(input, id)) {
         const basename = input.trim().replace(/\\/g, '/').slice('attachments/'.length);
         return `attachments/${toSafeFileToken(basename)}`;

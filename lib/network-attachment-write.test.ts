@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
+import { spawn } from 'node:child_process';
 import { and, eq } from 'drizzle-orm';
 
 import { ambulatories, attachments, auditEvents, patients, patientsToAmbulatories } from './schema';
@@ -307,3 +308,93 @@ test('ignored paired attachment insert fails without an orphan creation event', 
 });
 
 test.after(() => fs.rmSync(DATA_DIR, { recursive: true, force: true }));
+
+
+test('reviewed creates across web and paired writers reject a stale collection atomically', async () => {
+    resetDatabase();
+    const { createWebAttachment } = await import('./attachment-web-create.ts');
+    const context = makeContext();
+    const results = await Promise.all([
+        createWebAttachment(new Request('http://localhost/api/attachments', { method: 'POST',
+            body: JSON.stringify({ ...validCreateBody(), patientId: PATIENT_ID, expectedCollection: [] }) }), context.session),
+        createNetworkScopedAttachment(context, validCreateBody({ expectedCollection: [] })),
+    ]);
+    assert.deepEqual(results.map(result => result.status).sort(), [201, 409]);
+    assert.equal(dbServer.select().from(attachments).all().length, 1);
+    const row = dbServer.select().from(attachments).get()!;
+    assert.equal(row.path, SEALED_PATH);
+    const events = dbServer.select().from(auditEvents).where(eq(auditEvents.subjectRef, row.id)).all();
+    assert.equal(events.length, 1);
+    const before = atomicSnapshot();
+    const stale = await createNetworkScopedAttachment(context, validCreateBody({ expectedCollection: [] }));
+    assert.equal(stale.status, 409);
+    assert.deepEqual(atomicSnapshot(), before);
+});
+
+test('reviewed paired create checks currentness, scope and exact membership before writing', async () => {
+    resetDatabase();
+    const first = await createNetworkScopedAttachment(makeContext(), validCreateBody());
+    assert.equal(first.status, 201);
+    const row = dbServer.select().from(attachments).get()!;
+    const expectedCollection = [{ id: row.id, currentness: { sourceRef: row.documentSourceRef,
+        revision: row.documentRevision, freshnessEpoch: row.documentFreshnessEpoch } }];
+    dbServer.update(attachments).set({ documentRevision: 2 }).where(eq(attachments.id, row.id)).run();
+    const before = atomicSnapshot();
+    assert.equal((await createNetworkScopedAttachment(makeContext(), validCreateBody({ expectedCollection }))).status, 409);
+    assert.equal((await createNetworkScopedAttachment({ ...makeContext(), scopeAmbulatoryId: OTHER_AMBULATORY },
+        validCreateBody({ expectedCollection }))).status, 404);
+    assert.deepEqual(atomicSnapshot(), before);
+    for (const malformed of [null, {}, [expectedCollection[0], expectedCollection[0]],
+        [{ id: row.id, currentness: null }], [{ ...expectedCollection[0], data: 'untrusted' }]]) {
+        assert.equal((await createNetworkScopedAttachment(makeContext(), validCreateBody({ expectedCollection: malformed }))).status, 400);
+        assert.deepEqual(atomicSnapshot(), before);
+    }
+    dbServer.delete(attachments).where(eq(attachments.id, row.id)).run();
+    assert.equal((await createNetworkScopedAttachment(makeContext(), validCreateBody({ expectedCollection }))).status, 409);
+    assert.equal((await createNetworkScopedAttachment(makeContext(), validCreateBody({ expectedCollection: [] }))).status, 201);
+});
+
+
+test('separate host processes racing the same reviewed collection commit one attachment and one audit', { timeout: 30000 }, async t => {
+    resetDatabase();
+    const before = dbServer.select().from(auditEvents).all().length;
+    const context = makeContext();
+    const script = `
+        import { once } from 'node:events';
+        const { createNetworkScopedAttachment } = await import('./lib/network-attachment-write.ts');
+        const context = ${JSON.stringify({ ...context, request: undefined })};
+        context.request = new Request('http://localhost/synthetic');
+        const go = once(process.stdin, 'data');
+        console.log('READY');
+        await go;
+        const result = await createNetworkScopedAttachment(context, ${JSON.stringify(validCreateBody({ expectedCollection: [] }))});
+        console.log('RESULT:' + result.status);
+        process.stdin.destroy();
+    `;
+    const workers = [0, 1].map(() => {
+        const child = spawn(process.execPath, ['scripts/run-strip-types.mjs', '--input-type=module', '--eval', script],
+            { cwd: ROOT_DIR, env: { ...process.env, MEDIFLOW_DATA_DIR: DATA_DIR }, stdio: ['pipe', 'pipe', 'pipe'] });
+        t.after(() => { if (child.exitCode === null) child.kill(); });
+        let output = '', errors = '';
+        child.stderr.on('data', data => { errors += data; });
+        const ready = new Promise<void>((resolve, reject) => {
+            child.stdout.on('data', data => { output += data; if (output.includes('READY')) resolve(); });
+            child.on('error', reject);
+            child.on('exit', code => { if (!output.includes('READY')) reject(new Error(`worker exited ${code}: ${errors}`)); });
+        });
+        const done = new Promise<number>((resolve, reject) => {
+            child.on('error', reject);
+            child.on('exit', code => {
+                const match = /RESULT:(201|409)/u.exec(output);
+                if (code !== 0 || !match) reject(new Error(`worker exited ${code}: ${errors} ${output}`));
+                else resolve(Number(match[1]));
+            });
+        });
+        return { child, ready, done };
+    });
+    await Promise.all(workers.map(worker => worker.ready));
+    for (const worker of workers) worker.child.stdin.end('go');
+    assert.deepEqual((await Promise.all(workers.map(worker => worker.done))).sort(), [201, 409]);
+    assert.equal(dbServer.select().from(attachments).all().length, 1);
+    assert.equal(dbServer.select().from(auditEvents).all().length, before + 1);
+});

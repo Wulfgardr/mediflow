@@ -30,6 +30,9 @@ export function toNetworkDocumentOcrQueueReason(value: unknown): AttachmentSumma
 export const NETWORK_ATTACHMENT_READ_CAPABILITY = 'network.replica.readonly-documents';
 
 export const NETWORK_ATTACHMENT_METADATA_COLUMNS = {
+    documentSourceRef: attachments.documentSourceRef,
+    documentRevision: attachments.documentRevision,
+    documentFreshnessEpoch: attachments.documentFreshnessEpoch,
     id: attachments.id,
     patientId: attachments.patientId,
     name: attachments.name,
@@ -45,8 +48,7 @@ export const NETWORK_ATTACHMENT_METADATA_COLUMNS = {
     createdAt: attachments.createdAt,
 } as const;
 
-type AttachmentSummaryRow = Omit<typeof attachments.$inferSelect,
-    'data' | 'documentSourceRef' | 'documentRevision' | 'documentFreshnessEpoch'>;
+type AttachmentSummaryRow = Omit<typeof attachments.$inferSelect, 'data'>;
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -54,11 +56,9 @@ function toIsoString(value: unknown): string | null {
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-// Paired summaries retain their existing projection: no data blob and no
-// host currentness tuple. Web list/detail reads additionally expose nested
-// currentness for their ordinary metadata/delete preconditions.
 function toAttachmentSummary(row: AttachmentSummaryRow): AttachmentSummary {
     return {
+        currentness: { sourceRef: row.documentSourceRef, revision: row.documentRevision, freshnessEpoch: row.documentFreshnessEpoch },
         id: row.id,
         patientId: row.patientId,
         name: row.name,

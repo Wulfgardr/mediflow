@@ -29,3 +29,10 @@ test('buildAttachmentPath preserves canonical attachment paths without duplicati
         'attachments/att-4-referto-finale.pdf'
     );
 });
+
+
+test('sealed logical paths survive writer and read projections unchanged', () => {
+    const sealed = 'ENC:aXY=:cGF0aA==';
+    assert.equal(buildAttachmentPath(sealed, 'opaque name', 'synthetic-id'), sealed);
+    assert.equal(buildAttachmentPath(buildAttachmentPath(sealed, 'opaque name', 'synthetic-id'), 'opaque name', 'synthetic-id'), sealed);
+});
