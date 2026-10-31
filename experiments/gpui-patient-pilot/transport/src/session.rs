@@ -8554,4 +8554,68 @@ mod g2_settings_tests {
             worker.join().unwrap();
         }
     }
+    #[test]
+    fn g2_governance_uses_only_cookie_authenticated_reads_and_keeps_section_failures() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../comparison/governance.json")).unwrap();
+        for missing in [false, true] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let payload = fixture.clone();
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                for (path, field) in [
+                    ("/api/ai/fabric/status", "registry"),
+                    ("/api/ai/fabric/observability", "observations"),
+                    ("/api/system/ai-parliament", "parliament"),
+                    ("/api/system/ai-rollout-readiness", "rollout"),
+                ] {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let request = read_request(&mut stream);
+                    assert!(
+                        request.starts_with(&format!("GET {path} HTTP/1.1")),
+                        "{request}"
+                    );
+                    let lower = request.to_lowercase();
+                    assert!(lower.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                    assert!(lower.contains("x-mediflow-archive-generation: synthetic-generation"));
+                    assert!(!lower.contains("x-mediflow-paired-client"));
+                    assert!(!lower.contains("authorization:"));
+                    local_host_reply(
+                        &mut stream,
+                        if missing && field == "parliament" {
+                            404
+                        } else {
+                            200
+                        },
+                        payload[field].clone(),
+                        "",
+                    );
+                }
+                listener
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let snapshot = access.read_governance().unwrap();
+            assert_eq!(snapshot.registry.unwrap().capabilities.len(), 16);
+            assert!(snapshot.observations.is_ok());
+            assert_eq!(snapshot.parliament.is_err(), missing);
+            if missing {
+                assert!(matches!(snapshot.parliament, Err(RuntimeError::Missing)));
+            }
+            assert_eq!(snapshot.rollout.unwrap().lanes.len(), 5);
+            let listener = worker.join().unwrap();
+            session.lock();
+            assert!(matches!(
+                access.read_governance(),
+                Err(RuntimeError::Locked)
+            ));
+            listener.set_nonblocking(true).unwrap();
+            assert!(listener.accept().is_err(), "read after lock reached host");
+        }
+    }
 }

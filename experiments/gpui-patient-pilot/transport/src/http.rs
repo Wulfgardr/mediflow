@@ -514,20 +514,9 @@ impl RuntimeClient {
                 }
                 let response = request.send().await.map_err(|_| uncertain(mutation))?;
                 received(response.status().as_u16(), response.headers());
-                let raw = read_response_body(
-                    response,
-                    if path == ["api", "system", "recovery-backup"] {
-                        512 * 1024 * 1024
-                    } else if archive {
-                        JSON_LIMIT
-                    } else if path.len() == 3 && path[..2] == ["api", "attachments"] {
-                        DOCUMENT_LIMIT
-                    } else {
-                        AUTH_LIMIT
-                    },
-                    mutation,
-                )
-                .await?;
+                let raw =
+                    read_response_body(response, dedicated_web_limit(path, archive), mutation)
+                        .await?;
                 if (300..400).contains(&raw.status) {
                     return Err(RuntimeError::Rejected(raw.status));
                 }
@@ -1135,6 +1124,17 @@ pub(crate) fn operation_uuid() -> Result<String> {
     ))
 }
 
+fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
+    match path {
+        ["api", "system", "recovery-backup"] => 512 * 1024 * 1024,
+        // These reports carry their full Markdown beside the fields the panel reads.
+        ["api", "system", "ai-parliament" | "ai-rollout-readiness"] => JSON_LIMIT,
+        _ if archive => JSON_LIMIT,
+        ["api", "attachments", _] => DOCUMENT_LIMIT,
+        _ => AUTH_LIMIT,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -1249,6 +1249,24 @@ mod tests {
             sent: std::sync::atomic::AtomicBool::new(false),
         }
     }
+    #[test]
+    fn governance_reports_are_not_held_to_the_authentication_limit() {
+        for path in [
+            ["api", "system", "ai-parliament"],
+            ["api", "system", "ai-rollout-readiness"],
+        ] {
+            assert_eq!(dedicated_web_limit(&path, false), JSON_LIMIT);
+        }
+        assert_eq!(
+            dedicated_web_limit(&["api", "ai", "fabric", "status"], false),
+            AUTH_LIMIT
+        );
+        assert_eq!(
+            dedicated_web_limit(&["api", "attachments", "synthetic"], false),
+            DOCUMENT_LIMIT
+        );
+    }
+
     #[test]
     fn bootstrap_authentication_has_separate_cookies_exact_origin_and_existing_web_p3_login() {
         use std::{net::TcpListener, thread};

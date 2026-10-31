@@ -1,5 +1,6 @@
 mod archives;
 mod chatgpt;
+mod governance;
 mod models;
 mod parameters;
 mod security;
@@ -11,6 +12,7 @@ use crate::{
 };
 pub use archives::*;
 pub use chatgpt::*;
+pub use governance::*;
 pub use models::*;
 pub use parameters::*;
 use reqwest::{
