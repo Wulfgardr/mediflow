@@ -426,7 +426,7 @@ mod readback_tests {
             let observed = count.clone();
             let worker = std::thread::spawn(move || {
                 for index in 0..4 {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     let request = super::super::tests::read_request(&mut stream);
                     observed.fetch_add(1, Ordering::SeqCst);
                     let body=if index%2==0 {
@@ -492,7 +492,7 @@ mod stage_tests {
         let bytes = b"%PDF-1.7 synthetic source";
         let worker = std::thread::spawn(move || {
             for index in 0..2 {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = super::super::tests::read_request(&mut stream);
                 let response=if index==0 {
                     json!({"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}})
