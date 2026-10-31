@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - codex/091-chat-clinical-projections
 
 permissions:
   contents: read

@@ -1,0 +1,2325 @@
+[
+  {
+    "id": "review-name-lower",
+    "texts": [
+      "Diabete mellito in marta valli, terapia invariata."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-name-upper",
+    "texts": [
+      "Diabete mellito in MARTA VALLI, terapia invariata."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-name-initials",
+    "texts": [
+      "Diabete mellito in M. Valli, terapia invariata."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-name-spaced",
+    "texts": [
+      "Diabete mellito in M A R T A  V A L L I, terapia invariata."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-name-zwsp",
+    "texts": [
+      "Diabete mellito in Mar​ta Val​li, terapia invariata."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-name-confusable",
+    "texts": [
+      "Diabete mellito in Mаrtа Vаlli, terapia invariata."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-name-ocr",
+    "texts": [
+      "Diabete mellito in M4rta Va11i, terapia invariata."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-cf-ocr",
+    "texts": [
+      "Diabete mellito. CF da scansione RSSMRA8ODI2F2O5X."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-cf-spaces",
+    "texts": [
+      "Diabete mellito. CF R S S M R A 8 0 D 1 2 F 2 0 5 X."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-cf-group",
+    "texts": [
+      "Diabete mellito. CF RSS MRA 80 D12 F205 X."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-cf-zwsp",
+    "texts": [
+      "Diabete mellito. CF RSSMRA​80D12F205X."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-cf-fullwidth",
+    "texts": [
+      "Diabete mellito. CF ＲＳＳＭＲＡ８０Ｄ１２Ｆ２０５Ｘ."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-dob-spaces",
+    "texts": [
+      "Diabete mellito. Nato il 17 / 04 / 1972."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-dob-numeric",
+    "texts": [
+      "Diabete mellito. Nato il 17041972."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-dob-words",
+    "texts": [
+      "Diabete mellito. Nato il diciassette aprile millenovecentosettantadue."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-phone-spaces",
+    "texts": [
+      "Diabete mellito. Tel: 3 4 7 1 2 3 4 5 6 7."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-phone-unicode",
+    "texts": [
+      "Diabete mellito. Tel: ３４７１２３４５６７."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-address",
+    "texts": [
+      "Diabete mellito. Abita in v.le delle Prove 127/B, Borgo Fittizio."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-third",
+    "texts": [
+      "Diabete mellito, accompagnata dalla figlia Ada Lattesi e dal vicino Dario Fermi."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-filename",
+    "texts": [
+      "Diabete mellito. Allegato a123_Marta-Valli_17041972_scan.pdf."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-patient-id",
+    "texts": [
+      "Diabete mellito. Identificativo paziente PT-ALFA-729143."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-clinical-date",
+    "texts": [
+      "Diabete mellito. Visita 7 ottobre 2026."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-email-words",
+    "texts": [
+      "Diabete mellito. Contatto marta punto valli chiocciola esempio punto it."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "review-bare-id",
+    "texts": [
+      "Diabete mellito. riferimento 89746120358."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-dots",
+    "texts": [
+      "Terapia invariata; M.a.r.t.a V.a.l.l.i."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-hyphens",
+    "texts": [
+      "Terapia invariata; M-a-r-t-a V-a-l-l-i."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-reversed",
+    "texts": [
+      "Terapia invariata; Valli Marta."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-cyrillic",
+    "texts": [
+      "Terapia invariata; Mаrtа Vаllі."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-greek",
+    "texts": [
+      "Terapia invariata; Μαρτα Vαlli."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-roman",
+    "texts": [
+      "Terapia invariata; MⅣrta VaⅡi."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-symbol-registered-bars",
+    "texts": [
+      "Terapia invariata; Ma®ta Va||i."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-symbol-triangles",
+    "texts": [
+      "Terapia invariata; M△rta V△lli."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-zero-width",
+    "texts": [
+      "Terapia invariata; Mar‍ta Val⁠li."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-combining",
+    "texts": [
+      "Terapia invariata; Ma̸rta Válli."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-prefix-first",
+    "texts": [
+      "Terapia invariata; Mart."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-prefix-last",
+    "texts": [
+      "Terapia invariata; Vall."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-id-prefix",
+    "texts": [
+      "Terapia invariata; PT-ALFA."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-cf-prefix",
+    "texts": [
+      "Terapia invariata; RSSMRA."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-nickname",
+    "texts": [
+      "Terapia invariata; Martina."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-known-nickname",
+    "texts": [
+      "Terapia invariata; Martina."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143",
+        "Martina"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-cf-newline",
+    "texts": [
+      "Terapia invariata; RSSMRA80\nD12F205X."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-cf-spoken",
+    "texts": [
+      "Terapia invariata; erre esse esse emme erre a ottanta di dodici effe duecentocinque ics."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-cf-spoken-full",
+    "texts": [
+      "Terapia invariata; erre esse esse emme erre a otto zero di uno due effe due zero cinque ics."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-dob-words",
+    "texts": [
+      "Terapia invariata; diciassette aprile millenovecentosettantadue."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-dob-inverted",
+    "texts": [
+      "Terapia invariata; 17 aprile 1972."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-phone-punctuation",
+    "texts": [
+      "Terapia invariata; 347/123/45/67."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-phone-words",
+    "texts": [
+      "Terapia invariata; trecentoquarantasette centoventitre quarantacinque sessantasette."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-phone-digits-words",
+    "texts": [
+      "Terapia invariata; tre quattro sette uno due tre quattro cinque sei sette."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-email-chiocciola",
+    "texts": [
+      "Terapia invariata; marta punto valli chiocciola posta punto it."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-health-card",
+    "texts": [
+      "Terapia invariata; 8038 0000 1234 5678 9012."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-health-card-spoken",
+    "texts": [
+      "Terapia invariata; otto zero tre otto zero zero zero zero uno due tre quattro cinque sei sette otto nove zero uno due."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-matricola-unknown",
+    "texts": [
+      "Terapia invariata; AB-CD-EF."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-caregiver-known",
+    "texts": [
+      "Terapia invariata; A.d.a L.a.t.t.e.s.i."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-family-unknown",
+    "texts": [
+      "Terapia invariata; la cugina Nives Beldoni."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-doctor-unknown",
+    "texts": [
+      "Terapia invariata; dottor Ivo Monteluce."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-address-known-no-number",
+    "texts": [
+      "Terapia invariata; Via Fittizia."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-address-unknown-no-number",
+    "texts": [
+      "Terapia invariata; via delle Betulle."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-in-diagnosis",
+    "texts": [
+      "Terapia con metformina in Ma®ta Va||i."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-clinical-term-person",
+    "texts": [
+      "Diagnosi: Diabete mellito tipo 2. Terapia con metformina."
+    ],
+    "known": {
+      "names": [
+        "Diabete"
+      ],
+      "birthDates": []
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-split",
+    "texts": [
+      "Terapia invariata; Mar",
+      "ta. Decorso stabile."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-name-split-pair",
+    "texts": [
+      "Terapia invariata; Mar",
+      "ta Val",
+      "li. Decorso stabile."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-cf-split",
+    "texts": [
+      "Terapia invariata; RSSMRA80",
+      "D12F205X. Decorso stabile."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-cf-spoken-split",
+    "texts": [
+      "Terapia invariata; erre esse esse emme erre a",
+      "otto zero di uno due effe due zero cinque ics. Decorso stabile."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "positive-39",
+    "texts": [
+      "Diabete mellito"
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "positive-40",
+    "texts": [
+      "Ipertensione arteriosa"
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "positive-41",
+    "texts": [
+      "Ipertensione arteriosa. Terapia invariata."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "positive-42",
+    "texts": [
+      "Diagnosi: diabete mellito tipo 2. Terapia con metformina."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "positive-43",
+    "texts": [
+      "Terapia invariata. Decorso stabile."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "positive-44",
+    "texts": [
+      "HbA1c 7,2. Terapia invariata."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "positive-45",
+    "texts": [
+      "Metformina 500 mg due volte al giorno."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "positive-46",
+    "texts": [
+      "Metformina 1000 mg al mattino."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "positive-47",
+    "texts": [
+      "Pressione 130/80 mmHg. Peso 72 kg."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "positive-48",
+    "texts": [
+      "Creatinina 1,2 mg/dl."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "new-diagnosis-name-symbol-v2",
+    "texts": [
+      "Diagnosi: diabete mellito tipo 2. Ma®ta Va||i. Terapia con metformina."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-diagnosis-name-symbol-v3",
+    "texts": [
+      "Diagnosi: diabete mellito tipo 2 in M△rta V△lli. Terapia con metformina."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "denied"
+  },
+  {
+    "id": "new-known-metadata-clinical-corruption",
+    "texts": [
+      "Diabete mellito in trattamento."
+    ],
+    "known": {
+      "names": [
+        "patient-synthetic",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi",
+        "Ada",
+        "Lattesi",
+        "PT-ALFA-729143",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "mixed-positive-0",
+    "texts": [
+      "HbA1c 7,2%. Metformina 1000 mg al mattino. Pressione 130/80 mmHg. Peso 72 kg."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "mixed-positive-1",
+    "texts": [
+      "FEV1 80%. CD4 500. T4 1,2. B12 450. Vitamina D3 1000 UI."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "mixed-positive-2",
+    "texts": [
+      "Asma bronchiale. Dislipidemia. Ipotiroidismo."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  },
+  {
+    "id": "mixed-positive-3",
+    "texts": [
+      "Creatinina 1,2 mg/dl. Frequenza 70 bpm. Dose 500 mg."
+    ],
+    "known": {
+      "names": [
+        "synthetic-id",
+        "Marta",
+        "Valli",
+        "RSSMRA80D12F205X",
+        "3471234567",
+        "Via Fittizia 42",
+        "Via",
+        "Fittizia",
+        "42",
+        "Ada Lattesi ada@example.test",
+        "Ada",
+        "Lattesi",
+        "ada",
+        "example",
+        "test",
+        "synthetic-scope",
+        "2026-01-01",
+        "2026",
+        "01"
+      ],
+      "birthDates": [
+        "1972-04-17"
+      ]
+    },
+    "expected": "exact"
+  }
+]

@@ -541,6 +541,17 @@ impl RuntimeSession {
         Ok(rows)
     }
 
+    pub fn chat_clinical_profile(&self, context: &ChatAccessContext) -> Result<PatientDetail> {
+        self.revalidate_chat_access_context(context)?;
+        let detail =
+            self.open_patient_profile(&context.scope, &context.patient, &context.intent)?;
+        self.revalidate_chat_access_context(context)?;
+        if !detail.locked_fields.is_empty() {
+            return Err(RuntimeError::ReadRequired);
+        }
+        Ok(detail)
+    }
+
     pub fn chat_therapy_rows(&self, context: &ChatAccessContext) -> Result<(Vec<Therapy>, String)> {
         self.revalidate_chat_access_context(context)?;
         let rows = self.list_therapies(&context.scope, &context.patient)?;
@@ -5749,6 +5760,58 @@ mod tests {
     }
     const EPOCH_GET: &str = "GET /api/v1/network/patient-profile/selection-epoch ";
     const PROFILE_POST: &str = "POST /api/v1/network/patients/patient-a/profile-query ";
+    #[test]
+    fn chat_clinical_profile_uses_the_common_profile_port_and_rejects_unknown_fields() {
+        const ELIGIBLE: &str = "GET /api/auth/native/chat-access-confirmation ";
+        for unknown in [false, true] {
+            let mut wire = profile_wire(&session());
+            wire["currentness"]["selectionEpoch"] = json!(3);
+            if unknown {
+                wire["profile"]["filename"] = json!("synthetic.pdf");
+            }
+            let epoch = json!({"contractVersion":1,"selectionEpoch":3}).to_string();
+            let mut steps = vec![
+                (ELIGIBLE, 200, json!({"status":"eligible"}).to_string()),
+                (EPOCH_GET, 200, epoch.clone()),
+                (EPOCH_GET, 200, epoch.clone()),
+                (PROFILE_POST, 200, wire.to_string()),
+            ];
+            if !unknown {
+                steps.extend([
+                    (ELIGIBLE, 200, json!({"status":"eligible"}).to_string()),
+                    (EPOCH_GET, 200, epoch),
+                ]);
+            }
+            let (session, requests, _, _, server) = profile_script(steps, false);
+            session
+                .inner
+                .profile_selection
+                .lock()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .host_epoch
+                .store(3, Ordering::Release);
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            let result = session.chat_clinical_profile(&context);
+            if unknown {
+                assert!(result.is_err());
+            } else {
+                assert_eq!(result.unwrap().notes.as_deref(), Some("synthetic notes"));
+            }
+            server.join().unwrap();
+            assert!(
+                requests
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|r| r.starts_with(PROFILE_POST))
+            );
+            session.lock();
+            assert!(session.chat_clinical_profile(&context).is_err());
+        }
+    }
+
     fn epoch_wire() -> String {
         json!({"contractVersion":1,"selectionEpoch":2}).to_string()
     }

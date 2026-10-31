@@ -1,5 +1,6 @@
 mod adapter;
 mod card;
+mod clinical;
 mod native;
 pub(crate) mod owner;
 pub(crate) mod references;
@@ -151,7 +152,8 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
         let mut payload = None;
         let status = match serde_json::from_slice::<Value>(&bytes) {
             Ok(value)
-                if value == json!({"command": "request", "operation": owner::OPERATION})
+                if (value == json!({"command": "request", "operation": owner::OPERATION})
+                    || value == json!({"command":"clinical-profile"}))
                     && pending.is_none() =>
             {
                 let Ok(copy) = stream.try_clone() else {
@@ -160,6 +162,9 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                 let Some(request) = Request::new(peer, copy) else {
                     break;
                 };
+                if value["command"] == "clinical-profile" {
+                    request.lock().unwrap().request_clinical();
+                }
                 if incoming.try_send(request.clone()).is_err() {
                     break;
                 }
