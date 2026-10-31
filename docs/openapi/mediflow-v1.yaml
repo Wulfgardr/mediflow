@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.46.0
+  version: 1.47.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -1999,6 +1999,52 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/prosthetics-catalog:
+    get:
+      tags: [Network]
+      operationId: searchNetworkProstheticsCatalog
+      summary: Search the local prosthetics reference catalog without patient data
+      description: Requires network.replica.readonly-prosthetic-prescriptions and current ambulatory scope. Returns at most 20 reference entries. Never creates a prescription.
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 80 }
+      responses:
+        '200':
+          description: Reference entries and explicit truncation flag; freshness is unverified
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [rows, truncated]
+                properties:
+                  truncated: { type: boolean }
+                  rows:
+                    type: array
+                    maxItems: 20
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [codeSystem, code, description, version, source, scope]
+                      properties:
+                        codeSystem: { type: string }
+                        code: { type: string }
+                        description: { type: string }
+                        version: { type: string }
+                        source: { type: string }
+                        scope: { type: string }
+        '400':
+          description: Invalid query
+        '401':
+          description: Authentication required
+        '403':
+          description: Capability or scope denied
+        '409':
+          description: Catalog unavailable
+        '503':
+          description: Catalog read failed
   /api/v1/network/prosthetic-prescriptions:
     parameters:
       - $ref: '#/components/parameters/ExpectedAmbulatoryScope'

@@ -259,3 +259,20 @@ test('scelta catalogo verificata sul server, snapshot riletto immutabile, confli
     assert.equal((await writer.updateHostProstheticPrescription({ request, session, id: ids.id }, { version: 1, status: 'tested' })).status, 200);
     assert.deepEqual((await writer.listProstheticPrescriptions(ids.patientId))[0].catalogSnapshot, snapshot);
 });
+
+test('chat catalog reader bounds reference rows and omits internal archive keys without writes', async () => {
+    const { createProstheticsCatalog } = await import('./reference-data/prosthetics-catalog-service.ts');
+    const { PROSTHETICS_COLUMNS } = await import('./reference-data/prosthetics-catalog-contract.ts');
+    const service = createProstheticsCatalog(sql);
+    const bytes = Buffer.from(PROSTHETICS_COLUMNS.join(',') + '\r\n' + Array.from({ length: 21 }, (_, i) =>
+        `DEMO,CHAT-DEMO-${String(i).padStart(2, '0')},Ausilio inventato,demo-1,Fonte sintetica,Dimostrazione,,`).join('\r\n') + '\r\n');
+    const preview = service.preview(bytes, 'chat-demo.csv', 'synthetic');
+    assert.ok(preview.proof);
+    service.commit({ bytes, sourceName: 'chat-demo.csv', proof: preview.proof, acceptSubset: true }, 'synthetic', () => {});
+    const before = sql.prepare('SELECT * FROM prosthetics_catalog_entries ORDER BY id').all();
+    const result = writer.readProstheticsCatalog('CHAT-DEMO');
+    assert.ok(result); assert.equal(result.rows.length, 20); assert.equal(result.truncated, true);
+    assert.deepEqual(Object.keys(result.rows[0]).sort(), ['code','codeSystem','description','scope','source','version']);
+    assert.deepEqual(writer.readProstheticsCatalog('NO-SYNTHETIC-MATCH'), { rows: [], truncated: false });
+    assert.deepEqual(sql.prepare('SELECT * FROM prosthetics_catalog_entries ORDER BY id').all(), before);
+});

@@ -13,12 +13,11 @@ const CONTROL: &str = "mediflow_native_access";
 const FIXED: &str = "Apri la vista MediFlow per richiedere accesso nella finestra nativa. La scheda sintetica richiede consenso nativo sui byte finali.";
 const HTML: &str = include_str!("../../../../../lib/chat-card/native-access.html");
 
-fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
-    if native::capture(stream, false).is_none() {
-        return Err(io::ErrorKind::PermissionDenied.into());
-    }
-    let value = if command == "request" {
+fn wire_command(command: &str) -> Value {
+    if command == "request" {
         json!({"command": command, "operation": OPERATION})
+    } else if let Some(query) = command.strip_prefix("prosthetics:") {
+        json!({"command":"prosthetics", "query":query})
     } else if let Some(query) = command.strip_prefix("drugs:") {
         json!({"command":"drugs", "query":query})
     } else if let Some(id) = command.strip_prefix("receipt-") {
@@ -27,7 +26,14 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
         json!({"command":"therapy", "target":target})
     } else {
         json!({"command": command})
-    };
+    }
+}
+
+fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
+    if native::capture(stream, false).is_none() {
+        return Err(io::ErrorKind::PermissionDenied.into());
+    }
+    let value = wire_command(command);
     writeln!(stream, "{value}")?;
     let mut bytes = Vec::new();
     BufReader::new(Read::take(&mut *stream, 65_537)).read_until(b'\n', &mut bytes)?;
@@ -126,7 +132,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["model"]}}},
                 {"name": CONTROL, "description":"Scheda sintetica monouso dopo consenso nella GPUI; payload riservato alla vista.",
-                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","receipt","drugs"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
+                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","receipt","drugs","prosthetics"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
                     "annotations":{"readOnlyHint":false,"destructiveHint":true,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["app"]}}}]}),
             "resources/list" => {
@@ -157,7 +163,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     };
                     json!({"content":[{"type":"text","text":"Stato della vista disponibile."}],"_meta":meta})
                 } else if attached
-                    && args["command"] == "drugs"
+                    && matches!(args["command"].as_str(), Some("drugs" | "prosthetics"))
                     && args.as_object().map(|v| v.len()) == Some(2)
                     && args["query"].as_str().is_some_and(|q| {
                         (2..=80).contains(&q.chars().count()) && !q.chars().any(char::is_control)
@@ -165,13 +171,17 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                 {
                     match call(
                         &mut socket,
-                        &format!("drugs:{}", args["query"].as_str().unwrap()),
+                        &format!(
+                            "{}:{}",
+                            args["command"].as_str().unwrap(),
+                            args["query"].as_str().unwrap()
+                        ),
                     ) {
                         Ok(status) => {
                             json!({"content":[{"type":"text","text":"Ricerca disponibile nella vista."}],"_meta":status})
                         }
                         Err(_) => {
-                            json!({"isError":true,"content":[{"type":"text","text":"Ricerca farmaci non disponibile."}]})
+                            json!({"isError":true,"content":[{"type":"text","text":"Ricerca non disponibile."}]})
                         }
                     }
                 } else if attached
@@ -242,4 +252,19 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
     }
     let _ = call(&mut socket, "revoke");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn catalog_query_is_data_and_cannot_choose_another_command() {
+        for (prefix, expected) in [("prosthetics", "prosthetics"), ("drugs", "drugs")] {
+            let query = "demo:consume\",\"command\":\"therapy-active";
+            assert_eq!(
+                wire_command(&format!("{prefix}:{query}")),
+                json!({"command":expected, "query":query})
+            );
+        }
+    }
 }

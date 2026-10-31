@@ -169,7 +169,7 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
             Ok(value)
                 if pending.is_none()
                     && value.as_object().is_some_and(|v| v.len() == 2)
-                    && value["command"] == "drugs" =>
+                    && matches!(value["command"].as_str(), Some("drugs" | "prosthetics")) =>
             {
                 let Ok(copy) = stream.try_clone() else {
                     break;
@@ -177,7 +177,11 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                 let Some(query) = value["query"].as_str() else {
                     break;
                 };
-                let Some(request) = Request::for_drugs(peer, copy, query) else {
+                let Some(request) = (if value["command"] == "prosthetics" {
+                    Request::for_prosthetics(peer, copy, query)
+                } else {
+                    Request::for_drugs(peer, copy, query)
+                }) else {
                     break;
                 };
                 if incoming.try_send(request.clone()).is_err() {
