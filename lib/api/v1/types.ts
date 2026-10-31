@@ -181,6 +181,7 @@ export type ObservationSummary = {
 
 /* @Codex */
 export type AttachmentSummary = {
+    currentness: { sourceRef: string; revision: number; freshnessEpoch: number };
     id: string;
     patientId: string;
     name: string;

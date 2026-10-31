@@ -2773,6 +2773,46 @@ impl RuntimeSession {
         mime_type: &str,
         bytes: &[u8],
     ) -> Result<CreatedResource> {
+        self.create_attachment_with_collection(scope, patient_id, name, mime_type, bytes, None)
+    }
+
+    pub fn create_attachment_from_review(
+        &self,
+        scope: &str,
+        patient_id: &str,
+        upload: (&str, &str, &[u8]),
+        reviewed: &[Attachment],
+    ) -> Result<CreatedResource> {
+        if reviewed.len() > 10_000
+            || reviewed
+                .iter()
+                .any(|row| row.patient_id != patient_id || row.currentness.is_none())
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        let expected = reviewed
+            .iter()
+            .map(|row| json!({"id":row.id, "currentness":row.currentness}))
+            .collect::<Vec<_>>();
+        self.create_attachment_with_collection(
+            scope,
+            patient_id,
+            upload.0,
+            upload.1,
+            upload.2,
+            Some(expected),
+        )
+    }
+
+    fn create_attachment_with_collection(
+        &self,
+        scope: &str,
+        patient_id: &str,
+        name: &str,
+        mime_type: &str,
+        bytes: &[u8],
+        expected: Option<Vec<Value>>,
+    ) -> Result<CreatedResource> {
         validate_id(patient_id)?;
         if name.trim().is_empty()
             || name.len() > 1024
@@ -2789,7 +2829,10 @@ impl RuntimeSession {
         }
         let _guard = self.begin_write()?;
         let data = Zeroizing::new(format!("data:{mime_type};base64,{}", BASE64.encode(bytes)));
-        let body = self.seal_fields(json!({ "name": name, "path": name, "type": mime_type, "size": bytes.len(), "data": data.as_str() }), &["name", "path", "data"])?;
+        let mut body = self.seal_fields(json!({ "name": name, "path": name, "type": mime_type, "size": bytes.len(), "data": data.as_str() }), &["name", "path", "data"])?;
+        if let Some(expected) = expected {
+            body["expectedCollection"] = json!(expected);
+        }
         self.create(
             scope,
             &[
@@ -5079,6 +5122,69 @@ mod tests {
             Err(RuntimeError::Locked)
         );
         server.join().unwrap();
+    }
+
+    #[test]
+    fn reviewed_attachment_create_sends_the_exact_collection_and_preserves_conflict() {
+        let (url, seen, server) = scoped_response_server(409, r#"{"error":"collection changed"}"#);
+        let session = admitted_session(&url);
+        session
+            .inner
+            .capabilities
+            .lock()
+            .unwrap()
+            .insert("network.replica.write-documents".into());
+        let row: Attachment =
+            serde_json::from_value(json!({"id":"file-a", "patientId":"patient-a",
+            "name":"synthetic", "path":"synthetic", "type":"text/plain", "size":4,
+            "currentness":{"sourceRef":"b".repeat(64),"revision":3,"freshnessEpoch":2}}))
+            .unwrap();
+        let result = session.create_attachment_from_review(
+            "scope-a",
+            "patient-a",
+            ("new.txt", "text/plain", b"test"),
+            std::slice::from_ref(&row),
+        );
+        assert!(matches!(result, Err(RuntimeError::Conflict)));
+        let request = seen.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(request.starts_with("POST /api/v1/network/patients/patient-a/attachments "));
+        let body: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(
+            body["expectedCollection"],
+            json!([{"id":"file-a","currentness":row.currentness}])
+        );
+        for field in ["name", "path", "data"] {
+            assert!(body[field].as_str().unwrap().starts_with("ENC:"));
+        }
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn reviewed_attachment_create_rejects_missing_currentness_or_another_patient_without_http() {
+        let session = session();
+        let mut row: Attachment =
+            serde_json::from_value(json!({"id":"file-a", "patientId":"patient-a",
+            "name":"synthetic", "path":"synthetic", "type":"text/plain", "size":4}))
+            .unwrap();
+        assert!(matches!(
+            session.create_attachment_from_review(
+                "scope-a",
+                "patient-a",
+                ("new.txt", "text/plain", b"test"),
+                std::slice::from_ref(&row)
+            ),
+            Err(RuntimeError::InvalidResponse)
+        ));
+        row.currentness = Some(json!({"sourceRef":"b".repeat(64),"revision":1,"freshnessEpoch":1}));
+        assert!(matches!(
+            session.create_attachment_from_review(
+                "scope-a",
+                "other-patient",
+                ("new.txt", "text/plain", b"test"),
+                &[row]
+            ),
+            Err(RuntimeError::InvalidResponse)
+        ));
     }
 
     #[test]

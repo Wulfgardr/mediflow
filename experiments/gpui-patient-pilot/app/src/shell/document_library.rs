@@ -149,7 +149,7 @@ impl ClinicalApp {
                     .when(details_open, |el| el.child(self.document_details_view(row, cx)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
-            .child(notice("clinical-workspace-documents-native-limits", "Anteprima PDF e immagini, revisione dei dati estratti e importazione strutturata da CSV non disponibili. Nuova scheda da documento: non disponibile. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI.", theme, false))
+            .child(notice("clinical-workspace-documents-native-limits", "Anteprima PDF e immagini, revisione dei dati estratti e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI.", theme, false))
     }
 
     pub(super) fn document_imports_view(&self, cx: &Context<Self>) -> Div {
@@ -226,7 +226,7 @@ impl ClinicalApp {
                     documents::ImportAdmission::New(upload) => upload,
                     documents::ImportAdmission::Duplicate { .. } => return Err(RuntimeError::Conflict),
                 };
-                let created = session.create_attachment(&scope, &id, &upload.name, &upload.mime_type, &upload.bytes)?;
+                let created = session.create_attachment_from_review(&scope, &id, (&upload.name, &upload.mime_type, &upload.bytes), &rows)?;
                 after_create_read(session.read_attachment(&scope, &id, &created.id), |row| row.id == created.id && row.patient_id == id && upload.matches(&row))
             }, |this, result, cx| {
                 match result {
@@ -628,6 +628,45 @@ mod tests {
             1
         );
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[gpui::test]
+    fn concurrent_document_creation_keeps_the_draft_in_conflict_without_retry(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        host.plan(LIST).send((200, json!([]))).unwrap();
+        host.plan(CREATE)
+            .send((409, json!({"error":"collection changed"})))
+            .unwrap();
+        host.plan(LIST).send((200, json!([]))).unwrap();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            prepare(app, &host);
+            app.document_operation = DocumentOperation::Idle;
+            app.receive_document_upload(Ok(Ok(upload())), cx);
+        });
+        cx.update_window_entity(&view, |app, window, cx| app.review_form(window, cx));
+        view.update(cx, |app, cx| app.confirm_form(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert!(matches!(
+                app.form.as_ref().unwrap().state,
+                FormState::Conflict
+            ));
+            assert!(app.form.as_ref().unwrap().upload.is_some());
+            assert!(app.verified.is_none());
+            app.confirm_form(cx);
+        });
+        cx.run_until_parked();
+        assert_eq!(
+            host.routes()
+                .iter()
+                .filter(|route| route.starts_with(CREATE))
+                .count(),
+            1
+        );
     }
 
     #[gpui::test]
