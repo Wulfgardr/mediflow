@@ -45,7 +45,7 @@ jobs:
           cache: npm
           cache-dependency-path: plugins/mediflow-chat-demo/package-lock.json
       - run: echo "MEDIFLOW_DATA_DIR=$(mktemp -d)" >> "$GITHUB_ENV"
-      - run: npm ci --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund && npm run prepare:dependencies
         working-directory: .
       - run: npm ci --no-audit --no-fund
       - run: npm run build

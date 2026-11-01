@@ -15,13 +15,13 @@
     "preinstall": "node scripts/node-runtime-contract.mjs verify-node",
     "postinstall": "node scripts/node-runtime-contract.mjs verify",
     "predev": "node scripts/node-runtime-contract.mjs verify",
-    "dev": "next dev --turbopack --hostname 127.0.0.1 --port 3000",
+    "dev": "node scripts/node-runtime-contract.mjs verify && next dev --turbopack --hostname 127.0.0.1 --port 3000",
     "shots:readme": "node scripts/capture-readme-screenshots.mjs",
     "prebuild": "node scripts/build-input-metadata.mjs --source . && node scripts/node-runtime-contract.mjs verify",
-    "build": "node scripts/source-runtime.mjs build",
+    "build": "node scripts/build-source-runtime.mjs",
     "postbuild": "node scripts/node-runtime-contract.mjs write-standalone-manifest && node scripts/check-standalone-runtime-bundle.mjs && node scripts/source-runtime.mjs prepare",
     "prestart": "node scripts/node-runtime-contract.mjs verify-node",
-    "start": "node scripts/source-runtime.mjs web",
+    "start": "node scripts/node-runtime-contract.mjs verify-node && node scripts/source-runtime.mjs web",
     "mini": "node scripts/run-strip-types.mjs packages/mini/src/cli.ts",
     "mini:production": "node scripts/run-strip-types.mjs scripts/mediflow-headless-supervisor.mjs --mini",
     "test:mini-cli": "node scripts/run-strip-types.mjs --test --test-concurrency=1 packages/mini/src/cli.test.ts packages/mini/src/session.test.ts packages/mini/src/protocol.test.ts",
@@ -238,7 +238,8 @@
     "test:owned-http": "node scripts/run-owned-synthetic-http-suite.mjs",
     "test:owned-http-standalone": "node scripts/run-owned-synthetic-http-suite.mjs --standalone",
     "check:fhir-r4": "node scripts/validate-fhir-r4.mjs",
-    "test:fhir-r4": "node --test scripts/fhir-r4-gate.test.mjs scripts/verify-fhir-validator-cache.test.mjs scripts/fhir-scale-export-falsification.test.mjs && node scripts/run-strip-types.mjs --test --glob \"lib/fhir/**/*.test.ts\" scripts/fhir-r4-corpus.test.ts"
+    "test:fhir-r4": "node --test scripts/fhir-r4-gate.test.mjs scripts/verify-fhir-validator-cache.test.mjs scripts/fhir-scale-export-falsification.test.mjs && node scripts/run-strip-types.mjs --test --glob \"lib/fhir/**/*.test.ts\" scripts/fhir-r4-corpus.test.ts",
+    "prepare:dependencies": "node scripts/prepare-dependencies.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",

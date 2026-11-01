@@ -1,0 +1,55 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { gunzipSync } from 'node:zlib';
+import { SQLITE_PREBUILDS, sqlitePrebuildTarget, readNodeContract, assertNodeRuntime, verifyPinnedNativeBinding } from './node-runtime-contract.mjs';
+
+const root = path.resolve(import.meta.dirname, '..');
+assertNodeRuntime(readNodeContract(root));
+const target = sqlitePrebuildTarget();
+const expected = SQLITE_PREBUILDS[target];
+if (!expected || process.versions.modules !== '137') throw new Error(`Prebuild non ammesso: ${target}, ABI ${process.versions.modules}. Usa Node 24; su Windows ARM puoi usare Node x64 emulato.`);
+const packageRoot = path.join(root, 'node_modules/better-sqlite3');
+if (JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8')).version !== '12.6.2') throw new Error('Versione SQLite non ammessa.');
+const url = `https://github.com/WiseLibs/better-sqlite3/releases/download/v12.6.2/better-sqlite3-v12.6.2-node-v137-${target}.tar.gz`;
+const response = await fetch(url, { signal: AbortSignal.timeout(60000) });
+if (!response.ok) throw new Error(`Download SQLite: HTTP ${response.status}`);
+const archive = Buffer.from(await response.arrayBuffer());
+const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+if (digest(archive) !== expected.archive) throw new Error('Impronta archivio SQLite non ammessa.');
+const tar = gunzipSync(archive, { maxOutputLength: 32 * 1024 * 1024 });
+const header = tar.subarray(0, 512);
+const name = header.subarray(0, 100).toString().replace(/\0.*$/su, '');
+const size = Number.parseInt(header.subarray(124, 136).toString().replace(/\0.*$/su, '').trim(), 8);
+const binary = tar.subarray(512, 512 + size);
+if (name !== 'build/Release/better_sqlite3.node' || !Number.isSafeInteger(size) || digest(binary) !== expected.binary) throw new Error('Contenuto prebuild SQLite non ammesso.');
+const output = path.join(packageRoot, name);
+if (fs.realpathSync(packageRoot) !== packageRoot) throw new Error('Directory SQLite non fisica.');
+let directory = packageRoot;
+for (const segment of ['build', 'Release']) {
+    directory = path.join(directory, segment);
+    try { fs.mkdirSync(directory); } catch (error) { if (error.code !== 'EEXIST') throw error; }
+    if (!fs.lstatSync(directory).isDirectory() || fs.realpathSync(directory) !== directory) throw new Error('Directory SQLite non fisica.');
+}
+const admitDestination = () => {
+    const stat = fs.lstatSync(output, { throwIfNoEntry: false });
+    if (stat && (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1)) throw new Error('Destinazione SQLite non fisica o condivisa.');
+};
+admitDestination();
+const temporary = path.join(directory, `.better-sqlite3-${crypto.randomUUID()}.tmp`);
+let created = false;
+try {
+    const descriptor = fs.openSync(temporary, 'wx', 0o600);
+    created = true;
+    try { fs.writeFileSync(descriptor, binary); fs.fsyncSync(descriptor); } finally { fs.closeSync(descriptor); }
+    const stat = fs.lstatSync(temporary);
+    if (!stat.isFile() || stat.nlink !== 1 || fs.realpathSync(temporary) !== temporary
+        || digest(fs.readFileSync(temporary)) !== expected.binary) throw new Error('File SQLite preparato non ammesso.');
+    if (fs.realpathSync(directory) !== directory) throw new Error('Directory SQLite non fisica.');
+    admitDestination();
+    fs.renameSync(temporary, output);
+    created = false;
+    if (fs.lstatSync(output).nlink !== 1) throw new Error('File SQLite prodotto condiviso.');
+    verifyPinnedNativeBinding(root);
+} finally { if (created) fs.unlinkSync(temporary); }
+console.log(`Dipendenze pronte: SQLite 12.6.2, ${target}, SHA-256 verificato. Nessuno script delle dipendenze eseguito.`);

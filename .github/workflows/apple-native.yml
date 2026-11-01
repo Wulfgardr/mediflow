@@ -198,7 +198,7 @@ jobs:
           node-version: 24
           cache: npm
       - name: Install native source boundary test dependencies
-        run: npm ci
+        run: npm ci && npm run prepare:dependencies
       - name: Verify native source boundary test prerequisites
         run: node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) process.exit(1); console.log("Node", process.versions.node, "TypeScript", require("typescript").version)'
       - name: Select latest stable Xcode

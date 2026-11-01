@@ -115,6 +115,7 @@ git clone https://github.com/Wulfgardr/mediflow
 cd mediflow
 nvm use
 npm ci
+npm run prepare:dependencies
 ```
 
 ### Avvio locale

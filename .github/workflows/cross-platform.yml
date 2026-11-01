@@ -73,7 +73,7 @@ jobs:
         if: runner.os == 'Windows'
         run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
       - name: Install (npm ci)
-        run: npm ci
+        run: npm ci && npm run prepare:dependencies
       - name: Deny DB, Web, native and network imports in portable surfaces
         run: npm run check:headless-portable-imports
       - name: Typecheck profile contracts without DOM or framework types
@@ -115,7 +115,7 @@ jobs:
         if: runner.os == 'Windows'
         run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
       - name: Install (npm ci)
-        run: npm ci
+        run: npm ci && npm run prepare:dependencies
       - name: Verify better-sqlite3 native binding loads
         run: node -e "const db=require('better-sqlite3')(':memory:'); console.log('better-sqlite3 query result:', db.prepare('select 1 as x').get().x);"
       - name: Flag better-sqlite3 source compile (non-fatal visibility)
@@ -155,8 +155,22 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci && npm run prepare:dependencies
       - name: Lint
         run: npm run lint
       - name: Typecheck
         run: npm run typecheck
+
+  windows-x64-emulation:
+    name: SQLite and launcher (Windows ARM, Node x64)
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          architecture: x64
+      - name: Verify emulated Node and prepare pinned SQLite
+        run: node -e "if (process.arch !== 'x64') throw new Error('Expected emulated Node x64'); console.log(process.version, process.arch)" && npm ci --ignore-scripts --no-audit --no-fund && npm run prepare:dependencies && npm run check:node-runtime
+      - name: Verify failed preparation and stop during guardian startup
+        run: node --test --test-name-pattern="preserves custody through" scripts/launcher-helpers.test.mjs
