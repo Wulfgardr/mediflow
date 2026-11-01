@@ -2073,7 +2073,10 @@ for (const scenario of ['signal','chooser','error','switch','probe-EPERM','probe
         } else if (scenario !== 'error') await stop();
         await f.until(() => existsSync(f.stopTrace));
         const {pid,descendantPid,port} = JSON.parse(readFileSync(f.runtimePid));
-        await new Promise(resolve => setTimeout(resolve,80));
+        await f.until(() => {
+            try { process.kill(pid, 0); return false; }
+            catch (error) { if (error.code === 'ESRCH') return true; throw error; }
+        });
         assert.throws(() => process.kill(pid,0),{code:'ESRCH'},'Leader should already be terminal');
         process.kill(descendantPid,0); process.kill(-pid,0);
         assert.equal(await (await fetch('http://127.0.0.1:'+port,{signal:AbortSignal.timeout(1000)})).text(),'owned-descendant-alive');
@@ -2122,8 +2125,8 @@ for (const scenario of ['signal','chooser','error','switch','probe-EPERM','probe
             assert.equal(successor.claimed,true);
             const finalTrace = readFileSync(f.stopTrace,'utf8');
             assert.deepEqual(finalTrace.trim().split('\n').map(line => JSON.parse(line)).filter(entry => entry.signal !== 0).map(entry => entry.signal),['SIGTERM']);
-            await new Promise(resolve => setTimeout(resolve,650));
-            assert.equal(readFileSync(f.stopTrace,'utf8'),finalTrace,'A late timer observed or signalled the retired group');
+            assert.notEqual(f.child.exitCode, null, 'The launcher must be terminal before its successor claims');
+            assert.equal(readFileSync(f.stopTrace,'utf8'),finalTrace,'The terminal launcher observed or signalled the retired group');
             assert.equal(JSON.parse(readFileSync(successor.receiptFile)).pid,process.pid);
             process.kill(process.pid,0);
             t.diagnostic(JSON.stringify({scenario,leader:pid,descendant:descendantPid,groupAbsent:true,successor:process.pid,lateSignals:false}));

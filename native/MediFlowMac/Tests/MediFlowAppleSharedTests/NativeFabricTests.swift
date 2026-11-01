@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Combine
 import XCTest
 @testable import MediFlowAppleShared
 
@@ -256,13 +257,39 @@ final class NativeFabricModelTests: XCTestCase {
         }
     }
     func testCompletedProposalIsWithdrawnWhenHostStatusReportsDisable() async throws {
-        var service = services(); service.status = { id, _ in
+        let ready = expectation(description: "Host preparation ready")
+        let completed = expectation(description: "Proposal completed")
+        let polling = expectation(description: "Watchdog waiting for host poll")
+        let withdrawn = expectation(description: "Disabled proposal withdrawn and closed")
+        var resumePoll: CheckedContinuation<Void, Error>?
+        var service = services()
+        service.waitForStatusPoll = {
+            try await withCheckedThrowingContinuation { continuation in
+                resumePoll = continuation
+                polling.fulfill()
+            }
+        }
+        service.status = { id, _ in
             if id != nil { throw NativeFabricFailure(status: 403, code: .functionDisabled) }
             return try FabricFixture.response("closed")
         }
         let model = NativeFabricModel(function: .patientInsight, snapshot: { self.source() }, services: service)
-        model.prepare(); await settle(model); model.generate(); await settle(model); XCTAssertNotNil(model.proposal)
-        try await Task.sleep(nanoseconds: 2_100_000_000); await settle(model)
+        let observation = model.$phase.dropFirst().sink { phase in
+            switch phase {
+            case .ready: ready.fulfill()
+            case .completed: completed.fulfill()
+            case .idle: withdrawn.fulfill()
+            default: break
+            }
+        }
+        defer { observation.cancel() }
+        model.prepare()
+        await fulfillment(of: [ready, polling], timeout: 5)
+        model.generate()
+        await fulfillment(of: [completed], timeout: 5)
+        XCTAssertNotNil(model.proposal)
+        try XCTUnwrap(resumePoll).resume()
+        await fulfillment(of: [withdrawn], timeout: 5)
         XCTAssertNil(model.proposal); XCTAssertTrue(model.message.contains("disabilitata")); XCTAssertEqual(model.phase, .idle)
     }
 }
