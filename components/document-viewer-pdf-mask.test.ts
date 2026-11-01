@@ -34,6 +34,8 @@ for (const mask of ['smask', 'mask']) test(`real PDF ${mask} refuses the resolve
     const result = spawnSync(process.execPath, ['--no-addons', '--import', new URL('../scripts/register-strip-types-loader.mjs', import.meta.url).href,
         '--input-type=module', '-e', script], { encoding: 'utf8', timeout: 30_000, maxBuffer: 1024 * 1024 });
     assert.equal(result.status, 0, result.stderr);
-    const observation = JSON.parse(result.stdout.trim().split('\n').at(-1));
+    const line = result.stdout.trim().split('\n').at(-1);
+    assert.ok(line);
+    const observation = JSON.parse(line);
     t.diagnostic(JSON.stringify(observation));
 });
