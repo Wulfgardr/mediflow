@@ -1,4 +1,4 @@
-import { assertPrivateDirectory, restrictNewPrivateDirectory } from './windows-private-directory.mjs';
+import { assertPrivateDirectory, restrictNewPrivateDirectory, WindowsPrivateDirectoryError } from './windows-private-directory.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -13,9 +13,10 @@ export const LINUX_SINGLE_DEVICE_FILESYSTEMS = Object.freeze(['ext2', 'ext3', 'e
 export const MOUNT_ROOTS = Object.freeze(['/Volumes', '/mnt', '/media', '/run/media']);
 
 export class BackupDestinationError extends Error {
-  constructor(userMessage) {
+  constructor(userMessage, code = 'backup_destination_rejected') {
     super(userMessage);
     this.userMessage = userMessage;
+    this.code = code;
   }
 }
 
@@ -99,21 +100,38 @@ export function backupDestinationIdentity(destination) {
   return `${destination}:${fs.statSync(destination).dev}`;
 }
 
-export function validateBackupDestination(value, acknowledged = false, acknowledgedIdentity) {
+export function backupStorageDirectory(value, { platform = process.platform } = {}) {
+  return platform === 'win32' && path.basename(value).toLowerCase() !== '.mediflow-private'
+    ? path.join(value, '.mediflow-private') : value;
+}
+
+export function resolveEffectiveBackupDestination(value, { create = false } = {}) {
+  const requested = backupStorageDirectory(value);
   let destination;
-  try { destination = resolveBackupDestination(value); }
+  try {
+    if (!create && !fs.existsSync(requested)) return requested;
+    const parent = process.platform === 'win32' ? path.dirname(requested) : requested;
+    destination = process.platform === 'win32'
+      ? path.join(resolveBackupDestination(parent), path.basename(requested)) : resolveBackupDestination(requested);
+    if (process.platform === 'win32') {
+      if (create) {
+        try { fs.mkdirSync(destination); restrictNewPrivateDirectory(destination); }
+        catch (error) { if (error?.code !== 'EEXIST') throw error; }
+      }
+      assertPrivateDirectory(destination);
+      destination = resolveBackupDestination(destination);
+    }
+    return destination;
+  }
   catch (error) {
     if (error instanceof BackupDestinationError) throw error;
+    if (error instanceof WindowsPrivateDirectoryError) throw new BackupDestinationError(error.userMessage, error.code);
     throw new BackupDestinationError('La cartella di destinazione non è disponibile. Scegli una cartella esistente su un volume montato.');
   }
-  if (process.platform === 'win32') {
-    if (path.basename(destination) !== '.mediflow-private') {
-      destination = path.join(destination, '.mediflow-private');
-      try { fs.mkdirSync(destination); restrictNewPrivateDirectory(destination); }
-      catch (error) { if (error?.code !== 'EEXIST') throw error; }
-    }
-    assertPrivateDirectory(destination);
-  }
+}
+
+export function validateBackupDestination(value, acknowledged = false, acknowledgedIdentity) {
+  const destination = resolveEffectiveBackupDestination(value, { create: true });
   const directoryIdentity = fs.statSync(destination);
   const protection = probeBackupVolume(destination);
   if (protection === 'unencrypted') throw new BackupDestinationError('Il volume della destinazione non risulta cifrato. Attiva la cifratura prima di programmare il backup.');

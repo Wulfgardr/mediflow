@@ -35,7 +35,7 @@ test('reads default backup scheduler state when setting is missing', () => {
     assert.equal(state.config.enabled, false);
     assert.equal(state.config.hour, 2);
     assert.equal(state.config.minute, 0);
-    assert.match(state.config.destinationDir, /backups$/);
+    assert.equal(path.basename(state.config.destinationDir), process.platform === 'win32' ? '.mediflow-private' : 'backups');
     assert.equal(state.config.retentionKeepArtifacts, DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS);
 });
 
@@ -127,6 +127,26 @@ test('explicit manual force still creates a backup while automatic enablement is
             assert.equal(JSON.parse(fs.readFileSync(forced.result.artifactPath, 'utf8')).format, 'mediflow-backup');
         });
     }
+});
+
+test('Windows legacy parent configuration publishes and inventories only the same private destination', { skip: process.platform !== 'win32' }, () => {
+    withScheduledBackupFixture(({ destinationDir, setEnabled, run }) => {
+        setEnabled(true);
+        const result = run(true);
+        assert.equal(result.status, 0, JSON.stringify(result.result));
+        const effective = path.join(fs.realpathSync(destinationDir), '.mediflow-private');
+        assert.equal(path.dirname(result.result.artifactPath!), effective);
+        const legacy = path.join(destinationDir, 'mediflow-backup-v1-2026-10-01.mediflow');
+        fs.writeFileSync(legacy, 'synthetic parent copy');
+        for (const day of [29, 30]) fs.writeFileSync(path.join(effective, `mediflow-backup-v1-2026-10-${day}.mediflow`), 'synthetic older copy');
+        const preview = previewBackupRetention({ destinationDir, retentionKeepArtifacts: 1 });
+        assert.equal(preview.destinationDir, effective);
+        assert.equal(preview.artifactCount, 3);
+        assert.equal(preview.deleteCount, 2);
+        assert.ok(preview.items.every(item => path.dirname(item.path) === effective));
+        assert.equal(fs.readFileSync(legacy, 'utf8'), 'synthetic parent copy');
+        assert.equal(fs.readdirSync(effective).filter(name => name.endsWith('.mediflow')).length, 3);
+    });
 });
 
 test('scheduled backups and a new destination are readable only by the owning account', { skip: process.platform === 'win32' }, () => {
