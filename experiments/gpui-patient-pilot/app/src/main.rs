@@ -86,6 +86,16 @@ fn parse_launch(args: impl IntoIterator<Item = String>) -> Result<Launch, &'stat
 }
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("--document-preview-worker") {
+        let page = std::env::args()
+            .nth(2)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        if documents::pdf::worker(page).is_err() {
+            std::process::exit(2);
+        }
+        return;
+    }
     if std::env::args().nth(1).as_deref() == Some("--verify-bundled-assets") {
         println!("{}", components::verify_bundled_brand_assets());
         return;

@@ -149,7 +149,7 @@ impl ClinicalApp {
                     .when(details_open, |el| el.child(self.document_details_view(row, cx)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
-            .child(notice("clinical-workspace-documents-native-limits", "Anteprima PDF e immagini diverse da PNG e JPEG, revisione dei dati estratti e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI.", theme, false))
+            .child(notice("clinical-workspace-documents-native-limits", "Anteprima delle immagini diverse da PNG e JPEG, revisione dei dati estratti e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI.", theme, false))
     }
 
     pub(super) fn document_imports_view(&self, cx: &Context<Self>) -> Div {
