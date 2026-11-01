@@ -255,3 +255,53 @@ test('Documenti: maschere PDF grandi rifiutano tutta l’anteprima', async ({ pa
     }
 });
 
+test('Documenti e Diario: scansioni 400 e 600 dpi conservano il salvataggio esplicito dell’originale', async ({ page }, info) => {
+    const { readFileSync } = await import('node:fs');
+    const { docs } = await documents(page);
+    let downloads = 0;
+    let lastAttachmentId: string | null = null;
+    page.on('download', () => downloads++);
+    for (const dpi of [400, 600]) {
+        const name = `Scansione sintetica ${dpi}.pdf`;
+        const original = readFileSync(`scripts/fixtures/preview-a4-${dpi}.pdf`);
+        await docs.locator('input[type="file"]').setInputFiles({ name, mimeType: 'application/pdf', buffer: original });
+        await docs.getByRole('button', { name: `Visualizza ${name}`, exact: true }).click();
+        const viewer = page.getByTestId('document-viewer');
+        await expect(viewer.getByTestId('document-preview-error')).toBeVisible();
+        lastAttachmentId = await docs.locator('tbody[data-document-id]').filter({ has: page.getByRole('heading', { name, exact: true }) }).getAttribute('data-document-id');
+        const before = downloads;
+        await viewer.getByRole('button', { name: 'Salva originale', exact: true }).click();
+        await expect(viewer.getByRole('alert').filter({ hasText: 'copia decifrata' })).toBeVisible();
+        expect(downloads).toBe(before);
+        await viewer.getByRole('button', { name: 'Annulla', exact: true }).click();
+        expect(downloads).toBe(before);
+        await viewer.getByRole('button', { name: 'Salva originale', exact: true }).click();
+        const pending = page.waitForEvent('download');
+        await viewer.getByRole('button', { name: 'Salva copia decifrata', exact: true }).click();
+        const download = await pending;
+        expect(download.suggestedFilename()).toBe(name);
+        const saved = info.outputPath(`originale-${dpi}.pdf`);
+        await download.saveAs(saved);
+        expect(readFileSync(saved).equals(original)).toBe(true);
+        await viewer.getByRole('button', { name: 'Chiudi', exact: true }).click();
+    }
+    expect(lastAttachmentId).not.toBeNull();
+    await page.evaluate(async attachmentId => {
+        const patientId = location.pathname.split('/')[2];
+        const entry = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ patientId,
+            type: 'visit', date: '2026-11-01T09:00:00Z', title: 'Originale sintetico Diario', content: '<p>Solo dati sintetici.</p>', attachments: [attachmentId] }) });
+        if (!entry.ok) throw new Error(`Synthetic diary HTTP ${entry.status}`);
+    }, lastAttachmentId);
+    await page.reload();
+    await openPatientSection(page, 'diario');
+    await page.locator('#diario').getByRole('button', { name: /Scansione sintetica 600.pdf/u }).click();
+    const viewer = page.getByTestId('document-viewer');
+    await expect(viewer).toHaveAttribute('role', 'dialog');
+    await viewer.getByRole('button', { name: 'Salva originale', exact: true }).click();
+    await expect(viewer.getByRole('alert').filter({ hasText: 'copia decifrata' })).toBeVisible();
+    const pending = page.waitForEvent('download');
+    await viewer.getByRole('button', { name: 'Salva copia decifrata', exact: true }).click();
+    const saved = info.outputPath('diario-originale.pdf');
+    await (await pending).saveAs(saved);
+    expect(readFileSync(saved).equals(readFileSync('scripts/fixtures/preview-a4-600.pdf'))).toBe(true);
+});
