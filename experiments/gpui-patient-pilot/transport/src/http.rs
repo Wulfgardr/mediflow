@@ -522,22 +522,15 @@ impl RuntimeClient {
         if !self.is_local_bootstrap_origin() {
             return Err(RuntimeError::Forbidden);
         }
-        let encoded = body
-            .map(serde_json::to_vec)
-            .transpose()
-            .map_err(|_| RuntimeError::InvalidInput)?
-            .map(Zeroizing::new);
         let archive = path.starts_with(&["api", "system", "backup-restore"]);
-        if encoded.as_ref().is_some_and(|v| {
-            v.len()
-                > if archive || reference_json_path(path) {
-                    JSON_LIMIT
-                } else {
-                    4096
-                }
-        }) {
-            return Err(RuntimeError::TooLarge);
-        }
+        let request_limit = if archive || reference_json_path(path) {
+            JSON_LIMIT
+        } else {
+            4096
+        };
+        let encoded = body
+            .map(|value| encode_private_json(value, request_limit))
+            .transpose()?;
         http_runtime().block_on(self.context.run(
             async {
                 let mut request = self
@@ -548,7 +541,7 @@ impl RuntimeClient {
                     .header("sec-fetch-site", "same-origin")
                     .header("content-type", "application/json");
                 if let Some(body) = encoded {
-                    request = request.body(body.to_vec());
+                    request = request.body(bytes::Bytes::from_owner(body));
                 }
                 if matches!(
                     path,
@@ -1104,7 +1097,7 @@ pub(crate) fn authenticate_web_p3(
                     .as_str()
                     .ok_or(RuntimeError::InvalidResponse)?,
             )?),
-            Some("pin") => {
+            Some("pin") if check["unlock"]["kdfVersion"].is_null() => {
                 crypto::validate_pin(passphrase)?;
                 if crypto::normalize_passphrase(passphrase).is_ok() {
                     return Err(RuntimeError::LegacyAccessNeedsWeb);
@@ -1461,6 +1454,58 @@ mod tests {
             sent: std::sync::atomic::AtomicBool::new(false),
         }
     }
+    #[test]
+    fn local_pin_unknown_profile_never_dispatches_a_login() {
+        for local_client in [true, false] {
+            let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let client = RuntimeClient::new(RuntimeConfig {
+                base_url: format!("http://{}", listener.local_addr().unwrap()),
+                tls_pin_sha256: None,
+            })
+            .unwrap();
+            let finished = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let finished_on_server = finished.clone();
+            let worker = std::thread::spawn(move || {
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                assert!(bootstrap_request(&mut stream).starts_with("GET /api/auth/check "));
+                bootstrap_reply(
+                    &mut stream,
+                    200,
+                    &json!({"status":"ok","isSetup":true,"archiveGeneration":"generation","unlock":{"credential":"pin","kdfVersion":99}}),
+                    "ETag: \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\r\n",
+                );
+                listener.set_nonblocking(true).unwrap();
+                let deadline = std::time::Instant::now() + Duration::from_secs(5);
+                loop {
+                    match crate::test_loopback::accept(&listener) {
+                        Ok((mut stream, _)) => {
+                            let request = bootstrap_request(&mut stream);
+                            bootstrap_reply(&mut stream, 401, &json!({"error":"denied"}), "");
+                            return Some(request);
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            if finished_on_server.load(std::sync::atomic::Ordering::SeqCst) {
+                                return None;
+                            }
+                            assert!(std::time::Instant::now() < deadline);
+                            std::thread::sleep(Duration::from_millis(1));
+                        }
+                        Err(error) => panic!("{error}"),
+                    }
+                }
+            });
+            let user: RuntimeUser = serde_json::from_value(json!({"id":"user","username":"synthetic","role":"admin","archiveGeneration":"generation"})).unwrap();
+            let (cookie, result, issued) =
+                authenticate_web_p3(&client, &user, HeaderMap::new(), "1357", local_client);
+            finished.store(true, std::sync::atomic::Ordering::SeqCst);
+            let request = worker.join().unwrap();
+            assert_eq!(result, Err(RuntimeError::UnsupportedUnlock));
+            assert!(cookie.is_none());
+            assert!(!issued);
+            assert!(request.is_none());
+        }
+    }
+
     #[test]
     fn long_pin_is_not_sent_without_its_own_confirmation() {
         let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
