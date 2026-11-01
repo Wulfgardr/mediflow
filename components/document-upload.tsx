@@ -147,6 +147,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             activeExtraction.current = null;
             activeDelete.current = null;
             activeUploadSelection.current = null;
+            setIsProcessing(false);
             setStopRequested(true);
             setExtractingId(null); setDeletingId(null);
             setSelectedId(''); setViewingId(null); setLocalExtraction(null);
@@ -357,7 +358,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                 {currentAttachments?.map((file, index) => <tbody key={file.id} data-document-id={file.id}>
                     <tr className={viewingId === file.id ? styles.selected : undefined}><td>
                                 <h4 className={styles.documentName}><PrivacyBlur>{file.name}</PrivacyBlur></h4>
-                                <p className={disclosure.hint}>Documento {index + 1}{currentAttachments.some(other => other.id !== file.id && other.name === file.name && other.size === file.size) ? ' · Possibile duplicato: stesso nome e dimensione' : ''}</p>
+                                <p id={`document-identity-${file.id}`} className={disclosure.hint}>Documento {index + 1}{currentAttachments.some(other => other.id !== file.id && other.name === file.name && other.size === file.size) ? ' · Possibile duplicato: stesso nome e dimensione' : ''}</p>
                                 <p className={disclosure.hint}>Caricato il {new Date(file.createdAt).toLocaleDateString('it-IT')} · {Math.max(1, Math.ceil(file.size / 1024))} KB</p>
                                 <p className={disclosure.hint} data-testid="document-source-status">
                                     {extractingId === file.id ? 'Estrazione in corso' : localExtraction?.attachmentId === file.id
@@ -369,10 +370,10 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             <PatientSheetMenu className={styles.documentActions} label={`Azioni documento ${file.name}`} trigger={props => <>
                                 <button type="button" onClick={() => selectSource(file.id)} disabled={listLoading || deletingId === file.id}
                                     ref={(button) => { if (button) documentActions.current.set(file.id, button); else documentActions.current.delete(file.id); }}
-                                    className={disclosure.documentAction} data-lume-action="quiet" title="Visualizza" aria-label={`Visualizza ${file.name}`}>
+                                    className={disclosure.documentAction} data-lume-action="quiet" title="Visualizza" aria-describedby={`document-identity-${file.id}`} aria-label={`Visualizza ${file.name}`}>
                                     <Eye className="h-4 w-4" aria-hidden="true" />Apri
                                 </button>
-                                <button {...props} className={disclosure.documentAction} aria-label={`Altro per ${file.name}`}>Altro</button>
+                                <button {...props} className={disclosure.documentAction} aria-describedby={`document-identity-${file.id}`} aria-label={`Altro per ${file.name}`}>Altro</button>
                             </>}>
                                 <button type="button" role="menuitem" tabIndex={-1} onClick={() => handleLocalExtractionPreview(file)} disabled={extractingId !== null || deletingId === file.id}
                                     className="mf-popover-row" aria-label={`Estrai testo localmente da ${file.name}`}
