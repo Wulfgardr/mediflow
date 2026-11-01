@@ -37,11 +37,11 @@ const EXPECTED_SCRIPTS = {
     [GUARD_SCRIPT]: GUARD_COMMAND,
     [`post${GUARD_SCRIPT}`]: null,
     predev: 'node scripts/node-runtime-contract.mjs verify',
-    dev: 'next dev --turbopack --hostname 127.0.0.1 --port 3000', postdev: null,
-    prebuild: 'node scripts/build-input-metadata.mjs --source . && node scripts/node-runtime-contract.mjs verify', build: 'node scripts/source-runtime.mjs build',
+    dev: 'node scripts/node-runtime-contract.mjs verify && next dev --turbopack --hostname 127.0.0.1 --port 3000', postdev: null,
+    prebuild: 'node scripts/build-input-metadata.mjs --source . && node scripts/node-runtime-contract.mjs verify', build: 'node scripts/build-source-runtime.mjs',
     postbuild: 'node scripts/node-runtime-contract.mjs write-standalone-manifest && node scripts/check-standalone-runtime-bundle.mjs && node scripts/source-runtime.mjs prepare',
     prestart: 'node scripts/node-runtime-contract.mjs verify-node',
-    start: 'node scripts/source-runtime.mjs web',
+    start: 'node scripts/node-runtime-contract.mjs verify-node && node scripts/source-runtime.mjs web',
     poststart: null,
 };
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
