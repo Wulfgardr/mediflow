@@ -5,6 +5,7 @@ import styles from './clinical-register.module.css';
 import { X, FileText } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import DocumentPreviewCanvas from './document-viewer-canvas';
+import DocumentOriginalSave from './document-original-save';
 import { readDocumentPreview, releaseDocumentPreview, type DocumentPreview } from './document-viewer-preview.ts';
 import { PREVIEW_LIMITS, PreviewError, previewFailure, textWindow, type PreviewFailure } from './document-viewer-policy.ts';
 
@@ -13,6 +14,7 @@ interface DocumentViewerProps {
     fileName: string;
     onClose: () => void;
     inline?: boolean;
+    signal?: AbortSignal;
 }
 
 function DocumentText({ text }: { text: string }) {
@@ -76,13 +78,21 @@ function DocumentPreviewBody({ file, fileName }: Pick<DocumentViewerProps, 'file
         : <DocumentPreviewCanvas source={current.preview} signal={current.signal} />;
 }
 
-export default function DocumentViewer({ file, fileName, onClose, inline = false }: DocumentViewerProps) {
+export default function DocumentViewer({ file, fileName, onClose, inline = false, signal }: DocumentViewerProps) {
 
-    const [closed, setClosed] = useState(false);
+    const source = useMemo(() => ({ file, fileName, signal, token: Symbol('document-view') }), [file, fileName, signal]);
+    const [closedView, setClosedView] = useState<symbol | null>(null);
+    const closed = closedView === source.token;
     const titleId = useId();
     const shell = useRef<HTMLDivElement>(null);
     const closeButton = useRef<HTMLButtonElement>(null);
-    const close = () => { setClosed(true); onClose(); };
+    const close = () => { setClosedView(source.token); onClose(); };
+    useEffect(() => {
+        const retire = () => setClosedView(source.token);
+        if (signal?.aborted) retire();
+        signal?.addEventListener('abort', retire, { once: true });
+        return () => signal?.removeEventListener('abort', retire);
+    }, [signal, source]);
     useEffect(() => {
         if (closed || inline) return;
         const root = shell.current;
@@ -116,6 +126,7 @@ export default function DocumentViewer({ file, fileName, onClose, inline = false
             <div className="flex min-w-0 items-center gap-3"><FileText size={18} aria-hidden /><h3 id={titleId}>{fileName}</h3></div>
             <button ref={closeButton} type="button" onClick={close} className={styles.control} aria-label="Chiudi" title="Chiudi"><X size={18} aria-hidden /></button>
         </header>
+        <DocumentOriginalSave file={file} fileName={fileName} signal={signal} />
         <div className={inline ? `${styles.inlineCanvas} relative` : 'min-h-0 flex-1 relative'} style={{ background: 'var(--lume-surface-field)' }}>
             <DocumentPreviewBody file={file} fileName={fileName} />
         </div>

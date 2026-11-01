@@ -1,12 +1,17 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import {
     ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB,
     ANYDOC_PDF_CHILD_PROCESS_INTERNAL_TEST_SEAM,
     ANYDOC_PDF_CHILD_WORKER_SHA256,
+    runAnyDocPdfMaterializationChild,
+    runAnyDocPdfRenderingChild,
 } from './anydoc-pdf-child-process-owner';
 
 const ONE_PIXEL_PNG = Buffer.from(
@@ -100,10 +105,6 @@ test('pins the regular owned worker and keeps all PDF engines out of parent runt
 
     assert.equal(createHash('sha256').update(worker).digest('hex'), ANYDOC_PDF_CHILD_WORKER_SHA256);
     assert.match(owner, /child\.kill\('SIGKILL'\)/u);
-    assert.match(owner, /--max-old-space-size=\$\{ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB\}/u);
-    assert.match(owner, /--permission/u);
-    assert.match(owner, /--allow-fs-read=\$\{worker\.root\}/u);
-    assert.match(owner, /options\.allowAddons \? \['--allow-addons'\] : \[\]/u);
     assert.equal(ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB, 256);
     assert.doesNotMatch(`${owner}\n${materializer}\n${renderer}`,
         /from ['"](?:pdf-lib|pdfjs-dist|@napi-rs\/canvas)|import\(['"](?:pdf-lib|pdfjs-dist|@napi-rs\/canvas)/u);
@@ -115,4 +116,31 @@ test('pins the regular owned worker and keeps all PDF engines out of parent runt
     assert.match(worker.toString('utf8'), /const deadline = started \+ PAGE_TIMEOUT_MS/u);
     assert.doesNotMatch(worker.toString('utf8'),
         /documentSourceRef|documentRevision|documentFreshnessEpoch|attachmentId|patientId|receipt/u);
+});
+
+test('both real PDF callers pass the exact owned root, heap and conditional addon permission to spawn', async () => {
+    const root = realpathSync(fileURLToPath(new URL('../../../', import.meta.url)));
+    const worker = realpathSync(fileURLToPath(new URL('../../../scripts/anydoc-pdf-page-worker.mjs', import.meta.url)));
+    const original = childProcess.spawn;
+    const calls: { command: string; args: readonly string[] }[] = [];
+    childProcess.spawn = (command: string, args?: unknown) => {
+        assert.ok(Array.isArray(args) && args.every(arg => typeof arg === 'string'));
+        calls.push({ command, args });
+        throw new Error('Synthetic stop before execution');
+    };
+    syncBuiltinESMExports();
+    try {
+        assert.equal((await runAnyDocPdfMaterializationChild(Buffer.from('%PDF-synthetic'), 1)).status, 'failed');
+        assert.equal((await runAnyDocPdfRenderingChild([{ page: 1, pdfBytes: Buffer.from('%PDF-synthetic') }])).status, 'failed');
+    } finally { childProcess.spawn = original; syncBuiltinESMExports(); }
+    assert.equal(calls.length, 2);
+    for (const [index, call] of calls.entries()) {
+        const core = ['--max-old-space-size=256', '--permission', '--disable-warning=SecurityWarning', `--allow-fs-read=${root}`,
+            ...(index === 1 ? ['--allow-addons'] : []), worker];
+        const command = process.platform === 'darwin' ? '/usr/bin/sandbox-exec' : process.platform === 'linux' ? '/usr/bin/prlimit' : process.execPath;
+        const prefix = process.platform === 'darwin' ? ['-p', '(version 1) (allow default) (deny network*) (deny file-write*)', process.execPath]
+            : process.platform === 'linux' ? ['--data=1073741824', '--', process.execPath] : [];
+        assert.equal(call.command, command);
+        assert.deepEqual(call.args, [...prefix, ...core]);
+    }
 });

@@ -4,7 +4,7 @@ import { assertImageSize, PREVIEW_LIMITS, PreviewError } from './document-viewer
 import { PreviewScope } from './document-viewer-scope.ts';
 import { OwnedStandardFontDataFactory } from './document-viewer-pdf-fonts.ts';
 import { boundedCanvasFactory, checkPdfOperators } from './document-viewer-pdf-resources.ts';
-import { paintPdfPage, type PreviewPdfEngineFactory, type PreviewPdfPage, type PreviewRenderTask } from './document-viewer-pdf-core.ts';
+import { paintPdfPage, rejectPdfWorkerFailure, type PreviewPdfEngineFactory, type PreviewPdfPage, type PreviewRenderTask } from './document-viewer-pdf-core.ts';
 
 // PDF.js 4.10 exposes onContinue as Function. Do not assert that its task has
 // our narrower callback property: install a typed callback through this port.
@@ -41,11 +41,14 @@ export async function renderPdfPreview(bytes: Uint8Array, number: number, canvas
                 event.preventDefault();
                 fail(new PreviewError('runtime_unavailable'));
             };
+            const workerMessage = (event: MessageEvent) => rejectPdfWorkerFailure(event.data, fail);
+            port.addEventListener('message', workerMessage);
             port.addEventListener('error', workerError);
             port.addEventListener('messageerror', workerError);
             const dispose = () => {
                 if (disposed) return;
                 disposed = true;
+                port.removeEventListener('message', workerMessage);
                 port.removeEventListener('error', workerError);
                 port.removeEventListener('messageerror', workerError);
                 // Trigger PDF.js cleanup, but never wait for a destroyed peer's
@@ -84,10 +87,7 @@ export async function renderPdfPreview(bytes: Uint8Array, number: number, canvas
                     disableStream: true,
                     disableAutoFetch: true,
                     isOffscreenCanvasSupported: false,
-                    // PDF.js' finite maxImageSize can silently omit images.
-                    // Inspect materialized operators instead; see documented
-                    // residual decode-heap risk, not a false complete-page claim.
-                    maxImageSize: -1,
+                    maxImageSize: PREVIEW_LIMITS.imagePixels,
                     verbosity: 0,
                 });
                 loading.onPassword = () => fail(new PreviewError('encrypted_pdf'));

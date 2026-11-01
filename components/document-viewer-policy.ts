@@ -33,7 +33,7 @@ const MESSAGES = {
     invalid_image: 'L’immagine non è leggibile o è danneggiata. L’allegato non è stato modificato.',
     animated_image: 'L’anteprima locale supporta solo immagini statiche, non animate.',
     image_limit: 'L’immagine supera i limiti di dimensione dell’anteprima locale. L’allegato non è stato modificato.',
-    invalid_pdf: 'Il PDF non è leggibile o è danneggiato. L’allegato non è stato modificato.',
+    invalid_pdf: 'Anteprima PDF rifiutata: il documento è danneggiato o supera i limiti grafici. Nessuna pagina incompleta viene mostrata. L’allegato non è stato modificato.',
     encrypted_pdf: 'Il PDF è protetto da cifratura o password e non può essere aperto in questa anteprima.',
     xfa_pdf: 'I moduli PDF XFA non sono supportati dall’anteprima locale.',
     page_limit: 'Il PDF supera il limite di 500 pagine per l’anteprima locale.',
