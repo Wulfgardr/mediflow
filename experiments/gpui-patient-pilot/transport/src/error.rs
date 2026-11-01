@@ -58,7 +58,7 @@ impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::InvalidInput => "Configurazione o dati non validi.",
-            Self::UnsupportedUnlock => "Questo archivio usa un metodo di accesso non ancora supportato da questa versione.",
+            Self::UnsupportedUnlock => "Per gestire questo metodo di accesso, apri MediFlow nel browser sul computer dell’ambulatorio, accedi con il PIN e scegli Impostazioni, Accesso, Passa dal PIN alla passphrase. Salva il kit e la chiave di recupero, conferma e torna qui usando la nuova frase di accesso.",
             Self::UnsupportedProtocol => "Aggiorna Mediflow sul computer che ospita l’archivio per usare questa versione.",
             Self::Authentication => "Accesso non valido o sessione scaduta. Accedi di nuovo.",
             Self::Forbidden => "L'operatore o il dispositivo non è autorizzato a questa operazione.",
