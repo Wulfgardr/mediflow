@@ -235,35 +235,20 @@ impl ClinicalApp {
         if let Some(services) = &self.local_host.controls.services {
             pane = pane.child(services_view(services, theme));
         }
-        pane = pane.child(section("controls-updates","Aggiornamenti e revisione",theme))
-            .child(text!("Informazioni del manifest locale. La lettura non cerca release in rete e non installa aggiornamenti."));
-        for (id, result, keys) in [
-            (
-                "controls-updates-error",
-                &snapshot.updates,
-                &[
-                    ("currentVersion", "Versione corrente"),
-                    ("availableVersion", "Versione segnalata"),
-                    ("updateAvailable", "Aggiornamento segnalato"),
-                    ("source", "Fonte"),
-                    ("channel", "Canale"),
-                    ("checkedAt", "Lettura"),
-                    ("changelogTitle", "Changelog"),
-                    ("updateUrl", "Indirizzo aggiornamento"),
-                ][..],
-            ),
-            (
-                "controls-revision-error",
-                &snapshot.revision,
-                &[
-                    ("revision", "Revisione host"),
-                    ("branch", "Ramo host"),
-                    ("sourceFingerprint", "Impronta sorgente"),
-                    ("fingerprint", "Impronta build"),
-                    ("worktreeHash", "Impronta checkout"),
-                ][..],
-            ),
-        ] {
+        pane = pane.child(section("controls-updates","Versione e aggiornamenti",theme))
+            .child(text!("La versione e le novità sono quelle indicate su questo computer. Non sono stati cercati aggiornamenti in rete."));
+        for (id, result, keys) in [(
+            "controls-updates-error",
+            &snapshot.updates,
+            &[
+                ("currentVersion", "Versione corrente"),
+                ("availableVersion", "Versione segnalata"),
+                ("updateAvailable", "Aggiornamento segnalato"),
+                ("checkedAt", "Lettura"),
+                ("changelogTitle", "Novità"),
+                ("updateUrl", "Indirizzo aggiornamento"),
+            ][..],
+        )] {
             if let Some(error) = section_state(id, result, theme) {
                 pane = pane.child(error);
             }
