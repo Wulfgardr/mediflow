@@ -22,7 +22,7 @@ impl ClinicalApp {
     pub(super) fn toggle_document_original(&mut self, id: &str, cx: &mut Context<Self>) {
         if self.form.is_some()
             || self.document_operation != DocumentOperation::Idle
-            || self.local_host.has_work()
+            || self.local_work_pending()
         {
             return;
         }

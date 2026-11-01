@@ -2952,6 +2952,25 @@ impl RuntimeSession {
             .map_err(|_| RuntimeError::Locked)?;
         Ok(guard)
     }
+    pub(crate) fn open_document_insights(&self, value: &mut Value) -> Result<()> {
+        if !self
+            .decrypt_fields(value, &[("documentInsights", false, true)])?
+            .is_empty()
+        {
+            return Err(RuntimeError::LockedField);
+        }
+        if let Some(field) = value.get_mut("documentInsights")
+            && let Some(text) = field.as_str()
+        {
+            *field = serde_json::from_str(text).map_err(|_| RuntimeError::InvalidResponse)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn seal_document_insights(&self, rows: &[Value]) -> Result<Value> {
+        self.seal_fields(json!({"documentInsights":rows}), &["documentInsights"])
+    }
+
     fn seal_fields(&self, mut value: Value, fields: &[&str]) -> Result<Value> {
         self.ensure_open()?;
         let secrets = self
@@ -10379,5 +10398,232 @@ mod g3_network_tests {
         );
         drop(command);
         worker.join().unwrap();
+    }
+}
+
+#[cfg(test)]
+mod document_archive_tests {
+    use super::tests::{local_host_login, local_host_reply, read_request, session_at};
+    use super::*;
+    use std::{net::TcpListener, thread};
+    #[test]
+    fn archive_commands_cannot_cross_local_authorities_or_survive_lock() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            serve(&listener, "GET", 200, patient(3, json!([row("one")])));
+            local_host_login(&listener);
+        });
+        let first = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let archive = Arc::new(
+            first
+                .read_document_insights("scope-a", "patient-a")
+                .unwrap(),
+        );
+        let command = first
+            .prepare_insights_removal(archive.clone(), None)
+            .unwrap();
+        let second = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        assert_eq!(
+            second.prepare_insights_removal(archive, None).err(),
+            Some(RuntimeError::ReadRequired)
+        );
+        assert_eq!(
+            second.remove_document_insights(&command).err(),
+            Some(RuntimeError::ReadRequired)
+        );
+        session.lock();
+        assert_eq!(
+            first.remove_document_insights(&command).err(),
+            Some(RuntimeError::Locked)
+        );
+        worker.join().unwrap();
+    }
+    fn row(id: &str) -> Value {
+        json!({"id":id,"fileName":"Referto sintetico.jpg","summary": if id=="two" { "Sintesi sintetica invariata ".repeat(1000) } else {"Sintesi sintetica invariata".into()}, "rawMarkdown":"Testo clinico sintetico. Caffè e perché. 🩺", "extractedData":{"medications":["Farmaco sintetico"],"labs":{"valore":"42 unità"}}, "unknownFutureField":{"preserve":"exact"}})
+    }
+    fn patient(version: u64, rows: Value) -> Value {
+        json!({"id":"patient-a","ambulatoryId":"scope-a","version":version,"deletedAt":null,"documentInsights": if rows.is_array() { json!(rows.to_string()) } else {rows}})
+    }
+    fn serve(listener: &TcpListener, method: &str, status: u16, value: Value) -> String {
+        let (mut stream, _) = crate::test_loopback::accept(listener).unwrap();
+        let request = read_request(&mut stream);
+        assert!(request.starts_with(&format!("{method} /api/patients/patient-a ")));
+        assert!(request.contains("mediflow_session="));
+        assert!(!request.to_lowercase().contains("x-mediflow-paired-client"));
+        local_host_reply(&mut stream, status, value, "");
+        request
+    }
+    #[test]
+    fn archive_removal_uses_web_cas_encryption_and_preserves_every_unselected_value() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let decrypt = session.clone();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            serve(
+                &listener,
+                "GET",
+                200,
+                patient(3, json!([row("one"), row("two")])),
+            );
+            serve(
+                &listener,
+                "GET",
+                200,
+                patient(3, json!([row("one"), row("two")])),
+            );
+            let request = serve(&listener, "PUT", 200, json!({"success":true}));
+            assert!(!request.contains("Sintesi sintetica"));
+            let mut body: Value =
+                serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+            assert_eq!(body["version"], 3);
+            assert!(
+                body["documentInsights"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("ENC:")
+            );
+            decrypt.open_document_insights(&mut body).unwrap();
+            assert_eq!(body["documentInsights"], json!([row("two")]));
+            assert_eq!(body.as_object().unwrap().len(), 3);
+            serve(&listener, "GET", 200, patient(4, json!([row("two")])));
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let archive = Arc::new(
+            access
+                .read_document_insights("scope-a", "patient-a")
+                .unwrap(),
+        );
+        assert_eq!(archive.rows().len(), 2);
+        assert!(
+            access
+                .prepare_insights_removal(archive.clone(), Some("absent"))
+                .is_err()
+        );
+        let command = access
+            .prepare_insights_removal(archive, Some("one"))
+            .unwrap();
+        assert_eq!(command.removed().count(), 1);
+        assert_eq!(
+            access
+                .remove_document_insights(&command)
+                .map(|observed| observed.is_some()),
+            Ok(true)
+        );
+        assert_eq!(
+            access
+                .remove_document_insights(&command)
+                .map(|observed| observed.is_some()),
+            Err(RuntimeError::ReadRequired)
+        );
+        worker.join().unwrap();
+    }
+    #[test]
+    fn unreadable_foreign_malformed_or_duplicate_archive_never_becomes_an_empty_editable_list() {
+        for mut value in [
+            patient(3, json!("ENC2:not-readable")),
+            patient(3, json!([row("one"), row("one")])),
+            patient(3, json!([{"id":"bad","fileName":"bad"}])),
+            patient(3, json!([])),
+        ] {
+            let foreign = value["documentInsights"] == json!("[]");
+            if foreign {
+                value["ambulatoryId"] = json!("scope-b");
+            }
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                serve(&listener, "GET", 200, value);
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            assert!(
+                access
+                    .read_document_insights("scope-a", "patient-a")
+                    .is_err()
+            );
+            worker.join().unwrap();
+        }
+    }
+    #[test]
+    fn changed_archive_denies_the_put_and_an_acknowledgement_without_readback_stays_unconfirmed() {
+        for conflict in [true, false] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                serve(&listener, "GET", 200, patient(3, json!([row("one")])));
+                serve(
+                    &listener,
+                    "GET",
+                    200,
+                    patient(if conflict { 4 } else { 3 }, json!([row("one")])),
+                );
+                if !conflict {
+                    serve(&listener, "PUT", 200, json!({"success":true}));
+                    serve(&listener, "GET", 503, json!({"error":"synthetic"}));
+                    serve(&listener, "GET", 200, patient(4, json!([])));
+                }
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let archive = Arc::new(
+                access
+                    .read_document_insights("scope-a", "patient-a")
+                    .unwrap(),
+            );
+            let command = access.prepare_insights_removal(archive, None).unwrap();
+            assert_eq!(
+                access
+                    .remove_document_insights(&command)
+                    .map(|observed| observed.is_some()),
+                if conflict {
+                    Err(RuntimeError::Conflict)
+                } else {
+                    Ok(false)
+                }
+            );
+            assert_eq!(
+                access
+                    .remove_document_insights(&command)
+                    .map(|observed| observed.is_some()),
+                Err(RuntimeError::ReadRequired)
+            );
+            if !conflict {
+                assert_eq!(
+                    access
+                        .verify_insights_removal(&command)
+                        .map(|observed| observed.is_some()),
+                    Ok(true)
+                );
+            }
+            worker.join().unwrap();
+        }
     }
 }
