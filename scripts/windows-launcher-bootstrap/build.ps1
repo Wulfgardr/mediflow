@@ -18,7 +18,7 @@ $object = Join-Path $Output 'system-directory.obj'
 $binary = Join-Path $Output 'system-directory.node'
 $include = Join-Path $Sdk 'node-v24.22.0\include\node'
 $library = Join-Path $Sdk 'node.lib'
-& $compiler /nologo /TC /W4 /WX /O2 /GS- /LD "/I$include" "/Fo$object" $source /link /NOENTRY /NODEFAULTLIB /INCREMENTAL:NO "/MACHINE:$Architecture" "/OUT:$binary" $library kernel32.lib
+& $compiler /nologo /TC /W4 /WX /O2 /GS- /LD "/I$include" "/Fo$object" $source /link /Brepro /NOENTRY /NODEFAULTLIB /INCREMENTAL:NO "/MACHINE:$Architecture" "/OUT:$binary" $library kernel32.lib advapi32.lib
 if ($LASTEXITCODE -ne 0) { throw 'Native bootstrap compilation failed' }
 $dependencies = & $linker /nologo /dependents $binary
 if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect bootstrap dependencies' }

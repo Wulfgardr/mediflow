@@ -71,7 +71,7 @@ function seed(bytes: Buffer) {
 function substituteRecognition(start: () => { script?: string; missing?: boolean }) {
     let calls = 0;
     mock.method(childProcess, 'spawn', (command: string, args: string[], options: childProcess.SpawnOptions) => {
-        if (command !== '/usr/bin/sandbox-exec') return originalSpawn(command, args, options);
+        if (command !== '/usr/bin/sandbox-exec' || args[2] !== '/usr/bin/xcrun') return originalSpawn(command, args, options);
         calls += 1;
         assert.deepEqual(args.slice(0, 4), ['-p', '(version 1) (allow default) (deny network*)', '/usr/bin/xcrun', 'swift']);
         assert.equal(options.detached, true);

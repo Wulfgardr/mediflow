@@ -95,7 +95,7 @@ function DocumentOriginal({ patientId, attachment, onClose, onRefreshList }: {
     // A list refresh unmounts this view; it never promotes old bytes to new metadata.
     const current = result?.metadata === attachment && !result.signal.aborted ? result : null;
     if (current && 'file' in current)
-        return <DocumentViewer inline file={current.file.data!} fileName={current.file.name} onClose={onClose} />;
+        return <DocumentViewer inline file={current.file.data!} fileName={current.file.name} signal={current.signal} onClose={onClose} />;
     return <>
         <p role={current ? 'alert' : 'status'} className={styles.empty}>{current?.error ?? 'Caricamento originale…'}</p>
         {current && <button type="button" className={disclosure.documentAction} data-lume-action="quiet"

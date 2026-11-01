@@ -3,21 +3,24 @@
   "exports": [
     "createJobForProcess",
     "getProcessCreationTimeTicks",
-    "getSystemDirectory"
+    "getSystemDirectory",
+    "getDirectorySecurity",
+    "restrictDirectorySecurity"
   ],
   "platform": "win32",
   "arch": "x64",
   "napiVersion": 1,
   "binary": "system-directory.node",
-  "bytes": 8192,
-  "sha256": "d92c56c9e0bbc8aa4c40b41f64e7375403f94b04bddc2ed588ffa8558a2b7d8a",
+  "bytes": 12288,
+  "sha256": "bdacc6372dc221e94bfd1d9a13e650d53398d48575ead751a1ee0c762f55384f",
   "dependencies": [
+    "advapi32.dll",
     "kernel32.dll",
     "node.exe"
   ],
-  "sourceSha256": "d225cabaca09fca34c103e93608963aca8bb01dfca4ff7df21b285147cb16e7c",
-  "recipeSha256": "576c867a61525717b5bb5d613b92f195432357306ced21cdec07adae78c9c1f1",
-  "builderSha256": "dac5c0648b21e5e1f4c085ceea902eb80c52a7eba5329abd909ec57f28a72089",
+  "sourceSha256": "6a891f4ca0398902695c1e56af4a279bfcf923af6b57024f977b95083f3390bc",
+  "recipeSha256": "4b63b0d9168c677c806bef37ea1b6842fd8a2e5e5265ea1e66830b8be9deeccc",
+  "builderSha256": "aa77ba7c1815c059f69496c3a08a78586f11f6d8eb5d3ee0b9242af9295c55e0",
   "sdk": {
     "node": "24.22.0",
     "headersSha256": "00e9f08b9057f9f5428387a5ffd496e53f274565b40b144b7ba876700755352a",

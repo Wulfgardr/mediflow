@@ -1,3 +1,4 @@
+import { documentChildLaunch } from '../../../scripts/document-child-launcher.mjs';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
@@ -89,7 +90,7 @@ function inside(root: string, candidate: string): boolean {
     return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
 }
 
-function resolveOwnedWorker(): { path: string; directory: string } | null {
+function resolveOwnedWorker(): { path: string; directory: string; root: string } | null {
     let directory: string;
     try { directory = realpathSync(MODULE_DIRECTORY); } catch { return null; }
 
@@ -110,7 +111,7 @@ function resolveOwnedWorker(): { path: string; directory: string } | null {
                 const worker = realpathSync(workerPath);
                 if (!inside(root, worker) || !statSync(worker).isFile()) return null;
                 const digest = createHash('sha256').update(readFileSync(worker)).digest('hex');
-                return digest === WORKER_SHA256 ? { path: worker, directory: path.dirname(worker) } : null;
+                return digest === WORKER_SHA256 ? { path: worker, directory: path.dirname(worker), root } : null;
             } catch { return null; }
         }
         const parent = path.dirname(directory);
@@ -125,7 +126,8 @@ async function runWorker(bytes: Buffer): Promise<WorkerResult> {
     return await new Promise((resolve) => {
         const worker = resolveOwnedWorker();
         if (!worker) return resolve({ signal: 'io' });
-        const child = spawn(process.execPath, [worker.path], {
+        const launch = documentChildLaunch(worker.root, worker.path, { allowAddons: true });
+        const child = spawn(launch.command, launch.args, {
             cwd: worker.directory,
             env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
             stdio: ['pipe', 'pipe', 'pipe'],

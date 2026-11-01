@@ -5,6 +5,12 @@ name: Cross-platform (Win/Linux/macOS)
 # contract shared by .nvmrc, package engines, launchers and native bundles.
 
 on:
+  workflow_dispatch:
+    inputs:
+      regenerate_bootstrap:
+        description: Build and compare two deterministic native artifacts for review
+        type: boolean
+        default: false
   pull_request:
   push:
     branches:
@@ -31,9 +37,17 @@ jobs:
         with:
           node-version: 24
           architecture: ${{ matrix.arch }}
+      - name: Prepare native bootstrap regeneration
+        if: github.event_name == 'workflow_dispatch' && inputs.regenerate_bootstrap
+        run: node -e "const fs=require('node:fs'); for(const name of ['system-directory.node','manifest.json']) fs.unlinkSync('scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/'+name);"
       - name: Build native Windows bootstrap (development only)
         if: hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/system-directory.node', matrix.arch)) == '' && hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/manifest.json', matrix.arch)) == ''
         run: node scripts/prepare-windows-launcher-bootstrap.mjs build
+      - name: Compare delivered native bootstrap with source rebuild
+        id: compare
+        run: node scripts/verify-windows-bootstrap-rebuild.mjs
+      - name: Verify private backup DACL with Windows system tools
+        run: node --test lib/windows-private-directory.test.ts
       - name: Verify delivered artifact and OS path
         run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
       - name: Verify native bootstrap with hostile cwd PATH and root variables
@@ -43,6 +57,7 @@ jobs:
       - name: Prove source-first before npm ci
         run: node scripts/prepare-windows-launcher-bootstrap.mjs source-first
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: success() || (always() && github.event_name == 'workflow_dispatch' && inputs.regenerate_bootstrap && steps.compare.outcome == 'success')
         with:
           name: windows-launcher-bootstrap-${{ matrix.arch }}
           path: |
@@ -51,6 +66,7 @@ jobs:
           if-no-files-found: error
 
   headless-contracts:
+    if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
     needs: windows-bootstrap
     name: Headless contracts (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -87,6 +103,7 @@ jobs:
         run: npm run test:native-launcher
 
   build-start:
+    if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
     needs: windows-bootstrap
     name: build + start (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -134,7 +151,7 @@ jobs:
           try {
             # Each file owns multi-process drain/crash tests and synchronous volume flushes.
             # Serialize files on the shared runner; concurrency inside those tests stays intact.
-            node scripts/run-strip-types.mjs --test --test-concurrency=1 lib/sqlite-durability.test.ts lib/sqlite-maintenance-admission.test.ts lib/sqlite-swap-recovery.test.ts lib/sqlite-repair.test.ts lib/backup-total-roundtrip.test.ts lib/scheduled-backup-runtime-contract.test.ts
+            node scripts/run-strip-types.mjs --test --test-concurrency=1 lib/sqlite-durability.test.ts lib/sqlite-maintenance-admission.test.ts lib/sqlite-swap-recovery.test.ts lib/sqlite-repair.test.ts lib/backup-total-roundtrip.test.ts lib/scheduled-backup-runtime-contract.test.ts lib/backup-scheduler-route.test.ts lib/backup-scheduler.test.ts lib/recovery-backup.test.ts
             if ($LASTEXITCODE -ne 0) { throw 'Windows SQLite durability and recovery tests failed' }
           } finally {
             Remove-Item -LiteralPath $fixture -Recurse -Force
@@ -143,6 +160,7 @@ jobs:
         run: node scripts/ci-start-smoke.mjs
 
   static-checks:
+    if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
     name: lint + typecheck (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -162,6 +180,7 @@ jobs:
         run: npm run typecheck
 
   windows-x64-emulation:
+    if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
     name: SQLite and launcher (Windows ARM, Node x64)
     runs-on: windows-11-arm
     steps:

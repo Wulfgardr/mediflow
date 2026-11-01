@@ -318,3 +318,18 @@ test('valid typed RGB reaches paint and retains disposal; invalid typed RGB neve
     await assert.rejects(paintPdfPage(bytes, 1, canvas(), new AbortController().signal, bad.factory), fails('invalid_pdf'));
     assert.equal(bad.calls.paint, 0); assert.equal(bad.calls.dispose, 1);
 });
+
+test('worker stream errors reject the whole preview before PDF.js can publish a partial operator list', async () => {
+    const { rejectPdfWorkerFailure } = await import('./document-viewer-pdf-core.ts');
+    assert.equal(typeof rejectPdfWorkerFailure, 'function');
+    const f = fixture(), target = canvas();
+    f.opened.resolve(f.document);
+    f.page.operators = async () => {
+        rejectPdfWorkerFailure({ sourceName: 'worker', targetName: 'main', stream: 5, reason: { message: 'oversized image' } }, f.fail);
+        return { fnArray: [], argsArray: [] };
+    };
+    await assert.rejects(paintPdfPage(bytes, 1, target, new AbortController().signal, f.factory), fails('invalid_pdf'));
+    assert.equal(f.calls.paint, 0);
+    assert.equal(target.width, 0);
+    assert.equal(f.calls.dispose, 1);
+});
