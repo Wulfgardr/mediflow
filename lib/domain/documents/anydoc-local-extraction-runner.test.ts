@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, copyFileSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import os from 'node:os';
@@ -207,6 +207,8 @@ test('fails closed with sanitized io_failure for missing, symlinked, and tampere
     try {
         for (const relativePath of [
             'package.json',
+            'scripts/document-child-launcher.mjs',
+            'scripts/document-child-network-guard.mjs',
             'lib/domain/documents/anydoc-local-extraction-runner.ts',
             'lib/domain/documents/anydoc-local-extraction-contract.ts',
             relativeWorker,
@@ -216,7 +218,7 @@ test('fails closed with sanitized io_failure for missing, symlinked, and tampere
             copyFileSync(path.join(packageRoot, relativePath), destination);
             assert.deepEqual(readFileSync(destination), readFileSync(path.join(packageRoot, relativePath)));
         }
-        symlinkSync(path.join(packageRoot, 'node_modules'), path.join(fixtureRoot, 'node_modules'), 'dir');
+        cpSync(path.join(packageRoot, 'node_modules', '@firecrawl'), path.join(fixtureRoot, 'node_modules', '@firecrawl'), { recursive: true });
         /* a literal import in a synthetic child driver keeps the privacy import guard inspectable. */
         const fixtureDriver = path.join(fixtureRoot, 'driver.mjs');
         writeFileSync(fixtureDriver, `import { extractAnyDocLocalBytes } from './lib/domain/documents/anydoc-local-extraction-runner.ts';

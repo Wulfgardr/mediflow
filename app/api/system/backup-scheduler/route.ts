@@ -3,7 +3,7 @@ import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request'
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { backupDestinationIdentity, BackupDestinationError, validateBackupDestination } from '@/scripts/backup-destination-policy.mjs';
+import { backupDestinationIdentity, backupStorageDirectory, BackupDestinationError, validateBackupDestination } from '@/scripts/backup-destination-policy.mjs';
 import { dbServer, runDbServerImmediateTransaction } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 
         return runDbServerImmediateTransaction(() => mutateScheduler(body, request, session));
     } catch (error) {
-        if (error instanceof BackupDestinationError) return NextResponse.json({ error: error.userMessage, code: 'backup_destination_rejected' }, { status: 422 });
+        if (error instanceof BackupDestinationError) return NextResponse.json({ error: error.userMessage, code: error.code }, { status: 422 });
         return schedulerError(error);
     }
 }
@@ -122,9 +122,10 @@ function mutateScheduler(body: Record<string, unknown>, request: Request, sessio
     }
 
     const nextState = { ...draftState, revision: randomUUID() };
-    if (nextState.config.enabled && typeof configPatch.destinationDir === 'string' && configPatch.destinationDir !== nextState.config.destinationDir) throw new BackupDestinationError('Scegli una cartella assoluta esistente.');
+    if (nextState.config.enabled && typeof configPatch.destinationDir === 'string' && backupStorageDirectory(configPatch.destinationDir) !== nextState.config.destinationDir) throw new BackupDestinationError('Scegli una cartella assoluta esistente.');
     if (nextState.config.enabled) {
         const validated = validateBackupDestination(nextState.config.destinationDir, nextState.config.volumeProtectionAcknowledged);
+        nextState.config.destinationDir = validated.destination;
         nextState.config.volumeProtectionIdentity = backupDestinationIdentity(validated.destination);
     }
 

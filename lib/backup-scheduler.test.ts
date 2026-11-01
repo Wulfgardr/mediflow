@@ -1,3 +1,4 @@
+import { resolveEffectiveBackupDestination } from '../scripts/backup-destination-policy.mjs';
 import { prepareSyntheticBackupDestination } from './scheduled-backup.test-support.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,7 +36,7 @@ test('reads default backup scheduler state when setting is missing', () => {
     assert.equal(state.config.enabled, false);
     assert.equal(state.config.hour, 2);
     assert.equal(state.config.minute, 0);
-    assert.match(state.config.destinationDir, /backups$/);
+    assert.equal(path.basename(state.config.destinationDir), process.platform === 'win32' ? '.mediflow-private' : 'backups');
     assert.equal(state.config.retentionKeepArtifacts, DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS);
 });
 
@@ -45,6 +46,15 @@ test('persisted scheduler enablement accepts only the boolean true', () => {
         const state = readBackupSchedulerStateFromValue(JSON.stringify({ config: { enabled } }));
         assert.equal(state.config.enabled, false, JSON.stringify(enabled));
     }
+});
+
+test('schedule changes retain a volume confirmation only for the same effective destination', () => {
+    const current = getDefaultBackupSchedulerState();
+    current.config.volumeProtectionAcknowledged = true;
+    current.config.volumeProtectionIdentity = 'synthetic physical identity';
+    assert.equal(mergeBackupSchedulerConfig(current, { enabled: false }).config.volumeProtectionIdentity, 'synthetic physical identity');
+    assert.equal(mergeBackupSchedulerConfig(current, { volumeProtectionAcknowledged: false }).config.volumeProtectionIdentity, undefined);
+    assert.equal(mergeBackupSchedulerConfig(current, { destinationDir: path.join(os.tmpdir(), 'another-owned-folder'), volumeProtectionAcknowledged: true }).config.volumeProtectionIdentity, undefined);
 });
 
 function withScheduledBackupFixture(check: (fixture: {
@@ -129,6 +139,26 @@ test('explicit manual force still creates a backup while automatic enablement is
     }
 });
 
+test('Windows legacy parent configuration publishes and inventories only the same private destination', { skip: process.platform !== 'win32' }, () => {
+    withScheduledBackupFixture(({ destinationDir, setEnabled, run }) => {
+        setEnabled(true);
+        const result = run(true);
+        assert.equal(result.status, 0, JSON.stringify(result.result));
+        const effective = path.join(fs.realpathSync(destinationDir), '.mediflow-private');
+        assert.equal(path.dirname(result.result.artifactPath!), effective);
+        const legacy = path.join(destinationDir, 'mediflow-backup-v1-2026-10-01.mediflow');
+        fs.writeFileSync(legacy, 'synthetic parent copy');
+        for (const day of [29, 30]) fs.writeFileSync(path.join(effective, `mediflow-backup-v1-2026-10-${day}.mediflow`), 'synthetic older copy');
+        const preview = previewBackupRetention({ destinationDir, retentionKeepArtifacts: 1 });
+        assert.equal(preview.destinationDir, effective);
+        assert.equal(preview.artifactCount, 3);
+        assert.equal(preview.deleteCount, 2);
+        assert.ok(preview.items.every(item => path.dirname(item.path) === effective));
+        assert.equal(fs.readFileSync(legacy, 'utf8'), 'synthetic parent copy');
+        assert.equal(fs.readdirSync(effective).filter(name => name.endsWith('.mediflow')).length, 3);
+    });
+});
+
 test('scheduled backups and a new destination are readable only by the owning account', { skip: process.platform === 'win32' }, () => {
     withScheduledBackupFixture(({ destinationDir, setEnabled, run }) => {
         setEnabled(true);
@@ -167,12 +197,8 @@ test('merges and sanitizes backup scheduler config', () => {
 });
 
 test('builds a launchd plist with the configured schedule and destination', () => {
-    const state = mergeBackupSchedulerConfig(getDefaultBackupSchedulerState(), {
-        enabled: true,
-        hour: 1,
-        minute: 45,
-        destinationDir: '/Users/demo/Backups/MediFlow',
-    });
+    const state = getDefaultBackupSchedulerState();
+    state.config = { ...state.config, enabled: true, hour: 1, minute: 45, destinationDir: '/Users/demo/Backups/MediFlow' };
 
     const plist = buildBackupLaunchAgentPlist(state, {
         projectRoot: '/tmp/mediflow',
@@ -190,10 +216,11 @@ test('builds a launchd plist with the configured schedule and destination', () =
 
 test('previews only scheduler-owned backup artifacts beyond keep-last-N plus orphan temp files', async () => {
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mediflow-backup-preview-'));
-    const olderArtifact = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T00-00-00.000Z.mediflow');
-    const newerArtifact = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T01-00-00.000Z.mediflow');
-    const orphanTemp = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T02-00-00.000Z.mediflow.tmp');
-    const unrelated = path.join(tempDir, 'notes.txt');
+    const effective = resolveEffectiveBackupDestination(tempDir, { create: true });
+    const olderArtifact = path.join(effective, 'mediflow-backup-v1-2026-03-18T00-00-00.000Z.mediflow');
+    const newerArtifact = path.join(effective, 'mediflow-backup-v1-2026-03-18T01-00-00.000Z.mediflow');
+    const orphanTemp = path.join(effective, 'mediflow-backup-v1-2026-03-18T02-00-00.000Z.mediflow.tmp');
+    const unrelated = path.join(effective, 'notes.txt');
 
     await fs.promises.writeFile(olderArtifact, 'older');
     await fs.promises.writeFile(newerArtifact, 'newer');
@@ -223,10 +250,11 @@ test('previews only scheduler-owned backup artifacts beyond keep-last-N plus orp
 
 test('applies retention and tracks the last cleanup state', async () => {
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mediflow-backup-apply-'));
-    const preservedArtifact = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T02-00-00.000Z.mediflow');
-    const staleArtifact = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T01-00-00.000Z.mediflow');
-    const orphanTemp = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T03-00-00.000Z.mediflow.tmp');
-    const unrelated = path.join(tempDir, 'notes.txt');
+    const effective = resolveEffectiveBackupDestination(tempDir, { create: true });
+    const preservedArtifact = path.join(effective, 'mediflow-backup-v1-2026-03-18T02-00-00.000Z.mediflow');
+    const staleArtifact = path.join(effective, 'mediflow-backup-v1-2026-03-18T01-00-00.000Z.mediflow');
+    const orphanTemp = path.join(effective, 'mediflow-backup-v1-2026-03-18T03-00-00.000Z.mediflow.tmp');
+    const unrelated = path.join(effective, 'notes.txt');
 
     await fs.promises.writeFile(staleArtifact, 'older');
     await fs.promises.writeFile(preservedArtifact, 'latest');
@@ -277,9 +305,10 @@ test('applies retention and tracks the last cleanup state', async () => {
 
 test('retention preserves recent temp files and all temps while a runner lock is active', async () => {
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mediflow-backup-lock-'));
-    const recentTemp = path.join(tempDir, 'mediflow-backup-v1-recent.mediflow.tmp');
-    const staleTemp = path.join(tempDir, 'mediflow-backup-v1-stale.mediflow.tmp');
-    const lockPath = path.join(tempDir, '.mediflow-backup.lock');
+    const effective = resolveEffectiveBackupDestination(tempDir, { create: true });
+    const recentTemp = path.join(effective, 'mediflow-backup-v1-recent.mediflow.tmp');
+    const staleTemp = path.join(effective, 'mediflow-backup-v1-stale.mediflow.tmp');
+    const lockPath = path.join(effective, '.mediflow-backup.lock');
 
     await fs.promises.writeFile(recentTemp, 'recent');
     await fs.promises.writeFile(staleTemp, 'stale');

@@ -586,7 +586,9 @@ function schedulerFixture() {
     }));
     db.close();
     prepareSyntheticBackupDestination(f.dir, path.join(f.dir, 'backups'));
-    return f;
+    const destinationDir = path.join(f.dir, 'backups', ...(process.platform === 'win32' ? ['.mediflow-private'] : []));
+    assert.deepEqual(fs.readdirSync(destinationDir), []);
+    return { ...f, destinationDir };
 }
 
 const schedulerWorker = `
@@ -665,7 +667,7 @@ test('scheduler admission denial never reaches its error-path writer or changes 
             assert.match(w.output(), /SQLITE_MAINTENANCE_HOLD: maintenance_pending/);
             assert.match(w.output(), /NATIVE_HANDLES:\{"opened":0,"closed":0,"stillOpen":0\}/);
             assert.deepEqual(fs.readFileSync(f.target), before);
-            assert.deepEqual(fs.readdirSync(path.join(f.dir, 'backups')), []);
+            assert.deepEqual(fs.readdirSync(f.destinationDir), []);
             assert.deepEqual(fs.readdirSync(path.join(store(f.target), 'leases')), []);
         });
     } finally { f.cleanup(); }
@@ -676,8 +678,8 @@ for (const fault of ['destination-file', 'missing-settings']) {
         const f = schedulerFixture();
         try {
             if (fault === 'destination-file') {
-                fs.rmdirSync(path.join(f.dir, 'backups'));
-                fs.writeFileSync(path.join(f.dir, 'backups'), 'synthetic obstruction');
+                fs.rmdirSync(f.destinationDir);
+                fs.writeFileSync(f.destinationDir, 'synthetic obstruction');
             }
             else { const db = new Database(f.target); db.exec('DROP TABLE settings'); db.close(); }
             const w = schedulerChild(f.dir);

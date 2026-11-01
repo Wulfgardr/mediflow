@@ -400,6 +400,7 @@ export default function BackupSchedulerUI({ primary = true }: { primary?: boolea
                 <div className="mf-section mf-section-tight space-y-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                     <p><strong>Anteprima retention:</strong> {formatCountLabel(retentionPreview.deleteCount, 'file candidato', 'file candidati')}, {formatBytes(retentionPreview.deleteBytes)} totali.</p>
                     <p><strong>Policy:</strong> mantieni ultimi {retentionPreview.keepArtifacts} artifact nella cartella {retentionPreview.destinationDir}</p>
+                    <p>La pulizia riguarda soltanto questa cartella. Le copie in altre cartelle non vengono spostate né eliminate.</p>
                     <p><strong>Inventario:</strong> {retentionPreview.artifactCount} artifact gestiti, {retentionPreview.orphanTempCount} `.tmp` orfani</p>
                     {retentionPreview.items.length > 0 && (
                         <div className="space-y-1">

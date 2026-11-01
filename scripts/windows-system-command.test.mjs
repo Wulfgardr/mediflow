@@ -71,9 +71,9 @@ test('Windows bootstrap artifacts require source identity, digest, architecture 
   const bytes = Buffer.alloc(128); bytes.write('MZ'); bytes.writeUInt32LE(64, 60); bytes.writeUInt32LE(0x4550, 64); bytes.writeUInt16LE(0x8664, 68);
   const artifact = path.join(pack, 'prebuilds/win32-x64/system-directory.node');
   fs.writeFileSync(artifact, bytes);
-  const manifest = { schemaVersion: 3, exports: ['createJobForProcess','getProcessCreationTimeTicks','getSystemDirectory'], platform: 'win32', arch: 'x64', napiVersion: 1, binary: 'system-directory.node', bytes: bytes.length, sha256: sha(bytes),
+  const manifest = { schemaVersion: 3, exports: ['createJobForProcess','getProcessCreationTimeTicks','getSystemDirectory','getDirectorySecurity','restrictDirectorySecurity'], platform: 'win32', arch: 'x64', napiVersion: 1, binary: 'system-directory.node', bytes: bytes.length, sha256: sha(bytes),
     sourceSha256: sha(fs.readFileSync(path.join(pack, 'system-directory.c'))), recipeSha256: sha(fs.readFileSync(path.join(pack, 'build.ps1'))),
-    builderSha256: sha(fs.readFileSync(path.join(scripts, 'prepare-windows-launcher-bootstrap.mjs'))), dependencies: ['kernel32.dll', 'node.exe'] };
+    builderSha256: sha(fs.readFileSync(path.join(scripts, 'prepare-windows-launcher-bootstrap.mjs'))), dependencies: ['advapi32.dll', 'kernel32.dll', 'node.exe'] };
   fs.writeFileSync(path.join(pack, 'prebuilds/win32-x64/manifest.json'), JSON.stringify(manifest));
   t.diagnostic(driver(`
     import assert from 'node:assert/strict';import fs from 'node:fs';import module from 'node:module';
@@ -81,7 +81,7 @@ test('Windows bootstrap artifacts require source identity, digest, architecture 
     const actualOS=process.platform,original=JSON.parse(fs.readFileSync(manifestFile));let loads=0,shape='valid';
     const nativeRealpath=fs.realpathSync.native,nativeStat=fs.lstatSync;
     module.createRequire=url=>{assert.equal(url,${JSON.stringify(pathToFileURL(path.join(pack, 'index.mjs')).href)});return file=>{
-      assert.equal(file,artifact);loads++;if(shape==='missing')return {getSystemDirectory:()=>''};if(shape==='type')return {getProcessCreationTimeTicks:'invalid',getSystemDirectory:()=>''};if(shape==='extra')return {getProcessCreationTimeTicks:()=>'',getSystemDirectory:()=>'',extra:()=>''};const exported={createJobForProcess:()=>{},getProcessCreationTimeTicks:()=>"638000000000000001",getSystemDirectory:()=>String.raw\`C:\\Windows\\System32\`};if(shape==='hidden')Object.defineProperty(exported,'extra',{value:()=>''});if(shape==='symbol')exported[Symbol('extra')]=()=>'';return exported;
+      assert.equal(file,artifact);loads++;if(shape==='missing')return {getSystemDirectory:()=>''};if(shape==='type')return {getProcessCreationTimeTicks:'invalid',getSystemDirectory:()=>''};if(shape==='extra')return {getProcessCreationTimeTicks:()=>'',getSystemDirectory:()=>'',extra:()=>''};const exported={getDirectorySecurity:()=>{},restrictDirectorySecurity:()=>{},createJobForProcess:()=>{},getProcessCreationTimeTicks:()=>"638000000000000001",getSystemDirectory:()=>String.raw\`C:\\Windows\\System32\`};if(shape==='hidden')Object.defineProperty(exported,'extra',{value:()=>''});if(shape==='symbol')exported[Symbol('extra')]=()=>'';return exported;
     };};module.syncBuiltinESMExports();
     const {loadSystemDirectoryBinding}=await import(${JSON.stringify(pathToFileURL(path.join(pack, 'index.mjs')).href)});
     Object.defineProperty(process,'platform',{value:'win32'});Object.defineProperty(process,'arch',{value:'x64',configurable:true});

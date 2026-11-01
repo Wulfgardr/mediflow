@@ -177,3 +177,33 @@ Fermare il packet se:
 Questo ADR non aggiunge o riattiva OCR locale per immagini, egress, cloud,
 apply clinico, schema, migrazioni, route paired, locator, CAS, backup o nuove
 authority.
+
+## Contenimento dei processi, novembre 2026
+
+AnyDoc e i child PDF usano lo stesso launcher con heap V8 di 256 MiB,
+permission model Node, lettura della package root e nessun permesso di
+scrittura, creazione di child o worker. I moduli di rete e gli ingressi globali
+sono negati. Su macOS il processo nega anche rete e scritture tramite sandbox;
+su Linux richiede `prlimit` con `RLIMIT_DATA` di 1 GiB e fallisce se non disponibile.
+
+Questi limiti non costituiscono una quota universale sulla memoria nativa.
+Su Windows non viene ancora applicata una quota Job alla memoria; su macOS
+non viene dichiarato un limite RSS. Il permission model Node non confina le
+letture filesystem delle estensioni native. Apple Vision conserva il confine
+precedente: negare tutte le scritture impedisce, nella prova sintetica locale,
+la creazione della cache del motore e fa fallire una normale estrazione.
+Il contenimento completo di questo percorso resta aperto.
+
+
+### Limite residuo dell’anteprima PDF Web
+
+Il limite `maxImageSize` di PDF.js 4.10.38 controlla l’immagine principale prima
+della decodifica, ma non le costruzioni ricorsive di `/SMask` e `/Mask`. Non è
+esposto un controllo pubblico delle loro dimensioni prima delle allocazioni.
+Il rifiuto dell’intera anteprima dopo il controllo dell’immagine risolta resta
+obbligatorio, ma non costituisce una quota di memoria del decoder. Le fixture
+con immagine 1×1 e maschera 4000×4000 proteggono questo rifiuto; il limite
+pre-decodifica delle maschere resta aperto. La soglia non viene alzata e non
+vengono generate derivate. Il visualizzatore condiviso offre il salvataggio
+dell’originale solo dopo un gesto esplicito e l’avviso sulla copia decifrata,
+anche quando la scansione non è visualizzabile.
