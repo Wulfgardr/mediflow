@@ -29,5 +29,32 @@ khronos-egl = { git = "https://github.com/zed-industries/khronos-egl", rev = "42
 [profile.dev]
 debug = 0
 
+# I test derivano chiavi con PBKDF2 a 2.000.000 di iterazioni: senza
+# ottimizzare questi pacchetti dominano il tempo della suite.
+# pbkdf2_hmac è generico: viene istanziato nel crate che lo chiama.
+[profile.dev.package.mediflow-runtime-client]
+opt-level = 1
+
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.dev.package.hmac]
+opt-level = 3
+
+[profile.dev.package.pbkdf2]
+opt-level = 3
+
+[profile.dev.package.digest]
+opt-level = 3
+
+[profile.dev.package.block-buffer]
+opt-level = 3
+
+[profile.dev.package.generic-array]
+opt-level = 3
+
+[profile.dev.package.crypto-common]
+opt-level = 3
+
 [profile.release]
 strip = "debuginfo"
