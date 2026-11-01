@@ -230,15 +230,20 @@ export function mergeBackupSchedulerConfig(
     current: BackupSchedulerState,
     patch: Partial<BackupSchedulerConfig>,
 ): BackupSchedulerState {
+    const destinationDir = backupStorageDirectory(sanitizeDestinationDir(patch.destinationDir ?? current.config.destinationDir));
+    const sameDestination = destinationDir === backupStorageDirectory(current.config.destinationDir);
+    const volumeProtectionAcknowledged = patch.volumeProtectionAcknowledged === true
+        || (patch.volumeProtectionAcknowledged === undefined && sameDestination && current.config.volumeProtectionAcknowledged === true);
     return {
         ...current,
         config: {
-            volumeProtectionAcknowledged: patch.volumeProtectionAcknowledged === true
-                || (patch.volumeProtectionAcknowledged === undefined && (!patch.destinationDir || patch.destinationDir === current.config.destinationDir) && current.config.volumeProtectionAcknowledged === true),
+            ...(sameDestination && volumeProtectionAcknowledged && current.config.volumeProtectionIdentity
+                ? { volumeProtectionIdentity: current.config.volumeProtectionIdentity } : {}),
+            volumeProtectionAcknowledged,
             enabled: typeof patch.enabled === 'boolean' ? patch.enabled : current.config.enabled,
             hour: clampInteger(patch.hour, current.config.hour, 0, 23),
             minute: clampInteger(patch.minute, current.config.minute, 0, 59),
-            destinationDir: backupStorageDirectory(sanitizeDestinationDir(patch.destinationDir ?? current.config.destinationDir)),
+            destinationDir,
             retentionKeepArtifacts: clampRetentionKeepArtifacts(
                 patch.retentionKeepArtifacts,
                 current.config.retentionKeepArtifacts,

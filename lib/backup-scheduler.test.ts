@@ -47,6 +47,15 @@ test('persisted scheduler enablement accepts only the boolean true', () => {
     }
 });
 
+test('schedule changes retain a volume confirmation only for the same effective destination', () => {
+    const current = getDefaultBackupSchedulerState();
+    current.config.volumeProtectionAcknowledged = true;
+    current.config.volumeProtectionIdentity = 'synthetic physical identity';
+    assert.equal(mergeBackupSchedulerConfig(current, { enabled: false }).config.volumeProtectionIdentity, 'synthetic physical identity');
+    assert.equal(mergeBackupSchedulerConfig(current, { volumeProtectionAcknowledged: false }).config.volumeProtectionIdentity, undefined);
+    assert.equal(mergeBackupSchedulerConfig(current, { destinationDir: path.join(os.tmpdir(), 'another-owned-folder'), volumeProtectionAcknowledged: true }).config.volumeProtectionIdentity, undefined);
+});
+
 function withScheduledBackupFixture(check: (fixture: {
     destinationDir: string;
     setEnabled: (enabled: unknown) => void;
