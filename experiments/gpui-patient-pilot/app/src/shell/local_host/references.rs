@@ -5,8 +5,8 @@ use mediflow_runtime_client::{
 use serde_json::{Value, json};
 
 pub(super) struct ReferencesArea {
-    catalog: ReferenceCatalog,
-    snapshot: Option<ReferenceStatus>,
+    pub(super) catalog: ReferenceCatalog,
+    pub(super) snapshot: Option<ReferenceStatus>,
     pub(super) preview: Option<Arc<PreparedReferenceImport>>,
     pub(super) busy: bool,
     message: Option<String>,
@@ -318,11 +318,15 @@ impl ClinicalApp {
             return;
         };
         let catalog = self.local_host.references.catalog;
+        if catalog == ReferenceCatalog::Who {
+            self.local_host.who_administration.invalidate_observations();
+        }
         let area = &mut self.local_host.references;
         area.busy = true;
         area.snapshot = None;
         area.preview = None;
         area.who_consent = false;
+        self.local_host.who_administration.rollback = None;
         area.message = None;
         self.run_local_host(
             move || access.read_reference_catalog(catalog),
@@ -548,6 +552,7 @@ impl ClinicalApp {
         let area = &mut self.local_host.references;
         area.busy = true;
         area.who_consent = false;
+        self.local_host.who_administration.rollback = None;
         area.message = None;
         area.preview = None;
         area.receipt = None;
@@ -587,6 +592,9 @@ impl ClinicalApp {
         let catalog = command.catalog();
         self.local_host.references.busy = true;
         self.local_host.references.message = None;
+        if catalog == ReferenceCatalog::Who {
+            self.local_host.who_administration.invalidate_observations();
+        }
         self.local_host.references.in_flight = Some(command.clone());
         let retained = command.clone();
         self.run_local_host(move || {
@@ -664,6 +672,7 @@ impl ClinicalApp {
                                     area.message = None;
                                     area.receipt = None;
                                     area.who_consent = false;
+                                    this.local_host.who_administration.rollback = None;
                                     this.read_reference_catalog(cx);
                                 },
                             ))
@@ -886,7 +895,8 @@ impl ClinicalApp {
                 pane = pane.child(self.prosthetics_sources_view(cx));
             }
             ReferenceCatalog::Who => {
-                pane=pane.child(text!("ICD-11 MMS 2026-01, inglese. World Health Organization, CC BY-ND 3.0 IGO. Solo categorie e titoli inglesi, senza sinonimi o postcoordinazione. Il servizio locale opzionale resta gestito dall’host tramite Setup_WHO.command. Nessun import da file o svuotamento WHO disponibile. Il ripristino della versione precedente non è disponibile da questa pagina."));
+                pane = pane.child(self.who_administration_view(cx));
+                pane=pane.child(text!("ICD-11 MMS 2026-01, inglese. World Health Organization, CC BY-ND 3.0 IGO. Solo categorie e titoli inglesi, senza sinonimi o postcoordinazione. Il servizio locale opzionale resta gestito dall’host tramite Setup_WHO.command. Nessun import da file o svuotamento WHO disponibile. Il ripristino richiede una conferma separata e la revisione corrente del catalogo."));
                 let can_acquire = area
                     .snapshot
                     .as_ref()
@@ -905,6 +915,7 @@ impl ClinicalApp {
                             enabled && can_acquire,
                         )
                         .on_click(cx.listener(|this, _, _, cx| {
+                            this.local_host.who_administration.rollback = None;
                             this.local_host.references.who_consent = true;
                             cx.notify();
                         })),
@@ -1544,10 +1555,16 @@ mod tests {
                 commands.contains(&"references-who-download".into()),
                 catalog == ReferenceCatalog::Who
             );
-            assert!(!commands.iter().any(|s| s.contains("clear")
-                || s.contains("rollback")
-                || s.contains("seeder")
-                || s == "references-confirm"));
+            assert!(
+                !commands.iter().any(|s| s.contains("clear")
+                    || s.contains("seeder")
+                    || s == "references-confirm")
+            );
+            assert_eq!(
+                commands.contains(&"who-rollback-prepare".into()),
+                catalog == ReferenceCatalog::Who
+            );
+            assert!(!commands.contains(&"who-rollback-confirm".into()));
             assert_eq!(
                 commands.len(),
                 commands.iter().collect::<HashSet<_>>().len()
