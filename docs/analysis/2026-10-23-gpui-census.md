@@ -603,7 +603,7 @@ sono allineate alla policy Web; il limite del file resta quello nativo di
 10 MiB, più restrittivo dei 25 MiB Web. Le quote non sono un tetto heap del parser.
 
 Il motore Hayro 0.8.0 ammette un sottoinsieme esplicito: testo con font
-risolti, vettori e immagini JPEG/raw/Flate. Font sostitutivi, maschere,
+risolti, vettori e immagini JPEG/raw/Flate. Font sostitutivi, maschere, annotazioni,
 pattern, Type3, XFA, cifratura PDF, filtri e spazi colore immagine non
 supportati vengono rifiutati. Questa tranche non attesta compatibilità
 grafica universale, accessibilità del contenuto raster o collaudo del pacchetto.

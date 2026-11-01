@@ -44,6 +44,11 @@ fn binary_entry_point_emits_only_complete_bounded_pixels_or_an_error() {
         serde_json::from_slice::<serde_json::Value>(&over_page_limit.stdout).unwrap(),
         serde_json::json!({"error":"limit"})
     );
+    let annotated = worker(&fixture::page_with_extra_entries(b"/Annots []"), "1");
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&annotated.stdout).unwrap(),
+        serde_json::json!({"error":"unsupported"})
+    );
     assert!(output.stderr.is_empty());
 }
 
