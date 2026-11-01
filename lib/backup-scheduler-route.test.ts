@@ -12,6 +12,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import * as scheduler from './backup-scheduler.ts';
 import * as policy from '../scripts/backup-destination-policy.mjs';
 import { isWebAdminSession } from './security/server-auth-policy.ts';
+import { WindowsPrivateDirectoryError } from '../scripts/windows-private-directory.mjs';
 
 test('route-attacks: atomic revision, stale and simultaneous writers, rejected symlinks and legacy destination preserved', async () => {
     const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'backup-route-')));
@@ -107,6 +108,18 @@ test('route-attacks: atomic revision, stale and simultaneous writers, rejected s
                 assert.equal(fs.readdirSync(actual).filter(name => name.endsWith('.mediflow')).length, 3);
             } finally { childProcess.spawnSync = originalSpawn; syncBuiltinESMExports(); }
         }
+        const validDestination = destinationPolicy.validateBackupDestination;
+        for (const reason of ['existing', 'filesystem', 'blocked']) {
+            const denial = new WindowsPrivateDirectoryError(reason);
+            destinationPolicy.validateBackupDestination = () => { throw new policy.BackupDestinationError(denial.userMessage, denial.code); };
+            const fresh = await (await exports.GET()).json();
+            const response = await post({ ...config, enabled: true }, fresh.state.revision);
+            assert.equal(response.status, 422);
+            const problem = await response.json();
+            assert.equal(problem.code, denial.code);
+            assert.equal(problem.error, denial.userMessage);
+        }
+        destinationPolicy.validateBackupDestination = validDestination;
         for (const principal of [null, { role: 'physician', authChannel: 'web' }, { role: 'admin', authChannel: 'native' }]) {
             actor = principal;
             assert.equal((await post(config, revision)).status, principal ? 403 : 401);

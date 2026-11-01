@@ -715,6 +715,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
             const response = await fetch('/api/system/recovery-backup', { method: 'POST', cache: 'no-store',
                 headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            if (response.status === 422 && current()) {
+                const problem = await response.json().catch(() => null);
+                if (current() && ['backup_directory_existing', 'backup_directory_filesystem', 'backup_directory_blocked'].includes(problem?.code)
+                    && typeof problem.error === 'string' && problem.error.length <= 500) throw new Error(problem.error);
+            }
             if (!response.ok || Number(response.headers.get('Content-Length')) > MAX_RECOVERY_DATABASE_BYTES || !current()) {
                 throw new Error('Backup completo non disponibile. Rinnova l’accesso e verifica l’archivio.');
             }

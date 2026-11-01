@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 
         return runDbServerImmediateTransaction(() => mutateScheduler(body, request, session));
     } catch (error) {
-        if (error instanceof BackupDestinationError) return NextResponse.json({ error: error.userMessage, code: 'backup_destination_rejected' }, { status: 422 });
+        if (error instanceof BackupDestinationError) return NextResponse.json({ error: error.userMessage, code: error.code }, { status: 422 });
         return schedulerError(error);
     }
 }
