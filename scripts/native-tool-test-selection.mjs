@@ -100,7 +100,7 @@ function exactFields(actual, expected, label) {
 }
 export function cargoGpuiPilotTestCommand(root) {
   const manifest = `${gpuiDirectory}/Cargo.toml`;
-  const workspace = gpuiTables(root, manifest, ['[workspace]', '[workspace.package]', '[workspace.dependencies]', '[patch.crates-io]', '[profile.dev]', '[profile.release]']);
+  const workspace = gpuiTables(root, manifest, ['[workspace]', '[workspace.package]', '[workspace.dependencies]', '[patch.crates-io]', '[profile.dev]', '[profile.dev.package.mediflow-runtime-client]', '[profile.dev.package.sha2]', '[profile.dev.package.hmac]', '[profile.dev.package.pbkdf2]', '[profile.dev.package.digest]', '[profile.dev.package.block-buffer]', '[profile.dev.package.generic-array]', '[profile.dev.package.crypto-common]', '[profile.release]']);
   exactFields(workspace['[workspace]'], { members: '["client", "transport", "app", "state"]', 'default-members': '["client"]', resolver: '"3"' }, 'workspace membership');
   const toolchain = /^"(\d+\.\d+\.\d+)"$/u.exec(workspace['[workspace.package]']?.['rust-version'])?.[1];
   if (!toolchain) throw new Error('Pilot requires an exact Rust version');
