@@ -612,8 +612,13 @@ fra due letture. Limiti: 500 pagine, 14.400 punti per lato, immagine sorgente
 Maschere, annotazioni, Type3, pattern e XFA restano rifiutati.
 Differences controlla soltanto i nomi usati nel testo: elenco Adobe Glyph List
 per Base14 non incorporati, risoluzione nel font incorporato negli altri casi.
-Nomi mancanti ma non usati non bloccano il documento. Un glifo usato non
+Nomi mancanti ma non usati non bloccano il documento. Un nome Differences usato non
 risolvibile rifiuta l'intera anteprima, con motivo e salvataggio dell'originale.
+La guardia non copre ogni glifo e non verifica cmap/CIDToGIDMap. I due casi
+CID e TrueType semplice con cifra mappata al glifo zero restano accettati,
+come limite documentato. Sotto ogni PDF accettato è sempre visibile l'avviso
+«Alcuni caratteri possono mancare o differire: per un valore clinico controlla
+il documento originale.» con «Salva l'originale…» accanto.
 PDFKit non espone un esito pubblico per ogni glifo risolto: nessuna garanzia di
 completezza tipografica viene dedotta dall'esito del renderer. Sugli altri
 sistemi l'anteprima PDF è indisponibile; il documento resta esportabile.

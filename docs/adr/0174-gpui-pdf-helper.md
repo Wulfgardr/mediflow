@@ -39,11 +39,18 @@ CGFontGetGlyphWithGlyphName. Nomi sconosciuti non usati non bloccano l'anteprima
 L'elenco Adobe è incorporato come soli nomi, con origine e licenza nel pacchetto;
 non aggiunge dipendenze Cargo o font.
 
-PDFKit non dà un esito pubblico di risoluzione per ogni glifo. Nel corpus di
-revisione anche PDFKit senza il controllo Differences omette la cifra 3 di
-`Hb 13.4`, mostrando `Hb 1.4`, e rende bianco il caso con un solo glifo mancante.
-Il controllo rifiuta entrambi. Questo non prova completezza tipografica per
-qualunque PDF ammesso; gli operatori sconosciuti seguono il renderer di sistema.
+La guardia copre i nomi Differences effettivamente usati, non ogni glifo.
+Non verifica cmap e CIDToGIDMap. I casi sintetici `cid-three-missing.pdf` e
+`simple-three-missing.pdf`, conservati nel corpus di test, sono accettati e
+possono produrre un raster bianco pur mantenendo il codice della cifra 3 e
+ToUnicode. Sono limiti documentati, non rifiuti riusciti.
+
+Sotto ogni anteprima PDF accettata è sempre mostrato:
+«Alcuni caratteri possono mancare o differire: per un valore clinico controlla
+il documento originale.» Accanto rimane «Salva l'originale…», con le protezioni
+esistenti su sessione, paziente e operazioni in corso. L'avviso rende visibile
+il limite; non equivale a una garanzia di fedeltà o a una verifica di ogni valore.
+Gli operatori sconosciuti seguono il renderer di sistema.
 
 L'input e il raster posseduti dal helper sono azzerati prima del rilascio.
 I buffer interni di PDFKit, del kernel e della GPU non hanno questa garanzia.
