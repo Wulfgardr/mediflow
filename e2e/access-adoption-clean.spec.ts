@@ -4,7 +4,9 @@ import { bootstrapUnlockedSession } from './utils';
 test('a clean PIN archive adopts its passphrase and confirms cleanup again on unlock', async ({ page }) => {
   const passphrase = 'Frase sintetica per adozione U5';
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/settings/accesso');
+  await page.getByRole('complementary', { name: 'MediFlow', exact: true })
+    .getByRole('link', { name: 'Impostazioni', exact: true }).click();
+  await page.getByRole('link', { name: 'Accesso', exact: true }).click();
   await page.getByLabel('PIN attuale', { exact: true }).first().fill(process.env.E2E_PIN || '1234');
   await page.getByLabel('Nuova passphrase', { exact: true }).fill(passphrase);
   await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(passphrase);
