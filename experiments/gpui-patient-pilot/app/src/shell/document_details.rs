@@ -58,10 +58,16 @@ impl ClinicalApp {
             context: context.clone(),
         });
         let requested = id.clone();
+        let work_context = context.clone();
+        let expiry_context = context.clone();
+        let expiry_id = id.clone();
         self.run(
             move || {
                 let row = session.read_attachment(&scope, &patient, &requested)?;
-                Ok(documents::original_preview(&row))
+                Ok(documents::original_preview_with_context(
+                    &row,
+                    &work_context,
+                ))
             },
             move |this, result, _| {
                 if context.check().is_ok()
@@ -73,7 +79,89 @@ impl ClinicalApp {
             },
             cx,
         );
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(documents::pdf::VIEW_LIFETIME).await;
+            let _ = this.update(cx, |this, cx| {
+                if expiry_context.check().is_ok() && this.patient.document_original.as_ref().is_some_and(|view| view.id == expiry_id) {
+                    if let Some(view) = &mut this.patient.document_original {
+                        view.context.cancel();
+                        view.state = ReadLoad::Ready(Err("L’anteprima è scaduta. Chiudi e apri di nuovo l’originale per continuare la lettura.".into()));
+                    }
+                    cx.notify();
+                }
+            });
+        }).detach();
         cx.notify();
+    }
+
+    fn turn_document_original(&mut self, page: usize, cx: &mut Context<Self>) {
+        let Some(original) = &mut self.patient.document_original else {
+            return;
+        };
+        match &original.state {
+            ReadLoad::Ready(Ok(documents::OriginalPreview::Text(text)))
+                if documents::text_window(text, page).is_some() =>
+            {
+                original.page = page;
+            }
+            ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(pdf))) if page < pdf.pages => {
+                let source = pdf.source.clone();
+                let context = original.context.clone();
+                let work_context = context.clone();
+                let id = original.id.clone();
+                original.page = page;
+                original.state = ReadLoad::loading();
+                self.run(
+                    move || {
+                        Ok(documents::pdf::render(source, page + 1, &work_context)
+                            .map(documents::OriginalPreview::Pdf)
+                            .map_err(documents::pdf::Error::message))
+                    },
+                    move |this, result, _| {
+                        if context.check().is_ok()
+                            && let Some(original) = &mut this.patient.document_original
+                            && original.id == id
+                            && original.page == page
+                        {
+                            original.state = ReadLoad::from_result(result);
+                        }
+                    },
+                    cx,
+                );
+            }
+            _ => return,
+        }
+        cx.notify();
+    }
+
+    fn document_original_controls(&self, page: usize, count: usize, cx: &Context<Self>) -> Div {
+        div().flex().flex_wrap().gap(px(8.)).children(
+            [
+                (
+                    "document-original-previous",
+                    "Pagina precedente",
+                    page.checked_sub(1),
+                ),
+                (
+                    "document-original-next",
+                    "Pagina successiva",
+                    (page + 1 < count).then_some(page + 1),
+                ),
+            ]
+            .into_iter()
+            .map(|(id, label, target)| {
+                button(id, label, self.theme, false, target.is_some()).when_some(
+                    target,
+                    |el, page| {
+                        el.on_click(
+                            cx.listener(move |this, _, _, cx| {
+                                this.turn_document_original(page, cx)
+                            }),
+                        )
+                    },
+                )
+            }),
+        )
     }
 
     pub(super) fn document_original_view(&self, cx: &Context<Self>) -> Div {
@@ -99,42 +187,22 @@ impl ClinicalApp {
                         theme,
                     ))
                     .child(text!(format!("Pagina {} di {count}", original.page + 1)))
+                    .child(self.document_original_controls(original.page, count, cx));
+            }
+            ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(pdf))) => {
+                view = view
                     .child(
-                        div().flex().flex_wrap().gap(px(8.)).children(
-                            [
-                                (
-                                    "document-original-previous",
-                                    "Pagina precedente",
-                                    original.page.checked_sub(1),
-                                ),
-                                (
-                                    "document-original-next",
-                                    "Pagina successiva",
-                                    (original.page + 1 < count).then_some(original.page + 1),
-                                ),
-                            ]
-                            .into_iter()
-                            .map(|(id, label, page)| {
-                                button(id, label, theme, false, page.is_some()).when_some(
-                                    page,
-                                    |el, page| {
-                                        el.on_click(cx.listener(move |this, _, _, cx| {
-                                            if let Some(original) =
-                                                &mut this.patient.document_original
-                                                && let ReadLoad::Ready(Ok(
-                                                    documents::OriginalPreview::Text(text),
-                                                )) = &original.state
-                                                && documents::text_window(text, page).is_some()
-                                            {
-                                                original.page = page;
-                                            }
-                                            cx.notify();
-                                        }))
-                                    },
-                                )
-                            }),
-                        ),
-                    );
+                        gpui::img(pdf.image.clone())
+                            .w_full()
+                            .max_h(px(640.))
+                            .object_fit(gpui::ObjectFit::Contain),
+                    )
+                    .child(text!(format!(
+                        "Pagina {} di {}",
+                        original.page + 1,
+                        pdf.pages
+                    )))
+                    .child(self.document_original_controls(original.page, pdf.pages, cx));
             }
             ReadLoad::Ready(Ok(documents::OriginalPreview::Image(image))) => {
                 view = view.child(
@@ -1015,6 +1083,42 @@ mod tests {
         assert!(routes.iter().all(|route| {
             !route.starts_with("POST /api/v1/network/patients/patient-a/attachments")
         }));
+    }
+
+    #[gpui::test]
+    fn original_lifetime_retires_bytes_and_pending_work_in_its_own_panel(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let wire = json!({"id":"synthetic-document","patientId":"patient-a","name":"Originale.txt","path":"originale.txt","type":"text/plain","size":5,"data":"data:text/plain;base64,cHJvdmE="});
+        let row: Attachment = serde_json::from_value(wire.clone()).unwrap();
+        host.plan("GET /api/v1/network/patients/patient-a/attachments/synthetic-document")
+            .send((200, wire))
+            .unwrap();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.selected_id = Some("patient-a".into());
+            app.patient.attachments = ReadLoad::Ready(vec![row]);
+            app.toggle_document_original("synthetic-document", cx);
+        });
+        cx.run_until_parked();
+        let context = view.read_with(cx, |app, _| {
+            let original = app.patient.document_original.as_ref().unwrap();
+            assert!(matches!(&original.state, ReadLoad::Ready(Ok(documents::OriginalPreview::Text(text))) if text.as_str() == "prova"));
+            original.context.clone()
+        });
+        cx.cx
+            .executor()
+            .advance_clock(documents::pdf::VIEW_LIFETIME + std::time::Duration::from_secs(1));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert!(context.check().is_err());
+            assert!(matches!(&app.patient.document_original.as_ref().unwrap().state, ReadLoad::Ready(Err(text)) if text.contains("scaduta")));
+            app.disconnect(cx);
+        });
     }
 
     #[gpui::test]

@@ -590,3 +590,26 @@ Restano aperti il renderer PDF, gli altri formati immagine, curation e revisione
 degli estratti, revisione agentica e importazione CSV con mapping. Le prove del
 renderer isolato non qualificano picker, ritorno o pacchetto installato.
 Questa tranche non chiude G-4 e non modifica il contratto ENC2.
+
+### G-4a: anteprima PDF locale, seconda tranche U9
+
+L’Originale GPUI ora apre un PDF e cambia pagina usando l’eseguibile locale
+in un processo dedicato. Nessun file decifrato viene scritto su disco. Un errore
+di ammissione rifiuta l’intera anteprima, anche se riguarda immagini di altre
+pagine. Prima della decodifica si verificano le dimensioni effettive JPEG e
+quelle dichiarate per immagini raw/Flate: 8192 per lato e 12 milioni di pixel.
+Le altre quote numeriche di pagine, canvas, operatori e memoria applicativa
+sono allineate alla policy Web; il limite del file resta quello nativo di
+10 MiB, più restrittivo dei 25 MiB Web. Le quote non sono un tetto heap del parser.
+
+Il motore Hayro 0.8.0 ammette un sottoinsieme esplicito: testo con font
+risolti, vettori e immagini JPEG/raw/Flate. Font sostitutivi, maschere,
+pattern, Type3, XFA, cifratura PDF, filtri e spazi colore immagine non
+supportati vengono rifiutati. Questa tranche non attesta compatibilità
+grafica universale, accessibilità del contenuto raster o collaudo del pacchetto.
+L’anteprima scade dopo dieci minuti e la revoca impedisce risultati tardivi.
+
+Percorso per la corsia a schermo: paziente sintetico → Documenti →
+Aggiungi documenti → PDF sintetico → revisione e conferma → Originale →
+Pagina successiva / Pagina precedente; verificare anche Ritorna ai documenti
+e Giorno/Grafite. Curation degli estratti e CSV restano tranche distinte.

@@ -1,6 +1,8 @@
 //! Explicit local document IO for the native picker flows. No path or URL from a
 //! clinical record is opened. A download requires a path chosen by the operator.
 
+pub(crate) mod pdf;
+
 use base64::{Engine, engine::general_purpose::STANDARD};
 use mediflow_runtime_client::{Attachment, RequestContext};
 use std::{
@@ -51,13 +53,28 @@ pub fn original_text(attachment: &Attachment) -> Result<Zeroizing<String>, Strin
 pub enum OriginalPreview {
     Text(Zeroizing<String>),
     Image(Arc<gpui::RenderImage>),
+    Pdf(pdf::Preview),
 }
 
 pub const MAX_PREVIEW_PIXELS: u64 = 12_000_000;
 pub const MAX_PREVIEW_DIMENSION: u32 = 8192;
 
+#[cfg(test)]
 pub fn original_preview(attachment: &Attachment) -> Result<OriginalPreview, String> {
+    original_preview_with_context(attachment, &RequestContext::default())
+}
+
+pub fn original_preview_with_context(
+    attachment: &Attachment,
+    context: &RequestContext,
+) -> Result<OriginalPreview, String> {
     use image::ImageDecoder;
+    if attachment.mime_type == "application/pdf" {
+        let bytes = decode_attachment(attachment).map_err(|error| error.to_string())?;
+        return pdf::render(Arc::new(bytes), 1, context)
+            .map(OriginalPreview::Pdf)
+            .map_err(pdf::Error::message);
+    }
     if attachment.mime_type == "text/plain" {
         return original_text(attachment).map(OriginalPreview::Text);
     }
