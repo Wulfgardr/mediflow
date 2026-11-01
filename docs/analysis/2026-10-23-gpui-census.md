@@ -609,7 +609,11 @@ Il campionamento non è una quota di heap atomica: può esserci un superamento
 fra due letture. Limiti: 500 pagine, 14.400 punti per lato, immagine sorgente
 8192 per lato e 12 milioni di pixel prima del raster, canvas 2048 per lato e
 4 milioni di pixel. Una pagina fuori limite rifiuta l'intera anteprima.
-Maschere, annotazioni, Type3, pattern, XFA e codifiche Differences sono rifiutati.
+Maschere, annotazioni, Type3, pattern e XFA restano rifiutati.
+Differences controlla soltanto i nomi usati nel testo: elenco Adobe Glyph List
+per Base14 non incorporati, risoluzione nel font incorporato negli altri casi.
+Nomi mancanti ma non usati non bloccano il documento. Un glifo usato non
+risolvibile rifiuta l'intera anteprima, con motivo e salvataggio dell'originale.
 PDFKit non espone un esito pubblico per ogni glifo risolto: nessuna garanzia di
 completezza tipografica viene dedotta dall'esito del renderer. Sugli altri
 sistemi l'anteprima PDF è indisponibile; il documento resta esportabile.

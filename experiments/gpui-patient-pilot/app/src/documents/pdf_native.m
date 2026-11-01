@@ -12,6 +12,7 @@
 #import <unistd.h>
 #import <errno.h>
 #import <math.h>
+#include "adobe_glyph_names.h"
 
 static const size_t inputLimit = 10 * 1024 * 1024;
 static const size_t streamLimit = 48 * 1024 * 1024;
@@ -73,6 +74,23 @@ static bool present(CGPDFDictionaryRef d, const char *key) {
     CGPDFObjectRef object;
     return CGPDFDictionaryGetObject(d, key, &object);
 }
+static bool base14(CGPDFDictionaryRef font) {
+    const char *name = NULL;
+    if (!CGPDFDictionaryGetName(font, "BaseFont", &name)) return false;
+    const char *names[] = {"Helvetica","Helvetica-Bold","Helvetica-Oblique","Helvetica-BoldOblique","Times-Roman","Times-Bold","Times-Italic","Times-BoldItalic","Courier","Courier-Bold","Courier-Oblique","Courier-BoldOblique","Symbol","ZapfDingbats",NULL};
+    for (const char **n = names; *n; n++) if (!strcmp(name, *n)) return true;
+    return false;
+}
+static bool adobeGlyph(const char *name) {
+    size_t low = 0, high = sizeof(adobeGlyphNames) / sizeof(*adobeGlyphNames);
+    while (low < high) {
+        size_t middle = low + (high - low) / 2;
+        int order = strcmp(name, adobeGlyphNames[middle]);
+        if (!order) return true;
+        if (order < 0) high = middle; else low = middle + 1;
+    }
+    return false;
+}
 static CFDataRef copyStream(CGPDFStreamRef stream, CGPDFDataFormat *format) {
     CFDataRef data = CGPDFStreamCopyData(stream, format);
     if (!data) { failure = "invalid"; return NULL; }
@@ -121,7 +139,6 @@ static void entry(const char *key, CGPDFObjectRef value, void *info) {
     walk(value, ((struct WalkContext *)info)->depth + 1);
 }
 static void checkDictionary(CGPDFDictionaryRef d, size_t depth) {
-    if (present(d, "Differences")) { failure = "font_encoding"; return; }
     if (present(d, "Annots")) { failure = "annotations"; return; }
     if (present(d, "SMask") || present(d, "Mask")) { failure = "image_mask"; return; }
     if (named(d,"Subtype","Form")) { failure = "nested_graphics"; return; }
@@ -138,11 +155,7 @@ static void checkDictionary(CGPDFDictionaryRef d, size_t depth) {
         } else if (CGPDFObjectGetType(contents) != kCGPDFObjectTypeStream) { failure = "invalid"; return; }
     }
     if (named(d,"Type","Font") && !present(d,"FontDescriptor") && !named(d,"Subtype","Type0")) {
-        const char *font = NULL;
-        CGPDFDictionaryGetName(d, "BaseFont", &font);
-        NSString *name = font ? @(font) : @"";
-        NSArray *standard = @[@"Helvetica",@"Helvetica-Bold",@"Helvetica-Oblique",@"Helvetica-BoldOblique",@"Times-Roman",@"Times-Bold",@"Times-Italic",@"Times-BoldItalic",@"Courier",@"Courier-Bold",@"Courier-Oblique",@"Courier-BoldOblique",@"Symbol",@"ZapfDingbats"];
-        if (![standard containsObject:name]) { failure = "font"; return; }
+        if (!base14(d)) { failure = "font"; return; }
     }
     for (const char **key = (const char *[]){"FontFile", "FontFile2", "FontFile3", NULL}; *key; key++) {
         CGPDFStreamRef font;
@@ -189,6 +202,136 @@ static void walk(CGPDFObjectRef object, size_t depth) {
 static void countOperator(CGPDFScannerRef scanner, void *info) {
     (void)scanner; (void)info;
     if (++operators > 50000) failure = "limit";
+}
+struct FontUse {
+    const char *names[256];
+    uint8_t checked[256];
+    CGFontRef embedded;
+    bool standard;
+};
+struct TextUse {
+    CGPDFDictionaryRef font;
+    __unsafe_unretained NSMutableArray<NSValue *> *stack;
+    __unsafe_unretained NSMutableDictionary<NSValue *, NSValue *> *fonts;
+};
+static struct FontUse *fontUse(CGPDFDictionaryRef font, struct TextUse *text) {
+    NSValue *key = [NSValue valueWithPointer:font];
+    struct FontUse *use = [text->fonts[key] pointerValue];
+    if (use) return use;
+    use = calloc(1, sizeof(*use));
+    if (!use) { failure = "engine"; return NULL; }
+    text->fonts[key] = [NSValue valueWithPointer:use];
+    use->standard = base14(font);
+    CGPDFDictionaryRef encoding;
+    CGPDFArrayRef differences;
+    if (!CGPDFDictionaryGetDictionary(font, "Encoding", &encoding) || !present(encoding, "Differences")) return use;
+    if (!CGPDFDictionaryGetArray(encoding, "Differences", &differences)) { failure = "invalid"; return use; }
+    CGPDFInteger code = -1;
+    for (size_t i = 0; i < CGPDFArrayGetCount(differences); i++) {
+        CGPDFObjectRef item;
+        if (!CGPDFArrayGetObject(differences, i, &item)) { failure = "invalid"; break; }
+        if (CGPDFObjectGetType(item) == kCGPDFObjectTypeInteger) {
+            CGPDFObjectGetValue(item, kCGPDFObjectTypeInteger, &code);
+            if (code < 0 || code > 255) { failure = "invalid"; break; }
+        } else if (CGPDFObjectGetType(item) == kCGPDFObjectTypeName && code >= 0 && code <= 255) {
+            CGPDFObjectGetValue(item, kCGPDFObjectTypeName, &use->names[code++]);
+        } else { failure = "invalid"; break; }
+    }
+    return use;
+}
+static void loadEmbeddedFont(CGPDFDictionaryRef font, struct FontUse *use) {
+    CGPDFDictionaryRef descriptor;
+    if (!CGPDFDictionaryGetDictionary(font, "FontDescriptor", &descriptor)) return;
+    for (const char **key = (const char *[]){"FontFile", "FontFile2", "FontFile3", NULL}; *key; key++) {
+        CGPDFStreamRef stream;
+        if (!CGPDFDictionaryGetStream(descriptor, *key, &stream)) continue;
+        CGPDFDataFormat format;
+        CFDataRef data = copyStream(stream, &format);
+        if (!data) return;
+        CGDataProviderRef provider = CGDataProviderCreateWithCFData(data);
+        if (provider) { use->embedded = CGFontCreateWithDataProvider(provider); CGDataProviderRelease(provider); }
+        CFRelease(data);
+        return;
+    }
+}
+static void checkText(CGPDFStringRef string, struct TextUse *text) {
+    if (failure) return;
+    if (!text->font) { failure = "invalid"; return; }
+    struct FontUse *use = fontUse(text->font, text);
+    if (!use || failure) return;
+    const unsigned char *bytes = CGPDFStringGetBytePtr(string);
+    for (size_t i = 0; i < CGPDFStringGetLength(string) && !failure; i++) {
+        unsigned int code = bytes[i];
+        const char *name = use->names[code];
+        if (!name || use->checked[code]) continue;
+        bool resolved = false;
+        CGPDFDictionaryRef descriptor;
+        bool embedded = CGPDFDictionaryGetDictionary(text->font, "FontDescriptor", &descriptor)
+            && (present(descriptor, "FontFile") || present(descriptor, "FontFile2") || present(descriptor, "FontFile3"));
+        if (embedded) {
+            if (!use->embedded) loadEmbeddedFont(text->font, use);
+            NSString *glyphName = [NSString stringWithUTF8String:name];
+            resolved = use->embedded && glyphName && CGFontGetGlyphWithGlyphName(use->embedded, (__bridge CFStringRef)glyphName) != 0;
+        } else if (use->standard) resolved = adobeGlyph(name);
+        if (!resolved && !failure) failure = "font_encoding";
+        use->checked[code] = 1;
+    }
+}
+static void selectFont(CGPDFScannerRef scanner, void *info) {
+    countOperator(scanner, info);
+    CGPDFReal size;
+    const char *name;
+    if (!CGPDFScannerPopNumber(scanner, &size) || !isfinite(size) || !CGPDFScannerPopName(scanner, &name)) { failure = "invalid"; return; }
+    CGPDFObjectRef font = CGPDFContentStreamGetResource(CGPDFScannerGetContentStream(scanner), "Font", name);
+    struct TextUse *text = info;
+    if (!font || !CGPDFObjectGetValue(font, kCGPDFObjectTypeDictionary, &text->font)) failure = "invalid";
+}
+static void showText(CGPDFScannerRef scanner, void *info) {
+    countOperator(scanner, info);
+    CGPDFStringRef string;
+    if (!CGPDFScannerPopString(scanner, &string)) failure = "invalid";
+    else checkText(string, info);
+}
+static void spacedText(CGPDFScannerRef scanner, void *info) {
+    showText(scanner, info);
+    CGPDFReal character, word;
+    if (!CGPDFScannerPopNumber(scanner, &character) || !CGPDFScannerPopNumber(scanner, &word) || !isfinite(character) || !isfinite(word)) failure = "invalid";
+}
+static void showTextArray(CGPDFScannerRef scanner, void *info) {
+    countOperator(scanner, info);
+    CGPDFArrayRef array;
+    if (!CGPDFScannerPopArray(scanner, &array)) { failure = "invalid"; return; }
+    for (size_t i = 0; i < CGPDFArrayGetCount(array) && !failure; i++) {
+        CGPDFObjectRef item;
+        CGPDFStringRef string;
+        if (!CGPDFArrayGetObject(array, i, &item)) { failure = "invalid"; break; }
+        if (CGPDFObjectGetValue(item, kCGPDFObjectTypeString, &string)) checkText(string, info);
+        else if (CGPDFObjectGetType(item) != kCGPDFObjectTypeInteger && CGPDFObjectGetType(item) != kCGPDFObjectTypeReal) failure = "invalid";
+    }
+}
+static void saveTextState(CGPDFScannerRef scanner, void *info) {
+    countOperator(scanner, info);
+    struct TextUse *text = info;
+    [text->stack addObject:[NSValue valueWithPointer:text->font]];
+}
+static void restoreTextState(CGPDFScannerRef scanner, void *info) {
+    countOperator(scanner, info);
+    struct TextUse *text = info;
+    if (!text->stack.count) { failure = "invalid"; return; }
+    text->font = [text->stack.lastObject pointerValue];
+    [text->stack removeLastObject];
+}
+static void graphicsTextState(CGPDFScannerRef scanner, void *info) {
+    countOperator(scanner, info);
+    const char *name;
+    if (!CGPDFScannerPopName(scanner, &name)) { failure = "invalid"; return; }
+    CGPDFObjectRef object = CGPDFContentStreamGetResource(CGPDFScannerGetContentStream(scanner), "ExtGState", name);
+    CGPDFDictionaryRef state;
+    CGPDFArrayRef font;
+    CGPDFReal size;
+    struct TextUse *text = info;
+    if (!object || !CGPDFObjectGetValue(object, kCGPDFObjectTypeDictionary, &state)) { failure = "invalid"; return; }
+    if (present(state, "Font") && (!CGPDFDictionaryGetArray(state, "Font", &font) || CGPDFArrayGetCount(font) != 2 || !CGPDFArrayGetDictionary(font, 0, &text->font) || !CGPDFArrayGetNumber(font, 1, &size) || !isfinite(size))) failure = "invalid";
 }
 static void paintObject(CGPDFScannerRef scanner, void *info) {
     countOperator(scanner, info);
@@ -276,8 +419,24 @@ int MFDocumentPreviewWorker(size_t page) {
                 for (const char **op = ops; *op; op++) CGPDFOperatorTableSetCallback(table, *op, countOperator);
                 CGPDFOperatorTableSetCallback(table, "Do", paintObject);
                 CGPDFOperatorTableSetCallback(table, "EI", inlineImage);
-                CGPDFScannerRef scanner = CGPDFScannerCreate(content, table, NULL);
+                CGPDFOperatorTableSetCallback(table, "Tf", selectFont);
+                CGPDFOperatorTableSetCallback(table, "Tj", showText);
+                CGPDFOperatorTableSetCallback(table, "TJ", showTextArray);
+                CGPDFOperatorTableSetCallback(table, "'", showText);
+                CGPDFOperatorTableSetCallback(table, "\"", spacedText);
+                CGPDFOperatorTableSetCallback(table, "q", saveTextState);
+                CGPDFOperatorTableSetCallback(table, "Q", restoreTextState);
+                CGPDFOperatorTableSetCallback(table, "gs", graphicsTextState);
+                __attribute__((objc_precise_lifetime)) NSMutableArray<NSValue *> *stack = [NSMutableArray new];
+                __attribute__((objc_precise_lifetime)) NSMutableDictionary<NSValue *, NSValue *> *fonts = [NSMutableDictionary new];
+                struct TextUse text = {.stack = stack, .fonts = fonts};
+                CGPDFScannerRef scanner = CGPDFScannerCreate(content, table, &text);
                 if (!failure && !CGPDFScannerScan(scanner)) failure = "invalid";
+                for (NSValue *value in fonts.allValues) {
+                    struct FontUse *use = value.pointerValue;
+                    if (use->embedded) CGFontRelease(use->embedded);
+                    memset_s(use, sizeof(*use), 0, sizeof(*use)); free(use);
+                }
                 CGPDFScannerRelease(scanner); CGPDFOperatorTableRelease(table); CGPDFContentStreamRelease(content);
             }
             if (!failure) {

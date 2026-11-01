@@ -53,6 +53,38 @@ fn serialize(objects: &[Vec<u8>]) -> Vec<u8> {
     data
 }
 
+pub fn with_resources(content: &[u8], resources: &[u8], extras: &[Vec<u8>]) -> Vec<u8> {
+    let mut page =
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 60] /Contents 4 0 R /Resources ".to_vec();
+    page.extend_from_slice(resources);
+    page.extend_from_slice(b" >>");
+    serialize(
+        &[
+            b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
+            page,
+            stream(b"", content),
+        ]
+        .into_iter()
+        .chain(extras.iter().cloned())
+        .collect::<Vec<_>>(),
+    )
+}
+
+pub fn font_on_second_page(font: &[u8]) -> Vec<u8> {
+    let mut second = b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 60] /Contents 6 0 R /Resources << /Font << /F1 ".to_vec();
+    second.extend_from_slice(font);
+    second.extend_from_slice(b" >> >> >>");
+    serialize(&[
+        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        b"<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 60] /Contents 4 0 R >>".to_vec(),
+        stream(b"", b"0 0 1 rg 10 10 80 40 re f"),
+        second,
+        stream(b"", b"BT /F1 12 Tf 10 25 Td (Hb 13.4) Tj ET"),
+    ])
+}
+
 pub fn stream(dict: &[u8], data: &[u8]) -> Vec<u8> {
     let mut result = b"<< ".to_vec();
     result.extend_from_slice(dict);

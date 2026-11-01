@@ -76,7 +76,8 @@ function pilotFixture(t) {
   }
   for (const file of [...pilotFiles, `${pilot}/app/src/shell/clinical_forms.rs`, `${pilot}/app/src/shell/threshold_actions.rs`, `${pilot}/app/src/shell/ambulatory_commands.rs`, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`, `${pilot}/state/src/lib.rs`, `${pilot}/transport/src/local_host/archives.rs`, `${pilot}/transport/src/local_host/security.rs`]) write(file, 'must not execute');
   write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\n#[cfg(unix)]\nmod chat_access;\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\n#[cfg(unix)]\nmod local_voice;\nmod native_lock;\nmod navigation;\nmod patient_forms;\nmod patient_text;\nmod platform_integration;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nmod title;\nfn main() {}');
-  write(`${pilot}/app/src/documents/pdf_native.m`, '// compiled by app/build.rs');
+  write(`${pilot}/app/src/documents/pdf_native.m`, '#include "adobe_glyph_names.h"');
+  write(`${pilot}/app/src/documents/adobe_glyph_names.h`, '// synthetic glyph list');
   write(`${pilot}/app/src/documents.rs`, 'pub(crate) mod pdf;');
   write(`${pilot}/app/src/shell.rs`, '//! Synthetic shell binding fixture\nmod account_profile;\nmod agenda_flow;\nmod ai_preferences;\nmod ai_status;\nmod ambulatories;\nmod ambulatory_commands;\nmod analytics;\n#[cfg(unix)]\nmod chat_access;\nmod clinical_forms;\nmod document_details;\nmod document_library;\nmod local_host;\npub(crate) mod local_preferences;\nmod local_settings;\n#[cfg(unix)]\nmod local_voice;\n#[cfg(test)]\nmod notes_recovery_tests;\n#[cfg(unix)]\nmod patient_document;\n#[cfg(test)]\npub(crate) mod rendered_command;\nmod scales;\nmod settings;\nmod therapy_picker;\nmod threshold_actions;\nmod view_state;\nmod who_lookup;');
   write(`${pilot}/transport/src/session.rs`, 'pub mod patient_document;');

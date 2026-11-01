@@ -30,7 +30,14 @@ L'ammissione controlla tutte le pagine prima di emettere pixel. Sono conservati
 il limite di 500 pagine, i limiti di dimensioni e i 12 milioni di pixel per
 immagine prima del raster; per JPEG si leggono le dimensioni codificate, senza
 fidarsi del dizionario PDF. Un errore rifiuta l'intera anteprima. Maschere,
-annotazioni, XObject Form, Type3, pattern e codifiche Differences non sono ammesse.
+annotazioni, XObject Form, Type3 e pattern non sono ammessi.
+Le codifiche Differences sono controllate sui codici effettivamente usati dagli
+operatori di testo, con font attivo e stato grafico salvato/ripristinato. Per un
+font Base14 non incorporato il nome deve appartenere alla Adobe Glyph List 2.0;
+per un font incorporato deve essere risolvibile nel font stesso tramite
+CGFontGetGlyphWithGlyphName. Nomi sconosciuti non usati non bloccano l'anteprima.
+L'elenco Adobe è incorporato come soli nomi, con origine e licenza nel pacchetto;
+non aggiunge dipendenze Cargo o font.
 
 PDFKit non dà un esito pubblico di risoluzione per ogni glifo. Nel corpus di
 revisione anche PDFKit senza il controllo Differences omette la cifra 3 di
