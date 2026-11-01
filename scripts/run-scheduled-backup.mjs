@@ -9,7 +9,7 @@ import { assertProstheticsCatalogBackup, serializeProstheticsDocument } from '..
 
 import { assertBackupAuditSnapshots, canonicalizeBackupAuditRows } from '../lib/backup-audit.ts';
 import fs from 'fs';
-import { validateBackupDestination } from './backup-destination-policy.mjs';
+import { backupStorageDirectory, validateBackupDestination } from './backup-destination-policy.mjs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -79,7 +79,7 @@ function getDefaultState() {
       enabled: false,
       hour: 2,
       minute: 0,
-      destinationDir: path.join(getDefaultDataDir(), 'backups'),
+      destinationDir: backupStorageDirectory(path.join(getDefaultDataDir(), 'backups')),
       retentionKeepArtifacts: 14,
     },
     run: {
@@ -107,6 +107,7 @@ function readState(db) {
         ...getDefaultState().config,
         ...(parsed.config || {}),
         enabled: parsed.config?.enabled === true,
+        destinationDir: backupStorageDirectory(parsed.config?.destinationDir || getDefaultState().config.destinationDir),
       },
       run: {
         ...getDefaultState().run,
