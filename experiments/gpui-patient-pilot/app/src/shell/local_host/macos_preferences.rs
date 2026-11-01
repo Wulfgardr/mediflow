@@ -9,6 +9,7 @@ pub(in crate::shell) struct SystemAccessibility {
     #[cfg(target_os = "macos")]
     pub reduce_transparency: bool,
 }
+#[cfg(any(not(test), target_os = "macos"))]
 pub(in crate::shell) fn read_system_accessibility() -> Option<SystemAccessibility> {
     #[cfg(target_os = "macos")]
     {
