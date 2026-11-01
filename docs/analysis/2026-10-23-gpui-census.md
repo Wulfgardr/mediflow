@@ -130,7 +130,7 @@ consegne del registro chiuso sotto; G-7 e G-8 restano trasversali.
 | P13 — Prestazioni prescritte (Service Prescriptions, CRUD ricco + stato) | `#prestazioni` — `service-prescription-manager.tsx` | Assente | L/S native assenti; SP host e paired esistenti | Ø | QL/QS | G-6g |
 | P14 — Diario ausili e prescrizioni protesiche (CRUD + collaudo) | `#protesica` — `prosthetic-prescription-manager.tsx` | Assente | L/S native assenti; prescrizione/collaudo da portare | Ø | QL/QS | G-6h |
 | P15 — Upload documenti + OCR + sintesi clinica (Archivio documenti) | `#documenti` — `document-upload.tsx`, `document-viewer.tsx` | SH documents_view + DOC; upload singolo e download | L elenco/dettaglio; S allegato; OCR, multipli e originale inline residui | R0/D/F | QD/QS/QI | G-4a,G-4b,G-5b |
-| P16 — Archivio Intelligente / Document Insights (view estrazioni + delete) | `#documenti` — `document-insights-panel.tsx` | DOC mostra snapshot, non intero archivio insight | L sintesi/fonte salvata; S curation/delete assenti | D/Ø | QD/QS | G-4b |
+| P16 — Archivio Intelligente / Document Insights (view estrazioni + delete) | `#documenti` — `document-insights-panel.tsx` | DOC mostra snapshot e archivio insight tramite gestione locale | L sintesi/fonte/estratti archiviati paginati; S rimozione singola o completa con conferma e CAS Web | D/Ø | QD/QS | G-4b |
 | P17 — Smart Import (candidati diagnosi/terapie da documenti, applica in scheda) | Scheda/nuova scheda — `patient-smart-import-fabric-preview-card.tsx` | Assente | Nessuna generazione/apply nativa; apply legacy ritirato, non da riattivare | Ø | QI/QS | G-5c,G-4d,G-6j |
 | P18 — Referti recenti (Evidence Stack tile, view sintesi) | Scheda — `app/patients/[id]/modules/page.tsx`, `document-insights-panel.tsx` | DOC nel dettaglio; niente tile equivalenti di referti recenti | L snapshot; nessuna S all'apertura | D | QL/QD | G-4b,G-8b |
 | P19 — AI Patient Insight (sintesi/follow-up/alert generati) | Scheda — `ai-patient-insight.tsx` | Assente come generazione/revisione | L configurazione AI; S proiezione assistita assente | R0/Ø | QI/QS | G-5a,G-6j |
@@ -630,3 +630,34 @@ tranche successive. Percorso per la verifica nel pacchetto macOS:
 Aggiungi documenti → PDF sintetico → revisione e conferma → Originale →
 Pagina successiva / Pagina precedente; verificare anche Ritorna ai documenti
 e Giorno/Grafite. Curation degli estratti e CSV restano tranche distinte.
+
+### G-4b, U9: revisione dell’archivio delle sintesi
+
+Il pannello Sintesi archiviate legge tramite la porta host già autenticata
+e verifica paziente, ambulatorio, versione e struttura dell’intero archivio.
+Mostra sintesi, estratti di diagnosi/terapie/risultati e testo sorgente salvato
+senza riscriverli. Finestre di testo successive consentono di leggere tutto
+il contenuto, senza troncamento silenzioso. Il collegamento all’originale usa
+soltanto attachmentId esplicito, mai il nome; il lettore comune mantiene EXIF
+e i limiti PDF. Fonte archiviata e originale attuale restano distinti.
+
+Rimozione singola e svuotamento passano per PUT Web del profilo paziente,
+con versione CAS, cifratura esistente del solo documentInsights, rilettura
+prima dell’invio e verifica dell’archivio dopo. Ogni comando si invia una
+volta. Esito incerto: sola rilettura, oppure chiusura esplicita con avviso
+e nuova lettura obbligatoria; nessuna ripetizione automatica. Le altre
+sintesi e i relativi campi sconosciuti restano integri. Gli allegati non
+vengono modificati. I writer paired e expectedCollection restano invariati.
+
+Limiti: gestione locale richiesta; 500 sintesi e 8 MiB HTTP, nessuna lista
+parziale se la forma è illeggibile, duplicata o troppo grande. Il pannello
+non genera nuove estrazioni né proposte agentiche e non applica candidati
+alla scheda. Questi percorsi G-4/G-5/G-6 restano da collegare ai broker
+esistenti; il vecchio apply resta ritirato. CSV e qualifica del pacchetto
+sono ancora aperti.
+
+Percorso a schermo: Impostazioni → Funzioni AI → Gestione locale → paziente
+sintetico → Documenti → Leggi l’archivio delle sintesi → Rivedi gli estratti
+archiviati → Testo successivo / precedente → Rimuovi questa sintesi oppure
+Svuota le sintesi archiviate → Annulla o Conferma rimozione. Provare anche
+lettura senza fonte collegata, esito non verificato e ritorno, in Giorno/Grafite.
