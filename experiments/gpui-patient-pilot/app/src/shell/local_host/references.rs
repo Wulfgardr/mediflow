@@ -11,8 +11,14 @@ pub(super) struct ReferencesArea {
     pub(super) busy: bool,
     message: Option<String>,
     receipt: Option<Value>,
+    in_flight: Option<Arc<PreparedReferenceImport>>,
+    source_status: Option<Value>,
+    progress: Option<Value>,
     pub(super) who_consent: bool,
     fields: [Entity<TextInput>; 3],
+    prosthetics_fields: Vec<Entity<TextInput>>,
+    source_entries: Option<Value>,
+    pub(super) document: Option<Arc<mediflow_runtime_client::PreparedProstheticsDocument>>,
 }
 impl ReferencesArea {
     pub(super) fn new(theme: Theme, cx: &mut Context<ClinicalApp>) -> Self {
@@ -23,7 +29,56 @@ impl ReferencesArea {
             busy: false,
             message: None,
             receipt: None,
+            in_flight: None,
+            source_status: None,
+            progress: None,
             who_consent: false,
+            source_entries: None,
+            document: None,
+            prosthetics_fields: [
+                "Posizione codice sistema",
+                "Posizione codice",
+                "Posizione descrizione",
+                "Posizione versione",
+                "Posizione fonte",
+                "Posizione ambito",
+                "Posizione data inizio",
+                "Posizione data fine",
+                "Separatore (, oppure ;)",
+                "Ente della fonte",
+                "Data della fonte YYYY-MM-DD",
+                "Note della fonte",
+                "Pagina originale (facoltativa)",
+            ]
+            .into_iter()
+            .enumerate()
+            .map(|(i, label)| {
+                cx.new(|cx| {
+                    TextInput::new(
+                        [
+                            "prosthetics-option-0",
+                            "prosthetics-option-1",
+                            "prosthetics-option-2",
+                            "prosthetics-option-3",
+                            "prosthetics-option-4",
+                            "prosthetics-option-5",
+                            "prosthetics-option-6",
+                            "prosthetics-option-7",
+                            "prosthetics-option-8",
+                            "prosthetics-option-9",
+                            "prosthetics-option-10",
+                            "prosthetics-option-11",
+                            "prosthetics-option-12",
+                        ][i],
+                        label,
+                        label,
+                        false,
+                        theme,
+                        cx,
+                    )
+                })
+            })
+            .collect(),
             fields: [
                 ("aifa-source", "URL fonte"),
                 ("aifa-date", "Data di scarico YYYY-MM-DD"),
@@ -33,27 +88,41 @@ impl ReferencesArea {
         }
     }
     pub(super) fn withdraw(&mut self, cx: &mut App) {
+        if let Some(c) = self.in_flight.take() {
+            c.cancel_acquisition();
+        }
+        self.source_status = None;
+        self.progress = None;
         self.snapshot = None;
         self.preview = None;
         self.busy = false;
         self.message = None;
         self.receipt = None;
         self.who_consent = false;
-        for field in &self.fields {
+        self.source_entries = None;
+        self.document = None;
+        for field in self.fields.iter().chain(self.prosthetics_fields.iter()) {
             field.update(cx, |input, cx| input.retire(cx));
         }
     }
     pub(super) fn configure(&mut self, theme: Theme, cx: &mut Context<ClinicalApp>) {
-        for field in &self.fields {
+        for field in self.fields.iter().chain(self.prosthetics_fields.iter()) {
             field.update(cx, |input, cx| {
-                input.configure(theme, self.busy || self.preview.is_some(), cx)
+                input.configure(
+                    theme,
+                    self.busy || self.preview.is_some() || self.document.is_some(),
+                    cx,
+                )
             });
         }
     }
 }
 fn line(label: &str, value: impl AsRef<str>, theme: Theme) -> Div {
     div().min_w_0().text_color(theme.secondary).child({
-        let text = text!(format!("{label}: {}", value.as_ref()));
+        let text = gpui::Text::new(
+            gpui::ElementId::Name(label.to_owned().into()),
+            format!("{label}: {}", value.as_ref()).into(),
+        );
         #[cfg(test)]
         let text = rendered_command::observe_text(text);
         text
@@ -200,7 +269,7 @@ fn details(value: &Value, theme: Theme) -> Div {
             _ => None,
         };
         if let Some(text) = text {
-            pane = pane.child(line(label, text, theme));
+            pane = pane.child(div().id(key).child(line(label, text, theme)));
         }
     }
     for key in [
@@ -214,7 +283,7 @@ fn details(value: &Value, theme: Theme) -> Div {
         "review",
     ] {
         if value[key].is_object() {
-            pane = pane.child(details(&value[key], theme));
+            pane = pane.child(div().id(key).child(details(&value[key], theme)));
         }
     }
     for (key, label) in [
@@ -228,12 +297,12 @@ fn details(value: &Value, theme: Theme) -> Div {
             if rows.is_empty() {
                 pane = pane.child(line(label, "Nessuno", theme));
             }
-            for row in rows {
-                pane = pane.child(if let Some(s) = row.as_str() {
+            for (index, row) in rows.iter().enumerate() {
+                pane = pane.child(div().id((key, index)).child(if let Some(s) = row.as_str() {
                     line(label, s, theme)
                 } else {
                     details(row, theme)
-                });
+                }));
             }
         }
     }
@@ -269,6 +338,121 @@ impl ClinicalApp {
         );
         cx.notify();
     }
+    fn aifa_activity_view(&self, cx: &Context<Self>) -> Div {
+        let area = &self.local_host.references;
+        let theme = self.theme;
+        let mut pane = div().flex().flex_col().gap(px(8.));
+        if area
+            .in_flight
+            .as_ref()
+            .is_some_and(|c| c.acquisition_cancellable())
+        {
+            pane=pane.child(button("aifa-progress-read","Rileggi avanzamento",theme,false,true).on_click(cx.listener(|this,_,_,cx|this.read_aifa_progress(cx))))
+                        .child(button("aifa-download-cancel","Interrompi acquisizione AIFA",theme,false,true).on_click(cx.listener(|this,_,_,cx| {
+                            if let Some(c)=&this.local_host.references.in_flight {c.cancel_acquisition();}
+                            this.local_host.references.message=Some("Interruzione richiesta. L’esito potrebbe essere già registrato: rileggi il catalogo al termine.".into());cx.notify();
+                        })));
+        }
+        if let Some(p) = area.progress.as_ref().and_then(|p| p.get("progress")) {
+            pane = pane.child(line(
+                "Acquisizione osservata sulla postazione",
+                if p.is_null() {
+                    "Nessuna acquisizione attiva".into()
+                } else {
+                    format!(
+                        "{}: {} byte ricevuti su {}",
+                        if p["phase"] == "validating" {
+                            "Validazione"
+                        } else {
+                            "Download"
+                        },
+                        p["receivedBytes"],
+                        p["totalBytes"]
+                            .as_u64()
+                            .map(|n| n.to_string())
+                            .unwrap_or_else(|| "totale non noto".into())
+                    )
+                },
+                theme,
+            ));
+        }
+        pane
+    }
+    fn change_aifa_network(&mut self, expected: bool, cx: &mut Context<Self>) {
+        if self.local_host.has_work() {
+            return;
+        }
+        let Some(access) = self.local_host.access() else {
+            return;
+        };
+        self.local_host.references.busy = true;
+        self.run_local_host(
+            move || access.set_aifa_network_preference(expected, !expected),
+            |this, result, cx| {
+                let area = &mut this.local_host.references;
+                area.busy = false;
+                match result {
+                    Ok(v) => {
+                        area.source_status = Some(v);
+                        area.message =
+                            Some("Preferenza di accesso Internet AIFA salvata e riletta.".into());
+                    }
+                    Err(e) => {
+                        area.source_status = None;
+                        area.message = Some(format!(
+                            "{} Rileggi la preferenza prima di riprovare.",
+                            ui_error(e)
+                        ));
+                    }
+                }
+                cx.notify();
+            },
+            cx,
+        );
+    }
+    fn read_aifa_source(&mut self, remote: bool, cx: &mut Context<Self>) {
+        if self.local_host.has_work() {
+            return;
+        }
+        let Some(access) = self.local_host.access() else {
+            return;
+        };
+        self.local_host.references.busy = true;
+        self.run_local_host(
+            move || access.aifa_source_status(remote),
+            |this, result, cx| {
+                this.local_host.references.busy = false;
+                match result {
+                    Ok(v) => this.local_host.references.source_status = Some(v),
+                    Err(e) => {
+                        this.local_host.references.source_status = None;
+                        this.local_host.references.message = Some(ui_error(e));
+                    }
+                }
+                cx.notify();
+            },
+            cx,
+        );
+    }
+    fn read_aifa_progress(&mut self, cx: &mut Context<Self>) {
+        let Some(access) = self.local_host.access() else {
+            return;
+        };
+        self.run_local_host(
+            move || access.aifa_download_progress(),
+            |this, result, cx| {
+                match result {
+                    Ok(v) => this.local_host.references.progress = Some(v),
+                    Err(e) => {
+                        this.local_host.references.progress = None;
+                        this.local_host.references.message = Some(ui_error(e));
+                    }
+                }
+                cx.notify();
+            },
+            cx,
+        );
+    }
     fn pick_reference_file(&mut self, cx: &mut Context<Self>) {
         if self.local_host.has_work() {
             return;
@@ -281,7 +465,24 @@ impl ClinicalApp {
         if catalog == ReferenceCatalog::Who {
             return;
         }
-        let metadata = json!({"sourceUrl":area.fields[0].read(cx).value(),"downloadedAt":area.fields[1].read(cx).value(),"version":area.fields[2].read(cx).value()});
+        let metadata = if catalog == ReferenceCatalog::Prosthetics {
+            match prosthetics_options(
+                &area
+                    .prosthetics_fields
+                    .iter()
+                    .map(|f| f.read(cx).value().to_owned())
+                    .collect::<Vec<_>>(),
+            ) {
+                Ok(value) => value,
+                Err(message) => {
+                    area.message = Some(message.into());
+                    cx.notify();
+                    return;
+                }
+            }
+        } else {
+            json!({"sourceUrl":area.fields[0].read(cx).value(),"downloadedAt":area.fields[1].read(cx).value(),"version":area.fields[2].read(cx).value()})
+        };
         area.busy = true;
         area.preview = None;
         area.receipt = None;
@@ -385,13 +586,14 @@ impl ClinicalApp {
         let catalog = command.catalog();
         self.local_host.references.busy = true;
         self.local_host.references.message = None;
+        self.local_host.references.in_flight = Some(command.clone());
         let retained = command.clone();
         self.run_local_host(move || {
             let result=access.commit_reference_import(&command)?;
             let status=if matches!(result,ReferenceImportResult::Recorded(_)) {Some(access.read_reference_catalog(catalog))} else {None};
             Ok((result,status))
         },move |this,result,cx| {
-            let area=&mut this.local_host.references;area.busy=false;
+            let area=&mut this.local_host.references;area.busy=false;area.in_flight=None;
             match result {
                 Ok((ReferenceImportResult::CatalogChanged,_)) => {
                     area.preview=Some(retained);
@@ -451,6 +653,10 @@ impl ClinicalApp {
                                         return;
                                     }
                                     let area = &mut this.local_host.references;
+                                    area.document = None;
+                                    area.source_entries = None;
+                                    area.source_status = None;
+                                    area.progress = None;
                                     area.catalog = catalog;
                                     area.snapshot = None;
                                     area.preview = None;
@@ -475,12 +681,14 @@ impl ClinicalApp {
                 .on_click(cx.listener(|this, _, _, cx| this.read_reference_catalog(cx))),
             );
         if area.busy {
-            return pane.child(notice(
-                "references-busy",
-                "Operazione in corso…",
-                theme,
-                false,
-            ));
+            return pane
+                .child(notice(
+                    "references-busy",
+                    "Operazione in corso…",
+                    theme,
+                    false,
+                ))
+                .child(self.aifa_activity_view(cx));
         }
         if let Some(message) = &area.message {
             pane = pane.child(notice("references-message", message.clone(), theme, false));
@@ -507,7 +715,7 @@ impl ClinicalApp {
                         theme,
                     ));
             }
-            pane=pane.child(details(&snapshot.data,theme)).child(text!("La lettura locale non attesta che questa sia l’ultima pubblicazione della fonte. Le ricevute documentano l’import locale, non la validità normativa."));
+            pane=pane.child(div().id("reference-status").child(details(&snapshot.data,theme))).child(text!("La lettura locale non attesta che questa sia l’ultima pubblicazione della fonte. Le ricevute documentano l’import locale, non la validità normativa."));
             if snapshot.data["latestReceipt"].is_null()
                 && matches!(
                     area.catalog,
@@ -517,7 +725,7 @@ impl ClinicalApp {
                 pane=pane.child(text!("Nessuna ricevuta di import disponibile. La provenienza delle voci precedenti non è attestata."));
             }
             if let Some(sources) = &snapshot.sources {
-                pane = pane.child(match sources {
+                pane = pane.child(div().id("reference-sources").child(match sources {
                     Ok(v) => details(v, theme),
                     Err(e) => div().child(notice(
                         "references-source-error",
@@ -525,7 +733,7 @@ impl ClinicalApp {
                         theme,
                         true,
                     )),
-                });
+                }));
             }
         } else {
             pane = pane.child(text!("Stato non disponibile. Rileggi il repertorio."));
@@ -605,14 +813,77 @@ impl ClinicalApp {
                     pane = pane.child(field.clone());
                 }
                 pane = pane.child(text!(
-                    "Lo svuotamento del catalogo non è disponibile da questa pagina."
+                    "Svuotamento amministrativo non disponibile. Il catalogo resta conservato."
                 ));
+                pane = pane.child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .gap(px(8.))
+                        .child(
+                            button(
+                                "aifa-source-read",
+                                "Rileggi freschezza della fonte",
+                                theme,
+                                false,
+                                enabled,
+                            )
+                            .on_click(
+                                cx.listener(|this, _, _, cx| this.read_aifa_source(false, cx)),
+                            ),
+                        )
+                        .child(
+                            button(
+                                "aifa-source-check",
+                                "Verifica pubblicazione su AIFA",
+                                theme,
+                                false,
+                                enabled,
+                            )
+                            .on_click(
+                                cx.listener(|this, _, _, cx| this.read_aifa_source(true, cx)),
+                            ),
+                        ),
+                );
+                if let Some(status) = &area.source_status {
+                    let expected = status["networkPreference"] == true;
+                    pane=pane.child(button("aifa-network-preference",if expected {"Disattiva verifiche e download AIFA via Internet"}else{"Consenti verifiche e download del catalogo pubblico AIFA via Internet"},theme,false,enabled).on_click(cx.listener(move|this,_,_,cx|this.change_aifa_network(expected,cx))));
+                    pane = pane
+                        .child(line(
+                            "Ultima verifica della fonte",
+                            display_date(status["remote"]["checkedAt"].as_str()),
+                            theme,
+                        ))
+                        .child(line(
+                            "Pubblicazione",
+                            match status["remote"]["outcome"].as_str() {
+                                Some("unchanged") => "Invariata rispetto al catalogo locale",
+                                Some("available") => "Pubblicazione disponibile da valutare",
+                                _ => "Freschezza non verificabile",
+                            },
+                            theme,
+                        ))
+                        .child(line(
+                            "Accesso Internet AIFA",
+                            if status["networkAllowed"] == true {
+                                "Consentito dalla postazione"
+                            } else {
+                                "Disattivato sulla postazione"
+                            },
+                            theme,
+                        ));
+                }
+                pane = pane.child(self.aifa_activity_view(cx));
             }
             ReferenceCatalog::Exemptions => {
                 pane=pane.child(text!("File UTF-8 con separatore |, massimo 2 MiB e 20.000 righe. Colonne: CD_ESENZIONE, DS_ESENZIONE, CD_TIPO_ESENZIONE, DT_INIZIO_VALIDITA, DT_FINE_VALIDITA, FL_AMBITO_FARMACEUTICO, FL_AMBITO_SPECIALISTICO, FL_NAZIONALE. Anteprima e conferma obbligatorie."));
             }
             ReferenceCatalog::Prosthetics => {
-                pane=pane.child(text!("CSV UTF-8, virgola o punto e virgola, massimo 2 MiB e 20.000 righe. Colonne: codice_sistema,codice,descrizione,versione,fonte,ambito,data_inizio,data_fine. Una codifica, versione, fonte e ambito per file. Errori e duplicati bloccano l’import. I codici assenti restano. Originali in chiaro: allega solo documenti di repertorio privi di dati dei pazienti. Mappatura colonne e allegati agli originali non ancora gestibili qui."));
+                pane=pane.child(text!("CSV UTF-8, virgola o punto e virgola, massimo 2 MiB e 20.000 righe. Colonne: codice_sistema,codice,descrizione,versione,fonte,ambito,data_inizio,data_fine. Una codifica, versione, fonte e ambito per file. Errori e duplicati bloccano l’import. I codici assenti restano. Originali in chiaro: allega solo documenti di repertorio privi di dati dei pazienti. Le posizioni delle colonne partono da 1. Lascia tutte le posizioni vuote per usare le intestazioni. I metadati saranno applicati alla fonte con questo import."));
+                for field in &area.prosthetics_fields {
+                    pane = pane.child(field.clone());
+                }
+                pane = pane.child(self.prosthetics_sources_view(cx));
             }
             ReferenceCatalog::Who => {
                 pane=pane.child(text!("ICD-11 MMS 2026-01, inglese. World Health Organization, CC BY-ND 3.0 IGO. Solo categorie e titoli inglesi, senza sinonimi o postcoordinazione. Il servizio locale opzionale resta gestito dall’host tramite Setup_WHO.command. Nessun import da file o svuotamento WHO disponibile. Il ripristino della versione precedente non è disponibile da questa pagina."));
@@ -654,9 +925,464 @@ impl ClinicalApp {
     }
 }
 
+fn prosthetics_options(fields: &[String]) -> std::result::Result<Value, &'static str> {
+    let mut options = json!({});
+    if !fields[8].trim().is_empty() && !matches!(fields[8].trim(), "," | ";") {
+        return Err("Il separatore deve essere una virgola o un punto e virgola.");
+    }
+    if fields[..8].iter().all(|s| s.trim().is_empty()) && fields[8].trim() == ";" {
+        return Err("Per usare il punto e virgola indica tutte le otto posizioni delle colonne.");
+    }
+
+    if fields[..8].iter().any(|f| !f.trim().is_empty()) {
+        let mut columns = json!({});
+        for (i, key) in [
+            "codice_sistema",
+            "codice",
+            "descrizione",
+            "versione",
+            "fonte",
+            "ambito",
+            "data_inizio",
+            "data_fine",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let index = fields[i]
+                .trim()
+                .parse::<u8>()
+                .ok()
+                .filter(|i| (1..=100).contains(i))
+                .ok_or("Indica tutte le otto posizioni delle colonne, da 1 a 100.")?;
+            columns[*key] = json!(index - 1);
+        }
+        let delimiter = if fields[8].trim().is_empty() {
+            ","
+        } else {
+            fields[8].trim()
+        };
+        if !matches!(delimiter, "," | ";") {
+            return Err("Il separatore deve essere una virgola o un punto e virgola.");
+        }
+        options["mapping"] = json!({"delimiter":delimiter,"columns":columns});
+    }
+    if fields[9..12].iter().any(|s| !s.trim().is_empty()) {
+        options["sourceDetails"] = json!({"authority":fields[9].trim(),"date":if fields[10].trim().is_empty(){Value::Null}else{json!(fields[10].trim())},"notes":fields[11].trim()});
+    }
+    Ok(options)
+}
+impl ClinicalApp {
+    fn prosthetics_sources_view(&self, cx: &Context<Self>) -> Stateful<Div> {
+        let area = &self.local_host.references;
+        let enabled = !self.local_host.has_work();
+        let mut pane = div()
+            .id("prosthetics-source-management")
+            .flex()
+            .flex_col()
+            .gap(px(12.));
+        if let Some(command) = &area.document {
+            let review = command.review();
+            pane = pane
+                .child(line(
+                    "Fonte selezionata",
+                    review["sourceId"].as_str().unwrap_or("Non indicata"),
+                    self.theme,
+                ))
+                .child(line(
+                    "Revisione del repertorio",
+                    review["revision"].as_str().unwrap_or("Non indicata"),
+                    self.theme,
+                ))
+                .child(line(
+                    "Pagina o sezione",
+                    review["page"].as_str().unwrap_or("Non indicata"),
+                    self.theme,
+                ))
+                .child(line(
+                    "Originale da allegare",
+                    review["name"].as_str().unwrap_or("Non indicato"),
+                    self.theme,
+                ))
+                .child(line(
+                    "Impronta SHA-256",
+                    review["sha256"].as_str().unwrap_or("Non indicata"),
+                    self.theme,
+                ))
+                .child(text!(
+                    "Conferma solo documenti di repertorio privi di dati dei pazienti."
+                ))
+                .child(
+                    button(
+                        "prosthetics-document-confirm",
+                        "Conferma allegato originale",
+                        self.theme,
+                        true,
+                        enabled,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.attach_prosthetics_original(cx))),
+                )
+                .child(
+                    button(
+                        "prosthetics-document-discard",
+                        "Scarta allegato",
+                        self.theme,
+                        false,
+                        enabled,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.local_host.references.document = None;
+                        cx.notify();
+                    })),
+                );
+        }
+        if let Some(entries) = &area.source_entries {
+            let mut list = div()
+                .id("prosthetics-source-entries")
+                .flex()
+                .flex_col()
+                .gap(px(4.));
+            if let Some(rows) = entries["entries"].as_array() {
+                for (index, row) in rows.iter().enumerate() {
+                    list = list.child(div().id(("entry", index)).child(line(
+                        row["code"].as_str().unwrap_or("Codice"),
+                        row["description"].as_str().unwrap_or("Non indicata"),
+                        self.theme,
+                    )));
+                }
+                if rows.is_empty() {
+                    list = list.child(text!("Nessuna voce per questa fonte."));
+                }
+            }
+            if entries["truncated"] == true {
+                list = list.child(text!(
+                    "Mostrate le prime 50 voci della fonte. L’elenco è incompleto."
+                ));
+            }
+            pane = pane.child(list);
+        }
+        if let Some(Ok(sources)) = area.snapshot.as_ref().and_then(|s| s.sources.as_ref())
+            && let Some(rows) = sources["sources"].as_array()
+        {
+            for source in rows {
+                let Some(id) = source["id"].as_str() else {
+                    continue;
+                };
+                let mut row = div()
+                    .id(format!("prosthetics-source-{id}"))
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(line(
+                        "Fonte",
+                        source["name"].as_str().unwrap_or("Non indicata"),
+                        self.theme,
+                    ));
+                let source_id = id.to_owned();
+                let revision = sources["revision"].as_str().unwrap_or("").to_owned();
+                row = row
+                    .child(
+                        button(
+                            format!("prosthetics-entries-{id}"),
+                            "Leggi le voci della fonte",
+                            self.theme,
+                            false,
+                            enabled,
+                        )
+                        .on_click(cx.listener({
+                            let source_id = source_id.clone();
+                            move |this, _, _, cx| {
+                                this.read_prosthetics_entries(source_id.clone(), cx)
+                            }
+                        })),
+                    )
+                    .child(
+                        button(
+                            format!("prosthetics-attach-{id}"),
+                            "Allega originale alla fonte…",
+                            self.theme,
+                            false,
+                            enabled && area.document.is_none(),
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.pick_prosthetics_original(source_id.clone(), revision.clone(), cx)
+                        })),
+                    );
+                if let Some(documents) = source["documents"].as_array() {
+                    for doc in documents {
+                        let (Some(doc_id), Some(hash), Some(name)) = (
+                            doc["id"].as_str(),
+                            doc["sha256"].as_str(),
+                            doc["name"].as_str(),
+                        ) else {
+                            continue;
+                        };
+                        let (doc_id, hash, name) =
+                            (doc_id.to_owned(), hash.to_owned(), name.to_owned());
+                        row = row.child(
+                            button(
+                                format!("prosthetics-original-{doc_id}"),
+                                format!("Salva originale: {name}…"),
+                                self.theme,
+                                false,
+                                enabled,
+                            )
+                            .on_click(cx.listener(
+                                move |this, _, _, cx| {
+                                    this.save_prosthetics_original(
+                                        doc_id.clone(),
+                                        hash.clone(),
+                                        name.clone(),
+                                        cx,
+                                    )
+                                },
+                            )),
+                        );
+                    }
+                }
+                pane = pane.child(row);
+            }
+        }
+        pane
+    }
+    fn read_prosthetics_entries(&mut self, id: String, cx: &mut Context<Self>) {
+        if self.local_host.has_work() {
+            return;
+        }
+        let Some(access) = self.local_host.access() else {
+            return;
+        };
+        self.local_host.references.busy = true;
+        self.run_local_host(
+            move || access.read_prosthetics_source_entries(&id),
+            |this, result, cx| {
+                let area = &mut this.local_host.references;
+                area.busy = false;
+                match result {
+                    Ok(v) => area.source_entries = Some(v),
+                    Err(e) => {
+                        area.source_entries = None;
+                        area.message = Some(ui_error(e));
+                    }
+                }
+                cx.notify();
+            },
+            cx,
+        );
+    }
+    fn pick_prosthetics_original(&mut self, id: String, revision: String, cx: &mut Context<Self>) {
+        if self.local_host.has_work() {
+            return;
+        }
+        let Some(access) = self.local_host.access() else {
+            return;
+        };
+        let page = self.local_host.references.prosthetics_fields[12]
+            .read(cx)
+            .value();
+        let page = (!page.trim().is_empty()).then(|| page.trim().to_owned());
+        let generation = self.local_host.generation;
+        self.local_host.references.busy = true;
+        let chosen = cx.prompt_for_paths(gpui::PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some("Scegli l’originale del repertorio, senza dati dei pazienti".into()),
+        });
+        cx.spawn(async move |this, cx| {
+            let selected = chosen.await;
+            let _ = this.update(cx, |this, cx| {
+                if this.local_host.generation != generation {
+                    return;
+                }
+                if let Ok(Ok(Some(paths))) = selected
+                    && paths.len() == 1
+                {
+                    let path = paths[0].clone();
+                    this.run_local_host(
+                        move || {
+                            let bytes = archives::read_selected(&path, 25 * 1024 * 1024)
+                                .map_err(|_| RuntimeError::InvalidInput)?;
+                            let name = path
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .ok_or(RuntimeError::InvalidInput)?;
+                            access
+                                .prepare_prosthetics_document(
+                                    &id,
+                                    &revision,
+                                    name,
+                                    &bytes,
+                                    page.as_deref(),
+                                )
+                                .map(Arc::new)
+                        },
+                        |this, result, cx| {
+                            let area = &mut this.local_host.references;
+                            area.busy = false;
+                            match result {
+                                Ok(c) => area.document = Some(c),
+                                Err(e) => area.message = Some(ui_error(e)),
+                            }
+                            cx.notify();
+                        },
+                        cx,
+                    );
+                } else {
+                    this.local_host.references.busy = false;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+    fn attach_prosthetics_original(&mut self, cx: &mut Context<Self>) {
+        if self.local_host.has_work() {
+            return;
+        }
+        let (Some(access), Some(command)) = (
+            self.local_host.access(),
+            self.local_host.references.document.take(),
+        ) else {
+            return;
+        };
+        self.local_host.references.busy = true;
+        self.run_local_host(move||{let receipt=access.attach_prosthetics_document(&command)?;let current=access.read_reference_catalog(ReferenceCatalog::Prosthetics);Ok((receipt,current))},|this,result,cx|{
+            let area=&mut this.local_host.references;area.busy=false;
+            match result {
+                Ok((receipt,Ok(current)))=>{
+                    let found=current.sources.as_ref().and_then(|s|s.as_ref().ok()).and_then(|v|v["sources"].as_array()).is_some_and(|sources|sources.iter().any(|s|s["documents"].as_array().is_some_and(|docs|docs.iter().any(|d|d["id"]==receipt["id"] && d["sha256"]==receipt["sha256"]))));
+                    area.snapshot=Some(current);area.receipt=Some(receipt);area.message=Some(if found {"Originale allegato e riletto."}else{"Originale registrato. La rilettura non ne conferma la presenza: rileggi le fonti prima di riprovare."}.into());
+                },
+                Ok((receipt,Err(_)))=>{area.receipt=Some(receipt);area.snapshot=None;area.message=Some("Originale registrato; rilettura non riuscita. Rileggi le fonti.".into());},
+                Err(e)=>{area.snapshot=None;area.message=Some(format!("{} Rileggi le fonti prima di riprovare.",ui_error(e)));}
+            }cx.notify();
+        },cx);
+    }
+    fn save_prosthetics_original(
+        &mut self,
+        id: String,
+        hash: String,
+        name: String,
+        cx: &mut Context<Self>,
+    ) {
+        if self.local_host.has_work() {
+            return;
+        }
+        let Some(access) = self.local_host.access() else {
+            return;
+        };
+        let generation = self.local_host.generation;
+        self.local_host.references.busy = true;
+        let chosen = cx.prompt_for_new_path(&documents::initial_save_directory(), Some(&name));
+        cx.spawn(async move |this, cx| {
+            let selected = chosen.await;
+            let _ = this.update(cx, |this, cx| {
+                if this.local_host.generation != generation {
+                    return;
+                }
+                if let Ok(Ok(Some(path))) = selected {
+                    this.run_local_host(
+                        move || {
+                            let bytes = access.read_prosthetics_original(&id, &hash)?;
+                            access.admit_archive_file_effect()?;
+                            archives::write_new(&path, &bytes)
+                                .map_err(|_| RuntimeError::Indeterminate)
+                        },
+                        |this, result, cx| {
+                            this.local_host.references.busy = false;
+                            this.local_host.references.message = Some(match result {
+                                Ok(()) => "Originale salvato, impronta verificata.".into(),
+                                Err(e) => ui_error(e),
+                            });
+                            cx.notify();
+                        },
+                        cx,
+                    );
+                } else {
+                    this.local_host.references.busy = false;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn prosthetics_mapping_converts_positions_and_keeps_source_metadata() {
+        let mut fields = [
+            "3",
+            "1",
+            "2",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            ";",
+            "Ente inventato",
+            "2026-11-01",
+            "Fonte di prova",
+            "",
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        let options = prosthetics_options(&fields).unwrap();
+        assert_eq!(options["mapping"]["columns"]["codice"], 0);
+        assert_eq!(options["mapping"]["columns"]["descrizione"], 1);
+        assert_eq!(options["mapping"]["columns"]["codice_sistema"], 2);
+        assert_eq!(options["sourceDetails"]["authority"], "Ente inventato");
+        fields[1].clear();
+        assert!(prosthetics_options(&fields).is_err());
+        fields[..8].iter_mut().for_each(String::clear);
+        assert!(prosthetics_options(&fields).is_err());
+        fields[8] = "|".into();
+        assert!(prosthetics_options(&fields).is_err());
+        assert_eq!(
+            prosthetics_options(&vec![String::new(); 13]).unwrap(),
+            json!({})
+        );
+    }
+    #[gpui::test]
+    fn aifa_busy_download_keeps_progress_and_cancellation_reachable(cx: &mut gpui::TestAppContext) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let command = Arc::new(access.prepare_aifa_update().unwrap());
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, _| {
+            app.session = Some(host.session.clone());
+            app.area = Area::Settings;
+            app.settings_page = SettingsPage::References;
+            app.local_host.authority = Authority::Open(access);
+            app.local_host.references.busy = true;
+            app.local_host.references.in_flight = Some(command);
+        });
+        let ids = rendered_command::button_ids(|| {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            })
+        });
+        assert!(ids.contains(&"aifa-progress-read".to_owned()));
+        assert!(ids.contains(&"aifa-download-cancel".to_owned()));
+        view.update(cx, |app, cx| {
+            app.withdraw_local_host(cx);
+            assert!(app.local_host.references.in_flight.is_none());
+            assert!(!app.local_host.references.busy);
+        });
+    }
     #[test]
     fn truncated_aifa_review_reports_total_before_and_after_import() {
         let review = json!({"diagnosticsTruncated":true,"rejectedRecords":201,"duplicateRows":0,"diagnostics":vec![json!({"message":"AIC non valido"});200]});
