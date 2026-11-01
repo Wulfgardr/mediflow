@@ -1,3 +1,4 @@
+import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -45,7 +46,7 @@ export const NETWORK_SERVICE_PRESCRIPTION_WRITE_CAPABILITY = 'network.replica.wr
 type MutationResponse =
     | { status: 200; value: { success: true } }
     | { status: 201; value: { id: string; version: number } }
-    | { status: 400 | 403 | 404 | 409; value: Record<string, unknown> };
+    | { status: 400 | 401 | 403 | 404 | 409; value: Record<string, unknown> };
 
 type HostContext = {
     request: Request;
@@ -439,7 +440,10 @@ async function updateServicePrescription(
     if (expectedVersion === null) return badRequest('Version is required');
     const normalized = normalizeServicePrescriptionUpdate(body);
     if (!normalized.ok) return badRequest(normalized.error);
+    const authorizeCommit = surface === 'network' ? await prepareNetworkPatientCommitGuard(context as NetworkWriteContext, NETWORK_SERVICE_PRESCRIPTION_WRITE_CAPABILITY) : null;
     return dbServer.transaction((tx): MutationResponse => {
+        const denial = authorizeCommit?.(tx);
+        if (denial) return denial;
         const existing = tx.select().from(servicePrescriptions).where(eq(servicePrescriptions.id, context.id)).get();
         if (!existing) return { status: 404, value: { error: surface === 'host' ? 'Service prescription not found' : 'Not found' } };
         if (!activeParentExists(tx, existing.patientId) || (surface === 'network' && !patientIsInScope(tx, existing.patientId, (context as NetworkWriteContext).scopeAmbulatoryId))) return { status: 404, value: { error: 'Not found' } };
@@ -482,7 +486,10 @@ export async function createHostServicePrescriptionItem(context: HostContext, ra
 async function createServicePrescriptionItem(context: HostContext | NetworkWriteContext, body: ServicePrescriptionItemCreatePayload, surface: 'host' | 'network'): Promise<MutationResponse> {
     const prescriptionId = optionalPrescriptionText(body.prescriptionId);
     if (!prescriptionId) return badRequest('Missing required service prescription item fields');
+    const authorizeCommit = surface === 'network' ? await prepareNetworkPatientCommitGuard(context as NetworkWriteContext, NETWORK_SERVICE_PRESCRIPTION_WRITE_CAPABILITY) : null;
     return dbServer.transaction((tx): MutationResponse => {
+        const denial = authorizeCommit?.(tx);
+        if (denial) return denial;
         const parent = tx.select({ id: servicePrescriptions.id, patientId: servicePrescriptions.patientId }).from(servicePrescriptions).where(eq(servicePrescriptions.id, prescriptionId)).get();
         if (!parent) return { status: 404, value: { error: surface === 'host' ? 'Service prescription not found' : 'Not found' } };
         if (!activeParentExists(tx, parent.patientId) || (surface === 'network' && !patientIsInScope(tx, parent.patientId, (context as NetworkWriteContext).scopeAmbulatoryId))) return { status: 404, value: { error: 'Not found' } };
@@ -512,7 +519,10 @@ async function updateServicePrescriptionItem(context: (HostContext | NetworkWrit
     if (expectedVersion === null) return badRequest('Version is required');
     const normalized = normalizeServicePrescriptionItemUpdate(body);
     if (!normalized.ok) return badRequest(normalized.error);
+    const authorizeCommit = surface === 'network' ? await prepareNetworkPatientCommitGuard(context as NetworkWriteContext, NETWORK_SERVICE_PRESCRIPTION_WRITE_CAPABILITY) : null;
     return dbServer.transaction((tx): MutationResponse => {
+        const denial = authorizeCommit?.(tx);
+        if (denial) return denial;
         const existing = tx.select().from(servicePrescriptionItems).where(eq(servicePrescriptionItems.id, context.id)).get();
         if (!existing) return { status: 404, value: { error: surface === 'host' ? 'Service prescription item not found' : 'Not found' } };
         const parent = tx.select({ patientId: servicePrescriptions.patientId }).from(servicePrescriptions).where(eq(servicePrescriptions.id, existing.prescriptionId)).get();
@@ -548,7 +558,10 @@ export async function createNetworkScopedServicePrescription(context: NetworkPat
     if (!parsed.success) return badRequest('Payload non valido');
     const normalized = normalizeServicePrescriptionCreate(parsed.data);
     if (!normalized.ok) return badRequest(normalized.error);
+    const authorizeCommit = await prepareNetworkPatientCommitGuard(context as NetworkWriteContext, NETWORK_SERVICE_PRESCRIPTION_WRITE_CAPABILITY);
     return dbServer.transaction((tx): MutationResponse => {
+        const denial = authorizeCommit?.(tx);
+        if (denial) return denial;
         if (!activeParentExists(tx, context.patientId) || !patientIsInScope(tx, context.patientId, context.scopeAmbulatoryId)) return { status: 404, value: { error: 'Not found' } };
         if (tx.select({ id: servicePrescriptions.id }).from(servicePrescriptions)
             .where(eq(servicePrescriptions.id, normalized.values.id)).get()) {

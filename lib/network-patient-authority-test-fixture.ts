@@ -12,12 +12,13 @@ import { hashNetworkPairedClientToken, NETWORK_PAIRING_STATE_KEY, serializeNetwo
 import { createNativeServerSession, captureNativeLoginSessionFence } from './security/server-session';
 
 export function installNetworkPatientCookieFixture(dataDir: string, state: {
-    cookies: Map<string, string>; onCookies?: () => Promise<void> | void;
+    cookies: Map<string, string>; headers?: Headers; onCookies?: () => Promise<void> | void;
 }) {
     const key = `network-patient-cookies-${dataDir}`;
     (globalThis as unknown as Record<symbol, unknown>)[Symbol.for(key)] = state;
     const file = join(dataDir, 'synthetic-cookies.cjs');
     writeFileSync(file, `const s=globalThis[Symbol.for(${JSON.stringify(key)})];
+exports.headers=async()=>s.headers??new Headers();
 exports.cookies=async()=>{await s.onCookies?.();return {get:(name)=>s.cookies.has(name)?{name,value:s.cookies.get(name)}:undefined}};`);
     const load = createRequire(import.meta.url);
     const { registerHooks } = load('node:module') as { registerHooks: (hooks: {
@@ -30,14 +31,14 @@ exports.cookies=async()=>{await s.onCookies?.();return {get:(name)=>s.cookies.ha
 }
 
 export function syntheticNetworkPatientAuthority(db: typeof dbServer, scopeAmbulatoryId: string, options: {
-    clientId?: string; userId?: string; requestId?: string;
+    clientId?: string; userId?: string; requestId?: string; capabilities?: readonly string[];
 } = {}) {
     const user = { id: options.userId ?? 'synthetic-patient-operator',
         username: ['synthetic', 'patient', 'operator'].join('-'), role: 'admin' };
     const token = 'synthetic-patient-device-token';
     const pairedClient: StoredNetworkPairedClient = {
         clientId: options.clientId ?? 'synthetic-patient-device', deviceName: 'Synthetic device', clientPlatform: 'ipados',
-        appVersion: 'synthetic', grantedCapabilities: ['network.replica.write-patient-profile', 'network.replica.write-patient-lifecycle'],
+        appVersion: 'synthetic', grantedCapabilities: [...(options.capabilities ?? ['network.replica.write-patient-profile', 'network.replica.write-patient-lifecycle'])],
         pairedAt: new Date().toISOString(), lastSeenAt: null, sourceIntentId: 'synthetic-intent',
         tokenHash: hashNetworkPairedClientToken(token),
     };
