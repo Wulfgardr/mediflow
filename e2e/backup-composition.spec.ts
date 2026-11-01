@@ -76,11 +76,11 @@ test('Backup: composizione, tastiera, bozza di conferma e verifica senza riprist
         await restore.setInputFiles({ name: 'backup-inventato.mediflow', mimeType: 'application/json', buffer: Buffer.from(artifact) });
         const panel = page.getByTestId('restore-confirmation-panel'), keyword = page.getByTestId('restore-confirmation-input'), submit = page.getByTestId('restore-confirmation-submit');
         await expect(panel).toBeVisible();
-        if (!baseline) { await expect(panel).toContainText('Account e chiavi restano invariati.'); await expect(panel).toContainText('Lo storico protetto delle operazioni viene conservato.'); await expect(region).not.toContainText('TUTTI i dati'); }
+        if (!baseline) { await expect(panel).toContainText('Account e chiavi restano invariati.'); await expect(panel).toContainText('Lo storico viene conservato;'); await expect(region).not.toContainText('TUTTI i dati'); }
         await expect(submit).toBeDisabled(); await keyword.fill('RIPRI'); await expect(submit).toBeDisabled();
         await capture('conferma');
         if (!baseline) { await expect(region.locator('[data-backup-primary="true"]')).toHaveCount(1); await expect(panel.getByRole('button', { name: 'Annulla', exact: true })).toHaveAttribute('data-backup-primary', 'true'); }
-        await keyword.fill(' ripristina '); await expect(submit).toBeEnabled();
+        await keyword.fill(' ripristina '); await expect(submit).toBeDisabled(); await page.getByLabel('PIN amministrativo', { exact: true }).fill('1234'); await expect(submit).toBeEnabled();
         if (!baseline) { await keyword.focus(); await page.keyboard.press('Tab'); await expect(panel.getByRole('button', { name: 'Annulla', exact: true })).toBeFocused(); await page.keyboard.press('Enter'); }
         else await panel.getByRole('button', { name: 'Annulla', exact: true }).click();
         await expect(panel).toHaveCount(0);

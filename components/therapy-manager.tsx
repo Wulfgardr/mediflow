@@ -744,8 +744,10 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                         </>}
                         {statusConfirmation.phase === 'conflict' && <p className="type-body">La terapia è stata modificata da un&apos;altra postazione. Nulla è stato scritto.</p>}
                         {statusConfirmation.phase === 'rejected' && <p className="type-body">La richiesta è stata rifiutata. Rileggi la terapia prima di scegliere una nuova azione.</p>}
-                        {statusConfirmation.historical && <p className="type-body">La ricevuta attesta un effetto storico prima del ripristino; non prova lo stato attuale della terapia.</p>}
-                        {statusConfirmation.receipt?.outcome === 'applied' && statusConfirmation.phase === 'reviewed' && !statusConfirmation.historical && <p className="type-body">La ricevuta conferma la registrazione. Lo stato corrente riletto differisce da quell’esito.</p>}
+                        {statusConfirmation.origin === 'imported' && <p className="type-body">Ricevuta importata da un file portabile. Non prova un’esecuzione prodotta da questa postazione né lo stato attuale della terapia.</p>}
+                        {statusConfirmation.origin === 'unattested' && <p className="type-body">Origine della ricevuta non attestata. Questa ricevuta non prova un’esecuzione prodotta da questa postazione.</p>}
+                        {statusConfirmation.historical && statusConfirmation.origin === 'local' && <p className="type-body">La ricevuta attesta un effetto storico prima del ripristino; non prova lo stato attuale della terapia.</p>}
+                        {statusConfirmation.receipt?.outcome === 'applied' && statusConfirmation.phase === 'reviewed' && statusConfirmation.origin === 'local' && !statusConfirmation.historical && <p className="type-body">La ricevuta conferma la registrazione. Lo stato corrente riletto differisce da quell’esito.</p>}
                         {statusConfirmation.receipt?.outcome === 'closed' && <p className="type-body">ID richiesta ritirato. Una richiesta tardiva su questo ID non può registrare la modifica.</p>}
                         {statusConfirmation.receipt?.outcome === 'rejected' && <p className="type-body">La richiesta è stata rifiutata per una modifica concorrente. Nessun effetto da questo comando.</p>}
                         {statusConfirmation.readFailed && <p className="type-body">Rilettura non riuscita. Il nuovo invio resta bloccato.</p>}

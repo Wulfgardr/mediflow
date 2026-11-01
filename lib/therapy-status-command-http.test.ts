@@ -55,6 +55,21 @@ test('HTTP owner collision reveals no receipt; auth/generation/body limits prece
     assert.equal((await therapyStatusCommandHttp(request(command, 'close', undefined, { 'x-mediflow-archive-generation': randomUUID() }), command.commandId, 'close')).status, 409);
     assert.equal((await therapyStatusCommandHttp(request({ ...command, target: 'completed' }, 'close'), command.commandId, 'close')).status, 400);
 });
+for (const origin of ['imported', 'unattested']) test(`HTTP read and idempotent mutations keep ${origin} receipts historical`, async () => {
+    const command = fixture();
+    const applied = await therapyStatusCommandHttp(request({ ...command, target: 'completed' }, 'execute'), command.commandId, 'execute');
+    assert.equal(applied.status, 200);
+    const terminal = await applied.json();
+    sql.prepare("INSERT INTO portable_import_origins(kind,ref,import_event_id,origin) VALUES ('therapy_command',?,?,?)").run(command.commandId, terminal.receipt.auditEventId, origin);
+    for (const operation of ['receipt', 'execute', 'close'] as const) {
+        const payload = operation === 'execute' ? { ...command, target: 'completed' } : command;
+        const response = await therapyStatusCommandHttp(request(payload, operation), command.commandId, operation);
+        assert.equal(response.status, 200);
+        const result = await response.json(); assert.equal(result.origin, origin); assert.equal(result.historical, true);
+        assert.deepEqual(result.receipt, terminal.receipt);
+    }
+    assert.equal(sql.prepare('SELECT version FROM therapies WHERE id=?').pluck().get(command.therapyId), 2);
+});
 test('lock while HTTP body pending denies late execute with actual owner retirement', async () => {
     const command = fixture(); let push!: (value: Uint8Array) => void, end!: () => void;
     const stream = new ReadableStream<Uint8Array>({ start(controller) { push = value => controller.enqueue(value); end = () => controller.close(); } });

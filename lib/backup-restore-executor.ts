@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { recordPortableImportOrigin } from './backup-import-provenance';
 import { restoreSnapshot, writeRestoreReceipt, type RestoreIntent, type RestoreReceipt } from './backup-restore-receipt';
 import { planAmbulatoryCommandUnion, insertAmbulatoryCommandUnion } from './ambulatory-destructive-command-backup';
 import { planTherapyStatusCommandUnion, insertTherapyStatusCommandUnion } from './therapy-status-command-backup';
@@ -350,6 +352,14 @@ function soapAttestationsWithoutRestoredAuthority(rows: Record<string, unknown>[
     ];
 }
 
+function physicianAttestationsWithoutRestoredAuthority(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+    const revokedHere = dbServer.select().from(physicianReviewAttestations)
+        .where(eq(physicianReviewAttestations.status, 'revoked')).all();
+    const actors = new Set<unknown>(revokedHere.map(row => row.actorRef));
+    return [...revokedHere, ...rows.filter(row => !actors.has(row.actorRef))
+        .map(row => row.status === 'active' ? { ...row, status: 'inactive' } : row)];
+}
+
 export type BackupRestoreResult = {
     sourceChecksum: string;
     receipt?: RestoreReceipt;
@@ -380,10 +390,36 @@ function insertBackupAudits(plan: AuditRestorePlan): void {
     }
 }
 
+/* Keep source rows field-exact for history and command snapshots. Local companion events
+   identify every new imported event, including imported provenance claims, in the same transaction. */
+function recordPortableImport(plan: AuditRestorePlan, checksum: string, importedCommands: string[], actorRef?: string): void {
+    const eventId = randomUUID();
+    const now = new Date(Math.floor(Date.now() / 1000) * 1000);
+    const base = {
+        schemaVersion: 1, occurredAt: now, createdAt: now, outcome: 'success',
+        actorType: actorRef ? 'user' : 'system', actorRef: actorRef ?? 'portable-restore',
+        sourceSurface: 'web', requestId: eventId, redactedMetadata: null,
+    };
+    dbServer.insert(auditEvents).values({ ...base, eventId, eventType: 'backup.portable.imported',
+        subjectType: 'backup', subjectRef: checksum }).run();
+    for (const commandId of importedCommands) {
+        recordPortableImportOrigin(openDbServer(), 'therapy_command', commandId, eventId);
+        dbServer.insert(auditEvents).values({ ...base, eventId: randomUUID(), eventType: 'backup.therapy-command.imported',
+            subjectType: 'therapy_command', subjectRef: commandId }).run();
+    }
+    for (const { row, reused } of plan) {
+        if (reused) continue;
+        recordPortableImportOrigin(openDbServer(), 'audit', row.eventId, eventId);
+        dbServer.insert(auditEvents).values({ ...base, eventId: randomUUID(), eventType: 'backup.audit.imported',
+            subjectType: 'audit_event', subjectRef: row.eventId }).run();
+    }
+}
+
 export function restoreBackupArtifact(
     artifact: BackupArtifact,
     beforeMutation: BackupRestoreMutationFence,
     intent?: RestoreIntent,
+    actorRef?: string,
 ): BackupRestoreResult {
     assertExemptionImportReceiptRows(artifact.payload.exemptionImportReceipts ?? []);
     assertProstheticsCatalogBackup(artifact.payload.prostheticsCatalogEntries ?? [], artifact.payload.prostheticsCatalogReceipts ?? [], artifact.payload.prostheticsCatalogSources ?? [], artifact.payload.prostheticsCatalogDocuments ?? [], artifact.payload.prostheticPrescriptions ?? []);
@@ -408,8 +444,10 @@ export function restoreBackupArtifact(
         let ambulatoryCommands;
         try { ambulatoryCommands = planAmbulatoryCommandUnion(openDbServer(), artifact.payload.ambulatoryDestructiveCommands ?? [], rows); }
         catch { throw new BackupRestoreBlockedError('ambulatory_destructive_commands', 'ambulatory command or audit collision.'); }
+        const importedCommands = therapyCommands.filter(row => !openDbServer().prepare('SELECT 1 FROM therapy_status_commands WHERE command_id=?').get(row.commandId)).map(row => row.commandId as string);
         const plan = planBackupAuditRestore(rows);
         const soapAttestations = soapAttestationsWithoutRestoredAuthority(artifact.payload.headlessSoapActiveRoleAttestations ?? []);
+        const physicianAttestations = physicianAttestationsWithoutRestoredAuthority(artifact.payload.physicianReviewAttestations ?? []);
         runMutationFence(beforeMutation);
         rotateSqliteArchiveGeneration(openDbServer());
         clearAllSessions();
@@ -420,7 +458,7 @@ export function restoreBackupArtifact(
 
         for (const collection of INSERT_ORDER) {
             insertRows(dbServer, TABLE_LOOKUP[collection], collection === 'headlessSoapActiveRoleAttestations'
-                ? soapAttestations : artifact.payload[collection] ?? []);
+                ? soapAttestations : collection === 'physicianReviewAttestations' ? physicianAttestations : artifact.payload[collection] ?? []);
         }
 
         migrateProstheticsSources(dbServer.$client);
@@ -429,6 +467,7 @@ export function restoreBackupArtifact(
         restoreHeadlessSoapEntryCommits(headlessSoapRows);
         insertTherapyStatusCommandUnion(openDbServer(), therapyCommands);
         insertAmbulatoryCommandUnion(openDbServer(), ambulatoryCommands);
+        recordPortableImport(plan, backupArtifactInputChecksum(artifact), importedCommands, actorRef);
         if (intent) receipt = writeRestoreReceipt(openDbServer(), intent, backupArtifactInputChecksum(artifact));
         audit = { coverage, inserted: plan.filter(item => !item.reused).length, reused: plan.filter(item => item.reused).length };
     });

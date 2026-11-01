@@ -83,8 +83,12 @@ for (const mode of ['cancel', 'conflict', 'crash', 'committed-crash', 'success',
             try {
                 assert.equal(observed.pragma('integrity_check', { simple: true }), 'ok');
                 assert.deepEqual(observed.prepare('SELECT * FROM users ORDER BY id').all(), keys);
-                assert.deepEqual(observed.prepare('SELECT * FROM audit_events ORDER BY event_id').all(), audit);
                 const committed = mode === 'success' || mode === 'committed-crash';
+                const restoredAudit = observed.prepare('SELECT * FROM audit_events ORDER BY event_id').all() as { event_id: string; event_type: string; subject_ref: string }[];
+                assert.deepEqual(restoredAudit.filter(row => audit.some(original => (original as {event_id:string}).event_id === row.event_id)), audit);
+                const added = restoredAudit.filter(row => !audit.some(original => (original as {event_id:string}).event_id === row.event_id));
+                assert.equal(added.length, committed ? 1 : 0);
+                if (committed) { assert.equal(added[0]!.event_type, 'backup.portable.imported'); assert.equal(added[0]!.subject_ref, artifact.manifest.checksum); }
                 assert.deepEqual(observed.prepare('SELECT id FROM patients').all(), [{ id: committed ? 'after' : 'before' }]);
                 const receipt = observed.prepare('SELECT value FROM settings WHERE key=?').get('archive.restore.receipt.' + id) as { value: string } | undefined;
                 if (committed) {

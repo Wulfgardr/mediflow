@@ -38,13 +38,13 @@ export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const view = searchParams.get('view');
+        const origin = searchParams.get('origin') ?? 'local';
+        if (origin !== 'local' && origin !== 'imported' && origin !== 'unattested') return NextResponse.json({ error: 'Invalid audit origin' }, { status: 400 });
         const eventType = searchParams.get('eventType') as AuditEventType | null;
         const outcome = searchParams.get('outcome') as AuditOutcome | null;
         const subjectType = searchParams.get('subjectType') as AuditSubjectType | null;
         const actorRef = searchParams.get('actorRef')?.trim() || undefined;
-        const limit = view === 'summary'
-            ? parseLimit(searchParams.get('limit'), 500, 1000)
-            : parseLimit(searchParams.get('limit'), 50, 200);
+        const limit = parseLimit(searchParams.get('limit'), view === 'summary' ? 200 : 50, 200);
         const days = view === 'summary' ? parseDays(searchParams.get('days')) : null;
         const occurredAfter = days !== null
             ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
@@ -52,6 +52,7 @@ export async function GET(request: Request) {
 
         const rows = await listAuditEvents({
             limit,
+            origin,
             eventType: eventType || undefined,
             outcome: outcome || undefined,
             subjectType: subjectType || undefined,
@@ -60,9 +61,17 @@ export async function GET(request: Request) {
         });
 
         if (view === 'summary') {
+            const sample = async (requested: 'local' | 'imported' | 'unattested') => origin === requested ? rows
+                : origin === 'local' ? listAuditEvents({ limit, origin: requested, eventType: eventType || undefined,
+                    outcome: outcome || undefined, subjectType: subjectType || undefined, actorRef, occurredAfter }) : [];
+            const localRows = origin === 'local' ? rows : [];
+            const importedSample = await sample('imported');
+            const unattestedSample = await sample('unattested');
             return NextResponse.json({
                 days,
-                ...summarizeAuditEvents(rows, rows.length >= limit),
+                ...summarizeAuditEvents([...localRows, ...importedSample, ...unattestedSample], localRows.length >= limit),
+                importedIsTruncated: importedSample.length >= limit,
+                unattestedIsTruncated: unattestedSample.length >= limit,
             });
         }
 

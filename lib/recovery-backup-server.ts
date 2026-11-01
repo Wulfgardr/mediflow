@@ -20,7 +20,7 @@ function quote(identifier: string): string { return '"' + identifier.replaceAll(
 function validateCandidate(file: string, prepareReplacement = false): Database.Database {
     const probe = new Database(file, { readonly: true, fileMustExist: true });
     try {
-        if (![4, 5, CURRENT_SQLITE_SCHEMA_VERSION].includes(Number(probe.pragma('user_version', { simple: true })))
+        if (![4, 5, 6, CURRENT_SQLITE_SCHEMA_VERSION].includes(Number(probe.pragma('user_version', { simple: true })))
             || probe.pragma('integrity_check', { simple: true }) !== 'ok'
             || (probe.pragma('foreign_key_check') as unknown[]).length !== 0) fail();
         if (probe.pragma('user_version', { simple: true }) !== CURRENT_SQLITE_SCHEMA_VERSION) assertAmbulatoryCommandPredecessorRecoverySchema(probe);
