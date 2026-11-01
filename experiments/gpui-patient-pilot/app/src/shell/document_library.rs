@@ -113,6 +113,7 @@ impl ClinicalApp {
                 .child(button("clinical-workspace-new-document", "Aggiungi documenti…", theme, true, writable && !self.document_imports.pending())
                     .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))))
             .child(self.document_imports_view(cx))
+            .child(self.document_curation_view(cx))
             .child(div().text_color(theme.secondary).child(text!("Prima del salvataggio puoi annullare la copia cambiando scheda o bloccando la sessione. Una copia già avviata può completarsi anche dopo il blocco.")))
             .when(self.document_operation != DocumentOperation::Idle, |el| el.child(notice("clinical-workspace-document-operation", self.document_operation.message(), theme, false)))
             .when_some(self.patient.attachments.state(ReadObject::Documenti), |el, state| el.child(self.render_read_state("clinical-workspace-attachments-state", state, cx)))
@@ -127,7 +128,7 @@ impl ClinicalApp {
                 let delete_id = row.id.clone();
                 let original_id = row.id.clone();
                 let original_open = self.patient.document_original.as_ref().is_some_and(|view| view.id == row.id);
-                let can_delete = can_open && !self.local_host.has_work() && self.local_host.access().is_some();
+                let can_delete = can_open && !self.local_work_pending() && self.local_host.access().is_some();
                 div().id(SharedString::from(format!("clinical-workspace-document-{id}")))
                     .min_w_0().max_w_full()
                     .border_b_1().border_color(theme.rule).py(px(16.)).flex().flex_col().gap(px(8.))
@@ -149,7 +150,7 @@ impl ClinicalApp {
                     .when(details_open, |el| el.child(self.document_details_view(row, cx)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
-            .child(notice("clinical-workspace-documents-native-limits", "Anteprima delle immagini diverse da PNG e JPEG, revisione dei dati estratti e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI.", theme, false))
+            .child(notice("clinical-workspace-documents-native-limits", "Anteprima delle immagini diverse da PNG e JPEG, nuova estrazione dagli allegati, revisione agentica e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI.", theme, false))
     }
 
     pub(super) fn document_imports_view(&self, cx: &Context<Self>) -> Div {
@@ -178,7 +179,7 @@ impl ClinicalApp {
 
     fn document_import_available(&self) -> bool {
         self.form.is_none()
-            && !self.local_host.has_work()
+            && !self.local_work_pending()
             && self.document_operation == DocumentOperation::Idle
             && self.can_write(FormKind::Document)
             && self

@@ -1,6 +1,7 @@
 mod archives;
 mod chatgpt;
 mod controls;
+mod documents;
 mod governance;
 mod models;
 mod network;
@@ -18,6 +19,7 @@ use crate::{
 pub use archives::*;
 pub use chatgpt::*;
 pub use controls::*;
+pub use documents::*;
 pub use governance::*;
 pub use models::*;
 pub use network::*;

@@ -73,7 +73,7 @@ impl ClinicalApp {
                 && self.chat_access.voice.work.is_none()
                 && self.chat_access.pending.is_none()
                 && !self.patient_document.is_open()
-                && !self.local_host.has_work()
+                && !self.local_work_pending()
                 && self.can_write(FormKind::Entry)
         });
         let opened = binding.is_some();
@@ -148,7 +148,7 @@ impl ClinicalApp {
         else {
             return;
         };
-        if self.local_host.has_work()
+        if self.local_work_pending()
             || self.edit_pending
             || self.document_operation != DocumentOperation::Idle
             || self.patient_document.is_open()
