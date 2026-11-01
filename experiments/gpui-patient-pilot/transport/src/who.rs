@@ -189,7 +189,7 @@ pub(crate) fn validate_readiness_http(status: u16, body: &[u8]) -> Result<()> {
     }
 }
 
-fn canonical_uri(uri: &str, code: &str) -> bool {
+pub(crate) fn canonical_uri(uri: &str, code: &str) -> bool {
     if code.contains(['&', '/']) {
         let valid_combination = code.split(['&', '/']).all(|part| {
             part.as_bytes()
@@ -232,7 +232,7 @@ fn entry_valid(entry: &WhoEntry) -> bool {
         && canonical_uri(&entry.canonical_uri, code)
 }
 
-fn parse_search(value: Value) -> Result<WhoSearchResponse> {
+pub(crate) fn parse_search(value: Value) -> Result<WhoSearchResponse> {
     let result: WhoSearchResponse =
         serde_json::from_value(value).map_err(|_| RuntimeError::InvalidResponse)?;
     let receipt = &result.receipt;
