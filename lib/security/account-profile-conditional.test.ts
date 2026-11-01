@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest as localRequest } from './loopback-ingress-test-fixture';
 /* ADR 0155. Real SQLite, real paired admission and a real Web setup session;
    only the HTTP cookie adapter is synthetic, as in the currentness suites. */
 import assert from 'node:assert/strict';
@@ -19,7 +20,7 @@ import { NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState } from '@/lib/n
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-account-profile-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
-const cookieState = { cookies: new Map<string, string>() };
+const cookieState = { cookies: new Map<string, string>(), headers: localRequest('http://127.0.0.1').headers };
 const cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
 const { dbServer, openDbServer } = load('../db-server.ts') as typeof import('../db-server');
 openDbServer();
@@ -56,12 +57,12 @@ function cookieValue(response: Response, name: string): string {
 }
 
 async function createWebSession(): Promise<{ userId: string; generation: string }> {
-    const check = await checkRoute.GET(new Request('http://127.0.0.1/api/auth/check'));
+    const check = await checkRoute.GET(localRequest('http://127.0.0.1/api/auth/check'));
     assert.equal(check.status, 200);
     const control = cookieValue(check, 'mediflow_auth_control');
     const etag = check.headers.get('etag');
     assert.ok(etag);
-    const response = await setupRoute.POST(new Request('http://127.0.0.1/api/auth/setup', {
+    const response = await setupRoute.POST(localRequest('http://127.0.0.1/api/auth/setup', {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -123,11 +124,11 @@ function nativeHeaders(): Record<string, string> {
 }
 
 function profileRequest(headers: Record<string, string> = {}): Request {
-    return new Request(URL, { headers: { ...nativeHeaders(), ...headers } });
+    return localRequest(URL, { headers: { ...nativeHeaders(), ...headers } });
 }
 
 function request(body: unknown, headers: Record<string, string> = {}): Request {
-    return new Request(URL, {
+    return localRequest(URL, {
         method: 'PUT',
         headers: { 'content-type': 'application/json', ...nativeHeaders(), ...headers },
         body: JSON.stringify(body),
@@ -153,7 +154,7 @@ function profileRows(userId: string) {
 function heldRequest(body: unknown, headers: Record<string, string> = {}) {
     let controller!: ReadableStreamDefaultController<Uint8Array>;
     const stream = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
-    const held = new Request(URL, {
+    const held = localRequest(URL, {
         method: 'PUT',
         headers: { 'content-type': 'application/json', ...nativeHeaders(), ...headers },
         body: stream,
@@ -359,7 +360,7 @@ test('PUT without expectedVersion fails explicitly without profile or audit effe
 
 test('malformed profile JSON is a validation failure without effects', async () => {
     const before = profileRows(nativeUserId);
-    const response = await profileRoute.PUT(new Request(URL, {
+    const response = await profileRoute.PUT(localRequest(URL, {
         method: 'PUT', headers: { ...nativeHeaders(), 'content-type': 'application/json' }, body: '{',
     }));
     assert.equal(response.status, 400);
@@ -438,14 +439,14 @@ test('a session retired after admission returns 401 without effects', async () =
 
 test('a web conditional PUT requires the archive generation header and then succeeds', async () => {
     selectWebCookies();
-    const before = await (await profileRoute.GET(new Request(URL))).json() as { profileVersion: string };
+    const before = await (await profileRoute.GET(localRequest(URL))).json() as { profileVersion: string };
     const body = {
         expectedVersion: before.profileVersion,
         displayName: 'Dott. Web Dopo',
         ambulatoryName: 'Studio Web Dopo',
     };
 
-    const denied = await profileRoute.PUT(new Request(URL, {
+    const denied = await profileRoute.PUT(localRequest(URL, {
         method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
     }));
     const auditsBefore = auditCount();
@@ -453,7 +454,7 @@ test('a web conditional PUT requires the archive generation header and then succ
     assert.equal((await denied.json() as Record<string, unknown>).code, 'ARCHIVE_REPLACED');
     assert.equal(auditCount(), auditsBefore);
 
-    const allowed = await profileRoute.PUT(new Request(URL, {
+    const allowed = await profileRoute.PUT(localRequest(URL, {
         method: 'PUT',
         headers: { 'content-type': 'application/json', 'x-mediflow-archive-generation': webGeneration },
         body: JSON.stringify(body),
@@ -464,7 +465,7 @@ test('a web conditional PUT requires the archive generation header and then succ
     assert.equal(updated.displayName, 'Dott. Web Dopo');
     assert.equal(profileRows(webUserId).settings.clinicName, 'Studio Web Dopo');
     assert.equal(auditCount(), auditsBefore + 1);
-    const reread = await (await profileRoute.GET(new Request(URL))).json() as Record<string, unknown>;
+    const reread = await (await profileRoute.GET(localRequest(URL))).json() as Record<string, unknown>;
     assert.equal(reread.profileVersion, updated.profileVersion);
     assert.equal(reread.archiveGeneration, webGeneration);
 });
@@ -618,19 +619,19 @@ test('archive replacement is only reported to an admitted paired client', async 
         'x-mediflow-paired-client-id': 'synthetic-other-device',
         'x-mediflow-paired-client-token': 'synthetic-other-device-token',
     };
-    const getWithoutClient = await profileRoute.GET(new Request(URL));
+    const getWithoutClient = await profileRoute.GET(localRequest(URL));
     assert.equal(getWithoutClient.status, 401);
     assert.equal(getWithoutClient.headers.get('cache-control'), 'no-store');
     const getWithForeignClient = await profileRoute.GET(profileRequest(foreignHeaders));
     assert.equal(getWithForeignClient.status, 401);
 
-    const putWithoutClient = await profileRoute.PUT(new Request(URL, {
+    const putWithoutClient = await profileRoute.PUT(localRequest(URL, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
     }));
     assert.equal(putWithoutClient.status, 401);
-    const putWithForeignClient = await profileRoute.PUT(new Request(URL, {
+    const putWithForeignClient = await profileRoute.PUT(localRequest(URL, {
         method: 'PUT',
         headers: { 'content-type': 'application/json', ...foreignHeaders },
         body: JSON.stringify(body),

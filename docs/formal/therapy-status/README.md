@@ -10,6 +10,45 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 7 e i predecessori canonici 4, 5 e 6; le 31 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## Raccordo PR #769 del 31 ottobre 2026: autorità network al commit
+
+Riesaminato `lib/therapy-write-operation.ts` del runtime
+`745118a84c9234b581278cb76c1234db9fb43812` rispetto alla sincronizzazione
+`826a4df3fc0ec069c0eabb5fb77c93fe3aa69757`. Il nuovo parametro
+`authorizeCommit` viene invocato prima di ogni lettura clinica, CAS e audit,
+nel corpo sincrono della stessa transazione `IMMEDIATE`. La preparazione
+asincrona del grant in `network-therapy-write.ts` resta fuori dalla transazione;
+la rivalidazione effettiva di pairing, modalità, capability, sessione, archivio
+e ambulatorio avviene dentro. Un rifiuto o un errore non scrive terapia o audit
+di successo e non restituisce la ricevuta positiva di un duplicato.
+
+La PUT Web legacy non passa `authorizeCommit`: `Host`, CAS, incremento e audit
+mantengono il comportamento precedente. Gli altri writer rimangono astratti da
+`OtherWriter`: la nuova guardia può impedire un incremento prima ammesso, senza
+aggiungere stati, cambiare versione o separare CAS e audit. Un tentativo negato
+senza effetti clinici è uno stuttering step per quell'astrazione; il rifiuto
+di una richiesta host pendente è già ammesso da `HostReject`. La richiesta può
+ancora committare dopo un abort client se l'autorità è corrente: non si assume
+che l'abort annulli la transazione. Il consumer durevole e l'adapter paired
+specializzato conservano le proprie guardie; non vengono convertiti nel
+protocollo PUT legacy.
+
+**Il modello non cambia.** Statechart, cinque invarianti, bound, sei testimoni
+e tre mutanti restano identici. Identità e autorizzazione restano fuori da TLC;
+la prova non viene estesa alla revoca paired. Il modello conserva un insieme
+conservativo di possibili scritture esterne e non dichiara liveness. Le negazioni
+network sono controllate dalla matrice causale con SQLite reale.
+
+Prima di aggiornare il digest, TLC sul modello e configurazione originali ha
+completato 28.149.669 stati generati, 5.903.794 distinti, profondità 36 e coda
+vuota. Sono poi passati 266 test del codice, inclusa la matrice di revoca.
+La fixture di `therapy-required-audit.test.ts` ora fornisce pairing e sessione
+sintetici reali alla guardia e un secondo ambulatorio esistente per il caso
+fuori scope: nessuna guardia è sostituita e le asserzioni 404 e assenza di effetti
+restano attive. Solo dopo questi esiti sono aggiornati il digest del writer e
+`syncCommit`; il gate completo riesegue modello, controlli negativi, testimoni
+e test causali. `legacyModelSyncCommit` resta invariato.
+
 ## Raccordo PR #739 del 30 ottobre 2026: lettura degli allegati ENC2
 
 Confrontati `lib/db.ts` e `lib/locked-field-guard.ts` di

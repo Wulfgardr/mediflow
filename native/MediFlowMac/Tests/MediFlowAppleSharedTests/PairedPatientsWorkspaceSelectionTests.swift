@@ -165,7 +165,7 @@ final class PairedPatientsWorkspaceSelectionTests: XCTestCase {
             SelectionAttachmentURLProtocol.remove(host: host)
         }
         let source = HomeBasePatientsClient(
-            configuration: HomeBaseConnectionConfiguration(serverURLString: "https://\(host)"),
+            configuration: HomeBaseConnectionConfiguration(serverURLString: "https://\(host)", tlsPin: String(repeating: "a", count: 64)),
             session: session)
         return (makeModel(source: source), gate)
     }

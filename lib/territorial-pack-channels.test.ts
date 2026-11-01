@@ -1,3 +1,5 @@
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
+import { clearAllSessions } from './security/server-session';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtempSync, readFileSync } from 'node:fs';
@@ -32,13 +34,16 @@ function request(body: unknown, header = generation) {
 }
 const { dbServer, openDbServer } = await import('./db-server.ts');
 openDbServer(); bindSyntheticArchiveSessions('synthetic-territorial-web', 'synthetic-territorial-native');
+const authority = syntheticNetworkPatientAuthority(dbServer, 'synthetic-scope', { capabilities: ['network.replica.write-prosthetic-prescriptions'] });
+const cleanupCookies = installNetworkPatientCookieFixture(directory, { cookies: new Map([['ambulatory_id', 'synthetic-scope']]) });
 const writer = await import('./prosthetic-prescription-write.ts');
 const session = { id: 'synthetic-territorial-web', userId: web.userId, username: ['synthetic', 'territorial'].join('-'), role: 'admin', authChannel: 'web', createdAt: Date.now(), expiresAt: web.expiresAt } as ServerSession;
+db.prepare("INSERT INTO ambulatories (id,name,is_default) VALUES ('synthetic-scope','Sede inventata',1)").run();
 db.prepare("INSERT INTO patients (id,first_name,last_name,tax_code) VALUES ('synthetic-patient','Synthetic','Patient','SYNTHETIC')").run();
 let external = 0;
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async () => { external++; throw new Error('Unexpected external call'); };
-test.after(() => { globalThis.fetch = originalFetch; db.close(); dbServer.$client.close(); });
+test.after(() => { globalThis.fetch = originalFetch; clearAllSessions(); cleanupCookies(); db.close(); dbServer.$client.close(); });
 let serial = 0;
 async function write(cached?: unknown) {
     return writer.createHostProstheticPrescription({ request: new Request('http://localhost/writer', { headers: cached ? { 'x-mediflow-territorial-packs': JSON.stringify(cached) } : {} }), session },
@@ -65,8 +70,7 @@ test('core denies the real territorial writer; trusted Web requires a live sessi
 
 test('all five protesica mutation entrypoints deny core, including paired operations', async () => {
     const request = new Request('http://localhost/writer');
-    const native = { ...session, id: 'synthetic-territorial-native', authChannel: 'native' as const };
-    const paired = { request, session: native, pairedClient: { clientId: 'synthetic-paired' }, scopeAmbulatoryId: 'synthetic-scope' } as Parameters<typeof writer.createNetworkScopedProstheticPrescription>[0];
+    const paired = authority;
     const host = { request, session, id: 'synthetic-prescription' };
     const body = { patientId: 'synthetic-patient', prescribedAt: '2026-10-21', description: 'ENC:synthetic' };
     const results = [
@@ -77,6 +81,7 @@ test('all five protesica mutation entrypoints deny core, including paired operat
         await writer.updateNetworkScopedProstheticPrescription({ ...paired, prescriptionId: 'synthetic-prescription' }, { version: 1, description: 'ENC:synthetic' }),
     ];
     assert.deepEqual(results.map(result => result.status), [403, 403, 403, 403, 403]);
+    assert.deepEqual(results.map(result => 'code' in result.value ? result.value.code : undefined), Array(5).fill('TERRITORIAL_PACK_DISABLED'));
     await assertDisabled(readTerritorialPacks(db));
 });
 

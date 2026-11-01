@@ -327,25 +327,25 @@ test('Treatment portable bundle requires exact worker/CLI/TS closure and rejects
 });
 
 test('packaged TLS proxy starts outside the checkout and fails if its shared import is absent', async t => {
-  for (const included of [true, false]) {
-    await t.test(included ? 'complete packaged layout forwards HTTPS' : 'missing shared module rejects the bundle', () => {
+  for (const omitted of [null, 'loopback-ingress.mjs', 'network-ingress-policy.mjs']) {
+    await t.test(omitted ? `missing ${omitted} rejects the bundle` : 'complete packaged layout forwards HTTPS', () => {
       const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-tls-bundle-'));
       try {
         const resources = path.join(directory, 'MediFlow.app', 'Contents', 'Resources');
         const scripts = path.join(resources, 'scripts');
         fs.mkdirSync(scripts, { recursive: true });
         fs.copyFileSync(path.join(root, 'scripts/local-api-tls-proxy.mjs'), path.join(scripts, 'local-api-tls-proxy.mjs'));
-        if (included) {
+        for (const file of ['loopback-ingress.mjs', 'network-ingress-policy.mjs'].filter(name => name !== omitted)) {
           const security = path.join(resources, 'lib', 'security');
           fs.mkdirSync(security, { recursive: true });
-          fs.copyFileSync(path.join(root, 'lib/security/loopback-ingress.mjs'), path.join(security, 'loopback-ingress.mjs'));
+          fs.copyFileSync(path.join(root, 'lib/security', file), path.join(security, file));
         }
         const result = spawnSync(node, [checker, '--tls-proxy-resources', resources], {
           cwd: directory, env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 25_000,
         });
         assert.equal(result.error, undefined);
-        assert.equal(result.status, included ? 0 : 1, result.stderr);
-        if (included) assert.match(result.stdout, /started and forwarded HTTPS/u);
+        assert.equal(result.status, omitted ? 1 : 0, result.stderr);
+        if (!omitted) assert.match(result.stdout, /started and forwarded HTTPS/u);
         else assert.match(result.stderr, /ERR_MODULE_NOT_FOUND/u);
       } finally {
         fs.rmSync(directory, { recursive: true, force: true });

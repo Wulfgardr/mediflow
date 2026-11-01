@@ -3130,7 +3130,7 @@ impl ClinicalApp {
                                 if self.show_tls_pin {
                                     "Nascondi impronta del collegamento"
                                 } else {
-                                    "Hai un'impronta del collegamento?"
+                                    "Impronta del certificato, obbligatoria in rete"
                                 },
                                 theme,
                                 false,

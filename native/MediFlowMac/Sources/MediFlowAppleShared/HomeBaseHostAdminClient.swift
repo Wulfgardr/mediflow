@@ -226,13 +226,7 @@ public enum HostAdminAvailability {
             host = Self.hostFromAuthority(authority).lowercased()
         }
 
-        if host == "localhost" || host == "::1" || host == "[::1]" { return true }
-        // The whole 127.0.0.0/8 block is loopback, not just 127.0.0.1.
-        let octets = host.split(separator: ".")
-        if octets.count == 4, octets[0] == "127", octets.allSatisfy({ UInt8($0) != nil }) {
-            return true
-        }
-        return false
+        return HomeBaseConnectionConfiguration.isLoopbackHost(host)
     }
 
     /// Strips a port without mangling a bracketed IPv6 literal, where the colons

@@ -3591,7 +3591,7 @@ mod tests {
         RuntimeSession::new(
             RuntimeClient::new(RuntimeConfig {
                 base_url: base_url.into(),
-                tls_pin_sha256: None,
+                tls_pin_sha256: base_url.starts_with("https:").then(|| "a".repeat(64)),
             })
             .unwrap(),
             RuntimeUser {

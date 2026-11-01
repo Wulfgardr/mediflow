@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -23,7 +24,7 @@ const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-profile-review-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server'); openDbServer();
-const cookieState: { cookies: Map<string, string>; onCookies?: () => void } = { cookies: new Map() };
+const cookieState: { cookies: Map<string, string>; headers: Headers; onCookies?: () => void } = { cookies: new Map(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
 const cleanup = installNetworkPatientCookieFixture(dataDir, cookieState);
 const route = load('../app/api/patient-profile/review/route.ts') as typeof import('../app/api/patient-profile/review/route');
 const commitRoute = load('../app/api/patients/[id]/notes-commit/route.ts') as typeof import('../app/api/patients/[id]/notes-commit/route');
@@ -41,7 +42,7 @@ let epoch = 0;
 let sequence = 0;
 
 function request(body: unknown, path = '/api/patient-profile/review', method = 'POST') {
-    return new Request(new URL(path, 'http://127.0.0.1'), { method, headers: {
+    return syntheticLoopbackRequest(new URL(path, 'http://127.0.0.1'), { method, headers: {
         'content-type': 'application/json', origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin',
         'x-mediflow-archive-generation': currentArchiveGeneration(),
     }, body: JSON.stringify(body) });

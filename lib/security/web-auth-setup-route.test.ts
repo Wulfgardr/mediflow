@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest as localRequest } from './loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -29,7 +30,7 @@ const USERNAME = ['synthetic', 'recovery', 'admin'].join('-');
 const PIN = ['24', '68'].join('');
 type Control = Readonly<{ controlId: string; etag: string }>;
 function request(pathname: string, body: Record<string, unknown>, control: Control): Request {
-    return new Request(`${['http:', '', '127.0.0.1'].join('/')}${pathname}`, {
+    return localRequest(`${['http:', '', '127.0.0.1'].join('/')}${pathname}`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -52,7 +53,7 @@ function responseCookie(response: Response, name: string): string {
     return cookie.slice(`${name}=`.length).split(';', 1)[0];
 }
 async function bootstrapControl(): Promise<Control> {
-    const response = await check(new Request('http://127.0.0.1/api/auth/check'));
+    const response = await check(localRequest('http://127.0.0.1/api/auth/check'));
     assert.notEqual(response.status, 503);
     const etag = response.headers.get('etag');
     assert.ok(etag);
@@ -141,7 +142,7 @@ test('keeps the committed setup recoverable through ordinary login when final P3
     const logout = await completeExactWebP3Logout(
         { name: 'mediflow_session', value: sessionId },
         { name: 'mediflow_auth_control', value: loginControl.controlId },
-        new Request('http://127.0.0.1/api/auth/logout', { method: 'POST' }),
+        localRequest('http://127.0.0.1/api/auth/logout', { method: 'POST' }),
     );
     assert.equal(logout.status, 204);
 });

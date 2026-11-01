@@ -1,3 +1,4 @@
+import type { NetworkWriteContext } from './network-write-context';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* synthetic real-SQLite candidate oracle for required therapy audit and eight route contracts. */
 import assert from 'node:assert/strict';
@@ -19,7 +20,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-c05-therapy-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'c05-therapy-synthetic-token';
 const state = { session: { id: 'synthetic-web', userId: 'synthetic-admin', role: 'admin', authChannel: 'web' } as Record<string, unknown> | null,
-    scopeAmbulatoryId: 'c05-therapy-a' };
+    scopeAmbulatoryId: 'c05-therapy-a', networkAuthority: null as NetworkWriteContext | null };
 const stateKey = Symbol.for(`c05-therapy-seam-${dataDir}`);
 (globalThis as unknown as Record<symbol, typeof state>)[stateKey] = state;
 function seam(name: string, source: string) {
@@ -35,7 +36,7 @@ exports.forbiddenResponse=()=>Response.json({error:'Forbidden'},{status:403});`)
 const token = seam('token.cjs', `exports.requireLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-therapy-synthetic-token'?null:Response.json({error:'Unauthorized'},{status:401});
 exports.hasValidLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-therapy-synthetic-token';`);
 const network = seam('network.cjs', `const state=globalThis[Symbol.for(${JSON.stringify(`c05-therapy-seam-${dataDir}`)})];
-exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{request,scopeAmbulatoryId:state.scopeAmbulatoryId,pairedClient:{clientId:'synthetic-paired'},session:{id:'synthetic-native',userId:'synthetic-admin',role:'admin',authChannel:'native'}}});`);
+exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{...state.networkAuthority,request,scopeAmbulatoryId:state.scopeAmbulatoryId}});`);
 const { registerHooks } = load('node:module') as {
     registerHooks: (hooks: { resolve: (specifier: string, context: unknown,
         next: (specifier: string, context: unknown) => { url: string }) => { url: string; shortCircuit?: boolean } }) => { deregister: () => void };
@@ -53,6 +54,15 @@ const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('../l
 const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local', 'synthetic-native');
 openDbServer();
 const { ambulatories, patients, patientsToAmbulatories, therapies } = load('./schema.ts') as typeof import('../lib/schema.ts');
+const { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } = load('./network-patient-authority-test-fixture.ts') as typeof import('./network-patient-authority-test-fixture');
+const networkCookies = { cookies: new Map<string, string>() };
+const cleanupCookies = installNetworkPatientCookieFixture(dataDir, networkCookies);
+const networkAuthority = syntheticNetworkPatientAuthority(dbServer, state.scopeAmbulatoryId, { userId: 'synthetic-admin', clientId: 'synthetic-paired' });
+networkAuthority.pairedClient.grantedCapabilities.push('network.replica.write-therapies');
+state.networkAuthority = networkAuthority;
+const { NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState } = load('./network-pairing-model.ts') as typeof import('./network-pairing-model');
+const pairingState = { ...JSON.parse(serializeNetworkPairingState({ clients: [networkAuthority.pairedClient], intents: [] })), archiveGeneration };
+dbServer.$client.prepare('UPDATE settings SET value=? WHERE key=?').run(JSON.stringify(pairingState), NETWORK_PAIRING_STATE_KEY);
 const webCreate = load('../app/api/therapies/route.ts') as typeof import('../app/api/therapies/route.ts');
 const webItem = load('../app/api/therapies/[id]/route.ts') as typeof import('../app/api/therapies/[id]/route.ts');
 const v1Create = load('../app/api/v1/patients/[id]/therapies/route.ts') as typeof import('../app/api/v1/patients/[id]/therapies/route.ts');
@@ -67,7 +77,7 @@ const nextId = (name: string) => `c05-therapy-${++serial}-${name}`;
 test.after(() => {
     const report = process.env.MEDIFLOW_THERAPY_CANDIDATE_REPORT;
     if (report) writeFileSync(report, `${JSON.stringify({ observations }, null, 2)}\n`);
-    sql.close(); dbServer.$client.close(); hooks.deregister();
+    sql.close(); dbServer.$client.close(); hooks.deregister(); cleanupCookies();
     delete (globalThis as unknown as Record<symbol, typeof state>)[stateKey];
     rmSync(dataDir, { recursive: true, force: true });
 });
@@ -76,6 +86,7 @@ function seed(name: string, withTherapy: boolean, deleted = false, archived = fa
     const patientId = nextId(`${name}-patient`);
     const therapyId = nextId(`${name}-therapy`);
     dbServer.insert(ambulatories).values({ id: 'c05-therapy-a', name: 'Synthetic therapy ambulatory', type: 'live' }).onConflictDoNothing().run();
+    dbServer.insert(ambulatories).values({ id: 'c05-therapy-other', name: 'Synthetic other ambulatory', type: 'live' }).onConflictDoNothing().run();
     dbServer.insert(patients).values({ id: patientId, firstName: 'Synthetic', lastName: 'Patient',
         taxCode: `SYN${serial}`, deletedAt: deleted ? new Date('2026-01-01T00:00:00Z') : null,
         notes: 'ENC:synthetic:patient', isArchived: archived }).run();
@@ -112,6 +123,10 @@ function request(method: Operation, body: unknown, surface: Surface, raw?: strin
 async function invoke(surface: Surface, operation: Operation, ids: { patientId: string; therapyId: string }, body: unknown,
     raw?: string, headers: Record<string,string> = {}, suppliedRequest?: Request) {
     const req = suppliedRequest ?? request(operation, body, surface, raw, headers);
+    if (surface === 'network') {
+        networkCookies.cookies.set('ambulatory_id', state.scopeAmbulatoryId);
+        for (const [key, value] of networkAuthority.request.headers) req.headers.set(key, value);
+    }
     if (surface === 'web') return operation === 'POST' ? webCreate.POST(req)
         : operation === 'PUT' ? webItem.PUT(req, { params: Promise.resolve({ id: ids.therapyId }) })
             : webItem.DELETE(req, { params: Promise.resolve({ id: ids.therapyId }) });

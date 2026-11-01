@@ -1,3 +1,4 @@
+import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 import { archiveGenerationForSession } from './security/archive-session-generation';
 import { checkupCreateIdSchema } from './api-schemas/clinical-writes';
 /* paired checkup boundary preserves current capability, normalization and ENC semantics. */
@@ -11,7 +12,7 @@ import { createCheckupOperation, updateCheckupOperation } from './checkup-write-
 
 export const NETWORK_CHECKUP_WRITE_CAPABILITY = 'network.replica.write-checkups';
 
-type NetworkCheckupMutationResponse = { status: 200 | 201 | 400 | 403 | 404 | 409; value: Record<string, unknown> };
+type NetworkCheckupMutationResponse = { status: 200 | 201 | 400 | 401 | 403 | 404 | 409; value: Record<string, unknown> };
 
 type NetworkCheckupMutationContext = NetworkWriteContext & { patientId: string };
 type NetworkCheckupUpdateContext = NetworkCheckupMutationContext & { checkupId: string };
@@ -94,6 +95,7 @@ export async function createNetworkScopedCheckup(
     const normalized = normalizeCheckupCreateInput(body, { id: newId, patientId: context.patientId });
     if (!normalized.ok) return { status: 400, value: { error: normalized.error } };
     return createCheckupOperation({
+        authorizeCommit: await prepareNetworkPatientCommitGuard(context, NETWORK_CHECKUP_WRITE_CAPABILITY),
         patientId: context.patientId, checkupId: normalized.values.id, values: normalized.values,
         changedFields: listChangedFields(body, ['id']), mode: 'network',
         scopeAmbulatoryId: context.scopeAmbulatoryId, audit: requiredAuditContext(context),
@@ -110,6 +112,7 @@ export async function updateNetworkScopedCheckup(
     const normalized = normalizeCheckupUpdateInput(body);
     if (!normalized.ok) return { status: 400, value: { error: normalized.error } };
     return updateCheckupOperation({
+        authorizeCommit: await prepareNetworkPatientCommitGuard(context, NETWORK_CHECKUP_WRITE_CAPABILITY),
         patientId: context.patientId, checkupId: context.checkupId, expectedVersion,
         values: normalized.values, changedFields: listChangedFields(body, ['version']), mode: 'network',
         scopeAmbulatoryId: context.scopeAmbulatoryId, audit: requiredAuditContext(context),

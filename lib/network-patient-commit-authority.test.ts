@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 import { bindSessionToArchive, currentArchiveGeneration } from './security/archive-session-generation';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -18,7 +19,7 @@ import { retireServerSessionForLogout, clearAllSessions } from './security/serve
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-patient-authority-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
-const cookieState = { cookies: new Map<string, string>(), onCookies: undefined as (() => void) | undefined };
+const cookieState = { cookies: new Map<string, string>(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers, onCookies: undefined as (() => void) | undefined };
 const cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
 const { dbServer } = load('./db-server.ts') as typeof import('./db-server');
 const collection = load('../app/api/v1/network/patients/route.ts') as typeof import('../app/api/v1/network/patients/route');
@@ -96,7 +97,7 @@ for (const operation of ['create', 'update', 'delete', 'restore'] as const) {
         const before = clinicalSnapshot();
         const headers = new Headers(context.request.headers);
         headers.set('x-mediflow-expected-ambulatory-id', 'synthetic-unavailable');
-        const response = await route(operation, new Request(context.request.url, {
+        const response = await route(operation, syntheticLoopbackRequest(context.request.url, {
             method: operation === 'update' ? 'PUT' : operation === 'delete' ? 'DELETE' : 'POST',
             headers, body: JSON.stringify(body),
         }));
@@ -114,7 +115,7 @@ test('patient-list, patient-detail and shared capability admissions reject an ex
     const before = clinicalSnapshot();
     const headers = new Headers(context.request.headers);
     headers.set('x-mediflow-expected-ambulatory-id', 'synthetic-unavailable');
-    const request = new Request(context.request.url, { headers });
+    const request = syntheticLoopbackRequest(context.request.url, { headers });
     assert.equal((await collection.GET(request)).status, 403);
     assert.equal((await detail.GET(request, { params: Promise.resolve({ id: 'synthetic-patient' }) })).status, 403);
     const resolved = await capabilityContext.requireNetworkCapabilityContext(request, 'network.replica.write-patient-profile');
@@ -138,7 +139,7 @@ test('an explicitly matching request scope retains the ordinary patient writer a
     const { context, body } = fixture('create');
     context.request.headers.set('x-mediflow-expected-ambulatory-id', 'synthetic-a');
     const before = (dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get() as { n: number }).n;
-    const response = await route('create', new Request(context.request.url, {
+    const response = await route('create', syntheticLoopbackRequest(context.request.url, {
         method: 'POST', headers: context.request.headers, body: JSON.stringify(body),
     }));
     assert.equal(response.status, 201);
@@ -155,7 +156,7 @@ for (const channel of ['native', 'web'] as const) for (const operation of ['crea
         const { context, body } = fixture(operation, channel);
         const auditCount = () => (dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get() as { n: number }).n;
         const beforeAudit = auditCount();
-        const response = await route(operation, new Request(context.request.url, { method: operation === 'update' ? 'PUT' : operation === 'delete' ? 'DELETE' : 'POST',
+        const response = await route(operation, syntheticLoopbackRequest(context.request.url, { method: operation === 'update' ? 'PUT' : operation === 'delete' ? 'DELETE' : 'POST',
             headers: context.request.headers, body: JSON.stringify(body) }));
         assert.equal(response.status, operation === 'create' ? 201 : 200);
         assert.equal(auditCount(), beforeAudit + 1);
@@ -166,7 +167,7 @@ for (const channel of ['native', 'web'] as const) for (const operation of ['crea
             const before = clinicalSnapshot();
             let controller!: ReadableStreamDefaultController<Uint8Array>;
             const stream = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
-            const request = new Request(context.request.url, { method: operation === 'update' ? 'PUT' : operation === 'delete' ? 'DELETE' : 'POST',
+            const request = syntheticLoopbackRequest(context.request.url, { method: operation === 'update' ? 'PUT' : operation === 'delete' ? 'DELETE' : 'POST',
                 headers: context.request.headers, body: stream, duplex: 'half' } as RequestInit);
             let reading = false;
             const getReader = request.body!.getReader.bind(request.body);

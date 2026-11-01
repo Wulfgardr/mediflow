@@ -1,3 +1,4 @@
+import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 import { attachmentCollectionSchema } from './api-schemas/attachments';
 import { attachmentCollectionMatches } from './attachment-collection-currentness';
 import { archiveGenerationForSession } from './security/archive-session-generation';
@@ -24,7 +25,7 @@ type NetworkAttachmentMutationContext = NetworkWriteContext & {
 
 type NetworkAttachmentMutationResponse =
     | { status: 201; value: { id: string } }
-    | { status: 400 | 404 | 409 | 413; value: Record<string, unknown> };
+    | { status: 400 | 401 | 403 | 404 | 409 | 413; value: Record<string, unknown> };
 
 // D2/D3 (ADR 0076, Classe A): the paired create payload is a projection of the
 // web payload, not a replica. patientId comes from the path; the boundary
@@ -170,7 +171,10 @@ export async function createNetworkScopedAttachment(
     // before sealing.
     const path = body.path as string;
 
+    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_ATTACHMENT_WRITE_CAPABILITY);
     return dbServer.transaction((tx): NetworkAttachmentMutationResponse => {
+        const denial = authorizeCommit(tx);
+        if (denial) return denial;
         if (!patientIsActiveAndInScope(tx, context.patientId, context.scopeAmbulatoryId)) {
             return { status: 404, value: { error: 'Not found' } };
         }
