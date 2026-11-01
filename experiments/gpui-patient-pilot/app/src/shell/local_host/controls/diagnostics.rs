@@ -34,6 +34,9 @@ fn diagnose(
         }),
         1 => {
             let provider = access.read_diagnostic_provider_setting()?;
+            let Some(provider) = provider else {
+                return Ok(DiagnosticOutcome::Unavailable("Nessun provider specificato nelle impostazioni. Questo controllo richiede una scelta esplicita del provider locale Ollama.".into()));
+            };
             if provider != "ollama" {
                 return Ok(DiagnosticOutcome::Unavailable(
                     "La verifica del catalogo è disponibile per il provider locale Ollama.".into(),
@@ -53,7 +56,10 @@ fn diagnose(
             }
         }),
         _ => access.read_diagnostic_provider_setting().map(|provider| {
-            DiagnosticOutcome::Observed(format!("Configurazione letta: {provider}."))
+            DiagnosticOutcome::Observed(match provider {
+                Some(provider) => format!("Configurazione letta: {provider}."),
+                None => "Impostazione letta: nessun provider specificato.".into(),
+            })
         }),
     }
 }
@@ -254,7 +260,19 @@ mod tests {
         view.update(cx, |app, cx| app.run_diagnostics(Some(2), cx));
         cx.run_until_parked();
         assert_eq!(host.request_count(), before + 1);
+        host.plan("GET /api/settings/aiProvider")
+            .send((200, serde_json::json!({"key":"aiProvider","value":null})))
+            .unwrap();
+        view.update(cx, |app, cx| app.run_diagnostics(Some(3), cx));
+        cx.run_until_parked();
         view.update(cx, |app, cx| {
+            assert!(matches!(
+                app.local_host.controls.diagnostics[3]
+                    .as_ref()
+                    .unwrap()
+                    .outcome,
+                Ok(DiagnosticOutcome::Observed(_))
+            ));
             assert!(
                 app.local_host.controls.diagnostics[2]
                     .as_ref()

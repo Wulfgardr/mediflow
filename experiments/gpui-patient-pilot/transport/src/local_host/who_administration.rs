@@ -283,16 +283,18 @@ impl LocalHostAccess {
         let (_, v) = self.who_read(true, &[("code", code), ("release", "2026-01")])?;
         parse_code(v, code)
     }
-    pub fn read_diagnostic_provider_setting(&self) -> Result<String> {
+    pub fn read_diagnostic_provider_setting(&self) -> Result<Option<String>> {
         let v = self.request(Method::GET, &["api", "settings", "aiProvider"], None, false)?;
-        if v["key"] != "aiProvider" {
+        if v["key"] != "aiProvider" || v.get("value").is_none() {
             return Err(RuntimeError::InvalidResponse);
         }
-        v["value"]
-            .as_str()
-            .filter(|s| !s.is_empty() && s.len() <= 128 && !s.chars().any(char::is_control))
-            .map(str::to_owned)
-            .ok_or(RuntimeError::InvalidResponse)
+        match &v["value"] {
+            Value::Null => Ok(None),
+            Value::String(value) if value.len() <= 128 && !value.chars().any(char::is_control) => {
+                Ok((!value.trim().is_empty()).then(|| value.clone()))
+            }
+            _ => Err(RuntimeError::InvalidResponse),
+        }
     }
     pub fn prepare_who_rollback(&self, observed: &ReferenceStatus) -> Result<PreparedWhoRollback> {
         self.headers()?;

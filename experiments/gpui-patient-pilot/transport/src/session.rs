@@ -10003,6 +10003,20 @@ mod g2_settings_tests {
             ] {
                 g2_web_request(&listener, "GET", path, 200, value);
             }
+            g2_web_request(
+                &listener,
+                "GET",
+                "/api/settings/aiProvider",
+                200,
+                json!({"key":"aiProvider","value":null}),
+            );
+            g2_web_request(
+                &listener,
+                "GET",
+                "/api/settings/aiProvider",
+                200,
+                json!({"key":"aiProvider"}),
+            );
             let request = g2_web_request(
                 &listener,
                 "POST",
@@ -10039,6 +10053,11 @@ mod g2_settings_tests {
         assert_eq!(
             access.check_who_administration_code("AA00").unwrap(),
             f["found"]
+        );
+        assert_eq!(access.read_diagnostic_provider_setting().unwrap(), None);
+        assert_eq!(
+            access.read_diagnostic_provider_setting(),
+            Err(RuntimeError::InvalidResponse)
         );
         let command = access
             .prepare_who_rollback(&ReferenceStatus {
