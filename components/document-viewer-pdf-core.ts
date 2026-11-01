@@ -99,3 +99,9 @@ export async function paintPdfPage(
         scope.finish();
     }
 }
+
+export function rejectPdfWorkerFailure(message: unknown, fail: (error: PreviewError) => void): void {
+    if (message && typeof message === 'object' && 'stream' in message && message.stream === 5) {
+        fail(new PreviewError('invalid_pdf'));
+    }
+}
