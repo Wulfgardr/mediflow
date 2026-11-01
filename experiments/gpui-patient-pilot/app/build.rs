@@ -4,6 +4,7 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(local_voice_apple)");
     println!("cargo:rerun-if-changed=src/chat_access/native.m");
     println!("cargo:rerun-if-changed=src/documents/pdf_native.m");
+    println!("cargo:rerun-if-changed=src/documents/adobe_glyph_names.h");
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
         return;
     }

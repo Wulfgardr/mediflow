@@ -121,6 +121,9 @@ class BundleTests(unittest.TestCase):
                                  "manifest_path": str(source / "Cargo.toml")})
             destination = root / "licenses"
             bundle.collect_licenses({"workspace_members": [], "packages": packages}, destination)
+            self.assertEqual((destination / "Adobe-Glyph-List.txt").read_text(),
+                             (bundle.PACKAGING / "licenses/Adobe-Glyph-List.txt").read_text())
+            self.assertTrue(bundle.has_complete_license_text([destination / "Adobe-Glyph-List.txt"]))
             inventory = json.loads((destination / "packages.json").read_text())["packages"]
             self.assertEqual(len(inventory), len(supplements))
             for item in supplements:

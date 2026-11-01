@@ -88,6 +88,79 @@ fn missing_glyph_and_missing_digit_encodings_refuse_the_entire_preview() {
 }
 
 #[test]
+fn valid_differences_and_unused_missing_names_do_not_refuse_a_preview() {
+    for font in ["Helvetica", "Times-Roman", "Courier"] {
+        for mapping in ["51 /three", "46 /period"] {
+            let font = format!(
+                "<< /Type /Font /Subtype /Type1 /BaseFont /{font} /Encoding << /BaseEncoding /WinAnsiEncoding /Differences [{mapping} 65 /nonexistentSyntheticGlyph] >> >>"
+            );
+            let source = fixture::document_with_font(
+                b"BT /F1 12 Tf 10 25 Td (Hb 13.4) Tj ET",
+                &[],
+                font.as_bytes(),
+            );
+            assert!(worker(&source, "1").stdout.starts_with(b"{\"width\":150,"));
+        }
+    }
+    let source = fixture::document_with_font(b"BT /F1 12 Tf 10 25 Td (Hb 1.4) Tj ET", &[], b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding << /Differences [51 /nonexistentSyntheticGlyph] >> >>");
+    assert!(worker(&source, "1").stdout.starts_with(b"{\"width\":150,"));
+}
+
+#[test]
+fn all_text_operators_and_graphics_state_use_the_effective_font() {
+    let resources = b"<< /Font << /Bad << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding << /Differences [51 /nonexistentSyntheticGlyph] >> >> /Good << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> /ExtGState << /State << /Font [ << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding << /Differences [51 /nonexistentSyntheticGlyph] >> >> 12 ] >> >> >>";
+    for content in [
+        "BT /Bad 12 Tf (Hb 13.4) Tj ET",
+        "BT /Bad 12 Tf [(Hb 1) -20 (3.4)] TJ ET",
+        "BT /Bad 12 Tf (Hb 13.4) ' ET",
+        "BT /Bad 12 Tf 0 0 (Hb 13.4) \" ET",
+        "BT /Bad 12 Tf q /Good 12 Tf (Hb 13.4) Tj Q (Hb 13.4) Tj ET",
+        "BT /Good 12 Tf /State gs (Hb 13.4) Tj ET",
+    ] {
+        let source = fixture::with_resources(content.as_bytes(), resources, &[]);
+        assert_eq!(
+            worker(&source, "1").stdout,
+            b"{\"error\":\"font_encoding\"}\n",
+            "{content}"
+        );
+    }
+    let source =
+        fixture::with_resources(b"BT /Bad 12 Tf /Good 12 Tf (Hb 13.4) Tj ET", resources, &[]);
+    assert!(worker(&source, "1").stdout.starts_with(b"{\"width\":150,"));
+}
+
+#[test]
+fn embedded_font_names_are_resolved_in_the_embedded_font_only() {
+    let font = fixture::stream(
+        b"",
+        include_bytes!("../test_support/synthetic-glyph-font.ttf"),
+    );
+    for (name, accepted) in [
+        ("syntheticThree", true),
+        ("nonexistentSyntheticGlyph", false),
+    ] {
+        let resources = format!(
+            "<< /Font << /F1 << /Type /Font /Subtype /TrueType /BaseFont /MediFlowSynthetic /FirstChar 51 /LastChar 51 /Widths [600] /Encoding << /Differences [51 /{name}] >> /FontDescriptor << /Type /FontDescriptor /FontName /MediFlowSynthetic /Flags 32 /FontBBox [0 0 600 800] /ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 700 /StemV 80 /FontFile2 5 0 R >> >> >> >>"
+        );
+        let source = fixture::with_resources(
+            b"BT /F1 12 Tf 10 25 Td (3) Tj ET",
+            resources.as_bytes(),
+            std::slice::from_ref(&font),
+        );
+        let output = worker(&source, "1");
+        if accepted {
+            assert!(
+                output.stdout.starts_with(b"{\"width\":150,"),
+                "{:?}",
+                output.stdout
+            );
+        } else {
+            assert_eq!(output.stdout, b"{\"error\":\"font_encoding\"}\n");
+        }
+    }
+}
+
+#[test]
 fn inline_images_and_images_on_other_pages_obey_the_same_pixel_bound() {
     let source = fixture::document(b"BI /W 4000 /H 3001 /CS /RGB /BPC 8 /F /DCT ID bad EI", &[]);
     assert_eq!(
@@ -134,6 +207,10 @@ fn real_jpeg_dimensions_cannot_hide_behind_a_small_pdf_dictionary() {
 #[test]
 fn inherited_resources_cannot_bypass_font_or_image_admission() {
     let font = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding << /Differences [51 /nonexistentSyntheticGlyph] >> >>";
+    assert_eq!(
+        worker(&fixture::font_on_second_page(font), "1").stdout,
+        b"{\"error\":\"font_encoding\"}\n"
+    );
     assert_eq!(
         worker(&fixture::inherited_resources(font, None), "1").stdout,
         b"{\"error\":\"font_encoding\"}\n"

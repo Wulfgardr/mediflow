@@ -43,7 +43,7 @@ pub enum Error {
 impl Error {
     pub fn message(self) -> String {
         match self {
-            Self::FontEncoding => "Anteprima rifiutata: la codifica dei caratteri non può essere verificata. Puoi salvare l’originale senza modificarlo.",
+            Self::FontEncoding => "Anteprima rifiutata: un carattere usato nel testo non è risolvibile nel font. Puoi salvare l’originale senza modificarlo.",
             Self::Font => "Anteprima rifiutata: uno dei font del PDF non può essere verificato. Puoi salvare l’originale senza modificarlo.",
             Self::Annotations => "Anteprima rifiutata: il PDF dichiara campi o annotazioni non gestiti da questa anteprima. Puoi salvare l’originale senza modificarlo.",
             Self::ImageMask => "Anteprima rifiutata: il PDF usa una configurazione di trasparenza non supportata. Puoi salvare l’originale senza modificarlo.",
