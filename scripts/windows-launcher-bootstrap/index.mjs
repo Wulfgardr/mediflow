@@ -4,7 +4,6 @@ import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
-const root = fileURLToPath(new URL('.', import.meta.url));
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const exports = ['createJobForProcess', 'getProcessCreationTimeTicks', 'getSystemDirectory', 'getDirectorySecurity', 'restrictDirectorySecurity'];
 const deny = () => { throw new Error('Windows bootstrap artifact unavailable or invalid.'); };
@@ -17,6 +16,7 @@ const regular = file => {
 export function loadSystemDirectoryBinding() {
   const arch = process.arch;
   if (process.platform !== 'win32' || !['x64', 'arm64'].includes(arch) || Number(process.versions.napi) < 1) deny();
+  const root = fileURLToPath(new URL('.', import.meta.url));
   const directory = path.join(root, 'prebuilds', `win32-${arch}`);
   const manifest = JSON.parse(regular(path.join(directory, 'manifest.json')).toString('utf8'));
   const binary = path.join(directory, 'system-directory.node');
