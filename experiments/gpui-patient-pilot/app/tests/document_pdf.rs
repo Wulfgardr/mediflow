@@ -239,3 +239,20 @@ fn unqualified_form_content_is_refused_before_the_platform_raster() {
     let output = worker(&fixture::document(b"/Form Do", &[unused, form]), "1");
     assert_eq!(output.stdout, b"{\"error\":\"nested_graphics\"}\n");
 }
+
+#[test]
+fn cid_and_simple_missing_digits_are_documented_limits_not_refusals() {
+    for source in [
+        include_bytes!("../test_support/pdf-limits/cid-three-missing.pdf").as_slice(),
+        include_bytes!("../test_support/pdf-limits/simple-three-missing.pdf").as_slice(),
+    ] {
+        let output = worker(source, "1");
+        assert!(output.status.success());
+        let at = output.stdout.iter().position(|b| *b == b'\n').unwrap();
+        let header: serde_json::Value = serde_json::from_slice(&output.stdout[..at]).unwrap();
+        assert_eq!(header["pages"], 1);
+        assert!(header.get("error").is_none());
+        assert_eq!(output.stdout.len() - at - 1, 150 * 90 * 4);
+        assert!(output.stdout[at + 1..].iter().all(|b| *b == 255));
+    }
+}

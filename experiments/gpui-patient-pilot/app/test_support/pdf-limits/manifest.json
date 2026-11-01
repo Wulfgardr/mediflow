@@ -1,0 +1,12 @@
+[
+  {
+    "file": "simple-three-missing.pdf",
+    "sha256": "80900b9ba2c183e86b60a83baa4bb77e4aa9a3678e30d5a71f6bbb808fc93662",
+    "expected": "accepted; blank raster; fidelity warning required"
+  },
+  {
+    "file": "cid-three-missing.pdf",
+    "sha256": "f77f947d7e288a2c31ab4bdff2f8bd3aa1a26dd962dea308619a0d919493884a",
+    "expected": "accepted; blank raster; fidelity warning required"
+  }
+]

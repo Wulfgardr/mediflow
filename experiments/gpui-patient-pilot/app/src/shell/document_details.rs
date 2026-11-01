@@ -3,6 +3,7 @@ use serde_json::Value;
 
 const SOURCE_SCHEMA: &str = "mediflow.document_parse_evidence_artifact.v1";
 const DISPLAY_CHARS: usize = 12_000;
+const PDF_FIDELITY_NOTICE: &str = "Alcuni caratteri possono mancare o differire: per un valore clinico controlla il documento originale.";
 
 pub(super) struct DocumentOriginal {
     pub(super) id: String,
@@ -164,6 +165,41 @@ impl ClinicalApp {
         )
     }
 
+    fn document_original_save(&self, id: &str, cx: &Context<Self>) -> gpui::AnyElement {
+        let theme = self.theme;
+        let id = id.to_owned();
+        let can_save = self
+            .session
+            .as_ref()
+            .is_some_and(|session| !session.is_locked())
+            && self.document_operation == DocumentOperation::Idle
+            && self.form.is_none()
+            && !self.local_host.has_work()
+            && !self
+                .copy_state
+                .is_some_and(documents::CopyState::is_writing)
+            && self.patient.attachments.ready().is_some_and(|rows| {
+                rows.iter().any(|row| {
+                    row.id == id
+                        && Some(row.patient_id.as_str()) == self.selected_id.as_deref()
+                        && documents::original_readable(row)
+                })
+            });
+        let save = button(
+            "document-original-save",
+            "Salva l'originale…",
+            theme,
+            false,
+            can_save,
+        )
+        .when(can_save, |el| {
+            el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx)))
+        });
+        #[cfg(test)]
+        let save = rendered_command::observe(save);
+        save.into_any_element()
+    }
+
     pub(super) fn document_original_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let mut view = div()
@@ -203,6 +239,24 @@ impl ClinicalApp {
                         pdf.pages
                     )))
                     .child(self.document_original_controls(original.page, pdf.pages, cx));
+                let warning = notice(
+                    "document-pdf-fidelity-notice",
+                    PDF_FIDELITY_NOTICE,
+                    theme,
+                    false,
+                )
+                .flex_1();
+                #[cfg(test)]
+                let warning = rendered_command::observe(warning);
+                view = view.child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .items_center()
+                        .gap(px(12.))
+                        .child(warning)
+                        .child(self.document_original_save(&original.id, cx)),
+                );
             }
             ReadLoad::Ready(Ok(documents::OriginalPreview::Image(image))) => {
                 view = view.child(
@@ -213,44 +267,15 @@ impl ClinicalApp {
                 );
             }
             ReadLoad::Ready(Err(message)) => {
-                let id = original.id.clone();
-                let can_save = self
-                    .session
-                    .as_ref()
-                    .is_some_and(|session| !session.is_locked())
-                    && self.document_operation == DocumentOperation::Idle
-                    && self.form.is_none()
-                    && !self.local_host.has_work()
-                    && !self
-                        .copy_state
-                        .is_some_and(documents::CopyState::is_writing)
-                    && self.patient.attachments.ready().is_some_and(|rows| {
-                        rows.iter().any(|row| {
-                            row.id == id
-                                && Some(row.patient_id.as_str()) == self.selected_id.as_deref()
-                                && documents::original_readable(row)
-                        })
-                    });
                 let warning = notice(
                     "document-original-unavailable",
                     message.clone(),
                     theme,
                     true,
                 );
-                let save = button(
-                    "document-original-save",
-                    "Salva l’originale…",
-                    theme,
-                    false,
-                    can_save,
-                )
-                .when(can_save, |el| {
-                    el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx)))
-                });
                 #[cfg(test)]
                 let warning = rendered_command::observe(warning);
-                #[cfg(test)]
-                let save = rendered_command::observe(save);
+                let save = self.document_original_save(&original.id, cx);
                 view = view.child(warning).child(save)
             }
             ReadLoad::Failed(error) => {
@@ -1254,13 +1279,19 @@ mod tests {
         });
         let view = root.read_with(cx, |root, _| root.app.clone());
         for dark in [false, true] {
-            for error in [
+            for (error, page) in [
                 documents::pdf::Error::FontEncoding,
                 documents::pdf::Error::ImageMask,
                 documents::pdf::Error::Annotations,
                 documents::pdf::Error::ImageLimit,
-            ] {
-                let reason = error.message();
+            ]
+            .into_iter()
+            .map(|error| (Some(error), 0))
+            .chain([(None, 0), (None, 1)])
+            {
+                let reason = error
+                    .map(|error| error.message())
+                    .unwrap_or_else(|| PDF_FIDELITY_NOTICE.into());
                 view.update(cx, |app, _| {
                     app.theme = Theme::for_dark(dark);
                     app.session = Some(host.session.clone());
@@ -1268,8 +1299,17 @@ mod tests {
                     app.patient.attachments = ReadLoad::Ready(vec![attachment()]);
                     app.patient.document_original = Some(DocumentOriginal {
                         id: "synthetic-document".into(),
-                        state: ReadLoad::Ready(Err(reason.clone())),
-                        page: 0,
+                        state: ReadLoad::Ready(match error {
+                            Some(_) => Err(reason.clone()),
+                            None => Ok(documents::OriginalPreview::Pdf(documents::pdf::Preview {
+                                source: std::sync::Arc::new(zeroize::Zeroizing::new(Vec::new())),
+                                image: std::sync::Arc::new(gpui::RenderImage::new([
+                                    image::Frame::new(image::RgbaImage::new(2, 2)),
+                                ])),
+                                pages: 2,
+                            })),
+                        }),
+                        page,
                         context: RequestContext::default(),
                     });
                 });
@@ -1277,11 +1317,23 @@ mod tests {
                     window.refresh();
                     window.draw(cx).clear(cx);
                 });
-                let warning = rendered_command::node("document-original-unavailable").0;
-                assert_eq!(warning.role(), Role::Alert);
+                let warning = rendered_command::node(if error.is_some() {
+                    "document-original-unavailable"
+                } else {
+                    "document-pdf-fidelity-notice"
+                })
+                .0;
+                assert_eq!(
+                    warning.role(),
+                    if error.is_some() {
+                        Role::Alert
+                    } else {
+                        Role::Status
+                    }
+                );
                 assert_eq!(warning.label(), Some(reason.as_str()));
                 let save = rendered_command::node("document-original-save").0;
-                assert_eq!(save.label(), Some("Salva l’originale…"));
+                assert_eq!(save.label(), Some("Salva l'originale…"));
                 assert!(save.supports_action(gpui::accesskit::Action::Click));
                 view.update(cx, |app, _| app.selected_id = Some("other-patient".into()));
                 cx.update(|window, cx| {
