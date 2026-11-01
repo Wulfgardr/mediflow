@@ -38,7 +38,7 @@ fn binary_entry_point_emits_only_complete_bounded_pixels_or_an_error() {
     assert!(output.status.success());
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap(),
-        serde_json::json!({"error":"limit"})
+        serde_json::json!({"error":"image_limit"})
     );
     let over_page_limit = worker(&fixture::many_pages(501), "1");
     assert_eq!(
@@ -48,7 +48,7 @@ fn binary_entry_point_emits_only_complete_bounded_pixels_or_an_error() {
     let annotated = worker(&fixture::page_with_extra_entries(b"/Annots []"), "1");
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(&annotated.stdout).unwrap(),
-        serde_json::json!({"error":"unsupported"})
+        serde_json::json!({"error":"annotations"})
     );
     assert!(output.stderr.is_empty());
 }
@@ -83,17 +83,23 @@ fn missing_glyph_and_missing_digit_encodings_refuse_the_entire_preview() {
         content.extend_from_slice(b") Tj ET");
         let source = fixture::document_with_font(&content, &[], b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding << /Type /Encoding /BaseEncoding /WinAnsiEncoding /Differences [51 /nonexistentSyntheticGlyph 65 /nonexistentSyntheticGlyph] >> >>");
         let output = worker(&source, "1");
-        assert_eq!(output.stdout, b"{\"error\":\"unsupported\"}\n");
+        assert_eq!(output.stdout, b"{\"error\":\"font_encoding\"}\n");
     }
 }
 
 #[test]
 fn inline_images_and_images_on_other_pages_obey_the_same_pixel_bound() {
     let source = fixture::document(b"BI /W 4000 /H 3001 /CS /RGB /BPC 8 /F /DCT ID bad EI", &[]);
-    assert_eq!(worker(&source, "1").stdout, b"{\"error\":\"limit\"}\n");
+    assert_eq!(
+        worker(&source, "1").stdout,
+        b"{\"error\":\"image_limit\"}\n"
+    );
     let huge = fixture::stream(b"/Type /XObject /Subtype /Image /Width 4000 /Height 3001 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode", b"not a JPEG");
     let source = fixture::two_pages(b"0 0 1 rg 0 0 100 60 re f", b"/Image Do", Some(huge));
-    assert_eq!(worker(&source, "1").stdout, b"{\"error\":\"limit\"}\n");
+    assert_eq!(
+        worker(&source, "1").stdout,
+        b"{\"error\":\"image_limit\"}\n"
+    );
 }
 
 #[test]
@@ -122,7 +128,7 @@ fn real_jpeg_dimensions_cannot_hide_behind_a_small_pdf_dictionary() {
     jpeg[frame + 5..frame + 7].copy_from_slice(&3001u16.to_be_bytes());
     jpeg[frame + 7..frame + 9].copy_from_slice(&4000u16.to_be_bytes());
     let bad = fixture::document(b"/Image Do", &[fixture::stream(dict, &jpeg)]);
-    assert_eq!(worker(&bad, "1").stdout, b"{\"error\":\"limit\"}\n");
+    assert_eq!(worker(&bad, "1").stdout, b"{\"error\":\"image_limit\"}\n");
 }
 
 #[test]
@@ -130,7 +136,7 @@ fn inherited_resources_cannot_bypass_font_or_image_admission() {
     let font = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding << /Differences [51 /nonexistentSyntheticGlyph] >> >>";
     assert_eq!(
         worker(&fixture::inherited_resources(font, None), "1").stdout,
-        b"{\"error\":\"unsupported\"}\n"
+        b"{\"error\":\"font_encoding\"}\n"
     );
     let huge = fixture::stream(b"/Type /XObject /Subtype /Image /Width 4000 /Height 3001 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode",b"bad");
     assert_eq!(
@@ -142,7 +148,7 @@ fn inherited_resources_cannot_bypass_font_or_image_admission() {
             "1"
         )
         .stdout,
-        b"{\"error\":\"limit\"}\n"
+        b"{\"error\":\"image_limit\"}\n"
     );
 }
 
@@ -154,5 +160,5 @@ fn unqualified_form_content_is_refused_before_the_platform_raster() {
     );
     let unused = fixture::stream(b"", b"");
     let output = worker(&fixture::document(b"/Form Do", &[unused, form]), "1");
-    assert_eq!(output.stdout, b"{\"error\":\"unsupported\"}\n");
+    assert_eq!(output.stdout, b"{\"error\":\"nested_graphics\"}\n");
 }
