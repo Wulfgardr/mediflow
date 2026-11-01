@@ -2034,6 +2034,14 @@
       "sourceSha256": "c16028901c51c34200cce15e76f40746953bc9d2b368eb1089fa9b907c96cb2b",
       "count": 1,
       "reason": "Native ABI verification resolves the installed better-sqlite3 entry before requiring it. This exact file digest freezes the resolution logic."
+    },
+    {
+      "file": "scripts/windows-launcher-bootstrap/index.mjs",
+      "kind": "require",
+      "expression": "createRequire(import.meta.url)(binary)",
+      "sourceSha256": "5d6d21e5473cd8f1444225d0fdb26bc8c908dd01bd1c1f1be538c50ed243802f",
+      "count": 1,
+      "reason": "Il backup Windows usa il bootstrap esistente per risolvere gli strumenti DACL dalla directory di sistema. Il loader verifica impronte e manifest prima di caricare il modulo; non apre SQLite e non introduce autorita di scrittura clinica."
     }
   ]
 }

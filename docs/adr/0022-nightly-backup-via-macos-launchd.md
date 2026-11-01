@@ -96,3 +96,19 @@ o la home dell'host dalla macchina client. Il server decide l'ammissibilità del
 destinazione; il runner la riverifica a ogni esecuzione. Il confronto lessicale
 usa normalizzazione Unicode NFC e case folding uniforme, anche sui percorsi
 risolti e sui nomi delle cartelle sincronizzate.
+
+## Directory private Windows, novembre 2026
+
+Le nuove destinazioni Windows usano una sottocartella `.mediflow-private`.
+Prima di scrivere un payload la DACL deve essere protetta dall'ereditarietà e
+contenere soltanto due ACE di accesso completo, propagabili a file e directory:
+SID dell'utente corrente e SYSTEM. Una cartella preesistente con DACL più larga
+viene rifiutata. I temporanei di creazione e ripristino del recupero applicano
+la stessa verifica prima di scrivere lo snapshot.
+
+La verifica usa `whoami.exe` e `icacls.exe`, risolti dalla directory di sistema
+verificata dal bootstrap nativo, senza PowerShell. L'output SDDL di `icacls /save`
+è accettato soltanto nella forma prevista; errori, formati diversi e trustee
+aggiuntivi impediscono la scrittura. Il file temporaneo di verifica contiene
+solo la DACL, mai il payload del backup. Resta escluso un processo ostile con
+la stessa identità dell'utente che cambia i permessi durante la scrittura.

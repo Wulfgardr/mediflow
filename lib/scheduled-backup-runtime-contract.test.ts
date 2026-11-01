@@ -126,7 +126,7 @@ test('real isolated payload imports all approved sources and real ESM/CJS depend
     const receipt = await assertScheduledBackupRuntime(f.payload);
     assert.equal(receipt.imported, true);
     assert.equal(receipt.databaseAccess, 'denied');
-    assert.equal(receipt.sourceFiles, 17);
+    assert.equal(receipt.sourceFiles, 27);
     assert.ok(receipt.resolvedFiles.includes('node_modules/better-sqlite3/lib/database.js'));
     assert.ok(receipt.resolvedFiles.includes('node_modules/bindings/bindings.js'));
     assert.ok(receipt.resolvedFiles.includes('node_modules/file-uri-to-path/index.js'));
@@ -136,7 +136,7 @@ test('real isolated payload imports all approved sources and real ESM/CJS depend
 });
 
 test('tracing roster contains every approved source and the explicit native/import closure without duplicates', () => {
-  assert.equal(SCHEDULED_BACKUP_RUNTIME_ROSTER.length, 17);
+  assert.equal(SCHEDULED_BACKUP_RUNTIME_ROSTER.length, 27);
   assert.equal(new Set(SCHEDULED_BACKUP_TRACING_INCLUDES).size, SCHEDULED_BACKUP_TRACING_INCLUDES.length);
   for (const item of SCHEDULED_BACKUP_RUNTIME_ROSTER) {
     assert.match(item.sha256, /^[a-f0-9]{64}$/);
@@ -148,7 +148,7 @@ test('tracing roster contains every approved source and the explicit native/impo
 test('every hash-pinned source retains LF bytes on Windows checkouts', () => {
   const attributes = new Set(fs.readFileSync(path.join(sourceRoot, '.gitattributes'), 'utf8').split(/\r?\n/u));
   for (const item of SCHEDULED_BACKUP_RUNTIME_ROSTER) {
-    assert.ok(attributes.has(`${item.path} text eol=lf`), item.path);
+    assert.ok(attributes.has(`${item.path} ${item.path.endsWith('.node') ? '-text' : 'text eol=lf'}`), item.path);
   }
 });
 
@@ -293,7 +293,7 @@ test('configuration can import the contract without dependencies or persistent a
       cwd: f.dir, env: { NODE_ENV: 'test' }, encoding: 'utf8', timeout: 5000,
     });
     assert.equal(run.status, 0, run.stderr);
-    assert.equal(run.stdout.trim(), '17');
+    assert.equal(run.stdout.trim(), '27');
   } finally { f.cleanup(); }
 });
 
@@ -308,7 +308,7 @@ test('CommonJS configuration can synchronously require the contract without runn
       cwd: f.dir, env: { NODE_ENV: 'test' }, encoding: 'utf8', timeout: 5000,
     });
     assert.equal(run.status, 0, run.stderr);
-    assert.deepEqual(JSON.parse(run.stdout), { sources: 17, includes: 36, check: 'function' });
+    assert.deepEqual(JSON.parse(run.stdout), { sources: 27, includes: 46, check: 'function' });
     assert.deepEqual(fs.readdirSync(f.dir).sort(), ['contract.mjs', 'payload']);
   } finally { f.cleanup(); }
 });
