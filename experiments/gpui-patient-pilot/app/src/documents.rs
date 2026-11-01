@@ -57,6 +57,7 @@ pub const MAX_PREVIEW_PIXELS: u64 = 12_000_000;
 pub const MAX_PREVIEW_DIMENSION: u32 = 8192;
 
 pub fn original_preview(attachment: &Attachment) -> Result<OriginalPreview, String> {
+    use image::ImageDecoder;
     if attachment.mime_type == "text/plain" {
         return original_text(attachment).map(OriginalPreview::Text);
     }
@@ -84,13 +85,21 @@ pub fn original_preview(attachment: &Attachment) -> Result<OriginalPreview, Stri
             return Err("Le immagini animate non sono disponibili nell’anteprima. L’allegato non è stato modificato.".into());
         }
     }
-    let mut decoder = reader();
+    let mut configured = reader();
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(MAX_PREVIEW_DIMENSION);
     limits.max_image_height = Some(MAX_PREVIEW_DIMENSION);
     limits.max_alloc = Some(MAX_PREVIEW_PIXELS * 8);
-    decoder.limits(limits);
-    let mut pixels = decoder.decode().map_err(|_| invalid())?.into_rgba8();
+    configured.limits(limits.clone());
+    let mut decoder = configured.into_decoder().map_err(|_| invalid())?;
+    limits
+        .reserve(decoder.total_bytes())
+        .map_err(|_| invalid())?;
+    decoder.set_limits(limits).map_err(|_| invalid())?;
+    let orientation = decoder.orientation().map_err(|_| invalid())?;
+    let mut decoded = image::DynamicImage::from_decoder(decoder).map_err(|_| invalid())?;
+    decoded.apply_orientation(orientation);
+    let mut pixels = decoded.into_rgba8();
     for pixel in pixels.as_chunks_mut::<4>().0 {
         pixel.swap(0, 2);
     }
@@ -806,6 +815,60 @@ mod original_tests {
             .err()
             .unwrap();
         assert!(error.contains("animate"));
+    }
+
+    fn rotated_jpeg() -> Vec<u8> {
+        let pixels = image::RgbImage::from_fn(8, 16, |x, y| {
+            image::Rgb([(x * 30) as u8, (y * 15) as u8, 40])
+        });
+        let mut jpeg = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 100)
+            .encode_image(&pixels)
+            .unwrap();
+        let exif = b"Exif\0\0II\x2a\0\x08\0\0\0\x01\0\x12\x01\x03\0\x01\0\0\0\x06\0\0\0\0\0\0\0";
+        let mut result = jpeg[..2].to_vec();
+        result.extend_from_slice(&[0xff, 0xe1]);
+        result.extend_from_slice(&((exif.len() + 2) as u16).to_be_bytes());
+        result.extend_from_slice(exif);
+        result.extend_from_slice(&jpeg[2..]);
+        result
+    }
+
+    #[test]
+    fn jpeg_exif_orientation_is_applied_to_the_complete_decoded_raster() {
+        let bytes = rotated_jpeg();
+        let mut expected = image::load_from_memory(&bytes)
+            .unwrap()
+            .rotate90()
+            .into_rgba8();
+        for pixel in expected.as_chunks_mut::<4>().0 {
+            pixel.swap(0, 2);
+        }
+        let OriginalPreview::Image(preview) =
+            original_preview(&attachment("image/jpeg", &bytes)).unwrap()
+        else {
+            panic!("image expected")
+        };
+        assert_eq!(preview.size(0).width, gpui::DevicePixels(16));
+        assert_eq!(preview.size(0).height, gpui::DevicePixels(8));
+        assert_eq!(preview.as_bytes(0).unwrap(), expected.as_raw());
+    }
+
+    #[test]
+    fn rotated_jpeg_limits_use_real_frame_dimensions_before_pixel_decode() {
+        for (width, height) in [(8193u16, 1u16), (4000, 3001)] {
+            let mut bytes = rotated_jpeg();
+            let frame = bytes
+                .windows(2)
+                .position(|pair| pair == [0xff, 0xc0])
+                .unwrap();
+            bytes[frame + 5..frame + 7].copy_from_slice(&height.to_be_bytes());
+            bytes[frame + 7..frame + 9].copy_from_slice(&width.to_be_bytes());
+            let error = original_preview(&attachment("image/jpeg", &bytes))
+                .err()
+                .unwrap();
+            assert!(error.contains("12 milioni"), "{error}");
+        }
     }
 
     #[test]
