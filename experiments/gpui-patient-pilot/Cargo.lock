@@ -3141,6 +3141,7 @@ dependencies = [
  "gpui_platform",
  "hyphenation",
  "iana-time-zone",
+ "image",
  "mediflow-local-state",
  "mediflow-patient-client",
  "mediflow-runtime-client",
