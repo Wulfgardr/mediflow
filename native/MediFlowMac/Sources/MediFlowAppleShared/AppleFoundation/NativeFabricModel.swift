@@ -28,6 +28,7 @@ final class NativeFabricModel: ObservableObject {
         var prepare: (NativeOrdinaryPreparation, ClinicalWorkspaceConnection) async throws -> NativeFabricResponse
         var command: (NativeFabricCommand, ClinicalWorkspaceConnection) async throws -> NativeFabricResponse
         var status: (String?, ClinicalWorkspaceConnection) async throws -> NativeFabricResponse
+        var waitForStatusPoll: () async throws -> Void = { try await Task.sleep(nanoseconds: 2_000_000_000) }
         var project: (NativeOrdinaryProjectionPlan, NativeOrdinaryPreparation, NativeOrdinaryProjectionIO) async throws -> NativeFabricResponse = { _, _, _ in throw NativeOrdinaryContractError.invalid }
         var cancelProjection: (NativeOrdinaryProjectionPlan, ClinicalWorkspaceConnection) async throws -> NativeFabricResponse = { _, _ in throw NativeOrdinaryContractError.cleanupUnconfirmed }
         var retirement: (String, ClinicalWorkspaceConnection) async throws -> NativeAuthorityRetirement = { reference, connection in
@@ -138,7 +139,7 @@ final class NativeFabricModel: ObservableObject {
         watchdog?.cancel()
         watchdog = Task {
             while !Task.isCancelled {
-                do { try await Task.sleep(nanoseconds: 2_000_000_000) } catch { return }
+                do { try await services.waitForStatusPoll() } catch { return }
                 guard current(epoch, source), let id = attemptId else { if generation == epoch { invalidate() }; return }
                 do {
                     let response = try await services.status(id, source.connection)
