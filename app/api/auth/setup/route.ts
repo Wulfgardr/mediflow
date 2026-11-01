@@ -1,3 +1,4 @@
+import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
 import { assertArchiveGeneration } from '@/lib/archive-generation';
 import { currentArchiveGeneration } from '@/lib/security/archive-session-generation';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
@@ -28,6 +29,7 @@ function setupResponse(payload: Record<string, unknown>, status: number, etag?: 
 }
 
 export async function POST(request: Request) {
+    if (!hasAttestedLoopbackIngress(request)) return NextResponse.json({ error: 'Local access required' }, { status: 403 });
     let mutation: WebAuthControlMutation | null = null;
     let attempt: unknown | null = null;
     try {

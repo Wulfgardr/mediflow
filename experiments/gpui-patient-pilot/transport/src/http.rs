@@ -121,6 +121,16 @@ pub(crate) struct RawResponse {
 impl RuntimeClient {
     pub fn new(config: RuntimeConfig) -> Result<Self> {
         let origin = validate_origin(&config.base_url)?;
+        let loopback = origin.host_str().is_some_and(|host| {
+            host == "localhost"
+                || host
+                    .trim_matches(['[', ']'])
+                    .parse::<IpAddr>()
+                    .is_ok_and(|ip| ip.is_loopback())
+        });
+        if !loopback && config.tls_pin_sha256.is_none() {
+            return Err(RuntimeError::InvalidInput);
+        }
         if origin.scheme() != "https" && config.tls_pin_sha256.is_some() {
             return Err(RuntimeError::InvalidInput);
         }
@@ -1213,6 +1223,33 @@ fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn remote_origin_requires_valid_explicit_pin() {
+        for origin in ["https://192.0.2.1:3443", "https://homebase.local:3443"] {
+            for pin in [
+                None,
+                Some("".into()),
+                Some("aa".into()),
+                Some("z".repeat(64)),
+            ] {
+                assert!(
+                    RuntimeClient::new(RuntimeConfig {
+                        base_url: origin.into(),
+                        tls_pin_sha256: pin
+                    })
+                    .is_err()
+                );
+            }
+            assert!(
+                RuntimeClient::new(RuntimeConfig {
+                    base_url: origin.into(),
+                    tls_pin_sha256: Some("a".repeat(64))
+                })
+                .is_ok()
+            );
+        }
+    }
+
+    #[test]
     fn fixture_accept_discards_only_the_loopback_port_probe() {
         use std::io::{Read, Write};
         let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
@@ -1557,7 +1594,7 @@ mod tests {
         }
         let remote = RuntimeClient::new(RuntimeConfig {
             base_url: "https://example.invalid".into(),
-            tls_pin_sha256: None,
+            tls_pin_sha256: Some("a".repeat(64)),
         })
         .unwrap();
         assert!(!remote.is_local_bootstrap_origin());

@@ -1,3 +1,4 @@
+import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
 /* one ordinary therapy create/update authority; no generic clinical CRUD or headless path. */
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
@@ -8,15 +9,15 @@ import { buildTherapyVersionConflictPayload } from './therapy-concurrency';
 
 type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 type Mode = 'web' | 'v1' | 'network';
-type Result = { status: 200 | 201 | 404 | 409; value: Record<string, unknown> };
+type Result = { status: 200 | 201 | 401 | 403 | 404 | 409; value: Record<string, unknown> };
 type CreateInput = {
     patientId: string; therapyId: string; values: typeof therapies.$inferInsert; changedFields: string[];
-    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext;
+    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext; authorizeCommit?: NetworkPatientCommitGuard;
 };
 export type TherapyUpdateInput = {
     patientId?: string; therapyId: string; expectedVersion: number;
     values: Partial<typeof therapies.$inferInsert>; changedFields: string[];
-    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext; occurredAt?: Date;
+    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext; authorizeCommit?: NetworkPatientCommitGuard; occurredAt?: Date;
 };
 
 function networkScopeContains(tx: Tx, patientId: string, ambulatoryId: string): boolean {
@@ -33,6 +34,8 @@ function activeParentExists(tx: Tx, patientId: string): boolean {
 /* IMMEDIATE serializes the admission, duplicate check, row insert and required audit. */
 export function createTherapyOperation(input: CreateInput): Result {
     return dbServer.transaction((tx): Result => {
+        const denial = input.authorizeCommit?.(tx);
+        if (denial) return denial;
         const admitted = input.mode === 'network'
             ? networkScopeContains(tx, input.patientId, input.scopeAmbulatoryId!)
                 && activeParentExists(tx, input.patientId)
@@ -56,6 +59,8 @@ export function createTherapyOperation(input: CreateInput): Result {
 
 /* a matched UPDATE IGNORE is an integrity fault, not an optimistic 409. */
 export function updateTherapyOperationInTransaction(tx: Tx, input: TherapyUpdateInput): Result & { auditEventId?: string } {
+    const denial = input.authorizeCommit?.(tx);
+    if (denial) return denial;
     const existing = input.mode === 'network'
         ? tx.select({ therapy: therapies }).from(therapies)
             .innerJoin(patientsToAmbulatories, eq(therapies.patientId, patientsToAmbulatories.patientId))

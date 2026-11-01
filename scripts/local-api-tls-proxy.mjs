@@ -1,6 +1,7 @@
 // Codex: created 2026-02-01
 import fs from 'fs';
-import { proxyLoopbackHeaders } from '../lib/security/loopback-ingress.mjs';
+import { allowsNetworkIngress } from '../lib/security/network-ingress-policy.mjs';
+import { isLoopbackAddress, proxyLoopbackHeaders } from '../lib/security/loopback-ingress.mjs';
 import http from 'http';
 import https from 'https';
 import { URL } from 'url';
@@ -35,6 +36,11 @@ const options = {
 };
 
 const server = https.createServer(options, (req, res) => {
+    if (!isLoopbackAddress(req.socket.remoteAddress) && !allowsNetworkIngress(req.method, req.url)) {
+        res.writeHead(403, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify({ error: 'Local access required' }));
+        return;
+    }
     const forwardedHeaders = {
         ...proxyLoopbackHeaders(req.headers, req.socket.remoteAddress),
         'x-forwarded-proto': 'https',

@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest as localRequest } from './loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -34,7 +35,7 @@ const USERNAME = 'synthetic-web-admin'; const PIN = '2468';
 const WRAPPED_KEY = 'synthetic-wrapped-key'; const SALT = 'synthetic-salt';
 type Control = Readonly<{ controlId: string; etag: string }>;
 function forgedRequest(pathname: string, body: Record<string, unknown>, control: Control): Request {
-    return new Request(`${['http:', '', '127.0.0.1'].join('/')}${pathname}`, {
+    return localRequest(`${['http:', '', '127.0.0.1'].join('/')}${pathname}`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -50,7 +51,7 @@ function forgedRequest(pathname: string, body: Record<string, unknown>, control:
     });
 }
 async function bootstrapControl(): Promise<Control> {
-    const response = await check(new Request('http://127.0.0.1/api/auth/check', {
+    const response = await check(localRequest('http://127.0.0.1/api/auth/check', {
         headers: {
             'x-mediflow-source-surface': 'native',
             authorization: 'Bearer synthetic-local-api-token',
@@ -97,7 +98,7 @@ test('setup emits a web session despite forged native, paired, token, and cookie
     const logout = await completeExactWebP3Logout(
         { name: 'mediflow_session', value: id },
         { name: 'mediflow_auth_control', value: control.controlId },
-        new Request('http://127.0.0.1/api/auth/logout', { method: 'POST' }),
+        localRequest('http://127.0.0.1/api/auth/logout', { method: 'POST' }),
     );
     assert.equal(logout.status, 204);
 });
@@ -123,7 +124,7 @@ test('login delegates credentials, preserves its Web contract, and records Web a
     const logout = await completeExactWebP3Logout(
         { name: 'mediflow_session', value: id },
         { name: 'mediflow_auth_control', value: control.controlId },
-        new Request('http://127.0.0.1/api/auth/logout', { method: 'POST' }),
+        localRequest('http://127.0.0.1/api/auth/logout', { method: 'POST' }),
     );
     assert.equal(logout.status, 204);
 });

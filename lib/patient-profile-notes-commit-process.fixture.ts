@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 /** Synthetic process fixture: never invoked by the application or a provider. */
 import { createRequire } from 'node:module';
 import { mkdtempSync, readFileSync, rmSync, writeSync } from 'node:fs';
@@ -16,7 +17,7 @@ if (process.env.MEDIFLOW_TEST_PROFILE_NOTES_PROCESS !== '1' || !dataDir || !base
 const load = createRequire(import.meta.url);
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server'); openDbServer();
 const cookieDir = mkdtempSync(join(dataDir, 'process-cookies-'));
-const cookieState = { cookies: new Map<string, string>() };
+const cookieState = { cookies: new Map<string, string>(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
 const cleanup = installNetworkPatientCookieFixture(cookieDir, cookieState);
 const queryRoute = load('../app/api/patients/[id]/profile-query/route.ts') as typeof import('../app/api/patients/[id]/profile-query/route');
 const commitRoute = load('../app/api/patients/[id]/notes-commit/route.ts') as typeof import('../app/api/patients/[id]/notes-commit/route');
@@ -29,7 +30,7 @@ cookieState.cookies.set('mediflow_session', session.session.id); cookieState.coo
 cookieState.cookies.set('ambulatory_id', 'synthetic-scope');
 const context = { params: Promise.resolve({ id: 'synthetic-patient-a' }) };
 function request(body: unknown, path = 'notes-commit') {
-    return new Request(`http://127.0.0.1/api/patients/synthetic-patient-a/${path}`, { method: 'POST', headers: {
+    return syntheticLoopbackRequest(`http://127.0.0.1/api/patients/synthetic-patient-a/${path}`, { method: 'POST', headers: {
         'content-type': 'application/json', origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin',
         'x-mediflow-archive-generation': currentArchiveGeneration(),
     }, body: JSON.stringify(body) });

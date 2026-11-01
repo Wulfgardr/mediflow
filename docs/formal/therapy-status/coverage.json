@@ -1,5 +1,5 @@
 {
-  "syncCommit": "826a4df3fc0ec069c0eabb5fb77c93fe3aa69757",
+  "syncCommit": "745118a84c9234b581278cb76c1234db9fb43812",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -35,7 +35,7 @@
     "components/therapy-manager.tsx": "b6f063e3434015ddf20f8c60797ab9d924ed05507d10acb2fd2bb1f9d3120e6e",
     "lib/db.ts": "043d87d9ab0cb1c39a9b5e7329b7795721ec8dd688c3c330f43a9c910d18c534",
     "lib/security/client-auth-api.ts": "754aebaedb77bc9629a32d90f754ecc3ee7e89ead880c6add9088dd6449ee5ce",
-    "lib/therapy-write-operation.ts": "f72e2fe81427c5b74a87db7fe79fc96f372553eff6e1ca0b6badf3fd0cd1f3ee",
+    "lib/therapy-write-operation.ts": "9efd2ba24b9283498260274b1a98b71f569435836a07355e60eda201ba361da1",
     "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
     "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
     "lib/locked-field-guard.ts": "a4b64b4db1968423169937a2b491add2d2a19b6fba2489b1515e37b358a55d3a",

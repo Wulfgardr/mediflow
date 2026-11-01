@@ -124,7 +124,7 @@ function buildFixture(t) {
   const input = fixture(t), root = path.join(input.directory, 'repo with spaces');
   for (const file of ['package.json', 'scripts/build-input-metadata.mjs', 'scripts/build-apple-macos-app.sh', 'scripts/macos-native-artifact.py', 'scripts/check-macos-web-runtime-native-payload.sh',
     'scripts/stage-chatgpt-execution-mac-assets.ts', 'scripts/run-strip-types.mjs',
-    'scripts/local-api-tls-proxy.mjs', 'lib/security/loopback-ingress.mjs',
+    'scripts/local-api-tls-proxy.mjs', 'lib/security/loopback-ingress.mjs', 'lib/security/network-ingress-policy.mjs',
     'scripts/check-standalone-runtime-bundle.mjs', 'scripts/scheduled-backup-runtime-contract.mjs', 'scripts/anydoc-pdf-smoke-diagnostics.mjs',
     'scripts/native-first-install.mjs', 'scripts/native-first-install-contract.json', 'scripts/launcher-helpers.mjs', 'scripts/node-runtime-contract.mjs',
     'scripts/fixtures/mac-packaging-test-loader.mjs', 'scripts/fixtures/mac-packaging-test-support.mjs',
