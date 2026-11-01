@@ -3,7 +3,7 @@
 import { db, Attachment } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff } from 'lucide-react';
-import { useState, type ComponentProps, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import { ViewState } from '@/components/ui/view-state';
 import sectionRecipe from '@/components/ink-section.module.css';
@@ -36,6 +36,13 @@ export default function Timeline({
     const { proposal } = useRuntimeTwinDesign();
     const [showDeleted, setShowDeleted] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
+    const sessionSignal = db.getSessionReadSignal();
+    useEffect(() => {
+        const clear = () => setViewingFile(null);
+        if (sessionSignal.aborted) clear();
+        sessionSignal.addEventListener('abort', clear, { once: true });
+        return () => sessionSignal.removeEventListener('abort', clear);
+    }, [sessionSignal]);
     const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
     const confirm = useConfirm();
     const { showToast } = useToast();
@@ -161,7 +168,7 @@ export default function Timeline({
                 <DocumentViewer
                     file={viewingFile.data}
                     fileName={viewingFile.name}
-                    signal={db.getSessionReadSignal()}
+                    signal={sessionSignal}
                     onClose={() => setViewingFile(null)}
                 />
             )}
