@@ -213,12 +213,45 @@ impl ClinicalApp {
                 );
             }
             ReadLoad::Ready(Err(message)) => {
-                view = view.child(notice(
+                let id = original.id.clone();
+                let can_save = self
+                    .session
+                    .as_ref()
+                    .is_some_and(|session| !session.is_locked())
+                    && self.document_operation == DocumentOperation::Idle
+                    && self.form.is_none()
+                    && !self.local_host.has_work()
+                    && !self
+                        .copy_state
+                        .is_some_and(documents::CopyState::is_writing)
+                    && self.patient.attachments.ready().is_some_and(|rows| {
+                        rows.iter().any(|row| {
+                            row.id == id
+                                && Some(row.patient_id.as_str()) == self.selected_id.as_deref()
+                                && documents::original_readable(row)
+                        })
+                    });
+                let warning = notice(
                     "document-original-unavailable",
                     message.clone(),
                     theme,
                     true,
-                ))
+                );
+                let save = button(
+                    "document-original-save",
+                    "Salva l’originale…",
+                    theme,
+                    false,
+                    can_save,
+                )
+                .when(can_save, |el| {
+                    el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx)))
+                });
+                #[cfg(test)]
+                let warning = rendered_command::observe(warning);
+                #[cfg(test)]
+                let save = rendered_command::observe(save);
+                view = view.child(warning).child(save)
             }
             ReadLoad::Failed(error) => {
                 view = view.child(notice(
@@ -1201,5 +1234,85 @@ mod tests {
             assert!(app.patient.document_details_id.is_none());
             assert!(app.patient.attachments.ready().is_none());
         });
+    }
+    #[gpui::test]
+    fn refused_preview_explains_the_reason_and_keeps_the_original_copy_action(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        struct RefusedPreviewFixture {
+            app: Entity<ClinicalApp>,
+        }
+        impl Render for RefusedPreviewFixture {
+            fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                self.app
+                    .update(cx, |app, cx| app.document_original_view(cx))
+            }
+        }
+        let (root, cx) = cx.add_window_view(|window, cx| RefusedPreviewFixture {
+            app: cx.new(|cx| ClinicalApp::new(String::new(), window, cx)),
+        });
+        let view = root.read_with(cx, |root, _| root.app.clone());
+        for dark in [false, true] {
+            for error in [
+                documents::pdf::Error::FontEncoding,
+                documents::pdf::Error::ImageMask,
+                documents::pdf::Error::Annotations,
+                documents::pdf::Error::ImageLimit,
+            ] {
+                let reason = error.message();
+                view.update(cx, |app, _| {
+                    app.theme = Theme::for_dark(dark);
+                    app.session = Some(host.session.clone());
+                    app.selected_id = Some("synthetic-patient".into());
+                    app.patient.attachments = ReadLoad::Ready(vec![attachment()]);
+                    app.patient.document_original = Some(DocumentOriginal {
+                        id: "synthetic-document".into(),
+                        state: ReadLoad::Ready(Err(reason.clone())),
+                        page: 0,
+                        context: RequestContext::default(),
+                    });
+                });
+                cx.update(|window, cx| {
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                });
+                let warning = rendered_command::node("document-original-unavailable").0;
+                assert_eq!(warning.role(), Role::Alert);
+                assert_eq!(warning.label(), Some(reason.as_str()));
+                let save = rendered_command::node("document-original-save").0;
+                assert_eq!(save.label(), Some("Salva l’originale…"));
+                assert!(save.supports_action(gpui::accesskit::Action::Click));
+                view.update(cx, |app, _| app.selected_id = Some("other-patient".into()));
+                cx.update(|window, cx| {
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                });
+                assert!(
+                    !rendered_command::node("document-original-save")
+                        .0
+                        .supports_action(gpui::accesskit::Action::Click)
+                );
+            }
+        }
+        host.session.lock();
+        view.update(cx, |app, _| {
+            app.selected_id = Some("synthetic-patient".into())
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(
+            !rendered_command::node("document-original-save")
+                .0
+                .supports_action(gpui::accesskit::Action::Click)
+        );
+        assert!(
+            !host
+                .routes()
+                .iter()
+                .any(|route| route.contains("/attachments"))
+        );
     }
 }

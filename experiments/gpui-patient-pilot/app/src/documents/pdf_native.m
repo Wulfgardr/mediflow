@@ -61,7 +61,7 @@ static bool isolate(void) {
 static bool dimensions(int64_t w, int64_t h) {
     if (w <= 0 || h <= 0) { failure = "invalid"; return false; }
     if (w > 8192 || h > 8192 || (uint64_t)w * (uint64_t)h > imagePixels) {
-        failure = "limit"; return false;
+        failure = "image_limit"; return false;
     }
     return true;
 }
@@ -90,11 +90,11 @@ static void checkImage(CGPDFStreamRef stream) {
     if (!CGPDFDictionaryGetInteger(d, "Height", &h)) CGPDFDictionaryGetInteger(d, "H", &h);
     if (!dimensions(w, h)) return;
     pageImagePixels += (uint64_t)w * (uint64_t)h;
-    if (pageImagePixels > 24000000) { failure = "limit"; return; }
+    if (pageImagePixels > 24000000) { failure = "image_limit"; return; }
     const char *filter = NULL;
     if (!CGPDFDictionaryGetName(d, "Filter", &filter)) CGPDFDictionaryGetName(d, "F", &filter);
     if (present(d, "Mask") || present(d, "SMask") || (filter && strcmp(filter, "FlateDecode") && strcmp(filter, "Fl") && strcmp(filter, "DCTDecode") && strcmp(filter, "DCT"))) {
-        failure = "unsupported"; return;
+        failure = present(d, "Mask") || present(d, "SMask") ? "image_mask" : "image_format"; return;
     }
     CGPDFDataFormat format;
     CFDataRef bytes = copyStream(stream, &format);
@@ -111,7 +111,7 @@ static void checkImage(CGPDFStreamRef stream) {
             if (dimensions(realWidth, realHeight) && (realWidth != w || realHeight != h)) failure = "invalid";
         }
         if (source) CFRelease(source);
-    } else if (format != CGPDFDataFormatRaw) failure = "unsupported";
+    } else if (format != CGPDFDataFormatRaw) failure = "image_format";
     CFRelease(bytes);
 }
 static void walk(CGPDFObjectRef object, size_t depth);
@@ -121,9 +121,12 @@ static void entry(const char *key, CGPDFObjectRef value, void *info) {
     walk(value, ((struct WalkContext *)info)->depth + 1);
 }
 static void checkDictionary(CGPDFDictionaryRef d, size_t depth) {
-    if (present(d, "Annots") || present(d, "XFA") || present(d, "Pattern") || present(d, "SMask") || present(d, "Mask") || present(d, "Differences") || named(d,"Subtype","Form") || named(d,"Subtype","Type3")) {
-        failure = "unsupported"; return;
-    }
+    if (present(d, "Differences")) { failure = "font_encoding"; return; }
+    if (present(d, "Annots")) { failure = "annotations"; return; }
+    if (present(d, "SMask") || present(d, "Mask")) { failure = "image_mask"; return; }
+    if (named(d,"Subtype","Form")) { failure = "nested_graphics"; return; }
+    if (named(d,"Subtype","Type3")) { failure = "font"; return; }
+    if (present(d, "XFA") || present(d, "Pattern")) { failure = "unsupported"; return; }
     CGPDFObjectRef contents;
     if (CGPDFDictionaryGetObject(d, "Contents", &contents)) {
         CGPDFArrayRef array;
@@ -139,7 +142,7 @@ static void checkDictionary(CGPDFDictionaryRef d, size_t depth) {
         CGPDFDictionaryGetName(d, "BaseFont", &font);
         NSString *name = font ? @(font) : @"";
         NSArray *standard = @[@"Helvetica",@"Helvetica-Bold",@"Helvetica-Oblique",@"Helvetica-BoldOblique",@"Times-Roman",@"Times-Bold",@"Times-Italic",@"Times-BoldItalic",@"Courier",@"Courier-Bold",@"Courier-Oblique",@"Courier-BoldOblique",@"Symbol",@"ZapfDingbats"];
-        if (![standard containsObject:name]) { failure = "unsupported"; return; }
+        if (![standard containsObject:name]) { failure = "font"; return; }
     }
     for (const char **key = (const char *[]){"FontFile", "FontFile2", "FontFile3", NULL}; *key; key++) {
         CGPDFStreamRef font;
@@ -148,7 +151,7 @@ static void checkDictionary(CGPDFDictionaryRef d, size_t depth) {
             CFDataRef data = copyStream(font, &format);
             if (!data) return;
             CFArrayRef descriptors = CTFontManagerCreateFontDescriptorsFromData(data);
-            if (!descriptors || CFArrayGetCount(descriptors) == 0) failure = "unsupported";
+            if (!descriptors || CFArrayGetCount(descriptors) == 0) failure = "font";
             if (descriptors) CFRelease(descriptors);
             CFRelease(data);
         }
