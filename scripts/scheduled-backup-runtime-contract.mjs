@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 // Reviewed source identity, independent of the checkout used to run this gate.
 // Changes to this closure require review and a deliberate update of these pins.
 export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
-  ['scripts/windows-private-directory.mjs', '490f0850bad5d6bdff5e88857c28d11134cf3a0acecb16460d8f5616338e164d'],
+  ['scripts/windows-private-directory.mjs', 'dc61db676ca44c07c205067ccc38307b72064f7de9d3cf9dcd9dceebe760585f'],
   ['scripts/windows-system-command.mjs', 'adcd137e4a8e23e7495d83fc372befe0b3a4d9cdb25abc8de5f4252828a5b1f2'],
   ['scripts/windows-launcher-bootstrap/index.mjs', 'ddc8dad1aff9cdeb836a82cb4983c02b9b7e77203e861c3142c5767b52600304'],
   ['scripts/windows-launcher-bootstrap/system-directory.c', 'd225cabaca09fca34c103e93608963aca8bb01dfca4ff7df21b285147cb16e7c', true],
