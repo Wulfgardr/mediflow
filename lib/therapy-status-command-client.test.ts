@@ -14,8 +14,28 @@ test('receipt parser rejects partial/forged booleans, target drift and non-host 
 test('client makes one request, rejects malformed response and never retries', async t => {
     observeArchiveGeneration(command.archiveGeneration);
     const calls: {input: unknown;init: RequestInit | undefined}[] = [];
-    t.mock.method(globalThis, 'fetch', async (input: unknown, init?: RequestInit) => { calls.push({input,init}); return Response.json({ outcome: 'terminal', historical: false, receipt: { ...applied, outcome: true } }); });
+    t.mock.method(globalThis, 'fetch', async (input: unknown, init?: RequestInit) => { calls.push({input,init}); return Response.json({ outcome: 'terminal', origin: 'local', historical: false, receipt: { ...applied, outcome: true } }); });
     await assert.rejects(requestTherapyStatusCommand('execute', { ...command, target: 'completed' }, new AbortController().signal));
     assert.equal(calls.length, 1); assert.equal(calls[0]!.init!.method, 'POST');
     assert.deepEqual(JSON.parse(calls[0]!.init!.body as string), { ...command, target: 'completed' });
+});
+
+test('receipt provenance is required and imported results cannot claim current local execution', async t => {
+    observeArchiveGeneration(command.archiveGeneration);
+    let answer: unknown = { outcome: 'terminal', origin: 'imported', historical: true, receipt: applied };
+    t.mock.method(globalThis, 'fetch', async () => Response.json(answer));
+    const result = await requestTherapyStatusCommand('receipt', command, new AbortController().signal);
+    assert.equal(result.outcome, 'terminal');
+    if (result.outcome === 'terminal') assert.equal(result.origin, 'imported');
+    for (const origin of [undefined, 'other']) {
+        answer = { outcome: 'terminal', origin, historical: true, receipt: applied };
+        await assert.rejects(requestTherapyStatusCommand('receipt', command, new AbortController().signal), /Invalid therapy receipt/);
+    }
+    answer = { outcome: 'terminal', origin: 'unattested', historical: true, receipt: applied };
+    const unattested = await requestTherapyStatusCommand('receipt', command, new AbortController().signal);
+    assert.equal(unattested.outcome === 'terminal' && unattested.origin, 'unattested');
+    answer = { outcome: 'terminal', origin: 'unattested', historical: false, receipt: applied };
+    await assert.rejects(requestTherapyStatusCommand('receipt', command, new AbortController().signal), /Invalid therapy receipt/);
+    answer = { outcome: 'terminal', origin: 'imported', historical: false, receipt: applied };
+    await assert.rejects(requestTherapyStatusCommand('receipt', command, new AbortController().signal), /Invalid therapy receipt/);
 });

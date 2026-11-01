@@ -42,7 +42,7 @@ test('HTTP ripristina un backup oltre 35 MiB con allegati paziente e conserva i 
             expect(db.prepare('SELECT * FROM attachments WHERE id=?').get(attachmentId)).toEqual(before);
         }
         db.prepare('DELETE FROM attachments WHERE id=?').run(attachmentId);
-        const restored = await page.request.post('/api/system/backup-restore', { headers: { ...headers, 'Content-Type': 'application/json' }, data: artifact });
+        const restored = await page.request.post('/api/system/backup-restore', { data: artifact, headers: { ...headers, 'Content-Type': 'application/json', 'x-mediflow-restore-credential': JSON.stringify({ pin: process.env.E2E_PIN || '1234' }) } });
         expect(restored.status(), await restored.text()).toBe(200);
         expect((await restored.json()).success).toBe(true);
         expect(db.prepare('SELECT * FROM attachments WHERE id=?').get(attachmentId)).toEqual(before);

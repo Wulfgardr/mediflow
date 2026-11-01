@@ -42,14 +42,7 @@ public actor HomeBaseHostAdminClient {
         try await get(HostNetworkOverview.self, path: ["api", "system", "network-overview"], sessionCookie: sessionCookie)
     }
 
-    /// Audit summary over a window of days.
-    ///
-    /// Read the cap before trusting the numbers: the route accepts `limit` up to
-    /// 1000, but `listAuditEvents` runs it through `normalizeLimit`, which clamps
-    /// to 200. Every figure in this summary is therefore computed over **at most
-    /// 200 records**, not over the window — and `isTruncated`, which the route
-    /// derives from its own unclamped limit, is false with the defaults even when
-    /// the clamp did bite. The UI has to say so.
+    /// Local activity and imported history use separate samples of at most 200 records.
     public func auditSummary(sessionCookie: String, days: Int = 30) async throws -> HostAuditSummary {
         try await get(
             HostAuditSummary.self,
@@ -321,6 +314,10 @@ public struct HostNetworkOverview: Decodable, Equatable, Sendable {
 public struct HostAuditSummary: Decodable, Equatable, Sendable {
     public let days: Int?
     public let totalEvents: Int?
+    public let importedEvents: Int?
+    public let importedIsTruncated: Bool?
+    public let unattestedEvents: Int?
+    public let unattestedIsTruncated: Bool?
     public let distinctActors: Int?
     public let outcomes: Outcomes?
     public let sourceSurfaces: SourceSurfaces?
@@ -345,14 +342,12 @@ public struct HostAuditSummary: Decodable, Equatable, Sendable {
         public var id: String { eventType ?? "-" }
     }
 
-    /// The route's own `isTruncated` is computed against its unclamped limit, so
-    /// it reads false even when the 200 clamp applied. This says what actually
-    /// happened.
     public var reachedRecordCap: Bool { (totalEvents ?? 0) >= 200 }
 }
 
 /// One element of the bare array returned by `GET /api/system/audit`.
 public struct HostAuditEvent: Decodable, Equatable, Sendable, Identifiable {
+    public let origin: String?
     public let eventId: String?
     public let eventType: String?
     public let occurredAt: String?

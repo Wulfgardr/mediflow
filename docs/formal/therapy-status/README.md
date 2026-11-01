@@ -8,7 +8,7 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 6 e i predecessori canonici 4 e 5; le 24 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 7 e i predecessori canonici 4, 5 e 6; le 31 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
 ## Raccordo PR #769 del 31 ottobre 2026: autorità network al commit
 
@@ -662,3 +662,37 @@ servizio è aggiornato dopo il confronto del corpo estratto e le prove Web,
 PIN nativo, gare e crash. Il modello legacy non viene esteso ai grant nativi:
 scadenze, consumo e revoca sono provati separatamente con orologio iniettabile
 e mutazioni in `scripts/falsify-chat-therapy.mjs`.
+
+## Raccordo PR #768: provenienza delle ricevute e importazione portabile
+
+Riesaminata la correzione `3ff78ad3c` rispetto a `b81feca35` e al precedente
+head `a8d6e3f75`. Il delta iniziale di `lib/db.ts` riguarda soltanto l'header
+di credenziale del ripristino portabile. La conferma di una terapia continua
+a usare lo stesso protocollo, writer, CAS e legame audit/ledger; l'ammissione
+della superficie `native` nel validatore segue il writer esistente.
+
+Il lettore ricevute ora propaga `origin: local | imported | unattested`. Il controller
+mostra come registrazione locale soltanto una ricevuta locale e corrente;
+una ricevuta importata resta storico da esaminare, anche se lo stato della
+terapia coincide. Il client verifica il nuovo campo e rifiuta un'origine
+importata dichiarata corrente. Il modulo `backup-import-provenance.ts` entra
+nelle sorgenti fissate: consulta esclusivamente il registro locale `portable_import_origins`, senza
+cambiare le righe originali. Il ripristino assegna la provenienza solo alle
+righe nuove nella stessa transazione. I marcatori del file restano storia:
+non riclassificano righe locali, neppure dopo il percorso A → B → A. La
+migrazione allo schema 7 fissa come non attestate le righe preesistenti non
+indicizzate soltanto negli archivi con ricevuta portabile o traccia legacy
+di ripristino. Non ricostruisce l’origine dai riferimenti dei marcatori.
+La conservazione nel vero owner trasferisce anche indice ed eventi necessari
+alle FK per le nuove righe; le righe identiche in B mantengono l’autorità di B.
+
+Il modello TLC legacy non viene esteso a fiducia nella sorgente, backup o
+migrazioni. Il nuovo vincolo del controller durevole è coperto dai test del
+client, della conferma e da un vero ripristino di ledger ostile, incluso il
+caso di 650 audit importati con budget di lettura locale separato. Tale
+prova entra nel gruppo `code-current` del verificatore insieme alla migrazione
+6 → 7 e al suo rollback, insieme ai 19 casi del vero owner. Le prove HTTP su due server e l’aggiornamento da
+v0.9.0 restano evidenze separate dal modello. Modello, invarianti,
+assunzioni, mutanti e testimoni legacy restano invariati. Le impronte vengono
+aggiornate dopo questo confronto; `verify:therapy-status` deve ancora
+rieseguire TLC, i mutanti e tutti i test causali sull'head consegnato.

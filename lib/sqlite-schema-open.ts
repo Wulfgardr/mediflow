@@ -1,3 +1,4 @@
+import { freezeUnattestedBackupHistory } from './backup-import-provenance';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,7 +15,7 @@ import { initializeTerritorialPacks } from './territorial-pack-store';
 // 4: fonti protesica, originali e snapshot di provenienza.
 // A version is validated without DDL at every start: any change to the canonical
 // schema needs a new number, or the archives already stamped are refused.
-export const CURRENT_SQLITE_SCHEMA_VERSION = 6;
+export const CURRENT_SQLITE_SCHEMA_VERSION = 7;
 // Same values as scripts/native-first-install-contract.json, which the native
 // helper writes; sqlite-schema-open.test.ts reserves with the JSON and opens here.
 const reservation = { applicationId: 1296451154, userVersion: 0 };
@@ -150,6 +151,7 @@ export function openVersionedSqliteDatabase(databasePath: string, openConnection
                 }
                 const violationsBefore = foreignKeyViolations(connection);
                 initializeSqliteSchema(connection);
+                if (!fresh) freezeUnattestedBackupHistory(connection);
                 upgradeObservationTimestampDefault(connection, canonical);
                 upgradeReviewPatientReferenceDefault(connection, canonical);
                 assertCanonical(connection, canonical);
