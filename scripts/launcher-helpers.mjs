@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { assertNodeRuntime, readNodeContract, verifyNativeBinding } from './node-runtime-contract.mjs';
+import { assertNodeRuntime, readNodeContract, verifyPinnedNativeBinding } from './node-runtime-contract.mjs';
 
 function cleanDiagnostic(value) {
     return String(value || '').trim().replace(/[|\t\r\n]+/g, ' ').slice(0, 240);
@@ -104,7 +104,7 @@ export function checkNode(checkNative = false) {
     try {
         const contract = readNodeContract();
         const runtime = assertNodeRuntime(contract);
-        if (checkNative) verifyNativeBinding();
+        if (checkNative) verifyPinnedNativeBinding();
         return { ok: true, ...runtime, required: contract.engines, nativeBinding: checkNative ? 'ready' : 'not-checked' };
     } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };

@@ -1566,6 +1566,10 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 const closed = new Promise(resolve => child.once('close', () => {
                     record({type:'simulated-job-closed',pid:child.pid}); resolve();
                 }));
+                if (${Boolean(lifecycle?.guardianGate)}) await new Promise(resolve => {
+                    const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(startupGate)})) { clearInterval(timer); resolve(); } }, 10);
+                });
+                record({type:'simulated-job-ready',pid:child.pid});
                 return {closed, owner:owner.token, async stop() {
                     if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
                     await closed;
@@ -1591,6 +1595,12 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     record({type:'job-helper-created',pid:helper.pid});
                     helper.once('close',()=>record({type:'job-helper-exit',pid:helper.pid}));
                     return helper;
+                }
+                if (${Boolean(lifecycle?.preparationFailure)} && executable === process.execPath && argv[0] === '-e') {
+                    record({type:'preparation-created'});
+                    const child = spawn(executable, ['-e', 'process.once("message",()=>process.exit(1));'], options);
+                    child.once('close', () => record({type:'preparation-closed',pid:child.pid}));
+                    return child;
                 }
                 if (executable !== process.execPath || ![${JSON.stringify(path.join(source, 'scripts/source-runtime.mjs'))}, ${JSON.stringify(path.join(source, 'node_modules/next/dist/bin/next'))}].includes(argv[0])) throw new Error('FIXTURE_FOREIGN_CHILD_DENIED');
                 const inheritedStderr = options.stdio[2] === 2;
@@ -1626,7 +1636,12 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 const result = next(url, context);
                 if (url === ${JSON.stringify(pathToFileURL(path.join(source, 'scripts/mediflow.mjs')).href)}) {
                     record({ type: 'hook-active', url, node: process.version, execPath: process.execPath, uv: process.versions.uv });
-                    const text = String(result.source), from = text.indexOf('export async function stopOwnedChild'), to = text.indexOf('export function installDesktopEntry', from);
+                    let text = String(result.source);
+                    if (${Boolean(lifecycle?.preparationFailure)}) {
+                        const begin = text.indexOf('  const runNpm ='), end = text.indexOf('  const shutdown =',begin);
+                        text = text.slice(0,begin) + text.slice(begin,end).replaceAll("process.platform === 'win32'", 'true') + text.slice(end);
+                    }
+                    const from = text.indexOf('export async function stopOwnedChild'), to = text.indexOf('export function installDesktopEntry', from);
                     if (from < 0 || to < from) throw new Error('FIXTURE_STOP_HELPER_NOT_FOUND');
                     let helper = text.slice(from, to).replace('if (settled) return;',
                         'if (settled) return; globalThis[Symbol.for("mediflow.fixture.stop-observation")]({type:"stop-result",pid:child.pid,windowsTreeStopped,originalExitObserved,groupAbsent,exitCode:child.exitCode,signalCode:child.signalCode,cause:cause ? {code:cause.code,message:cause.message} : null});');
@@ -1815,7 +1830,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         import crypto from 'node:crypto';
         import { webIdentityProof } from ${JSON.stringify(new URL('./local-ui-web-identity.mjs', import.meta.url).href)};
         import { installLocalUiWebNavigation } from ${JSON.stringify(new URL('./local-ui-web-navigation.mjs', import.meta.url).href)};
-        export const verifySourceRuntime = () => ({ identity: ${JSON.stringify(identity)} });
+        export const verifySourceRuntime = () => ({ identity: ${JSON.stringify(lifecycle?.preparationFailure ? {...identity,revision:'bbbbbbbbbbbb'} : identity)} });
         if (process.argv[1].endsWith('source-runtime.mjs')) {
             if (process.env.MEDIFLOW_WEB_OWNER_GATE) await new Promise(resolve => {
                 const receive = frame => { if (frame.type === 'mediflow-web-owner-start' && frame.nonce === process.env.MEDIFLOW_WEB_OWNER_GATE) { process.off('message',receive); resolve(); } };
@@ -3395,4 +3410,28 @@ test('synthetic crash writer retains its open transaction across garbage collect
         assert.equal(lease.database.pragma('integrity_check',{simple:true}),'ok');
         assert.deepEqual(lease.database.prepare('SELECT id,value FROM synthetic_stop_rows ORDER BY id').all(),[{id:'committed',value:generation}]);
     } finally {lease.closeSync();}
+});
+
+for (const phase of ['guardian-pending','preparation-failed']) test(`launcher preserves custody through ${phase}`, {timeout:15000}, async t => {
+    const pending = phase === 'guardian-pending';
+    const f = await ordinaryLauncherFixture(t,'web',['--scelta','web'],pending,true,{},null,
+        {job:'simulated',guardianGate:pending,preparationFailure:!pending});
+    if (pending) {
+        await f.until(() => f.observations().some(event => event.type === 'simulated-job-created'));
+        const file = launcherReceiptFile(f.stateFiles.lockDirectory), receipt = JSON.parse(readFileSync(file));
+        const endpoint = new URL('stop',receipt.choiceUrl);
+        const response = await fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:'{}'});
+        assert.equal(response.status,200); await response.text();
+        await f.until(() => f.output().includes('Arresto in corso.'));
+        try {
+            assert.ok(existsSync(file));
+            assert.doesNotMatch(f.output(),/MediFlow arrestato\./u);
+        } finally { f.releaseStartup(); }
+    }
+    await f.waitForTerminal();
+    assert.equal(existsSync(path.join(f.stateFiles.lockDirectory,'active')),false,f.output());
+    assert.match(f.output(),/MediFlow arrestato\./u);
+    assert.doesNotMatch(f.output(),/Arresto non verificato|cleanup unconfirmed/u);
+    assert.ok(f.observations().some(event => event.type === (pending ? 'simulated-job-closed' : 'preparation-closed')));
+    assert.equal(f.child.exitCode,pending ? 0 : 1);
 });
