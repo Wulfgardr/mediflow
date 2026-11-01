@@ -1,11 +1,12 @@
 # Windows launcher bootstrap
 
-This package belongs only to the ordinary launcher. It is not part of the
-native-free AIP/MCP/Mini delivery closure. Node 24 and trusted Windows are
+This package provides verified Windows primitives for the ordinary launcher
+and local backup/recovery. It is not part of the native-free AIP/MCP/Mini
+delivery closure. Node 24 and trusted Windows are
 prerequisites; no report, environment-derived system root, FFI, runtime build
 or runtime download is used.
 
-`system-directory.c` exports exactly three C Node-API v1 functions: getSystemDirectory using
+`system-directory.c` exports exactly five C Node-API v1 functions: getSystemDirectory using
 [GetSystemDirectoryW](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsystemdirectoryw).
 getProcessCreationTimeTicks(pid) opens one non-inheritable process handle
 with QUERY_LIMITED_INFORMATION, reads GetProcessTimes and closes it once on
@@ -22,8 +23,16 @@ runs the guardian with its own Node executable; no PowerShell or C# compilation
 is involved. The guardian confirms zero active processes before reporting drained;
 its unexpected death kills the tree but does not fabricate cleanup confirmation.
 The API rights follow [AssignProcessToJobObject](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-assignprocesstojobobject).
+getDirectorySecurity(path) reads the current process token and the directory DACL
+through Windows handles. restrictDirectorySecurity(path) protects a new directory
+and installs inheritable full access only for the token user and SYSTEM, then
+reads the result back. The JavaScript caller permits restriction only for a new,
+empty directory. Reparse points and volumes without persistent ACLs are denied;
+the strict parser rejects any additional or different rule. These operations do
+not start PowerShell, whoami or icacls. The pre-existing BitLocker volume probe
+is a separate control.
 Node-API version 1 uses the stable C ABI. The MSVC recipe links only Node and
-Kernel32, without a dynamic CRT dependency or DLL entry point. The producer
+Kernel32 and Advapi32, without a dynamic CRT dependency or DLL entry point. The producer
 checks the actual dependency list with dumpbin, the PE architecture, exact
 exports, native API, canonical taskkill path and source-first startup.
 
@@ -48,7 +57,7 @@ install dependencies or prove a GUI interaction.
 
 Output is exactly `prebuilds/win32-<arch>/{system-directory.node,manifest.json}`.
 Manifest schema 3 lists the exact ordered exports
-`createJobForProcess,getProcessCreationTimeTicks,getSystemDirectory` and identifies binary bytes, PE architecture, source/recipe/builder
+`createJobForProcess,getProcessCreationTimeTicks,getSystemDirectory,getDirectorySecurity,restrictDirectorySecurity` and identifies binary bytes, PE architecture, source/recipe/builder
 digests, SDK and compiler provenance. Hashes attest identity/integrity, not
 source-to-binary equivalence. Review and commit both files for each admitted
 architecture before distributing source. The cross-platform workflow uploads
@@ -108,3 +117,10 @@ before admission/distribution. macOS stubs and source checks cannot qualify
 Win32 conversion, handle lifetime, or source-first Windows. Native mutation
 recipes (raw FILETIME, floating-point rounding, omitted CloseHandle) belong
 to the development evidence, not the distributed addon or portable closure.
+
+The MSVC linker uses `/Brepro`. The ordinary native jobs rebuild the source and
+compare every delivered binary byte, including timestamps, with no exclusions.
+Manual regeneration compares two new builds; its artifacts require review and
+commit before the ordinary delivered-artifact comparison qualifies the checkout.
+The Windows DACL test checks a newly restricted directory before payload and
+requires rejection after an actual grant to the Users SID.
