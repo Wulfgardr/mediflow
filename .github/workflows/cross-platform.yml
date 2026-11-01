@@ -42,7 +42,7 @@ jobs:
         shell: bash
         run: |
           git fetch --no-tags --depth=1 origin ef2a4006adc5f4d59f8e9db627070f6333ad066e
-          legacy="$RUNNER_TEMP/legacy-bootstrap"
+          legacy="$(cygpath -u "$RUNNER_TEMP")/legacy-bootstrap"
           mkdir "$legacy"
           git archive ef2a4006adc5f4d59f8e9db627070f6333ad066e scripts/prepare-windows-launcher-bootstrap.mjs scripts/windows-system-command.mjs scripts/windows-launcher-bootstrap | tar -xf - -C "$legacy"
           rm "$legacy/scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node" "$legacy/scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/manifest.json"
