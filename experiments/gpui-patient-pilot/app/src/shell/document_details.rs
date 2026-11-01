@@ -1002,7 +1002,19 @@ mod tests {
             assert!(context.check().is_err());
             app.disconnect(cx);
         });
-        assert_eq!(host.routes().len(), 1);
+        let routes = host.routes();
+        assert_eq!(
+            routes
+                .iter()
+                .filter(|route| route.starts_with(
+                    "GET /api/v1/network/patients/patient-a/attachments/synthetic-document"
+                ))
+                .count(),
+            1
+        );
+        assert!(routes.iter().all(|route| {
+            !route.starts_with("POST /api/v1/network/patients/patient-a/attachments")
+        }));
     }
 
     #[gpui::test]
