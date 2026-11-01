@@ -161,6 +161,7 @@ export default function Timeline({
                 <DocumentViewer
                     file={viewingFile.data}
                     fileName={viewingFile.name}
+                    signal={db.getSessionReadSignal()}
                     onClose={() => setViewingFile(null)}
                 />
             )}
