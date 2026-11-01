@@ -34,7 +34,7 @@ export function loadSystemDirectoryBinding() {
     || bytes.readUInt32LE(offset) !== 0x4550 || bytes.readUInt16LE(offset + 4) !== (arch === 'x64' ? 0x8664 : 0xaa64)) deny();
   if (!Array.isArray(manifest.dependencies) || manifest.dependencies.length !== 2
     || [...manifest.dependencies].sort().join(',').toLowerCase() !== 'kernel32.dll,node.exe') deny();
-  const binding = createRequire(import.meta.url)(binary);
+  const binding = createRequire(import.meta.url)(/* turbopackIgnore: true */ binary);
   const names = Reflect.ownKeys(binding);
   if (names.length !== exports.length || exports.some(name => !names.includes(name) || typeof binding[name] !== 'function')) deny();
   return binding;

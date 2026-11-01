@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['scripts/windows-private-directory.mjs', '7365ce92004de1f0d51fadd150574014696234a651481ebe637b0ad28a4533fa'],
   ['scripts/windows-system-command.mjs', 'adcd137e4a8e23e7495d83fc372befe0b3a4d9cdb25abc8de5f4252828a5b1f2'],
-  ['scripts/windows-launcher-bootstrap/index.mjs', '5d6d21e5473cd8f1444225d0fdb26bc8c908dd01bd1c1f1be538c50ed243802f'],
+  ['scripts/windows-launcher-bootstrap/index.mjs', 'ddc8dad1aff9cdeb836a82cb4983c02b9b7e77203e861c3142c5767b52600304'],
   ['scripts/windows-launcher-bootstrap/system-directory.c', 'd225cabaca09fca34c103e93608963aca8bb01dfca4ff7df21b285147cb16e7c', true],
   ['scripts/windows-launcher-bootstrap/build.ps1', '576c867a61525717b5bb5d613b92f195432357306ced21cdec07adae78c9c1f1', true],
   ['scripts/prepare-windows-launcher-bootstrap.mjs', 'dac5c0648b21e5e1f4c085ceea902eb80c52a7eba5329abd909ec57f28a72089', true],
