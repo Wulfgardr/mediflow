@@ -496,11 +496,12 @@ export async function main(args = process.argv.slice(2)) {
   let terminal = null, useTerminal = false, webSecret = null, instance = null;
   const pairRequests = new Map();
   const ipcStopChildren = new WeakSet();
-  let childOwner = null, leases = null, webJob = null;
+  let childOwner = null, leases = null, webJob = null, webJobPending = null;
   const stopChild = async () => {
     if (child && child.exitCode === null && child.signalCode === null && leases?.external) {
       throw new Error('MediFlow è ancora utilizzato da un altro client.');
     }
+    if (webJobPending) await webJobPending;
     if (webJob) {
       await webJob.stop();
       webJob = null;
@@ -524,12 +525,29 @@ export async function main(args = process.argv.slice(2)) {
   };
   const runNpm = async command => {
     const owned = process.platform === 'win32'
-      ? run(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `npm ${command}`])
-      : run('npm', command === 'ci' ? ['ci'] : ['run', 'build']);
-    await new Promise((resolve, reject) => {
+      ? run(process.execPath, ['-e', `
+          const {spawn} = require('node:child_process');
+          process.once('message', () => {
+            const child = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', ${JSON.stringify('npm ' + (command === 'ci' ? 'ci --ignore-scripts' : command === 'prepare:dependencies' ? 'run prepare:dependencies' : command))}], {stdio:'inherit'});
+            child.once('error', () => process.exit(1));
+            child.once('exit', code => process.exit(code ?? 1));
+          });`], true)
+      : run('npm', command === 'ci' ? ['ci', '--ignore-scripts'] : command === 'prepare:dependencies' ? ['run', command] : ['run', 'build']);
+    const completed = new Promise((resolve, reject) => {
       owned.once('error', reject);
       owned.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error(`npm ${command} non completato (${signal || code}). Controlla i log e riprova.`)));
     });
+    completed.catch(() => {});
+    if (process.platform === 'win32') owned.stderr.pipe(process.stderr);
+    if (process.platform === 'win32') {
+      webJobPending = containWindowsWeb(owned, childOwner).then(job => { webJob = job; });
+      try { await webJobPending; } finally { webJobPending = null; }
+      if (!closing) owned.send({ type: 'prepare' }, () => {});
+    }
+    try { await completed; }
+    finally {
+      if (webJob) { await webJob.closed; webJob = null; child = null; childOwner = null; }
+    }
     if (closing) throw new Error('Avvio interrotto.');
   };
   const shutdown = (stopError = null) => {
@@ -677,9 +695,10 @@ export async function main(args = process.argv.slice(2)) {
       if (!approved || closing) throw new Error('Dipendenze non installate.');
       update({ step: 'dipendenze', message: 'Installazione delle dipendenze.' });
       await runNpm('ci');
+      await runNpm('prepare:dependencies');
     }
     const nativeStatus = checkNode(true);
-    if (!nativeStatus.ok) throw new Error(`${nativeStatus.error}\nEsegui npm ci con Node 24 nella cartella di MediFlow e riprova.`);
+    if (!nativeStatus.ok) throw new Error(`${nativeStatus.error}\nEsegui npm ci e npm run prepare:dependencies con Node 24 nella cartella di MediFlow e riprova.`);
     const current = readProductIdentity(ROOT);
     if (current.sourceFingerprint !== identity.sourceFingerprint) throw new Error('I sorgenti sono cambiati. Riapri il lanciatore.');
     if (current.worktreeHash !== 'clean' && choice !== 'sviluppo') throw new Error('Questa cartella contiene modifiche non committate. Scegli Apri per sviluppo oppure usa una copia Git pulita.');
@@ -716,6 +735,7 @@ export async function main(args = process.argv.slice(2)) {
       const port = Number(process.env.PORT || 3000);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT deve essere un numero tra 1 e 65535.');
       if (choice !== 'agenti') await requireFreePort(port);
+      if (closing) return;
       for (const pair of pairRequests.values()) pair.socket?.destroy();
       pairRequests.clear();
       instance = crypto.randomUUID();
@@ -736,7 +756,9 @@ export async function main(args = process.argv.slice(2)) {
         bindRuntimeOwnership([ownership, archiveOwnership], runtime);
       }
       if (choice === 'web' && process.platform === 'win32') {
-        webJob = await containWindowsWeb(owned, childOwner);
+        webJobPending = containWindowsWeb(owned, childOwner).then(job => { webJob = job; });
+        try { await webJobPending; } finally { webJobPending = null; }
+        if (closing) return;
         void webJob.closed.then(() => finishGeneration(true), error => finishGeneration(true, error));
         bindRuntimeOwnership([ownership, archiveOwnership], { kind: 'windows-job', web: childOwner.token, guardian: webJob.owner });
       }

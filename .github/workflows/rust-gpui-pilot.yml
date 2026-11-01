@@ -128,7 +128,9 @@ jobs:
         run: node scripts/probe-patient-document-key-erasure.mjs experiments/gpui-patient-pilot/target/debug/examples/patient_document_key_erasure key-erasure-ci --ci
       - name: Install real route dependencies for withdrawal regression
         if: runner.os == 'macOS'
-        run: npm ci
+        run: |
+          npm ci
+          npm run prepare:dependencies
       - name: Withdraw during real PIN verification and reconcile failures
         if: runner.os == 'macOS'
         run: node scripts/check-chat-therapy-withdraw.mjs
@@ -148,7 +150,9 @@ jobs:
           node-version: 24
           cache: npm
       - name: Install the locked current runtime
-        run: npm ci
+        run: |
+          npm ci
+          npm run prepare:dependencies
       - name: Install source-pinned Rust toolchain
         run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy
       - name: Check governance fixtures against host builders and report storage

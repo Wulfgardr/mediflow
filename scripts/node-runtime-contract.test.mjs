@@ -209,3 +209,40 @@ test('bundled roster rejects altered shared SQLite before fixture code executes'
     assert.equal(result.status, 1);
     assert.equal(fs.existsSync(f.marker), false);
 });
+
+for (const kind of ['missing', 'modified', 'other-version']) test(`pinned SQLite rejects ${kind} before dependency code executes`, t => {
+    const f = nativeFixture(t), local = syntheticSqlite(f.root, f.marker);
+    writeFixture(path.join(local, 'package.json'), JSON.stringify({name:'better-sqlite3',version:kind === 'other-version' ? '0.0.0' : '12.6.2',main:'lib/database.js'}));
+    if (kind !== 'missing') writeFixture(path.join(local, 'build/Release/better_sqlite3.node'), 'synthetic unapproved binary');
+    const result = spawnSync(process.execPath, ['--input-type=module','-e', `
+        import {verifyPinnedNativeBinding} from ${JSON.stringify(nativeContract)};
+        verifyPinnedNativeBinding(${JSON.stringify(f.root)});
+    `], {encoding:'utf8'});
+    assert.notEqual(result.status,0);
+    assert.equal(fs.existsSync(f.marker),false);
+});
+
+test('npm installation disables dependency scripts while build retains its admission and finalization', () => {
+    assert.match(fs.readFileSync(path.join(sourceRoot,'.npmrc'),'utf8'),/^ignore-scripts=true$/mu);
+    const scripts = JSON.parse(fs.readFileSync(path.join(sourceRoot,'package.json'),'utf8')).scripts;
+    assert.ok(scripts.build.startsWith(scripts.prebuild + ' && '));
+    assert.ok(scripts.build.endsWith(' && ' + scripts.postbuild));
+    assert.ok(scripts.dev.startsWith(scripts.predev + ' && '));
+    assert.ok(scripts.start.startsWith(scripts.prestart + ' && '));
+});
+
+test('dependency preparation denies a replaced download before writing or requiring SQLite', t => {
+    const f = nativeFixture(t);
+    syntheticSqlite(f.root,f.marker);
+    writeFixture(path.join(f.root,'.nvmrc'),'24');
+    writeFixture(path.join(f.root,'package.json'),JSON.stringify({engines:{node:'>=24 <25'}}));
+    writeFixture(path.join(f.root,'node_modules/better-sqlite3/package.json'),JSON.stringify({version:'12.6.2',main:'lib/database.js'}));
+    for (const name of ['prepare-dependencies.mjs','node-runtime-contract.mjs']) writeFixture(path.join(f.root,'scripts',name),fs.readFileSync(path.join(sourceRoot,'scripts',name)));
+    const loader = path.join(f.root,'download-fixture.mjs');
+    writeFixture(loader,`globalThis.fetch = async () => ({ok:true,arrayBuffer:async()=>new TextEncoder().encode('SYNTHETIC REPLACED DOWNLOAD')});`);
+    const result = spawnSync(process.execPath,['--import',loader,path.join(f.root,'scripts/prepare-dependencies.mjs')],{encoding:'utf8'});
+    assert.notEqual(result.status,0);
+    assert.match(result.stderr,/Impronta archivio SQLite non ammessa/u);
+    assert.equal(fs.existsSync(f.marker),false);
+    assert.equal(fs.existsSync(path.join(f.root,'node_modules/better-sqlite3/build/Release/better_sqlite3.node')),false);
+});

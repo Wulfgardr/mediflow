@@ -269,12 +269,23 @@ git clone https://github.com/Wulfgardr/mediflow
 cd mediflow
 nvm use
 npm ci
+npm run prepare:dependencies
 ```
 
 `nvm use` vale per chi usa nvm; con altri gestori seleziona Node 24.
-La dipendenza nativa `better-sqlite3` deve corrispondere alla versione di Node.
+`npm ci` non esegue gli script delle dipendenze: la configurazione del progetto
+li disabilita. Il comando successivo scarica il prebuild ufficiale di SQLite
+12.6.2 per Node 24 e verifica SHA-256 di archivio e binario prima del caricamento.
+Le impronte ammesse sono in `scripts/node-runtime-contract.mjs`.
+Sono coperti macOS e Linux glibc e musl x64/ARM64, Windows x64/ARM64; su Windows ARM
+con Node x64 emulato viene selezionato il prebuild x64. Altri target si fermano.
+Gli script di esbuild (entrambe le versioni), fsevents, unrs-resolver e core-js
+restano disabilitati: i pacchetti opzionali nel lockfile forniscono i binari
+necessari a esbuild e al resolver; core-js non richiede preparazione.
+Non usare `--ignore-scripts=false` né `npm rebuild` per aggirare questo percorso.
+I comandi build, dev e start includono esplicitamente i controlli necessari.
 Su Windows, se PowerShell blocca `npm.ps1` per la execution policy, usa
-`npm.cmd ci`. Nel Prompt dei comandi puoi usare `npm ci`.
+`npm.cmd ci` e `npm.cmd run prepare:dependencies`. Nel Prompt dei comandi puoi usare `npm ci`.
 
 | Sistema | Apri nella cartella del progetto |
 | --- | --- |
@@ -289,7 +300,7 @@ alcuni minuti. Il terminale conserva i log: lascialo aperto. **Ctrl+C** o
 **Arresta** chiudono i processi avviati dal lanciatore.
 
 Se mancano dipendenze, il lanciatore propone `npm ci` e chiede conferma
-prima di collegarsi al registro npm. La produzione richiede una cartella
+prima di collegarsi al registro npm, poi prepara SQLite dal download GitHub verificato. La produzione richiede una cartella
 Git pulita; con modifiche non committate scegli **Apri per sviluppo**.
 **Ricorda la mia scelta** conserva la preferenza; **Cambia** riapre il menu.
 

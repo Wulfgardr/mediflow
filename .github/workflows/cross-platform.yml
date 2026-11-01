@@ -73,7 +73,9 @@ jobs:
         if: runner.os == 'Windows'
         run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
       - name: Install (npm ci)
-        run: npm ci
+        run: |
+          npm ci
+          npm run prepare:dependencies
       - name: Deny DB, Web, native and network imports in portable surfaces
         run: npm run check:headless-portable-imports
       - name: Typecheck profile contracts without DOM or framework types
@@ -115,7 +117,9 @@ jobs:
         if: runner.os == 'Windows'
         run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
       - name: Install (npm ci)
-        run: npm ci
+        run: |
+          npm ci
+          npm run prepare:dependencies
       - name: Verify better-sqlite3 native binding loads
         run: node -e "const db=require('better-sqlite3')(':memory:'); console.log('better-sqlite3 query result:', db.prepare('select 1 as x').get().x);"
       - name: Flag better-sqlite3 source compile (non-fatal visibility)
@@ -155,7 +159,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: |
+          npm ci
+          npm run prepare:dependencies
       - name: Lint
         run: npm run lint
       - name: Typecheck
