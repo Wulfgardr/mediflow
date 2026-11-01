@@ -1620,8 +1620,11 @@ impl ClinicalApp {
                 .is_some_and(|therapy| therapy.reveal_if_focused(window, cx))
                 && !reveal_fields(&form.fields, window, cx)
                 && (self.threshold_scrolls_with_content.get()
-                    || Layout::for_window(f32::from(window.viewport_size().width), self.text_scale)
-                        .magnified)
+                    || Layout::for_window(
+                        f32::from(window.viewport_size().width),
+                        self.effective_text_scale(),
+                    )
+                    .magnified)
             {
                 self.form_actions
                     .iter()
@@ -1632,9 +1635,11 @@ impl ClinicalApp {
                 .iter()
                 .any(|target| target.reveal_if_focused(window, cx));
         } else if self.area == Area::Patients && self.directory {
-            let magnified =
-                Layout::for_window(f32::from(window.viewport_size().width), self.text_scale)
-                    .magnified;
+            let magnified = Layout::for_window(
+                f32::from(window.viewport_size().width),
+                self.effective_text_scale(),
+            )
+            .magnified;
             if !(magnified && self.search_target.reveal_if_focused(window, cx)) {
                 self.patient_targets
                     .values()
@@ -1791,7 +1796,11 @@ impl ClinicalApp {
         // remembered toggle must not disable a desktop action after resize.
         let section_menu_visible = self.show_sections
             && !self.directory
-            && Layout::for_window(f32::from(window.viewport_size().width), self.text_scale).compact;
+            && Layout::for_window(
+                f32::from(window.viewport_size().width),
+                self.effective_text_scale(),
+            )
+            .compact;
         if !self.navigation_shortcuts_available()
             || self.area != Area::Patients
             || section_menu_visible
@@ -4776,7 +4785,7 @@ impl ClinicalApp {
             .child(div().flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-date-interval-heading", "INTERVALLO DI LETTURA", theme))
                 .child(div().flex().flex_wrap().items_end().gap(px(12.))
-                    .when(self.text_scale >= 2.5, |el| el.flex_col().items_stretch())
+                    .when(self.effective_text_scale() >= 2.5, |el| el.flex_col().items_stretch())
                     .children(self.global_dates.iter().enumerate().map(|(index, field)| {
                         div().flex_1().min_w(px(180.)).max_w_full()
                             .child(self.field_view(field, format!("clinical-workspace-date-field-{index}"), cx))
@@ -5437,7 +5446,10 @@ impl Render for ClinicalApp {
                 });
             }
         }
-        let layout = Layout::for_window(f32::from(window.viewport_size().width), self.text_scale);
+        let layout = Layout::for_window(
+            f32::from(window.viewport_size().width),
+            self.effective_text_scale(),
+        );
         let connected = self.session.is_some();
         self.sync_patient_targets(cx);
         self.prepare_agenda_return(window, cx);
@@ -5570,7 +5582,10 @@ impl Render for ClinicalApp {
             )
             .on_action(cx.listener(|this, _: &Review, window, cx| this.review_form(window, cx)))
             .on_action(cx.listener(|this, _: &Escape, window, cx| {
-                if this.local_host.command_visible() {
+                if this.local_host.clinical_command_visible()
+                    || (this.area == Area::Settings
+                        && this.local_host.page_command_visible(this.settings_page))
+                {
                     this.cancel_local_command(window, cx);
                     return;
                 }
@@ -6283,7 +6298,7 @@ impl ClinicalApp {
             return pane.child(self.who_view(cx));
         }
         pane = pane.child(div().min_w_0().flex().flex_wrap().gap(px(8.))
-                .when(self.text_scale >= 2.5, |el| el.flex_col().items_stretch())
+                .when(self.effective_text_scale() >= 2.5, |el| el.flex_col().items_stretch())
                 .child(self.reference_search_target.attach_enabled(
                     div().id("clinical-workspace-reference-search-anchor").flex_1().min_w(px(160.)).max_w_full()
                         .child(crate::text_input::themed(self.reference_search.clone(), theme)), false))

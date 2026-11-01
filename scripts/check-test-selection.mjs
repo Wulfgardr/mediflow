@@ -26,7 +26,7 @@ const signals = [
   /(?:from\s*['"]@playwright\/test['"]|require\s*\(\s*['"]@playwright\/test['"])/u,
   /\bXCTestCase\b|@Test\b|@Suite\b|\bimport\s+Testing\b/u,
   /\b(?:import\s+(?:unittest|pytest)|from\s+(?:unittest|pytest)\s+import)|^\s*(?:async\s+)?def\s+test_\w+\s*\(/mu,
-  /#\s*\[\s*(?:(?:tokio|async_std)::)?test(?:\s*\(|\s*\])/u,
+  /#\s*\[\s*(?:(?:tokio|async_std|gpui)::)?test(?:\s*\(|\s*\])/u,
   /(?:^|\n)\s*@test\b|--self-test\b|\b(?:assert_eq|assert_equal|assert_success|assert_failure)\b/u,
   /(?:from\s*['"](?:node:)?assert(?:\/strict)?['"]|require\s*\(\s*['"](?:node:)?assert(?:\/strict)?['"])/u,
 ];

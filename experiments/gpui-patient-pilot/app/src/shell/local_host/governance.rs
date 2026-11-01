@@ -1,4 +1,5 @@
 use super::*;
+use crate::theme::{TextRole, TypeStyle};
 use mediflow_runtime_client::GovernanceSnapshot;
 
 #[derive(Default)]
@@ -142,6 +143,7 @@ impl ClinicalApp {
     ) -> Stateful<Div> {
         let key = key.to_owned();
         let open = self.local_host.governance.reports_open.contains(&key);
+        let command_key = key.clone();
         let mut pane = div()
             .id(format!("governance-report-body-{key}"))
             .min_w_0()
@@ -149,23 +151,28 @@ impl ClinicalApp {
             .flex_col()
             .gap(px(8.))
             .child(
-                button(
-                    format!("governance-report-{key}"),
-                    if open {
-                        "Chiudi report integrale"
-                    } else {
-                        "Leggi report integrale"
-                    },
-                    self.theme,
-                    false,
-                    true,
-                )
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    if !this.local_host.governance.reports_open.remove(&key) {
-                        this.local_host.governance.reports_open.insert(key.clone());
-                    }
-                    cx.notify();
-                })),
+                div().flex().child(
+                    button(
+                        format!("governance-report-{key}"),
+                        if open {
+                            "Chiudi report integrale"
+                        } else {
+                            "Leggi report integrale"
+                        },
+                        self.theme,
+                        false,
+                        true,
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        if !this.local_host.governance.reports_open.remove(&command_key) {
+                            this.local_host
+                                .governance
+                                .reports_open
+                                .insert(command_key.clone());
+                        }
+                        cx.notify();
+                    })),
+                ),
             );
         if open {
             pane = pane
@@ -179,15 +186,29 @@ impl ClinicalApp {
                     missing(markdown_path),
                     self.theme,
                 ));
-            pane = pane.child(fact(
-                "Report JSON",
-                if report.is_null() {
-                    "Nessun report disponibile".into()
-                } else {
-                    serde_json::to_string_pretty(report).unwrap_or_default()
-                },
-                self.theme,
-            ));
+            let json = if report.is_null() {
+                "Nessun report disponibile".into()
+            } else {
+                serde_json::to_string_pretty(report).unwrap_or_default()
+            };
+            pane = pane.child(text!("Report JSON")).child(
+                div()
+                    .id(format!("governance-json-{key}"))
+                    .min_w_0()
+                    .p(px(16.))
+                    .border_1()
+                    .border_color(self.theme.rule)
+                    .type_role(self.theme, TextRole::Code)
+                    .child({
+                        let text = gpui::Text::new(
+                            gpui::ElementId::Name("report-json-content".into()),
+                            json.into(),
+                        );
+                        #[cfg(test)]
+                        let text = rendered_command::observe_text(text);
+                        text
+                    }),
+            );
             pane = pane.child(fact(
                 "Report Markdown",
                 markdown.unwrap_or("Contenuto non disponibile dal servizio"),
@@ -404,7 +425,11 @@ impl ClinicalApp {
         if let Ok(report) = &snapshot.parliament {
             let decision = &report.report.parliament;
             pane = pane
-                .child(fact("Aggiornamento del report", &report.updated_at, theme))
+                .child(fact(
+                    "Aggiornamento del report",
+                    display_date(Some(&report.updated_at)),
+                    theme,
+                ))
                 .child(fact("Stato confronto", label(&decision.readiness), theme))
                 .child(fact(
                     "Motivo",
@@ -605,7 +630,7 @@ impl ClinicalApp {
                     ))
                     .child(fact(
                         "Aggiornamento del report",
-                        missing(row.updated_at.as_deref()),
+                        display_date(row.updated_at.as_deref()),
                         theme,
                     ));
                 if let Some(evidence) = &report.evidence {

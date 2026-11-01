@@ -1,3 +1,5 @@
+mod audit;
+mod diagnostics;
 use super::governance::section_state;
 use super::*;
 use mediflow_runtime_client::{
@@ -11,10 +13,36 @@ fn fact(label: &str, value: impl AsRef<str>, theme: Theme) -> Stateful<Div> {
         .child(super::governance::fact(label, value, theme))
 }
 
-#[derive(Default)]
 pub(super) struct ControlsArea {
+    audit: audit::AuditArea,
+    diagnostic_busy: bool,
+    diagnostics: [Option<diagnostics::DiagnosticResult>; 4],
     snapshot: Option<ControlsSnapshot>,
     services: Option<HostServices>,
+}
+impl ControlsArea {
+    pub(super) fn new(theme: Theme, cx: &mut Context<ClinicalApp>) -> Self {
+        Self {
+            snapshot: None,
+            services: None,
+            audit: audit::AuditArea::new(theme, cx),
+            diagnostic_busy: false,
+            diagnostics: std::array::from_fn(|_| None),
+        }
+    }
+    pub(super) fn withdraw(&mut self, cx: &mut App) {
+        self.snapshot = None;
+        self.services = None;
+        self.audit.withdraw(cx);
+        self.diagnostic_busy = false;
+        self.diagnostics = std::array::from_fn(|_| None);
+    }
+    pub(super) fn configure(&mut self, theme: Theme, busy: bool, cx: &mut Context<ClinicalApp>) {
+        self.audit.configure(theme, busy, cx);
+    }
+    pub(super) fn busy(&self) -> bool {
+        self.diagnostic_busy
+    }
 }
 struct HostServices {
     address: String,
@@ -89,7 +117,13 @@ fn fields(value: &Value, keys: &[(&str, &str)], theme: Theme) -> Div {
         .gap(px(8.))
         .children(keys.iter().map(|(key, label)| {
             let text = match &value[*key] {
-                Value::String(s) if !s.is_empty() => s.clone(),
+                Value::String(s) if !s.is_empty() => {
+                    if matches!(*key, "occurredAt" | "checkedAt") {
+                        super::who_administration::timestamp(s)
+                    } else {
+                        s.clone()
+                    }
+                }
                 Value::Bool(true) => "Sì".into(),
                 Value::Bool(false) => "No".into(),
                 Value::Number(n) => n.to_string(),
@@ -163,13 +197,22 @@ impl ClinicalApp {
         let Some(session) = self.session.clone() else {
             return;
         };
+        let filter = match self.local_host.controls.audit.filter(cx) {
+            Ok(filter) => filter,
+            Err(error) => {
+                self.local_host.operation = Operation::Failed(ui_error(error));
+                cx.notify();
+                return;
+            }
+        };
+        self.local_host.controls.audit.set_applied(filter.clone());
         let scope = self.scope.clone();
         self.local_host.operation = Operation::Reading;
         self.local_host.controls.snapshot = None;
         self.local_host.controls.services = None;
         self.run_local_host(
             move || {
-                let snapshot = access.read_controls()?;
+                let snapshot = access.read_controls_with_audit_filter(&filter)?;
                 let services = HostServices {
                     address: session.base_url().to_owned(),
                     authentication: access.read_authentication_health(),
@@ -216,6 +259,7 @@ impl ClinicalApp {
             )
             .on_click(cx.listener(|this, _, _, cx| this.read_controls(cx))),
         );
+        pane = pane.child(self.diagnostic_hub_view(cx));
         if matches!(self.local_host.operation, Operation::Reading) {
             return pane.child(notice(
                 "controls-loading",
@@ -255,7 +299,8 @@ impl ClinicalApp {
             ));
         }
         pane = pane.child(section("controls-audit","Audit operativo",theme))
-            .child(text!("Ultimi eventi restituiti dal servizio, massimo 50. Questa finestra non rappresenta l’intero storico. Solo gli amministratori possono leggere l’audit."));
+            .child(text!("Eventi restituiti dal servizio secondo i filtri applicati. Questa finestra non rappresenta l’intero storico. Solo gli amministratori possono leggere l’audit."));
+        pane = pane.child(self.audit_filters_view(cx));
         if let Some(error) = section_state("controls-audit-error", &snapshot.audit, theme) {
             pane = pane.child(error);
         }

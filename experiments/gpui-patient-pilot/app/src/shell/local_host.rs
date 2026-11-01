@@ -2,13 +2,19 @@ mod archives;
 mod chatgpt;
 mod controls;
 mod governance;
+mod macos_preferences;
 mod models;
 mod network;
 mod parameters;
 mod references;
 mod security;
+mod who_administration;
+mod work_profile;
 use super::*;
 use archives::ArchiveArea;
+pub(in crate::shell) use macos_preferences::effective_preferences;
+#[cfg(not(test))]
+pub(in crate::shell) use macos_preferences::read_system_accessibility;
 pub(super) use mediflow_runtime_client::RETIREMENT_WARNING;
 use mediflow_runtime_client::{
     HostSettingKey, LocalHostAccess, PreparedDocumentDeletion, PreparedHostSetting,
@@ -41,6 +47,8 @@ pub(super) struct LocalAdministration {
     pub(super) retirement: RetirementNotice,
     archives: ArchiveArea,
     governance: governance::GovernanceArea,
+    work_profile: work_profile::WorkProfileArea,
+    who_administration: who_administration::WhoAdministration,
     controls: controls::ControlsArea,
     network: network::NetworkArea,
     references: references::ReferencesArea,
@@ -86,7 +94,9 @@ impl LocalAdministration {
                 cx,
             ),
             governance: governance::GovernanceArea::default(),
-            controls: controls::ControlsArea::default(),
+            work_profile: work_profile::WorkProfileArea::default(),
+            who_administration: who_administration::WhoAdministration::new(theme, cx),
+            controls: controls::ControlsArea::new(theme, cx),
             network: network::NetworkArea::default(),
             references: references::ReferencesArea::new(theme, cx),
             security: security::SecurityArea::new(theme, cx),
@@ -105,16 +115,27 @@ impl LocalAdministration {
             _subscription: subscription,
         }
     }
-    pub(super) fn command_visible(&self) -> bool {
-        self.references.preview.is_some()
-            || self.references.who_consent
-            || self.models.command_visible()
+    pub(super) fn clinical_command_visible(&self) -> bool {
+        self.models.command_visible()
             || self.security.has_work()
-            || self.archives.has_work()
             || !matches!(self.operation, Operation::Idle)
     }
+    pub(super) fn page_command_visible(&self, page: SettingsPage) -> bool {
+        match page {
+            SettingsPage::References => {
+                self.references.preview.is_some()
+                    || self.references.who_consent
+                    || self.who_administration.rollback.is_some()
+            }
+            SettingsPage::Archives => self.archives.has_work(),
+            _ => false,
+        }
+    }
     pub(super) fn has_work(&self) -> bool {
-        self.references.busy
+        self.controls.busy()
+            || self.who_administration.busy
+            || self.work_profile.busy
+            || self.references.busy
             || self.chatgpt.busy()
             || self.models.has_work()
             || self.security.has_work()
@@ -141,9 +162,11 @@ impl LocalAdministration {
             .expect("local authority generation exhausted");
         self.archives.withdraw(cx);
         self.governance.withdraw();
-        self.controls = controls::ControlsArea::default();
+        self.work_profile = work_profile::WorkProfileArea::default();
+        self.controls.withdraw(cx);
         self.network = network::NetworkArea::default();
         self.references.withdraw(cx);
+        self.who_administration.withdraw(cx);
         self.security.withdraw(cx);
         self.models.withdraw(cx);
         self.chatgpt.withdraw();
@@ -172,6 +195,9 @@ impl LocalAdministration {
         cx: &mut Context<ClinicalApp>,
     ) {
         self.references.configure(theme, cx);
+        self.controls.configure(theme, self.has_work(), cx);
+        self.who_administration
+            .configure(theme, self.has_work(), cx);
         self.archives.configure(theme, window, cx);
         self.security.configure(theme, cx);
         self.models.configure(theme, cx);
@@ -184,7 +210,7 @@ impl LocalAdministration {
             )
         });
         if std::mem::take(&mut self.focus_confirmation) {
-            if self.command_visible() {
+            if self.clinical_command_visible() {
                 window.focus(&self.targets[0].focus, cx);
                 self.targets[0].scroll_to(window, cx);
             } else if let Some(focus) = self.return_focus.take() {
@@ -282,6 +308,9 @@ impl ClinicalApp {
                     }
                     if this.settings_page == SettingsPage::Controls {
                         this.read_controls(cx);
+                    }
+                    if this.settings_page == SettingsPage::Profile {
+                        this.read_work_profile(cx);
                     }
                     if this.settings_page == SettingsPage::Governance {
                         this.read_governance(cx);
@@ -401,7 +430,18 @@ impl ClinicalApp {
         );
     }
     pub(super) fn cancel_local_command(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.local_host.references.busy
+        if self.area == Area::Settings
+            && self.settings_page == SettingsPage::References
+            && !self.local_host.has_work()
+            && self.local_host.who_administration.rollback.is_some()
+        {
+            self.local_host.who_administration.rollback = None;
+            cx.notify();
+            return;
+        }
+        if self.area == Area::Settings
+            && self.settings_page == SettingsPage::References
+            && !self.local_host.references.busy
             && (self.local_host.references.preview.is_some()
                 || self.local_host.references.who_consent)
         {
@@ -502,6 +542,7 @@ impl ClinicalApp {
                     !matches!(
                         self.settings_page,
                         SettingsPage::Archives
+                            | SettingsPage::Profile
                             | SettingsPage::Access
                             | SettingsPage::Danger
                             | SettingsPage::Host
@@ -584,10 +625,7 @@ impl ClinicalApp {
                 }
             }
         }
-        if self.local_host.security.has_work()
-            || self.local_host.models.command_visible()
-            || !matches!(self.local_host.operation, Operation::Idle)
-        {
+        if self.local_host.clinical_command_visible() {
             pane = pane.child(self.threshold(
                 Layout::for_window(760., self.text_scale),
                 ThresholdMode::Complete,

@@ -14,9 +14,14 @@ fn main() {
     let minimum = env::var("MACOSX_DEPLOYMENT_TARGET").unwrap_or_else(|_| "11.0".into());
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     build_voice(&out, &minimum);
+    println!("cargo:rerun-if-changed=src/shell/local_host/macos_preferences.m");
     for (source, name) in [
         ("src/chat_access/native.m", "chat-access.o"),
         ("src/documents/pdf_native.m", "pdf-preview.o"),
+        (
+            "src/shell/local_host/macos_preferences.m",
+            "macos-preferences.o",
+        ),
     ] {
         let object = out.join(name);
         assert!(
