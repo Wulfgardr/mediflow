@@ -123,7 +123,11 @@ test('both real PDF callers pass the exact owned root, heap and conditional addo
     const worker = realpathSync(fileURLToPath(new URL('../../../scripts/anydoc-pdf-page-worker.mjs', import.meta.url)));
     const original = childProcess.spawn;
     const calls: { command: string; args: readonly string[] }[] = [];
-    childProcess.spawn = ((command: string, args: readonly string[]) => { calls.push({ command, args }); throw new Error('Synthetic stop before execution'); }) as typeof childProcess.spawn;
+    childProcess.spawn = (command: string, args?: unknown) => {
+        assert.ok(Array.isArray(args) && args.every(arg => typeof arg === 'string'));
+        calls.push({ command, args });
+        throw new Error('Synthetic stop before execution');
+    };
     syncBuiltinESMExports();
     try {
         assert.equal((await runAnyDocPdfMaterializationChild(Buffer.from('%PDF-synthetic'), 1)).status, 'failed');
