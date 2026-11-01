@@ -5,6 +5,12 @@ name: Cross-platform (Win/Linux/macOS)
 # contract shared by .nvmrc, package engines, launchers and native bundles.
 
 on:
+  workflow_dispatch:
+    inputs:
+      regenerate_bootstrap:
+        description: Build and compare two deterministic native artifacts for review
+        type: boolean
+        default: false
   pull_request:
   push:
     branches:
@@ -31,6 +37,18 @@ jobs:
         with:
           node-version: 24
           architecture: ${{ matrix.arch }}
+      - name: Diagnose the original linker output and prepare regeneration
+        if: github.event_name == 'workflow_dispatch' && inputs.regenerate_bootstrap
+        shell: bash
+        run: |
+          git fetch --no-tags --depth=1 origin ef2a4006adc5f4d59f8e9db627070f6333ad066e
+          legacy="$RUNNER_TEMP/legacy-bootstrap"
+          mkdir "$legacy"
+          git archive ef2a4006adc5f4d59f8e9db627070f6333ad066e scripts/prepare-windows-launcher-bootstrap.mjs scripts/windows-system-command.mjs scripts/windows-launcher-bootstrap | tar -xf - -C "$legacy"
+          rm "$legacy/scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node" "$legacy/scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/manifest.json"
+          node "$legacy/scripts/prepare-windows-launcher-bootstrap.mjs" build
+          node --input-type=module -e "import fs from 'node:fs'; import {peByteDifferences} from './scripts/verify-windows-bootstrap-rebuild.mjs'; const base='scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node'; const report=peByteDifferences(fs.readFileSync(base),fs.readFileSync(process.argv[1]+'/'+base)); fs.writeFileSync(process.argv[1]+'/differences.json',JSON.stringify(report,null,2)); console.log(JSON.stringify(report));" "$legacy"
+          rm "scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node" "scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/manifest.json"
       - name: Build native Windows bootstrap (development only)
         if: hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/system-directory.node', matrix.arch)) == '' && hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/manifest.json', matrix.arch)) == ''
         run: node scripts/prepare-windows-launcher-bootstrap.mjs build
@@ -54,7 +72,17 @@ jobs:
             scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/manifest.json
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.regenerate_bootstrap
+        with:
+          name: windows-bootstrap-diagnosis-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/legacy-bootstrap/differences.json
+            ${{ runner.temp }}/legacy-bootstrap/scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}
+          if-no-files-found: error
+
   headless-contracts:
+    if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
     needs: windows-bootstrap
     name: Headless contracts (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -91,6 +119,7 @@ jobs:
         run: npm run test:native-launcher
 
   build-start:
+    if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
     needs: windows-bootstrap
     name: build + start (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -147,6 +176,7 @@ jobs:
         run: node scripts/ci-start-smoke.mjs
 
   static-checks:
+    if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
     name: lint + typecheck (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -166,6 +196,7 @@ jobs:
         run: npm run typecheck
 
   windows-x64-emulation:
+    if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
     name: SQLite and launcher (Windows ARM, Node x64)
     runs-on: windows-11-arm
     steps:
