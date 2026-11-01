@@ -1,0 +1,345 @@
+{
+  "initial": {
+    "schemaVersion": 1,
+    "revision": 0,
+    "active": null,
+    "previous": null,
+    "canRollback": false,
+    "draft": null,
+    "lastCommand": null
+  },
+  "steps": [
+    {
+      "command": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "expectedRevision": 0,
+        "action": "save-draft",
+        "draft": {
+          "profile": "interactive",
+          "source": "guided",
+          "answers": {
+            "activity": "records",
+            "interaction": "screens",
+            "platform": null
+          },
+          "step": 0
+        }
+      },
+      "state": {
+        "schemaVersion": 1,
+        "revision": 1,
+        "active": null,
+        "previous": null,
+        "canRollback": false,
+        "draft": {
+          "profile": "interactive",
+          "source": "guided",
+          "answers": {
+            "activity": "records",
+            "interaction": "screens",
+            "platform": null
+          },
+          "step": 0
+        },
+        "lastCommand": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "expectedRevision": 0,
+          "action": "save-draft",
+          "draft": {
+            "profile": "interactive",
+            "source": "guided",
+            "answers": {
+              "activity": "records",
+              "interaction": "screens",
+              "platform": null
+            },
+            "step": 0
+          }
+        }
+      }
+    },
+    {
+      "command": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "expectedRevision": 1,
+        "action": "save-draft",
+        "draft": {
+          "profile": "interactive",
+          "source": "guided",
+          "answers": {
+            "activity": "records",
+            "interaction": "screens",
+            "platform": "macos"
+          },
+          "step": 3
+        }
+      },
+      "state": {
+        "schemaVersion": 1,
+        "revision": 2,
+        "active": null,
+        "previous": null,
+        "canRollback": false,
+        "draft": {
+          "profile": "interactive",
+          "source": "guided",
+          "answers": {
+            "activity": "records",
+            "interaction": "screens",
+            "platform": "macos"
+          },
+          "step": 3
+        },
+        "lastCommand": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "expectedRevision": 1,
+          "action": "save-draft",
+          "draft": {
+            "profile": "interactive",
+            "source": "guided",
+            "answers": {
+              "activity": "records",
+              "interaction": "screens",
+              "platform": "macos"
+            },
+            "step": 3
+          }
+        }
+      }
+    },
+    {
+      "command": {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "expectedRevision": 2,
+        "action": "confirm"
+      },
+      "state": {
+        "schemaVersion": 1,
+        "revision": 3,
+        "active": {
+          "profile": "interactive",
+          "source": "guided",
+          "answers": {
+            "activity": "records",
+            "interaction": "screens",
+            "platform": "macos"
+          }
+        },
+        "previous": null,
+        "canRollback": true,
+        "draft": null,
+        "lastCommand": {
+          "id": "00000000-0000-4000-8000-000000000003",
+          "expectedRevision": 2,
+          "action": "confirm"
+        }
+      }
+    },
+    {
+      "command": {
+        "id": "00000000-0000-4000-8000-000000000004",
+        "expectedRevision": 3,
+        "action": "save-draft",
+        "draft": {
+          "profile": "agent",
+          "source": "manual",
+          "answers": {
+            "activity": null,
+            "interaction": null,
+            "platform": null
+          },
+          "step": 3
+        }
+      },
+      "state": {
+        "schemaVersion": 1,
+        "revision": 4,
+        "active": {
+          "profile": "interactive",
+          "source": "guided",
+          "answers": {
+            "activity": "records",
+            "interaction": "screens",
+            "platform": "macos"
+          }
+        },
+        "previous": null,
+        "canRollback": true,
+        "draft": {
+          "profile": "agent",
+          "source": "manual",
+          "answers": {
+            "activity": null,
+            "interaction": null,
+            "platform": null
+          },
+          "step": 3
+        },
+        "lastCommand": {
+          "id": "00000000-0000-4000-8000-000000000004",
+          "expectedRevision": 3,
+          "action": "save-draft",
+          "draft": {
+            "profile": "agent",
+            "source": "manual",
+            "answers": {
+              "activity": null,
+              "interaction": null,
+              "platform": null
+            },
+            "step": 3
+          }
+        }
+      }
+    },
+    {
+      "command": {
+        "id": "00000000-0000-4000-8000-000000000005",
+        "expectedRevision": 4,
+        "action": "discard-draft"
+      },
+      "state": {
+        "schemaVersion": 1,
+        "revision": 5,
+        "active": {
+          "profile": "interactive",
+          "source": "guided",
+          "answers": {
+            "activity": "records",
+            "interaction": "screens",
+            "platform": "macos"
+          }
+        },
+        "previous": null,
+        "canRollback": true,
+        "draft": null,
+        "lastCommand": {
+          "id": "00000000-0000-4000-8000-000000000005",
+          "expectedRevision": 4,
+          "action": "discard-draft"
+        }
+      }
+    },
+    {
+      "command": {
+        "id": "00000000-0000-4000-8000-000000000006",
+        "expectedRevision": 5,
+        "action": "save-draft",
+        "draft": {
+          "profile": "agent",
+          "source": "manual",
+          "answers": {
+            "activity": null,
+            "interaction": null,
+            "platform": null
+          },
+          "step": 3
+        }
+      },
+      "state": {
+        "schemaVersion": 1,
+        "revision": 6,
+        "active": {
+          "profile": "interactive",
+          "source": "guided",
+          "answers": {
+            "activity": "records",
+            "interaction": "screens",
+            "platform": "macos"
+          }
+        },
+        "previous": null,
+        "canRollback": true,
+        "draft": {
+          "profile": "agent",
+          "source": "manual",
+          "answers": {
+            "activity": null,
+            "interaction": null,
+            "platform": null
+          },
+          "step": 3
+        },
+        "lastCommand": {
+          "id": "00000000-0000-4000-8000-000000000006",
+          "expectedRevision": 5,
+          "action": "save-draft",
+          "draft": {
+            "profile": "agent",
+            "source": "manual",
+            "answers": {
+              "activity": null,
+              "interaction": null,
+              "platform": null
+            },
+            "step": 3
+          }
+        }
+      }
+    },
+    {
+      "command": {
+        "id": "00000000-0000-4000-8000-000000000007",
+        "expectedRevision": 6,
+        "action": "confirm"
+      },
+      "state": {
+        "schemaVersion": 1,
+        "revision": 7,
+        "active": {
+          "profile": "agent",
+          "source": "manual",
+          "answers": {
+            "activity": null,
+            "interaction": null,
+            "platform": null
+          }
+        },
+        "previous": {
+          "profile": "interactive",
+          "source": "guided",
+          "answers": {
+            "activity": "records",
+            "interaction": "screens",
+            "platform": "macos"
+          }
+        },
+        "canRollback": true,
+        "draft": null,
+        "lastCommand": {
+          "id": "00000000-0000-4000-8000-000000000007",
+          "expectedRevision": 6,
+          "action": "confirm"
+        }
+      }
+    },
+    {
+      "command": {
+        "id": "00000000-0000-4000-8000-000000000008",
+        "expectedRevision": 7,
+        "action": "rollback"
+      },
+      "state": {
+        "schemaVersion": 1,
+        "revision": 8,
+        "active": {
+          "profile": "interactive",
+          "source": "guided",
+          "answers": {
+            "activity": "records",
+            "interaction": "screens",
+            "platform": "macos"
+          }
+        },
+        "previous": null,
+        "canRollback": false,
+        "draft": null,
+        "lastCommand": {
+          "id": "00000000-0000-4000-8000-000000000008",
+          "expectedRevision": 7,
+          "action": "rollback"
+        }
+      }
+    }
+  ]
+}

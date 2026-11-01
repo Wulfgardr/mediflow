@@ -13,6 +13,24 @@ fn main() {
     let minimum = env::var("MACOSX_DEPLOYMENT_TARGET").unwrap_or_else(|_| "11.0".into());
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     build_voice(&out, &minimum);
+    println!("cargo:rerun-if-changed=src/shell/local_host/macos_preferences.m");
+    let preferences = out.join("macos-preferences.o");
+    assert!(
+        Command::new("clang")
+            .args([
+                "-fobjc-arc",
+                "-Wall",
+                "-Werror",
+                "-c",
+                "src/shell/local_host/macos_preferences.m",
+                "-o"
+            ])
+            .arg(&preferences)
+            .arg(format!("-mmacosx-version-min={minimum}"))
+            .status()
+            .unwrap()
+            .success()
+    );
     let object = out.join("chat-access.o");
     assert!(
         Command::new("clang")
@@ -38,6 +56,7 @@ fn main() {
             .arg("rcs")
             .arg(out.join("libchat_access_native.a"))
             .arg(object)
+            .arg(preferences)
             .status()
             .unwrap()
             .success()
