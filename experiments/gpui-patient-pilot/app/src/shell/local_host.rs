@@ -68,8 +68,8 @@ impl LocalAdministration {
         let secret = cx.new(|cx| {
             TextInput::new(
                 "local-host-passphrase",
-                "Passphrase dell’account",
-                "Passphrase",
+                "Frase di accesso o PIN precedente",
+                "Frase di accesso o PIN",
                 false,
                 theme,
                 cx,

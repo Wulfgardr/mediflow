@@ -125,6 +125,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     const [localExtraction, setLocalExtraction] = useState<LocalExtractionState | null>(null);
     const activeExtraction = useRef<{ attachmentId: string; sourceSnapshot: readonly Attachment[] | undefined; controller: AbortController } | null>(null);
     const activeDelete = useRef<object | null>(null);
+    const activeUploadSelection = useRef<object | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [deleteErrorId, setDeleteErrorId] = useState<string | null>(null);
     const [fileRejections, setFileRejections] = useState<string[]>([]);
@@ -145,6 +146,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             activeExtraction.current?.controller.abort();
             activeExtraction.current = null;
             activeDelete.current = null;
+            activeUploadSelection.current = null;
             setStopRequested(true);
             setExtractingId(null); setDeletingId(null);
             setSelectedId(''); setViewingId(null); setLocalExtraction(null);
@@ -157,8 +159,9 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             activeExtraction.current?.controller.abort();
             activeExtraction.current = null;
             activeDelete.current = null;
+            activeUploadSelection.current = null;
         };
-    }, [uploadQueue, currentAttachments, confirm]);
+    }, [uploadQueue]);
 
     const { data: attachments, error: listError, loading: listLoading, refresh: refreshAttachments } = useLiveQueryState(
         () => db.attachments.query({ patientId, metadataOnly: true }).toArray({ signal: db.getSessionReadSignal() }),
@@ -184,27 +187,34 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     }, [attachments, isProcessing, listError, listLoading]);
 
     const onDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
-        const possibleDuplicates = acceptedFiles.filter((file, index) =>
-            currentAttachments?.some(existing => existing.name === file.name && existing.size === file.size)
-            || acceptedFiles.slice(0, index).some(existing => existing.name === file.name && existing.size === file.size));
-        if (possibleDuplicates.length && !(await confirm({
-            title: 'Possibili documenti duplicati',
-            message: 'Un documento con lo stesso nome e la stessa dimensione è già presente o selezionato. Controlla l’elenco prima di aggiungere altre copie.',
-            confirmLabel: 'Carica altre copie',
-        })).confirmed) return;
-        const task = uploadQueue.start(acceptedFiles);
-        // Rejections belong to this selection, including mixed accepted/rejected drops.
+        if (activeUploadSelection.current) return;
+        const operation = {};
+        activeUploadSelection.current = operation;
         setFileRejections(rejectionMessages(rejectedFiles));
-        if (!task) return;
-        uploadedId.current = null;
-        if (uploadArea.current?.contains(document.activeElement)) listStatus.current?.focus();
-        const token = generation.current;
+        if (!acceptedFiles.length) { activeUploadSelection.current = null; return; }
         setIsProcessing(true); setStopRequested(false); setUploadResult(null);
         try {
+            const possibleDuplicates = acceptedFiles.filter((file, index) =>
+                currentAttachments?.some(existing => existing.name === file.name && existing.size === file.size)
+                || acceptedFiles.slice(0, index).some(existing => existing.name === file.name && existing.size === file.size));
+            if (possibleDuplicates.length && !(await confirm({
+                title: 'Possibili documenti duplicati',
+                message: 'Un documento con lo stesso nome e la stessa dimensione è già presente o selezionato. Controlla l’elenco prima di aggiungere altre copie.',
+                confirmLabel: 'Carica altre copie',
+                cancelLabel: 'Torna all’elenco',
+            })).confirmed) return;
+            if (activeUploadSelection.current !== operation) return;
+            const task = uploadQueue.start(acceptedFiles);
+            if (!task) return;
+            uploadedId.current = null;
+            if (uploadArea.current?.contains(document.activeElement)) listStatus.current?.focus();
             const result = await task;
-            if (token === generation.current) setUploadResult(result);
+            if (activeUploadSelection.current === operation) setUploadResult(result);
         } finally {
-            if (token === generation.current) setIsProcessing(false);
+            if (activeUploadSelection.current === operation) {
+                activeUploadSelection.current = null;
+                setIsProcessing(false);
+            }
         }
     }, [uploadQueue, currentAttachments, confirm]);
 
@@ -416,7 +426,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             onChange={(event) => selectSource(event.target.value)}
                             description="Cambiare documento chiude la proposta corrente, senza cancellare l’allegato o le sintesi archiviate.">
                                 <option value="">Scegli un documento</option>
-                                {currentAttachments?.map((file, index) => <option key={file.id} value={file.id}>{isPrivacyMode ? `Documento ${index + 1}` : `${file.name} · Documento ${index + 1}`}</option>)}
+                                {currentAttachments?.map((file, index) => <option key={file.id} value={file.id}>{isPrivacyMode ? `Documento ${index + 1}` : currentAttachments.some(other => other.id !== file.id && other.name === file.name) ? `${file.name} · Documento ${index + 1}` : file.name}</option>)}
                         </ChoiceField>
                         {!selectedAttachment && <p role="status" className={disclosure.hint}>{listLoading ? 'Rilettura della fonte selezionata…' : selectedId
                             ? 'La fonte selezionata non è più disponibile nell’elenco. Rileggi l’elenco o scegli un altro documento.'
