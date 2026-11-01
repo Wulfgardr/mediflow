@@ -121,7 +121,7 @@ static void entry(const char *key, CGPDFObjectRef value, void *info) {
     walk(value, ((struct WalkContext *)info)->depth + 1);
 }
 static void checkDictionary(CGPDFDictionaryRef d, size_t depth) {
-    if (present(d, "Annots") || present(d, "XFA") || present(d, "Pattern") || present(d, "SMask") || present(d, "Mask") || present(d, "Differences") || named(d,"Subtype","Type3")) {
+    if (present(d, "Annots") || present(d, "XFA") || present(d, "Pattern") || present(d, "SMask") || present(d, "Mask") || present(d, "Differences") || named(d,"Subtype","Form") || named(d,"Subtype","Type3")) {
         failure = "unsupported"; return;
     }
     CGPDFObjectRef contents;
@@ -248,6 +248,19 @@ int MFDocumentPreviewWorker(size_t page) {
                 if (!cg || !canvas([p boundsForBox:kPDFDisplayBoxMediaBox], &w, &h)) { failure = "limit"; break; }
                 CGPDFDictionaryRef dict = CGPDFPageGetDictionary(cg);
                 checkDictionary(dict, 0);
+                // Resources are inheritable page attributes. Validate the first
+                // effective dictionary, not only the page's direct entries.
+                CGPDFDictionaryRef ancestor = dict;
+                for (size_t depth = 0; ancestor && !failure; depth++) {
+                    if (depth > 32) { failure = "limit"; break; }
+                    CGPDFObjectRef resources;
+                    if (CGPDFDictionaryGetObject(ancestor, "Resources", &resources)) {
+                        walk(resources, 0); break;
+                    }
+                    CGPDFDictionaryRef parent = NULL;
+                    CGPDFDictionaryGetDictionary(ancestor, "Parent", &parent);
+                    ancestor = parent;
+                }
                 CGPDFContentStreamRef content = CGPDFContentStreamCreateWithPage(cg);
                 CFArrayRef streams = CGPDFContentStreamGetStreams(content);
                 for (CFIndex i = 0; i < CFArrayGetCount(streams) && !failure; i++) {

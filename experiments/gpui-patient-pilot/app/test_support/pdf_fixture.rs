@@ -110,3 +110,28 @@ pub fn page_with_extra_entries(entries: &[u8]) -> Vec<u8> {
         stream(b"", b"0 0 1 rg 10 10 80 40 re f"),
     ])
 }
+
+pub fn inherited_resources(font: &[u8], image: Option<Vec<u8>>) -> Vec<u8> {
+    let mut parent = b"<< /Type /Pages /Kids [3 0 R] /Count 1 /Resources << /Font << /F1 ".to_vec();
+    parent.extend_from_slice(font);
+    parent.extend_from_slice(b" >> /XObject << ");
+    if image.is_some() {
+        parent.extend_from_slice(b"/Image 5 0 R");
+    }
+    parent.extend_from_slice(b" >> >> >>");
+    let mut objects = vec![
+        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        parent,
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 60] /Contents 4 0 R >>".to_vec(),
+        stream(
+            b"",
+            if image.is_some() {
+                b"/Image Do"
+            } else {
+                b"BT /F1 12 Tf 10 25 Td (Hb 13.4) Tj ET"
+            },
+        ),
+    ];
+    objects.extend(image);
+    serialize(&objects)
+}
