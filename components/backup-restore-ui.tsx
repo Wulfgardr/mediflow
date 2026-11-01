@@ -235,8 +235,8 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                 </div>
                 <p className="mt-4 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                     <strong>Verificare</strong> controlla formato, integrità e chiave senza toccare i dati.{' '}
-                    <strong>Provare un ripristino</strong> è un passo diverso: la prova sintetica ripristina un backup in un archivio
-                    di prova e lo confronta, con <code>npm run test:backup-restore:drill</code> dalla cartella del progetto.
+                    <strong>Provare un ripristino</strong> è un passo diverso: chiedi assistenza per usare una copia separata
+                    dell’archivio e confrontare pazienti, diario e documenti dopo il recupero. Conserva l’originale e non usare l’archivio di lavoro per la prova.
                 </p>
             </section>
 

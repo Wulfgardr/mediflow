@@ -1,7 +1,7 @@
 # MediFlow: client Rust / GPUI collegato
 
 Il comando normale apre il client nativo collegato al servizio MediFlow.
-La finestra, lo stato di lavoro, lo sblocco v3, la decrittazione e il trasporto
+La finestra, lo stato di lavoro, lo sblocco, la decrittazione e il trasporto
 sono Rust. Il servizio esistente conserva autorizzazione, SQLite, controllo
 delle versioni e audit. Il percorso `--demo` mantiene separatamente la prima
 prova con cinque pazienti inventati in memoria.
@@ -30,12 +30,24 @@ riceve passphrase o token dalla riga di comando.
 
 Occorrono un servizio candidato con protocollo network **1.13 o successivo
 nella serie 1.x**, che dichiari `scope.requestBinding: expected-ambulatory-id-v1`
-nell'identità, un account con sblocco **v3** e un abbinamento ordinario del
+nell'identità, un account con frase di accesso **v3** o PIN precedente
+con involucro **v1/v2**, e un abbinamento ordinario del
 dispositivo con le capability dei percorsi desiderati. Le piattaforme sono
 esplicite: `macos`, `windows`, `linux`; i valori Apple già ammessi restano
-`ios` e `ipados`. La release 0.9.0 con sblocco precedente non è un host
-compatibile per questo accesso nativo v3. Il confronto con quella release
-è una prova distinta di lettura tramite il suo client Web.
+`ios` e `ipados`. Il servizio deve essere aggiornato al protocollo richiesto:
+il supporto al PIN non rende compatibile un host con protocollo precedente.
+
+Per una frase di accesso usa **Accedi all’archivio**. Per il PIN puoi usare
+**Accedi con il PIN precedente**. Se il PIN è lungo quanto una frase di
+accesso, il comando normale non lo invia: inseriscilo di nuovo e usa il
+comando dedicato solo se è il tuo PIN. La frase di accesso viene derivata
+nel client; il PIN precedente segue il contratto Web esistente.
+
+L’accesso con PIN non richiede un cambio di credenziale. Per la gestione
+che richiede v3, la finestra indica il percorso esatto nelle impostazioni
+Web: Accesso, Passa dal PIN alla passphrase, salvataggio del kit e della
+chiave separata, conferma e nuovo accesso. Il client non esegue questa
+adozione e non introduce un altro servizio di scrittura.
 
 Ogni richiesta con un ambulatorio selezionato porta anche
 `x-mediflow-expected-ambulatory-id`, codificato come il relativo cookie.
@@ -324,7 +336,7 @@ soltanto da un comando esplicito dell'operatore.
 | Componente | Responsabilità |
 | --- | --- |
 | `client` | Macchina a stati indipendente da GPUI per bozza, revisione, richieste correlate e rilettura delle note. |
-| `transport` | Autenticazione paired v3, chiavi temporanee, TLS, DTO, letture e scritture nominate sulle route esistenti. |
+| `transport` | Autenticazione paired v3 e PIN precedente, chiavi temporanee, TLS, DTO, letture e scritture nominate sulle route esistenti. |
 | `app/src/shell.rs` | Finestra collegata, navigazione, ambulatorio, moduli clinici e lavoro asincrono. |
 | `app/src/shell/who_lookup.rs`, `transport/src/who.rs` | Consultazione WHO esplicita e parser del contratto paired v2, senza autorità o fonti alternative. |
 | `app/src/text_input.rs` | Input locale Unicode, IME, selezione e modalità segreta. |

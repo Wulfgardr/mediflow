@@ -87,6 +87,8 @@ fn open_profile(
 
 fn runtime_error(phase: &'static str, error: RuntimeError) -> ProbeError {
     let reason = match error {
+        RuntimeError::LegacyAccessNeedsWeb => "legacy-access-needs-web",
+        RuntimeError::PinConfirmationRequired => "pin-confirmation-required",
         RuntimeError::UnsupportedUnlock => "unsupported-unlock",
         RuntimeError::UnsupportedProtocol => "unsupported-protocol",
         RuntimeError::Authentication => "authentication",

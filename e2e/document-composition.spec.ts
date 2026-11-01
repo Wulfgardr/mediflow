@@ -220,3 +220,23 @@ test('Documenti: PDF con immagine oltre soglia rifiuta tutta la pagina; PDF norm
         await page.keyboard.press('Escape');
     }
 });
+
+test('Documenti: un duplicato richiede una scelta e le copie restano distinguibili', async ({ page }) => {
+    const { docs, names } = await documents(page);
+    const source = { name: names[0], mimeType: 'text/plain', buffer: Buffer.from('Originale sintetico A. Nessun dato reale.') };
+    const rows = docs.locator('tbody[data-document-id]');
+    await expect(rows).toHaveCount(2);
+    await docs.locator('input[type="file"]').setInputFiles(source);
+    const dialog = page.getByRole('dialog', { name: 'Possibili documenti duplicati' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Torna all’elenco' }).click();
+    await expect(rows).toHaveCount(2);
+    await docs.locator('input[type="file"]').setInputFiles(source);
+    await dialog.getByRole('button', { name: 'Carica altre copie' }).click();
+    await expect(rows).toHaveCount(3);
+    await expect(docs.getByText(/Possibile duplicato: stesso nome e dimensione/u)).toHaveCount(2);
+    const choices = await docs.getByRole('combobox', { name: /^Documento da sintetizzare/u }).locator('option').allTextContents();
+    const copies = choices.filter(label => label.includes(names[0]));
+    expect(copies).toHaveLength(2);
+    expect(new Set(copies).size).toBe(2);
+});
