@@ -29,6 +29,9 @@ impl LocalHostAccess {
             return Err(RuntimeError::InvalidInput);
         }
         let checked = self.request(Method::GET, &["api", "auth", "check"], None, false)?;
+        if checked["unlock"]["credential"] == "pin" {
+            return Err(RuntimeError::LegacyAccessNeedsWeb);
+        }
         if checked["status"] != "ok"
             || checked["isSetup"] != true
             || checked["archiveGeneration"] != self.generation

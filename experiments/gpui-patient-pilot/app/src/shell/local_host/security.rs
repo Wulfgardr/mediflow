@@ -75,7 +75,7 @@ impl ClinicalApp {
             ))
             .child(text!(user.map(|u| u.username.clone()).unwrap_or_default()))
             .child(text!(
-                "Il blocco richiede la passphrase al prossimo accesso."
+                "Il blocco richiede la frase di accesso o il PIN precedente al prossimo accesso."
             ))
             .child(
                 button(

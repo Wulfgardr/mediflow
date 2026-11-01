@@ -7,7 +7,7 @@ use reqwest::{
     header::{COOKIE, HeaderMap, HeaderValue, SET_COOKIE},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::{net::IpAddr, sync::OnceLock, time::Duration};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -168,12 +168,22 @@ impl RuntimeClient {
         &self.base_url
     }
 
-    /// Unlocks v3 locally. Only the domain-separated verifier crosses the wire.
+    /// Uses the existing native login contract for passphrase and legacy PIN accounts.
     pub fn login(
         &self,
         pairing: PairingCredentials,
         username: &str,
         passphrase: &str,
+    ) -> Result<RuntimeSession> {
+        self.login_with_pin_confirmation(pairing, username, passphrase, false)
+    }
+
+    pub fn login_with_pin_confirmation(
+        &self,
+        pairing: PairingCredentials,
+        username: &str,
+        passphrase: &str,
+        pin_confirmed: bool,
     ) -> Result<RuntimeSession> {
         let username = username.trim();
         if username.is_empty() || username.len() > 256 {
@@ -216,20 +226,34 @@ impl RuntimeClient {
             .filter(|v| !v.is_empty() && v.len() <= 256)
             .ok_or(RuntimeError::InvalidResponse)?;
         let unlock = check.unlock.ok_or(RuntimeError::UnsupportedUnlock)?;
-        if unlock.credential != "passphrase" || unlock.kdf_version != Some(3) {
-            return Err(RuntimeError::UnsupportedUnlock);
-        }
-        let salt = unlock.salt.ok_or(RuntimeError::InvalidResponse)?;
-        let material = crypto::derive_v3(passphrase, &salt)?;
+        let salt = unlock.salt;
+        let material = match (unlock.credential.as_str(), unlock.kdf_version) {
+            ("passphrase", Some(3)) => Some(crypto::derive_v3(
+                passphrase,
+                salt.as_deref().ok_or(RuntimeError::InvalidResponse)?,
+            )?),
+            ("pin", None) => {
+                crypto::validate_pin(passphrase)?;
+                if crypto::normalize_passphrase(passphrase).is_ok() && !pin_confirmed {
+                    return Err(RuntimeError::PinConfirmationRequired);
+                }
+                None
+            }
+            _ => return Err(RuntimeError::UnsupportedUnlock),
+        };
         #[derive(Serialize)]
         struct Login<'a> {
             username: &'a str,
-            verifier: &'a str,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            verifier: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            password: Option<&'a str>,
         }
         let body = Zeroizing::new(
             serde_json::to_vec(&Login {
                 username,
-                verifier: &material.verifier,
+                verifier: material.as_ref().map(|material| material.verifier.as_str()),
+                password: material.is_none().then_some(passphrase),
             })
             .map_err(|_| RuntimeError::InvalidInput)?,
         );
@@ -260,13 +284,16 @@ impl RuntimeClient {
                 .map_err(|_| RuntimeError::InvalidResponse)?;
             if !login.success
                 || login.user.archive_generation != generation
-                || login.salt != salt
+                || salt.as_ref().is_some_and(|salt| &login.salt != salt)
                 || login.user.username != username
             {
                 return Err(RuntimeError::InvalidResponse);
             }
             validate_id(&login.user.id).map_err(|_| RuntimeError::InvalidResponse)?;
-            let master = crypto::unwrap_v3(&login.encrypted_master_key, &material.kek)?;
+            let master = match &material {
+                Some(material) => crypto::unwrap_v3(&login.encrypted_master_key, &material.kek)?,
+                None => crypto::unwrap_pin(&login.encrypted_master_key, passphrase, &login.salt)?,
+            };
             Ok((login.user, master))
         })();
         match admitted {
@@ -495,22 +522,15 @@ impl RuntimeClient {
         if !self.is_local_bootstrap_origin() {
             return Err(RuntimeError::Forbidden);
         }
-        let encoded = body
-            .map(serde_json::to_vec)
-            .transpose()
-            .map_err(|_| RuntimeError::InvalidInput)?
-            .map(Zeroizing::new);
         let archive = path.starts_with(&["api", "system", "backup-restore"]);
-        if encoded.as_ref().is_some_and(|v| {
-            v.len()
-                > if archive || reference_json_path(path) {
-                    JSON_LIMIT
-                } else {
-                    4096
-                }
-        }) {
-            return Err(RuntimeError::TooLarge);
-        }
+        let request_limit = if archive || reference_json_path(path) {
+            JSON_LIMIT
+        } else {
+            4096
+        };
+        let encoded = body
+            .map(|value| encode_private_json(value, request_limit))
+            .transpose()?;
         http_runtime().block_on(self.context.run(
             async {
                 let mut request = self
@@ -521,7 +541,7 @@ impl RuntimeClient {
                     .header("sec-fetch-site", "same-origin")
                     .header("content-type", "application/json");
                 if let Some(body) = encoded {
-                    request = request.body(body.to_vec());
+                    request = request.body(bytes::Bytes::from_owner(body));
                 }
                 if matches!(
                     path,
@@ -1067,15 +1087,25 @@ pub(crate) fn authenticate_web_p3(
         if check["status"] != "ok"
             || check["isSetup"] != true
             || check["archiveGeneration"] != user.archive_generation
-            || check["unlock"]["credential"] != "passphrase"
-            || check["unlock"]["kdfVersion"] != 3
         {
             return Err(RuntimeError::UnsupportedUnlock);
         }
-        let salt = check["unlock"]["salt"]
-            .as_str()
-            .ok_or(RuntimeError::InvalidResponse)?;
-        let material = crypto::derive_v3(passphrase, salt)?;
+        let material = match check["unlock"]["credential"].as_str() {
+            Some("passphrase") if check["unlock"]["kdfVersion"] == 3 => Some(crypto::derive_v3(
+                passphrase,
+                check["unlock"]["salt"]
+                    .as_str()
+                    .ok_or(RuntimeError::InvalidResponse)?,
+            )?),
+            Some("pin") if check["unlock"]["kdfVersion"].is_null() => {
+                crypto::validate_pin(passphrase)?;
+                if crypto::normalize_passphrase(passphrase).is_ok() {
+                    return Err(RuntimeError::LegacyAccessNeedsWeb);
+                }
+                None
+            }
+            _ => return Err(RuntimeError::UnsupportedUnlock),
+        };
         let mut headers = headers.clone();
         let etag = checked
             .headers
@@ -1094,7 +1124,10 @@ pub(crate) fn authenticate_web_p3(
         }
         headers.insert("if-match", sensitive_header(etag)?);
         headers.insert("idempotency-key", sensitive_header(&operation_uuid()?)?);
-        let mut body = serde_json::json!({"username":user.username,"verifier":&*material.verifier});
+        let mut body = match &material {
+            Some(material) => json!({"username":user.username,"verifier":&*material.verifier}),
+            None => json!({"username":user.username,"password":passphrase}),
+        };
         possibly_issued = true;
         let logged = client.dedicated_web_raw_observing_headers(
             Method::POST,
@@ -1111,8 +1144,10 @@ pub(crate) fn authenticate_web_p3(
                 possibly_issued = cookie.is_some() || (200..300).contains(&status);
             },
         );
-        if let Some(Value::String(verifier)) = body.get_mut("verifier") {
-            verifier.zeroize();
+        for field in ["verifier", "password"] {
+            if let Some(Value::String(secret)) = body.get_mut(field) {
+                secret.zeroize();
+            }
         }
         let logged = logged?;
         if cookie.is_none() {
@@ -1419,6 +1454,177 @@ mod tests {
             sent: std::sync::atomic::AtomicBool::new(false),
         }
     }
+    #[test]
+    fn local_pin_unknown_profile_never_dispatches_a_login() {
+        for local_client in [true, false] {
+            let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let client = RuntimeClient::new(RuntimeConfig {
+                base_url: format!("http://{}", listener.local_addr().unwrap()),
+                tls_pin_sha256: None,
+            })
+            .unwrap();
+            let finished = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let finished_on_server = finished.clone();
+            let worker = std::thread::spawn(move || {
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                assert!(bootstrap_request(&mut stream).starts_with("GET /api/auth/check "));
+                bootstrap_reply(
+                    &mut stream,
+                    200,
+                    &json!({"status":"ok","isSetup":true,"archiveGeneration":"generation","unlock":{"credential":"pin","kdfVersion":99}}),
+                    "ETag: \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\r\n",
+                );
+                listener.set_nonblocking(true).unwrap();
+                let deadline = std::time::Instant::now() + Duration::from_secs(5);
+                loop {
+                    match crate::test_loopback::accept(&listener) {
+                        Ok((mut stream, _)) => {
+                            let request = bootstrap_request(&mut stream);
+                            bootstrap_reply(&mut stream, 401, &json!({"error":"denied"}), "");
+                            return Some(request);
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            if finished_on_server.load(std::sync::atomic::Ordering::SeqCst) {
+                                return None;
+                            }
+                            assert!(std::time::Instant::now() < deadline);
+                            std::thread::sleep(Duration::from_millis(1));
+                        }
+                        Err(error) => panic!("{error}"),
+                    }
+                }
+            });
+            let user: RuntimeUser = serde_json::from_value(json!({"id":"user","username":"synthetic","role":"admin","archiveGeneration":"generation"})).unwrap();
+            let (cookie, result, issued) =
+                authenticate_web_p3(&client, &user, HeaderMap::new(), "1357", local_client);
+            finished.store(true, std::sync::atomic::Ordering::SeqCst);
+            let request = worker.join().unwrap();
+            assert_eq!(result, Err(RuntimeError::UnsupportedUnlock));
+            assert!(cookie.is_none());
+            assert!(!issued);
+            assert!(request.is_none());
+        }
+    }
+
+    #[test]
+    fn long_pin_is_not_sent_without_its_own_confirmation() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let client = RuntimeClient::new(RuntimeConfig {
+            base_url: format!("http://{}", listener.local_addr().unwrap()),
+            tls_pin_sha256: None,
+        })
+        .unwrap();
+        let worker = std::thread::spawn(move || {
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+            assert!(bootstrap_request(&mut stream).starts_with("GET /api/auth/check "));
+            bootstrap_reply(
+                &mut stream,
+                200,
+                &json!({"status":"ok","isSetup":true,"archiveGeneration":"generation","unlock":{"credential":"pin"}}),
+                "",
+            );
+        });
+        assert!(matches!(
+            client.login(
+                PairingCredentials::new("paired-test", "t".repeat(64)).unwrap(),
+                "admin",
+                "Long synthetic PIN only"
+            ),
+            Err(RuntimeError::PinConfirmationRequired)
+        ));
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn legacy_pin_login_uses_existing_route_and_web_wrapping() {
+        for version in [1, 2, 3] {
+            let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let client = RuntimeClient::new(RuntimeConfig {
+                base_url: url,
+                tls_pin_sha256: None,
+            })
+            .unwrap();
+            let worker = std::thread::spawn(move || {
+                for step in 0..3 {
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                    let request = bootstrap_request(&mut stream);
+                    match step {
+                        0 => bootstrap_reply(
+                            &mut stream,
+                            200,
+                            &json!({"status":"ok","isSetup":true,"archiveGeneration":"generation","unlock":{"credential":"pin"}}),
+                            "",
+                        ),
+                        1 => {
+                            assert!(request.starts_with("POST /api/auth/native/login "));
+                            let body: Value =
+                                serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap())
+                                    .unwrap();
+                            assert_eq!(
+                                body,
+                                json!({"username":"admin","password":if version == 3 {"Long synthetic PIN only"} else {"1357"}})
+                            );
+                            let vector: Value = serde_json::from_str(if version == 1 {
+                                include_str!(
+                                    "../../../../native/contracts/crypto-golden-vectors.v1.json"
+                                )
+                            } else {
+                                include_str!(
+                                    "../../../../native/contracts/crypto-golden-vectors.v2.json"
+                                )
+                            })
+                            .unwrap();
+                            let long_wrapped = json!(
+                                "v2:BwcHBwcHBwcHBwcHmEksoiU6l+1xqibGmdLC45Ln/lmw1UmYDQYAbExxdBIv1MP5vGBAsik7bdK6jXce"
+                            );
+                            let wrapped = if version == 3 {
+                                &long_wrapped
+                            } else if version == 1 {
+                                &vector["vectors"]["wrappedMasterKeyB64"]
+                            } else {
+                                &vector["vectors"]["wrappedMasterKeyVersioned"]
+                            };
+                            bootstrap_reply(
+                                &mut stream,
+                                200,
+                                &json!({"success":true,"id":"synthetic-admin","username":"admin","role":"admin","displayName":"Prova","ambulatoryName":"Prova","archiveGeneration":"generation","salt":"AAECAwQFBgcICQoLDA0ODw==","encryptedMasterKey":wrapped}),
+                                &format!(
+                                    "Set-Cookie: mediflow_session={}; Path=/; HttpOnly\r\n",
+                                    "a".repeat(64)
+                                ),
+                            );
+                        }
+                        _ => {
+                            assert!(request.starts_with("GET /api/v1/network/capabilities "));
+                            bootstrap_reply(
+                                &mut stream,
+                                200,
+                                &json!({"protocolVersion":"1.13.0","operatingMode":"network-home-base","capabilities":[],"hostPorts":serde_json::from_str::<Value>(include_str!("../tests/fixtures/host-ports.json")).unwrap()}),
+                                "",
+                            );
+                        }
+                    }
+                }
+            });
+            let session = client
+                .login_with_pin_confirmation(
+                    PairingCredentials::new("paired-test", "t".repeat(64)).unwrap(),
+                    "admin",
+                    if version == 3 {
+                        "Long synthetic PIN only"
+                    } else {
+                        "1357"
+                    },
+                    version == 3,
+                )
+                .unwrap();
+            assert_eq!(session.user().username, "admin");
+            session.lock();
+            worker.join().unwrap();
+        }
+    }
+
     #[test]
     fn governance_reports_are_not_held_to_the_authentication_limit() {
         for path in [

@@ -43,9 +43,9 @@ export function RecoveryBackupUI({ primary = true }: { primary?: boolean }) {
         </div>
         {message && <p role="status">{message}</p>}
         <Disclosure title="Recupero su un computer nuovo">
-            <p className="mt-3">Non completare il primo avvio. Chiudi MediFlow, usa un volume cifrato e recupera in una cartella locale vuota con il comando seguente dalla cartella del programma. Il comando chiede la chiave senza mostrarla. Poi avvia MediFlow con la stessa cartella dati e scegli «Recupera con kit e chiave» per impostare una nuova passphrase.</p>
-            <code className="mt-3 block overflow-x-auto">npm run recovery:restore -- --backup /percorso/backup.mediflow-recovery --kit /percorso/kit.json --data-dir /percorso/archivio-vuoto --source-retired</code>
-            <p className="mt-3">L’opzione finale conferma che il vecchio archivio non sarà più usato. Se recuperi il computer originale, ritiralo prima di lavorare sul nuovo: il programma non può impedire l’uso di una copia su un altro computer. I dispositivi abbinati devono essere abbinati di nuovo.</p>
+            <p className="mt-3">Chiedi assistenza per il recupero sul nuovo computer. Tieni pronti il backup completo e il kit corrispondente; conserva la chiave separata e inseriscila personalmente quando viene richiesta. Non completare il primo avvio di MediFlow prima del ripristino.</p>
+            <p className="mt-3">Chiudi MediFlow su entrambi i computer. Il backup deve essere ripristinato in una cartella locale vuota, su un volume cifrato. Dopo il ripristino, apri MediFlow su quell’archivio e scegli «Recupera con kit e chiave» per impostare una nuova passphrase.</p>
+            <p className="mt-3">Prima di proseguire, conferma a chi ti assiste che il vecchio archivio non sarà più usato. Se recuperi il computer originale, ritiralo prima di lavorare sul nuovo: il programma non può impedire l’uso di una copia su un altro computer. I dispositivi abbinati devono essere abbinati di nuovo.</p>
         </Disclosure>
     </section>;
 }
