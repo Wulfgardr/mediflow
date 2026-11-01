@@ -104,7 +104,14 @@
     "package": "hayro-interpret@0.8.0",
     "sha256": "469d87b5fa48f8aaf69e25f4fcac3a309c97dbb7d561b917638abdb640e004d9",
     "url": "https://raw.githubusercontent.com/LaurenzV/hayro/ea9c81dc70cde40c64205986fdcfcd481fe934d8/hayro-interpret/assets/CGATS_LICENSE.txt",
-    "note": "CC0 notice for the embedded CGATS color profile. The package and bundled font licenses are collected from the crate separately."
+    "note": "CC0 notice for the embedded CGATS color profile, with the package MIT permission text. Bundled font notices are collected from the crate separately.",
+    "license_texts": [
+      {
+        "file": "hayro-interpret-0.8.0-LICENSE-MIT.txt",
+        "sha256": "51b50e6120c344dcc146bbd6375ca1c78e079d97c8bea76e67a53d6ff0efebac",
+        "url": "https://raw.githubusercontent.com/LaurenzV/hayro/ea9c81dc70cde40c64205986fdcfcd481fe934d8/hayro-interpret/LICENSE-MIT"
+      }
+    ]
   },
   {
     "file": "objc2-terms-MIT.txt",
