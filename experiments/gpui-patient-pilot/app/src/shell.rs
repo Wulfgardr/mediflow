@@ -5582,7 +5582,10 @@ impl Render for ClinicalApp {
             )
             .on_action(cx.listener(|this, _: &Review, window, cx| this.review_form(window, cx)))
             .on_action(cx.listener(|this, _: &Escape, window, cx| {
-                if this.local_host.command_visible() {
+                if this.local_host.clinical_command_visible()
+                    || (this.area == Area::Settings
+                        && this.local_host.page_command_visible(this.settings_page))
+                {
                     this.cancel_local_command(window, cx);
                     return;
                 }

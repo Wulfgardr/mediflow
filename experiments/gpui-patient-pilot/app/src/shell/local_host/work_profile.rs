@@ -12,14 +12,6 @@ pub(super) struct WorkProfileArea {
     rollback_review: bool,
     message: Option<String>,
 }
-impl WorkProfileArea {
-    pub(super) fn has_draft(&self) -> bool {
-        self.draft
-            .as_ref()
-            .is_some_and(|d| self.snapshot.as_ref().and_then(|s| s.draft.as_ref()) != Some(d))
-            || self.rollback_review
-    }
-}
 impl ClinicalApp {
     pub(in crate::shell) fn ensure_work_profile_loaded(&mut self, cx: &mut Context<Self>) {
         let area = &self.local_host.work_profile;
@@ -442,6 +434,140 @@ impl ClinicalApp {
 mod tests {
     use super::*;
     #[gpui::test]
+    fn page_drafts_survive_patient_navigation_and_clinical_threshold(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(bind_keys);
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../transport/tests/fixtures/work-profile.json"
+        ))
+        .unwrap();
+        let initial: WorkProfileState = serde_json::from_value(fixture["initial"].clone()).unwrap();
+        let draft = WorkProfileDraft {
+            profile: WorkProfile::Agent,
+            source: WorkProfileSource::Manual,
+            answers: WorkProfileAnswers::default(),
+            step: 3,
+        };
+        let document = Arc::new(
+            access
+                .prepare_prosthetics_document(
+                    "source-synthetic",
+                    &"a".repeat(64),
+                    "originale-sintetico.txt",
+                    b"Synthetic reference only",
+                    None,
+                )
+                .unwrap(),
+        );
+        for case in [
+            "work-profile",
+            "prosthetics-document",
+            "reference-preview",
+            "who-consent",
+        ] {
+            let (view, cx) =
+                cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+            view.update(cx, |app, cx| {
+                app.session = Some(host.session.clone());
+                app.scope = Some("scope-a".into());
+                app.area = Area::Settings;
+                app.settings_page = if case == "work-profile" {
+                    SettingsPage::Profile
+                } else {
+                    SettingsPage::References
+                };
+                app.local_host.authority = Authority::Open(access.clone());
+                match case {
+                    "work-profile" => {
+                        app.local_host.work_profile.snapshot = Some(initial.clone());
+                        app.local_host.work_profile.draft = Some(draft.clone());
+                    }
+                    "prosthetics-document" => {
+                        app.local_host.references.document = Some(document.clone())
+                    }
+                    "reference-preview" => {
+                        app.local_host.references.preview =
+                            Some(Arc::new(access.prepare_aifa_update().unwrap()))
+                    }
+                    "who-consent" => app.local_host.references.who_consent = true,
+                    _ => unreachable!(),
+                }
+                app.navigate(Area::Patients, cx);
+                assert_eq!(app.area, Area::Patients, "{case}");
+                app.select_patient("patient-a", true, cx);
+            });
+            cx.run_until_parked();
+            cx.update_window_entity(&view, |app, window, cx| {
+                app.open_form(FormKind::Notes, window, cx)
+            });
+            let ids = rendered_command::button_ids(|| notes_recovery_tests::draw(cx));
+            assert!(
+                ids.contains(&"clinical-workspace-review-save".to_owned()),
+                "{case}"
+            );
+            cx.update_window_entity(&view, |app, window, cx| {
+                let editor = app.form.as_ref().unwrap().fields[0].editor.clone();
+                editor.update(cx, |input, cx| input.focus_and_select(window, cx));
+            });
+            cx.simulate_input("Bozza clinica inventata");
+            cx.run_until_parked();
+            cx.update_window_entity(&view, |app, window, cx| app.review_form(window, cx));
+            notes_recovery_tests::draw(cx);
+            view.read_with(cx, |app, _| {
+                assert!(
+                    app.form.as_ref().unwrap().state == FormState::Review,
+                    "{case}"
+                )
+            });
+            cx.simulate_keystrokes("escape");
+            notes_recovery_tests::draw(cx);
+            view.read_with(cx, |app, _| {
+                assert!(
+                    app.form.as_ref().unwrap().state == FormState::Draft,
+                    "{case}"
+                )
+            });
+            host.plan("GET /api/auth/profile").send((200,serde_json::json!({"operation":"account-profile.read.v1","contractVersion":1,"userId":"synthetic-user","username":"synthetic","displayName":"Medico inventato","ambulatoryName":"Studio sintetico","profileVersion":"p1:synthetic","archiveGeneration":"synthetic-generation"}))).unwrap();
+            host.plan("GET /api/v1/network/ai-runtime")
+                .send((404, serde_json::json!({})))
+                .unwrap();
+            view.update(cx, |app, cx| {
+                assert!(app.form.as_ref().unwrap().kind == FormKind::Notes, "{case}");
+                app.finish_discard(Discard::Form, cx);
+                app.navigate(Area::Settings, cx);
+                assert_eq!(app.area, Area::Settings, "{case}");
+                match case {
+                    "work-profile" => {
+                        assert_eq!(app.local_host.work_profile.draft.as_ref(), Some(&draft))
+                    }
+                    "prosthetics-document" => assert!(Arc::ptr_eq(
+                        app.local_host.references.document.as_ref().unwrap(),
+                        &document
+                    )),
+                    "reference-preview" => assert!(app.local_host.references.preview.is_some()),
+                    "who-consent" => assert!(app.local_host.references.who_consent),
+                    _ => unreachable!(),
+                }
+            });
+            notes_recovery_tests::draw(cx);
+        }
+        assert!(
+            !host.routes().iter().any(
+                |route| route.starts_with("PUT ") || route.starts_with("POST /api/prosthetics")
+            )
+        );
+    }
+    #[gpui::test]
     fn work_profile_draws_persisted_preview_and_guards_unsaved_confirmation_and_lock(
         cx: &mut gpui::TestAppContext,
     ) {
@@ -483,7 +609,10 @@ mod tests {
             app.save_work_profile(WorkProfileAction::Confirm, cx);
             assert!(!app.local_host.work_profile.busy);
             assert!(app.local_host.work_profile.message.is_some());
-            assert!(app.local_host.work_profile.has_draft());
+            assert_ne!(
+                app.local_host.work_profile.draft,
+                app.local_host.work_profile.snapshot.as_ref().unwrap().draft
+            );
             app.withdraw_local_host(cx);
             assert!(app.local_host.work_profile.draft.is_none());
             assert!(app.local_host.work_profile.snapshot.is_none());
