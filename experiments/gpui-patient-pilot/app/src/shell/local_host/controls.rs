@@ -1,9 +1,15 @@
-use super::governance::{fact, section_state};
+use super::governance::section_state;
 use super::*;
 use mediflow_runtime_client::{
     AiLocalState, AiRuntimeStatus, ControlsSnapshot, WhoReadiness, WhoReadinessStatus,
 };
 use serde_json::Value;
+
+fn fact(label: &str, value: impl AsRef<str>, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(SharedString::from(label.to_owned()))
+        .child(super::governance::fact(label, value, theme))
+}
 
 #[derive(Default)]
 pub(super) struct ControlsArea {
@@ -99,37 +105,50 @@ fn compliance(theme: Theme) -> Div {
     let mut pane = div().flex().flex_col().gap(px(16.))
         .child(section("controls-compliance", "Evidenze e conformità", theme))
         .child(text!("Inventario di evidenze, non attestazione. Lo stato legale non è valutato. Applicabilità, ruoli, adempimenti e certificazioni richiedono una valutazione del deployment."));
-    for row in inventory["records"].as_array().expect("inventory records") {
-        pane = pane.child(fields(
-            row,
-            &[
-                ("label", "Ambito"),
-                ("summary", "Evidenze"),
-                ("limitation", "Limite"),
-                ("owner", "Responsabile"),
-            ],
-            theme,
-        ));
+    for (index, row) in inventory["records"]
+        .as_array()
+        .expect("inventory records")
+        .iter()
+        .enumerate()
+    {
+        let mut record = div()
+            .id(SharedString::from(format!("controls-evidence-{index}")))
+            .flex()
+            .flex_col()
+            .gap(px(8.))
+            .child(fields(
+                row,
+                &[
+                    ("label", "Ambito"),
+                    ("summary", "Evidenze"),
+                    ("limitation", "Limite"),
+                    ("owner", "Responsabile"),
+                ],
+                theme,
+            ));
         let status = match row["status"].as_str() {
             Some("source_evidence") => "Evidenza nel sorgente",
             Some("source_evidence_with_limit") => "Evidenza con limite esplicito",
             _ => "Valutazione esterna necessaria",
         };
-        pane = pane.child(fact("Stato", status, theme));
-        for source in row["evidence"].as_array().expect("evidence") {
-            pane = pane.child(fact(
-                "Fonte nel repository",
-                source.as_str().unwrap_or("Non indicata"),
-                theme,
-            ));
+        record = record.child(fact("Stato", status, theme));
+        for (index, source) in row["externalReferences"]
+            .as_array()
+            .expect("references")
+            .iter()
+            .enumerate()
+        {
+            record = record.child(
+                div()
+                    .id(SharedString::from(format!("official-reference-{index}")))
+                    .child(fields(
+                        source,
+                        &[("label", "Fonte ufficiale"), ("href", "Indirizzo")],
+                        theme,
+                    )),
+            );
         }
-        for source in row["externalReferences"].as_array().expect("references") {
-            pane = pane.child(fields(
-                source,
-                &[("label", "Fonte ufficiale"), ("href", "Indirizzo")],
-                theme,
-            ));
-        }
+        pane = pane.child(record);
     }
     pane
 }
@@ -216,46 +235,24 @@ impl ClinicalApp {
         if let Some(services) = &self.local_host.controls.services {
             pane = pane.child(services_view(services, theme));
         }
-        pane = pane.child(section("controls-updates","Aggiornamenti e revisione",theme))
-            .child(text!("Informazioni del manifest locale. La lettura non cerca release in rete e non installa aggiornamenti."));
-        for (id, result, keys) in [
-            (
-                "controls-updates-error",
-                &snapshot.updates,
+        pane = pane.child(section("controls-updates","Versione e aggiornamenti",theme))
+            .child(text!("La versione e le novità sono quelle indicate su questo computer. Non sono stati cercati aggiornamenti in rete."));
+        if let Some(error) = section_state("controls-updates-error", &snapshot.updates, theme) {
+            pane = pane.child(error);
+        }
+        if let Ok(value) = &snapshot.updates {
+            pane = pane.child(fields(
+                value,
                 &[
                     ("currentVersion", "Versione corrente"),
                     ("availableVersion", "Versione segnalata"),
                     ("updateAvailable", "Aggiornamento segnalato"),
-                    ("source", "Fonte"),
-                    ("channel", "Canale"),
                     ("checkedAt", "Lettura"),
-                    ("changelogTitle", "Changelog"),
+                    ("changelogTitle", "Novità"),
                     ("updateUrl", "Indirizzo aggiornamento"),
-                ][..],
-            ),
-            (
-                "controls-revision-error",
-                &snapshot.revision,
-                &[
-                    ("revision", "Revisione host"),
-                    ("branch", "Ramo host"),
-                    ("sourceFingerprint", "Impronta sorgente"),
-                    ("fingerprint", "Impronta build"),
-                    ("worktreeHash", "Impronta checkout"),
-                ][..],
-            ),
-        ] {
-            if let Some(error) = section_state(id, result, theme) {
-                pane = pane.child(error);
-            }
-            if let Ok(value) = result {
-                pane = pane.child(fields(value, keys, theme));
-            }
-        }
-        if let Ok(value) = &snapshot.updates {
-            for note in value["notes"].as_array().into_iter().flatten() {
-                pane = pane.child(fact("Nota", note.as_str().unwrap_or("Non indicata"), theme));
-            }
+                ],
+                theme,
+            ));
         }
         pane = pane.child(section("controls-audit","Audit operativo",theme))
             .child(text!("Ultimi eventi restituiti dal servizio, massimo 50. Questa finestra non rappresenta l’intero storico. Solo gli amministratori possono leggere l’audit."));
@@ -267,23 +264,27 @@ impl ClinicalApp {
             if rows.is_empty() {
                 pane = pane.child(fact("Eventi", "Nessun evento restituito", theme));
             }
-            for row in rows {
-                pane = pane.child(fields(
-                    row,
-                    &[
-                        ("eventId", "Evento"),
-                        ("eventType", "Tipo"),
-                        ("occurredAt", "Data"),
-                        ("outcome", "Esito"),
-                        ("actorType", "Tipo attore"),
-                        ("actorRef", "Attore"),
-                        ("subjectType", "Tipo oggetto"),
-                        ("subjectRef", "Oggetto"),
-                        ("sourceSurface", "Superficie"),
-                        ("requestId", "Richiesta"),
-                    ],
-                    theme,
-                ));
+            for (index, row) in rows.iter().enumerate() {
+                pane = pane.child(
+                    div()
+                        .id(SharedString::from(format!("controls-audit-{index}")))
+                        .child(fields(
+                            row,
+                            &[
+                                ("eventId", "Evento"),
+                                ("eventType", "Tipo"),
+                                ("occurredAt", "Data"),
+                                ("outcome", "Esito"),
+                                ("actorType", "Tipo attore"),
+                                ("actorRef", "Attore"),
+                                ("subjectType", "Tipo oggetto"),
+                                ("subjectRef", "Oggetto"),
+                                ("sourceSurface", "Superficie"),
+                                ("requestId", "Richiesta"),
+                            ],
+                            theme,
+                        )),
+                );
             }
         }
         pane=pane.child(section("controls-redaction","Servizio di redazione",theme))

@@ -368,7 +368,8 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             <input
                                 id="patient-phone"
                                 {...register('phone')}
-                                className={`${FORM_INPUT_CLASS} pl-11`}
+                                className={FORM_INPUT_CLASS}
+                                style={{ paddingLeft: '2.75rem' }}
                                 placeholder="Es. +39 333 1234567"
                             />
                         </div>
