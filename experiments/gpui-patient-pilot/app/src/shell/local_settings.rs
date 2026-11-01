@@ -15,6 +15,22 @@ pub(super) enum PreferenceIssue {
 }
 
 impl ClinicalApp {
+    pub(super) fn effective_text_scale(&self) -> f32 {
+        #[cfg(test)]
+        {
+            self.text_scale
+        }
+        #[cfg(not(test))]
+        {
+            local_host::effective_preferences(
+                self.text_scale,
+                self.increased_contrast,
+                local_host::read_system_accessibility(),
+            )
+            .0
+        }
+    }
+
     fn visual_preferences(&self) -> LocalPreferences {
         LocalPreferences {
             dark_override: self.dark_override,
@@ -71,7 +87,13 @@ impl ClinicalApp {
 
     fn apply_local_appearance(&mut self, system_dark: bool) {
         self.dark = self.dark_override.unwrap_or(system_dark);
-        self.theme = Theme::for_dark(self.dark).sized(self.text_scale, self.increased_contrast);
+        #[cfg(test)]
+        let system = None;
+        #[cfg(not(test))]
+        let system = local_host::read_system_accessibility();
+        let (scale, contrast) =
+            local_host::effective_preferences(self.text_scale, self.increased_contrast, system);
+        self.theme = Theme::for_dark(self.dark).sized(scale, contrast);
         #[cfg(test)]
         if let Some(body) = self.test_body_size {
             self.theme.scale = body * self.text_scale / Theme::for_dark(false).body();

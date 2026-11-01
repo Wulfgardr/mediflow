@@ -7,6 +7,7 @@ mod network;
 mod parameters;
 mod references;
 mod security;
+mod work_profile;
 use crate::RetirementNotice;
 use crate::http::{authenticate_web_p3, control_cookie, operation_uuid, sensitive_header};
 use crate::{
@@ -32,6 +33,7 @@ use std::sync::{
     Arc, Mutex, Weak,
     atomic::{AtomicBool, Ordering},
 };
+pub use work_profile::*;
 use zeroize::Zeroizing;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
