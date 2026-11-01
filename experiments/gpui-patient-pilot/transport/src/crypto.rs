@@ -204,13 +204,17 @@ pub(crate) fn passphrase_bundle(
     })
 }
 
-pub(crate) fn seal(value: &Value, master: &MasterKey) -> Result<String> {
+pub(crate) fn seal<T: serde::Serialize + ?Sized>(value: &T, master: &MasterKey) -> Result<String> {
     let mut iv = [0u8; 12];
     getrandom::fill(&mut iv).map_err(|_| RuntimeError::Crypto)?;
     seal_with_iv(value, master, &iv)
 }
 
-fn seal_with_iv(value: &Value, master: &MasterKey, iv: &[u8; 12]) -> Result<String> {
+fn seal_with_iv<T: serde::Serialize + ?Sized>(
+    value: &T,
+    master: &MasterKey,
+    iv: &[u8; 12],
+) -> Result<String> {
     let plaintext = Zeroizing::new(serde_json::to_vec(value).map_err(|_| RuntimeError::Crypto)?);
     let cipher = Aes256Gcm::new_from_slice(master.as_ref()).map_err(|_| RuntimeError::Crypto)?;
     let sealed = cipher

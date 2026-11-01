@@ -19,10 +19,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOADER_PATH = path.join(ROOT_DIR, 'scripts', 'register-strip-types-loader.mjs');
 const DRIFT_HOOK_PATH = path.join(ROOT_DIR, 'scripts', 'schema-drift-resolve-hook.mjs');
 const WORKER_PATH = path.join(ROOT_DIR, 'scripts', 'check-schema-drift-worker.mjs');

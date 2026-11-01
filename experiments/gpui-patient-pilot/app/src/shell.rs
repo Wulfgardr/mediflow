@@ -11,6 +11,7 @@ mod analytics;
 #[cfg(unix)]
 mod chat_access;
 mod clinical_forms;
+mod document_curation;
 mod document_details;
 mod document_library;
 mod local_host;
@@ -364,6 +365,7 @@ struct PatientData {
     observations: ReadLoad<Vec<Observation>>,
     checkups: ReadLoad<Vec<Checkup>>,
     attachments: ReadLoad<Vec<Attachment>>,
+    document_curation: document_curation::DocumentCuration,
     document_details_id: Option<String>,
     document_original: Option<document_details::DocumentOriginal>,
 }
@@ -376,6 +378,7 @@ impl Default for PatientData {
             observations: ReadLoad::Idle,
             checkups: ReadLoad::Idle,
             attachments: ReadLoad::Idle,
+            document_curation: document_curation::DocumentCuration::default(),
             document_details_id: None,
             document_original: None,
         }
@@ -919,6 +922,7 @@ impl ClinicalApp {
             self.settings_page = SettingsPage::Overview;
         }
         self.who.reset();
+        self.patient.document_curation = document_curation::DocumentCuration::default();
         self.patient.document_details_id = None;
         self.patient.document_original = None;
         self.document_imports = DocumentImports::default();
@@ -1225,7 +1229,7 @@ impl ClinicalApp {
     }
 
     fn change_scope(&mut self, id: &str, cx: &mut Context<Self>) {
-        if self.local_host.has_work() {
+        if self.local_work_pending() {
             self.message = Some((
                 "Completa o annulla l’operazione locale prima di cambiare contesto.".into(),
                 false,
@@ -1305,7 +1309,7 @@ impl ClinicalApp {
     }
 
     fn select_patient(&mut self, id: &str, open: bool, cx: &mut Context<Self>) {
-        if self.local_host.has_work() {
+        if self.local_work_pending() {
             self.message = Some((
                 "Completa o annulla l’operazione locale prima di cambiare contesto.".into(),
                 false,
@@ -1386,6 +1390,7 @@ impl ClinicalApp {
         self.patient.observations = ReadLoad::loading();
         self.patient.checkups = ReadLoad::loading();
         self.patient.attachments = ReadLoad::loading();
+        self.patient.document_curation = document_curation::DocumentCuration::default();
         self.patient.document_details_id = None;
         self.patient.document_original = None;
         self.watch_patient_reads(cx);
@@ -1429,7 +1434,7 @@ impl ClinicalApp {
     }
 
     fn navigate(&mut self, area: Area, cx: &mut Context<Self>) {
-        if self.local_host.has_work() {
+        if self.local_work_pending() {
             self.message = Some((
                 "Completa o annulla l’operazione locale prima di cambiare contesto.".into(),
                 false,
@@ -1726,7 +1731,7 @@ impl ClinicalApp {
             && self.form.is_none()
             && self.discard.is_none()
             && !self.edit_pending
-            && !self.local_host.has_work()
+            && !self.local_work_pending()
             && self.document_operation == DocumentOperation::Idle
             && !self.show_other
     }
@@ -1842,7 +1847,7 @@ impl ClinicalApp {
     }
 
     fn request_discard(&mut self, action: Discard, cx: &mut Context<Self>) {
-        if action == Discard::Reload && self.local_host.has_work() {
+        if action == Discard::Reload && self.local_work_pending() {
             self.message = Some((
                 "Completa o annulla l’operazione locale prima di rileggere.".into(),
                 false,
@@ -2123,7 +2128,7 @@ impl ClinicalApp {
         if self.chat_access.voice.is_open() {
             return;
         }
-        if self.local_host.has_work()
+        if self.local_work_pending()
             || self.edit_pending
             || self.document_operation != DocumentOperation::Idle
         {
@@ -2636,7 +2641,7 @@ impl ClinicalApp {
 
 impl ClinicalApp {
     fn section_selected(&mut self, section: PatientSection, cx: &mut Context<Self>) {
-        if self.local_host.has_work() {
+        if self.local_work_pending() {
             self.message = Some((
                 "Completa o annulla l’operazione locale prima di cambiare contesto.".into(),
                 false,
@@ -5385,6 +5390,7 @@ impl Render for ClinicalApp {
         }
         let theme = self.theme;
         self.local_host.prepare_render(theme, window, cx);
+        self.prepare_document_curation_render(window, cx);
         if self.settings_page == SettingsPage::AiPreferences {
             self.ai_preferences.prepare_render(window, cx);
         }
@@ -5551,7 +5557,7 @@ impl Render for ClinicalApp {
                 this.reveal_focused(window, cx);
             }))
             .on_action(cx.listener(|this, _: &Search, _, cx| {
-                if this.session.is_some() && this.form.is_none() && !this.local_host.has_work() {
+                if this.session.is_some() && this.form.is_none() && !this.local_work_pending() {
                     this.show_other = false;
                     this.show_sections = false;
                     match this.area {
@@ -5582,6 +5588,9 @@ impl Render for ClinicalApp {
             )
             .on_action(cx.listener(|this, _: &Review, window, cx| this.review_form(window, cx)))
             .on_action(cx.listener(|this, _: &Escape, window, cx| {
+                if this.cancel_document_curation_review(window, cx) {
+                    return;
+                }
                 if this.local_host.clinical_command_visible()
                     || (this.area == Area::Settings
                         && this.local_host.page_command_visible(this.settings_page))
@@ -5938,7 +5947,7 @@ impl ClinicalApp {
     fn can_edit_record(&self, kind: editing::Kind) -> bool {
         self.form.is_none()
             && !self.edit_pending
-            && !self.local_host.has_work()
+            && !self.local_work_pending()
             && self.document_operation == DocumentOperation::Idle
             && self.can_write(form_kind(kind))
             && self
