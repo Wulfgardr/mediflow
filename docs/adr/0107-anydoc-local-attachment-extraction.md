@@ -177,3 +177,19 @@ Fermare il packet se:
 Questo ADR non aggiunge o riattiva OCR locale per immagini, egress, cloud,
 apply clinico, schema, migrazioni, route paired, locator, CAS, backup o nuove
 authority.
+
+## Contenimento dei processi, novembre 2026
+
+AnyDoc e i child PDF usano lo stesso launcher con heap V8 di 256 MiB,
+permission model Node, lettura della package root e nessun permesso di
+scrittura, creazione di child o worker. I moduli di rete e gli ingressi globali
+sono negati. Su macOS il processo nega anche rete e scritture tramite sandbox;
+su Linux richiede `prlimit` con `RLIMIT_DATA` di 1 GiB e fallisce se non disponibile.
+
+Questi limiti non costituiscono una quota universale sulla memoria nativa.
+Su Windows non viene ancora applicata una quota Job alla memoria; su macOS
+non viene dichiarato un limite RSS. Il permission model Node non confina le
+letture filesystem delle estensioni native. Apple Vision conserva il confine
+precedente: negare tutte le scritture impedisce, nella prova sintetica locale,
+la creazione della cache del motore e fa fallire una normale estrazione.
+Il contenimento completo di questo percorso resta aperto.
