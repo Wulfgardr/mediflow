@@ -20,6 +20,21 @@ pub(super) struct ReferencesArea {
     source_entries: Option<Value>,
     pub(super) document: Option<Arc<mediflow_runtime_client::PreparedProstheticsDocument>>,
 }
+const PROSTHETICS_FIELD_LABELS: [&str; 13] = [
+    "Posizione codice sistema",
+    "Posizione codice",
+    "Posizione descrizione",
+    "Posizione versione",
+    "Posizione fonte",
+    "Posizione ambito",
+    "Posizione data inizio",
+    "Posizione data fine",
+    "Separatore (, oppure ;)",
+    "Ente della fonte",
+    "Data della fonte YYYY-MM-DD",
+    "Note della fonte",
+    "Pagina originale (facoltativa)",
+];
 impl ReferencesArea {
     pub(super) fn new(theme: Theme, cx: &mut Context<ClinicalApp>) -> Self {
         Self {
@@ -35,50 +50,36 @@ impl ReferencesArea {
             who_consent: false,
             source_entries: None,
             document: None,
-            prosthetics_fields: [
-                "Posizione codice sistema",
-                "Posizione codice",
-                "Posizione descrizione",
-                "Posizione versione",
-                "Posizione fonte",
-                "Posizione ambito",
-                "Posizione data inizio",
-                "Posizione data fine",
-                "Separatore (, oppure ;)",
-                "Ente della fonte",
-                "Data della fonte YYYY-MM-DD",
-                "Note della fonte",
-                "Pagina originale (facoltativa)",
-            ]
-            .into_iter()
-            .enumerate()
-            .map(|(i, label)| {
-                cx.new(|cx| {
-                    TextInput::new(
-                        [
-                            "prosthetics-option-0",
-                            "prosthetics-option-1",
-                            "prosthetics-option-2",
-                            "prosthetics-option-3",
-                            "prosthetics-option-4",
-                            "prosthetics-option-5",
-                            "prosthetics-option-6",
-                            "prosthetics-option-7",
-                            "prosthetics-option-8",
-                            "prosthetics-option-9",
-                            "prosthetics-option-10",
-                            "prosthetics-option-11",
-                            "prosthetics-option-12",
-                        ][i],
-                        label,
-                        label,
-                        false,
-                        theme,
-                        cx,
-                    )
+            prosthetics_fields: PROSTHETICS_FIELD_LABELS
+                .into_iter()
+                .enumerate()
+                .map(|(i, label)| {
+                    cx.new(|cx| {
+                        TextInput::new(
+                            [
+                                "prosthetics-option-0",
+                                "prosthetics-option-1",
+                                "prosthetics-option-2",
+                                "prosthetics-option-3",
+                                "prosthetics-option-4",
+                                "prosthetics-option-5",
+                                "prosthetics-option-6",
+                                "prosthetics-option-7",
+                                "prosthetics-option-8",
+                                "prosthetics-option-9",
+                                "prosthetics-option-10",
+                                "prosthetics-option-11",
+                                "prosthetics-option-12",
+                            ][i],
+                            label,
+                            label,
+                            false,
+                            theme,
+                            cx,
+                        )
+                    })
                 })
-            })
-            .collect(),
+                .collect(),
             fields: [
                 ("aifa-source", "URL fonte"),
                 ("aifa-date", "Data di scarico YYYY-MM-DD"),
@@ -796,9 +797,14 @@ impl ClinicalApp {
                         "Aggiorna da AIFA…",
                         theme,
                         false,
-                        enabled,
+                        enabled && area.snapshot.is_some(),
                     )
                     .on_click(cx.listener(|this, _, _, cx| {
+                        if this.local_host.has_work()
+                            || this.local_host.references.snapshot.is_none()
+                        {
+                            return;
+                        }
                         let Some(access) = this.local_host.access() else {
                             return;
                         };
@@ -880,8 +886,16 @@ impl ClinicalApp {
             }
             ReferenceCatalog::Prosthetics => {
                 pane=pane.child(text!("CSV UTF-8, virgola o punto e virgola, massimo 2 MiB e 20.000 righe. Colonne: codice_sistema,codice,descrizione,versione,fonte,ambito,data_inizio,data_fine. Una codifica, versione, fonte e ambito per file. Errori e duplicati bloccano l’import. I codici assenti restano. Originali in chiaro: allega solo documenti di repertorio privi di dati dei pazienti. Le posizioni delle colonne partono da 1. Lascia tutte le posizioni vuote per usare le intestazioni. I metadati saranno applicati alla fonte con questo import."));
-                for field in &area.prosthetics_fields {
-                    pane = pane.child(field.clone());
+                for (index, field) in area.prosthetics_fields.iter().enumerate() {
+                    pane = pane.child(
+                        div()
+                            .id(("prosthetics-field", index))
+                            .flex()
+                            .flex_col()
+                            .gap(px(6.))
+                            .child(text!(PROSTHETICS_FIELD_LABELS[index]))
+                            .child(field.clone()),
+                    );
                 }
                 pane = pane.child(self.prosthetics_sources_view(cx));
             }
@@ -1377,6 +1391,36 @@ mod tests {
         });
         assert!(ids.contains(&"aifa-progress-read".to_owned()));
         assert!(ids.contains(&"aifa-download-cancel".to_owned()));
+        view.update(cx, |app, _| {
+            app.local_host.references.busy = false;
+            app.local_host.references.in_flight = None;
+            app.local_host.references.snapshot = None;
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(
+            rendered_command::node("references-aifa-update")
+                .0
+                .is_disabled()
+        );
+        view.update(cx, |app, _| {
+            app.local_host.references.snapshot = Some(ReferenceStatus {
+                catalog: ReferenceCatalog::Aifa,
+                data: json!({"count":0}),
+                sources: None,
+            });
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(
+            !rendered_command::node("references-aifa-update")
+                .0
+                .is_disabled()
+        );
         view.update(cx, |app, cx| {
             app.withdraw_local_host(cx);
             assert!(app.local_host.references.in_flight.is_none());
