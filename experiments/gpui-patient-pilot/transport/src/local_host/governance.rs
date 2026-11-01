@@ -9,6 +9,7 @@ pub struct FabricRegistry {
     pub egress_gate_open: bool,
     pub readiness_note: String,
     pub capabilities: Vec<FabricCapability>,
+    pub provider_disclosure: ProviderDisclosure,
 }
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,6 +21,19 @@ pub struct FabricCapability {
     pub availability_disposition: String,
     pub venues: Vec<String>,
     pub egress_profile: FabricEgress,
+}
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderDisclosure {
+    schema_version: String,
+    pub providers: Vec<ProviderDisclosureRow>,
+}
+#[derive(Clone, Debug, Deserialize)]
+pub struct ProviderDisclosureRow {
+    pub id: String,
+    pub label: String,
+    pub declared: Value,
+    pub effective: Value,
 }
 #[derive(Clone, Debug, Deserialize)]
 pub struct FabricEgress {
@@ -45,6 +59,10 @@ pub struct FabricVenueObservation {
 pub struct ModelParliament {
     pub updated_at: String,
     pub report: ParliamentReport,
+    pub json_path: Option<String>,
+    pub markdown_path: Option<String>,
+    #[serde(skip)]
+    pub complete_report: Value,
 }
 #[derive(Clone, Debug, Deserialize)]
 pub struct ParliamentReport {
@@ -68,6 +86,7 @@ pub struct ParliamentDecision {
 pub struct ParliamentScorecard {
     #[serde(default)]
     pub lanes: Vec<ParliamentLane>,
+    pub summary: Option<Value>,
 }
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -97,6 +116,11 @@ pub struct RolloutLane {
     pub updated_at: Option<String>,
     pub report: Option<RolloutReport>,
     pub error: Option<String>,
+    pub json_path: Option<String>,
+    pub markdown_path: Option<String>,
+    pub markdown: Option<String>,
+    #[serde(skip)]
+    pub complete_report: Value,
 }
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -143,11 +167,50 @@ fn unique<'a>(values: impl IntoIterator<Item = &'a str>) -> bool {
         .into_iter()
         .all(|id| !id.is_empty() && seen.insert(id))
 }
+fn valid_provider(row: &ProviderDisclosureRow) -> bool {
+    let local = matches!(row.id.as_str(), "ollama" | "athena_mlx");
+    if !local && !matches!(row.id.as_str(), "openai" | "anthropic") {
+        return false;
+    }
+    let expected = if local {
+        json!({"lifecycle":"host_managed", "runtimeObservation":"operation_receipt_required", "venue":"local_process", "egress":"none", "credentialClass":"local_model", "executionDisposition":"proposal_only_candidate", "accessBoundary":"not_applicable"})
+    } else {
+        json!({"lifecycle":"informational_only", "runtimeObservation":"disabled", "venue":"cloud", "egress":"disabled", "credentialClass":"separate_api_access_required", "executionDisposition":"execution_disabled", "accessBoundary":"consumer_subscription_is_not_api_access"})
+    };
+    let lifecycle = row.effective["lifecycle"].as_str().unwrap_or("");
+    let observed = matches!(lifecycle, "available_unqualified" | "degraded" | "revoked");
+    let effective = json!({
+        "lifecycle": lifecycle,
+        "runtimeObservation": "not_observed", "venue": null, "egress": null,
+        "credentialClass": if local && observed { Some("local_model") } else { None },
+        "executionDisposition": if !local { "execution_disabled" } else if lifecycle == "available_unqualified" { "not_observed" } else { "denied_by_contract" }
+    });
+    row.declared == expected
+        && row.effective == effective
+        && if local {
+            observed || matches!(lifecycle, "missing" | "corrupt" | "unavailable" | "invalid")
+        } else {
+            lifecycle == "not_applicable"
+        }
+}
 fn registry(value: Value) -> Result<FabricRegistry> {
     let row: FabricRegistry = decode(value)?;
     if row.schema_version != "mediflow.ai.fabric-status.v1"
         || row.contract_version != "mediflow.ai.fabric.v1"
         || row.readiness_note != "available_unqualified"
+        || row.provider_disclosure.schema_version != "mediflow.ai.provider-disclosure.v1"
+        || !unique(
+            row.provider_disclosure
+                .providers
+                .iter()
+                .map(|r| r.id.as_str()),
+        )
+        || row.provider_disclosure.providers.len() != 4
+        || row
+            .provider_disclosure
+            .providers
+            .iter()
+            .any(|r| !valid_provider(r))
         || !unique(row.capabilities.iter().map(|r| r.id.as_str()))
         || row.capabilities.iter().any(|r| {
             !matches!(r.class.as_str(), "generative" | "deterministic")
@@ -206,7 +269,9 @@ fn observations(value: Value) -> Result<FabricObservation> {
     Ok(row)
 }
 fn parliament(value: Value) -> Result<ModelParliament> {
-    let row: ModelParliament = decode(value)?;
+    let complete_report = value["report"].clone();
+    let mut row: ModelParliament = decode(value)?;
+    row.complete_report = complete_report;
     if !matches!(
         row.report.parliament.readiness.as_str(),
         "hold" | "prune_ready"
@@ -216,11 +281,27 @@ fn parliament(value: Value) -> Result<ModelParliament> {
     Ok(row)
 }
 fn rollout(value: Value) -> Result<RolloutReadiness> {
-    let row: RolloutReadiness = decode(value)?;
+    let reports = value["lanes"]
+        .as_array()
+        .ok_or(RuntimeError::InvalidResponse)?
+        .iter()
+        .map(|r| r["report"].clone())
+        .collect::<Vec<_>>();
+    let mut row: RolloutReadiness = decode(value)?;
+    for (lane, report) in row.lanes.iter_mut().zip(reports) {
+        lane.complete_report = report;
+    }
     if !unique(row.lanes.iter().map(|r| r.lane.as_str()))
         || !unique(row.local_controls.iter().map(|r| r.lane.as_str()))
         || row.lanes.iter().any(|r| {
-            r.available != r.report.is_some()
+            !matches!(
+                r.lane.as_str(),
+                "patient_insight"
+                    | "smart_import"
+                    | "redaction"
+                    | "clinical_entities"
+                    | "generative_challenger"
+            ) || r.available != r.report.is_some()
                 || r.report
                     .as_ref()
                     .and_then(|r| r.status.as_deref())
@@ -284,6 +365,44 @@ mod tests {
     use super::*;
     pub(super) fn fixture() -> Value {
         serde_json::from_str(include_str!("../../../comparison/governance.json")).unwrap()
+    }
+    #[test]
+    fn governance_retains_complete_reports_and_refuses_invented_provider_execution() {
+        let mut source = fixture();
+        source["parliament"]["report"]["futureDetail"] = json!({"sample": [1, 2, 3]});
+        source["rollout"]["lanes"][0]["report"]["measurements"] = json!({"latency":123});
+        source["rollout"]["lanes"][0]["markdown"] =
+            json!("# Verifica sintetica\nDettaglio completo.");
+        let parsed = parliament(source["parliament"].clone()).unwrap();
+        assert_eq!(parsed.complete_report, source["parliament"]["report"]);
+        assert_eq!(
+            parsed.json_path.as_deref(),
+            source["parliament"]["jsonPath"].as_str()
+        );
+        let parsed = rollout(source["rollout"].clone()).unwrap();
+        assert_eq!(
+            parsed.lanes[0].complete_report,
+            source["rollout"]["lanes"][0]["report"]
+        );
+        assert_eq!(
+            parsed.lanes[0].markdown.as_deref(),
+            Some("# Verifica sintetica\nDettaglio completo.")
+        );
+        assert!(parsed.lanes[1].complete_report.is_null());
+        let parsed = registry(source["registry"].clone()).unwrap();
+        assert_eq!(parsed.provider_disclosure.providers.len(), 4);
+        for (field, value) in [
+            ("venue", json!("cloud")),
+            ("runtimeObservation", json!("observed")),
+            ("executionDisposition", json!("available")),
+        ] {
+            let mut invalid = source["registry"].clone();
+            invalid["providerDisclosure"]["providers"][0]["effective"][field] = value;
+            assert!(registry(invalid).is_err());
+        }
+        source["registry"]["providerDisclosure"]["providers"][1] =
+            source["registry"]["providerDisclosure"]["providers"][0].clone();
+        assert!(registry(source["registry"].clone()).is_err());
     }
     #[test]
     fn governance_parses_host_snapshots_and_rejects_drift_without_promoting_readiness() {

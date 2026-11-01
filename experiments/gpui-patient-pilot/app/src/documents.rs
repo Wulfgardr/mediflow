@@ -48,6 +48,78 @@ pub fn original_text(attachment: &Attachment) -> Result<Zeroizing<String>, Strin
     Ok(Zeroizing::new(text.to_owned()))
 }
 
+pub enum OriginalPreview {
+    Text(Zeroizing<String>),
+    Image(Arc<gpui::RenderImage>),
+}
+
+pub const MAX_PREVIEW_PIXELS: u64 = 12_000_000;
+pub const MAX_PREVIEW_DIMENSION: u32 = 8192;
+
+pub fn original_preview(attachment: &Attachment) -> Result<OriginalPreview, String> {
+    use image::ImageDecoder;
+    if attachment.mime_type == "text/plain" {
+        return original_text(attachment).map(OriginalPreview::Text);
+    }
+    let expected = match attachment.mime_type.as_str() {
+        "image/png" => image::ImageFormat::Png,
+        "image/jpeg" => image::ImageFormat::Jpeg,
+        _ => return Err("Anteprima disponibile per testo UTF-8 e immagini PNG e JPEG. L’allegato non è stato modificato.".into()),
+    };
+    let bytes = decode_attachment(attachment).map_err(|error| error.to_string())?;
+    let invalid = || {
+        "L’immagine non è leggibile o non corrisponde al formato dichiarato. Anteprima interrotta."
+            .to_owned()
+    };
+    if image::guess_format(&bytes).map_err(|_| invalid())? != expected {
+        return Err(invalid());
+    }
+    let reader =
+        || image::ImageReader::with_format(std::io::Cursor::new(bytes.as_slice()), expected);
+    let (width, height) = reader().into_dimensions().map_err(|_| invalid())?;
+    admit_preview_dimensions(width, height)?;
+    if expected == image::ImageFormat::Png {
+        let decoder = image::codecs::png::PngDecoder::new(std::io::Cursor::new(bytes.as_slice()))
+            .map_err(|_| invalid())?;
+        if decoder.is_apng().map_err(|_| invalid())? {
+            return Err("Le immagini animate non sono disponibili nell’anteprima. L’allegato non è stato modificato.".into());
+        }
+    }
+    let mut configured = reader();
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_PREVIEW_DIMENSION);
+    limits.max_image_height = Some(MAX_PREVIEW_DIMENSION);
+    limits.max_alloc = Some(MAX_PREVIEW_PIXELS * 8);
+    configured.limits(limits.clone());
+    let mut decoder = configured.into_decoder().map_err(|_| invalid())?;
+    limits
+        .reserve(decoder.total_bytes())
+        .map_err(|_| invalid())?;
+    decoder.set_limits(limits).map_err(|_| invalid())?;
+    let orientation = decoder.orientation().map_err(|_| invalid())?;
+    let mut decoded = image::DynamicImage::from_decoder(decoder).map_err(|_| invalid())?;
+    decoded.apply_orientation(orientation);
+    let mut pixels = decoded.into_rgba8();
+    for pixel in pixels.as_chunks_mut::<4>().0 {
+        pixel.swap(0, 2);
+    }
+    Ok(OriginalPreview::Image(Arc::new(gpui::RenderImage::new([
+        image::Frame::new(pixels),
+    ]))))
+}
+
+fn admit_preview_dimensions(width: u32, height: u32) -> Result<(), String> {
+    if width == 0
+        || height == 0
+        || width > MAX_PREVIEW_DIMENSION
+        || height > MAX_PREVIEW_DIMENSION
+        || u64::from(width) * u64::from(height) > MAX_PREVIEW_PIXELS
+    {
+        return Err("L’immagine supera i limiti dell’anteprima: 8192 pixel per lato e 12 milioni di pixel complessivi. Anteprima interrotta.".into());
+    }
+    Ok(())
+}
+
 pub fn text_window(text: &str, page: usize) -> Option<(&str, usize)> {
     let count = text.chars().count().div_ceil(TEXT_WINDOW_CHARS).max(1);
     if page >= count {
@@ -710,6 +782,132 @@ mod import_tests {
 #[cfg(test)]
 mod original_tests {
     use super::*;
+    #[test]
+    fn preview_limits_reject_each_dimension_and_total_pixels_before_decode() {
+        assert_eq!(admit_preview_dimensions(4000, 3000), Ok(()));
+        for (width, height) in [
+            (0, 10),
+            (10, 0),
+            (8193, 1),
+            (1, 8193),
+            (4000, 3001),
+            (u32::MAX, u32::MAX),
+        ] {
+            assert!(admit_preview_dimensions(width, height).is_err());
+        }
+    }
+
+    #[test]
+    fn oversized_png_is_rejected_from_its_header_before_missing_pixel_data() {
+        let bytes = STANDARD
+            .decode("iVBORw0KGgoAAAANSUhEUgAAD6AAAAu5CAYAAAA+6ZRCAAAAAElEQVQ1rwYeAAAAAElFTkSuQmCC")
+            .unwrap();
+        let error = original_preview(&attachment("image/png", &bytes))
+            .err()
+            .unwrap();
+        assert!(error.contains("12 milioni"));
+    }
+
+    #[test]
+    fn animated_png_is_rejected_instead_of_showing_a_partial_document() {
+        let bytes = STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACGFjVEwAAAACAAAAAPONk3AAAAANSURBVHicY/jPwPAfAAUAAf+JmT0dAAAAAElFTkSuQmCC").unwrap();
+        let error = original_preview(&attachment("image/png", &bytes))
+            .err()
+            .unwrap();
+        assert!(error.contains("animate"));
+    }
+
+    fn rotated_jpeg() -> Vec<u8> {
+        let pixels = image::RgbImage::from_fn(8, 16, |x, y| {
+            image::Rgb([(x * 30) as u8, (y * 15) as u8, 40])
+        });
+        let mut jpeg = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 100)
+            .encode_image(&pixels)
+            .unwrap();
+        let exif = b"Exif\0\0II\x2a\0\x08\0\0\0\x01\0\x12\x01\x03\0\x01\0\0\0\x06\0\0\0\0\0\0\0";
+        let mut result = jpeg[..2].to_vec();
+        result.extend_from_slice(&[0xff, 0xe1]);
+        result.extend_from_slice(&((exif.len() + 2) as u16).to_be_bytes());
+        result.extend_from_slice(exif);
+        result.extend_from_slice(&jpeg[2..]);
+        result
+    }
+
+    #[test]
+    fn jpeg_exif_orientation_is_applied_to_the_complete_decoded_raster() {
+        let bytes = rotated_jpeg();
+        let mut expected = image::load_from_memory(&bytes)
+            .unwrap()
+            .rotate90()
+            .into_rgba8();
+        for pixel in expected.as_chunks_mut::<4>().0 {
+            pixel.swap(0, 2);
+        }
+        let OriginalPreview::Image(preview) =
+            original_preview(&attachment("image/jpeg", &bytes)).unwrap()
+        else {
+            panic!("image expected")
+        };
+        assert_eq!(preview.size(0).width, gpui::DevicePixels(16));
+        assert_eq!(preview.size(0).height, gpui::DevicePixels(8));
+        assert_eq!(preview.as_bytes(0).unwrap(), expected.as_raw());
+    }
+
+    #[test]
+    fn rotated_jpeg_limits_use_real_frame_dimensions_before_pixel_decode() {
+        for (width, height) in [(8193u16, 1u16), (4000, 3001)] {
+            let mut bytes = rotated_jpeg();
+            let frame = bytes
+                .windows(2)
+                .position(|pair| pair == [0xff, 0xc0])
+                .unwrap();
+            bytes[frame + 5..frame + 7].copy_from_slice(&height.to_be_bytes());
+            bytes[frame + 7..frame + 9].copy_from_slice(&width.to_be_bytes());
+            let error = original_preview(&attachment("image/jpeg", &bytes))
+                .err()
+                .unwrap();
+            assert!(error.contains("12 milioni"), "{error}");
+        }
+    }
+
+    #[test]
+    fn inline_image_is_decoded_only_for_matching_complete_supported_content() {
+        let pixels = image::RgbaImage::from_pixel(2, 3, image::Rgba([10, 20, 30, 255]));
+        let mut encoded = std::io::Cursor::new(Vec::new());
+        pixels
+            .write_to(&mut encoded, image::ImageFormat::Png)
+            .unwrap();
+        let bytes = encoded.into_inner();
+        let result = original_preview(&attachment("image/png", &bytes)).unwrap();
+        let OriginalPreview::Image(preview) = result else {
+            panic!("image expected")
+        };
+        assert_eq!(preview.as_bytes(0).unwrap(), [30, 20, 10, 255].repeat(6));
+        for (mime, content) in [
+            ("image/jpeg", bytes.as_slice()),
+            ("image/png", &bytes[..24]),
+            ("image/png", b"not an image".as_slice()),
+            ("application/pdf", b"%PDF-1.7".as_slice()),
+        ] {
+            assert!(original_preview(&attachment(mime, content)).is_err());
+        }
+        let mut jpeg = std::io::Cursor::new(Vec::new());
+        image::RgbImage::from_pixel(2, 3, image::Rgb([10, 20, 30]))
+            .write_to(&mut jpeg, image::ImageFormat::Jpeg)
+            .unwrap();
+        assert!(matches!(
+            original_preview(&attachment("image/jpeg", &jpeg.into_inner())),
+            Ok(OriginalPreview::Image(_))
+        ));
+        let mut locked = attachment("image/png", &bytes);
+        locked.locked_fields.push("data".into());
+        assert!(original_preview(&locked).is_err());
+        locked.locked_fields.clear();
+        locked.data = None;
+        assert!(original_preview(&locked).is_err());
+    }
+
     fn attachment(mime: &str, bytes: &[u8]) -> Attachment {
         serde_json::from_value(serde_json::json!({"id":"file-a","patientId":"patient-a","name":"sintetico.txt","path":"sintetico.txt","type":mime,"size":bytes.len(),"data":format!("data:{mime};base64,{}", STANDARD.encode(bytes))})).unwrap()
     }

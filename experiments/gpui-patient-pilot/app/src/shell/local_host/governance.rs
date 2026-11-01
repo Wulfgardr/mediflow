@@ -5,6 +5,7 @@ use mediflow_runtime_client::GovernanceSnapshot;
 pub(super) struct GovernanceArea {
     snapshot: Option<GovernanceSnapshot>,
     reading: bool,
+    reports_open: std::collections::HashSet<String>,
 }
 impl GovernanceArea {
     pub(super) fn withdraw(&mut self) {
@@ -13,7 +14,10 @@ impl GovernanceArea {
 }
 pub(super) fn fact(label: &str, value: impl AsRef<str>, theme: Theme) -> Div {
     div().min_w_0().text_color(theme.secondary).child({
-        let text = text!(format!("{label}: {}", value.as_ref()));
+        let text = gpui::Text::new(
+            gpui::ElementId::Name(label.to_owned().into()),
+            format!("{label}: {}", value.as_ref()).into(),
+        );
         #[cfg(test)]
         let text = rendered_command::observe_text(text);
         text
@@ -54,6 +58,24 @@ fn label(value: &str) -> &str {
         "generative" => "Generativa",
         "deterministic" => "Deterministica",
         "none" => "Nessuna",
+        "host_managed" => "Gestito dalla postazione",
+        "informational_only" => "Solo informativo",
+        "operation_receipt_required" => "Richiede la prova dell’operazione corrente",
+        "disabled" => "Disabilitato",
+        "local_model" => "Modello locale",
+        "separate_api_access_required" => "Accesso API separato",
+        "proposal_only_candidate" => "Candidato locale, solo proposta",
+        "execution_disabled" => "Esecuzione disabilitata",
+        "not_observed" => "Non osservato",
+        "denied_by_contract" => "Negato dal contratto",
+        "available_unqualified" => "Presente, idoneità da verificare",
+        "revoked" => "Revocato",
+        "missing" => "Assente",
+        "corrupt" | "invalid" => "Non valido",
+        "not_applicable" => "Non applicabile",
+        "consumer_subscription_is_not_api_access" => {
+            "Un abbonamento consumer non equivale all’accesso API"
+        }
         "redacted_explicit_consent" => "Dati redatti e consenso esplicito",
         "target_invalid" => "Indirizzo locale non valido",
         "daemon_unreachable" => "Ollama non risponde",
@@ -109,6 +131,71 @@ pub(super) fn section_state<T>(
     }
 }
 impl ClinicalApp {
+    fn governance_report(
+        &self,
+        key: &str,
+        json_path: Option<&str>,
+        markdown_path: Option<&str>,
+        markdown: Option<&str>,
+        report: &serde_json::Value,
+        cx: &Context<Self>,
+    ) -> Stateful<Div> {
+        let key = key.to_owned();
+        let open = self.local_host.governance.reports_open.contains(&key);
+        let mut pane = div()
+            .id(format!("governance-report-body-{key}"))
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .gap(px(8.))
+            .child(
+                button(
+                    format!("governance-report-{key}"),
+                    if open {
+                        "Chiudi report integrale"
+                    } else {
+                        "Leggi report integrale"
+                    },
+                    self.theme,
+                    false,
+                    true,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    if !this.local_host.governance.reports_open.remove(&key) {
+                        this.local_host.governance.reports_open.insert(key.clone());
+                    }
+                    cx.notify();
+                })),
+            );
+        if open {
+            pane = pane
+                .child(fact(
+                    "File JSON sulla postazione",
+                    missing(json_path),
+                    self.theme,
+                ))
+                .child(fact(
+                    "File Markdown sulla postazione",
+                    missing(markdown_path),
+                    self.theme,
+                ));
+            pane = pane.child(fact(
+                "Report JSON",
+                if report.is_null() {
+                    "Nessun report disponibile".into()
+                } else {
+                    serde_json::to_string_pretty(report).unwrap_or_default()
+                },
+                self.theme,
+            ));
+            pane = pane.child(fact(
+                "Report Markdown",
+                markdown.unwrap_or("Contenuto non disponibile dal servizio"),
+                self.theme,
+            ));
+        }
+        pane
+    }
     pub(in crate::shell) fn read_governance(&mut self, cx: &mut Context<Self>) {
         if self.local_host.has_work() {
             return;
@@ -118,6 +205,7 @@ impl ClinicalApp {
         };
         self.local_host.operation = Operation::Reading;
         self.local_host.governance.snapshot = None;
+        self.local_host.governance.reports_open.clear();
         self.local_host.governance.reading = true;
         self.run_local_host(
             move || access.read_governance(),
@@ -181,10 +269,60 @@ impl ClinicalApp {
         if let Ok(registry) = &snapshot.registry {
             pane = pane.child(notice("governance-egress", if registry.egress_gate_open { "Uscita esterna APERTA. Verifica policy, consenso e funzione interessata." } else { "Uscita esterna chiusa." }, theme, registry.egress_gate_open))
                 .child(text!("La presenza nel registro non prova la disponibilità di un modello o un’esecuzione corrente."));
+            pane = pane.child(section("governance-providers", "Provider", theme))
+                .child(text!("La configurazione dichiarata non prova un’esecuzione corrente. Sede e uscita effettive richiedono la prova della singola operazione."));
+            for provider in &registry.provider_disclosure.providers {
+                let mut provider_pane = div()
+                    .id(format!("governance-provider-{}", provider.id))
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(text!(provider.label.clone()));
+                if provider.id == "athena_mlx" {
+                    provider_pane =
+                        provider_pane.child(text!("Non disponibile in questa versione"));
+                }
+                provider_pane = provider_pane.child(fact(
+                    "Accesso",
+                    provider.declared["accessBoundary"]
+                        .as_str()
+                        .map(label)
+                        .unwrap_or("Non indicato"),
+                    theme,
+                ));
+                for (title, data) in [
+                    ("Dichiarato", &provider.declared),
+                    ("Effettivo", &provider.effective),
+                ] {
+                    let mut phase = div()
+                        .id(title)
+                        .flex()
+                        .flex_col()
+                        .gap(px(4.))
+                        .child(text!(title));
+                    for (key, title) in [
+                        ("lifecycle", "Stato"),
+                        ("runtimeObservation", "Osservazione"),
+                        ("venue", "Sede"),
+                        ("egress", "Uscita dati"),
+                        ("credentialClass", "Credenziale"),
+                        ("executionDisposition", "Esecuzione"),
+                    ] {
+                        phase = phase.child(fact(
+                            title,
+                            data[key].as_str().map(label).unwrap_or("Non osservato"),
+                            theme,
+                        ));
+                    }
+                    provider_pane = provider_pane.child(phase);
+                }
+                pane = pane.child(provider_pane);
+            }
             for row in &registry.capabilities {
                 let treatment = row.id == "treatment_reasoning";
                 pane = pane.child(
                     div()
+                        .id(format!("governance-capability-{}", row.id))
                         .min_w_0()
                         .border_b_1()
                         .border_color(theme.rule)
@@ -235,18 +373,22 @@ impl ClinicalApp {
         if let Ok(observations) = &snapshot.observations {
             pane = pane.child(text!("Nessun dirottamento automatico verso un’altra sede."));
             for row in &observations.observations {
-                pane = pane.child(fact(
-                    label(&row.venue),
-                    format!(
-                        "{} · {}",
-                        label(&row.state),
-                        row.reason
-                            .as_deref()
-                            .map(label)
-                            .unwrap_or("Nessun motivo di indisponibilità riportato")
-                    ),
-                    theme,
-                ));
+                pane = pane.child(
+                    div()
+                        .id(format!("governance-row-{}", row.venue))
+                        .child(fact(
+                            label(&row.venue),
+                            format!(
+                                "{} · {}",
+                                label(&row.state),
+                                row.reason
+                                    .as_deref()
+                                    .map(label)
+                                    .unwrap_or("Nessun motivo di indisponibilità riportato")
+                            ),
+                            theme,
+                        )),
+                );
             }
         }
         pane = pane.child(section(
@@ -289,9 +431,78 @@ impl ClinicalApp {
                     list(&decision.recommended_prune_models),
                     theme,
                 ));
+            pane = pane.child(self.governance_report(
+                "parliament",
+                report.json_path.as_deref(),
+                report.markdown_path.as_deref(),
+                None,
+                &report.complete_report,
+                cx,
+            ));
             if let Some(scorecard) = &report.report.scorecard {
+                if let Some(summary) = &scorecard.summary {
+                    for (title, name, model, score) in [
+                        (
+                            "Qualità migliore",
+                            "bestQualityLabel",
+                            "bestQualityModel",
+                            "bestQualityScore",
+                        ),
+                        (
+                            "Rapporto qualità/costo",
+                            "bestValueLabel",
+                            "bestValueModel",
+                            "bestValueScore",
+                        ),
+                        (
+                            "Alternativa qualità/costo",
+                            "bestValueChallengerLabel",
+                            "bestValueChallengerModel",
+                            "bestValueChallengerScore",
+                        ),
+                        (
+                            "Più veloce",
+                            "fastestLabel",
+                            "fastestModel",
+                            "fastestAvgLatencyMs",
+                        ),
+                    ] {
+                        let mut summary_row = div()
+                            .id(format!("governance-summary-{name}"))
+                            .flex()
+                            .flex_col()
+                            .child(fact(
+                                title,
+                                summary[name]
+                                    .as_str()
+                                    .or(summary[model].as_str())
+                                    .unwrap_or("Non misurato"),
+                                theme,
+                            ));
+                        if let Some(value) = summary[score].as_f64() {
+                            summary_row = summary_row.child(fact(
+                                if score == "fastestAvgLatencyMs" {
+                                    "Latenza media (ms)"
+                                } else {
+                                    "Punteggio"
+                                },
+                                value.to_string(),
+                                theme,
+                            ));
+                        }
+                        pane = pane.child(summary_row);
+                    }
+                }
+                if scorecard.summary.is_none() {
+                    pane = pane.child(text!(
+                        "Riepilogo qualità, costo e velocità non disponibile nel report."
+                    ));
+                }
                 for row in &scorecard.lanes {
-                    pane = pane
+                    let row_pane = div()
+                        .id(format!("governance-scorecard-{}", row.lane))
+                        .flex()
+                        .flex_col()
                         .child(fact(
                             label(&row.lane),
                             format!("{} · {}", label(&row.state), row.capability),
@@ -318,6 +529,7 @@ impl ClinicalApp {
                         ))
                         .child(fact("Motivi di blocco", list(&row.blockers), theme))
                         .child(fact("Nota", missing(row.focus_note.as_deref()), theme));
+                    pane = pane.child(row_pane);
                 }
             }
         }
@@ -331,7 +543,7 @@ impl ClinicalApp {
         }
         if let Ok(rollout) = &snapshot.rollout {
             for row in &rollout.local_controls {
-                pane = pane.child(fact(
+                pane = pane.child(div().id(format!("governance-row-{}", row.lane)).child(fact(
                     label(&row.lane),
                     if row.lane == "treatment_reasoning" {
                         "Non disponibile in questa versione"
@@ -341,12 +553,25 @@ impl ClinicalApp {
                         "Non spenta nelle impostazioni, disponibilità da verificare"
                     },
                     theme,
-                ));
+                )));
             }
             for row in &rollout.lanes {
-                pane = pane.child(fact("Attività", label(&row.lane), theme));
+                let mut row_pane = div()
+                    .id(format!("governance-rollout-{}", row.lane))
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.));
+                row_pane = row_pane.child(fact("Attività", label(&row.lane), theme));
+                row_pane = row_pane.child(self.governance_report(
+                    &row.lane,
+                    row.json_path.as_deref(),
+                    row.markdown_path.as_deref(),
+                    row.markdown.as_deref(),
+                    &row.complete_report,
+                    cx,
+                ));
                 let Some(report) = &row.report else {
-                    pane = pane.child(fact(
+                    row_pane = row_pane.child(fact(
                         "Verifica",
                         if row.error.is_some() {
                             "Report non leggibile. Nessun esito disponibile."
@@ -355,9 +580,10 @@ impl ClinicalApp {
                         },
                         theme,
                     ));
+                    pane = pane.child(row_pane);
                     continue;
                 };
-                pane = pane
+                row_pane = row_pane
                     .child(fact(
                         "Esito salvato",
                         report
@@ -383,7 +609,7 @@ impl ClinicalApp {
                         theme,
                     ));
                 if let Some(evidence) = &report.evidence {
-                    pane = pane
+                    row_pane = row_pane
                         .child(fact(
                             "Attualità delle prove",
                             if evidence.benchmark_fresh == Some(true) {
@@ -403,23 +629,25 @@ impl ClinicalApp {
                     ("Blocco", &report.blockers),
                     ("Avvertenza", &report.warnings),
                 ] {
-                    for issue in issues {
-                        pane = pane.child(fact(
-                            title,
-                            format!(
-                                "{}: {}",
-                                missing(issue.id.as_deref()),
-                                missing(issue.message.as_deref())
-                            ),
-                            theme,
-                        ));
+                    for (index, issue) in issues.iter().enumerate() {
+                        row_pane =
+                            row_pane.child(div().id(format!("{title}-{index}")).child(fact(
+                                title,
+                                format!(
+                                    "{}: {}",
+                                    missing(issue.id.as_deref()),
+                                    missing(issue.message.as_deref())
+                                ),
+                                theme,
+                            )));
                     }
                 }
                 if report.blockers.is_empty() {
-                    pane = pane.child(text!(
+                    row_pane = row_pane.child(text!(
                         "Nessun blocco riportato. Non equivale a un’autorizzazione all’uso."
                     ));
                 }
+                pane = pane.child(row_pane);
             }
         }
         pane
@@ -438,6 +666,64 @@ mod tests {
             parliament: Ok(serde_json::from_value(value["parliament"].clone()).unwrap()),
             rollout: Ok(serde_json::from_value(value["rollout"].clone()).unwrap()),
         }
+    }
+    #[gpui::test]
+    fn governance_integral_report_disclosure_and_lock(cx: &mut gpui::TestAppContext) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, _| {
+            app.session = Some(host.session.clone());
+            app.area = Area::Settings;
+            app.settings_page = SettingsPage::Governance;
+            app.local_host.authority = Authority::Open(access);
+            let mut data = snapshot();
+            data.parliament.as_mut().unwrap().complete_report =
+                serde_json::json!({"sample": "Synthetic full report tail"});
+            app.local_host.governance.snapshot = Some(data);
+        });
+        for open in [false, true] {
+            view.update(cx, |app, _| {
+                if open {
+                    app.local_host
+                        .governance
+                        .reports_open
+                        .insert("parliament".into());
+                }
+            });
+            rendered_command::take_text_nodes();
+            let ids = rendered_command::button_ids(|| {
+                cx.update(|window, cx| {
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                })
+            });
+            assert!(ids.contains(&"governance-report-parliament".to_owned()));
+            let nodes = rendered_command::take_text_nodes();
+            assert_eq!(
+                nodes.iter().any(|(_, n)| n
+                    .value()
+                    .is_some_and(|v| v.contains("Synthetic full report tail"))),
+                open
+            );
+            if open {
+                assert!(nodes.iter().any(|(_, n)| n.value()
+                    == Some("Report Markdown: Contenuto non disponibile dal servizio")));
+            }
+        }
+        view.update(cx, |app, cx| {
+            app.withdraw_local_host(cx);
+            assert!(app.local_host.governance.reports_open.is_empty());
+            assert!(app.local_host.governance.snapshot.is_none());
+        });
     }
     #[gpui::test]
     fn governance_draws_only_reads_and_clears_reports_on_lock(cx: &mut gpui::TestAppContext) {
@@ -477,6 +763,11 @@ mod tests {
             });
             if scenario != 3 {
                 let nodes = rendered_command::take_text_nodes();
+                let mut text_ids = HashSet::new();
+                assert!(
+                    nodes.iter().all(|(id, _)| text_ids.insert(id.clone())),
+                    "duplicate text IDs"
+                );
                 assert!(nodes.iter().any(|(_, node)| node.value()
                     == Some("Disponibilità: Non disponibile in questa versione")));
                 assert!(
