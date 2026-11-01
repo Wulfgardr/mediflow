@@ -34,7 +34,7 @@ struct PairedHomeBaseCredentialsView: View {
                 TextField("https://…", text: $model.serverURL)
                     .accessibilityIdentifier("homebase-server-url-field")
             }
-            credentialField("Impronta SHA-256 del certificato (opzionale)") {
+            credentialField("Impronta SHA-256 confermata sul Mac") {
                 TextField("Impronta SHA-256", text: $model.tlsPin)
                     .accessibilityIdentifier("homebase-tls-pin-field")
             }

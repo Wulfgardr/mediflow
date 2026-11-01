@@ -130,8 +130,9 @@ come base del successivo percorso di distribuzione, usa:
     MEDIFLOW_CODESIGN_IDENTITY=- scripts/build-apple-macos-app.sh # ad-hoc sign incl. the runtime
 
 Lo script assembla `Contents/Resources/WebRuntime/`, con `server.js`,
-`.next/static` e `public`, insieme a `scripts/local-api-tls-proxy.mjs` e al suo modulo
-`lib/security/loopback-ingress.mjs`, entrambi sotto `Contents/Resources/`: sono i componenti
+`.next/static` e `public`, insieme a `scripts/local-api-tls-proxy.mjs` e ai moduli
+`lib/security/loopback-ingress.mjs` e `lib/security/network-ingress-policy.mjs`, tutti
+sotto `Contents/Resources/`: sono i componenti
 che il supervisore avvia. Node NON è incluso. Il WebRuntime contiene un
 manifest Node/ABI prodotto alla compilazione, rispetto al quale il supervisore
 accetta solo un Node 24.x compatibile, trovato nel sistema, in Homebrew,

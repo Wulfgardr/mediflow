@@ -788,10 +788,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         await runTask {
             let candidate = try await HomeBaseBonjourDiscovery().discoverFirst()
             self.serverURL = candidate.serverURLString
-            if let tlsPin = candidate.tlsPin {
-                self.tlsPin = tlsPin
-            }
+            self.tlsPin = ""
             self.discoveryMessage = candidate.reviewLine
+                + (candidate.tlsPin.map { " · Impronta candidata: \($0). Confrontala con quella mostrata sul Mac e inserisci l'impronta confermata." }
+                    ?? " · Inserisci l'impronta mostrata sul Mac.")
             self.statusMessage = "Home-base trovato in LAN."
         }
     }
@@ -4073,6 +4073,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
         errorMessage = nil
         do {
+            _ = try HomeBaseConnectionConfiguration(serverURLString: serverURL, tlsPin: tlsPin).serverURL()
             try persistPairing()
             statusMessage = "Credenziali paired salvate sul dispositivo."
         } catch {

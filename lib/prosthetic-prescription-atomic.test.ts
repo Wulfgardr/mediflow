@@ -1,3 +1,5 @@
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
+import { clearAllSessions } from './security/server-session';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* real SQLite regression oracle for the five ordinary prosthetic writes. */
 import assert from 'node:assert/strict';
@@ -18,6 +20,8 @@ const { commitTerritorialPackTransition } = await import('./territorial-pack-sto
 commitTerritorialPackTransition(openDbServer(), { schemaVersion: 'mediflow.territorial-packs.v1', expectedRevision: 0, preset: 'core+it+lom', confirmed: true }, { actorType: 'system', actorRef: 'synthetic-supervisor', sourceSurface: 'job' }, () => {});
 bindSyntheticArchiveSessions('synthetic-session', 'synthetic-native', 'synthetic-local-api');
 const { patients, ambulatories, patientsToAmbulatories, prostheticPrescriptions } = await import('./schema.ts');
+const cookieState = { cookies: new Map<string, string>() };
+const cleanupCookies = installNetworkPatientCookieFixture(dir, cookieState);
 const writer = await import('./prosthetic-prescription-write.ts');
 const sql = new Database(join(dir, 'medical.db'));
 const baseline = process.env.MEDIFLOW_PROSTHETIC_BASELINE === '1';
@@ -25,12 +29,17 @@ const observations: unknown[] = [];
 let n = 0;
 const next = (name: string) => `synthetic-prosthetic-${++n}-${name}`;
 const session: ServerSession = { id: 'synthetic-session', userId: 'synthetic-user', username: next('username'), role: 'admin', authChannel: 'web', createdAt: Date.now(), expiresAt: Date.now() + 60_000 };
-const pairedSession: ServerSession = { ...session, id: 'synthetic-native', authChannel: 'native' };
-const pairedClient = { clientId: 'synthetic-paired' } as Parameters<typeof writer.createNetworkScopedProstheticPrescription>[0]['pairedClient'];
-const request = new Request('http://localhost/test', { headers: { 'x-request-id': 'synthetic-request', 'x-audit-source-surface': 'job' } });
 const ambulatoryId = next('ambulatory');
+const authority = syntheticNetworkPatientAuthority(dbServer, ambulatoryId, {
+    userId: session.userId, clientId: 'synthetic-paired', requestId: 'synthetic-request',
+    capabilities: ['network.replica.write-prosthetic-prescriptions'],
+});
+const pairedSession = authority.session;
+const pairedClient = authority.pairedClient;
+const request = new Request('http://localhost/test', { headers: { ...Object.fromEntries(authority.request.headers), 'x-audit-source-surface': 'job' } });
+cookieState.cookies.set('ambulatory_id', ambulatoryId);
 dbServer.insert(ambulatories).values({ id: ambulatoryId, name: 'Synthetic ambulatory', type: 'live' }).run();
-test.after(() => { if (process.env.MEDIFLOW_PROSTHETIC_REPORT) writeFileSync(process.env.MEDIFLOW_PROSTHETIC_REPORT, JSON.stringify(observations, null, 2)); sql.close(); dbServer.$client.close(); });
+test.after(() => { if (process.env.MEDIFLOW_PROSTHETIC_REPORT) writeFileSync(process.env.MEDIFLOW_PROSTHETIC_REPORT, JSON.stringify(observations, null, 2)); clearAllSessions(); cleanupCookies(); sql.close(); dbServer.$client.close(); });
 function seed(kind: 'active' | 'deleted' | 'archived' = 'active', inScope = true) {
     const patientId = next('patient'); const id = next('prescription');
     dbServer.insert(patients).values({ id: patientId, firstName: 'Synthetic', lastName: 'Patient', taxCode: next('tax'), deletedAt: kind === 'deleted' ? new Date('2026-01-01') : null, isArchived: kind === 'archived' }).run();

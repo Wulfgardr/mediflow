@@ -1,3 +1,4 @@
+import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
 /* one ordinary checkup create/update authority; no generic clinical CRUD or headless path. */
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
@@ -8,15 +9,15 @@ import { buildCheckupVersionConflictPayload } from './checkup-concurrency';
 
 type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 type Mode = 'web' | 'v1' | 'network';
-type Result = { status: 200 | 201 | 404 | 409; value: Record<string, unknown> };
+type Result = { status: 200 | 201 | 401 | 403 | 404 | 409; value: Record<string, unknown> };
 type CreateInput = {
     patientId: string; checkupId: string; values: typeof checkups.$inferInsert; changedFields: string[];
-    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext;
+    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext; authorizeCommit?: NetworkPatientCommitGuard;
 };
 type UpdateInput = {
     patientId?: string; checkupId: string; expectedVersion: number;
     values: Partial<typeof checkups.$inferInsert>; changedFields: string[];
-    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext;
+    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext; authorizeCommit?: NetworkPatientCommitGuard;
 };
 
 function networkScopeContains(tx: Tx, patientId: string, ambulatoryId: string): boolean {
@@ -33,6 +34,8 @@ function activeParentExists(tx: Tx, patientId: string): boolean {
 /* IMMEDIATE serializes the admission, row insert and required audit. */
 export function createCheckupOperation(input: CreateInput): Result {
     return dbServer.transaction((tx): Result => {
+        const denial = input.authorizeCommit?.(tx);
+        if (denial) return denial;
         const admitted = input.mode === 'network'
             ? networkScopeContains(tx, input.patientId, input.scopeAmbulatoryId!)
                 && activeParentExists(tx, input.patientId)
@@ -61,6 +64,8 @@ export function createCheckupOperation(input: CreateInput): Result {
 /* a matched UPDATE IGNORE is an integrity fault, not an optimistic 409. */
 export function updateCheckupOperation(input: UpdateInput): Result {
     return dbServer.transaction((tx): Result => {
+        const denial = input.authorizeCommit?.(tx);
+        if (denial) return denial;
         const existing = input.mode === 'network'
             ? tx.select({ checkup: checkups }).from(checkups)
                 .innerJoin(patientsToAmbulatories, eq(checkups.patientId, patientsToAmbulatories.patientId))

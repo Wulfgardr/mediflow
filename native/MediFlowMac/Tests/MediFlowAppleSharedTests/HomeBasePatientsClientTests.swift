@@ -333,6 +333,41 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(paths, ["/api/auth/check", "/api/auth/native/login", "/api/auth/native/logout"])
     }
 
+    func testRemoteOriginRequiresConfirmedValidPin() throws {
+        for host in ["192.0.2.1", "homebase.local"] {
+            for pin in ["", "aa", String(repeating: "z", count: 64)] {
+                XCTAssertThrowsError(try HomeBaseConnectionConfiguration(serverURLString: ["https:", "", "\(host):3443"].joined(separator: "/"), tlsPin: pin).serverURL())
+            }
+            XCTAssertNoThrow(try HomeBaseConnectionConfiguration(serverURLString: ["https:", "", "\(host):3443"].joined(separator: "/"), tlsPin: String(repeating: "a", count: 64)).serverURL())
+        }
+        XCTAssertNoThrow(try HomeBaseConnectionConfiguration(serverURLString: "https://127.0.0.1:3443").serverURL())
+        XCTAssertNoThrow(try HomeBaseConnectionConfiguration(serverURLString: ["https:", "", "[::1]:3443"].joined(separator: "/")).serverURL())
+    }
+
+    func testEquivalentLoopbackOriginsDoNotRequireAPin() throws {
+        for host in ["localhost", "127.0.0.1", "127.0.0.2", "127.255.255.254", "[::1]",
+                     "[0:0:0:0:0:0:0:1]", "[0::1]", "[::ffff:127.0.0.1]",
+                     "[::ffff:7f00:2]", "[0:0:0:0:0:ffff:7f00:1]"] {
+            let origin = ["https:", "", "\(host):3443"].joined(separator: "/")
+            XCTAssertNoThrow(try HomeBaseConnectionConfiguration(serverURLString: origin).serverURL(), host)
+            #if os(macOS)
+            XCTAssertTrue(HostAdminAvailability.isLocalHost(serverURLString: origin), host)
+            XCTAssertTrue(HostAdminAvailability.isLocalHost(serverURLString: "\(host):3443"), host)
+            #endif
+        }
+    }
+
+    func testRemoteOrMalformedHostsCannotUseTheLoopbackException() {
+        for host in ["192.0.2.1", "homebase.local", "localhost.invalid", "127.0.0.1.attacker",
+                     "127.0.0.999", "[::2]", "[::ffff:192.0.2.1]", "[0:0:0:0:0:ffff:c000:201]"] {
+            let origin = ["https:", "", "\(host):3443"].joined(separator: "/")
+            XCTAssertThrowsError(try HomeBaseConnectionConfiguration(serverURLString: origin).serverURL(), host)
+            #if os(macOS)
+            XCTAssertFalse(HostAdminAvailability.isLocalHost(serverURLString: origin), host)
+            #endif
+        }
+    }
+
     private func v3Vector() throws -> [String: String] {
         let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

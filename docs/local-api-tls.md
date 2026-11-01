@@ -54,6 +54,12 @@ Quando `network.mode` non è ancora `network-home-base`, lo script rifiuta
 l'ascolto sulla LAN e termina con errore. Il proxy non viene quindi esposto
 per effetto della sola configurazione dell'indirizzo.
 
+Per peer non loopback il proxy inoltra solo metodi e percorsi espliciti del
+contratto network e native, più check, profilo account e cambio credenziale
+usati dai client abbinati. Login e API della Web richiedono invece ingresso
+loopback attestato anche sul server Next. Il listener LAN non pubblica una
+seconda interfaccia Web.
+
 ## 3) Calcola il fingerprint SHA256
 
 Il client macOS identifica il certificato atteso mediante la sua SHA256 in formato DER; il comando seguente calcola il valore da usare per il pin.
@@ -62,4 +68,7 @@ Il client macOS identifica il certificato atteso mediante la sua SHA256 in forma
 openssl x509 -in ./certs/local-api.crt -outform der | shasum -a 256
 ```
 
-Copia l'hash esadecimale nelle impostazioni del client macOS.
+Confronta sul Mac questo valore con quello inserito nel client. Per origini
+non loopback Swift e Rust richiedono un pin SHA-256 valido, prima di inviare
+credenziali. Un'impronta annunciata da Bonjour è solo una candidata: la discovery
+non la salva come pin fidato. Inserisci il valore confermato localmente.

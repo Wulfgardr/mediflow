@@ -8,6 +8,7 @@ type AuthContext = Readonly<{ session: object; owner: object }>;
 type SessionReader = () => Promise<Record<string, unknown> | null>;
 type Hook = (() => void) | undefined;
 type State = {
+    ingressAllowed: boolean;
     projection: Record<string, unknown>;
     resolution: unknown;
     bearerCookie: unknown;
@@ -63,6 +64,7 @@ const owner = {
     dispose() { return undefined; },
 } as Record<string, unknown>;
 const state = {
+    ingressAllowed: true,
     projection,
     resolution: sealed({ status: 'active', projection }),
     bearerCookie: { name: 'mediflow_session', value: SESSION_ID },
@@ -115,7 +117,9 @@ moduleApi._load = function (request, parent, isMain) {
         currentArchiveGeneration: () => '11111111-1111-4111-8111-111111111111',
         archiveGenerationForSession: () => '11111111-1111-4111-8111-111111111111',
     };
+    if (request === './loopback-ingress.mjs') return { hasAttestedLoopbackIngress: () => state.ingressAllowed };
     if (request === 'next/headers') return {
+        headers: async () => new Headers(),
         cookies: () => { state.cookiesCalls += 1; state.onCookies?.(); return state.cookieResult; },
     };
     if (request === 'next/server') return { NextResponse: { json: () => null } };
@@ -183,6 +187,7 @@ try {
 }
 
 function reset(): void {
+    state.ingressAllowed = true;
     state.resolution = sealed({ status: 'active', projection });
     state.bearerCookie = { name: 'mediflow_session', value: SESSION_ID };
     state.controlCookie = { name: 'mediflow_auth_control', value: CONTROL_ID };
@@ -239,6 +244,14 @@ function assertContext(value: unknown): asserts value is AuthContext {
 }
 
 describe('external Web owner server-auth boundary', { concurrency: 1 }, () => {
+    test('a valid Web session without loopback attestation cannot reach any reader', async () => {
+        for (const reader of [requireSession, readAuthenticatedWebSession, acquire]) {
+            reset(); state.ingressAllowed = false;
+            assert.equal(await reader(), null);
+            assert.equal(state.getCalls, 0);
+        }
+    });
+
     test('all Web readers require both cookies and return the exact active projection', async () => {
         for (const reader of [requireSession, readAuthenticatedWebSession]) {
             reset();
