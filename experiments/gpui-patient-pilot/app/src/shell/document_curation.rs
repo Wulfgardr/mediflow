@@ -571,6 +571,11 @@ mod tests {
             app.navigate(Area::Agenda, cx);
             assert_eq!(app.area, Area::Patients);
             assert!(app.local_work_pending());
+            app.back_from_patient(cx);
+            assert!(
+                !app.directory,
+                "Il ritorno non deve lasciare la revisione della rimozione"
+            );
             app.apply_insights_removal(false, cx);
         });
         cx.simulate_resize(gpui::size(px(800.), px(840.)));

@@ -282,6 +282,14 @@ impl ClinicalApp {
     }
 
     pub(super) fn return_to_agenda(&mut self, cx: &mut Context<Self>) {
+        if self.local_work_pending() {
+            self.message = Some((
+                "Completa o annulla l’operazione locale prima di cambiare contesto.".into(),
+                false,
+            ));
+            cx.notify();
+            return;
+        }
         if self.form.is_some() {
             self.message = Some((
                 "Completa o scarta la bozza prima di tornare all’Agenda.".into(),
@@ -322,6 +330,14 @@ impl ClinicalApp {
     }
 
     pub(super) fn back_from_patient(&mut self, cx: &mut Context<Self>) {
+        if self.local_work_pending() {
+            self.message = Some((
+                "Completa o annulla l’operazione locale prima di cambiare contesto.".into(),
+                false,
+            ));
+            cx.notify();
+            return;
+        }
         if self.agenda_flow.origin.is_some() {
             self.return_to_agenda(cx);
         } else {
