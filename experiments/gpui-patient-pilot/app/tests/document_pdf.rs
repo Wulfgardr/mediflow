@@ -113,6 +113,11 @@ fn real_jpeg_dimensions_cannot_hide_behind_a_small_pdf_dictionary() {
     );
     let output = worker(&good, "1");
     assert!(output.stdout.starts_with(b"{\"width\":150,"));
+    let mismatch = fixture::stream(b"/Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode", &jpeg);
+    assert_eq!(
+        worker(&fixture::document(b"/Image Do", &[mismatch]), "1").stdout,
+        b"{\"error\":\"invalid\"}\n"
+    );
     let frame = jpeg.windows(2).position(|p| p == [0xff, 0xc0]).unwrap();
     jpeg[frame + 5..frame + 7].copy_from_slice(&3001u16.to_be_bytes());
     jpeg[frame + 7..frame + 9].copy_from_slice(&4000u16.to_be_bytes());

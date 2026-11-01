@@ -105,7 +105,11 @@ static void checkImage(CGPDFStreamRef stream) {
         CGImageSourceRef source = CGImageSourceCreateWithData(bytes, (__bridge CFDictionaryRef)@{(id)kCGImageSourceShouldCache:@NO});
         NSDictionary *properties = source ? CFBridgingRelease(CGImageSourceCopyPropertiesAtIndex(source, 0, NULL)) : nil;
         if (!properties) failure = "invalid";
-        else dimensions([properties[(id)kCGImagePropertyPixelWidth] longLongValue], [properties[(id)kCGImagePropertyPixelHeight] longLongValue]);
+        else {
+            int64_t realWidth = [properties[(id)kCGImagePropertyPixelWidth] longLongValue];
+            int64_t realHeight = [properties[(id)kCGImagePropertyPixelHeight] longLongValue];
+            if (dimensions(realWidth, realHeight) && (realWidth != w || realHeight != h)) failure = "invalid";
+        }
         if (source) CFRelease(source);
     } else if (format != CGPDFDataFormatRaw) failure = "unsupported";
     CFRelease(bytes);
