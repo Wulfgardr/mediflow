@@ -1,3 +1,4 @@
+import { ensurePortableImportOriginsSchema } from './backup-import-provenance';
 import { ensureAmbulatoryDestructiveCommandSchema } from './ambulatory-destructive-command-schema';
 import { ensureTherapyStatusCommandSchema } from './therapy-status-command-schema';
 import Database from 'better-sqlite3';
@@ -938,6 +939,7 @@ export function initializeSqliteSchema(sqlite: Database.Database): void {
         bootstrapEmptySqliteDatabase(sqlite);
         applySchemaGuards(sqlite);
         ensureTherapyStatusCommandSchema(sqlite);
+        ensurePortableImportOriginsSchema(sqlite);
         ensureAmbulatoryDestructiveCommandSchema(sqlite);
         upgradeLegacyAttachmentCurrentness(sqlite);
         sqlite.exec(`CREATE TABLE IF NOT EXISTS archive_generation (

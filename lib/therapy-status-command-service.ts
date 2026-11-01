@@ -1,3 +1,4 @@
+import { therapyCommandOrigin, type BackupOrigin } from './backup-import-provenance';
 import { mintResourcePort, releaseResourcePort } from './security/web-auth-lifecycle-owner-adapter';
 import { createHash } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
@@ -78,12 +79,15 @@ export function closeTherapyStatusCommand(session: ServerSession, command: Thera
     }, { behavior: 'immediate' });
 }
 export function readTherapyStatusReceipt(session: ServerSession, command: TherapyStatusCommand):
-    { outcome: 'unknown' } | { outcome: 'terminal'; historical: boolean; receipt: TherapyStatusReceipt } {
+    { outcome: 'unknown' } | { outcome: 'terminal'; origin: BackupOrigin; historical: boolean; receipt: TherapyStatusReceipt } {
     if (!parseTherapyStatusCommand(command, false)) throw new TherapyStatusCommandDenied('invalid');
     return dbServer.transaction(tx => {
         const actorRef = admitActor(tx, session);
         const existing = existingReceipt(tx, command, actorRef);
-        if (existing) return { outcome: 'terminal' as const, historical: existing.archiveGeneration !== readSqliteArchiveGeneration(dbServer.$client), receipt: receipt(existing) };
+        if (existing) {
+            const origin = therapyCommandOrigin(dbServer.$client, existing.commandId);
+            return { outcome: 'terminal' as const, origin, historical: origin !== 'local' || existing.archiveGeneration !== readSqliteArchiveGeneration(dbServer.$client), receipt: receipt(existing) };
+        }
         assertArchiveGeneration(tx, command.archiveGeneration);
         admitResource(tx, command);
         return { outcome: 'unknown' as const };

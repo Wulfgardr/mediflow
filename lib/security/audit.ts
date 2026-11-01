@@ -1,7 +1,8 @@
+import { auditOrigin, type BackupOrigin } from '../backup-import-provenance';
 import { buildAifaCatalogManifest, parseStoredAifaCatalogManifest, type AifaCatalogManifest } from '../aifa-catalog';
 import { assertArchiveRequestInTransaction } from './archive-request-context';
 import crypto from 'crypto';
-import { and, desc, eq, gte } from 'drizzle-orm';
+import { and, desc, eq, gte, ne } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { hasValidLocalApiToken } from './local-api-auth';
 import { auditEvents } from '../schema';
@@ -16,6 +17,10 @@ import { parsePatientDocumentCreateJournal, type PatientDocumentCreateJournal } 
 export const AUDIT_SCHEMA_VERSION = 1 as const;
 
 export const AUDIT_EVENT_TYPES = [
+    'backup.portable.imported',
+    'backup.provenance.unattested',
+    'backup.audit.imported',
+    'backup.therapy-command.imported',
     'auth.login.succeeded',
     'auth.login.failed',
     'auth.logout',
@@ -86,7 +91,7 @@ export const AUDIT_EVENT_TYPES = [
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
-export type AuditSubjectType = 'session' | 'active_role_attestation' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review' | 'agent_operation' | 'reference_data';
+export type AuditSubjectType = 'backup' | 'audit_event' | 'therapy_command' | 'session' | 'active_role_attestation' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review' | 'agent_operation' | 'reference_data';
 export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job';
 export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
 
@@ -147,6 +152,7 @@ export type AuditRequestWriteInput = {
 };
 
 type AuditListFilters = {
+    origin?: BackupOrigin;
     limit?: number;
     eventType?: AuditEventType;
     outcome?: AuditOutcome;
@@ -156,6 +162,7 @@ type AuditListFilters = {
 };
 
 export type AuditRecord = {
+    origin: BackupOrigin;
     schemaVersion: number;
     eventId: string;
     eventType: AuditEventType;
@@ -172,6 +179,8 @@ export type AuditRecord = {
 };
 
 export type AuditSummary = {
+    importedEvents: number;
+    unattestedEvents: number;
     totalEvents: number;
     distinctActors: number;
     outcomes: Record<AuditOutcome, number>;
@@ -420,7 +429,9 @@ export async function writeAuditEvent(input: AuditWriteInput): Promise<string> {
 export async function listAuditEvents(filters: AuditListFilters = {}): Promise<AuditRecord[]> {
     const { dbServer } = await import('../db-server');
     const limit = normalizeLimit(filters.limit);
-    const clauses = [];
+    const origin = filters.origin ?? 'local';
+    const clauses = [eq(auditOrigin(auditEvents.eventId), origin)];
+    if (!filters.eventType) clauses.push(ne(auditEvents.eventType, 'backup.audit.imported'), ne(auditEvents.eventType, 'backup.therapy-command.imported'));
 
     if (filters.eventType) clauses.push(eq(auditEvents.eventType, filters.eventType));
     if (filters.outcome) clauses.push(eq(auditEvents.outcome, filters.outcome));
@@ -434,6 +445,7 @@ export async function listAuditEvents(filters: AuditListFilters = {}): Promise<A
         : await dbServer.select().from(auditEvents).orderBy(desc(auditEvents.occurredAt)).limit(limit);
 
     return rows.map((row) => ({
+        origin,
         schemaVersion: row.schemaVersion,
         eventId: row.eventId,
         eventType: row.eventType as AuditEventType,
@@ -463,6 +475,9 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
         job: 0,
     };
     const subjectTypes: Record<AuditSubjectType, number> = {
+        backup: 0,
+        audit_event: 0,
+        therapy_command: 0,
         session: 0,
         active_role_attestation: 0,
         patient: 0,
@@ -484,7 +499,8 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
     const eventTypeCounts = new Map<AuditEventType, number>();
     const actors = new Set<string>();
 
-    for (const record of records) {
+    const localRecords = records.filter(record => record.origin === 'local');
+    for (const record of localRecords) {
         outcomes[record.outcome] += 1;
         sourceSurfaces[record.sourceSurface] += 1;
         subjectTypes[record.subjectType] += 1;
@@ -498,7 +514,9 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
         .map(([eventType, count]) => ({ eventType, count }));
 
     return {
-        totalEvents: records.length,
+        totalEvents: localRecords.length,
+        importedEvents: records.filter(record => record.origin === 'imported').length,
+        unattestedEvents: records.filter(record => record.origin === 'unattested').length,
         distinctActors: actors.size,
         outcomes,
         sourceSurfaces,

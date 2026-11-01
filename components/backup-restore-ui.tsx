@@ -1,5 +1,8 @@
 'use client';
 
+import { checkAuthHealthRequest, readUnlockParameters } from '@/lib/security/client-auth-api';
+import { deriveUnlockMaterial } from '@/lib/security/unlock-credential';
+import { planUnlock, LONG_PIN_NOTICE, LONG_PIN_CONFIRM_LABEL } from '@/lib/security/unlock-plan';
 import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Download, Upload, AlertTriangle, CheckCircle, RefreshCw, ShieldCheck } from 'lucide-react';
@@ -58,7 +61,11 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
     onRestorePendingChange?: (pending: boolean) => void;
     children?: ReactNode;
 }) {
-    const { isAuthenticated, lock } = useSecurity();
+    const { isAuthenticated, lock, unlockCredential } = useSecurity();
+    const [restoreSecret, setRestoreSecret] = useState('');
+    const [longPinConfirmed, setLongPinConfirmed] = useState(false);
+    const [longPinNotice, setLongPinNotice] = useState(false);
+    const [exportConfirmed, setExportConfirmed] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [status, setStatus] = useState<Outcome | null>(null);
     const [pendingRestoreFile, setPendingRestoreFile] = useState<File | null>(null);
@@ -127,25 +134,45 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
 
         setStatus(null);
         setRestoreConfirmText('');
+        setRestoreSecret('');
+        setLongPinConfirmed(false);
+        setLongPinNotice(false);
         setPendingRestoreFile(file);
     };
 
     const cancelRestore = () => {
         setPendingRestoreFile(null);
         setRestoreConfirmText('');
+        setRestoreSecret('');
+        setLongPinConfirmed(false);
+        setLongPinNotice(false);
     };
 
     const restoreConfirmed = restoreConfirmText.trim().toUpperCase() === RESTORE_CONFIRM_KEYWORD;
 
     const confirmRestore = async () => {
-        if (!pendingRestoreFile || !restoreConfirmed || isLoading) return;
+        if (!pendingRestoreFile || !restoreConfirmed || !restoreSecret || isLoading) return;
 
         setIsLoading(true);
         setStatus({ type: 'info', message: 'Ripristino in corso...' });
 
         try {
             const text = await pendingRestoreFile.text();
-            await importRawDatabase(text);
+            const health = await checkAuthHealthRequest({ fresh: true });
+            const plan = planUnlock({ shown: unlockCredential, current: readUnlockParameters(health.payload?.unlock),
+                secret: restoreSecret, longPinConfirmed });
+            if (plan.action === 'refuse') throw new Error(plan.message);
+            if (plan.action === 'confirm-long-pin') {
+                setLongPinNotice(true);
+                setStatus({ type: 'error', message: LONG_PIN_NOTICE });
+                return;
+            }
+            const credential = plan.action === 'derive'
+                ? { verifier: (await deriveUnlockMaterial(restoreSecret, Uint8Array.from(atob(plan.salt), c => c.charCodeAt(0)))).verifier }
+                : { pin: restoreSecret };
+            setRestoreSecret('');
+            await importRawDatabase(text, credential);
+            setPendingRestoreFile(null);
             setStatus({ type: 'success', title: 'Ripristino completato', message: 'I dati sono stati sostituiti con quelli del backup. L\'applicazione si blocca per ricaricare le chiavi.' });
 
             // Wait a sec then lock/reload
@@ -156,11 +183,10 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
 
         } catch (err) {
             console.error(err);
+            setRestoreSecret('');
             setStatus(failedOutcome(err, 'restore'));
         } finally {
             setIsLoading(false);
-            setPendingRestoreFile(null);
-            setRestoreConfirmText('');
         }
     };
 
@@ -179,10 +205,16 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                     <br />
                     <span className="font-semibold text-[color:var(--lume-signal-warning)]">Nota:</span> il restore copre le collezioni esportabili via API locale; i dati non validi vengono rifiutati prima della scrittura.
                 </p>
+                <label className="mb-4 flex items-start gap-2 text-sm">
+                    <input type="checkbox" checked={exportConfirmed} onChange={e => setExportConfirmed(e.target.checked)} />
+                    <span>Il file portabile contiene categorie leggibili in chiaro: nomi, codici fiscali, date di nascita,
+                        farmaci e dosaggi, valori di laboratorio e titoli dei controlli. Confermo che lo salverò in una
+                        destinazione locale protetta, senza sincronizzazione o condivisione non autorizzata.</span>
+                </label>
                 <div className={composition.actions}>
                 <button
                     onClick={handleExport}
-                    disabled={isLoading}
+                    disabled={isLoading || !exportConfirmed}
                     className="mf-btn-secondary lume-press px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {isLoading ? <RefreshCw className="w-4 h-4" /> : <Download className="w-4 h-4" />}
@@ -216,7 +248,7 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                     <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                     <p>
                         Il ripristino <strong>sostituirà pazienti, voci, allegati e gli altri dati del formato portabile</strong> con quelli del file.
-                        Account e chiavi restano invariati. Lo storico protetto delle operazioni viene conservato.
+                        Account e chiavi restano invariati. Le attestazioni attive tornano inattive. Lo storico viene conservato; gli eventi importati sono segnalati da eventi locali di importazione. Usa solo file di provenienza fidata: il checksum non autentica chi li ha creati.
                         Il file viene verificato prima della scrittura e rifiutato se il manifest non coincide.
                     </p>
                 </div>
@@ -243,7 +275,7 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                             <p>
                                 ATTENZIONE: <strong>I dati del formato portabile verranno sostituiti</strong> con quelli del file selezionato.
-                                Account e chiavi restano invariati. Lo storico protetto delle operazioni viene conservato.
+                                Account e chiavi restano invariati. Le attestazioni attive tornano inattive. Lo storico viene conservato; gli eventi importati sono segnalati da eventi locali di importazione. Usa solo file di provenienza fidata: il checksum non autentica chi li ha creati.
                                 L&apos;operazione non è reversibile. Le altre schede verranno ricaricate;
                                 i dispositivi abbinati dovranno essere abbinati e sincronizzati di nuovo.
                             </p>
@@ -252,6 +284,16 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                             File selezionato: <code>{pendingRestoreFile.name}</code>{' '}
                             ({Math.max(1, Math.round(pendingRestoreFile.size / 1024)).toLocaleString()} KB)
                         </p>
+                        <label className="block text-sm mb-3">
+                            {unlockCredential === 'passphrase' ? 'Passphrase amministrativa' : 'PIN amministrativo'}
+                            <input type="password" autoComplete="current-password" value={restoreSecret}
+                                onChange={e => { setRestoreSecret(e.target.value); setLongPinConfirmed(false); setLongPinNotice(false); }}
+                                className="mf-input mt-1 w-full" />
+                        </label>
+                        {longPinNotice && <label className="block text-sm mb-3">
+                            <input type="checkbox" checked={longPinConfirmed} onChange={e => setLongPinConfirmed(e.target.checked)} />
+                            {LONG_PIN_CONFIRM_LABEL}
+                        </label>}
                         <label className="block text-xs font-medium">
                             Scrivi <strong>{RESTORE_CONFIRM_KEYWORD}</strong> per procedere
                             <input
@@ -278,7 +320,7 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                             <button
                                 type="button"
                                 onClick={confirmRestore}
-                                disabled={!restoreConfirmed || isLoading}
+                                disabled={!restoreConfirmed || !restoreSecret || isLoading}
                                 data-testid="restore-confirmation-submit"
                                 className="mf-button-destructive inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                             >

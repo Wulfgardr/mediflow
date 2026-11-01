@@ -1076,11 +1076,11 @@ export class BackupRestoreBlockedError extends Error {
 
 export type BackupVerification = { createdAt: string | null; collections: number; records: number };
 
-async function postBackup(url: string, jsonString: string, failure: string): Promise<Response> {
+async function postBackup(url: string, jsonString: string, failure: string, credential?: { pin: string } | { verifier: string }): Promise<Response> {
     await db.assertBackupReadable(jsonString);
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(credential ? { 'x-mediflow-restore-credential': JSON.stringify(credential) } : {}) },
         body: jsonString,
     });
     if (response.ok) return response;
@@ -1101,8 +1101,8 @@ async function postBackup(url: string, jsonString: string, failure: string): Pro
     throw new Error(errorMessage);
 }
 
-export async function importRawDatabase(jsonString: string) {
-    await postBackup('/api/system/backup-restore', jsonString, 'Restore failed');
+export async function importRawDatabase(jsonString: string, credential?: { pin: string } | { verifier: string }) {
+    await postBackup('/api/system/backup-restore', jsonString, 'Restore failed', credential);
 }
 
 /* Same key check and preflight as a restore, through a route that cannot write. */
