@@ -8282,6 +8282,130 @@ mod g2_settings_tests {
         );
     }
     #[test]
+    fn g2_work_profile_conflict_lost_and_false_success_require_reread_without_replay() {
+        use crate::local_host::{WorkProfileAction, WorkProfileDraft, WorkProfileState};
+        let contract: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/work-profile.json")).unwrap();
+        for outcome in [409, 0, 200] {
+            let (listener, session) = fixture();
+            let initial: WorkProfileState =
+                serde_json::from_value(contract["initial"].clone()).unwrap();
+            let draft: WorkProfileDraft =
+                serde_json::from_value(contract["steps"][1]["command"]["draft"].clone()).unwrap();
+            let mut reply = contract["steps"][1]["state"].clone();
+            reply["revision"] = json!(1);
+            reply["draft"]["profile"] = json!("agent");
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("PUT /api/onboarding/work-profile "));
+                let command: Value =
+                    serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                reply["lastCommand"] = command;
+                if outcome != 0 {
+                    local_host_reply(&mut stream, outcome, reply, "");
+                }
+                drop(stream);
+                listener
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let command = access
+                .prepare_work_profile(&initial, WorkProfileAction::SaveDraft, Some(draft))
+                .unwrap();
+            assert!(
+                matches!(access.write_work_profile(&command),Err(e) if e==if outcome==409 {RuntimeError::Conflict}else{RuntimeError::Indeterminate})
+            );
+            assert!(matches!(
+                access.write_work_profile(&command),
+                Err(RuntimeError::ReadRequired)
+            ));
+            let listener = worker.join().unwrap();
+            listener.set_nonblocking(true).unwrap();
+            assert!(crate::test_loopback::accept(&listener).is_err());
+        }
+    }
+    #[test]
+    fn g2_work_profile_persists_preview_confirm_discard_rollback_with_single_writer() {
+        use crate::local_host::{WorkProfileAction, WorkProfileDraft, WorkProfileState};
+        let contract: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/work-profile.json")).unwrap();
+        let (listener, session) = fixture();
+        let host_fixture = contract.clone();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+            assert!(read_request(&mut stream).starts_with("GET /api/onboarding/work-profile "));
+            local_host_reply(&mut stream, 200, host_fixture["initial"].clone(), "");
+            for step in host_fixture["steps"].as_array().unwrap() {
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("PUT /api/onboarding/work-profile "));
+                let lower = request.to_ascii_lowercase();
+                assert!(lower.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                assert!(lower.contains("x-mediflow-archive-generation: synthetic-generation"));
+                assert!(!lower.contains("authorization:"));
+                let command: Value =
+                    serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                let mut expected = step["command"].clone();
+                expected["id"] = command["id"].clone();
+                assert_eq!(command, expected);
+                let mut next = step["state"].clone();
+                next["lastCommand"] = command;
+                local_host_reply(&mut stream, 200, next.clone(), "");
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/onboarding/work-profile "));
+                local_host_reply(&mut stream, 200, next, "");
+            }
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let mut observed = access.read_work_profile().unwrap();
+        for step in contract["steps"].as_array().unwrap() {
+            let action = match step["command"]["action"].as_str().unwrap() {
+                "save-draft" => WorkProfileAction::SaveDraft,
+                "confirm" => WorkProfileAction::Confirm,
+                "discard-draft" => WorkProfileAction::DiscardDraft,
+                _ => WorkProfileAction::Rollback,
+            };
+            let draft = step["command"]
+                .get("draft")
+                .map(|d| serde_json::from_value::<WorkProfileDraft>(d.clone()).unwrap());
+            let command = access
+                .prepare_work_profile(&observed, action, draft)
+                .unwrap();
+            let result = access.write_work_profile(&command).unwrap();
+            assert_eq!(result.current.as_ref().unwrap(), &result.recorded);
+            let mut expected: WorkProfileState =
+                serde_json::from_value(step["state"].clone()).unwrap();
+            expected.last_command = result.recorded.last_command.clone();
+            assert_eq!(result.recorded, expected);
+            assert!(matches!(
+                access.write_work_profile(&command),
+                Err(RuntimeError::ReadRequired)
+            ));
+            observed = result.recorded;
+        }
+        let listener = worker.join().unwrap();
+        session.lock();
+        assert!(matches!(
+            access.read_work_profile(),
+            Err(RuntimeError::Locked)
+        ));
+        listener.set_nonblocking(true).unwrap();
+        assert!(crate::test_loopback::accept(&listener).is_err());
+    }
+    #[test]
     fn g2_passphrase_rotation_uses_web_writer_retires_all_local_clones_and_never_replays() {
         for (status, readback) in [
             (200, "changed"),

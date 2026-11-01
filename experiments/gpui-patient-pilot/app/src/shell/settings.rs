@@ -61,6 +61,7 @@ impl ClinicalApp {
         self.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
         if page == SettingsPage::Profile {
             self.ensure_account_profile_loaded(cx);
+            self.ensure_work_profile_loaded(cx);
         }
         if page == SettingsPage::Host {
             self.read_network_mode(cx);
@@ -134,7 +135,7 @@ impl ClinicalApp {
             SettingsPage::Controls => view.child(self.controls_view(cx)),
             SettingsPage::Archives => view.child(self.archives_view(cx)),
             SettingsPage::References => view.child(self.reference_administration_view(cx)),
-            SettingsPage::Profile => view.child(self.account_profile_view(cx)),
+            SettingsPage::Profile => view.child(self.account_profile_view(cx)).child(self.work_profile_view(cx)),
             SettingsPage::Appearance => view.child(heading("clinical-workspace-settings-heading", "Aspetto", theme))
             .child(div().flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-appearance-heading", "ASPETTO", theme))
@@ -151,6 +152,7 @@ impl ClinicalApp {
             .child(button("clinical-workspace-increased-contrast", if self.increased_contrast { "Contrasto dei filetti: aumentato" } else { "Aumenta il contrasto dei filetti" }, theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| this.change_local_preference(PreferenceChange::Contrast(!this.increased_contrast), cx))))
             .child(self.local_preferences_status(cx))
+            .child(self.system_accessibility_view(cx))
             .child(div().border_t_1().border_color(theme.rule).pt(px(24.)).flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-privacy-heading", "Privacy", theme))
                 .child(div().text_color(theme.secondary).child(text!("Copre questa finestra e conserva la bozza. L’accesso resta aperto finché non scegli Blocca. Puoi oscurare e mostrare i contenuti anche con Ctrl/Cmd + Maiusc + P.")))
