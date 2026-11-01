@@ -1,9 +1,15 @@
-use super::governance::{fact, section_state};
+use super::governance::section_state;
 use super::*;
 use mediflow_runtime_client::{
     AiLocalState, AiRuntimeStatus, ControlsSnapshot, WhoReadiness, WhoReadinessStatus,
 };
 use serde_json::Value;
+
+fn fact(label: &str, value: impl AsRef<str>, theme: Theme) -> Div {
+    div()
+        .id(SharedString::from(label.to_owned()))
+        .child(super::governance::fact(label, value, theme))
+}
 
 #[derive(Default)]
 pub(super) struct ControlsArea {
@@ -99,37 +105,50 @@ fn compliance(theme: Theme) -> Div {
     let mut pane = div().flex().flex_col().gap(px(16.))
         .child(section("controls-compliance", "Evidenze e conformità", theme))
         .child(text!("Inventario di evidenze, non attestazione. Lo stato legale non è valutato. Applicabilità, ruoli, adempimenti e certificazioni richiedono una valutazione del deployment."));
-    for row in inventory["records"].as_array().expect("inventory records") {
-        pane = pane.child(fields(
-            row,
-            &[
-                ("label", "Ambito"),
-                ("summary", "Evidenze"),
-                ("limitation", "Limite"),
-                ("owner", "Responsabile"),
-            ],
-            theme,
-        ));
+    for (index, row) in inventory["records"]
+        .as_array()
+        .expect("inventory records")
+        .iter()
+        .enumerate()
+    {
+        let mut record = div()
+            .id(SharedString::from(format!("controls-evidence-{index}")))
+            .flex()
+            .flex_col()
+            .gap(px(8.))
+            .child(fields(
+                row,
+                &[
+                    ("label", "Ambito"),
+                    ("summary", "Evidenze"),
+                    ("limitation", "Limite"),
+                    ("owner", "Responsabile"),
+                ],
+                theme,
+            ));
         let status = match row["status"].as_str() {
             Some("source_evidence") => "Evidenza nel sorgente",
             Some("source_evidence_with_limit") => "Evidenza con limite esplicito",
             _ => "Valutazione esterna necessaria",
         };
-        pane = pane.child(fact("Stato", status, theme));
-        for source in row["evidence"].as_array().expect("evidence") {
-            pane = pane.child(fact(
-                "Fonte nel repository",
-                source.as_str().unwrap_or("Non indicata"),
-                theme,
-            ));
+        record = record.child(fact("Stato", status, theme));
+        for (index, source) in row["externalReferences"]
+            .as_array()
+            .expect("references")
+            .iter()
+            .enumerate()
+        {
+            record = record.child(
+                div()
+                    .id(SharedString::from(format!("official-reference-{index}")))
+                    .child(fields(
+                        source,
+                        &[("label", "Fonte ufficiale"), ("href", "Indirizzo")],
+                        theme,
+                    )),
+            );
         }
-        for source in row["externalReferences"].as_array().expect("references") {
-            pane = pane.child(fields(
-                source,
-                &[("label", "Fonte ufficiale"), ("href", "Indirizzo")],
-                theme,
-            ));
-        }
+        pane = pane.child(record);
     }
     pane
 }
@@ -262,23 +281,27 @@ impl ClinicalApp {
             if rows.is_empty() {
                 pane = pane.child(fact("Eventi", "Nessun evento restituito", theme));
             }
-            for row in rows {
-                pane = pane.child(fields(
-                    row,
-                    &[
-                        ("eventId", "Evento"),
-                        ("eventType", "Tipo"),
-                        ("occurredAt", "Data"),
-                        ("outcome", "Esito"),
-                        ("actorType", "Tipo attore"),
-                        ("actorRef", "Attore"),
-                        ("subjectType", "Tipo oggetto"),
-                        ("subjectRef", "Oggetto"),
-                        ("sourceSurface", "Superficie"),
-                        ("requestId", "Richiesta"),
-                    ],
-                    theme,
-                ));
+            for (index, row) in rows.iter().enumerate() {
+                pane = pane.child(
+                    div()
+                        .id(SharedString::from(format!("controls-audit-{index}")))
+                        .child(fields(
+                            row,
+                            &[
+                                ("eventId", "Evento"),
+                                ("eventType", "Tipo"),
+                                ("occurredAt", "Data"),
+                                ("outcome", "Esito"),
+                                ("actorType", "Tipo attore"),
+                                ("actorRef", "Attore"),
+                                ("subjectType", "Tipo oggetto"),
+                                ("subjectRef", "Oggetto"),
+                                ("sourceSurface", "Superficie"),
+                                ("requestId", "Richiesta"),
+                            ],
+                            theme,
+                        )),
+                );
             }
         }
         pane=pane.child(section("controls-redaction","Servizio di redazione",theme))
