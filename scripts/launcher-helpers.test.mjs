@@ -1601,7 +1601,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     const child = spawn(executable, ['-e', ${JSON.stringify(`
                         const fs = require('node:fs');
                         process.once('message', () => {
-                            process.stderr.write('FIXTURE_PREPARATION_WAITING\n');
+                            console.error('FIXTURE_PREPARATION_WAITING');
                             const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(startupGate)})) { clearInterval(timer); process.exit(1); } }, 10);
                         });
                     `)}], options);
@@ -3418,9 +3418,9 @@ test('synthetic crash writer retains its open transaction across garbage collect
     } finally {lease.closeSync();}
 });
 
-for (const phase of ['guardian-pending','preparation-failed']) test(`launcher preserves custody through ${phase}`, {timeout:15000}, async t => {
-    const pending = phase === 'guardian-pending';
-    const f = await ordinaryLauncherFixture(t,'web',['--scelta','web'],pending,true,{},null,
+for (const phase of ['guardian-pending','preparation-failed','preparation-failed-chooser']) test(`launcher preserves custody through ${phase}`, {timeout:15000}, async t => {
+    const pending = phase === 'guardian-pending', chooser = phase === 'preparation-failed-chooser';
+    const f = await ordinaryLauncherFixture(t,'web',[...chooser ? ['--scegli'] : [],'--scelta','web'],pending,true,{},null,
         {job: !pending && process.platform === 'win32' ? 'native' : 'simulated',guardianGate:pending,preparationFailure:!pending});
     if (pending) {
         await f.until(() => f.observations().some(event => event.type === 'simulated-job-created'));
@@ -3444,10 +3444,19 @@ for (const phase of ['guardian-pending','preparation-failed']) test(`launcher pr
             assert.ok(owner.runtime.guardian.pid > 0);
         } finally { f.releaseStartup(); }
     }
+    if (chooser) {
+        await f.until(() => f.output().includes('npm run build non completato'));
+        const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
+        const state = await (await fetch(new URL('state',receipt.choiceUrl))).json();
+        assert.equal(state.step,'errore'); assert.equal(state.ready,false);
+        const endpoint = new URL('stop',receipt.choiceUrl);
+        const response = await fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:'{}'});
+        assert.equal(response.status,200); await response.text();
+    }
     await f.waitForTerminal();
     assert.equal(existsSync(path.join(f.stateFiles.lockDirectory,'active')),false,f.output());
     assert.match(f.output(),/MediFlow arrestato\./u);
     assert.doesNotMatch(f.output(),/Arresto non verificato|cleanup unconfirmed/u);
     assert.ok(f.observations().some(event => event.type === (pending ? 'simulated-job-closed' : 'preparation-closed')));
-    assert.equal(f.child.exitCode,pending ? 0 : 1);
+    assert.equal(f.child.exitCode,pending || chooser ? 0 : 1);
 });
