@@ -799,21 +799,7 @@ impl ClinicalApp {
                         false,
                         enabled && area.snapshot.is_some(),
                     )
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        if this.local_host.has_work()
-                            || this.local_host.references.snapshot.is_none()
-                        {
-                            return;
-                        }
-                        let Some(access) = this.local_host.access() else {
-                            return;
-                        };
-                        match access.prepare_aifa_update() {
-                            Ok(p) => this.local_host.references.preview = Some(Arc::new(p)),
-                            Err(e) => this.local_host.references.message = Some(ui_error(e)),
-                        }
-                        cx.notify();
-                    })),
+                    .on_click(cx.listener(|this, _, _, cx| this.prepare_aifa_acquisition(cx))),
                 );
                 for field in &area.fields {
                     pane = pane.child(field.clone());
@@ -987,6 +973,19 @@ fn prosthetics_options(fields: &[String]) -> std::result::Result<Value, &'static
     Ok(options)
 }
 impl ClinicalApp {
+    fn prepare_aifa_acquisition(&mut self, cx: &mut Context<Self>) {
+        if self.local_host.has_work() || self.local_host.references.snapshot.is_none() {
+            return;
+        }
+        let Some(access) = self.local_host.access() else {
+            return;
+        };
+        match access.prepare_aifa_update() {
+            Ok(command) => self.local_host.references.preview = Some(Arc::new(command)),
+            Err(error) => self.local_host.references.message = Some(ui_error(error)),
+        }
+        cx.notify();
+    }
     fn prosthetics_sources_view(&self, cx: &Context<Self>) -> Stateful<Div> {
         let area = &self.local_host.references;
         let enabled = !self.local_host.has_work();
@@ -1396,31 +1395,17 @@ mod tests {
             app.local_host.references.in_flight = None;
             app.local_host.references.snapshot = None;
         });
-        cx.update(|window, cx| {
-            window.refresh();
-            window.draw(cx).clear(cx);
-        });
-        assert!(
-            rendered_command::node("references-aifa-update")
-                .0
-                .is_disabled()
-        );
-        view.update(cx, |app, _| {
+        view.update(cx, |app, cx| {
+            app.prepare_aifa_acquisition(cx);
+            assert!(app.local_host.references.preview.is_none());
             app.local_host.references.snapshot = Some(ReferenceStatus {
                 catalog: ReferenceCatalog::Aifa,
                 data: json!({"count":0}),
                 sources: None,
             });
+            app.prepare_aifa_acquisition(cx);
+            assert!(app.local_host.references.preview.is_some());
         });
-        cx.update(|window, cx| {
-            window.refresh();
-            window.draw(cx).clear(cx);
-        });
-        assert!(
-            !rendered_command::node("references-aifa-update")
-                .0
-                .is_disabled()
-        );
         view.update(cx, |app, cx| {
             app.withdraw_local_host(cx);
             assert!(app.local_host.references.in_flight.is_none());
