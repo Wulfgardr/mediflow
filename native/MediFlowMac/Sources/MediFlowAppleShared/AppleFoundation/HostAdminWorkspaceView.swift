@@ -130,10 +130,10 @@ struct HostAdminWorkspaceView: View {
             isPresented: $confirmsExport,
             titleVisibility: .visible
         ) {
-            Button("Scegli destinazione ed esporta") { presentSavePanel() }
+            Button("Conferma e scegli destinazione") { presentSavePanel() }
             Button("Annulla", role: .cancel) {}
         } message: {
-            Text("Il file conterrà tutti i pazienti e i loro dati clinici in un unico documento. Resta sul tuo disco e non viene inviato a nessuno, ma da quel momento vive fuori dall'archivio protetto: scegli una destinazione che tratteresti come i dati stessi.")
+            Text("Il file portabile contiene categorie leggibili in chiaro: nomi, codici fiscali, date di nascita, farmaci e dosaggi, valori di laboratorio e titoli dei controlli. Conferma una destinazione locale protetta, senza sincronizzazione o condivisione non autorizzata.")
         }
         .accessibilityIdentifier("clinical-workspace-host-view")
     }
@@ -197,7 +197,9 @@ struct HostAdminWorkspaceView: View {
         if let audit = store.auditSummary {
             section("Audit operativo", systemImage: "checkmark.shield") {
                 InfoRow("Finestra", "\(audit.days ?? 30) giorni")
-                InfoRow("Eventi esaminati", String(audit.totalEvents ?? 0))
+                InfoRow("Eventi locali esaminati", String(audit.totalEvents ?? 0))
+                InfoRow("Importati, esaminati separatamente", "\(audit.importedEvents ?? 0)\(audit.importedIsTruncated == true ? " o più" : "")")
+                InfoRow("Origine non attestata, esaminati separatamente", "\(audit.unattestedEvents ?? 0)\(audit.unattestedIsTruncated == true ? " o più" : "")")
                 InfoRow("Operatori distinti", String(audit.distinctActors ?? 0))
                 if let outcomes = audit.outcomes {
                     InfoRow(
@@ -207,7 +209,7 @@ struct HostAdminWorkspaceView: View {
                 }
                 if let surfaces = audit.sourceSurfaces {
                     InfoRow(
-                        "Origine",
+                        "Superfici locali",
                         "web \(surfaces.web ?? 0) · nativo \(surfaces.native ?? 0) · api \(surfaces.api ?? 0) · job \(surfaces.job ?? 0)"
                     )
                 }

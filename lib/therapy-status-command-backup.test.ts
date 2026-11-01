@@ -15,9 +15,9 @@ import { rotateSqliteArchiveGeneration } from './archive-generation.ts';
 const load = createRequire(import.meta.url);
 const data = mkdtempSync(join(tmpdir(), 'mediflow-command-backup-')); process.env.MEDIFLOW_DATA_DIR = data;
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
-const { users, patients, therapies } = load('./schema.ts') as typeof import('./schema.ts');
+const { users, patients, therapies, ambulatories, patientsToAmbulatories } = load('./schema.ts') as typeof import('./schema.ts');
 const { bindSyntheticArchiveSessions, issueSyntheticWebSession } = load('./security/web-auth-lifecycle-owner-test-fixture.ts') as typeof import('./security/web-auth-lifecycle-owner-test-fixture.ts');
-const { executeTherapyStatusCommand, closeTherapyStatusCommand, readTherapyStatusReceipt } = load('./therapy-status-command-service.ts') as typeof import('./therapy-status-command-service.ts');
+const { executeTherapyStatusInTransaction, executeTherapyStatusCommand, closeTherapyStatusCommand, readTherapyStatusReceipt } = load('./therapy-status-command-service.ts') as typeof import('./therapy-status-command-service.ts');
 const { restoreBackupArtifact } = load('./backup-restore-executor.ts') as typeof import('./backup-restore-executor.ts');
 const generation = bindSyntheticArchiveSessions('synthetic-backup-session');
 const syntheticUsername = 'synthetic-backup';
@@ -32,6 +32,12 @@ function fixture() {
     return { commandId: randomUUID(), protocol: 'therapy.status.change.v1' as const, archiveGeneration: generation, patientId, therapyId, expectedVersion: 1 };
 }
 const applied = fixture(); executeTherapyStatusCommand(session, { ...applied, target: 'completed' });
+const native = fixture();
+const scopeId = randomUUID();
+dbServer.insert(ambulatories).values({ id: scopeId, name: 'Sintetico', type: 'live' }).run();
+dbServer.insert(patientsToAmbulatories).values({ patientId: native.patientId, ambulatoryId: scopeId }).run();
+dbServer.transaction(tx => executeTherapyStatusInTransaction(tx, { ...native, target: 'suspended' }, session.userId, scopeId), { behavior: 'immediate' });
+assert.equal(readTherapyCommandAudits(sql).find(row => row.requestId === native.commandId)?.sourceSurface, 'native');
 const closed = fixture(); closeTherapyStatusCommand(session, closed);
 const rejected = fixture(); executeTherapyStatusCommand(session, { ...rejected, expectedVersion: 2, target: 'suspended' });
 function dataset() { return { ...createEmptyDataset(), therapyStatusCommands: readTherapyStatusCommandRows(sql), auditEvents: readTherapyCommandAudits(sql) }; }
@@ -56,6 +62,15 @@ test('each immutable field, missing or divergent audit and malformed result are 
     assert.throws(() => validateTherapyStatusCommandRows(payload.therapyStatusCommands.map(value => value.outcome === 'closed' ? { ...value, target: 'active' } : value), payload.auditEvents), /closed/);
     const audits = payload.auditEvents.map(row => row.eventId === payload.therapyStatusCommands.find(value => value.outcome === 'applied')!.auditEventId ? { ...row, actorRef: 'other' } : row);
     assert.throws(() => validateTherapyStatusCommandRows(payload.therapyStatusCommands, audits), /audit/);
+});
+test('command writer surfaces are bounded even when snapshot and audit agree', () => {
+    const payload = dataset();
+    for (const surface of ['api', 'job', '', 'import']) {
+        const audits = payload.auditEvents.map(row => ({ ...row, sourceSurface: surface }));
+        const rows = payload.therapyStatusCommands.map(row => row.auditSnapshot
+            ? { ...row, auditSnapshot: JSON.stringify({ ...JSON.parse(row.auditSnapshot as string), sourceSurface: surface }) } : row);
+        assert.throws(() => validateTherapyStatusCommandRows(rows, audits), /audit/);
+    }
 });
 test('raw replacement preserves postbackup applied and closed rows in staging without replaying their clinical effect', async () => {
     const root = mkdtempSync(join(tmpdir(), 'mediflow-command-raw-')), source = join(root, 'old.db'), destination = join(root, 'medical.db');
