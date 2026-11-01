@@ -66,7 +66,7 @@ test('Backup: avviso completo e annullamento raggiungibili al 400 percento', asy
         await expect(panel).toBeVisible();
         const warning = panel.locator('p').first();
         await expect(warning).toContainText('Account e chiavi restano invariati.');
-        await expect(warning).toContainText('Lo storico protetto delle operazioni viene conservato.');
+        await expect(warning).toContainText('Lo storico viene conservato;');
         await mkdir(directory, { recursive: true });
         for (const theme of ['giorno', 'grafite']) {
             await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(4);
@@ -121,8 +121,11 @@ test('Backup: avviso completo e annullamento raggiungibili al 400 percento', asy
             frames.push({ theme, entireWarning: true, viewport: { width: 1440, height: 2160 }, zoom: 4, rect: await warning.boundingBox(), text });
             await page.setViewportSize({ width: 1440, height: 1000 });
             const keyword = page.getByTestId('restore-confirmation-input'), submit = page.getByTestId('restore-confirmation-submit');
+            const credential = page.getByLabel('PIN amministrativo', { exact: true });
+            await credential.fill('');
             await keyword.fill('RIPRI'); await expect(submit).toBeDisabled();
-            await keyword.fill('RIPRISTINA'); await expect(submit).toBeEnabled();
+            await keyword.fill('RIPRISTINA'); await expect(submit).toBeDisabled();
+            await credential.fill(process.env.E2E_PIN || '1234'); await expect(submit).toBeEnabled();
             await keyword.focus(); await page.keyboard.press('Tab');
             const cancel = panel.getByRole('button', { name: 'Annulla', exact: true });
             await expect(cancel).toBeFocused();

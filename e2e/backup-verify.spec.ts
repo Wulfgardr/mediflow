@@ -10,6 +10,9 @@ test('un backup scaricato si verifica senza ripristinarlo e un file alterato vie
 
   const outcome = page.getByTestId('backup-outcome');
   const verifyInput = page.getByTestId('backup-verify-input');
+  const exportButton = page.getByRole('button', { name: 'Scarica Backup' });
+  await expect(exportButton).toBeDisabled();
+  await page.getByRole('checkbox', { name: /Il file portabile contiene categorie leggibili in chiaro/ }).check();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Scarica Backup' }).click();
   await download;

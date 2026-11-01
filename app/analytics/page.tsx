@@ -21,6 +21,10 @@ import styles from './analytics.module.css';
 type AuditSummary = {
     days: number;
     totalEvents: number;
+    importedEvents: number;
+    unattestedEvents: number;
+    unattestedIsTruncated: boolean;
+    importedIsTruncated: boolean;
     distinctActors: number;
     outcomes: Record<'success' | 'failure' | 'denied', number>;
     sourceSurfaces: Record<'web' | 'native' | 'api' | 'job', number>;
@@ -323,7 +327,7 @@ export default function AnalyticsPage() {
                     <SectionHeading
                         label="Audit locale"
                         title="Attività della postazione"
-                        description="Eventi tecnici senza contenuti clinici."
+                        description="Eventi prodotti localmente, senza contenuti clinici. Lo storico importato è escluso dai conteggi."
                     />
                     <label className={styles.compactField}>
                         <span>{proposal ? 'Periodo' : 'Finestra audit'}</span>
@@ -347,7 +351,7 @@ export default function AnalyticsPage() {
                         <ShieldCheck aria-hidden="true" />
                         <dl className={styles.factList}>
                             <div className={styles.factRow}>
-                                <dt>Eventi registrati</dt>
+                                <dt>Eventi locali registrati</dt>
                                 <dd className="lume-registro" data-lume-register-value="true">{auditSummary.totalEvents}</dd>
                             </div>
                             <div className={styles.factRow}>
@@ -355,6 +359,14 @@ export default function AnalyticsPage() {
                                 <dd className="lume-registro" data-lume-register-value="true">
                                     {auditSummary.outcomes.success} / {auditSummary.outcomes.failure} / {auditSummary.outcomes.denied}
                                 </dd>
+                            </div>
+                            <div className={styles.factRow}>
+                                <dt>Eventi importati, esaminati separatamente</dt>
+                                <dd>{auditSummary.importedEvents}{auditSummary.importedIsTruncated ? ' o più' : ''}</dd>
+                            </div>
+                            <div className={styles.factRow}>
+                                <dt>Origine non attestata, esaminati separatamente</dt>
+                                <dd>{auditSummary.unattestedEvents}{auditSummary.unattestedIsTruncated ? ' o più' : ''}</dd>
                             </div>
                             <div className={styles.factRow}>
                                 <dt>Attori distinti</dt>
@@ -371,7 +383,7 @@ export default function AnalyticsPage() {
                             </div>
                         </dl>
                         {auditSummary.isTruncated ? (
-                            <p className={styles.mutedNote}>Riepilogo calcolato sui primi 500 eventi nel filtro.</p>
+                            <p className={styles.mutedNote}>Riepilogo calcolato sui primi 200 eventi locali nel filtro.</p>
                         ) : null}
                     </div>
                 ) : (

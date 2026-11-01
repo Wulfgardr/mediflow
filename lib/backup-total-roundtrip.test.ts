@@ -28,7 +28,7 @@ const MEMBERSHIP_TABLE = 'patients_to_ambulatories';
 // Their historical audit backfill does not qualify export/restore continuity (C15).
 const NON_BACKUP_TABLES = new Set(['settings', 'users', 'patient_duplicate_intents', 'patient_retired_ids']);
 /* Checkup enrollment is host-local authorization state and is not exported by the v1 clinical backup. */
-const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['headless_checkup_active_role_attestations', 'archive_generation', 'archive_session_generations']);
+const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['headless_checkup_active_role_attestations', 'archive_generation', 'archive_session_generations', 'portable_import_origins']);
 /* Command replay remains empty until append-only audit restore has a separate contract. */
 const AUDIT_DEPENDENT_EMPTY_TABLES = new Set(['durable_review_command_operations', 'durable_review_command_states']);
 const BACKUP_TABLES = {
@@ -730,7 +730,7 @@ test('restores entries then exact H7b audits then ledger while preserving unrela
             restoreArtifact(targetDataDir, artifactPath);
             assert.equal(countRows(target, 'entries'), 1);
             assert.equal(countRows(target, 'headless_soap_entry_commits'), 1);
-            assert.equal(countRows(target, 'audit_events'), 3);
+            assert.equal(countRows(target, 'audit_events'), 4);
             const restored = target.prepare('SELECT audit_snapshot AS auditSnapshot FROM headless_soap_entry_commits').get() as { auditSnapshot: string };
             assert.equal(restored.auditSnapshot, JSON.stringify(fixture.audit));
         } finally { target.close(); }
@@ -985,10 +985,20 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             let encryptedFieldCount = 0;
             for (const table of clinicalTables) {
                 const sourceRows = readOrderedRows(sourceDb, table);
-                const targetRows = readOrderedRows(targetDb, table);
+                const allTargetRows = readOrderedRows(targetDb, table);
+                if (table === 'audit_events') {
+                    const imports = allTargetRows.filter(row => row.event_type === 'backup.portable.imported');
+                    assert.equal(imports.length, 1);
+                    assert.equal(imports[0].subject_ref, artifact.manifest.checksum);
+                    const markers = allTargetRows.filter(row => row.event_type === 'backup.audit.imported');
+                    assert.deepEqual(markers.map(row => row.subject_ref).sort(), sourceRows.map(row => row.event_id).sort());
+                    assert.ok(markers.every(row => row.request_id === imports[0].event_id));
+                }
+                const targetRows = table === 'audit_events' ? allTargetRows.filter(row => !['backup.portable.imported', 'backup.audit.imported', 'backup.therapy-command.imported'].includes(String(row.event_type))) : allTargetRows;
                 // The activation is a grant of the source host: the attestation reaches the target inactive.
                 const expectedRows: Array<Record<string, unknown>> = table === 'headless_soap_active_role_attestations'
                     ? sourceRows.map((row) => ({ ...row, status: 'inactive', issuer_ref: null, expires_at: null, activated_at: null }))
+                    : table === 'physician_review_attestations' ? sourceRows.map(row => row.status === 'active' ? { ...row, status: 'inactive' } : row)
                     : table === 'audit_events' ? [...sourceRows, ...targetInitialAudits].sort((a, b) => String(a.event_id).localeCompare(String(b.event_id))) : sourceRows;
                 assert.equal(targetRows.length, expectedRows.length, `${table} count must survive restore`);
                 assert.deepEqual(targetRows, expectedRows, `${table} rows must reach the target as the restore contract declares`);
