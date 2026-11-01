@@ -8229,7 +8229,7 @@ mod review706b_callers {
     fn verified_outcomes_are_withdrawn_when_the_work_context_changes(
         cx: &mut gpui::TestAppContext,
     ) {
-        let (app, cx) = cx.add_window_view(|window, cx| make_app(window, cx));
+        let (app, cx) = cx.add_window_view(make_app);
         app.update(cx, |app, cx| {
             app.verified = Some("Esito precedente".into());
             app.section_selected(PatientSection::Therapies, cx);

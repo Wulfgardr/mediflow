@@ -237,24 +237,22 @@ impl ClinicalApp {
         }
         pane = pane.child(section("controls-updates","Versione e aggiornamenti",theme))
             .child(text!("La versione e le novità sono quelle indicate su questo computer. Non sono stati cercati aggiornamenti in rete."));
-        for (id, result, keys) in [(
-            "controls-updates-error",
-            &snapshot.updates,
-            &[
-                ("currentVersion", "Versione corrente"),
-                ("availableVersion", "Versione segnalata"),
-                ("updateAvailable", "Aggiornamento segnalato"),
-                ("checkedAt", "Lettura"),
-                ("changelogTitle", "Novità"),
-                ("updateUrl", "Indirizzo aggiornamento"),
-            ][..],
-        )] {
-            if let Some(error) = section_state(id, result, theme) {
-                pane = pane.child(error);
-            }
-            if let Ok(value) = result {
-                pane = pane.child(fields(value, keys, theme));
-            }
+        if let Some(error) = section_state("controls-updates-error", &snapshot.updates, theme) {
+            pane = pane.child(error);
+        }
+        if let Ok(value) = &snapshot.updates {
+            pane = pane.child(fields(
+                value,
+                &[
+                    ("currentVersion", "Versione corrente"),
+                    ("availableVersion", "Versione segnalata"),
+                    ("updateAvailable", "Aggiornamento segnalato"),
+                    ("checkedAt", "Lettura"),
+                    ("changelogTitle", "Novità"),
+                    ("updateUrl", "Indirizzo aggiornamento"),
+                ],
+                theme,
+            ));
         }
         pane = pane.child(section("controls-audit","Audit operativo",theme))
             .child(text!("Ultimi eventi restituiti dal servizio, massimo 50. Questa finestra non rappresenta l’intero storico. Solo gli amministratori possono leggere l’audit."));
