@@ -8,19 +8,18 @@ import { fileURLToPath } from 'node:url';
 // Reviewed source identity, independent of the checkout used to run this gate.
 // Changes to this closure require review and a deliberate update of these pins.
 export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
-  ['scripts/windows-private-directory.mjs', 'dc61db676ca44c07c205067ccc38307b72064f7de9d3cf9dcd9dceebe760585f'],
-  ['scripts/windows-system-command.mjs', 'adcd137e4a8e23e7495d83fc372befe0b3a4d9cdb25abc8de5f4252828a5b1f2'],
-  ['scripts/windows-launcher-bootstrap/index.mjs', 'ddc8dad1aff9cdeb836a82cb4983c02b9b7e77203e861c3142c5767b52600304'],
-  ['scripts/windows-launcher-bootstrap/system-directory.c', 'd225cabaca09fca34c103e93608963aca8bb01dfca4ff7df21b285147cb16e7c', true],
-  ['scripts/windows-launcher-bootstrap/build.ps1', '663d4fd89674122695a1519ad50674526b3b461b0df00391906a0d1730ccbb9c', true],
-  ['scripts/prepare-windows-launcher-bootstrap.mjs', 'dac5c0648b21e5e1f4c085ceea902eb80c52a7eba5329abd909ec57f28a72089', true],
+  ['scripts/windows-private-directory.mjs', 'ed5115a1c3448ee3c47e2918f16a4ab4ad09443e8702a84d1bcbc0d3abbaef2c'],
+  ['scripts/windows-launcher-bootstrap/index.mjs', '232d95e87c8f9e820927971e667a496f95685075145cf102a506fb7451f83d33'],
+  ['scripts/windows-launcher-bootstrap/system-directory.c', '6a891f4ca0398902695c1e56af4a279bfcf923af6b57024f977b95083f3390bc', true],
+  ['scripts/windows-launcher-bootstrap/build.ps1', '4b63b0d9168c677c806bef37ea1b6842fd8a2e5e5265ea1e66830b8be9deeccc', true],
+  ['scripts/prepare-windows-launcher-bootstrap.mjs', 'aa77ba7c1815c059f69496c3a08a78586f11f6d8eb5d3ee0b9242af9295c55e0', true],
   ['scripts/windows-launcher-bootstrap/prebuilds/win32-x64/manifest.json', '571db389fb79bba3021d2ef6a285fa5425cfb53b2823e9e12e8e7cc8aeeb85d4', true],
   ['scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node', '8b249ff19cd199a1bb3a89e6850b2ec1955bf3506ec916a2f71be389146105ff', true],
   ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/manifest.json', '9e47842b2e15c8d338d5f7a1649642a72f8129edbee11d306e2d30ff101dba8a', true],
   ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/system-directory.node', 'c0cf812086e0f1a731b1259b39e7477514e56c6c8c3f95f041779ec8a004f9cd', true],
 
-  ['scripts/run-scheduled-backup.mjs', '33e1930e4da417aadf74ee506e4086d19bc1b954a7faecb5494a04bb4447fa09'],
-  ['scripts/backup-destination-policy.mjs', '1eaf750b52e039ec932ceef5d5977199d6053cd5ed5d684f4512375be9ce33e7'],
+  ['scripts/run-scheduled-backup.mjs', '6c53e6cd74811c53ccc307d748fa46d728f91611cd4709c2211f35671b0ff290'],
+  ['scripts/backup-destination-policy.mjs', 'e8092ad74fe3ce830ada88210348d159c1263ddc20591872a2e0087775536257'],
   ['scripts/scheduled-backup-date-fields.mjs', '91779e9df7f34bd71bce6329ca1577070cfb3a12fbc55365272982d8fb4fb1a0'],
   ['lib/sqlite-maintenance-admission.mjs', 'd5a74f882934a3175f17476b4633effd5325ae6985c28e9baccfb73789088356'],
   ['lib/sqlite-durability.mjs', '75dc15f8a383bf040d6a0b494a2889d136be248772f5ddca7cd29651d5a4a103'],

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-const exports = ['createJobForProcess', 'getProcessCreationTimeTicks', 'getSystemDirectory'];
+const exports = ['createJobForProcess', 'getProcessCreationTimeTicks', 'getSystemDirectory', 'getDirectorySecurity', 'restrictDirectorySecurity'];
 const deny = () => { throw new Error('Windows bootstrap artifact unavailable or invalid.'); };
 const regular = file => {
   const stat = fs.lstatSync(file);
@@ -32,8 +32,8 @@ export function loadSystemDirectoryBinding() {
   const offset = bytes.length >= 64 ? bytes.readUInt32LE(60) : -1;
   if (bytes.toString('ascii', 0, 2) !== 'MZ' || offset < 64 || offset + 6 > bytes.length
     || bytes.readUInt32LE(offset) !== 0x4550 || bytes.readUInt16LE(offset + 4) !== (arch === 'x64' ? 0x8664 : 0xaa64)) deny();
-  if (!Array.isArray(manifest.dependencies) || manifest.dependencies.length !== 2
-    || [...manifest.dependencies].sort().join(',').toLowerCase() !== 'kernel32.dll,node.exe') deny();
+  if (!Array.isArray(manifest.dependencies) || manifest.dependencies.length !== 3
+    || [...manifest.dependencies].sort().join(',').toLowerCase() !== 'advapi32.dll,kernel32.dll,node.exe') deny();
   const binding = createRequire(import.meta.url)(/* turbopackIgnore: true */ binary);
   const names = Reflect.ownKeys(binding);
   if (names.length !== exports.length || exports.some(name => !names.includes(name) || typeof binding[name] !== 'function')) deny();

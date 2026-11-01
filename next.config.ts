@@ -79,7 +79,6 @@ const nextConfig: NextConfig = {
       "./licenses/who-icd11/*.md",
       // Raw scheduler closure; checked against the canonical runtime roster in tests.
       "./scripts/windows-private-directory.mjs",
-      "./scripts/windows-system-command.mjs",
       "./scripts/windows-launcher-bootstrap/index.mjs",
       "./scripts/windows-launcher-bootstrap/system-directory.c",
       "./scripts/windows-launcher-bootstrap/build.ps1",

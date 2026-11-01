@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { assertPrivateDacl } from '../scripts/windows-private-directory.mjs';
+import { assertPrivateDacl, WindowsPrivateDirectoryError } from '../scripts/windows-private-directory.mjs';
 const sid = 'S-1-5-21-123-456-789-1001';
 const rule = (trustee: string) => ({ sid: trustee, type: 0, rights: 0x1f01ff, inheritance: 3, propagation: 0, inherited: false });
 const valid = { sid, protected: true, rules: [rule('S-1-5-18'), rule(sid)] };
@@ -15,6 +15,18 @@ test('private backup DACL accepts only inheritable full access for current user 
         assert.throws(() => assertPrivateDacl({ ...valid, ...change }));
     }
     for (const value of [null, {}, [], 'D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;LA)']) assert.throws(() => assertPrivateDacl(value));
+});
+
+test('private directory denials give distinct remedies without relaxing policy', () => {
+    for (const reason of ['existing', 'filesystem', 'blocked']) {
+        const error = new WindowsPrivateDirectoryError(reason);
+        assert.equal(error.code, `backup_directory_${reason}`);
+        assert.ok(error.userMessage.length > 60);
+        assert.doesNotMatch(error.userMessage, /disabilita le policy/u);
+    }
+    assert.match(new WindowsPrivateDirectoryError('existing').userMessage, /nuova cartella/u);
+    assert.match(new WindowsPrivateDirectoryError('filesystem').userMessage, /NTFS/u);
+    assert.match(new WindowsPrivateDirectoryError('blocked').userMessage, /amministratore/u);
 });
 
 test('Windows creates and verifies the private DACL before any payload', { skip: process.platform !== 'win32' }, async () => {

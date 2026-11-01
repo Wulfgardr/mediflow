@@ -106,9 +106,21 @@ SID dell'utente corrente e SYSTEM. Una cartella preesistente con DACL più larga
 viene rifiutata. I temporanei di creazione e ripristino del recupero applicano
 la stessa verifica prima di scrivere lo snapshot.
 
-La verifica usa `whoami.exe` e `icacls.exe`, risolti dalla directory di sistema
-verificata dal bootstrap nativo, senza PowerShell. L'output SDDL di `icacls /save`
-è accettato soltanto nella forma prevista; errori, formati diversi e trustee
-aggiuntivi impediscono la scrittura. Il file temporaneo di verifica contiene
-solo la DACL, mai il payload del backup. Resta escluso un processo ostile con
-la stessa identità dell'utente che cambia i permessi durante la scrittura.
+Token, DACL e restrizione della nuova cartella passano dalle API Windows del
+bootstrap nativo verificato, senza PowerShell, whoami o icacls a runtime per
+questo controllo. Il produttore legge il SID dal token e le ACE da un handle
+alla directory, rifiuta reparse point e filesystem senza ACL persistenti.
+Il parser richiede SID numerici, esattamente due Allow FullControl, OI+CI,
+nessuna propagazione speciale e nessuna regola ereditata. Solo una cartella
+nuova e vuota può ricevere una nuova DACL. Le cartelle preesistenti non vengono
+corrette automaticamente. Dinieghi per cartella esistente, filesystem e
+controllo nativo indisponibile hanno rimedi distinti per l'utente.
+
+Salvataggio della configurazione, runner, retention e lock usano la medesima
+destinazione effettiva. Le vecchie configurazioni che indicano il padre
+vengono risolte nella sottocartella privata, senza spostare o cancellare i
+backup nel padre; la destinazione effettiva è mostrata prima della conferma
+manuale della retention. Non è introdotta retention automatica.
+Resta escluso un processo ostile con la stessa identità dell'utente che cambia
+i permessi durante la scrittura. Il probe BitLocker precedente è distinto dal
+controllo DACL e mantiene i limiti di verifica del volume già documentati.
