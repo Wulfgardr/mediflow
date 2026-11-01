@@ -1,3 +1,4 @@
+import { assertPrivateDirectory, restrictNewPrivateDirectory } from './windows-private-directory.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -104,6 +105,14 @@ export function validateBackupDestination(value, acknowledged = false, acknowled
   catch (error) {
     if (error instanceof BackupDestinationError) throw error;
     throw new BackupDestinationError('La cartella di destinazione non è disponibile. Scegli una cartella esistente su un volume montato.');
+  }
+  if (process.platform === 'win32') {
+    if (path.basename(destination) !== '.mediflow-private') {
+      destination = path.join(destination, '.mediflow-private');
+      try { fs.mkdirSync(destination); restrictNewPrivateDirectory(destination); }
+      catch (error) { if (error?.code !== 'EEXIST') throw error; }
+    }
+    assertPrivateDirectory(destination);
   }
   const directoryIdentity = fs.statSync(destination);
   const protection = probeBackupVolume(destination);

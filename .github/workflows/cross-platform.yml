@@ -36,6 +36,8 @@ jobs:
         run: node scripts/prepare-windows-launcher-bootstrap.mjs build
       - name: Compare delivered native bootstrap with source rebuild
         run: node scripts/verify-windows-bootstrap-rebuild.mjs
+      - name: Verify private backup DACL with Windows system tools
+        run: node --test lib/windows-private-directory.test.ts
       - name: Verify delivered artifact and OS path
         run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
       - name: Verify native bootstrap with hostile cwd PATH and root variables

@@ -1,3 +1,4 @@
+import { restrictNewPrivateDirectory } from '../scripts/windows-private-directory.mjs';
 import { assertAmbulatoryCommandPredecessorRecoverySchema } from './ambulatory-destructive-command-recovery-schema';
 import { captureAmbulatoryCommands, preserveAmbulatoryCommands } from './ambulatory-destructive-command-backup';
 import { captureTherapyStatusCommands, preserveTherapyStatusCommands } from './therapy-status-command-backup';
@@ -35,6 +36,7 @@ export function createRecoverySnapshot(connection: Database.Database, actorId: s
     const root = fs.mkdtempSync(path.join(path.dirname(connection.name), '.recovery-backup-'));
     const file = path.join(root, 'snapshot.db');
     try {
+        restrictNewPrivateDirectory(root);
         copySqliteDatabaseSync(connection.name, file);
         fs.chmodSync(file, 0o600);
         const candidate = validateCandidate(file);
@@ -108,6 +110,7 @@ export async function restoreRecoveryBackup(options: {
     const root = fs.mkdtempSync(path.join(parent, '.recovery-restore-'));
     const source = path.join(root, 'snapshot.db');
     try {
+        restrictNewPrivateDirectory(root);
         fs.writeFileSync(source, bytes, { flag: 'wx', mode: 0o600 });
         bytes.fill(0);
         const verifierHash = await hashAccessVerifier(recovered.verifier);

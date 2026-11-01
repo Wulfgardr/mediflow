@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { assertPrivateDirectory } from './windows-private-directory.mjs';
 import { validateAmbulatoryCommandRows } from '../lib/ambulatory-destructive-command-backup.ts';
 import { validateTherapyStatusCommandRows } from '../lib/therapy-status-command-backup.ts';
 /* @Codex */
@@ -320,6 +321,7 @@ function assertBackupDirectory(directory, identity) {
 export function publishScheduledBackup(finalPath, artifact, directoryIdentity = fs.statSync(path.dirname(finalPath))) {
   const directory = path.dirname(finalPath);
   const tempPath = `${finalPath}.tmp`;
+  assertPrivateDirectory(directory);
   const descriptor = fs.openSync(tempPath, 'wx', 0o600);
   const ownFile = fs.fstatSync(descriptor);
   const assertOwnFile = file => {
