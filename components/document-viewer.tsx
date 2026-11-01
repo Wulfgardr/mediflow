@@ -80,17 +80,19 @@ function DocumentPreviewBody({ file, fileName }: Pick<DocumentViewerProps, 'file
 
 export default function DocumentViewer({ file, fileName, onClose, inline = false, signal }: DocumentViewerProps) {
 
-    const [closed, setClosed] = useState(false);
+    const source = useMemo(() => ({ file, fileName, signal, token: Symbol('document-view') }), [file, fileName, signal]);
+    const [closedView, setClosedView] = useState<symbol | null>(null);
+    const closed = closedView === source.token;
     const titleId = useId();
     const shell = useRef<HTMLDivElement>(null);
     const closeButton = useRef<HTMLButtonElement>(null);
-    const close = () => { setClosed(true); onClose(); };
+    const close = () => { setClosedView(source.token); onClose(); };
     useEffect(() => {
-        const retire = () => { setClosed(true); onClose(); };
+        const retire = () => setClosedView(source.token);
         if (signal?.aborted) retire();
         signal?.addEventListener('abort', retire, { once: true });
         return () => signal?.removeEventListener('abort', retire);
-    }, [signal, onClose]);
+    }, [signal, source]);
     useEffect(() => {
         if (closed || inline) return;
         const root = shell.current;

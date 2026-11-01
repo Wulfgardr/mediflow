@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 export default function DocumentOriginalSave({ file, fileName, signal }: { file: Blob | string; fileName: string; signal?: AbortSignal }) {
-    const source = useMemo(() => ({ file, fileName }), [file, fileName]);
+    const source = useMemo(() => ({ file, fileName, signal }), [file, fileName, signal]);
     const [confirmation, setConfirmation] = useState<typeof source | null>(null);
     const [failed, setFailed] = useState<typeof source | null>(null);
     const urls = useRef(new Map<string, number>());
