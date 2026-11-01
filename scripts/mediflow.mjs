@@ -540,9 +540,13 @@ export async function main(args = process.argv.slice(2)) {
     completed.catch(() => {});
     if (process.platform === 'win32') owned.stderr.pipe(process.stderr);
     if (process.platform === 'win32') {
+      bindRuntimeOwnership([ownership, archiveOwnership], { kind: 'windows-job', web: childOwner.token });
       webJobPending = containWindowsWeb(owned, childOwner).then(job => { webJob = job; });
       try { await webJobPending; } finally { webJobPending = null; }
-      if (!closing) owned.send({ type: 'prepare' }, () => {});
+      if (!closing) {
+        bindRuntimeOwnership([ownership, archiveOwnership], { kind: 'windows-job', web: childOwner.token, guardian: webJob.owner });
+        owned.send({ type: 'prepare' }, () => {});
+      }
     }
     try { await completed; }
     finally {
