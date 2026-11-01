@@ -268,6 +268,7 @@ impl Budget {
         match value {
             Object::Dict(dict) => {
                 if name(dict, b"Subtype").as_deref() == Some(b"Type3")
+                    || dict.contains_key(b"Annots")
                     || dict.contains_key(b"PatternType")
                     || dict.contains_key(b"Mask")
                     || (dict.contains_key(b"UserUnit") && dict.get::<f32>(b"UserUnit") != Some(1.))
@@ -688,7 +689,13 @@ fn raster(source: &[u8], number: usize) -> Result<(image::RgbaImage, usize), Err
         let mut bytes = Vec::new();
         let streams: Vec<_> = match contents {
             Some(Object::Stream(s)) => vec![s],
-            Some(Object::Array(a)) => a.iter::<Stream<'_>>().collect(),
+            Some(Object::Array(a)) => {
+                let streams: Vec<_> = a.iter::<Stream<'_>>().collect();
+                if streams.len() != a.raw_iter().count() {
+                    return Err(Error::Invalid);
+                }
+                streams
+            }
             None | Some(Object::Null(_)) => vec![],
             _ => return Err(Error::Invalid),
         };
@@ -964,6 +971,14 @@ mod tests {
         assert_eq!(raster(&missing, 1).err(), Some(Error::Unsupported));
         let damaged = fixture::document_with_font(text, &[fixture::stream(b"", b"not a font")], b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /FontDescriptor << /Type /FontDescriptor /FontName /Helvetica /Flags 32 /FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 700 /StemV 80 /FontFile 5 0 R >> >>");
         assert_eq!(raster(&damaged, 1).err(), Some(Error::Unsupported));
+    }
+
+    #[test]
+    fn annotations_and_non_stream_contents_cannot_be_silently_omitted() {
+        let source = fixture::page_with_extra_entries(b"/Annots [<< /Type /Annot /Subtype /Text /Rect [0 0 10 10] /Contents (TEST SINTETICO) >>]");
+        assert_eq!(raster(&source, 1).err(), Some(Error::Unsupported));
+        let source = fixture::page_with_extra_entries(b"/Contents [4 0 R 12]");
+        assert_eq!(raster(&source, 1).err(), Some(Error::Invalid));
     }
 
     #[test]
