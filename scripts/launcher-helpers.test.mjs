@@ -1598,7 +1598,13 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 }
                 if (${Boolean(lifecycle?.preparationFailure)} && executable === process.execPath && argv[0] === '-e') {
                     record({type:'preparation-created'});
-                    const child = spawn(executable, ['-e', 'process.once("message",()=>process.exit(1));'], options);
+                    const child = spawn(executable, ['-e', ${JSON.stringify(`
+                        const fs = require('node:fs');
+                        process.once('message', () => {
+                            process.stderr.write('FIXTURE_PREPARATION_WAITING\n');
+                            const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(startupGate)})) { clearInterval(timer); process.exit(1); } }, 10);
+                        });
+                    `)}], options);
                     child.once('close', () => record({type:'preparation-closed',pid:child.pid}));
                     return child;
                 }
@@ -3426,6 +3432,16 @@ for (const phase of ['guardian-pending','preparation-failed']) test(`launcher pr
         try {
             assert.ok(existsSync(file));
             assert.doesNotMatch(f.output(),/MediFlow arrestato\./u);
+        } finally { f.releaseStartup(); }
+    }
+    if (!pending) {
+        await f.until(() => f.output().includes('FIXTURE_PREPARATION_WAITING'));
+        try {
+            const file = launcherReceiptFile(f.stateFiles.lockDirectory);
+            const owner = JSON.parse(readFileSync(path.join(path.dirname(file),'owner.json')));
+            assert.equal(owner.runtime.kind,'windows-job');
+            assert.ok(owner.runtime.web.pid > 0);
+            assert.ok(owner.runtime.guardian.pid > 0);
         } finally { f.releaseStartup(); }
     }
     await f.waitForTerminal();
