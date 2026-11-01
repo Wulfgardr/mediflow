@@ -584,7 +584,7 @@ impl ClinicalApp {
             ),
             Field::new(
                 "clinical-workspace-passphrase",
-                "Frase di accesso",
+                "Frase di accesso o PIN precedente",
                 "",
                 false,
                 true,
@@ -1467,6 +1467,7 @@ impl ClinicalApp {
             }
             self.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
             self.area = area;
+            self.verified = None;
             self.message = None;
             if matches!(area, Area::Agenda | Area::Diary) {
                 self.load_global_area(cx);
@@ -2639,6 +2640,8 @@ impl ClinicalApp {
             self.focus_after_render = true;
             self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
             self.patient.document_original = None;
+            self.message = None;
+            self.verified = None;
             self.patient_section = section;
             self.show_sections = false;
         }
@@ -4362,29 +4365,48 @@ impl ClinicalApp {
                             .flex()
                             .flex_col()
                             .gap(px(8.))
-                            .child(record_header(
-                                theme,
-                                div()
-                                    .type_role(theme, crate::theme::TextRole::Strong)
-                                    .child(text!(row.drug_name.clone())),
-                                div()
-                                    .type_role(theme, crate::theme::TextRole::Meta)
-                                    .text_color(theme.secondary)
-                                    .child(text!(therapy_status(&row.status))),
-                            ))
                             .child(
-                                button(
-                                    format!("clinical-workspace-edit-therapy-{id}"),
-                                    "Modifica terapia",
-                                    theme,
-                                    false,
-                                    editable,
-                                )
-                                .when(editable, |el| {
-                                    el.on_click(cx.listener(move |this, _, _, cx| {
-                                        this.edit_record(editing::Kind::Therapy, &id, cx)
-                                    }))
-                                }),
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
+                                    .gap(px(12.))
+                                    .flex_wrap()
+                                    .child(record_header(
+                                        theme,
+                                        div()
+                                            .type_role(theme, crate::theme::TextRole::Strong)
+                                            .child(text!(row.drug_name.clone())),
+                                        div()
+                                            .type_role(theme, crate::theme::TextRole::Meta)
+                                            .text_color(theme.secondary)
+                                            .child(text!(therapy_status(&row.status))),
+                                    ))
+                                    .child(
+                                        div().flex().flex_shrink_0().child(
+                                            button(
+                                                format!("clinical-workspace-edit-therapy-{id}"),
+                                                "Modifica terapia",
+                                                theme,
+                                                false,
+                                                editable,
+                                            )
+                                            .when(
+                                                editable,
+                                                |el| {
+                                                    el.on_click(cx.listener(
+                                                        move |this, _, _, cx| {
+                                                            this.edit_record(
+                                                                editing::Kind::Therapy,
+                                                                &id,
+                                                                cx,
+                                                            )
+                                                        },
+                                                    ))
+                                                },
+                                            ),
+                                        ),
+                                    ),
                             )
                             .child(text!(row.dosage.clone()))
                             .child(
@@ -4426,12 +4448,6 @@ impl ClinicalApp {
                             )
                     }),
             )
-            .child(self.current_module_button(
-                "clinical-workspace-manage-therapies",
-                "Gestisci nell'interfaccia corrente…",
-                PatientSection::Therapies,
-                cx,
-            ))
     }
 
     fn observations_view(&self, cx: &Context<Self>) -> Div {

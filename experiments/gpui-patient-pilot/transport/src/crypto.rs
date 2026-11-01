@@ -83,6 +83,30 @@ pub(crate) fn unwrap_v3(wrapped: &str, kek: &MasterKey) -> Result<MasterKey> {
     Ok(key)
 }
 
+pub(crate) fn unwrap_pin(wrapped: &str, pin: &str, salt: &str) -> Result<MasterKey> {
+    if !(4..=8).contains(&pin.len()) {
+        return Err(RuntimeError::InvalidInput);
+    }
+    let (iterations, payload) = if let Some(payload) = wrapped.strip_prefix("v2:") {
+        (600_000, payload)
+    } else if let Some(payload) = wrapped.strip_prefix("v1:") {
+        (100_000, payload)
+    } else if wrapped.contains(':') {
+        return Err(RuntimeError::UnsupportedUnlock);
+    } else {
+        (100_000, wrapped)
+    };
+    let salt = BASE64
+        .decode(salt)
+        .map_err(|_| RuntimeError::InvalidResponse)?;
+    if !(16..=256).contains(&salt.len()) {
+        return Err(RuntimeError::InvalidResponse);
+    }
+    let mut kek = Zeroizing::new([0u8; 32]);
+    pbkdf2_hmac::<Sha256>(pin.as_bytes(), &salt, iterations, kek.as_mut());
+    unwrap_v3(&format!("v3:{payload}"), &kek)
+}
+
 pub(crate) struct PassphraseBundle {
     pub credentials: Zeroizing<String>,
     pub kit: Zeroizing<String>,
@@ -437,6 +461,28 @@ mod tests {
         assert!(normalize_passphrase(&"🩺".repeat(15)).is_ok());
         assert!(normalize_passphrase(&"🩺".repeat(129)).is_err());
         assert!(normalize_passphrase("1234").is_err());
+    }
+
+    #[test]
+    fn legacy_pin_opens_web_vectors_and_rejects_wrong_pin_and_unknown_version() {
+        for source in [
+            include_str!("../../../../native/contracts/crypto-golden-vectors.v1.json"),
+            include_str!("../../../../native/contracts/crypto-golden-vectors.v2.json"),
+        ] {
+            let vector: Value = serde_json::from_str(source).unwrap();
+            let wrapped = vector["vectors"]["wrappedMasterKeyVersioned"]
+                .as_str()
+                .or_else(|| vector["vectors"]["wrappedMasterKeyB64"].as_str())
+                .unwrap();
+            let salt = BASE64.encode((0..16).collect::<Vec<u8>>());
+            let key = unwrap_pin(wrapped, "1357", &salt).unwrap();
+            assert_eq!(key.as_ref(), &(64..96).collect::<Vec<u8>>());
+            assert!(unwrap_pin(wrapped, "9999", &salt).is_err());
+            assert_eq!(
+                unwrap_pin("v4:invalid", "1357", &salt).unwrap_err(),
+                RuntimeError::UnsupportedUnlock
+            );
+        }
     }
 
     #[test]

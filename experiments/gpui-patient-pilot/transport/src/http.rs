@@ -7,7 +7,7 @@ use reqwest::{
     header::{COOKIE, HeaderMap, HeaderValue, SET_COOKIE},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::{net::IpAddr, sync::OnceLock, time::Duration};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -168,7 +168,7 @@ impl RuntimeClient {
         &self.base_url
     }
 
-    /// Unlocks v3 locally. Only the domain-separated verifier crosses the wire.
+    /// Uses the existing native login contract for passphrase and legacy PIN accounts.
     pub fn login(
         &self,
         pairing: PairingCredentials,
@@ -216,20 +216,19 @@ impl RuntimeClient {
             .filter(|v| !v.is_empty() && v.len() <= 256)
             .ok_or(RuntimeError::InvalidResponse)?;
         let unlock = check.unlock.ok_or(RuntimeError::UnsupportedUnlock)?;
-        if unlock.credential != "passphrase" || unlock.kdf_version != Some(3) {
-            return Err(RuntimeError::UnsupportedUnlock);
-        }
-        let salt = unlock.salt.ok_or(RuntimeError::InvalidResponse)?;
-        let material = crypto::derive_v3(passphrase, &salt)?;
-        #[derive(Serialize)]
-        struct Login<'a> {
-            username: &'a str,
-            verifier: &'a str,
-        }
+        let salt = unlock.salt;
+        let material = match (unlock.credential.as_str(), unlock.kdf_version) {
+            ("passphrase", Some(3)) => Some(crypto::derive_v3(
+                passphrase,
+                salt.as_deref().ok_or(RuntimeError::InvalidResponse)?,
+            )?),
+            ("pin", None) if (4..=8).contains(&passphrase.len()) => None,
+            _ => return Err(RuntimeError::UnsupportedUnlock),
+        };
         let body = Zeroizing::new(
-            serde_json::to_vec(&Login {
-                username,
-                verifier: &material.verifier,
+            serde_json::to_vec(&match &material {
+                Some(material) => json!({"username":username,"verifier":&*material.verifier}),
+                None => json!({"username":username,"password":passphrase}),
             })
             .map_err(|_| RuntimeError::InvalidInput)?,
         );
@@ -260,13 +259,16 @@ impl RuntimeClient {
                 .map_err(|_| RuntimeError::InvalidResponse)?;
             if !login.success
                 || login.user.archive_generation != generation
-                || login.salt != salt
+                || salt.as_ref().is_some_and(|salt| &login.salt != salt)
                 || login.user.username != username
             {
                 return Err(RuntimeError::InvalidResponse);
             }
             validate_id(&login.user.id).map_err(|_| RuntimeError::InvalidResponse)?;
-            let master = crypto::unwrap_v3(&login.encrypted_master_key, &material.kek)?;
+            let master = match &material {
+                Some(material) => crypto::unwrap_v3(&login.encrypted_master_key, &material.kek)?,
+                None => crypto::unwrap_pin(&login.encrypted_master_key, passphrase, &login.salt)?,
+            };
             Ok((login.user, master))
         })();
         match admitted {
@@ -1067,15 +1069,19 @@ pub(crate) fn authenticate_web_p3(
         if check["status"] != "ok"
             || check["isSetup"] != true
             || check["archiveGeneration"] != user.archive_generation
-            || check["unlock"]["credential"] != "passphrase"
-            || check["unlock"]["kdfVersion"] != 3
         {
             return Err(RuntimeError::UnsupportedUnlock);
         }
-        let salt = check["unlock"]["salt"]
-            .as_str()
-            .ok_or(RuntimeError::InvalidResponse)?;
-        let material = crypto::derive_v3(passphrase, salt)?;
+        let material = match check["unlock"]["credential"].as_str() {
+            Some("passphrase") if check["unlock"]["kdfVersion"] == 3 => Some(crypto::derive_v3(
+                passphrase,
+                check["unlock"]["salt"]
+                    .as_str()
+                    .ok_or(RuntimeError::InvalidResponse)?,
+            )?),
+            Some("pin") if (4..=8).contains(&passphrase.len()) => None,
+            _ => return Err(RuntimeError::UnsupportedUnlock),
+        };
         let mut headers = headers.clone();
         let etag = checked
             .headers
@@ -1094,7 +1100,10 @@ pub(crate) fn authenticate_web_p3(
         }
         headers.insert("if-match", sensitive_header(etag)?);
         headers.insert("idempotency-key", sensitive_header(&operation_uuid()?)?);
-        let mut body = serde_json::json!({"username":user.username,"verifier":&*material.verifier});
+        let mut body = match &material {
+            Some(material) => json!({"username":user.username,"verifier":&*material.verifier}),
+            None => json!({"username":user.username,"password":passphrase}),
+        };
         possibly_issued = true;
         let logged = client.dedicated_web_raw_observing_headers(
             Method::POST,
@@ -1111,8 +1120,10 @@ pub(crate) fn authenticate_web_p3(
                 possibly_issued = cookie.is_some() || (200..300).contains(&status);
             },
         );
-        if let Some(Value::String(verifier)) = body.get_mut("verifier") {
-            verifier.zeroize();
+        for field in ["verifier", "password"] {
+            if let Some(Value::String(secret)) = body.get_mut(field) {
+                secret.zeroize();
+            }
         }
         let logged = logged?;
         if cookie.is_none() {
@@ -1419,6 +1430,83 @@ mod tests {
             sent: std::sync::atomic::AtomicBool::new(false),
         }
     }
+    #[test]
+    fn legacy_pin_login_uses_existing_route_and_web_wrapping() {
+        for version in [1, 2] {
+            let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let client = RuntimeClient::new(RuntimeConfig {
+                base_url: url,
+                tls_pin_sha256: None,
+            })
+            .unwrap();
+            let worker = std::thread::spawn(move || {
+                for step in 0..3 {
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                    let request = bootstrap_request(&mut stream);
+                    match step {
+                        0 => bootstrap_reply(
+                            &mut stream,
+                            200,
+                            &json!({"status":"ok","isSetup":true,"archiveGeneration":"generation","unlock":{"credential":"pin"}}),
+                            "",
+                        ),
+                        1 => {
+                            assert!(request.starts_with("POST /api/auth/native/login "));
+                            let body: Value =
+                                serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap())
+                                    .unwrap();
+                            assert_eq!(body, json!({"username":"admin","password":"1357"}));
+                            let vector: Value = serde_json::from_str(if version == 1 {
+                                include_str!(
+                                    "../../../../native/contracts/crypto-golden-vectors.v1.json"
+                                )
+                            } else {
+                                include_str!(
+                                    "../../../../native/contracts/crypto-golden-vectors.v2.json"
+                                )
+                            })
+                            .unwrap();
+                            let wrapped = if version == 1 {
+                                &vector["vectors"]["wrappedMasterKeyB64"]
+                            } else {
+                                &vector["vectors"]["wrappedMasterKeyVersioned"]
+                            };
+                            bootstrap_reply(
+                                &mut stream,
+                                200,
+                                &json!({"success":true,"id":"synthetic-admin","username":"admin","role":"admin","displayName":"Prova","ambulatoryName":"Prova","archiveGeneration":"generation","salt":"AAECAwQFBgcICQoLDA0ODw==","encryptedMasterKey":wrapped}),
+                                &format!(
+                                    "Set-Cookie: mediflow_session={}; Path=/; HttpOnly\r\n",
+                                    "a".repeat(64)
+                                ),
+                            );
+                        }
+                        _ => {
+                            assert!(request.starts_with("GET /api/v1/network/capabilities "));
+                            bootstrap_reply(
+                                &mut stream,
+                                200,
+                                &json!({"protocolVersion":"1.13.0","operatingMode":"network-home-base","capabilities":[],"hostPorts":serde_json::from_str::<Value>(include_str!("../tests/fixtures/host-ports.json")).unwrap()}),
+                                "",
+                            );
+                        }
+                    }
+                }
+            });
+            let session = client
+                .login(
+                    PairingCredentials::new("paired-test", "t".repeat(64)).unwrap(),
+                    "admin",
+                    "1357",
+                )
+                .unwrap();
+            assert_eq!(session.user().username, "admin");
+            session.lock();
+            worker.join().unwrap();
+        }
+    }
+
     #[test]
     fn governance_reports_are_not_held_to_the_authentication_limit() {
         for path in [

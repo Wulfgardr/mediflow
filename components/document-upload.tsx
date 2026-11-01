@@ -158,7 +158,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             activeExtraction.current = null;
             activeDelete.current = null;
         };
-    }, [uploadQueue]);
+    }, [uploadQueue, currentAttachments, confirm]);
 
     const { data: attachments, error: listError, loading: listLoading, refresh: refreshAttachments } = useLiveQueryState(
         () => db.attachments.query({ patientId, metadataOnly: true }).toArray({ signal: db.getSessionReadSignal() }),
@@ -184,6 +184,14 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     }, [attachments, isProcessing, listError, listLoading]);
 
     const onDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
+        const possibleDuplicates = acceptedFiles.filter((file, index) =>
+            currentAttachments?.some(existing => existing.name === file.name && existing.size === file.size)
+            || acceptedFiles.slice(0, index).some(existing => existing.name === file.name && existing.size === file.size));
+        if (possibleDuplicates.length && !(await confirm({
+            title: 'Possibili documenti duplicati',
+            message: 'Un documento con lo stesso nome e la stessa dimensione è già presente o selezionato. Controlla l’elenco prima di aggiungere altre copie.',
+            confirmLabel: 'Carica altre copie',
+        })).confirmed) return;
         const task = uploadQueue.start(acceptedFiles);
         // Rejections belong to this selection, including mixed accepted/rejected drops.
         setFileRejections(rejectionMessages(rejectedFiles));
@@ -198,7 +206,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
         } finally {
             if (token === generation.current) setIsProcessing(false);
         }
-    }, [uploadQueue]);
+    }, [uploadQueue, currentAttachments, confirm]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop, disabled: isProcessing, maxFiles: 10, maxSize: 25 * 1024 * 1024,
@@ -336,9 +344,10 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                     <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshAttachments} disabled={listLoading}>Riprova elenco</button>
                 </div> : null}
                 <table className={`${styles.table} ${styles.documentTable}`}><thead><tr><th>Documento</th><th>Azioni</th></tr></thead>
-                {currentAttachments?.map(file => <tbody key={file.id} data-document-id={file.id}>
+                {currentAttachments?.map((file, index) => <tbody key={file.id} data-document-id={file.id}>
                     <tr className={viewingId === file.id ? styles.selected : undefined}><td>
                                 <h4 className={styles.documentName}><PrivacyBlur>{file.name}</PrivacyBlur></h4>
+                                <p className={disclosure.hint}>Documento {index + 1}{currentAttachments.some(other => other.id !== file.id && other.name === file.name && other.size === file.size) ? ' · Possibile duplicato: stesso nome e dimensione' : ''}</p>
                                 <p className={disclosure.hint}>Caricato il {new Date(file.createdAt).toLocaleDateString('it-IT')} · {Math.max(1, Math.ceil(file.size / 1024))} KB</p>
                                 <p className={disclosure.hint} data-testid="document-source-status">
                                     {extractingId === file.id ? 'Estrazione in corso' : localExtraction?.attachmentId === file.id
@@ -407,7 +416,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             onChange={(event) => selectSource(event.target.value)}
                             description="Cambiare documento chiude la proposta corrente, senza cancellare l’allegato o le sintesi archiviate.">
                                 <option value="">Scegli un documento</option>
-                                {currentAttachments?.map((file, index) => <option key={file.id} value={file.id}>{isPrivacyMode ? `Documento ${index + 1}` : file.name}</option>)}
+                                {currentAttachments?.map((file, index) => <option key={file.id} value={file.id}>{isPrivacyMode ? `Documento ${index + 1}` : `${file.name} · Documento ${index + 1}`}</option>)}
                         </ChoiceField>
                         {!selectedAttachment && <p role="status" className={disclosure.hint}>{listLoading ? 'Rilettura della fonte selezionata…' : selectedId
                             ? 'La fonte selezionata non è più disponibile nell’elenco. Rileggi l’elenco o scegli un altro documento.'

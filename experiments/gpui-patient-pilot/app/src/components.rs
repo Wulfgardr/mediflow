@@ -439,7 +439,11 @@ fn brand_render_image(dark: bool) -> &'static Arc<RenderImage> {
         )
     };
     cache.get_or_init(|| {
-        Image::from_bytes(ImageFormat::Svg, bytes.to_vec())
+        let source = std::str::from_utf8(bytes).expect("embedded SVG is UTF-8");
+        let start = source.find("  <rect ").expect("brand background");
+        let end = start + source[start..].find("/>").expect("brand background end") + 2;
+        let transparent = format!("{}{}", &source[..start], &source[end..]);
+        Image::from_bytes(ImageFormat::Svg, transparent.into_bytes())
             .to_image_data(SvgRenderer::new(Arc::new(())))
             .expect("embedded MediFlow brand must decode")
     })

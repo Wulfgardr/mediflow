@@ -252,11 +252,6 @@ impl ClinicalApp {
                 pane = pane.child(fields(value, keys, theme));
             }
         }
-        if let Ok(value) = &snapshot.updates {
-            for note in value["notes"].as_array().into_iter().flatten() {
-                pane = pane.child(fact("Nota", note.as_str().unwrap_or("Non indicata"), theme));
-            }
-        }
         pane = pane.child(section("controls-audit","Audit operativo",theme))
             .child(text!("Ultimi eventi restituiti dal servizio, massimo 50. Questa finestra non rappresenta l’intero storico. Solo gli amministratori possono leggere l’audit."));
         if let Some(error) = section_state("controls-audit-error", &snapshot.audit, theme) {
