@@ -225,8 +225,7 @@ for (const kind of ['missing', 'modified', 'other-version']) test(`pinned SQLite
 test('npm installation disables dependency scripts while build retains its admission and finalization', () => {
     assert.match(fs.readFileSync(path.join(sourceRoot,'.npmrc'),'utf8'),/^ignore-scripts=true$/mu);
     const scripts = JSON.parse(fs.readFileSync(path.join(sourceRoot,'package.json'),'utf8')).scripts;
-    assert.ok(scripts.build.startsWith(scripts.prebuild + ' && '));
-    assert.ok(scripts.build.endsWith(' && ' + scripts.postbuild));
+    assert.equal(scripts.build, 'node scripts/build-source-runtime.mjs');
     assert.ok(scripts.dev.startsWith(scripts.predev + ' && '));
     assert.ok(scripts.start.startsWith(scripts.prestart + ' && '));
 });
@@ -245,4 +244,24 @@ test('dependency preparation denies a replaced download before writing or requir
     assert.match(result.stderr,/Impronta archivio SQLite non ammessa/u);
     assert.equal(fs.existsSync(f.marker),false);
     assert.equal(fs.existsSync(path.join(f.root,'node_modules/better-sqlite3/build/Release/better_sqlite3.node')),false);
+});
+
+for (const fail of [false,true]) test(`build preserves compiler arguments and ordered checks${fail ? ' and stops on failure' : ''}`, t => {
+    const f = nativeFixture(t), loader = path.join(f.directory,'build-loader.mjs'), trace = path.join(f.directory,'build-trace.json');
+    writeFixture(loader, `
+        import cp from 'node:child_process'; import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
+        const commands=[];
+        cp.execFileSync = (node,args) => {
+            commands.push(args); fs.writeFileSync(${JSON.stringify(trace)},JSON.stringify(commands));
+            if (${fail} && commands.length === 3) throw new Error('SYNTHETIC_COMPILER_FAILURE');
+        };
+        syncBuiltinESMExports();
+    `);
+    const result = spawnSync(process.execPath,['--import',loader,path.join(sourceRoot,'scripts/build-source-runtime.mjs'),'--webpack'],{encoding:'utf8'});
+    assert.equal(result.status,fail ? 1 : 0,result.stderr);
+    const commands = JSON.parse(fs.readFileSync(trace));
+    assert.deepEqual(commands.map(args=>[path.basename(args[0]),...args.slice(1)]), [
+        ['build-input-metadata.mjs','--source','.'],['node-runtime-contract.mjs','verify'],['source-runtime.mjs','build','--webpack'],
+        ...fail ? [] : [['node-runtime-contract.mjs','write-standalone-manifest'],['check-standalone-runtime-bundle.mjs'],['source-runtime.mjs','prepare']],
+    ]);
 });
