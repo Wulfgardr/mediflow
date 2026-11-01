@@ -240,3 +240,18 @@ test('Documenti: un duplicato richiede una scelta e le copie restano distinguibi
     expect(copies).toHaveLength(2);
     expect(new Set(copies).size).toBe(2);
 });
+
+test('Documenti: maschere PDF grandi rifiutano tutta l’anteprima', async ({ page }) => {
+    const { readFileSync } = await import('node:fs');
+    const { docs } = await documents(page);
+    for (const mask of ['smask', 'mask']) {
+        const name = `Maschera sintetica ${mask}.pdf`;
+        await docs.locator('input[type="file"]').setInputFiles({ name, mimeType: 'application/pdf', buffer: readFileSync(`scripts/fixtures/preview-large-${mask}.pdf`) });
+        await docs.getByRole('button', { name: `Visualizza ${name}`, exact: true }).click();
+        const viewer = page.getByTestId('document-viewer');
+        await expect(viewer.getByTestId('document-preview-error')).toBeVisible();
+        await expect(viewer.getByTestId('document-preview-pdf-page')).toHaveAttribute('width', '0');
+        await viewer.getByRole('button', { name: 'Chiudi', exact: true }).click();
+    }
+});
+
