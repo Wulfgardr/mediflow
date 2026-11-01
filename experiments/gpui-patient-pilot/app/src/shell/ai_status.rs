@@ -11,7 +11,7 @@ pub(super) struct AiRuntimeObservation {
 
 impl ClinicalApp {
     pub(super) fn load_ai_status(&mut self, cx: &mut Context<Self>) {
-        if self.local_host.has_work() {
+        if self.local_work_pending() {
             return;
         }
         self.next_epoch();
@@ -41,7 +41,7 @@ impl ClinicalApp {
     pub(super) fn ai_status_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let enabled = self.session.is_some()
-            && !self.local_host.has_work()
+            && !self.local_work_pending()
             && !matches!(self.ai_status, Load::Loading);
         let pane = div()
             .min_w_0()

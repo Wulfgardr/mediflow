@@ -47,7 +47,7 @@ impl ClinicalApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.local_host.has_work()
+        if self.local_work_pending()
             || self.ambulatory_management.is_saving()
             || self.ai_preferences_blocks_navigation(cx)
         {
@@ -167,7 +167,7 @@ impl ClinicalApp {
                 .child(self.ai_status_view(cx))
                 .child(self.parameters_view(cx))
                 .child(self.chatgpt_account_view(cx))
-                .child(button("local-host-function-preferences","Preferenze e scelta del modello per funzione…",theme,false,!self.local_host.has_work()).on_click(cx.listener(|this,_,window,cx|this.select_settings_page(SettingsPage::AiPreferences,window,cx)))),
+                .child(button("local-host-function-preferences","Preferenze e scelta del modello per funzione…",theme,false,!self.local_work_pending()).on_click(cx.listener(|this,_,window,cx|this.select_settings_page(SettingsPage::AiPreferences,window,cx)))),
             SettingsPage::Models => view
                 .child(heading("clinical-workspace-settings-heading", "Modelli e hardware", theme))
                 .child(self.models_view(cx)),

@@ -583,7 +583,7 @@ impl RuntimeClient {
         let archive = path.starts_with(&["api", "system", "backup-restore"]);
         let request_limit = if path == ["api", "prosthetics", "catalog", "documents"] {
             36 * 1024 * 1024
-        } else if archive || reference_json_path(path) {
+        } else if archive || reference_json_path(path) || matches!(path, ["api", "patients", _]) {
             JSON_LIMIT
         } else {
             4096
@@ -1317,6 +1317,7 @@ fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
         ["api", "system", "audit" | "update-awareness"] => JSON_LIMIT,
         _ if archive => JSON_LIMIT,
         ["api", "attachments", _] => DOCUMENT_LIMIT,
+        ["api", "patients", _] => JSON_LIMIT,
         _ if reference_json_path(path) => JSON_LIMIT,
         _ => AUTH_LIMIT,
     }
