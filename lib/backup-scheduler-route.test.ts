@@ -7,9 +7,12 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
 import * as scheduler from './backup-scheduler.ts';
 import * as policy from '../scripts/backup-destination-policy.mjs';
 import { isWebAdminSession } from './security/server-auth-policy.ts';
+import { WindowsPrivateDirectoryError } from '../scripts/windows-private-directory.mjs';
 
 test('route-attacks: atomic revision, stale and simultaneous writers, rejected symlinks and legacy destination preserved', async () => {
     const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'backup-route-')));
@@ -24,9 +27,10 @@ test('route-attacks: atomic revision, stale and simultaneous writers, rejected s
         return { supported: true, installed, state: { ...state, revision: scheduler.backupSchedulerRevision(state) } };
     };
     const json = (body: unknown, init?: ResponseInit) => Response.json(body, init);
+    const destinationPolicy = { ...policy };
     const dependencies: Record<string, unknown> = {
         'node:crypto': { randomUUID },
-        '@/scripts/backup-destination-policy.mjs': policy,
+        '@/scripts/backup-destination-policy.mjs': destinationPolicy,
         '@/lib/api-error-response': { archiveReplacementResponse: () => null, apiInternalError: () => json({}, { status: 500 }) },
         '@/lib/security/archive-write-request': { archiveWriteRequestDenial: () => null },
         'next/server': { NextResponse: { json } }, 'drizzle-orm': { eq: () => true },
@@ -73,6 +77,49 @@ test('route-attacks: atomic revision, stale and simultaneous writers, rejected s
             assert.equal(installs, count);
         }
         assert.equal(fs.existsSync(path.join(root, 'absent-volume')), false);
+        if (process.platform === 'win32') {
+            const originalSpawn = childProcess.spawnSync;
+            childProcess.spawnSync = ((file: string, args: string[], ...options: unknown[]) =>
+                file === 'powershell.exe' && args.some(arg => arg.includes('Get-BitLockerVolume'))
+                    ? { status: 1, stdout: '', stderr: 'Synthetic unavailable volume probe' }
+                    : Reflect.apply(originalSpawn, childProcess, [file, args, ...options])) as typeof childProcess.spawnSync;
+            syncBuiltinESMExports();
+            try {
+                const saved = await post({ ...config, enabled: true, volumeProtectionAcknowledged: true }, current.state.revision);
+                assert.equal(saved.status, 200);
+                const actual = path.join(root, '.mediflow-private');
+                assert.equal(JSON.parse(read()!.value).config.destinationDir, fs.realpathSync(actual));
+                const legacy = path.join(root, 'mediflow-backup-v1-2026-10-01.mediflow');
+                fs.writeFileSync(legacy, 'synthetic old parent copy');
+                for (const day of [1, 2, 3]) fs.writeFileSync(path.join(actual, `mediflow-backup-v1-2026-11-0${day}.mediflow`), 'synthetic');
+                const old = new Date(Date.now() - 60 * 60_000);
+                const temp = path.join(actual, 'mediflow-backup-v1-2026-11-04.mediflow.tmp');
+                fs.writeFileSync(temp, 'synthetic pending');
+                fs.utimesSync(temp, old, old);
+                fs.writeFileSync(path.join(actual, '.mediflow-backup.lock'), 'synthetic active lock');
+                const preview = scheduler.previewBackupRetention({ destinationDir: root, retentionKeepArtifacts: 1 });
+                assert.equal(preview.destinationDir, fs.realpathSync(actual));
+                assert.equal(preview.artifactCount, 3);
+                assert.equal(preview.deleteCount, 2);
+                assert.equal(preview.orphanTempCount, 0);
+                const parsedLegacy = scheduler.readBackupSchedulerStateFromValue(JSON.stringify({ config: { destinationDir: root } }));
+                assert.equal(parsedLegacy.config.destinationDir, actual);
+                assert.equal(fs.readFileSync(legacy, 'utf8'), 'synthetic old parent copy');
+                assert.equal(fs.readdirSync(actual).filter(name => name.endsWith('.mediflow')).length, 3);
+            } finally { childProcess.spawnSync = originalSpawn; syncBuiltinESMExports(); }
+        }
+        const validDestination = destinationPolicy.validateBackupDestination;
+        for (const reason of ['existing', 'filesystem', 'blocked']) {
+            const denial = new WindowsPrivateDirectoryError(reason);
+            destinationPolicy.validateBackupDestination = () => { throw new policy.BackupDestinationError(denial.userMessage, denial.code); };
+            const fresh = await (await exports.GET()).json();
+            const response = await post({ ...config, enabled: true }, fresh.state.revision);
+            assert.equal(response.status, 422);
+            const problem = await response.json();
+            assert.equal(problem.code, denial.code);
+            assert.equal(problem.error, denial.userMessage);
+        }
+        destinationPolicy.validateBackupDestination = validDestination;
         for (const principal of [null, { role: 'physician', authChannel: 'web' }, { role: 'admin', authChannel: 'native' }]) {
             actor = principal;
             assert.equal((await post(config, revision)).status, principal ? 403 : 401);

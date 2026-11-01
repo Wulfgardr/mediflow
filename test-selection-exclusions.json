@@ -211,7 +211,7 @@
   },
   {
     "path": "scripts/athena-quality/run.ts",
-    "reason": "CLI diagnostica con autoverifica, esercitata da scripts/athena-quality/bench.test.ts; non è una suite node:test.",
+    "reason": "CLI diagnostica con autoverifica, esercitata da scripts/athena-quality/bench.test.ts; non \u00e8 una suite node:test.",
     "owner": "WUL-790"
   },
   {
@@ -222,6 +222,11 @@
   {
     "path": "lib/local-operation/specialist/acceptance.test-support.ts",
     "reason": "WUL-791: Harness interattivo per Leonardo con helper nativo e Touch ID reale; richiede selezione, diniego e gesto personale. Non registra test automatici. Procedura in docs/analysis/2026-10-30-cu-acceptance/accettazione-leonardo.md.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/verify-windows-bootstrap-rebuild.mjs",
+    "reason": "Verificatore CI eseguito dai job Windows x64 e arm64; non registra test. Il confronto PE ha prove unit in lib/windows-bootstrap-provenance.test.ts.",
     "owner": "@Wulfgardr"
   }
 ]

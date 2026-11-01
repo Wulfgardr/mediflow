@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
+import { backupStorageDirectory, resolveEffectiveBackupDestination } from '../scripts/backup-destination-policy.mjs';
 
 export const BACKUP_SCHEDULER_COMMAND_OPTIONS = { encoding: 'utf8' as const, timeout: 15_000, maxBuffer: 1024 * 1024, killSignal: 'SIGKILL' as const };
 export class BackupSchedulerOutcomeUnknownError extends Error {
@@ -125,7 +126,7 @@ export function getDefaultDataDir(): string {
 }
 
 function getDefaultDestinationDir(): string {
-    return path.join(getDefaultDataDir(), 'backups');
+    return backupStorageDirectory(path.join(getDefaultDataDir(), 'backups'));
 }
 
 function clampInteger(value: unknown, fallback: number, min: number, max: number): number {
@@ -215,7 +216,7 @@ export function readBackupSchedulerStateFromValue(value: string | null | undefin
                 enabled: config.enabled === true,
                 hour: clampInteger(config.hour, 2, 0, 23),
                 minute: clampInteger(config.minute, 0, 0, 59),
-                destinationDir: sanitizeDestinationDir(config.destinationDir),
+                destinationDir: backupStorageDirectory(sanitizeDestinationDir(config.destinationDir)),
                 retentionKeepArtifacts: clampRetentionKeepArtifacts(config.retentionKeepArtifacts),
             },
             run: sanitizeRunState(parsed.run),
@@ -229,15 +230,20 @@ export function mergeBackupSchedulerConfig(
     current: BackupSchedulerState,
     patch: Partial<BackupSchedulerConfig>,
 ): BackupSchedulerState {
+    const destinationDir = backupStorageDirectory(sanitizeDestinationDir(patch.destinationDir ?? current.config.destinationDir));
+    const sameDestination = destinationDir === backupStorageDirectory(current.config.destinationDir);
+    const volumeProtectionAcknowledged = patch.volumeProtectionAcknowledged === true
+        || (patch.volumeProtectionAcknowledged === undefined && sameDestination && current.config.volumeProtectionAcknowledged === true);
     return {
         ...current,
         config: {
-            volumeProtectionAcknowledged: patch.volumeProtectionAcknowledged === true
-                || (patch.volumeProtectionAcknowledged === undefined && (!patch.destinationDir || patch.destinationDir === current.config.destinationDir) && current.config.volumeProtectionAcknowledged === true),
+            ...(sameDestination && volumeProtectionAcknowledged && current.config.volumeProtectionIdentity
+                ? { volumeProtectionIdentity: current.config.volumeProtectionIdentity } : {}),
+            volumeProtectionAcknowledged,
             enabled: typeof patch.enabled === 'boolean' ? patch.enabled : current.config.enabled,
             hour: clampInteger(patch.hour, current.config.hour, 0, 23),
             minute: clampInteger(patch.minute, current.config.minute, 0, 59),
-            destinationDir: sanitizeDestinationDir(patch.destinationDir ?? current.config.destinationDir),
+            destinationDir,
             retentionKeepArtifacts: clampRetentionKeepArtifacts(
                 patch.retentionKeepArtifacts,
                 current.config.retentionKeepArtifacts,
@@ -305,8 +311,9 @@ export function previewBackupRetention(
 ): BackupRetentionPreview {
     const preservePaths = new Set((options?.preservePaths ?? []).map((value) => path.resolve(value)));
     const nowMs = options?.nowMs ?? Date.now();
-    const activeBackupLock = hasActiveBackupLock(config.destinationDir, nowMs);
-    const managedFiles = sortManagedBackupFiles(listManagedBackupFiles(config.destinationDir));
+    const destinationDir = resolveEffectiveBackupDestination(config.destinationDir);
+    const activeBackupLock = hasActiveBackupLock(destinationDir, nowMs);
+    const managedFiles = sortManagedBackupFiles(listManagedBackupFiles(destinationDir));
     const artifacts = managedFiles.filter((file) => file.kind === 'artifact');
     const orphanTemps = managedFiles
         .filter((file) => file.kind === 'temp')
@@ -335,7 +342,7 @@ export function previewBackupRetention(
     ];
 
     return {
-        destinationDir: config.destinationDir,
+        destinationDir,
         keepArtifacts: clampRetentionKeepArtifacts(config.retentionKeepArtifacts),
         artifactCount: artifacts.length,
         orphanTempCount: orphanTemps.length,

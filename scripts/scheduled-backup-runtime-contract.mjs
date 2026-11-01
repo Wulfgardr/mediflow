@@ -8,8 +8,18 @@ import { fileURLToPath } from 'node:url';
 // Reviewed source identity, independent of the checkout used to run this gate.
 // Changes to this closure require review and a deliberate update of these pins.
 export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
-  ['scripts/run-scheduled-backup.mjs', '7072f5d739b3385874f1b782413b56cc45d6f69a1599c808455081991e074904'],
-  ['scripts/backup-destination-policy.mjs', '635d29f5ef74013aad5022d08e798bd8e3bc86a07308c2fb0fc6357b8ced6513'],
+  ['scripts/windows-private-directory.mjs', 'ed5115a1c3448ee3c47e2918f16a4ab4ad09443e8702a84d1bcbc0d3abbaef2c'],
+  ['scripts/windows-launcher-bootstrap/index.mjs', '232d95e87c8f9e820927971e667a496f95685075145cf102a506fb7451f83d33'],
+  ['scripts/windows-launcher-bootstrap/system-directory.c', '6a891f4ca0398902695c1e56af4a279bfcf923af6b57024f977b95083f3390bc', true],
+  ['scripts/windows-launcher-bootstrap/build.ps1', '4b63b0d9168c677c806bef37ea1b6842fd8a2e5e5265ea1e66830b8be9deeccc', true],
+  ['scripts/prepare-windows-launcher-bootstrap.mjs', 'aa77ba7c1815c059f69496c3a08a78586f11f6d8eb5d3ee0b9242af9295c55e0', true],
+  ['scripts/windows-launcher-bootstrap/prebuilds/win32-x64/manifest.json', 'cc1803f2f20a06afa8417fa3c1c592757893a49e7415c51c6b61a6e390efe525', true],
+  ['scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node', 'bdacc6372dc221e94bfd1d9a13e650d53398d48575ead751a1ee0c762f55384f', true],
+  ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/manifest.json', 'f39f01aab5c84671461fd9f7f0abf96e7b64a9069eaa084afec4754d10982a95', true],
+  ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/system-directory.node', '35666d8b5e9aa882c66dd28300634ac23128f85c178d3b2beb69561b3cbffb3c', true],
+
+  ['scripts/run-scheduled-backup.mjs', '6c53e6cd74811c53ccc307d748fa46d728f91611cd4709c2211f35671b0ff290'],
+  ['scripts/backup-destination-policy.mjs', 'e8092ad74fe3ce830ada88210348d159c1263ddc20591872a2e0087775536257'],
   ['scripts/scheduled-backup-date-fields.mjs', '91779e9df7f34bd71bce6329ca1577070cfb3a12fbc55365272982d8fb4fb1a0'],
   ['lib/sqlite-maintenance-admission.mjs', 'd5a74f882934a3175f17476b4633effd5325ae6985c28e9baccfb73789088356'],
   ['lib/sqlite-durability.mjs', '75dc15f8a383bf040d6a0b494a2889d136be248772f5ddca7cd29651d5a4a103'],
@@ -25,7 +35,7 @@ export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['lib/reference-data/prosthetics-snapshot.ts', 'a32dbdc57e1991eccd9a28324718fb280cde9364e015e7694e7d1522bb638b94'],
   ['lib/attachment-path.ts', '845962ee6c8ea23479ee58090d48ddc77d20bd5364ca3d5fd2d5c5de0c8183bd'],
   ['lib/reference-data/prosthetics-catalog-contract.ts', '2ad9638759dd09ee76aea62bf4d53986d13ad818e38aeefb97b2b415f875318d'],
-].map(([file, sha256]) => Object.freeze({ path: file, sha256 })));
+].map(([file, sha256, passive]) => Object.freeze({ path: file, sha256, passive: passive === true })));
 
 // Import closure from lock-pinned better-sqlite3 12.6.2, bindings 1.5.0 and
 // file-uri-to-path 1.0.0. JS/JSON bytes were independently compared with the
@@ -209,7 +219,7 @@ export async function assertScheduledBackupRuntime(runtimeRoot, { timeoutMs = 10
     const receipt = await probeChild(root, probeRoot, timeoutMs);
     if (receipt.imported !== true || receipt.databaseAccess !== 'denied'
         || !Array.isArray(receipt.resolvedFiles)
-        || SCHEDULED_BACKUP_RUNTIME_ROSTER.some(item => !receipt.resolvedFiles.includes(item.path))) {
+        || SCHEDULED_BACKUP_RUNTIME_ROSTER.some(item => !item.passive && !receipt.resolvedFiles.includes(item.path))) {
       fail('incomplete import receipt');
     }
     if (fs.readdirSync(probeRoot).length) fail('import changed its synthetic data directory');

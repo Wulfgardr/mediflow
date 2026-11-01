@@ -39,3 +39,11 @@ lib/therapy-status-command-contract.ts text eol=lf
 
 lib/ambulatory-destructive-command-backup.ts text eol=lf
 lib/ambulatory-destructive-command-contract.ts text eol=lf
+
+scripts/windows-private-directory.mjs text eol=lf
+scripts/windows-system-command.mjs text eol=lf
+scripts/windows-launcher-bootstrap/index.mjs text eol=lf
+scripts/windows-launcher-bootstrap/prebuilds/win32-x64/manifest.json text eol=lf
+scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/manifest.json text eol=lf
+scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node -text
+scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/system-directory.node -text

@@ -1,6 +1,8 @@
 #define WIN32_LEAN_AND_MEAN
 #define NAPI_VERSION 1
 #include <windows.h>
+#include <aclapi.h>
+#include <sddl.h>
 #include <node_api.h>
 
 static napi_value fail(napi_env env) {
@@ -212,6 +214,145 @@ invalid:
   return job_error(env);
 }
 
+static BOOL security_property(napi_env env, napi_value object, const char *name, DWORD value) {
+  napi_value number;
+  return napi_create_uint32(env, value, &number) == napi_ok
+      && napi_set_named_property(env, object, name, number) == napi_ok;
+}
+
+static BOOL security_boolean(napi_env env, napi_value object, const char *name, BOOL value) {
+  napi_value boolean;
+  return napi_get_boolean(env, value != FALSE, &boolean) == napi_ok
+      && napi_set_named_property(env, object, name, boolean) == napi_ok;
+}
+
+static BOOL security_sid(napi_env env, napi_value object, const char *name, PSID sid) {
+  LPWSTR text = NULL;
+  napi_value value;
+  size_t length = 0;
+  BOOL ok;
+  if (!IsValidSid(sid) || !ConvertSidToStringSidW(sid, &text)) return FALSE;
+  while (text[length] != L'\0') length++;
+  ok = napi_create_string_utf16(env, (const char16_t *)text, length, &value) == napi_ok
+      && napi_set_named_property(env, object, name, value) == napi_ok;
+  return LocalFree(text) == NULL && ok;
+}
+
+static TOKEN_USER *security_token(void) {
+  HANDLE token = NULL;
+  TOKEN_USER *user = NULL;
+  DWORD size = 0;
+  BOOL ok = FALSE;
+  if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return NULL;
+  if (!GetTokenInformation(token, TokenUser, NULL, 0, &size)
+      && GetLastError() == ERROR_INSUFFICIENT_BUFFER && size <= 65536 && size >= sizeof(TOKEN_USER)) {
+    user = (TOKEN_USER *)HeapAlloc(GetProcessHeap(), 0, size);
+    if (user != NULL) ok = GetTokenInformation(token, TokenUser, user, size, &size);
+  }
+  if (!CloseHandle(token)) ok = FALSE;
+  if (!ok && user != NULL) { HeapFree(GetProcessHeap(), 0, user); user = NULL; }
+  return user;
+}
+
+static napi_value directory_security(napi_env env, napi_callback_info info, BOOL restrict_acl) {
+  napi_value argv[2], result = NULL, rules = NULL, rule;
+  size_t argc = 2, length = 0, copied = 0, i;
+  WCHAR *name = NULL;
+  WCHAR volume[MAX_PATH];
+  HANDLE directory = INVALID_HANDLE_VALUE;
+  TOKEN_USER *user = NULL;
+  PSECURITY_DESCRIPTOR descriptor = NULL;
+  PACL acl = NULL;
+  SECURITY_DESCRIPTOR_CONTROL control;
+  DWORD revision = 0, filesystem = 0, count, status;
+  FILE_ATTRIBUTE_TAG_INFO attributes;
+  union { ACL header; BYTE bytes[256]; } private_acl;
+  BYTE system_sid[SECURITY_MAX_SID_SIZE];
+  DWORD system_size = sizeof(system_sid);
+  const char *error = "MEDIFLOW_WINDOWS_DACL_UNAVAILABLE";
+  BOOL ok = FALSE;
+  if (napi_get_cb_info(env, info, &argc, argv, NULL, NULL) != napi_ok || argc != 1
+      || napi_get_value_string_utf16(env, argv[0], NULL, 0, &length) != napi_ok
+      || length == 0 || length >= 32768) goto done;
+  name = (WCHAR *)HeapAlloc(GetProcessHeap(), 0, (length + 1) * sizeof(WCHAR));
+  if (name == NULL || napi_get_value_string_utf16(env, argv[0], (char16_t *)name, length + 1, &copied) != napi_ok
+      || copied != length) goto done;
+  for (i = 0; i < length; i++) if (name[i] == L'\0') goto done;
+  if (!GetVolumePathNameW(name, volume, MAX_PATH)
+      || !GetVolumeInformationW(volume, NULL, 0, NULL, NULL, &filesystem, NULL, 0)) goto done;
+  if (!(filesystem & FILE_PERSISTENT_ACLS)) { error = "MEDIFLOW_WINDOWS_DACL_FILESYSTEM"; goto done; }
+  directory = CreateFileW(name, READ_CONTROL | FILE_READ_ATTRIBUTES | (restrict_acl ? WRITE_DAC : 0),
+      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+      FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+  if (directory == INVALID_HANDLE_VALUE) {
+    if (GetLastError() == ERROR_ACCESS_DENIED) error = "MEDIFLOW_WINDOWS_DACL_REJECTED";
+    goto done;
+  }
+  if (!GetFileInformationByHandleEx(directory, FileAttributeTagInfo, &attributes, sizeof(attributes))) goto done;
+  if (!(attributes.FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+      || (attributes.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+    error = "MEDIFLOW_WINDOWS_DACL_REJECTED"; goto done;
+  }
+  if (!GetVolumeInformationByHandleW(directory, NULL, 0, NULL, NULL, &filesystem, NULL, 0)) goto done;
+  if (!(filesystem & FILE_PERSISTENT_ACLS)) { error = "MEDIFLOW_WINDOWS_DACL_FILESYSTEM"; goto done; }
+  user = security_token();
+  if (user == NULL || !IsValidSid(user->User.Sid)) goto done;
+  if (restrict_acl) {
+    if (!CreateWellKnownSid(WinLocalSystemSid, NULL, system_sid, &system_size)
+        || !InitializeAcl(&private_acl.header, sizeof(private_acl.bytes), ACL_REVISION)
+        || !AddAccessAllowedAceEx(&private_acl.header, ACL_REVISION, OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE,
+            FILE_ALL_ACCESS, user->User.Sid)
+        || !AddAccessAllowedAceEx(&private_acl.header, ACL_REVISION, OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE,
+            FILE_ALL_ACCESS, system_sid)) goto done;
+    status = SetSecurityInfo(directory, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+        NULL, NULL, &private_acl.header, NULL);
+    if (status != ERROR_SUCCESS) goto done;
+  }
+  if (GetSecurityInfo(directory, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, &acl, NULL, &descriptor) != ERROR_SUCCESS
+      || !GetSecurityDescriptorControl(descriptor, &control, &revision)) goto done;
+  count = acl != NULL && IsValidAcl(acl) ? acl->AceCount : 0;
+  if (napi_create_object(env, &result) != napi_ok || napi_create_array_with_length(env, count, &rules) != napi_ok
+      || !security_sid(env, result, "sid", user->User.Sid)
+      || !security_boolean(env, result, "protected", (control & SE_DACL_PROTECTED) != 0)
+      || napi_set_named_property(env, result, "rules", rules) != napi_ok) goto done;
+  if (count == 2) for (i = 0; i < count; i++) {
+    ACE_HEADER *header;
+    ACCESS_ALLOWED_ACE *allowed;
+    PSID sid;
+    DWORD sid_size, offset = (DWORD)FIELD_OFFSET(ACCESS_ALLOWED_ACE, SidStart);
+    if (!GetAce(acl, (DWORD)i, (void **)&header) || napi_create_object(env, &rule) != napi_ok
+        || !security_property(env, rule, "type", header->AceType)
+        || napi_set_element(env, rules, (uint32_t)i, rule) != napi_ok) goto done;
+    if (header->AceType != ACCESS_ALLOWED_ACE_TYPE) continue;
+    if (header->AceSize < offset + 8) goto done;
+    allowed = (ACCESS_ALLOWED_ACE *)header;
+    sid = &allowed->SidStart;
+    sid_size = 8 + 4 * ((BYTE *)sid)[1];
+    if (sid_size > (DWORD)header->AceSize - offset || !IsValidSid(sid)
+        || !security_sid(env, rule, "sid", sid)
+        || !security_property(env, rule, "rights", allowed->Mask)
+        || !security_property(env, rule, "inheritance", header->AceFlags & (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE))
+        || !security_property(env, rule, "propagation", header->AceFlags & (NO_PROPAGATE_INHERIT_ACE | INHERIT_ONLY_ACE))
+        || !security_boolean(env, rule, "inherited", (header->AceFlags & INHERITED_ACE) != 0)) goto done;
+  }
+  ok = TRUE;
+done:
+  if (descriptor != NULL && LocalFree(descriptor) != NULL) ok = FALSE;
+  if (user != NULL && !HeapFree(GetProcessHeap(), 0, user)) ok = FALSE;
+  if (directory != INVALID_HANDLE_VALUE && !CloseHandle(directory)) ok = FALSE;
+  if (name != NULL && !HeapFree(GetProcessHeap(), 0, name)) ok = FALSE;
+  if (!ok) { napi_throw_error(env, error, "Windows directory security unavailable."); return NULL; }
+  return result;
+}
+
+static napi_value get_directory_security(napi_env env, napi_callback_info info) {
+  return directory_security(env, info, FALSE);
+}
+
+static napi_value restrict_directory_security(napi_env env, napi_callback_info info) {
+  return directory_security(env, info, TRUE);
+}
+
 static napi_value init(napi_env env, napi_value exports) {
   napi_value function;
   if (napi_create_function(env, "createJobForProcess", NAPI_AUTO_LENGTH,
@@ -223,6 +364,12 @@ static napi_value init(napi_env env, napi_value exports) {
   if (napi_create_function(env, "getSystemDirectory", NAPI_AUTO_LENGTH,
       get_system_directory, NULL, &function) != napi_ok) return fail(env);
   if (napi_set_named_property(env, exports, "getSystemDirectory", function) != napi_ok) return fail(env);
+  if (napi_create_function(env, "getDirectorySecurity", NAPI_AUTO_LENGTH,
+      get_directory_security, NULL, &function) != napi_ok) return fail(env);
+  if (napi_set_named_property(env, exports, "getDirectorySecurity", function) != napi_ok) return fail(env);
+  if (napi_create_function(env, "restrictDirectorySecurity", NAPI_AUTO_LENGTH,
+      restrict_directory_security, NULL, &function) != napi_ok) return fail(env);
+  if (napi_set_named_property(env, exports, "restrictDirectorySecurity", function) != napi_ok) return fail(env);
   return exports;
 }
 

@@ -3,16 +3,17 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import os from 'node:os';
 import Database from 'better-sqlite3';
-import { backupDestinationIdentity } from '../scripts/backup-destination-policy.mjs';
+import { backupDestinationIdentity, resolveEffectiveBackupDestination } from '../scripts/backup-destination-policy.mjs';
 
 export function prepareSyntheticBackupDestination(dataDir: string, destination: string): string {
     const preload = createSyntheticBackupVolumePreload(dataDir);
     fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
+    const effective = resolveEffectiveBackupDestination(destination, { create: true });
     const db = new Database(path.join(dataDir, 'medical.db'));
     try {
         const row = db.prepare('SELECT value FROM settings WHERE key=?').get('backupScheduler') as { value: string } | undefined;
         const state = row ? JSON.parse(row.value) : { version: 1, config: {}, run: {} };
-        state.config = { ...state.config, destinationDir: destination, volumeProtectionAcknowledged: true, volumeProtectionIdentity: backupDestinationIdentity(fs.realpathSync(destination)) };
+        state.config = { ...state.config, destinationDir: destination, volumeProtectionAcknowledged: true, volumeProtectionIdentity: backupDestinationIdentity(effective) };
         db.prepare('INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run('backupScheduler', JSON.stringify(state));
     } finally { db.close(); }
     return preload;

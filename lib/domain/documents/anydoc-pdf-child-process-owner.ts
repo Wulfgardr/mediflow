@@ -1,3 +1,4 @@
+import { documentChildLaunch, DOCUMENT_CHILD_HEAP_MB } from '../../../scripts/document-child-launcher.mjs';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
@@ -11,7 +12,7 @@ export const ANYDOC_PDF_CHILD_PROTOCOL_SCHEMA_VERSION = 'mediflow.anydoc_pdf_chi
 export const ANYDOC_PDF_CHILD_WORKER_SHA256 = '438a8a5c417abbdc7268888a4202c4bad112089425cf5dfda952e9981844d9ae' as const;
 export const ANYDOC_PDF_CHILD_JOB_TIMEOUT_MS = 30_000;
 export const ANYDOC_PDF_CHILD_MAX_HEADER_BYTES = 64 * 1024;
-export const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
+export const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = DOCUMENT_CHILD_HEAP_MB;
 const MAX_BODY_BYTES = 32 * 1024 * 1024;
 const MAX_STDOUT_BYTES = 4 + ANYDOC_PDF_CHILD_MAX_HEADER_BYTES + MAX_BODY_BYTES;
 const MAX_DIAGNOSTIC_BYTES = 16 * 1024;
@@ -170,17 +171,10 @@ async function runOwnedWorker(input: Buffer, options: RunOptions): Promise<RawRu
         return await new Promise<RawRunResult>((resolve) => {
             let child;
             try {
-                const runtimeArguments = [
-                    `--max-old-space-size=${ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB}`,
-                    ...(options.wasmMemoryPages ? [`--wasm-max-mem-pages=${options.wasmMemoryPages}`] : []),
-                    '--permission',
-                    '--disable-warning=SecurityWarning',
-                    `--allow-fs-read=${worker.root}`,
-                    ...(options.allowAddons ? ['--allow-addons'] : []),
-                    worker.path,
-                    ...options.args,
-                ];
-                child = spawn(process.execPath, runtimeArguments, {
+                const launch = documentChildLaunch(worker.root, worker.path, {
+                    networkGuard: false, allowAddons: options.allowAddons, args: options.args, wasmMemoryPages: options.wasmMemoryPages,
+                });
+                child = spawn(launch.command, launch.args, {
                     cwd: worker.directory,
                     env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
                     stdio: ['pipe', 'pipe', 'pipe'],

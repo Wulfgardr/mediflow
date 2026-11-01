@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { assertPrivateDirectory } from './windows-private-directory.mjs';
 import { validateAmbulatoryCommandRows } from '../lib/ambulatory-destructive-command-backup.ts';
 import { validateTherapyStatusCommandRows } from '../lib/therapy-status-command-backup.ts';
 /* @Codex */
@@ -8,7 +9,7 @@ import { assertProstheticsCatalogBackup, serializeProstheticsDocument } from '..
 
 import { assertBackupAuditSnapshots, canonicalizeBackupAuditRows } from '../lib/backup-audit.ts';
 import fs from 'fs';
-import { validateBackupDestination } from './backup-destination-policy.mjs';
+import { backupStorageDirectory, validateBackupDestination } from './backup-destination-policy.mjs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -78,7 +79,7 @@ function getDefaultState() {
       enabled: false,
       hour: 2,
       minute: 0,
-      destinationDir: path.join(getDefaultDataDir(), 'backups'),
+      destinationDir: backupStorageDirectory(path.join(getDefaultDataDir(), 'backups')),
       retentionKeepArtifacts: 14,
     },
     run: {
@@ -106,6 +107,7 @@ function readState(db) {
         ...getDefaultState().config,
         ...(parsed.config || {}),
         enabled: parsed.config?.enabled === true,
+        destinationDir: backupStorageDirectory(parsed.config?.destinationDir || getDefaultState().config.destinationDir),
       },
       run: {
         ...getDefaultState().run,
@@ -320,6 +322,7 @@ function assertBackupDirectory(directory, identity) {
 export function publishScheduledBackup(finalPath, artifact, directoryIdentity = fs.statSync(path.dirname(finalPath))) {
   const directory = path.dirname(finalPath);
   const tempPath = `${finalPath}.tmp`;
+  assertPrivateDirectory(directory);
   const descriptor = fs.openSync(tempPath, 'wx', 0o600);
   const ownFile = fs.fstatSync(descriptor);
   const assertOwnFile = file => {

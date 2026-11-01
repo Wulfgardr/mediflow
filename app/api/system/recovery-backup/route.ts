@@ -4,6 +4,7 @@ import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { openDbServer } from '@/lib/db-server';
 import { createRecoverySnapshot } from '@/lib/recovery-backup-server';
+import { WindowsPrivateDirectoryError } from '@/scripts/windows-private-directory.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,9 @@ export async function POST(request: Request) {
         const bytes = createRecoverySnapshot(openDbServer(), session.userId);
         return new Response(new Uint8Array(bytes), { headers: { 'Content-Type': 'application/octet-stream',
             'Cache-Control': 'no-store', 'Content-Length': String(bytes.length), 'X-Content-Type-Options': 'nosniff' } });
-    } catch {
+    } catch (error) {
+        if (error instanceof WindowsPrivateDirectoryError) return Response.json({ error: error.userMessage, code: error.code },
+            { status: 422, headers: { 'Cache-Control': 'no-store' } });
         return Response.json({ error: 'Backup completo non disponibile. Verifica passphrase, kit e integrità dell’archivio.' },
             { status: 409, headers: { 'Cache-Control': 'no-store' } });
     }
