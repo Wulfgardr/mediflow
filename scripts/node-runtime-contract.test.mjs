@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { physicalFiles, physicalRecord, sha256 } from './launch-bundled-headless-supervisor.mjs';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
 
@@ -264,4 +265,73 @@ for (const fail of [false,true]) test(`build preserves compiler arguments and or
         ['build-input-metadata.mjs','--source','.'],['node-runtime-contract.mjs','verify'],['source-runtime.mjs','build','--webpack'],
         ...fail ? [] : [['node-runtime-contract.mjs','write-standalone-manifest'],['check-standalone-runtime-bundle.mjs'],['source-runtime.mjs','prepare']],
     ]);
+});
+
+function preparationFixture(t) {
+    const f = nativeFixture(t), local = syntheticSqlite(f.root,f.marker);
+    writeFixture(path.join(f.root,'.nvmrc'),'24');
+    writeFixture(path.join(f.root,'package.json'),JSON.stringify({engines:{node:'>=24 <25'}}));
+    writeFixture(path.join(local,'package.json'),JSON.stringify({version:'12.6.2',main:'lib/database.js'}));
+    for (const name of ['prepare-dependencies.mjs','node-runtime-contract.mjs']) writeFixture(path.join(f.root,'scripts',name),fs.readFileSync(path.join(sourceRoot,'scripts',name)));
+    const binary = Buffer.from('SYNTHETIC SQLITE PAYLOAD'), header = Buffer.alloc(512);
+    header.write('build/Release/better_sqlite3.node');
+    header.write(binary.length.toString(8).padStart(11,'0')+'\0',124);
+    const archive = path.join(f.directory,'synthetic.tar.gz');
+    writeFixture(archive,gzipSync(Buffer.concat([header,binary,Buffer.alloc(1024)])));
+    const loader = path.join(f.directory,'prepare-loader.mjs'), output = path.join(local,'build/Release/better_sqlite3.node');
+    writeFixture(loader,`
+        import fs from 'node:fs'; import crypto from 'node:crypto'; import {syncBuiltinESMExports} from 'node:module';
+        import {SQLITE_PREBUILDS,sqlitePrebuildTarget} from ${JSON.stringify(pathToFileURL(path.join(f.root,'scripts/node-runtime-contract.mjs')).href)};
+        const archive=fs.readFileSync(${JSON.stringify(archive)}), binary=Buffer.from('SYNTHETIC SQLITE PAYLOAD');
+        const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+        Object.assign(SQLITE_PREBUILDS[sqlitePrebuildTarget()],{archive:hash(archive),binary:hash(binary)});
+        globalThis.fetch=async()=>({ok:true,arrayBuffer:async()=>archive});
+        if(process.env.MEDIFLOW_FIXTURE_RENAME_DENIED==='1') fs.renameSync=()=>{throw new Error('SYNTHETIC_RENAME_DENIED');};
+        syncBuiltinESMExports();
+    `);
+    return {...f,local,binary,output,run: env => spawnSync(process.execPath,['--import',loader,path.join(f.root,'scripts/prepare-dependencies.mjs')],{env:{...process.env,...env},encoding:'utf8'})};
+}
+
+for (const kind of ['dangling-symlink','symlink','hardlink']) test(`dependency preparation refuses ${kind} without changing outside files`, t => {
+    const f=preparationFixture(t), outside=path.join(f.directory,'outside.txt'), sentinel='SYNTHETIC OUTSIDE SENTINEL';
+    fs.mkdirSync(path.dirname(f.output),{recursive:true});
+    if(kind!=='dangling-symlink') writeFixture(outside,sentinel);
+    if(kind==='hardlink') fs.linkSync(outside,f.output); else fs.symlinkSync(outside,f.output,'file');
+    const result=f.run();
+    if(kind==='dangling-symlink') assert.equal(fs.existsSync(outside),false,'dangling symlink must not create an outside file');
+    else assert.equal(fs.readFileSync(outside,'utf8'),sentinel,'outside inode must remain unchanged');
+    assert.notEqual(result.status,0,result.stderr);
+    assert.equal(fs.existsSync(f.marker),false,'unapproved destination must not load dependency code');
+    assert.equal(fs.lstatSync(f.output).isSymbolicLink(),kind!=='hardlink');
+    if(kind==='hardlink') assert.equal(fs.lstatSync(outside).nlink,2);
+    assert.deepEqual(fs.readdirSync(path.dirname(f.output)),['better_sqlite3.node']);
+});
+
+test('dependency preparation refuses a linked parent without creating outside directories', t => {
+    const f=preparationFixture(t), outside=path.join(f.directory,'outside'); fs.mkdirSync(outside);
+    fs.symlinkSync(outside,path.join(f.local,'build'),process.platform==='win32'?'junction':'dir');
+    const result=f.run();
+    assert.deepEqual(fs.readdirSync(outside),[],'linked parent must not create an outside Release directory');
+    assert.notEqual(result.status,0); assert.equal(fs.existsSync(f.marker),false);
+});
+
+for(const existing of [false,true]) test(`dependency preparation promotes a verified exclusive file${existing?' over an existing regular file':''}`, t=>{
+    const f=preparationFixture(t);
+    if(existing) writeFixture(f.output,'SYNTHETIC OLD BINDING');
+    const before=existing?fs.statSync(f.output):null, result=f.run();
+    assert.equal(result.status,0,result.stderr);
+    assert.deepEqual(fs.readFileSync(f.output),f.binary);
+    assert.equal(fs.lstatSync(f.output).nlink,1);
+    if(before) assert.notEqual(fs.statSync(f.output).ino,before.ino,'the old inode must never be truncated');
+    assert.equal(fs.readFileSync(f.marker,'utf8'),'load\nclose\n');
+    assert.deepEqual(fs.readdirSync(path.dirname(f.output)),['better_sqlite3.node']);
+});
+
+test('dependency preparation preserves the old destination and removes its temporary after rename failure',t=>{
+    const f=preparationFixture(t), sentinel='SYNTHETIC OLD BINDING'; writeFixture(f.output,sentinel);
+    const result=f.run({MEDIFLOW_FIXTURE_RENAME_DENIED:'1'});
+    assert.equal(fs.readFileSync(f.output,'utf8'),sentinel);
+    assert.notEqual(result.status,0); assert.match(result.stderr,/SYNTHETIC_RENAME_DENIED/u);
+    assert.equal(fs.existsSync(f.marker),false);
+    assert.deepEqual(fs.readdirSync(path.dirname(f.output)),['better_sqlite3.node']);
 });

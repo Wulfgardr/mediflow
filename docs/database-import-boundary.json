@@ -1967,7 +1967,7 @@
       "file": "scripts/node-runtime-contract.mjs",
       "kind": "require-base",
       "expression": "createRequire(path.join(runtimeRoot, 'package.json'))",
-      "sourceSha256": "4e5b0ae3e368191abd8c6c547fa9001f30ae51376a4236a3e9c8abbaf2f7192d",
+      "sourceSha256": "c16028901c51c34200cce15e76f40746953bc9d2b368eb1089fa9b907c96cb2b",
       "count": 1,
       "reason": "Native ABI verification resolves the installed better-sqlite3 entry before requiring it. This exact file digest freezes the resolution logic."
     },
@@ -2031,7 +2031,7 @@
       "file": "scripts/node-runtime-contract.mjs",
       "kind": "require",
       "expression": "requireFromRoot(entry)",
-      "sourceSha256": "4e5b0ae3e368191abd8c6c547fa9001f30ae51376a4236a3e9c8abbaf2f7192d",
+      "sourceSha256": "c16028901c51c34200cce15e76f40746953bc9d2b368eb1089fa9b907c96cb2b",
       "count": 1,
       "reason": "Native ABI verification resolves the installed better-sqlite3 entry before requiring it. This exact file digest freezes the resolution logic."
     }

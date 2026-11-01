@@ -3420,7 +3420,7 @@ test('synthetic crash writer retains its open transaction across garbage collect
 
 for (const phase of ['guardian-pending','preparation-failed','preparation-failed-chooser']) test(`launcher preserves custody through ${phase}`, {timeout:15000}, async t => {
     const pending = phase === 'guardian-pending', chooser = phase === 'preparation-failed-chooser';
-    const f = await ordinaryLauncherFixture(t,'web',[...chooser ? ['--scegli'] : [],'--scelta','web'],pending,true,{},null,
+    const f = await ordinaryLauncherFixture(t,'web',[...chooser ? ['--scegli'] : [],'--scelta','web'],pending,true,chooser ? { DISPLAY: ':synthetic' } : {},null,
         {job: !pending && process.platform === 'win32' ? 'native' : 'simulated',guardianGate:pending,preparationFailure:!pending});
     if (pending) {
         await f.until(() => f.observations().some(event => event.type === 'simulated-job-created'));
