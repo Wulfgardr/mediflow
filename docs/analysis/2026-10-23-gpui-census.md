@@ -576,3 +576,17 @@ approvate. G-2 resta aperta, incluse le parti G-2d/e/f/g non implementate.
 Download/rimozione sono riconciliati con il Web corrente, che non li offre
 come operazioni HTTP ammesse; il rinvio agli strumenti Ollama non è contato
 come completamento nativo.
+
+### Anteprima immagini G-4a, 1 novembre 2026
+
+Il lettore dell’originale include immagini statiche PNG e JPEG. Verifica il tipo
+reale e le dimensioni prima della decodifica: massimo 8192 pixel per lato e
+12 milioni di pixel, coerentemente con `components/document-viewer-policy.ts`.
+PNG animati, contenuto incompleto e formati non supportati interrompono l’intera
+anteprima. La chiusura e il cambio sezione ritirano lo stato del lettore; non
+sono introdotti file temporanei, scritture di allegati o aperture esterne.
+
+Restano aperti il renderer PDF, gli altri formati immagine, curation e revisione
+degli estratti, revisione agentica e importazione CSV con mapping. Le prove del
+renderer isolato non qualificano picker, ritorno o pacchetto installato.
+Questa tranche non chiude G-4 e non modifica il contratto ENC2.
