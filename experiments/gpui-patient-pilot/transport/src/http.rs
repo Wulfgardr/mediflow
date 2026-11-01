@@ -175,6 +175,16 @@ impl RuntimeClient {
         username: &str,
         passphrase: &str,
     ) -> Result<RuntimeSession> {
+        self.login_with_pin_confirmation(pairing, username, passphrase, false)
+    }
+
+    pub fn login_with_pin_confirmation(
+        &self,
+        pairing: PairingCredentials,
+        username: &str,
+        passphrase: &str,
+        pin_confirmed: bool,
+    ) -> Result<RuntimeSession> {
         let username = username.trim();
         if username.is_empty() || username.len() > 256 {
             return Err(RuntimeError::InvalidInput);
@@ -222,13 +232,28 @@ impl RuntimeClient {
                 passphrase,
                 salt.as_deref().ok_or(RuntimeError::InvalidResponse)?,
             )?),
-            ("pin", None) if (4..=8).contains(&passphrase.len()) => None,
+            ("pin", None) => {
+                crypto::validate_pin(passphrase)?;
+                if crypto::normalize_passphrase(passphrase).is_ok() && !pin_confirmed {
+                    return Err(RuntimeError::PinConfirmationRequired);
+                }
+                None
+            }
             _ => return Err(RuntimeError::UnsupportedUnlock),
         };
+        #[derive(Serialize)]
+        struct Login<'a> {
+            username: &'a str,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            verifier: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            password: Option<&'a str>,
+        }
         let body = Zeroizing::new(
-            serde_json::to_vec(&match &material {
-                Some(material) => json!({"username":username,"verifier":&*material.verifier}),
-                None => json!({"username":username,"password":passphrase}),
+            serde_json::to_vec(&Login {
+                username,
+                verifier: material.as_ref().map(|material| material.verifier.as_str()),
+                password: material.is_none().then_some(passphrase),
             })
             .map_err(|_| RuntimeError::InvalidInput)?,
         );
@@ -1079,7 +1104,13 @@ pub(crate) fn authenticate_web_p3(
                     .as_str()
                     .ok_or(RuntimeError::InvalidResponse)?,
             )?),
-            Some("pin") if (4..=8).contains(&passphrase.len()) => None,
+            Some("pin") => {
+                crypto::validate_pin(passphrase)?;
+                if crypto::normalize_passphrase(passphrase).is_ok() {
+                    return Err(RuntimeError::LegacyAccessNeedsWeb);
+                }
+                None
+            }
             _ => return Err(RuntimeError::UnsupportedUnlock),
         };
         let mut headers = headers.clone();
@@ -1431,8 +1462,37 @@ mod tests {
         }
     }
     #[test]
+    fn long_pin_is_not_sent_without_its_own_confirmation() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let client = RuntimeClient::new(RuntimeConfig {
+            base_url: format!("http://{}", listener.local_addr().unwrap()),
+            tls_pin_sha256: None,
+        })
+        .unwrap();
+        let worker = std::thread::spawn(move || {
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+            assert!(bootstrap_request(&mut stream).starts_with("GET /api/auth/check "));
+            bootstrap_reply(
+                &mut stream,
+                200,
+                &json!({"status":"ok","isSetup":true,"archiveGeneration":"generation","unlock":{"credential":"pin"}}),
+                "",
+            );
+        });
+        assert!(matches!(
+            client.login(
+                PairingCredentials::new("paired-test", "t".repeat(64)).unwrap(),
+                "admin",
+                "Long synthetic PIN only"
+            ),
+            Err(RuntimeError::PinConfirmationRequired)
+        ));
+        worker.join().unwrap();
+    }
+
+    #[test]
     fn legacy_pin_login_uses_existing_route_and_web_wrapping() {
-        for version in [1, 2] {
+        for version in [1, 2, 3] {
             let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
             let url = format!("http://{}", listener.local_addr().unwrap());
             let client = RuntimeClient::new(RuntimeConfig {
@@ -1456,7 +1516,10 @@ mod tests {
                             let body: Value =
                                 serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap())
                                     .unwrap();
-                            assert_eq!(body, json!({"username":"admin","password":"1357"}));
+                            assert_eq!(
+                                body,
+                                json!({"username":"admin","password":if version == 3 {"Long synthetic PIN only"} else {"1357"}})
+                            );
                             let vector: Value = serde_json::from_str(if version == 1 {
                                 include_str!(
                                     "../../../../native/contracts/crypto-golden-vectors.v1.json"
@@ -1467,7 +1530,12 @@ mod tests {
                                 )
                             })
                             .unwrap();
-                            let wrapped = if version == 1 {
+                            let long_wrapped = json!(
+                                "v2:BwcHBwcHBwcHBwcHmEksoiU6l+1xqibGmdLC45Ln/lmw1UmYDQYAbExxdBIv1MP5vGBAsik7bdK6jXce"
+                            );
+                            let wrapped = if version == 3 {
+                                &long_wrapped
+                            } else if version == 1 {
                                 &vector["vectors"]["wrappedMasterKeyB64"]
                             } else {
                                 &vector["vectors"]["wrappedMasterKeyVersioned"]
@@ -1495,10 +1563,15 @@ mod tests {
                 }
             });
             let session = client
-                .login(
+                .login_with_pin_confirmation(
                     PairingCredentials::new("paired-test", "t".repeat(64)).unwrap(),
                     "admin",
-                    "1357",
+                    if version == 3 {
+                        "Long synthetic PIN only"
+                    } else {
+                        "1357"
+                    },
+                    version == 3,
                 )
                 .unwrap();
             assert_eq!(session.user().username, "admin");

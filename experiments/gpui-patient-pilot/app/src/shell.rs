@@ -414,7 +414,7 @@ pub struct ClinicalApp {
     edit_pending: bool,
     focus_first_field: bool,
     login_fields: Vec<Field>,
-    login_actions: [ScrollTarget; 3],
+    login_actions: [ScrollTarget; 4],
     login_appearance: [ScrollTarget; 3],
     settings_appearance: [ScrollTarget; 3],
     ambulatories: Load<Vec<Ambulatory>>,
@@ -1064,6 +1064,10 @@ impl ClinicalApp {
     }
 
     fn connect(&mut self, cx: &mut Context<Self>) {
+        self.connect_with_pin_confirmation(false, cx);
+    }
+
+    fn connect_with_pin_confirmation(&mut self, pin_confirmed: bool, cx: &mut Context<Self>) {
         if self.connecting {
             return;
         }
@@ -1090,7 +1094,7 @@ impl ClinicalApp {
         let client = client.with_request_context(self.request_context.clone());
         let task = cx.background_executor().spawn(async move {
             let pairing = PairingCredentials::new(id, token.to_string())?;
-            client.login(pairing, &username, &passphrase)
+            client.login_with_pin_confirmation(pairing, &username, &passphrase, pin_confirmed)
         });
         cx.spawn(async move |this, cx| {
             let mut result = Some(task.await);
@@ -3168,6 +3172,8 @@ impl ClinicalApp {
         panel = if paired {
             panel.child(self.login_actions[1].attach_enabled(button("clinical-workspace-connect", if self.connecting { "Accesso in corso…" } else { "Accedi all'archivio" }, theme, true, !self.connecting), !self.connecting)
                 .when(!self.connecting, |el| el.on_click(cx.listener(|this, _, _, cx| this.connect(cx)))))
+                .child(self.login_actions[3].attach_enabled(button("clinical-workspace-connect-pin", "Accedi con il PIN precedente", theme, false, !self.connecting), !self.connecting)
+                    .when(!self.connecting, |el| el.on_click(cx.listener(|this, _, _, cx| this.connect_with_pin_confirmation(true, cx)))))
                 .child(self.login_actions[2].attach_enabled(button("clinical-workspace-change-archive", "Cambia collegamento…", theme, false, !self.connecting), !self.connecting)
                     .when(!self.connecting, |el| el.on_click(cx.listener(|this, _, _, cx| this.forget_pairing(cx)))))
                 .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
@@ -8219,6 +8225,21 @@ mod review706b_callers {
         app.text_scale = 2.;
         app
     }
+    #[gpui::test]
+    fn verified_outcomes_are_withdrawn_when_the_work_context_changes(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (app, cx) = cx.add_window_view(|window, cx| make_app(window, cx));
+        app.update(cx, |app, cx| {
+            app.verified = Some("Esito precedente".into());
+            app.section_selected(PatientSection::Therapies, cx);
+            assert!(app.verified.is_none());
+            app.verified = Some("Esito precedente".into());
+            app.navigate(Area::Scales, cx);
+            assert!(app.verified.is_none());
+        });
+    }
+
     struct Hcg5Page {
         app: Entity<ClinicalApp>,
     }

@@ -7,6 +7,8 @@ pub type Result<T> = std::result::Result<T, RuntimeError>;
 pub enum RuntimeError {
     InvalidInput,
     UnsupportedUnlock,
+    PinConfirmationRequired,
+    LegacyAccessNeedsWeb,
     UnsupportedProtocol,
     Authentication,
     Forbidden,
@@ -58,7 +60,9 @@ impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::InvalidInput => "Configurazione o dati non validi.",
-            Self::UnsupportedUnlock => "Per gestire questo metodo di accesso, apri MediFlow nel browser sul computer dell’ambulatorio, accedi con il PIN e scegli Impostazioni, Accesso, Passa dal PIN alla passphrase. Salva il kit e la chiave di recupero, conferma e torna qui usando la nuova frase di accesso.",
+            Self::PinConfirmationRequired => "Questo archivio usa il PIN. Il testo inserito è lungo come una frase di accesso: inseriscilo di nuovo e scegli Accedi con il PIN precedente solo se è il tuo PIN.",
+            Self::UnsupportedUnlock => "Aggiorna MediFlow sul computer dell’ambulatorio e su questo dispositivo, poi riapri l’archivio. Questa versione non riconosce il metodo di accesso.",
+            Self::LegacyAccessNeedsWeb => "Per gestire questo metodo di accesso, apri MediFlow nel browser sul computer dell’ambulatorio, accedi con il PIN e scegli Impostazioni, Accesso, Passa dal PIN alla passphrase. Salva il kit e la chiave di recupero, conferma e torna qui usando la nuova frase di accesso.",
             Self::UnsupportedProtocol => "Aggiorna Mediflow sul computer che ospita l’archivio per usare questa versione.",
             Self::Authentication => "Accesso non valido o sessione scaduta. Accedi di nuovo.",
             Self::Forbidden => "L'operatore o il dispositivo non è autorizzato a questa operazione.",

@@ -83,10 +83,15 @@ pub(crate) fn unwrap_v3(wrapped: &str, kek: &MasterKey) -> Result<MasterKey> {
     Ok(key)
 }
 
-pub(crate) fn unwrap_pin(wrapped: &str, pin: &str, salt: &str) -> Result<MasterKey> {
-    if !(4..=8).contains(&pin.len()) {
+pub(crate) fn validate_pin(pin: &str) -> Result<()> {
+    if !(4..=64).contains(&pin.encode_utf16().count()) {
         return Err(RuntimeError::InvalidInput);
     }
+    Ok(())
+}
+
+pub(crate) fn unwrap_pin(wrapped: &str, pin: &str, salt: &str) -> Result<MasterKey> {
+    validate_pin(pin)?;
     let (iterations, payload) = if let Some(payload) = wrapped.strip_prefix("v2:") {
         (600_000, payload)
     } else if let Some(payload) = wrapped.strip_prefix("v1:") {
