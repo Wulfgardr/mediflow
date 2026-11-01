@@ -112,14 +112,19 @@ impl LocalAdministration {
             _subscription: subscription,
         }
     }
-    pub(super) fn command_visible(&self) -> bool {
-        self.work_profile.has_draft()
-            || (self.references.preview.is_some() || self.references.document.is_some())
-            || self.references.who_consent
-            || self.models.command_visible()
+    pub(super) fn clinical_command_visible(&self) -> bool {
+        self.models.command_visible()
             || self.security.has_work()
-            || self.archives.has_work()
             || !matches!(self.operation, Operation::Idle)
+    }
+    pub(super) fn page_command_visible(&self, page: SettingsPage) -> bool {
+        match page {
+            SettingsPage::References => {
+                self.references.preview.is_some() || self.references.who_consent
+            }
+            SettingsPage::Archives => self.archives.has_work(),
+            _ => false,
+        }
     }
     pub(super) fn has_work(&self) -> bool {
         self.work_profile.busy
@@ -194,7 +199,7 @@ impl LocalAdministration {
             )
         });
         if std::mem::take(&mut self.focus_confirmation) {
-            if self.command_visible() {
+            if self.clinical_command_visible() {
                 window.focus(&self.targets[0].focus, cx);
                 self.targets[0].scroll_to(window, cx);
             } else if let Some(focus) = self.return_focus.take() {
@@ -414,7 +419,9 @@ impl ClinicalApp {
         );
     }
     pub(super) fn cancel_local_command(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.local_host.references.busy
+        if self.area == Area::Settings
+            && self.settings_page == SettingsPage::References
+            && !self.local_host.references.busy
             && (self.local_host.references.preview.is_some()
                 || self.local_host.references.who_consent)
         {
@@ -598,10 +605,7 @@ impl ClinicalApp {
                 }
             }
         }
-        if self.local_host.security.has_work()
-            || self.local_host.models.command_visible()
-            || !matches!(self.local_host.operation, Operation::Idle)
-        {
+        if self.local_host.clinical_command_visible() {
             pane = pane.child(self.threshold(
                 Layout::for_window(760., self.text_scale),
                 ThresholdMode::Complete,
