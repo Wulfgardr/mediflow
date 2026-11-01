@@ -9983,6 +9983,252 @@ mod g2_settings_tests {
             assert!(crate::test_loopback::accept(&listener).is_err());
         }
     }
+    #[test]
+    fn g2_who_reads_and_rollback_use_existing_cookie_routes_once_then_reread() {
+        use crate::{ReferenceCatalog, ReferenceStatus};
+        let f: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/who-administration.json"))
+                .unwrap();
+        let reply = f.clone();
+        let (listener, session) = fixture();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            for (path, value) in [
+                ("/api/icd/proxy", reply["readiness"].clone()),
+                ("/api/icd/proxy?q=cholera", reply["probe"].clone()),
+                (
+                    "/api/icd/code-check?code=AA00&release=2026-01",
+                    reply["found"].clone(),
+                ),
+            ] {
+                g2_web_request(&listener, "GET", path, 200, value);
+            }
+            g2_web_request(
+                &listener,
+                "GET",
+                "/api/settings/aiProvider",
+                200,
+                json!({"key":"aiProvider","value":null}),
+            );
+            g2_web_request(
+                &listener,
+                "GET",
+                "/api/settings/aiProvider",
+                200,
+                json!({"key":"aiProvider"}),
+            );
+            let request = g2_web_request(
+                &listener,
+                "POST",
+                "/api/icd/catalog",
+                200,
+                reply["rollback"].clone(),
+            );
+            let body: Value =
+                serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+            assert_eq!(
+                body,
+                json!({"action":"rollback","confirmed":true,"expectedRevision":2})
+            );
+            g2_web_request(
+                &listener,
+                "GET",
+                "/api/icd/catalog",
+                200,
+                reply["rollback"].clone(),
+            );
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        assert_eq!(
+            access.read_who_administration_readiness().unwrap(),
+            f["readiness"]
+        );
+        assert_eq!(access.probe_who_administration().unwrap(), f["probe"]);
+        assert_eq!(
+            access.check_who_administration_code("AA00").unwrap(),
+            f["found"]
+        );
+        assert_eq!(access.read_diagnostic_provider_setting().unwrap(), None);
+        assert_eq!(
+            access.read_diagnostic_provider_setting(),
+            Err(RuntimeError::InvalidResponse)
+        );
+        let command = access
+            .prepare_who_rollback(&ReferenceStatus {
+                catalog: ReferenceCatalog::Who,
+                data: f["before"].clone(),
+                sources: None,
+            })
+            .unwrap();
+        let write = access.rollback_who_catalog(&command).unwrap();
+        assert_eq!(write.recorded, f["rollback"]);
+        assert_eq!(write.current.unwrap(), f["rollback"]);
+        assert!(matches!(
+            access.rollback_who_catalog(&command),
+            Err(RuntimeError::ReadRequired)
+        ));
+        session.lock();
+        assert_eq!(
+            access.read_who_administration_readiness(),
+            Err(RuntimeError::Locked)
+        );
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(crate::test_loopback::accept(&listener).is_err());
+    }
+
+    #[test]
+    fn g2_who_conflict_lost_false_success_and_failed_readback_never_replay_rollback() {
+        use crate::{ReferenceCatalog, ReferenceStatus};
+        for outcome in [409, 0, 200, 503] {
+            let f: Value =
+                serde_json::from_str(include_str!("../tests/fixtures/who-administration.json"))
+                    .unwrap();
+            let reply = f.clone();
+            let (listener, session) = fixture();
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                assert!(read_request(&mut stream).starts_with("POST /api/icd/catalog "));
+                if outcome == 409 {
+                    local_host_reply(&mut stream, 409, json!({"error":"synthetic conflict"}), "");
+                } else if outcome == 200 {
+                    let mut invalid = reply["rollback"].clone();
+                    invalid["revision"] = json!(2);
+                    local_host_reply(&mut stream, 200, invalid, "");
+                } else if outcome == 503 {
+                    local_host_reply(&mut stream, 200, reply["rollback"].clone(), "");
+                    drop(stream);
+                    g2_web_request(
+                        &listener,
+                        "GET",
+                        "/api/icd/catalog",
+                        503,
+                        json!({"error":"synthetic readback unavailable"}),
+                    );
+                    return listener;
+                }
+                drop(stream);
+                listener
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let observed = ReferenceStatus {
+                catalog: ReferenceCatalog::Who,
+                data: f["before"].clone(),
+                sources: None,
+            };
+            let command = access.prepare_who_rollback(&observed).unwrap();
+            match access.rollback_who_catalog(&command) {
+                Ok(write) => {
+                    assert_eq!(outcome, 503);
+                    assert!(write.current.is_err());
+                    assert_eq!(write.recorded, f["rollback"]);
+                }
+                Err(e) => assert_eq!(
+                    e,
+                    if outcome == 409 {
+                        RuntimeError::Conflict
+                    } else {
+                        RuntimeError::Indeterminate
+                    }
+                ),
+            }
+            assert!(matches!(
+                access.rollback_who_catalog(&command),
+                Err(RuntimeError::ReadRequired)
+            ));
+            let mut absent = observed;
+            absent.data["previousAvailable"] = json!(false);
+            assert!(matches!(
+                access.prepare_who_rollback(&absent),
+                Err(RuntimeError::ReadRequired)
+            ));
+            let listener = worker.join().unwrap();
+            listener.set_nonblocking(true).unwrap();
+            assert!(crate::test_loopback::accept(&listener).is_err());
+        }
+    }
+
+    #[test]
+    fn g2_audit_filters_encode_exact_values_and_reject_unfiltered_or_oversized_results() {
+        use crate::AuditFilter;
+        let row = json!({"eventId":"synthetic-1","eventType":"reference_data.icd11.rollback","occurredAt":"2026-11-01T01:00:00.000Z","outcome":"success","subjectType":"reference_data","actorRef":"synthetic & operator"});
+        let filter = AuditFilter {
+            event_type: "reference_data.icd11.rollback".into(),
+            outcome: "success".into(),
+            subject_type: "reference_data".into(),
+            actor_ref: "synthetic & operator".into(),
+            origin: "imported".into(),
+            limit: 1,
+        };
+        let (listener, session) = fixture();
+        let reply = row.clone();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let path = "/api/system/audit?origin=imported&limit=1&eventType=reference_data.icd11.rollback&outcome=success&subjectType=reference_data&actorRef=synthetic+%26+operator";
+            for rows in [
+                json!([reply.clone()]),
+                json!([{ "eventId":"wrong","eventType":"other","occurredAt":"2026-11-01T01:00:00.000Z","outcome":"success"}]),
+                json!([reply.clone(), reply]),
+            ] {
+                g2_web_request(&listener, "GET", path, 200, rows);
+            }
+            g2_web_request(
+                &listener,
+                "GET",
+                path,
+                403,
+                json!({"error":"synthetic admin required"}),
+            );
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let mut invalid = filter.clone();
+        invalid.limit = 0;
+        assert_eq!(
+            access.read_filtered_audit(&invalid),
+            Err(RuntimeError::InvalidInput)
+        );
+        assert_eq!(
+            access.check_who_administration_code("Nome inventato"),
+            Err(RuntimeError::InvalidInput)
+        );
+        assert_eq!(access.read_filtered_audit(&filter).unwrap(), json!([row]));
+        for _ in 0..2 {
+            assert_eq!(
+                access.read_filtered_audit(&filter),
+                Err(RuntimeError::InvalidResponse)
+            );
+        }
+        assert_eq!(
+            access.read_filtered_audit(&filter),
+            Err(RuntimeError::Forbidden)
+        );
+        session.lock();
+        assert_eq!(
+            access.read_filtered_audit(&filter),
+            Err(RuntimeError::Locked)
+        );
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(crate::test_loopback::accept(&listener).is_err());
+    }
 }
 
 #[cfg(test)]

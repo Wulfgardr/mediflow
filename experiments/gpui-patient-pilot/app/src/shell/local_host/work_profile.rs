@@ -474,6 +474,7 @@ mod tests {
             "prosthetics-document",
             "reference-preview",
             "who-consent",
+            "who-rollback",
         ] {
             let (view, cx) =
                 cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
@@ -500,6 +501,21 @@ mod tests {
                             Some(Arc::new(access.prepare_aifa_update().unwrap()))
                     }
                     "who-consent" => app.local_host.references.who_consent = true,
+                    "who-rollback" => {
+                        let f: serde_json::Value = serde_json::from_str(include_str!(
+                            "../../../../transport/tests/fixtures/who-administration.json"
+                        ))
+                        .unwrap();
+                        app.local_host.who_administration.rollback = Some(Arc::new(
+                            access
+                                .prepare_who_rollback(&mediflow_runtime_client::ReferenceStatus {
+                                    catalog: mediflow_runtime_client::ReferenceCatalog::Who,
+                                    data: f["before"].clone(),
+                                    sources: None,
+                                })
+                                .unwrap(),
+                        ));
+                    }
                     _ => unreachable!(),
                 }
                 app.navigate(Area::Patients, cx);
@@ -556,6 +572,7 @@ mod tests {
                     )),
                     "reference-preview" => assert!(app.local_host.references.preview.is_some()),
                     "who-consent" => assert!(app.local_host.references.who_consent),
+                    "who-rollback" => assert!(app.local_host.who_administration.rollback.is_some()),
                     _ => unreachable!(),
                 }
             });
