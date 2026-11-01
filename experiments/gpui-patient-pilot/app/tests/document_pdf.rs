@@ -1,3 +1,4 @@
+#![cfg(target_os = "macos")]
 #[path = "../test_support/pdf_fixture.rs"]
 mod fixture;
 use std::{
@@ -72,4 +73,49 @@ fn second_page_uses_the_same_binary_and_does_not_run_the_app_ui() {
             .iter()
             .all(|p| p[0] < 5 && p[2] > 250)
     );
+}
+
+#[test]
+fn missing_glyph_and_missing_digit_encodings_refuse_the_entire_preview() {
+    for text in [b"A".as_slice(), b"Hb 13.4"] {
+        let mut content = b"BT /F1 12 Tf 10 25 Td (".to_vec();
+        content.extend_from_slice(text);
+        content.extend_from_slice(b") Tj ET");
+        let source = fixture::document_with_font(&content, &[], b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding << /Type /Encoding /BaseEncoding /WinAnsiEncoding /Differences [51 /nonexistentSyntheticGlyph 65 /nonexistentSyntheticGlyph] >> >>");
+        let output = worker(&source, "1");
+        assert_eq!(output.stdout, b"{\"error\":\"unsupported\"}\n");
+    }
+}
+
+#[test]
+fn inline_images_and_images_on_other_pages_obey_the_same_pixel_bound() {
+    let source = fixture::document(b"BI /W 4000 /H 3001 /CS /RGB /BPC 8 /F /DCT ID bad EI", &[]);
+    assert_eq!(worker(&source, "1").stdout, b"{\"error\":\"limit\"}\n");
+    let huge = fixture::stream(b"/Type /XObject /Subtype /Image /Width 4000 /Height 3001 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode", b"not a JPEG");
+    let source = fixture::two_pages(b"0 0 1 rg 0 0 100 60 re f", b"/Image Do", Some(huge));
+    assert_eq!(worker(&source, "1").stdout, b"{\"error\":\"limit\"}\n");
+}
+
+#[test]
+fn real_jpeg_dimensions_cannot_hide_behind_a_small_pdf_dictionary() {
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new(&mut jpeg)
+        .encode_image(&image::RgbImage::from_pixel(
+            3,
+            2,
+            image::Rgb([20, 60, 180]),
+        ))
+        .unwrap();
+    let dict = b"/Type /XObject /Subtype /Image /Width 3 /Height 2 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode";
+    let good = fixture::document(
+        b"q 100 0 0 60 0 0 cm /Image Do Q",
+        &[fixture::stream(dict, &jpeg)],
+    );
+    let output = worker(&good, "1");
+    assert!(output.stdout.starts_with(b"{\"width\":150,"));
+    let frame = jpeg.windows(2).position(|p| p == [0xff, 0xc0]).unwrap();
+    jpeg[frame + 5..frame + 7].copy_from_slice(&3001u16.to_be_bytes());
+    jpeg[frame + 7..frame + 9].copy_from_slice(&4000u16.to_be_bytes());
+    let bad = fixture::document(b"/Image Do", &[fixture::stream(dict, &jpeg)]);
+    assert_eq!(worker(&bad, "1").stdout, b"{\"error\":\"limit\"}\n");
 }

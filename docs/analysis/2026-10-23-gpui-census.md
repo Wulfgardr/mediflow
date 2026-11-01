@@ -602,14 +602,22 @@ Le altre quote numeriche di pagine, canvas, operatori e memoria applicativa
 sono allineate alla policy Web; il limite del file resta quello nativo di
 10 MiB, più restrittivo dei 25 MiB Web. Le quote non sono un tetto heap del parser.
 
-Il motore Hayro 0.8.0 ammette un sottoinsieme esplicito: testo con font
-risolti, vettori e immagini JPEG/raw/Flate. Font sostitutivi, maschere /Mask e /SMask, annotazioni,
-pattern, Type3, XFA, cifratura PDF, filtri e spazi colore immagine non
-supportati vengono rifiutati. Questa tranche non attesta compatibilità
-grafica universale, accessibilità del contenuto raster o collaudo del pacchetto.
-L’anteprima scade dopo dieci minuti e la revoca impedisce risultati tardivi.
+Il helper macOS usa PDFKit dal ponte nativo, con dati via pipe e senza file
+intermedi. Seatbelt nega rete e scritture; il parent controlla footprint/RSS
+(256 MiB), cancellazione e tempo totale (15 secondi, parsing e raster inclusi).
+Il campionamento non è una quota di heap atomica: può esserci un superamento
+fra due letture. Limiti: 500 pagine, 14.400 punti per lato, immagine sorgente
+8192 per lato e 12 milioni di pixel prima del raster, canvas 2048 per lato e
+4 milioni di pixel. Una pagina fuori limite rifiuta l'intera anteprima.
+Maschere, annotazioni, Type3, pattern, XFA e codifiche Differences sono rifiutati.
+PDFKit non espone un esito pubblico per ogni glifo risolto: nessuna garanzia di
+completezza tipografica viene dedotta dall'esito del renderer. Sugli altri
+sistemi l'anteprima PDF è indisponibile; il documento resta esportabile.
+I byte originali e il raster posseduti dal helper vengono azzerati prima del
+rilascio; i buffer interni del framework, del kernel e della GPU non sono
+coperti da questa dichiarazione. Curation, nuova estrazione e CSV restano nelle
+tranche successive. Percorso per la verifica nel pacchetto macOS:
 
-Percorso per la corsia a schermo: paziente sintetico → Documenti →
 Aggiungi documenti → PDF sintetico → revisione e conferma → Originale →
 Pagina successiva / Pagina precedente; verificare anche Ritorna ai documenti
 e Giorno/Grafite. Curation degli estratti e CSV restano tranche distinte.
