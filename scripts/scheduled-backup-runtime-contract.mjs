@@ -8,16 +8,16 @@ import { fileURLToPath } from 'node:url';
 // Reviewed source identity, independent of the checkout used to run this gate.
 // Changes to this closure require review and a deliberate update of these pins.
 export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
-  ['scripts/windows-private-directory.mjs', '7365ce92004de1f0d51fadd150574014696234a651481ebe637b0ad28a4533fa'],
+  ['scripts/windows-private-directory.mjs', '490f0850bad5d6bdff5e88857c28d11134cf3a0acecb16460d8f5616338e164d'],
   ['scripts/windows-system-command.mjs', 'adcd137e4a8e23e7495d83fc372befe0b3a4d9cdb25abc8de5f4252828a5b1f2'],
   ['scripts/windows-launcher-bootstrap/index.mjs', 'ddc8dad1aff9cdeb836a82cb4983c02b9b7e77203e861c3142c5767b52600304'],
   ['scripts/windows-launcher-bootstrap/system-directory.c', 'd225cabaca09fca34c103e93608963aca8bb01dfca4ff7df21b285147cb16e7c', true],
   ['scripts/windows-launcher-bootstrap/build.ps1', '663d4fd89674122695a1519ad50674526b3b461b0df00391906a0d1730ccbb9c', true],
   ['scripts/prepare-windows-launcher-bootstrap.mjs', 'dac5c0648b21e5e1f4c085ceea902eb80c52a7eba5329abd909ec57f28a72089', true],
-  ['scripts/windows-launcher-bootstrap/prebuilds/win32-x64/manifest.json', '36d3ba2543b8c4ec571ad8e2fa25846af46a202aa86904d1528ce074fd0aacac', true],
-  ['scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node', 'd92c56c9e0bbc8aa4c40b41f64e7375403f94b04bddc2ed588ffa8558a2b7d8a', true],
-  ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/manifest.json', '41b43e7307b2eac09a14dc4af62d4179e485ce63ff27a3bcac085cf664396e0d', true],
-  ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/system-directory.node', '5c62e9f046e9c8ef2c0104f4cae138d6765ab743d1fb49eef02a48c240aae706', true],
+  ['scripts/windows-launcher-bootstrap/prebuilds/win32-x64/manifest.json', '571db389fb79bba3021d2ef6a285fa5425cfb53b2823e9e12e8e7cc8aeeb85d4', true],
+  ['scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node', '8b249ff19cd199a1bb3a89e6850b2ec1955bf3506ec916a2f71be389146105ff', true],
+  ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/manifest.json', '9e47842b2e15c8d338d5f7a1649642a72f8129edbee11d306e2d30ff101dba8a', true],
+  ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/system-directory.node', 'c0cf812086e0f1a731b1259b39e7477514e56c6c8c3f95f041779ec8a004f9cd', true],
 
   ['scripts/run-scheduled-backup.mjs', '33e1930e4da417aadf74ee506e4086d19bc1b954a7faecb5494a04bb4447fa09'],
   ['scripts/backup-destination-policy.mjs', '1eaf750b52e039ec932ceef5d5977199d6053cd5ed5d684f4512375be9ce33e7'],

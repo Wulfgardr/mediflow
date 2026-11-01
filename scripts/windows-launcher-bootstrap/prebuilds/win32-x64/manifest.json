@@ -10,13 +10,13 @@
   "napiVersion": 1,
   "binary": "system-directory.node",
   "bytes": 8192,
-  "sha256": "d92c56c9e0bbc8aa4c40b41f64e7375403f94b04bddc2ed588ffa8558a2b7d8a",
+  "sha256": "8b249ff19cd199a1bb3a89e6850b2ec1955bf3506ec916a2f71be389146105ff",
   "dependencies": [
     "kernel32.dll",
     "node.exe"
   ],
   "sourceSha256": "d225cabaca09fca34c103e93608963aca8bb01dfca4ff7df21b285147cb16e7c",
-  "recipeSha256": "576c867a61525717b5bb5d613b92f195432357306ced21cdec07adae78c9c1f1",
+  "recipeSha256": "663d4fd89674122695a1519ad50674526b3b461b0df00391906a0d1730ccbb9c",
   "builderSha256": "dac5c0648b21e5e1f4c085ceea902eb80c52a7eba5329abd909ec57f28a72089",
   "sdk": {
     "node": "24.22.0",
