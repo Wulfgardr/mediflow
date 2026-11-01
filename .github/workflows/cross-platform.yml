@@ -39,16 +39,24 @@ jobs:
           architecture: ${{ matrix.arch }}
       - name: Diagnose the original linker output and prepare regeneration
         if: github.event_name == 'workflow_dispatch' && inputs.regenerate_bootstrap
-        shell: bash
+        shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           git fetch --no-tags --depth=1 origin ef2a4006adc5f4d59f8e9db627070f6333ad066e
-          legacy="$(cygpath -u "$RUNNER_TEMP")/legacy-bootstrap"
-          mkdir "$legacy"
-          git archive ef2a4006adc5f4d59f8e9db627070f6333ad066e scripts/prepare-windows-launcher-bootstrap.mjs scripts/windows-system-command.mjs scripts/windows-launcher-bootstrap | tar -xf - -C "$legacy"
-          rm "$legacy/scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node" "$legacy/scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/manifest.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch original bootstrap source' }
+          $legacy = Join-Path $env:RUNNER_TEMP 'legacy-bootstrap'
+          $archive = Join-Path $env:RUNNER_TEMP 'legacy-bootstrap.tar'
+          New-Item -ItemType Directory -Path $legacy | Out-Null
+          git archive --output=$archive ef2a4006adc5f4d59f8e9db627070f6333ad066e scripts/prepare-windows-launcher-bootstrap.mjs scripts/windows-system-command.mjs scripts/windows-launcher-bootstrap
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot archive original bootstrap source' }
+          tar.exe -xf $archive -C $legacy
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot extract original bootstrap source' }
+          Remove-Item -LiteralPath "$legacy/scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node", "$legacy/scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/manifest.json"
           node "$legacy/scripts/prepare-windows-launcher-bootstrap.mjs" build
-          node --input-type=module -e "import fs from 'node:fs'; import {peByteDifferences} from './scripts/verify-windows-bootstrap-rebuild.mjs'; const base='scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node'; const report=peByteDifferences(fs.readFileSync(base),fs.readFileSync(process.argv[1]+'/'+base)); fs.writeFileSync(process.argv[1]+'/differences.json',JSON.stringify(report,null,2)); console.log(JSON.stringify(report));" "$legacy"
-          rm "scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node" "scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/manifest.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Original bootstrap rebuild failed' }
+          node --input-type=module -e "import fs from 'node:fs'; import {peByteDifferences} from './scripts/verify-windows-bootstrap-rebuild.mjs'; const base='scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node'; const report=peByteDifferences(fs.readFileSync(base),fs.readFileSync(process.argv[1]+'/'+base)); fs.writeFileSync(process.argv[1]+'/differences.json',JSON.stringify(report,null,2)); console.log(JSON.stringify(report));" $legacy
+          if ($LASTEXITCODE -ne 0) { throw 'Original bootstrap comparison failed' }
+          Remove-Item -LiteralPath "scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node", "scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/manifest.json"
       - name: Build native Windows bootstrap (development only)
         if: hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/system-directory.node', matrix.arch)) == '' && hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/manifest.json', matrix.arch)) == ''
         run: node scripts/prepare-windows-launcher-bootstrap.mjs build
