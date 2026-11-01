@@ -1,0 +1,194 @@
+[
+  {
+    "file": "docx-export-1.pdf",
+    "category": "docx-export",
+    "sha256": "d4d7ffc2cbc259df05cfb60a29b274c560f6a02c64a96fbd5c81d97359a62d8d",
+    "flagFalse": true
+  },
+  {
+    "file": "pdfa-2b-1.pdf",
+    "category": "pdfa-2b",
+    "sha256": "e6b5df08c5f94cd18eba23c1b4697c7e23cb6c04d68bd0c3c1adefa87c37e4e7",
+    "flagFalse": true
+  },
+  {
+    "file": "docx-export-2.pdf",
+    "category": "docx-export",
+    "sha256": "cfe177b6a471725db61a53f32192ae323cc436af7f7359bb4f4c2dc42067c893",
+    "flagFalse": true
+  },
+  {
+    "file": "pdfa-2b-2.pdf",
+    "category": "pdfa-2b",
+    "sha256": "eeadb4c9f8ef0702038f510f0f52c5891c63358f6e148674fe8301b0e55613f7",
+    "flagFalse": true
+  },
+  {
+    "file": "docx-export-3.pdf",
+    "category": "docx-export",
+    "sha256": "6626d9618c28a83d0d4d4c670faddc36852bb70b538260253d5b50d75dc0a9eb",
+    "flagFalse": true
+  },
+  {
+    "file": "pdfa-2b-3.pdf",
+    "category": "pdfa-2b",
+    "sha256": "524eec970a91b0a687de07f4fbbb0702f83944782d0122e3609707d25c7c51c9",
+    "flagFalse": true
+  },
+  {
+    "file": "docx-export-4.pdf",
+    "category": "docx-export",
+    "sha256": "57db5a1b10361fab974175fbad3ae7932e4a9f8296911fbab7341f211c632f1a",
+    "flagFalse": true
+  },
+  {
+    "file": "pdfa-2b-4.pdf",
+    "category": "pdfa-2b",
+    "sha256": "a15730319c098114c49c5f687231d92d4981b1b048df68652cdada50380eb676",
+    "flagFalse": true
+  },
+  {
+    "file": "docx-export-5.pdf",
+    "category": "docx-export",
+    "sha256": "dde4a5b0464f0e3856f6bb8bf0fef5c79a58cc6208f129ff8766cd54d1ee599d",
+    "flagFalse": true
+  },
+  {
+    "file": "pdfa-2b-5.pdf",
+    "category": "pdfa-2b",
+    "sha256": "f6a224bab895a6cac88a4ea09c9215ae05fffae00178a2e8ab34572b65486c76",
+    "flagFalse": true
+  },
+  {
+    "file": "docx-export-6.pdf",
+    "category": "docx-export",
+    "sha256": "b09d8fe9bc96f400af0339f0f5dbbd179f1966e34f769b9e5ccb6206eab4a279",
+    "flagFalse": true
+  },
+  {
+    "file": "pdfa-2b-6.pdf",
+    "category": "pdfa-2b",
+    "sha256": "bb68b3e34b127fd5e46238915cb5fc4725a5e8de02f8d37cdcf58d09fd277d35",
+    "flagFalse": true
+  },
+  {
+    "file": "laboratory-1.pdf",
+    "category": "laboratory-unembedded",
+    "sha256": "8446b8436c8dc3d8d962ecaa71c491d050981e0b890ad971624274c594ab4217",
+    "flagFalse": true
+  },
+  {
+    "file": "laboratory-2.pdf",
+    "category": "laboratory-unembedded",
+    "sha256": "d8206e43b8b3b2a95f9f0a9a3d891af1e8f8277e8140fae5f1ce5ad243c62d7a",
+    "flagFalse": false
+  },
+  {
+    "file": "laboratory-3.pdf",
+    "category": "laboratory-unembedded",
+    "sha256": "8be7d66383c82dad42eddda4411eb241a80017b95051bed36d77679deda56af4",
+    "flagFalse": false
+  },
+  {
+    "file": "laboratory-4.pdf",
+    "category": "laboratory-unembedded",
+    "sha256": "d0a7187263420513ebaa97e71c8ef36ebfdc6d6b5e5781207a187242495772df",
+    "flagFalse": true
+  },
+  {
+    "file": "laboratory-5.pdf",
+    "category": "laboratory-unembedded",
+    "sha256": "c2264885f365723df541ce9568aa321cbc37625706a77c2d00c6a51a040b5c1f",
+    "flagFalse": false
+  },
+  {
+    "file": "laboratory-6.pdf",
+    "category": "laboratory-unembedded",
+    "sha256": "43f49167deb44bb1a9825f61a2dd71ba8a515b68ca95de9287ad9359344bfc56",
+    "flagFalse": false
+  },
+  {
+    "file": "ocr-1.pdf",
+    "category": "scan-ocr",
+    "sha256": "0ddf0d5af9778ce811b29fd7e0bf05d58a176f53b4f84278753a0d27b71a669b",
+    "flagFalse": false
+  },
+  {
+    "file": "ocr-2.pdf",
+    "category": "scan-ocr",
+    "sha256": "f07344c9f16d64485d00f382ae6befa177dfd97f30937d10f5979c0d61c22266",
+    "flagFalse": false
+  },
+  {
+    "file": "ocr-3.pdf",
+    "category": "scan-ocr",
+    "sha256": "8d69daf7fca644227581b47953f4266f729cf212e6cc42b6333d8c5bfc4f82e7",
+    "flagFalse": false
+  },
+  {
+    "file": "ocr-4.pdf",
+    "category": "scan-ocr",
+    "sha256": "74116ee438555e086f7abb823dcc221039f591a433d6a29551a1a13ad355bea5",
+    "flagFalse": false
+  },
+  {
+    "file": "ocr-5.pdf",
+    "category": "scan-ocr",
+    "sha256": "83003aa24408b85d39520338301c5c0f44a2b19afda8223be17def45b4160b1a",
+    "flagFalse": false
+  },
+  {
+    "file": "ocr-6.pdf",
+    "category": "scan-ocr",
+    "sha256": "f5e72c4e8e9e7135c406ce5ce9231082d98ed01dfb3699640b77019e11a2e79e",
+    "flagFalse": false
+  },
+  {
+    "file": "valid-differences-1.pdf",
+    "category": "valid-encoding-control",
+    "sha256": "91d2d585ce1c4336d2a80d4778b0348b33342e95f575fb4e4037cae6176615ff",
+    "flagFalse": true
+  },
+  {
+    "file": "valid-differences-2.pdf",
+    "category": "valid-encoding-control",
+    "sha256": "32ac24cabe1cb80001bc118675f6abbd00f76b366c5810a411ea5d3585e7aa87",
+    "flagFalse": false
+  },
+  {
+    "file": "valid-differences-3.pdf",
+    "category": "valid-encoding-control",
+    "sha256": "f81215e3465900357411de264132aadf43a5411896bc7f27dc7bd3a5f3e0b4fc",
+    "flagFalse": false
+  },
+  {
+    "file": "valid-differences-4.pdf",
+    "category": "valid-encoding-control",
+    "sha256": "fc034d4138a99804c311793e0cd2a24ee010eeeb8cbce322f55ae7676cfd358c",
+    "flagFalse": true
+  },
+  {
+    "file": "valid-differences-5.pdf",
+    "category": "valid-encoding-control",
+    "sha256": "cb9d37eccd3cb6f08e31180abe37335ea2d4fb85df143e06e95a4462c762d4f6",
+    "flagFalse": false
+  },
+  {
+    "file": "valid-differences-6.pdf",
+    "category": "valid-encoding-control",
+    "sha256": "b4ac9e2b1df0624a2835986f130ee5dd71b91ecba65956c9d535f2b2d9a70b78",
+    "flagFalse": false
+  },
+  {
+    "file": "missing-glyph.pdf",
+    "category": "review",
+    "sha256": "c234ee2438159b21e55a106a5764799b7f1040c2929b43a3c0f7c849be6f4ab2",
+    "flagFalse": true
+  },
+  {
+    "file": "lab-missing-digit.pdf",
+    "category": "review",
+    "sha256": "680e29995268743bf9754d85f45dfe308bd00c6d1f0dde468be99c3d36fa47f1",
+    "flagFalse": true
+  }
+]
