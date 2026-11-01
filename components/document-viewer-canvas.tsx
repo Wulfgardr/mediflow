@@ -93,7 +93,7 @@ function OwnedDocumentPreviewCanvas({ source, signal }: CanvasProps) {
                     style={{ display: status === 'ready' ? 'block' : 'none', maxWidth: '100%', height: 'auto', margin: 'auto' }} />
             </div>
             {isPdf && <p className="px-3 py-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                Anteprima grafica locale, senza moduli o collegamenti attivi. I caratteri possono differire dall’originale.
+                Anteprima grafica locale, senza moduli o collegamenti attivi. Alcuni caratteri possono mancare o differire: per un valore clinico controlla il documento originale.
             </p>}
         </section>
     );
