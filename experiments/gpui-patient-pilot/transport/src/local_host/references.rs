@@ -49,8 +49,17 @@ pub struct PreparedReferenceImport {
     file: Option<Vec<u8>>,
     submitted: AtomicBool,
     baseline: Option<Value>,
+    cancellation: Option<Box<RequestContext>>,
 }
 impl PreparedReferenceImport {
+    pub fn cancel_acquisition(&self) {
+        if let Some(context) = &self.cancellation {
+            context.cancel();
+        }
+    }
+    pub fn acquisition_cancellable(&self) -> bool {
+        self.cancellation.is_some()
+    }
     pub fn catalog(&self) -> ReferenceCatalog {
         self.catalog
     }
@@ -246,6 +255,64 @@ impl LocalHostAccess {
             sources,
         })
     }
+    pub fn aifa_source_status(&self, check_remote: bool) -> Result<Value> {
+        let value = self.request(
+            if check_remote {
+                Method::POST
+            } else {
+                Method::GET
+            },
+            &["api", "drugs", "source"],
+            None,
+            check_remote,
+        )?;
+        if !value["catalog"].is_object()
+            || !value["networkAllowed"].is_boolean()
+            || !value["networkPreference"].is_boolean()
+            || !matches!(
+                value["remote"]["outcome"].as_str(),
+                Some("available" | "unchanged" | "unavailable")
+            )
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        Ok(value)
+    }
+    pub fn set_aifa_network_preference(&self, expected: bool, enabled: bool) -> Result<Value> {
+        if self.aifa_source_status(false)?["networkPreference"] != expected {
+            return Err(RuntimeError::Conflict);
+        }
+        let value = if enabled { "enabled" } else { "disabled" };
+        let response = self.request(
+            Method::PUT,
+            &["api", "settings", "aifaNetworkAccess"],
+            Some(&json!({"value":value})),
+            true,
+        )?;
+        if response["success"] != true
+            || response["key"] != "aifaNetworkAccess"
+            || response["value"] != value
+        {
+            return Err(RuntimeError::Indeterminate);
+        }
+        let current = self.aifa_source_status(false)?;
+        if current["networkPreference"] != enabled {
+            return Err(RuntimeError::Indeterminate);
+        }
+        Ok(current)
+    }
+    pub fn aifa_download_progress(&self) -> Result<Value> {
+        let value = self.request(Method::GET, &["api", "drugs", "update"], None, false)?;
+        let p = &value["progress"];
+        if !p.is_null()
+            && (!p["receivedBytes"].is_u64()
+                || (!p["totalBytes"].is_null() && !p["totalBytes"].is_u64())
+                || !matches!(p["phase"].as_str(), Some("downloading" | "validating")))
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        Ok(value)
+    }
     pub fn prepare_reference_file(
         &self,
         catalog: ReferenceCatalog,
@@ -288,7 +355,10 @@ impl LocalHostAccess {
                 Some(bytes.to_vec()),
             )
         } else {
-            let payload = json!({"sourceName":name,"base64":STANDARD.encode(bytes)});
+            let mut payload = json!({"sourceName":name,"base64":STANDARD.encode(bytes)});
+            if catalog == ReferenceCatalog::Prosthetics && !metadata.is_null() {
+                payload["options"] = metadata;
+            }
             let preview = self.request(
                 Method::POST,
                 &catalog.path("preview"),
@@ -331,6 +401,7 @@ impl LocalHostAccess {
             file,
             submitted: AtomicBool::new(false),
             baseline,
+            cancellation: None,
         })
     }
     pub fn prepare_aifa_update(&self) -> Result<PreparedReferenceImport> {
@@ -343,6 +414,7 @@ impl LocalHostAccess {
             file: None,
             submitted: AtomicBool::new(false),
             baseline: None,
+            cancellation: Some(Box::new(self.client.request_context().child())),
         })
     }
     pub fn prepare_who_acquisition(&self) -> Result<PreparedReferenceImport> {
@@ -367,6 +439,7 @@ impl LocalHostAccess {
             file: None,
             submitted: AtomicBool::new(false),
             baseline: None,
+            cancellation: None,
         })
     }
     pub fn commit_reference_import(
@@ -418,7 +491,12 @@ impl LocalHostAccess {
                         sensitive_header(token)?,
                     );
                 }
-                self.client.dedicated_web_raw(
+                let client = command
+                    .cancellation
+                    .as_ref()
+                    .map(|c| self.client.with_request_context(c.as_ref().clone()))
+                    .unwrap_or_else(|| self.client.clone());
+                client.dedicated_web_raw(
                     Method::POST,
                     &["api", "drugs", "update"],
                     headers,
@@ -463,6 +541,7 @@ impl LocalHostAccess {
                     file: command.file.clone(),
                     submitted: AtomicBool::new(false),
                     baseline: command.baseline.clone(),
+                    cancellation: command.cancellation.as_ref().map(|c| Box::new(c.child())),
                 }));
             }
             if !value["rejectedRecords"].is_u64() || !value["totalRecords"].is_u64() {
@@ -505,6 +584,121 @@ impl LocalHostAccess {
         self.headers()?;
         Ok(ReferenceImportResult::Recorded(value))
     }
+}
+
+pub struct PreparedProstheticsDocument {
+    owner: Weak<()>,
+    payload: Value,
+    sha256: String,
+    submitted: AtomicBool,
+}
+impl PreparedProstheticsDocument {
+    pub fn review(&self) -> Value {
+        json!({"sourceId":self.payload["sourceId"],"revision":self.payload["revision"],"name":self.payload["name"],"sha256":self.sha256,"page":self.payload["page"]})
+    }
+}
+impl LocalHostAccess {
+    pub fn read_prosthetics_source_entries(&self, source_id: &str) -> Result<Value> {
+        if source_id.is_empty() || source_id.encode_utf16().count() > 1024 {
+            return Err(RuntimeError::InvalidInput);
+        }
+        let raw =
+            self.client
+                .prosthetics_read(false, &[("sourceId", source_id)], self.headers()?)?;
+        let value: Value =
+            serde_json::from_slice(&raw.body).map_err(|_| RuntimeError::InvalidResponse)?;
+        if !value["revision"].is_string()
+            || !value["entries"].is_array()
+            || !value["truncated"].is_boolean()
+            || value["entries"].as_array().unwrap().iter().any(|r| {
+                r["sourceId"] != source_id
+                    || !r["code"].is_string()
+                    || !r["description"].is_string()
+            })
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        self.headers()?;
+        Ok(value)
+    }
+    pub fn prepare_prosthetics_document(
+        &self,
+        source_id: &str,
+        revision: &str,
+        name: &str,
+        bytes: &[u8],
+        page: Option<&str>,
+    ) -> Result<PreparedProstheticsDocument> {
+        self.headers()?;
+        if source_id.is_empty()
+            || source_id.encode_utf16().count() > 1024
+            || !reference_hash(revision)
+            || name.is_empty()
+            || name.encode_utf16().count() > 200
+            || name.chars().any(char::is_control)
+            || bytes.is_empty()
+            || bytes.len() > 25 * 1024 * 1024
+            || page
+                .is_some_and(|p| p.encode_utf16().count() > 100 || p.chars().any(char::is_control))
+        {
+            return Err(RuntimeError::InvalidInput);
+        }
+        use sha2::{Digest, Sha256};
+        Ok(PreparedProstheticsDocument {
+            owner: Arc::downgrade(&self.owner),
+            payload: json!({"sourceId":source_id,"revision":revision,"name":name,"base64":STANDARD.encode(bytes),"page":page}),
+            sha256: format!("{:x}", Sha256::digest(bytes)),
+            submitted: AtomicBool::new(false),
+        })
+    }
+    pub fn attach_prosthetics_document(
+        &self,
+        command: &PreparedProstheticsDocument,
+    ) -> Result<Value> {
+        if !command.owner.ptr_eq(&Arc::downgrade(&self.owner)) {
+            return Err(RuntimeError::ReadRequired);
+        }
+        self.headers()?;
+        if command.submitted.swap(true, Ordering::AcqRel) {
+            return Err(RuntimeError::ReadRequired);
+        }
+        let value = self.request(
+            Method::POST,
+            &["api", "prosthetics", "catalog", "documents"],
+            Some(&command.payload),
+            true,
+        )?;
+        if !value["id"].is_string()
+            || value["sourceId"] != command.payload["sourceId"]
+            || value["sha256"] != command.sha256
+        {
+            return Err(RuntimeError::Indeterminate);
+        }
+        Ok(value)
+    }
+    pub fn read_prosthetics_original(&self, id: &str, sha256: &str) -> Result<Zeroizing<Vec<u8>>> {
+        validate_id(id)?;
+        if !reference_hash(sha256) {
+            return Err(RuntimeError::InvalidInput);
+        }
+        let raw = self.client.prosthetics_read(
+            true,
+            &[("id", id), ("sha256", sha256)],
+            self.headers()?,
+        )?;
+        use sha2::{Digest, Sha256};
+        if format!("{:x}", Sha256::digest(&raw.body)) != sha256 {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        self.headers()?;
+        Ok(raw.body)
+    }
+}
+fn reference_hash(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
 }
 
 #[cfg(test)]

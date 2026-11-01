@@ -134,7 +134,7 @@ mod tests {
                 app.area = Area::Settings;
                 app.settings_page = SettingsPage::Models;
                 app.local_host.models.provider.busy = true;
-                assert!(!app.local_host.command_visible());
+                assert!(!app.local_host.clinical_command_visible());
                 let _ = app.models_view(cx);
                 app.select_settings_page(SettingsPage::Overview, window, cx);
                 assert_eq!(app.settings_page, SettingsPage::Models);
