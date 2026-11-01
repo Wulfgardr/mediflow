@@ -34,6 +34,8 @@ jobs:
       - name: Build native Windows bootstrap (development only)
         if: hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/system-directory.node', matrix.arch)) == '' && hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/manifest.json', matrix.arch)) == ''
         run: node scripts/prepare-windows-launcher-bootstrap.mjs build
+      - name: Compare delivered native bootstrap with source rebuild
+        run: node scripts/verify-windows-bootstrap-rebuild.mjs
       - name: Verify delivered artifact and OS path
         run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
       - name: Verify native bootstrap with hostile cwd PATH and root variables
