@@ -1,0 +1,119 @@
+{
+  "readiness": {
+    "schemaVersion": "mediflow.reference-data.icd11-who-readiness.v3",
+    "status": "available",
+    "releaseId": "2026-01",
+    "language": "en",
+    "deployment": "embedded",
+    "catalogState": "ready",
+    "datasetSnapshotId": "sha256:4ad4c2f5813dd418f3f2a7f71c70aa5f294aec7f5003d1fb0bdd34f349672b90"
+  },
+  "probe": {
+    "schemaVersion": "mediflow.reference-data.icd11-search-response.v3",
+    "entries": [],
+    "partial": false,
+    "receipt": {
+      "schemaVersion": "mediflow.reference-data.icd11-search-receipt.v3",
+      "operation": "mediflow.reference_data.icd11.search.v3",
+      "source": "embedded",
+      "releaseId": "2026-01",
+      "language": "en",
+      "bindingId": "who.icd11.2026-01.mms.en.embedded.v1",
+      "datasetSnapshotId": "sha256:4ad4c2f5813dd418f3f2a7f71c70aa5f294aec7f5003d1fb0bdd34f349672b90",
+      "resultCount": 0,
+      "latencyMs": 0,
+      "completedAt": "2026-11-01T06:49:02.025Z"
+    }
+  },
+  "found": {
+    "schemaVersion": "mediflow.reference-data.icd11-code-check.v1",
+    "code": "AA00",
+    "status": "found",
+    "entry": {
+      "canonicalUri": "http://id.who.int/icd/release/11/2026-01/mms/codeinfo/AA00",
+      "stemUri": "http://id.who.int/icd/release/11/2026-01/mms/1000000001",
+      "stemCode": "AA00",
+      "stemTitle": "Synthetic blue condition"
+    },
+    "receipt": {
+      "schemaVersion": "mediflow.reference-data.icd11-code-check-receipt.v1",
+      "operation": "mediflow.reference_data.icd11.code_check.v1",
+      "source": "embedded",
+      "releaseId": "2026-01",
+      "language": "en",
+      "bindingId": "who.icd11.2026-01.mms.en.embedded.v1",
+      "datasetSnapshotId": "sha256:4ad4c2f5813dd418f3f2a7f71c70aa5f294aec7f5003d1fb0bdd34f349672b90",
+      "found": true,
+      "checkedAt": "2026-11-01T06:49:02.025Z",
+      "latencyMs": 0
+    }
+  },
+  "notFound": {
+    "schemaVersion": "mediflow.reference-data.icd11-code-check.v1",
+    "code": "ZZ99",
+    "status": "not_found",
+    "entry": null,
+    "receipt": {
+      "schemaVersion": "mediflow.reference-data.icd11-code-check-receipt.v1",
+      "operation": "mediflow.reference_data.icd11.code_check.v1",
+      "source": "embedded",
+      "releaseId": "2026-01",
+      "language": "en",
+      "bindingId": "who.icd11.2026-01.mms.en.embedded.v1",
+      "datasetSnapshotId": "sha256:4ad4c2f5813dd418f3f2a7f71c70aa5f294aec7f5003d1fb0bdd34f349672b90",
+      "found": false,
+      "checkedAt": "2026-11-01T06:49:02.025Z",
+      "latencyMs": 0
+    }
+  },
+  "before": {
+    "state": "ready",
+    "enabled": true,
+    "revision": 2,
+    "manifest": {
+      "schemaVersion": "mediflow.icd11-catalog-manifest.v1",
+      "sourceUrl": "https://icdcdn.who.int/static/releasefiles/2026-01/SimpleTabulation-ICD-11-MMS-en.zip",
+      "releaseId": "2026-01",
+      "language": "en",
+      "license": "CC BY-ND 3.0 IGO",
+      "attribution": "World Health Organization (WHO)",
+      "sha256": "4ad4c2f5813dd418f3f2a7f71c70aa5f294aec7f5003d1fb0bdd34f349672b90",
+      "bytes": 451,
+      "rows": 3,
+      "categories": 2,
+      "withoutCode": 1,
+      "blocks": 0,
+      "chapters": 1,
+      "versionDate": null,
+      "tabulationFile": "SimpleTabulation-ICD-11-MMS-en.txt",
+      "ignoredFiles": []
+    },
+    "previousAvailable": true,
+    "searchEngine": "fts5"
+  },
+  "rollback": {
+    "state": "ready",
+    "enabled": true,
+    "revision": 3,
+    "manifest": {
+      "schemaVersion": "mediflow.icd11-catalog-manifest.v1",
+      "sourceUrl": "https://icdcdn.who.int/static/releasefiles/2026-01/SimpleTabulation-ICD-11-MMS-en.zip",
+      "releaseId": "2026-01",
+      "language": "en",
+      "license": "CC BY-ND 3.0 IGO",
+      "attribution": "World Health Organization (WHO)",
+      "sha256": "f26d41b9f58deb1a9e3e91c089455833adacd2cfa12016d979c93b6b93b5012c",
+      "bytes": 448,
+      "rows": 3,
+      "categories": 2,
+      "withoutCode": 1,
+      "blocks": 0,
+      "chapters": 1,
+      "versionDate": null,
+      "tabulationFile": "SimpleTabulation-ICD-11-MMS-en.txt",
+      "ignoredFiles": []
+    },
+    "previousAvailable": true,
+    "searchEngine": "fts5"
+  }
+}

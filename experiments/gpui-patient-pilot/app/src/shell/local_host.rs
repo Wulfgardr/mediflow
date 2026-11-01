@@ -8,6 +8,7 @@ mod network;
 mod parameters;
 mod references;
 mod security;
+mod who_administration;
 mod work_profile;
 use super::*;
 use archives::ArchiveArea;
@@ -47,6 +48,7 @@ pub(super) struct LocalAdministration {
     archives: ArchiveArea,
     governance: governance::GovernanceArea,
     work_profile: work_profile::WorkProfileArea,
+    who_administration: who_administration::WhoAdministration,
     controls: controls::ControlsArea,
     network: network::NetworkArea,
     references: references::ReferencesArea,
@@ -93,7 +95,8 @@ impl LocalAdministration {
             ),
             governance: governance::GovernanceArea::default(),
             work_profile: work_profile::WorkProfileArea::default(),
-            controls: controls::ControlsArea::default(),
+            who_administration: who_administration::WhoAdministration::new(theme, cx),
+            controls: controls::ControlsArea::new(theme, cx),
             network: network::NetworkArea::default(),
             references: references::ReferencesArea::new(theme, cx),
             security: security::SecurityArea::new(theme, cx),
@@ -120,14 +123,18 @@ impl LocalAdministration {
     pub(super) fn page_command_visible(&self, page: SettingsPage) -> bool {
         match page {
             SettingsPage::References => {
-                self.references.preview.is_some() || self.references.who_consent
+                self.references.preview.is_some()
+                    || self.references.who_consent
+                    || self.who_administration.rollback.is_some()
             }
             SettingsPage::Archives => self.archives.has_work(),
             _ => false,
         }
     }
     pub(super) fn has_work(&self) -> bool {
-        self.work_profile.busy
+        self.controls.busy()
+            || self.who_administration.busy
+            || self.work_profile.busy
             || self.references.busy
             || self.chatgpt.busy()
             || self.models.has_work()
@@ -156,9 +163,10 @@ impl LocalAdministration {
         self.archives.withdraw(cx);
         self.governance.withdraw();
         self.work_profile = work_profile::WorkProfileArea::default();
-        self.controls = controls::ControlsArea::default();
+        self.controls.withdraw(cx);
         self.network = network::NetworkArea::default();
         self.references.withdraw(cx);
+        self.who_administration.withdraw(cx);
         self.security.withdraw(cx);
         self.models.withdraw(cx);
         self.chatgpt.withdraw();
@@ -187,6 +195,9 @@ impl LocalAdministration {
         cx: &mut Context<ClinicalApp>,
     ) {
         self.references.configure(theme, cx);
+        self.controls.configure(theme, self.has_work(), cx);
+        self.who_administration
+            .configure(theme, self.has_work(), cx);
         self.archives.configure(theme, window, cx);
         self.security.configure(theme, cx);
         self.models.configure(theme, cx);
@@ -419,6 +430,15 @@ impl ClinicalApp {
         );
     }
     pub(super) fn cancel_local_command(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.area == Area::Settings
+            && self.settings_page == SettingsPage::References
+            && !self.local_host.has_work()
+            && self.local_host.who_administration.rollback.is_some()
+        {
+            self.local_host.who_administration.rollback = None;
+            cx.notify();
+            return;
+        }
         if self.area == Area::Settings
             && self.settings_page == SettingsPage::References
             && !self.local_host.references.busy

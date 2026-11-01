@@ -510,6 +510,41 @@ impl RuntimeClient {
         )
     }
 
+    pub(crate) fn who_administration_read(
+        &self,
+        code_check: bool,
+        query: &[(&str, &str)],
+        headers: HeaderMap,
+    ) -> Result<RawResponse> {
+        self.dedicated_web_raw_observing_headers(
+            Method::GET,
+            &[
+                "api",
+                "icd",
+                if code_check { "code-check" } else { "proxy" },
+            ],
+            headers,
+            None,
+            false,
+            query,
+            &mut |_, _| {},
+        )
+    }
+    pub(crate) fn filtered_audit_read(
+        &self,
+        query: &[(&str, &str)],
+        headers: HeaderMap,
+    ) -> Result<RawResponse> {
+        self.dedicated_web_raw_observing_headers(
+            Method::GET,
+            &["api", "system", "audit"],
+            headers,
+            None,
+            false,
+            query,
+            &mut |_, _| {},
+        )
+    }
     pub(crate) fn prosthetics_read(
         &self,
         documents: bool,
@@ -593,6 +628,9 @@ impl RuntimeClient {
                     if (path == ["api", "ai", "local-provider", "onboarding"]
                         && matches!(raw.status, 409 | 503))
                         || (path == ["api", "drugs", "update"] && raw.status == 409)
+                        || (path == ["api", "icd", "proxy"]
+                            && query.is_empty()
+                            && raw.status == 503)
                     {
                         return Ok(raw);
                     }
@@ -1269,6 +1307,7 @@ fn reference_json_path(path: &[&str]) -> bool {
 
 fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
     match path {
+        ["api", "icd", "proxy" | "code-check"] => 131_072,
         ["api", "prosthetics", "catalog", "documents"] => 25 * 1024 * 1024,
         ["api", "system", "recovery-backup"] => 512 * 1024 * 1024,
         ["api", "prosthetics", "catalog", "search"] => JSON_LIMIT,
