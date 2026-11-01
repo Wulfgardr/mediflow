@@ -590,3 +590,43 @@ Restano aperti il renderer PDF, gli altri formati immagine, curation e revisione
 degli estratti, revisione agentica e importazione CSV con mapping. Le prove del
 renderer isolato non qualificano picker, ritorno o pacchetto installato.
 Questa tranche non chiude G-4 e non modifica il contratto ENC2.
+
+### G-4a: anteprima PDF locale, seconda tranche U9
+
+L’Originale GPUI ora apre un PDF e cambia pagina usando l’eseguibile locale
+in un processo dedicato. Nessun file decifrato viene scritto su disco. Un errore
+di ammissione rifiuta l’intera anteprima, anche se riguarda immagini di altre
+pagine. Prima della decodifica si verificano le dimensioni effettive JPEG e
+quelle dichiarate per immagini raw/Flate: 8192 per lato e 12 milioni di pixel.
+Le altre quote numeriche di pagine, canvas, operatori e memoria applicativa
+sono allineate alla policy Web; il limite del file resta quello nativo di
+10 MiB, più restrittivo dei 25 MiB Web. Le quote non sono un tetto heap del parser.
+
+Il helper macOS usa PDFKit dal ponte nativo, con dati via pipe e senza file
+intermedi. Seatbelt nega rete e scritture; il parent controlla footprint/RSS
+(256 MiB), cancellazione e tempo totale (15 secondi, parsing e raster inclusi).
+Il campionamento non è una quota di heap atomica: può esserci un superamento
+fra due letture. Limiti: 500 pagine, 14.400 punti per lato, immagine sorgente
+8192 per lato e 12 milioni di pixel prima del raster, canvas 2048 per lato e
+4 milioni di pixel. Una pagina fuori limite rifiuta l'intera anteprima.
+Maschere, annotazioni, Type3, pattern e XFA restano rifiutati.
+Differences controlla soltanto i nomi usati nel testo: elenco Adobe Glyph List
+per Base14 non incorporati, risoluzione nel font incorporato negli altri casi.
+Nomi mancanti ma non usati non bloccano il documento. Un nome Differences usato non
+risolvibile rifiuta l'intera anteprima, con motivo e salvataggio dell'originale.
+La guardia non copre ogni glifo e non verifica cmap/CIDToGIDMap. I due casi
+CID e TrueType semplice con cifra mappata al glifo zero restano accettati,
+come limite documentato. Sotto ogni PDF accettato è sempre visibile l'avviso
+«Alcuni caratteri possono mancare o differire: per un valore clinico controlla
+il documento originale.» con «Salva l'originale…» accanto.
+PDFKit non espone un esito pubblico per ogni glifo risolto: nessuna garanzia di
+completezza tipografica viene dedotta dall'esito del renderer. Sugli altri
+sistemi l'anteprima PDF è indisponibile; il documento resta esportabile.
+I byte originali e il raster posseduti dal helper vengono azzerati prima del
+rilascio; i buffer interni del framework, del kernel e della GPU non sono
+coperti da questa dichiarazione. Curation, nuova estrazione e CSV restano nelle
+tranche successive. Percorso per la verifica nel pacchetto macOS:
+
+Aggiungi documenti → PDF sintetico → revisione e conferma → Originale →
+Pagina successiva / Pagina precedente; verificare anche Ritorna ai documenti
+e Giorno/Grafite. Curation degli estratti e CSV restano tranche distinte.

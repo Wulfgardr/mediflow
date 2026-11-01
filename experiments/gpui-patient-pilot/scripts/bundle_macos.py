@@ -191,6 +191,7 @@ def collect_licenses(metadata, destination):
     for source, name in [
         (ROOT / "LICENSE", "MediFlow-MIT.txt"),
         (WORKSPACE / "NOTICE", "MediFlow-NOTICE.txt"),
+        (PACKAGING / "licenses/Adobe-Glyph-List.txt", "Adobe-Glyph-List.txt"),
         (WORKSPACE / "LICENSE-APACHE-GPUI", "GPUI-Apache-2.0.txt"),
         (ROOT / "app/fonts/Newsreader-OFL.txt", "Newsreader-OFL.txt"),
         (ROOT / "native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/IBM-Plex-Mono-OFL.txt", "IBM-Plex-Mono-OFL.txt"),
