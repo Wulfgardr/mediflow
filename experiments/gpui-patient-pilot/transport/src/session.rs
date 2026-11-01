@@ -8909,8 +8909,11 @@ mod g2_settings_tests {
     }
     #[test]
     fn g2_governance_uses_only_cookie_authenticated_reads_and_keeps_section_failures() {
-        let fixture: Value =
+        let mut fixture: Value =
             serde_json::from_str(include_str!("../../comparison/governance.json")).unwrap();
+        let tail = format!("{}integral-report-tail", "x".repeat(80_000));
+        fixture["parliament"]["report"]["additionalEvidence"] = json!(tail);
+        fixture["rollout"]["lanes"][0]["markdown"] = json!(tail);
         for missing in [false, true] {
             let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
             let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
@@ -8960,7 +8963,15 @@ mod g2_settings_tests {
             if missing {
                 assert!(matches!(snapshot.parliament, Err(RuntimeError::Missing)));
             }
-            assert_eq!(snapshot.rollout.unwrap().lanes.len(), 5);
+            if !missing {
+                assert_eq!(
+                    snapshot.parliament.as_ref().unwrap().complete_report["additionalEvidence"],
+                    tail
+                );
+            }
+            let rollout = snapshot.rollout.unwrap();
+            assert_eq!(rollout.lanes.len(), 5);
+            assert_eq!(rollout.lanes[0].markdown.as_deref(), Some(tail.as_str()));
             let listener = worker.join().unwrap();
             session.lock();
             assert!(matches!(
