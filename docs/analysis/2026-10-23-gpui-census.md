@@ -661,3 +661,22 @@ sintetico → Documenti → Leggi l’archivio delle sintesi → Rivedi gli estr
 archiviati → Testo successivo / precedente → Rimuovi questa sintesi oppure
 Svuota le sintesi archiviate → Annulla o Conferma rimozione. Provare anche
 lettura senza fonte collegata, esito non verificato e ritorno, in Giorno/Grafite.
+
+
+Correzione della review G-4 del 1 novembre: l'archivio decifrato ha un
+proprietario condiviso revocabile. Cambio paziente, blocco, ritiro dell'autorità
+locale e ultimo rilascio cancellano ricorsivamente le stringhe del payload,
+comprese le chiavi dei campi sconosciuti. Una lettura tardiva non può
+registrarsi dopo un cambio di selezione. I comandi conservano gli indici delle
+righe da mantenere, senza duplicare il testo; la cifratura serializza riferimenti
+con lo stesso formato ENC. Il testo composto viene misurato e allocato una sola
+volta, con buffer azzerato al rilascio e revocabile se trattenuto. Le copie
+interne di testo di GPUI e del sistema grafico non hanno una garanzia di
+azzeramento esplicito; il ritiro le toglie dalla vista.
+
+L'appartenenza del paziente usa l'elenco nativo scoped, con identità e header
+dell'ambulatorio verificati. Il servizio dell'elenco unisce
+`patientsToAmbulatories`: il primario restituito dalla GET Web non sostituisce
+questa verifica. Sono provati il primario A con appartenenza B e un contesto
+in cui il paziente è davvero assente. P-01, CAS, audit e allegati restano quelli
+esistenti. Questa correzione non chiude le voci G-4 ancora aperte.

@@ -42,22 +42,41 @@ impl DocumentCuration {
     }
 }
 
-fn review_text(row: &Value) -> String {
-    let mut output = format!(
+fn review_text(row: &Value) -> zeroize::Zeroizing<String> {
+    // Measure first, then allocate once: growing a Zeroizing<String> could
+    // otherwise release an earlier plaintext allocation during reallocation.
+    struct Length(usize);
+    impl std::fmt::Write for Length {
+        fn write_str(&mut self, text: &str) -> std::fmt::Result {
+            self.0 += text.len();
+            Ok(())
+        }
+    }
+    let mut length = Length(0);
+    compose_review_text(row, &mut length).expect("infallible text measurement");
+    let mut output = zeroize::Zeroizing::new(String::with_capacity(length.0));
+    compose_review_text(row, &mut *output).expect("infallible String writer");
+    output
+}
+fn compose_review_text(row: &Value, output: &mut impl std::fmt::Write) -> std::fmt::Result {
+    write!(
+        output,
         "Sintesi archiviata\n{}",
         row["summary"].as_str().unwrap_or("")
-    );
+    )?;
     if let Some(level) = row["quality"]["level"].as_str() {
-        let label = match level.trim().to_ascii_lowercase().as_str() {
+        let normalized = zeroize::Zeroizing::new(level.trim().to_ascii_lowercase());
+        let label = match normalized.as_str() {
             "green" => "Buona",
             "yellow" => "Da verificare",
             "red" => "Critica",
             _ => "Non indicata",
         };
-        output.push_str(&format!("\n\nQualità del documento: {label}"));
+        output.write_str(&format!("\n\nQualità del documento: {label}"))?;
     }
     if let Some(class) = row["routedClass"]["classification"].as_str() {
-        let label = match class.trim().to_ascii_lowercase().as_str() {
+        let normalized = zeroize::Zeroizing::new(class.trim().to_ascii_lowercase());
+        let label = match normalized.as_str() {
             "identity_document" => "Documento di identità",
             "medication_prescription" => "Prescrizione farmaco",
             "specialist_service_prescription" => "Impegnativa specialistica",
@@ -73,25 +92,25 @@ fn review_text(row: &Value) -> String {
             "mute_or_scanned" => "Scansione/muto",
             _ => "Da classificare",
         };
-        output.push_str(&format!("\n\nClasse del documento: {label}"));
+        output.write_str(&format!("\n\nClasse del documento: {label}"))?;
     }
     if row["routedClass"]["synthesis"]["kind"] == "deterministic" {
-        output.push_str("\n\nSintesi senza modello");
+        output.write_str("\n\nSintesi senza modello")?;
         if let Some(reason) = row["routedClass"]["synthesis"]["rationale"].as_str() {
-            output.push('\n');
-            output.push_str(reason);
+            output.write_char('\n')?;
+            output.write_str(reason)?;
         }
     }
     if let Some(codes) = row["autofill"]["appliedDiagnoses"].as_array()
         && !codes.is_empty()
     {
-        output.push_str("\n\nDiagnosi aggiunte in precedenza alla scheda\n");
+        output.write_str("\n\nDiagnosi aggiunte in precedenza alla scheda\n")?;
         for code in codes {
             if let Some(text) = code.as_str() {
-                output.push_str(text);
-                output.push('\n');
+                output.write_str(text)?;
+                output.write_char('\n')?;
             } else {
-                output.push_str("Dato storico non leggibile.\n");
+                output.write_str("Dato storico non leggibile.\n")?;
             }
         }
     }
@@ -103,50 +122,50 @@ fn review_text(row: &Value) -> String {
             ("labs", "Risultati estratti"),
         ] {
             if let Some(value) = data.get(key) {
-                output.push_str(&format!("\n\n{label}\n"));
+                output.write_str(&format!("\n\n{label}\n"))?;
                 match value {
-                    Value::String(text) => output.push_str(text),
+                    Value::String(text) => output.write_str(text)?,
                     Value::Array(items) => {
                         for item in items {
                             if let Some(text) = item.as_str() {
-                                output.push_str(text);
+                                output.write_str(text)?;
                             } else {
                                 for key in ["system", "code", "description", "evidence"] {
                                     if let Some(text) = item[key].as_str() {
-                                        output.push_str(text);
-                                        output.push(' ');
+                                        output.write_str(text)?;
+                                        output.write_char(' ')?;
                                     }
                                 }
                             }
-                            output.push('\n');
+                            output.write_char('\n')?;
                         }
                     }
                     Value::Object(items) => {
                         for (name, value) in items {
                             if let Some(text) = value.as_str() {
-                                output.push_str(name);
-                                output.push_str(": ");
-                                output.push_str(text);
-                                output.push('\n');
+                                output.write_str(name)?;
+                                output.write_str(": ")?;
+                                output.write_str(text)?;
+                                output.write_char('\n')?;
                             }
                         }
                     }
-                    _ => output.push_str("Contenuto non leggibile."),
+                    _ => output.write_str("Contenuto non leggibile.")?,
                 }
             }
         }
     }
     if let Some(reason) = row["quality"]["reason"].as_str() {
-        output.push_str("\n\nQualità del documento\n");
-        output.push_str(reason);
+        output.write_str("\n\nQualità del documento\n")?;
+        output.write_str(reason)?;
     }
     if let Some(text) = row["rawMarkdown"].as_str().filter(|s| !s.is_empty()) {
-        output.push_str("\n\nTesto sorgente archiviato\n");
-        output.push_str(text);
+        output.write_str("\n\nTesto sorgente archiviato\n")?;
+        output.write_str(text)?;
     } else {
-        output.push_str("\n\nTesto sorgente archiviato non disponibile.");
+        output.write_str("\n\nTesto sorgente archiviato non disponibile.")?;
     }
-    output
+    Ok(())
 }
 
 impl ClinicalApp {
@@ -319,7 +338,11 @@ impl ClinicalApp {
             _ => {}
         }
         if let Some(archive) = area.archive.ready() {
-            if archive.rows().is_empty() {
+            let rows = archive.rows();
+            if archive.is_retired() {
+                return view.child(text!("Sintesi chiuse. Rileggi l’archivio per continuare."));
+            }
+            if rows.is_empty() {
                 view = view.child(text!("Nessuna sintesi archiviata."));
             } else {
                 view = view.child(
@@ -337,7 +360,7 @@ impl ClinicalApp {
                     }),
                 );
             }
-            for row in archive.rows() {
+            for row in rows.iter() {
                 let id = row["id"].as_str().unwrap().to_owned();
                 let remove_id = id.clone();
                 let expanded = area.expanded.as_deref() == Some(&id);
@@ -356,7 +379,9 @@ impl ClinicalApp {
                     .border_b_1()
                     .border_color(theme.rule)
                     .py(px(12.))
-                    .child(text!(row["fileName"].as_str().unwrap().to_owned()))
+                    .child(text!(gpui::SharedString::new(
+                        row["fileName"].as_str().unwrap()
+                    )))
                     .child(text!(format!(
                         "Archiviata il {}",
                         display_date(row["date"].as_str())
@@ -384,10 +409,19 @@ impl ClinicalApp {
                         }),
                     );
                 if expanded {
-                    let content = review_text(row);
-                    let (text, page_count) =
-                        documents::text_window(&content, area.page).unwrap_or(("", 1));
-                    entry = entry.child(div().min_w_0().max_w_full().child(text!(text.to_owned())));
+                    let content = archive.protect_text(review_text(row));
+                    let (element, page_count) = content.with_text(|content| {
+                        let (text, count) =
+                            documents::text_window(content, area.page).unwrap_or(("", 1));
+                        (
+                            div()
+                                .min_w_0()
+                                .max_w_full()
+                                .child(text!(gpui::SharedString::new(text))),
+                            count,
+                        )
+                    });
+                    entry = entry.child(element);
                     for (offset, label) in [(-1, "Testo precedente"), (1, "Testo successivo")] {
                         let target = area
                             .page
@@ -451,7 +485,7 @@ impl ClinicalApp {
             Operation::Review(command) => {
                 view=view.child(heading("document-curation-confirm-heading","Rimuovere le sintesi selezionate?",theme))
                     .when_some(self.patient.detail.ready(),|el,patient|el.child(text!(format!("Scheda: {}",crate::title::TitleText::name(patient.display_name()).text()))))
-                    .children(command.removed().map(|row|text!(row["fileName"].as_str().unwrap_or("Documento").to_owned())))
+                    .children(command.with_removed(|rows| rows.iter().map(|row|text!(gpui::SharedString::new(row["fileName"].as_str().unwrap_or("Documento")))).collect::<Vec<_>>()))
                     .child(text!("Le sintesi selezionate saranno rimosse dall’archivio. Gli allegati della cartella restano disponibili."))
                     .child(self.form_actions[0].attach(button("document-curation-confirm","Conferma rimozione",theme,true,self.local_host.access().is_some())).on_click(cx.listener(|this,_,_,cx|this.apply_insights_removal(false,cx))))
                     .child(self.form_actions[1].attach(button("document-curation-cancel","Annulla",theme,false,true)).on_click(cx.listener(|this,_,window,cx|{this.cancel_document_curation_review(window,cx);})));
@@ -489,6 +523,18 @@ impl ClinicalApp {
             Operation::Idle => {}
         }
         view
+    }
+}
+
+impl Drop for DocumentCuration {
+    fn drop(&mut self) {
+        if let ReadLoad::Ready(archive) = &self.archive {
+            archive.retire();
+        }
+        match &self.operation {
+            Operation::Review(command) | Operation::Unconfirmed(command) => command.retire(),
+            _ => {}
+        }
     }
 }
 
@@ -535,7 +581,7 @@ mod tests {
         let reconstructed = (0..count)
             .map(|page| documents::text_window(&content, page).unwrap().0)
             .collect::<String>();
-        assert_eq!(reconstructed, content);
+        assert_eq!(reconstructed, *content);
     }
     #[gpui::test]
     fn archive_review_cancel_and_uncertain_removal_never_send_twice_or_report_unverified_success(
@@ -550,6 +596,9 @@ mod tests {
                 )
                 .unwrap(),
         );
+        host.plan("GET /api/v1/network/patients")
+            .send((200, json!([{"id":"patient-a","deletedAt":null}])))
+            .unwrap();
         host.plan("GET /api/patients/patient-a")
             .send((200, profile(3, json!([row()]))))
             .unwrap();
@@ -658,13 +707,36 @@ mod tests {
             app.run_insights_removal(access.clone(), false, cx);
             assert!(app.message.as_ref().unwrap().1);
             assert!(!app.local_work_pending());
-            prepare(app, &host, archive.clone());
         });
+        assert!(archive.is_retired());
+        host.plan("GET /api/v1/network/patients")
+            .send((200, json!([{"id":"patient-a","deletedAt":null}])))
+            .unwrap();
+        host.plan("GET /api/patients/patient-a")
+            .send((200, profile(3, json!([row()]))))
+            .unwrap();
+        let archive = Arc::new(
+            access
+                .read_document_insights("scope-a", "patient-a")
+                .unwrap(),
+        );
+        let command = Arc::new(
+            access
+                .prepare_insights_removal(archive.clone(), Some("insight-a"))
+                .unwrap(),
+        );
+        view.update(cx, |app, _| prepare(app, &host, archive.clone()));
+        host.plan("GET /api/v1/network/patients")
+            .send((200, json!([{"id":"patient-a","deletedAt":null}])))
+            .unwrap();
         host.plan("GET /api/patients/patient-a")
             .send((200, profile(3, json!([row()]))))
             .unwrap();
         host.plan("PUT /api/patients/patient-a")
             .send((200, json!({"success":true})))
+            .unwrap();
+        host.plan("GET /api/v1/network/patients")
+            .send((200, json!([{"id":"patient-a","deletedAt":null}])))
             .unwrap();
         host.plan("GET /api/patients/patient-a")
             .send((503, json!({"error":"synthetic unavailable"})))
@@ -683,6 +755,9 @@ mod tests {
             assert!(app.verified.is_none());
             app.run_insights_removal(access.clone(), false, cx);
         });
+        host.plan("GET /api/v1/network/patients")
+            .send((200, json!([{"id":"patient-a","deletedAt":null}])))
+            .unwrap();
         host.plan("GET /api/patients/patient-a")
             .send((200, profile(4, json!([]))))
             .unwrap();

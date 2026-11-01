@@ -127,6 +127,7 @@ pub struct LocalHostAccess {
     control: Zeroizing<String>,
     generation: String,
     owner: Arc<()>,
+    document_archives: Mutex<Vec<Weak<DocumentInsightsData>>>,
     closed: AtomicBool,
     retired: AtomicBool,
     retirement_marker: Mutex<Option<String>>,
@@ -171,6 +172,7 @@ impl LocalHostAccess {
             control,
             generation: user.archive_generation.clone(),
             owner: Arc::new(()),
+            document_archives: Mutex::new(vec![]),
             closed: AtomicBool::new(false),
             retired: AtomicBool::new(false),
             retirement_marker: Mutex::new(None),
@@ -367,7 +369,9 @@ impl LocalHostAccess {
         }
     }
     pub fn retire(&self) -> Result<()> {
-        if self.closed.swap(true, Ordering::AcqRel) {
+        let already_closed = self.closed.swap(true, Ordering::AcqRel);
+        self.revoke_document_archives();
+        if already_closed {
             return if self.retired.load(Ordering::Acquire) {
                 Ok(())
             } else {
@@ -424,6 +428,23 @@ pub struct RetiringAccess {
 impl RetiringAccess {
     pub fn retire(self) -> Result<()> {
         self.access.retire()
+    }
+}
+
+impl LocalHostAccess {
+    fn revoke_document_archives(&self) {
+        let mut owners = self
+            .document_archives
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        for owner in owners.drain(..).filter_map(|w| w.upgrade()) {
+            owner.revoke();
+        }
+    }
+}
+impl Drop for LocalHostAccess {
+    fn drop(&mut self) {
+        self.revoke_document_archives();
     }
 }
 
