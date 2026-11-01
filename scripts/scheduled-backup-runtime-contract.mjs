@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 // Changes to this closure require review and a deliberate update of these pins.
 export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['scripts/windows-private-directory.mjs', 'ed5115a1c3448ee3c47e2918f16a4ab4ad09443e8702a84d1bcbc0d3abbaef2c'],
-  ['scripts/windows-launcher-bootstrap/index.mjs', '232d95e87c8f9e820927971e667a496f95685075145cf102a506fb7451f83d33'],
+  ['scripts/windows-launcher-bootstrap/index.mjs', '3829d1db2bc76f64501eaebfd8632b4d0db4ec3b95652f2412b381d3c0ff7bb8'],
   ['scripts/windows-launcher-bootstrap/system-directory.c', '6a891f4ca0398902695c1e56af4a279bfcf923af6b57024f977b95083f3390bc', true],
   ['scripts/windows-launcher-bootstrap/build.ps1', '4b63b0d9168c677c806bef37ea1b6842fd8a2e5e5265ea1e66830b8be9deeccc', true],
   ['scripts/prepare-windows-launcher-bootstrap.mjs', 'aa77ba7c1815c059f69496c3a08a78586f11f6d8eb5d3ee0b9242af9295c55e0', true],
