@@ -8282,6 +8282,431 @@ mod g2_settings_tests {
         );
     }
     #[test]
+    fn g2_prosthetics_options_originals_source_entries_and_hash_mismatch_use_existing_routes() {
+        use crate::ReferenceCatalog;
+        use base64::Engine as _;
+        use sha2::{Digest, Sha256};
+        let (listener, session) = fixture();
+        let source = format!("source/A?B{}", "à".repeat(700));
+        let revision = "a".repeat(64);
+        let bytes = b"Synthetic reference document, no patient data".to_vec();
+        let sha = format!("{:x}", Sha256::digest(&bytes));
+        let options = json!({"mapping":{"delimiter":";","columns":{"codice_sistema":2,"codice":0,"descrizione":1,"versione":3,"fonte":4,"ambito":5,"data_inizio":6,"data_fine":7}},"sourceDetails":{"authority":"Ente inventato","date":"2026-11-01","notes":"Solo repertorio sintetico"}});
+        let host_source = source.clone();
+        let expected_options = options.clone();
+        let doc_bytes = bytes.clone();
+        let expected_hash = sha.clone();
+        let host_revision = revision.clone();
+        let worker = thread::spawn(move || {
+            let source = host_source;
+            local_host_login(&listener);
+            for step in 0..7 {
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                let request = read_request(&mut stream);
+                assert!(
+                    request
+                        .to_ascii_lowercase()
+                        .contains(&format!("mediflow_session={}", "b".repeat(64)))
+                );
+                let target = request
+                    .lines()
+                    .next()
+                    .unwrap()
+                    .split_whitespace()
+                    .nth(1)
+                    .unwrap();
+                let url = reqwest::Url::parse(&format!("http://127.0.0.1{target}")).unwrap();
+                let body: Value = request
+                    .split("\r\n\r\n")
+                    .nth(1)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| serde_json::from_str(s).unwrap())
+                    .unwrap_or(Value::Null);
+                match step {
+                    0 => {
+                        assert!(request.starts_with("POST /api/prosthetics/catalog/preview "));
+                        assert_eq!(body["options"], expected_options);
+                        local_host_reply(
+                            &mut stream,
+                            200,
+                            json!({"valid":true,"proof":"synthetic-proof","revision":host_revision,"manifest":{"options":expected_options,"counts":{"valid":1}},"sample":[],"diagnostics":[]}),
+                            "",
+                        );
+                    }
+                    1 => {
+                        assert!(request.starts_with("POST /api/prosthetics/catalog/commit "));
+                        assert_eq!(body["options"], expected_options);
+                        assert_eq!(body["proof"], "synthetic-proof");
+                        assert_eq!(body["acceptSubset"], true);
+                        local_host_reply(
+                            &mut stream,
+                            200,
+                            json!({"receipt":{"operationKey":"synthetic-import","revision":host_revision}}),
+                            "",
+                        );
+                    }
+                    2 | 6 => {
+                        assert!(request.starts_with("POST /api/prosthetics/catalog/documents "));
+                        assert_eq!(body["sourceId"], source);
+                        assert_eq!(body["revision"], host_revision);
+                        assert_eq!(
+                            body["base64"],
+                            base64::engine::general_purpose::STANDARD.encode(&doc_bytes)
+                        );
+                        local_host_reply(
+                            &mut stream,
+                            if step == 6 { 409 } else { 200 },
+                            json!({"id":"synthetic-original","sourceId":source,"sha256":expected_hash,"size":doc_bytes.len(),"name":"originale.txt","page":"1"}),
+                            "",
+                        );
+                    }
+                    3 => {
+                        assert_eq!(url.path(), "/api/prosthetics/catalog/search");
+                        assert_eq!(
+                            url.query_pairs().find(|(k, _)| k == "sourceId").unwrap().1,
+                            source
+                        );
+                        local_host_reply(
+                            &mut stream,
+                            200,
+                            json!({"revision":host_revision,"entries":[{"sourceId":source,"code":"SYN-001","description":"Ausilio inventato"}],"truncated":true}),
+                            "",
+                        );
+                    }
+                    _ => {
+                        assert_eq!(url.path(), "/api/prosthetics/catalog/documents");
+                        assert_eq!(
+                            url.query_pairs().find(|(k, _)| k == "id").unwrap().1,
+                            "synthetic-original"
+                        );
+                        assert_eq!(
+                            url.query_pairs().find(|(k, _)| k == "sha256").unwrap().1,
+                            expected_hash
+                        );
+                        use std::io::Write;
+                        let response = if step == 4 {
+                            doc_bytes.as_slice()
+                        } else {
+                            b"changed bytes".as_slice()
+                        };
+                        write!(stream,"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",response.len()).unwrap();
+                        stream.write_all(response).unwrap();
+                    }
+                }
+            }
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let import = access
+            .prepare_reference_file(
+                ReferenceCatalog::Prosthetics,
+                "inventato.csv",
+                b"synthetic CSV",
+                options,
+            )
+            .unwrap();
+        assert!(matches!(
+            access.commit_reference_import(&import),
+            Ok(crate::ReferenceImportResult::Recorded(_))
+        ));
+        assert!(matches!(
+            access.commit_reference_import(&import),
+            Err(RuntimeError::ReadRequired)
+        ));
+        let command = access
+            .prepare_prosthetics_document(&source, &revision, "originale.txt", &bytes, Some("1"))
+            .unwrap();
+        assert_eq!(
+            access.attach_prosthetics_document(&command).unwrap()["sha256"],
+            sha
+        );
+        assert!(matches!(
+            access.attach_prosthetics_document(&command),
+            Err(RuntimeError::ReadRequired)
+        ));
+        let entries = access.read_prosthetics_source_entries(&source).unwrap();
+        assert_eq!(entries["entries"][0]["code"], "SYN-001");
+        assert_eq!(entries["truncated"], true);
+        assert_eq!(
+            &*access
+                .read_prosthetics_original("synthetic-original", &sha)
+                .unwrap(),
+            &bytes
+        );
+        assert!(matches!(
+            access.read_prosthetics_original("synthetic-original", &sha),
+            Err(RuntimeError::InvalidResponse)
+        ));
+        let stale = access
+            .prepare_prosthetics_document(&source, &revision, "originale.txt", &bytes, Some("1"))
+            .unwrap();
+        assert!(matches!(
+            access.attach_prosthetics_document(&stale),
+            Err(RuntimeError::Conflict)
+        ));
+        let listener = worker.join().unwrap();
+        session.lock();
+        assert!(matches!(
+            access.read_prosthetics_source_entries(&source),
+            Err(RuntimeError::Locked)
+        ));
+        listener.set_nonblocking(true).unwrap();
+        assert!(crate::test_loopback::accept(&listener).is_err());
+    }
+    #[test]
+    fn g2_aifa_freshness_network_preference_and_progress_stay_distinct() {
+        let (listener, session) = fixture();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            for step in 0..6 {
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                let request = read_request(&mut stream);
+                let value = match step {
+                    0 | 1 | 3 => {
+                        assert!(request.starts_with("GET /api/drugs/source "));
+                        json!({"catalog":{},"remote":{"outcome":if step==3 {"unavailable"}else{"unchanged"},"checkedAt":"2026-11-01T00:00:00Z"},"networkAllowed":false,"networkPreference":step==3})
+                    }
+                    2 => {
+                        assert!(request.starts_with("PUT /api/settings/aifaNetworkAccess "));
+                        let body: Value =
+                            serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap())
+                                .unwrap();
+                        assert_eq!(body, json!({"value":"enabled"}));
+                        json!({"success":true,"key":"aifaNetworkAccess","value":"enabled"})
+                    }
+                    _ => {
+                        assert!(request.starts_with("GET /api/drugs/update "));
+                        json!({"progress":{"receivedBytes":10,"totalBytes":20,"phase":if step==4 {"downloading"}else{"invented"}}})
+                    }
+                };
+                local_host_reply(&mut stream, 200, value, "");
+            }
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        assert_eq!(
+            access.aifa_source_status(false).unwrap()["remote"]["outcome"],
+            "unchanged"
+        );
+        let state = access.set_aifa_network_preference(false, true).unwrap();
+        assert_eq!(state["networkPreference"], true);
+        assert_eq!(state["networkAllowed"], false);
+        assert_eq!(
+            access.aifa_download_progress().unwrap()["progress"]["receivedBytes"],
+            10
+        );
+        assert!(matches!(
+            access.aifa_download_progress(),
+            Err(RuntimeError::InvalidResponse)
+        ));
+        worker.join().unwrap();
+    }
+    #[test]
+    fn g2_aifa_download_cancellation_retires_only_the_request_and_never_retries() {
+        let (listener, session) = fixture();
+        let (seen_tx, seen_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+            let request = read_request(&mut stream);
+            assert!(request.starts_with("POST /api/drugs/update "));
+            seen_tx.send(()).unwrap();
+            release_rx
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .unwrap();
+            drop(stream);
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+            assert!(read_request(&mut stream).starts_with("GET /api/drugs?count=1 "));
+            local_host_reply(
+                &mut stream,
+                200,
+                json!({"count":7,"state":"unverified"}),
+                "",
+            );
+            listener
+        });
+        let access = Arc::new(
+            session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let command = Arc::new(access.prepare_aifa_update().unwrap());
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let reader = thread::spawn({
+            let access = access.clone();
+            let command = command.clone();
+            move || {
+                done_tx
+                    .send(access.commit_reference_import(&command).err())
+                    .unwrap()
+            }
+        });
+        seen_rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap();
+        command.cancel_acquisition();
+        assert_eq!(
+            done_rx
+                .recv_timeout(std::time::Duration::from_secs(3))
+                .unwrap(),
+            Some(RuntimeError::Indeterminate)
+        );
+        assert!(matches!(
+            access.commit_reference_import(&command),
+            Err(RuntimeError::ReadRequired)
+        ));
+        release_tx.send(()).unwrap();
+        reader.join().unwrap();
+        assert_eq!(
+            access
+                .read_reference_catalog(crate::ReferenceCatalog::Aifa)
+                .unwrap()
+                .data["count"],
+            7
+        );
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(crate::test_loopback::accept(&listener).is_err());
+    }
+    #[test]
+    fn g2_work_profile_conflict_lost_and_false_success_require_reread_without_replay() {
+        use crate::local_host::{WorkProfileAction, WorkProfileDraft, WorkProfileState};
+        let contract: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/work-profile.json")).unwrap();
+        for outcome in [409, 0, 200] {
+            let (listener, session) = fixture();
+            let initial: WorkProfileState =
+                serde_json::from_value(contract["initial"].clone()).unwrap();
+            let draft: WorkProfileDraft =
+                serde_json::from_value(contract["steps"][1]["command"]["draft"].clone()).unwrap();
+            let mut reply = contract["steps"][1]["state"].clone();
+            reply["revision"] = json!(1);
+            reply["draft"]["profile"] = json!("agent");
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("PUT /api/onboarding/work-profile "));
+                let command: Value =
+                    serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                reply["lastCommand"] = command;
+                if outcome != 0 {
+                    local_host_reply(&mut stream, outcome, reply, "");
+                }
+                drop(stream);
+                listener
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let command = access
+                .prepare_work_profile(&initial, WorkProfileAction::SaveDraft, Some(draft))
+                .unwrap();
+            assert!(
+                matches!(access.write_work_profile(&command),Err(e) if e==if outcome==409 {RuntimeError::Conflict}else{RuntimeError::Indeterminate})
+            );
+            assert!(matches!(
+                access.write_work_profile(&command),
+                Err(RuntimeError::ReadRequired)
+            ));
+            let listener = worker.join().unwrap();
+            listener.set_nonblocking(true).unwrap();
+            assert!(crate::test_loopback::accept(&listener).is_err());
+        }
+    }
+    #[test]
+    fn g2_work_profile_persists_preview_confirm_discard_rollback_with_single_writer() {
+        use crate::local_host::{WorkProfileAction, WorkProfileDraft, WorkProfileState};
+        let contract: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/work-profile.json")).unwrap();
+        let (listener, session) = fixture();
+        let host_fixture = contract.clone();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+            assert!(read_request(&mut stream).starts_with("GET /api/onboarding/work-profile "));
+            local_host_reply(&mut stream, 200, host_fixture["initial"].clone(), "");
+            for step in host_fixture["steps"].as_array().unwrap() {
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("PUT /api/onboarding/work-profile "));
+                let lower = request.to_ascii_lowercase();
+                assert!(lower.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                assert!(lower.contains("x-mediflow-archive-generation: synthetic-generation"));
+                assert!(!lower.contains("authorization:"));
+                let command: Value =
+                    serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                let mut expected = step["command"].clone();
+                expected["id"] = command["id"].clone();
+                assert_eq!(command, expected);
+                let mut next = step["state"].clone();
+                next["lastCommand"] = command;
+                local_host_reply(&mut stream, 200, next.clone(), "");
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/onboarding/work-profile "));
+                local_host_reply(&mut stream, 200, next, "");
+            }
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let mut observed = access.read_work_profile().unwrap();
+        for step in contract["steps"].as_array().unwrap() {
+            let action = match step["command"]["action"].as_str().unwrap() {
+                "save-draft" => WorkProfileAction::SaveDraft,
+                "confirm" => WorkProfileAction::Confirm,
+                "discard-draft" => WorkProfileAction::DiscardDraft,
+                _ => WorkProfileAction::Rollback,
+            };
+            let draft = step["command"]
+                .get("draft")
+                .map(|d| serde_json::from_value::<WorkProfileDraft>(d.clone()).unwrap());
+            let command = access
+                .prepare_work_profile(&observed, action, draft)
+                .unwrap();
+            let result = access.write_work_profile(&command).unwrap();
+            assert_eq!(result.current.as_ref().unwrap(), &result.recorded);
+            let mut expected: WorkProfileState =
+                serde_json::from_value(step["state"].clone()).unwrap();
+            expected.last_command = result.recorded.last_command.clone();
+            assert_eq!(result.recorded, expected);
+            assert!(matches!(
+                access.write_work_profile(&command),
+                Err(RuntimeError::ReadRequired)
+            ));
+            observed = result.recorded;
+        }
+        let listener = worker.join().unwrap();
+        session.lock();
+        assert!(matches!(
+            access.read_work_profile(),
+            Err(RuntimeError::Locked)
+        ));
+        listener.set_nonblocking(true).unwrap();
+        assert!(crate::test_loopback::accept(&listener).is_err());
+    }
+    #[test]
     fn g2_passphrase_rotation_uses_web_writer_retires_all_local_clones_and_never_replays() {
         for (status, readback) in [
             (200, "changed"),
@@ -9557,6 +9982,252 @@ mod g2_settings_tests {
             listener.set_nonblocking(true).unwrap();
             assert!(crate::test_loopback::accept(&listener).is_err());
         }
+    }
+    #[test]
+    fn g2_who_reads_and_rollback_use_existing_cookie_routes_once_then_reread() {
+        use crate::{ReferenceCatalog, ReferenceStatus};
+        let f: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/who-administration.json"))
+                .unwrap();
+        let reply = f.clone();
+        let (listener, session) = fixture();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            for (path, value) in [
+                ("/api/icd/proxy", reply["readiness"].clone()),
+                ("/api/icd/proxy?q=cholera", reply["probe"].clone()),
+                (
+                    "/api/icd/code-check?code=AA00&release=2026-01",
+                    reply["found"].clone(),
+                ),
+            ] {
+                g2_web_request(&listener, "GET", path, 200, value);
+            }
+            g2_web_request(
+                &listener,
+                "GET",
+                "/api/settings/aiProvider",
+                200,
+                json!({"key":"aiProvider","value":null}),
+            );
+            g2_web_request(
+                &listener,
+                "GET",
+                "/api/settings/aiProvider",
+                200,
+                json!({"key":"aiProvider"}),
+            );
+            let request = g2_web_request(
+                &listener,
+                "POST",
+                "/api/icd/catalog",
+                200,
+                reply["rollback"].clone(),
+            );
+            let body: Value =
+                serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+            assert_eq!(
+                body,
+                json!({"action":"rollback","confirmed":true,"expectedRevision":2})
+            );
+            g2_web_request(
+                &listener,
+                "GET",
+                "/api/icd/catalog",
+                200,
+                reply["rollback"].clone(),
+            );
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        assert_eq!(
+            access.read_who_administration_readiness().unwrap(),
+            f["readiness"]
+        );
+        assert_eq!(access.probe_who_administration().unwrap(), f["probe"]);
+        assert_eq!(
+            access.check_who_administration_code("AA00").unwrap(),
+            f["found"]
+        );
+        assert_eq!(access.read_diagnostic_provider_setting().unwrap(), None);
+        assert_eq!(
+            access.read_diagnostic_provider_setting(),
+            Err(RuntimeError::InvalidResponse)
+        );
+        let command = access
+            .prepare_who_rollback(&ReferenceStatus {
+                catalog: ReferenceCatalog::Who,
+                data: f["before"].clone(),
+                sources: None,
+            })
+            .unwrap();
+        let write = access.rollback_who_catalog(&command).unwrap();
+        assert_eq!(write.recorded, f["rollback"]);
+        assert_eq!(write.current.unwrap(), f["rollback"]);
+        assert!(matches!(
+            access.rollback_who_catalog(&command),
+            Err(RuntimeError::ReadRequired)
+        ));
+        session.lock();
+        assert_eq!(
+            access.read_who_administration_readiness(),
+            Err(RuntimeError::Locked)
+        );
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(crate::test_loopback::accept(&listener).is_err());
+    }
+
+    #[test]
+    fn g2_who_conflict_lost_false_success_and_failed_readback_never_replay_rollback() {
+        use crate::{ReferenceCatalog, ReferenceStatus};
+        for outcome in [409, 0, 200, 503] {
+            let f: Value =
+                serde_json::from_str(include_str!("../tests/fixtures/who-administration.json"))
+                    .unwrap();
+            let reply = f.clone();
+            let (listener, session) = fixture();
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                assert!(read_request(&mut stream).starts_with("POST /api/icd/catalog "));
+                if outcome == 409 {
+                    local_host_reply(&mut stream, 409, json!({"error":"synthetic conflict"}), "");
+                } else if outcome == 200 {
+                    let mut invalid = reply["rollback"].clone();
+                    invalid["revision"] = json!(2);
+                    local_host_reply(&mut stream, 200, invalid, "");
+                } else if outcome == 503 {
+                    local_host_reply(&mut stream, 200, reply["rollback"].clone(), "");
+                    drop(stream);
+                    g2_web_request(
+                        &listener,
+                        "GET",
+                        "/api/icd/catalog",
+                        503,
+                        json!({"error":"synthetic readback unavailable"}),
+                    );
+                    return listener;
+                }
+                drop(stream);
+                listener
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let observed = ReferenceStatus {
+                catalog: ReferenceCatalog::Who,
+                data: f["before"].clone(),
+                sources: None,
+            };
+            let command = access.prepare_who_rollback(&observed).unwrap();
+            match access.rollback_who_catalog(&command) {
+                Ok(write) => {
+                    assert_eq!(outcome, 503);
+                    assert!(write.current.is_err());
+                    assert_eq!(write.recorded, f["rollback"]);
+                }
+                Err(e) => assert_eq!(
+                    e,
+                    if outcome == 409 {
+                        RuntimeError::Conflict
+                    } else {
+                        RuntimeError::Indeterminate
+                    }
+                ),
+            }
+            assert!(matches!(
+                access.rollback_who_catalog(&command),
+                Err(RuntimeError::ReadRequired)
+            ));
+            let mut absent = observed;
+            absent.data["previousAvailable"] = json!(false);
+            assert!(matches!(
+                access.prepare_who_rollback(&absent),
+                Err(RuntimeError::ReadRequired)
+            ));
+            let listener = worker.join().unwrap();
+            listener.set_nonblocking(true).unwrap();
+            assert!(crate::test_loopback::accept(&listener).is_err());
+        }
+    }
+
+    #[test]
+    fn g2_audit_filters_encode_exact_values_and_reject_unfiltered_or_oversized_results() {
+        use crate::AuditFilter;
+        let row = json!({"eventId":"synthetic-1","eventType":"reference_data.icd11.rollback","occurredAt":"2026-11-01T01:00:00.000Z","outcome":"success","subjectType":"reference_data","actorRef":"synthetic & operator"});
+        let filter = AuditFilter {
+            event_type: "reference_data.icd11.rollback".into(),
+            outcome: "success".into(),
+            subject_type: "reference_data".into(),
+            actor_ref: "synthetic & operator".into(),
+            origin: "imported".into(),
+            limit: 1,
+        };
+        let (listener, session) = fixture();
+        let reply = row.clone();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let path = "/api/system/audit?origin=imported&limit=1&eventType=reference_data.icd11.rollback&outcome=success&subjectType=reference_data&actorRef=synthetic+%26+operator";
+            for rows in [
+                json!([reply.clone()]),
+                json!([{ "eventId":"wrong","eventType":"other","occurredAt":"2026-11-01T01:00:00.000Z","outcome":"success"}]),
+                json!([reply.clone(), reply]),
+            ] {
+                g2_web_request(&listener, "GET", path, 200, rows);
+            }
+            g2_web_request(
+                &listener,
+                "GET",
+                path,
+                403,
+                json!({"error":"synthetic admin required"}),
+            );
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let mut invalid = filter.clone();
+        invalid.limit = 0;
+        assert_eq!(
+            access.read_filtered_audit(&invalid),
+            Err(RuntimeError::InvalidInput)
+        );
+        assert_eq!(
+            access.check_who_administration_code("Nome inventato"),
+            Err(RuntimeError::InvalidInput)
+        );
+        assert_eq!(access.read_filtered_audit(&filter).unwrap(), json!([row]));
+        for _ in 0..2 {
+            assert_eq!(
+                access.read_filtered_audit(&filter),
+                Err(RuntimeError::InvalidResponse)
+            );
+        }
+        assert_eq!(
+            access.read_filtered_audit(&filter),
+            Err(RuntimeError::Forbidden)
+        );
+        session.lock();
+        assert_eq!(
+            access.read_filtered_audit(&filter),
+            Err(RuntimeError::Locked)
+        );
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(crate::test_loopback::accept(&listener).is_err());
     }
 }
 

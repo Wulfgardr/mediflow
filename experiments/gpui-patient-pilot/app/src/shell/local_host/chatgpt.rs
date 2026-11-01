@@ -317,7 +317,7 @@ mod tests {
             assert_eq!(app.local_host.chatgpt.generation, generation + 1);
             app.local_host.chatgpt.observation = Some(observation());
             app.local_host.chatgpt.busy = true;
-            assert!(!app.local_host.command_visible());
+            assert!(!app.local_host.clinical_command_visible());
             let _ = app.chatgpt_account_view(cx);
             app.request_discard(Discard::Lock, cx);
             assert!(app.local_host.chatgpt.observation.is_none());
