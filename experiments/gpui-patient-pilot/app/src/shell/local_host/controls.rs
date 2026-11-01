@@ -5,7 +5,7 @@ use mediflow_runtime_client::{
 };
 use serde_json::Value;
 
-fn fact(label: &str, value: impl AsRef<str>, theme: Theme) -> Div {
+fn fact(label: &str, value: impl AsRef<str>, theme: Theme) -> Stateful<Div> {
     div()
         .id(SharedString::from(label.to_owned()))
         .child(super::governance::fact(label, value, theme))
