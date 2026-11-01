@@ -51,9 +51,7 @@ jobs:
         with:
           path: ~/.cache/mediflow-fhir-validator/artifacts
           key: ${{ runner.os }}-fhir-validator-${{ hashFiles('contracts/fhir/validator-lock.v1.json') }}
-      - run: |
-          npm ci
-          npm run prepare:dependencies
+      - run: npm ci && npm run prepare:dependencies
       - name: Gate, outcome and mapper corpus tests
         run: |
           export MEDIFLOW_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/fhir-test.XXXXXX")"
