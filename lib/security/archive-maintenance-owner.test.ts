@@ -1,3 +1,5 @@
+import { insertTherapyStatusCommandUnion, type TherapyCommandRow } from '../therapy-status-command-backup';
+import { therapyCommandOrigin } from '../backup-import-provenance';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -21,7 +23,7 @@ async function until<T>(read: () => T | undefined): Promise<T> {
     throw new Error('Synthetic owner did not reach the expected state.');
 }
 
-for (const sourceCase of ['canonical', 'tracked-baseline', 'territorial-active', 'territorial-legacy', 'territorial-inverse', 'incompatible', 'weakened-trigger', 'audit-index-failure', 'quoted-type', 'extra-trigger', 'post-stop-io-failure', 'backup-collision'])
+for (const sourceCase of ['canonical', 'tracked-baseline', 'territorial-active', 'territorial-legacy', 'territorial-inverse', 'incompatible', 'weakened-trigger', 'audit-index-failure', 'quoted-type', 'extra-trigger', 'post-stop-io-failure', 'backup-collision', 'origin-applied', 'origin-closed', 'origin-rejected', 'origin-unattested', 'origin-reused-local', 'origin-reused-imported', 'origin-reused-applied'])
 test(`owned Web repair ${sourceCase}: close, validate, commit or preserve A without restart`, async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-managed-web-synthetic-'));
     const data = path.join(root, 'data');
@@ -37,7 +39,8 @@ test(`owned Web repair ${sourceCase}: close, validate, commit or preserve A with
         finally { db.close(); }
     };
     const territorial = sourceCase.startsWith('territorial-');
-    const admitted = ['canonical', 'tracked-baseline', 'territorial-active', 'territorial-legacy', 'territorial-inverse'].includes(sourceCase);
+    const originCase = sourceCase.startsWith('origin-');
+    const admitted = originCase || ['canonical', 'tracked-baseline', 'territorial-active', 'territorial-legacy', 'territorial-inverse'].includes(sourceCase);
     const before = seed(path.join(data, 'medical.db'), 'Archive A');
     const account = 'synthetic-repair-account';
     const wrapping = sourceCase === 'tracked-baseline' ? 'v3:synthetic-passphrase' : 'v2:synthetic-pin';
@@ -51,6 +54,24 @@ test(`owned Web repair ${sourceCase}: close, validate, commit or preserve A with
         if (sourceCase !== 'territorial-inverse') change('core', 1);
     }
     const hostMarker = prior.prepare("SELECT value FROM settings WHERE key='territorial.packs.initialization'").pluck().get();
+    const originCommand = '22222222-2222-4222-8222-222222222222', originEvent = '11111111-1111-4111-8111-111111111111';
+    const originAudit = '33333333-3333-4333-8333-333333333333', replacementEvent = '44444444-4444-4444-8444-444444444444';
+    let originRow: TherapyCommandRow;
+    const appliedOrigin = sourceCase.endsWith('applied');
+    const putOrigin = (db: Database.Database, event: string, origin: string) => {
+        db.prepare("INSERT INTO audit_events(event_id,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,source_surface) VALUES (?,'backup.portable.imported',1,'success','system','synthetic','backup','web')").run(event);
+        db.prepare("INSERT INTO portable_import_origins(kind,ref,import_event_id,origin) VALUES ('therapy_command',?,?,?)").run(originCommand, event, origin);
+        if (appliedOrigin) db.prepare("INSERT INTO portable_import_origins(kind,ref,import_event_id,origin) VALUES ('audit',?,?,?)").run(originAudit, event, origin);
+    };
+    if (originCase) {
+        const outcome = appliedOrigin ? 'applied' : sourceCase === 'origin-rejected' ? 'rejected' : 'closed';
+        const audit = { eventId: originAudit, schemaVersion: 1, eventType: 'therapy.updated', occurredAt: 1, outcome: 'success', actorType: 'user', actorRef: account,
+            subjectType: 'therapy', subjectRef: 'synthetic-therapy', sourceSurface: 'native', requestId: originCommand, redactedMetadata: JSON.stringify({ resourceVersion: 2 }), createdAt: 1 };
+        originRow = { commandId: originCommand, protocol: 'therapy.status.change.v1', archiveGeneration: before, actorRef: account, patientId: 'synthetic-same-id', therapyId: 'synthetic-therapy', expectedVersion: 1,
+            target: outcome === 'closed' ? null : 'suspended', outcome, reason: outcome === 'rejected' ? 'version_conflict' : null, committedAt: 1,
+            resultVersion: appliedOrigin ? 2 : null, resultEndDate: null, auditEventId: appliedOrigin ? originAudit : null, auditSnapshot: appliedOrigin ? JSON.stringify(audit) : null };
+        prior.transaction(() => { insertTherapyStatusCommandUnion(prior, [originRow]); putOrigin(prior, originEvent, sourceCase === 'origin-unattested' ? 'unattested' : 'imported'); }).immediate();
+    }
     prior.close();
     const collision = path.join(data, 'medical.db.bak-20261011-101500123');
     if (sourceCase === 'backup-collision') fs.writeFileSync(collision, 'existing recovery copy');
@@ -66,6 +87,10 @@ test(`owned Web repair ${sourceCase}: close, validate, commit or preserve A with
     } else {
         sourceGeneration = seed(sourceFile, 'Archive B');
         const source = new Database(sourceFile);
+        if (sourceCase.startsWith('origin-reused')) source.transaction(() => {
+            insertTherapyStatusCommandUnion(source, [originRow!]);
+            if (sourceCase === 'origin-reused-imported') putOrigin(source, replacementEvent, 'imported');
+        }).immediate();
         if (sourceCase === 'territorial-active') commitTerritorialPackTransition(source,
             { schemaVersion: TERRITORIAL_PACK_SCHEMA, preset: 'core+it+lom', expectedRevision: 0, confirmed: true },
             { actorType: 'system', actorRef: 'synthetic-source', sourceSurface: 'job' }, () => {});
@@ -168,6 +193,14 @@ process.on('SIGTERM', () => { server.close(); setTimeout(() => {
         assert.equal(fs.readFileSync(path.join(data, 'terminal.txt'), 'utf8').trim(), before);
         const installed = openVersionedSqliteDatabase(path.join(data, 'medical.db'));
         try {
+            if (originCase) {
+                const expected = sourceCase === 'origin-unattested' ? 'unattested' : ['origin-reused-local', 'origin-reused-applied'].includes(sourceCase) ? 'local' : 'imported';
+                assert.equal(therapyCommandOrigin(installed, originCommand), expected);
+                const origin = installed.prepare("SELECT * FROM portable_import_origins WHERE kind='therapy_command' AND ref=?").get(originCommand) as { import_event_id: string } | undefined;
+                if (origin) assert.equal(origin.import_event_id, sourceCase === 'origin-reused-imported' ? replacementEvent : originEvent);
+                if (appliedOrigin) assert.equal(installed.prepare("SELECT origin FROM portable_import_origins WHERE kind='audit' AND ref=?").pluck().get(originAudit) ?? 'local', expected);
+                assert.deepEqual(installed.pragma('foreign_key_check'), []);
+            }
             assert.equal(readSqliteArchiveGeneration(installed), status.archiveGeneration);
             if (territorial) {
                 const capability = readTerritorialPacks(installed);
