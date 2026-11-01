@@ -505,10 +505,32 @@ impl RuntimeClient {
             headers,
             body,
             mutation,
+            &[],
             &mut |_, _| {},
         )
     }
 
+    pub(crate) fn prosthetics_read(
+        &self,
+        documents: bool,
+        query: &[(&str, &str)],
+        headers: HeaderMap,
+    ) -> Result<RawResponse> {
+        self.dedicated_web_raw_observing_headers(
+            Method::GET,
+            &[
+                "api",
+                "prosthetics",
+                "catalog",
+                if documents { "documents" } else { "search" },
+            ],
+            headers,
+            None,
+            false,
+            query,
+            &mut |_, _| {},
+        )
+    }
     #[allow(clippy::too_many_arguments)]
     fn dedicated_web_raw_observing_headers(
         &self,
@@ -517,13 +539,16 @@ impl RuntimeClient {
         headers: HeaderMap,
         body: Option<&Value>,
         mutation: bool,
+        query: &[(&str, &str)],
         received: &mut impl FnMut(u16, &HeaderMap),
     ) -> Result<RawResponse> {
         if !self.is_local_bootstrap_origin() {
             return Err(RuntimeError::Forbidden);
         }
         let archive = path.starts_with(&["api", "system", "backup-restore"]);
-        let request_limit = if archive || reference_json_path(path) {
+        let request_limit = if path == ["api", "prosthetics", "catalog", "documents"] {
+            36 * 1024 * 1024
+        } else if archive || reference_json_path(path) {
             JSON_LIMIT
         } else {
             4096
@@ -535,7 +560,7 @@ impl RuntimeClient {
             async {
                 let mut request = self
                     .http
-                    .request(method, self.endpoint(path, &[])?)
+                    .request(method, self.endpoint(path, query)?)
                     .headers(headers)
                     .header("origin", self.origin.origin().ascii_serialization())
                     .header("sec-fetch-site", "same-origin")
@@ -1139,6 +1164,7 @@ pub(crate) fn authenticate_web_p3(
             headers,
             Some(&body),
             true,
+            &[],
             &mut |status, headers| {
                 cookie = session_cookie(headers).ok();
                 possibly_issued = cookie.is_some() || (200..300).contains(&status);
@@ -1243,7 +1269,9 @@ fn reference_json_path(path: &[&str]) -> bool {
 
 fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
     match path {
+        ["api", "prosthetics", "catalog", "documents"] => 25 * 1024 * 1024,
         ["api", "system", "recovery-backup"] => 512 * 1024 * 1024,
+        ["api", "prosthetics", "catalog", "search"] => JSON_LIMIT,
         ["api", "system", "backup-scheduler"] => JSON_LIMIT,
         // These reports carry their full Markdown beside the fields the panel reads.
         ["api", "system", "ai-parliament" | "ai-rollout-readiness"] => JSON_LIMIT,

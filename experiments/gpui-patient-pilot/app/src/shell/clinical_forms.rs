@@ -401,7 +401,7 @@ impl ClinicalApp {
             .flex_col()
             .gap(px(12.))
             .reading_surface(theme);
-        if self.local_host.command_visible() {
+        if self.local_host.clinical_command_visible() {
             return self
                 .local_command_threshold(threshold, cx)
                 .expect("visible local command");
