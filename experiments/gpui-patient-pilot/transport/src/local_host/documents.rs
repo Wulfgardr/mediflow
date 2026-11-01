@@ -118,8 +118,17 @@ pub struct PreparedInsightsRemoval {
     // Only row positions, never another decrypted archive.
     kept: Vec<usize>,
     submitted: AtomicBool,
+    #[cfg(test)]
+    pub(crate) before_rows_lock: Mutex<Option<Box<dyn FnOnce() + Send>>>,
 }
 impl PreparedInsightsRemoval {
+    #[cfg(test)]
+    fn run_before_rows_lock(&self) {
+        let action = self.before_rows_lock.lock().unwrap().take();
+        if let Some(action) = action {
+            action();
+        }
+    }
     pub fn patient_id(&self) -> &str {
         &self.archive.patient
     }
@@ -277,6 +286,8 @@ impl LocalHostAccess {
             archive,
             kept,
             submitted: AtomicBool::new(false),
+            #[cfg(test)]
+            before_rows_lock: Mutex::new(None),
         })
     }
 
@@ -303,10 +314,12 @@ impl LocalHostAccess {
         if command.archive.expires <= Instant::now() {
             return Err(RuntimeError::ReadRequired);
         }
+        #[cfg(test)]
+        command.run_before_rows_lock();
+        let rows = command.archive.rows();
         if command.archive.is_retired() {
             return Err(RuntimeError::ReadRequired);
         }
-        let rows = command.archive.rows();
         let kept: Vec<_> = command.kept.iter().map(|&i| &rows[i]).collect();
         let mut body = self.native.seal_document_insights(&kept)?;
         drop(kept);
@@ -351,10 +364,12 @@ impl LocalHostAccess {
         }
         match self.read_document_insights(&command.archive.scope, &command.archive.patient) {
             Ok(current) => {
+                #[cfg(test)]
+                command.run_before_rows_lock();
+                let rows = command.archive.rows();
                 if command.archive.is_retired() {
                     return Err(RuntimeError::ReadRequired);
                 }
-                let rows = command.archive.rows();
                 let kept: Vec<_> = command.kept.iter().map(|&i| &rows[i]).collect();
                 let matches =
                     current.version > command.archive.version && current.rows().iter().eq(kept);

@@ -10663,6 +10663,85 @@ mod document_archive_tests {
         );
         worker.join().unwrap();
     }
+    fn retirement_before_insights_rows_lock_requires_a_new_read(verify: bool) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            serve(
+                &listener,
+                "GET",
+                200,
+                patient(3, json!([row("one"), row("two")])),
+            );
+            if verify {
+                serve(
+                    &listener,
+                    "GET",
+                    200,
+                    patient(3, json!([row("one"), row("two")])),
+                );
+                serve(&listener, "PUT", 200, json!({"success":true}));
+                serve(&listener, "GET", 503, json!({"error":"synthetic"}));
+            }
+            serve(
+                &listener,
+                "GET",
+                200,
+                if verify {
+                    patient(4, json!([row("two")]))
+                } else {
+                    patient(3, json!([row("one"), row("two")]))
+                },
+            );
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let archive = Arc::new(
+            access
+                .read_document_insights("scope-a", "patient-a")
+                .unwrap(),
+        );
+        let command = access
+            .prepare_insights_removal(archive.clone(), Some("one"))
+            .unwrap();
+        if verify {
+            assert!(access.remove_document_insights(&command).unwrap().is_none());
+        }
+        let retiring = archive.clone();
+        *command.before_rows_lock.lock().unwrap() = Some(Box::new(move || {
+            assert!(!retiring.is_retired());
+            thread::spawn(move || retiring.retire()).join().unwrap();
+        }));
+        let result = if verify {
+            access.verify_insights_removal(&command)
+        } else {
+            access.remove_document_insights(&command)
+        };
+        assert_eq!(result.err(), Some(RuntimeError::ReadRequired));
+        assert!(command.before_rows_lock.lock().unwrap().is_none());
+        assert!(archive.is_retired());
+        assert!(archive.rows().is_empty());
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(crate::test_loopback::accept(&listener).is_err());
+    }
+
+    #[test]
+    fn removal_retired_before_rows_lock_requires_a_new_read() {
+        retirement_before_insights_rows_lock_requires_a_new_read(false);
+    }
+
+    #[test]
+    fn verification_retired_before_rows_lock_requires_a_new_read() {
+        retirement_before_insights_rows_lock_requires_a_new_read(true);
+    }
+
     #[test]
     fn unreadable_foreign_malformed_or_duplicate_archive_never_becomes_an_empty_editable_list() {
         for value in [
