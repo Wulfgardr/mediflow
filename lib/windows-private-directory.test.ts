@@ -19,10 +19,20 @@ test('Windows creates and verifies the private DACL before any payload', { skip:
     const { restrictNewPrivateDirectory, assertPrivateDirectory } = await import('../scripts/windows-private-directory.mjs');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-private-dacl-'));
     try {
+        assert.throws(() => assertPrivateDirectory(root));
+        assert.deepEqual(fs.readdirSync(root), []);
         restrictNewPrivateDirectory(root);
         assertPrivateDirectory(root);
         assert.deepEqual(fs.readdirSync(root), []);
         fs.writeFileSync(path.join(root, 'synthetic.txt'), 'synthetic');
         assert.throws(() => restrictNewPrivateDirectory(root));
+        const { initializeWindowsSystemCommand } = await import('../scripts/windows-system-command.mjs');
+        const { spawnSync } = await import('node:child_process');
+        const system = initializeWindowsSystemCommand();
+        assert.ok(system);
+        const broadened = spawnSync(path.join(path.dirname(system), 'icacls.exe'),
+            [root, '/grant', '*S-1-5-32-545:(OI)(CI)RX', '/q'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
+        assert.equal(broadened.status, 0, broadened.stderr);
+        assert.throws(() => assertPrivateDirectory(root));
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
