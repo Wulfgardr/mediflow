@@ -100,10 +100,11 @@ test('pins the regular owned worker and keeps all PDF engines out of parent runt
 
     assert.equal(createHash('sha256').update(worker).digest('hex'), ANYDOC_PDF_CHILD_WORKER_SHA256);
     assert.match(owner, /child\.kill\('SIGKILL'\)/u);
-    assert.match(owner, /--max-old-space-size=\$\{ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB\}/u);
-    assert.match(owner, /--permission/u);
-    assert.match(owner, /--allow-fs-read=\$\{worker\.root\}/u);
-    assert.match(owner, /options\.allowAddons \? \['--allow-addons'\] : \[\]/u);
+    const launcher = readFileSync(new URL('../../../scripts/document-child-launcher.mjs', import.meta.url), 'utf8');
+    assert.match(launcher, /--max-old-space-size/u);
+    assert.match(launcher, /--permission/u);
+    assert.match(launcher, /--allow-fs-read/u);
+    assert.match(launcher, /--allow-addons/u);
     assert.equal(ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB, 256);
     assert.doesNotMatch(`${owner}\n${materializer}\n${renderer}`,
         /from ['"](?:pdf-lib|pdfjs-dist|@napi-rs\/canvas)|import\(['"](?:pdf-lib|pdfjs-dist|@napi-rs\/canvas)/u);

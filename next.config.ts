@@ -132,6 +132,8 @@ const nextConfig: NextConfig = {
       "./lib/athena-model-identity.ts",
       "./scripts/node-runtime-contract.mjs",
       "./.nvmrc",
+      "./scripts/document-child-launcher.mjs",
+      "./scripts/document-child-network-guard.mjs",
       "./scripts/anydoc-local-extraction-worker.mjs",
       "./scripts/anydoc-pdf-page-worker.mjs",
       "./scripts/anydoc-tesseract-artifacts.json", // @Codex
