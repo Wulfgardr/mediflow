@@ -3,7 +3,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { initializeWindowsSystemCommand } from './windows-system-command.mjs';
 
-const failure = () => new Error('DACL privata della cartella non verificabile. Nessun backup scritto.');
+/** @param {unknown} [cause] */
+const failure = cause => new Error('DACL privata della cartella non verificabile. Nessun backup scritto.', { cause });
 function run(name, args) {
   const directory = path.dirname(initializeWindowsSystemCommand());
   const command = path.join(directory, name);
@@ -22,7 +23,7 @@ export function assertPrivateDacl(sddl, sid) {
   if (typeof sid !== 'string' || !/^S-1-\d+(?:-\d+)+$/u.test(sid)
     || typeof sddl !== 'string' || !/^D:P(?:AI)?\(/u.test(sddl)) throw failure();
   const aces = [...sddl.matchAll(/\(([^()]*)\)/gu)].map(match => match[1]);
-  if (aces.length !== 2 || sddl !== sddl.slice(0, sddl.indexOf('(')) + aces.map(ace => `(${ace})`).join('')) throw failure();
+  if (aces.length !== 2 || sddl !== sddl.slice(0, sddl.indexOf('(')) + aces.map(ace => `(${ace})`).join('')) throw failure({ aceCount: aces.length, terminalCodeUnits: [...sddl.slice(-4)].map(char => char.charCodeAt(0)) });
   const trustees = aces.map(ace => {
     const parts = ace.split(';');
     if (parts.length !== 6 || parts[0] !== 'A' || parts[1] !== 'OICI'
@@ -47,6 +48,7 @@ export function restrictNewPrivateDirectory(directory) {
   if (process.platform !== 'win32') return;
   if (fs.readdirSync(directory).length !== 0 || fs.lstatSync(directory).isSymbolicLink()) throw failure();
   const sid = currentSid();
+  run('icacls.exe', [directory, '/reset', '/q']);
   run('icacls.exe', [directory, '/inheritance:r', '/grant:r', `*${sid}:(OI)(CI)F`, '*S-1-5-18:(OI)(CI)F', '/q']);
   assertPrivateDirectory(directory);
 }
