@@ -10451,7 +10451,7 @@ mod document_archive_tests {
         worker.join().unwrap();
     }
     fn row(id: &str) -> Value {
-        json!({"id":id,"fileName":"Referto sintetico.jpg","summary": if id=="two" { "Sintesi sintetica invariata ".repeat(1000) } else {"Sintesi sintetica invariata".into()}, "rawMarkdown":"Testo clinico sintetico. Caffè e perché. 🩺", "extractedData":{"medications":["Farmaco sintetico"],"labs":{"valore":"42 unità"}}, "unknownFutureField":{"preserve":"exact"}})
+        json!({"id":id,"fileName":"Referto sintetico.jpg","summary": if id=="two" { "Sintesi sintetica invariata ".repeat(150) } else {"Sintesi sintetica invariata".into()}, "rawMarkdown":"Testo clinico sintetico. Caffè e perché. 🩺", "extractedData":{"medications":["Farmaco sintetico"],"labs":{"valore":"42 unità"}}, "unknownFutureField":{"preserve":"exact"}})
     }
     fn patient(version: u64, rows: Value) -> Value {
         json!({"id":"patient-a","ambulatoryId":"scope-a","version":version,"deletedAt":null,"documentInsights": if rows.is_array() { json!(rows.to_string()) } else {rows}})
@@ -10485,6 +10485,7 @@ mod document_archive_tests {
                 patient(3, json!([row("one"), row("two")])),
             );
             let request = serve(&listener, "PUT", 200, json!({"success":true}));
+            assert!(request.split("\r\n\r\n").nth(1).unwrap().len() > 4096);
             assert!(!request.contains("Sintesi sintetica"));
             let mut body: Value =
                 serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
