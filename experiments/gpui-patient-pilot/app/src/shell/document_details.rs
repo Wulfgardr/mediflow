@@ -6,7 +6,7 @@ const DISPLAY_CHARS: usize = 12_000;
 
 pub(super) struct DocumentOriginal {
     pub(super) id: String,
-    state: ReadLoad<Result<Zeroizing<String>, String>>,
+    state: ReadLoad<Result<documents::OriginalPreview, String>>,
     page: usize,
     context: RequestContext,
 }
@@ -61,7 +61,7 @@ impl ClinicalApp {
         self.run(
             move || {
                 let row = session.read_attachment(&scope, &patient, &requested)?;
-                Ok(documents::original_text(&row))
+                Ok(documents::original_preview(&row))
             },
             move |this, result, _| {
                 if context.check().is_ok()
@@ -89,7 +89,7 @@ impl ClinicalApp {
             return view;
         };
         match &original.state {
-            ReadLoad::Ready(Ok(text)) => {
+            ReadLoad::Ready(Ok(documents::OriginalPreview::Text(text))) => {
                 let (text, count) =
                     documents::text_window(text, original.page).expect("valid original page");
                 view = view
@@ -121,7 +121,9 @@ impl ClinicalApp {
                                         el.on_click(cx.listener(move |this, _, _, cx| {
                                             if let Some(original) =
                                                 &mut this.patient.document_original
-                                                && let ReadLoad::Ready(Ok(text)) = &original.state
+                                                && let ReadLoad::Ready(Ok(
+                                                    documents::OriginalPreview::Text(text),
+                                                )) = &original.state
                                                 && documents::text_window(text, page).is_some()
                                             {
                                                 original.page = page;
@@ -133,6 +135,14 @@ impl ClinicalApp {
                             }),
                         ),
                     );
+            }
+            ReadLoad::Ready(Ok(documents::OriginalPreview::Image(image))) => {
+                view = view.child(
+                    gpui::img(image.clone())
+                        .w_full()
+                        .max_h(px(640.))
+                        .object_fit(gpui::ObjectFit::Contain),
+                );
             }
             ReadLoad::Ready(Err(message)) => {
                 view = view.child(notice(
@@ -938,7 +948,7 @@ mod tests {
         view.update(cx, |app, cx| {
             let original = app.patient.document_original.as_ref().unwrap();
             assert!(
-                matches!(&original.state, ReadLoad::Ready(Ok(text)) if text.as_str() == "prova")
+                matches!(&original.state, ReadLoad::Ready(Ok(documents::OriginalPreview::Text(text))) if text.as_str() == "prova")
             );
             let context = original.context.clone();
             app.section_selected(PatientSection::Diary, cx);
@@ -951,6 +961,48 @@ mod tests {
         assert!(host.routes().iter().all(|request| {
             !request.starts_with("POST /api/v1/network/patients/patient-a/attachments")
         }));
+    }
+
+    #[gpui::test]
+    fn image_original_uses_the_attachment_read_and_is_released_on_navigation(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use base64::Engine;
+        let mut encoded = std::io::Cursor::new(Vec::new());
+        image::RgbaImage::from_pixel(2, 3, image::Rgba([10, 20, 30, 255]))
+            .write_to(&mut encoded, image::ImageFormat::Png)
+            .unwrap();
+        let bytes = encoded.into_inner();
+        let host = notes_recovery_tests::Host::new();
+        let wire = json!({"id":"synthetic-document","patientId":"patient-a","name":"Originale.png","path":"originale.png","type":"image/png","size":bytes.len(),"data":format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&bytes))});
+        let row: Attachment = serde_json::from_value(wire.clone()).unwrap();
+        host.plan("GET /api/v1/network/patients/patient-a/attachments/synthetic-document")
+            .send((200, wire))
+            .unwrap();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.selected_id = Some("patient-a".into());
+            app.patient.attachments = ReadLoad::Ready(vec![row]);
+            app.toggle_document_original("synthetic-document", cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            let original = app.patient.document_original.as_ref().unwrap();
+            let ReadLoad::Ready(Ok(documents::OriginalPreview::Image(image))) = &original.state
+            else {
+                panic!("image expected")
+            };
+            assert_eq!(image.as_bytes(0).unwrap(), [30, 20, 10, 255].repeat(6));
+            let context = original.context.clone();
+            app.section_selected(PatientSection::Diary, cx);
+            assert!(app.patient.document_original.is_none());
+            assert!(context.check().is_err());
+            app.disconnect(cx);
+        });
+        assert_eq!(host.routes().len(), 1);
     }
 
     #[gpui::test]
