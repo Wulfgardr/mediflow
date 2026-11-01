@@ -2,13 +2,18 @@ mod archives;
 mod chatgpt;
 mod controls;
 mod governance;
+mod macos_preferences;
 mod models;
 mod network;
 mod parameters;
 mod references;
 mod security;
+mod work_profile;
 use super::*;
 use archives::ArchiveArea;
+pub(in crate::shell) use macos_preferences::effective_preferences;
+#[cfg(not(test))]
+pub(in crate::shell) use macos_preferences::read_system_accessibility;
 pub(super) use mediflow_runtime_client::RETIREMENT_WARNING;
 use mediflow_runtime_client::{
     HostSettingKey, LocalHostAccess, PreparedDocumentDeletion, PreparedHostSetting,
@@ -41,6 +46,7 @@ pub(super) struct LocalAdministration {
     pub(super) retirement: RetirementNotice,
     archives: ArchiveArea,
     governance: governance::GovernanceArea,
+    work_profile: work_profile::WorkProfileArea,
     controls: controls::ControlsArea,
     network: network::NetworkArea,
     references: references::ReferencesArea,
@@ -86,6 +92,7 @@ impl LocalAdministration {
                 cx,
             ),
             governance: governance::GovernanceArea::default(),
+            work_profile: work_profile::WorkProfileArea::default(),
             controls: controls::ControlsArea::default(),
             network: network::NetworkArea::default(),
             references: references::ReferencesArea::new(theme, cx),
@@ -106,7 +113,8 @@ impl LocalAdministration {
         }
     }
     pub(super) fn command_visible(&self) -> bool {
-        self.references.preview.is_some()
+        self.work_profile.has_draft()
+            || (self.references.preview.is_some() || self.references.document.is_some())
             || self.references.who_consent
             || self.models.command_visible()
             || self.security.has_work()
@@ -114,7 +122,8 @@ impl LocalAdministration {
             || !matches!(self.operation, Operation::Idle)
     }
     pub(super) fn has_work(&self) -> bool {
-        self.references.busy
+        self.work_profile.busy
+            || self.references.busy
             || self.chatgpt.busy()
             || self.models.has_work()
             || self.security.has_work()
@@ -141,6 +150,7 @@ impl LocalAdministration {
             .expect("local authority generation exhausted");
         self.archives.withdraw(cx);
         self.governance.withdraw();
+        self.work_profile = work_profile::WorkProfileArea::default();
         self.controls = controls::ControlsArea::default();
         self.network = network::NetworkArea::default();
         self.references.withdraw(cx);
@@ -282,6 +292,9 @@ impl ClinicalApp {
                     }
                     if this.settings_page == SettingsPage::Controls {
                         this.read_controls(cx);
+                    }
+                    if this.settings_page == SettingsPage::Profile {
+                        this.read_work_profile(cx);
                     }
                     if this.settings_page == SettingsPage::Governance {
                         this.read_governance(cx);
@@ -502,6 +515,7 @@ impl ClinicalApp {
                     !matches!(
                         self.settings_page,
                         SettingsPage::Archives
+                            | SettingsPage::Profile
                             | SettingsPage::Access
                             | SettingsPage::Danger
                             | SettingsPage::Host
