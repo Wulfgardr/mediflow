@@ -124,3 +124,35 @@ fn real_jpeg_dimensions_cannot_hide_behind_a_small_pdf_dictionary() {
     let bad = fixture::document(b"/Image Do", &[fixture::stream(dict, &jpeg)]);
     assert_eq!(worker(&bad, "1").stdout, b"{\"error\":\"limit\"}\n");
 }
+
+#[test]
+fn inherited_resources_cannot_bypass_font_or_image_admission() {
+    let font = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding << /Differences [51 /nonexistentSyntheticGlyph] >> >>";
+    assert_eq!(
+        worker(&fixture::inherited_resources(font, None), "1").stdout,
+        b"{\"error\":\"unsupported\"}\n"
+    );
+    let huge = fixture::stream(b"/Type /XObject /Subtype /Image /Width 4000 /Height 3001 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode",b"bad");
+    assert_eq!(
+        worker(
+            &fixture::inherited_resources(
+                b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+                Some(huge)
+            ),
+            "1"
+        )
+        .stdout,
+        b"{\"error\":\"limit\"}\n"
+    );
+}
+
+#[test]
+fn unqualified_form_content_is_refused_before_the_platform_raster() {
+    let form = fixture::stream(
+        b"/Type /XObject /Subtype /Form /BBox [0 0 100 60]",
+        b"BI /W 4000 /H 3001 /CS /RGB /BPC 8 /F /DCT ID bad EI",
+    );
+    let unused = fixture::stream(b"", b"");
+    let output = worker(&fixture::document(b"/Form Do", &[unused, form]), "1");
+    assert_eq!(output.stdout, b"{\"error\":\"unsupported\"}\n");
+}

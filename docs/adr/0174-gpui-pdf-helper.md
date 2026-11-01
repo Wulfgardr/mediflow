@@ -30,7 +30,7 @@ L'ammissione controlla tutte le pagine prima di emettere pixel. Sono conservati
 il limite di 500 pagine, i limiti di dimensioni e i 12 milioni di pixel per
 immagine prima del raster; per JPEG si leggono le dimensioni codificate, senza
 fidarsi del dizionario PDF. Un errore rifiuta l'intera anteprima. Maschere,
-annotazioni, Type3, pattern e codifiche Differences non sono ammesse.
+annotazioni, XObject Form, Type3, pattern e codifiche Differences non sono ammesse.
 
 PDFKit non dà un esito pubblico di risoluzione per ogni glifo. Nel corpus di
 revisione anche PDFKit senza il controllo Differences omette la cifra 3 di
@@ -41,3 +41,7 @@ qualunque PDF ammesso; gli operatori sconosciuti seguono il renderer di sistema.
 L'input e il raster posseduti dal helper sono azzerati prima del rilascio.
 I buffer interni di PDFKit, del kernel e della GPU non hanno questa garanzia.
 Le prove sintetiche sul helper non sostituiscono il collaudo del pacchetto.
+
+Le risorse ereditate dai nodi Pages vengono controllate come quelle dirette.
+Gli XObject Form sono rifiutati: la scansione dei contenuti inline annidati
+non è qualificata in questa tranche e non deve aggirare le quote immagini.
