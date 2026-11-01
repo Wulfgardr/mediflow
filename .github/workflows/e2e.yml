@@ -58,7 +58,7 @@ jobs:
           cache: npm
 
       # npm ci rebuilds better-sqlite3 for the Node 24 ABI so the server can boot.
-      - run: npm ci
+      - run: npm ci && npm run prepare:dependencies
 
       - name: Test AnyDoc diagnostic artifact boundary
         run: npm run test:anydoc-diagnostics

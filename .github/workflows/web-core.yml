@@ -27,7 +27,7 @@ jobs:
           # test:unit uses the strip-types/registerHooks runner; Node 20 is not enough for this gate.
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci && npm run prepare:dependencies
       - name: Admit complete checkout before production build
         run: npm run prebuild
       - name: Fetch frozen capability mapping sources

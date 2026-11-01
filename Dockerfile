@@ -2,8 +2,8 @@
 FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json .nvmrc .npmrc ./
-COPY scripts/node-runtime-contract.mjs ./scripts/node-runtime-contract.mjs
-RUN npm ci
+COPY scripts/node-runtime-contract.mjs scripts/prepare-dependencies.mjs ./scripts/
+RUN npm ci && npm run prepare:dependencies
 
 # Stage 2: Builder
 FROM node:24-alpine AS builder
