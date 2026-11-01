@@ -18,7 +18,7 @@
     "dev": "node scripts/node-runtime-contract.mjs verify && next dev --turbopack --hostname 127.0.0.1 --port 3000",
     "shots:readme": "node scripts/capture-readme-screenshots.mjs",
     "prebuild": "node scripts/build-input-metadata.mjs --source . && node scripts/node-runtime-contract.mjs verify",
-    "build": "node scripts/build-input-metadata.mjs --source . && node scripts/node-runtime-contract.mjs verify && node scripts/source-runtime.mjs build && node scripts/node-runtime-contract.mjs write-standalone-manifest && node scripts/check-standalone-runtime-bundle.mjs && node scripts/source-runtime.mjs prepare",
+    "build": "node scripts/build-source-runtime.mjs",
     "postbuild": "node scripts/node-runtime-contract.mjs write-standalone-manifest && node scripts/check-standalone-runtime-bundle.mjs && node scripts/source-runtime.mjs prepare",
     "prestart": "node scripts/node-runtime-contract.mjs verify-node",
     "start": "node scripts/node-runtime-contract.mjs verify-node && node scripts/source-runtime.mjs web",
