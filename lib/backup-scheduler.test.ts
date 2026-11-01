@@ -1,3 +1,4 @@
+import { resolveEffectiveBackupDestination } from '../scripts/backup-destination-policy.mjs';
 import { prepareSyntheticBackupDestination } from './scheduled-backup.test-support.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -196,12 +197,8 @@ test('merges and sanitizes backup scheduler config', () => {
 });
 
 test('builds a launchd plist with the configured schedule and destination', () => {
-    const state = mergeBackupSchedulerConfig(getDefaultBackupSchedulerState(), {
-        enabled: true,
-        hour: 1,
-        minute: 45,
-        destinationDir: '/Users/demo/Backups/MediFlow',
-    });
+    const state = getDefaultBackupSchedulerState();
+    state.config = { ...state.config, enabled: true, hour: 1, minute: 45, destinationDir: '/Users/demo/Backups/MediFlow' };
 
     const plist = buildBackupLaunchAgentPlist(state, {
         projectRoot: '/tmp/mediflow',
@@ -219,10 +216,11 @@ test('builds a launchd plist with the configured schedule and destination', () =
 
 test('previews only scheduler-owned backup artifacts beyond keep-last-N plus orphan temp files', async () => {
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mediflow-backup-preview-'));
-    const olderArtifact = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T00-00-00.000Z.mediflow');
-    const newerArtifact = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T01-00-00.000Z.mediflow');
-    const orphanTemp = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T02-00-00.000Z.mediflow.tmp');
-    const unrelated = path.join(tempDir, 'notes.txt');
+    const effective = resolveEffectiveBackupDestination(tempDir, { create: true });
+    const olderArtifact = path.join(effective, 'mediflow-backup-v1-2026-03-18T00-00-00.000Z.mediflow');
+    const newerArtifact = path.join(effective, 'mediflow-backup-v1-2026-03-18T01-00-00.000Z.mediflow');
+    const orphanTemp = path.join(effective, 'mediflow-backup-v1-2026-03-18T02-00-00.000Z.mediflow.tmp');
+    const unrelated = path.join(effective, 'notes.txt');
 
     await fs.promises.writeFile(olderArtifact, 'older');
     await fs.promises.writeFile(newerArtifact, 'newer');
@@ -252,10 +250,11 @@ test('previews only scheduler-owned backup artifacts beyond keep-last-N plus orp
 
 test('applies retention and tracks the last cleanup state', async () => {
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mediflow-backup-apply-'));
-    const preservedArtifact = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T02-00-00.000Z.mediflow');
-    const staleArtifact = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T01-00-00.000Z.mediflow');
-    const orphanTemp = path.join(tempDir, 'mediflow-backup-v1-2026-03-18T03-00-00.000Z.mediflow.tmp');
-    const unrelated = path.join(tempDir, 'notes.txt');
+    const effective = resolveEffectiveBackupDestination(tempDir, { create: true });
+    const preservedArtifact = path.join(effective, 'mediflow-backup-v1-2026-03-18T02-00-00.000Z.mediflow');
+    const staleArtifact = path.join(effective, 'mediflow-backup-v1-2026-03-18T01-00-00.000Z.mediflow');
+    const orphanTemp = path.join(effective, 'mediflow-backup-v1-2026-03-18T03-00-00.000Z.mediflow.tmp');
+    const unrelated = path.join(effective, 'notes.txt');
 
     await fs.promises.writeFile(staleArtifact, 'older');
     await fs.promises.writeFile(preservedArtifact, 'latest');
@@ -306,9 +305,10 @@ test('applies retention and tracks the last cleanup state', async () => {
 
 test('retention preserves recent temp files and all temps while a runner lock is active', async () => {
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mediflow-backup-lock-'));
-    const recentTemp = path.join(tempDir, 'mediflow-backup-v1-recent.mediflow.tmp');
-    const staleTemp = path.join(tempDir, 'mediflow-backup-v1-stale.mediflow.tmp');
-    const lockPath = path.join(tempDir, '.mediflow-backup.lock');
+    const effective = resolveEffectiveBackupDestination(tempDir, { create: true });
+    const recentTemp = path.join(effective, 'mediflow-backup-v1-recent.mediflow.tmp');
+    const staleTemp = path.join(effective, 'mediflow-backup-v1-stale.mediflow.tmp');
+    const lockPath = path.join(effective, '.mediflow-backup.lock');
 
     await fs.promises.writeFile(recentTemp, 'recent');
     await fs.promises.writeFile(staleTemp, 'stale');
