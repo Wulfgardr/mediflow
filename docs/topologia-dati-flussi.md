@@ -127,7 +127,7 @@ di una connessione non amplia questo perimetro.
 ```mermaid
 flowchart LR
   Plain["Dato clinico in chiaro"] --> Encrypt["Cifratura client-side AES-256-GCM"]
-  Encrypt --> EncFmt["ENC:iv_b64:cipher_b64; ENC2 per data della creazione da documento"]
+  Encrypt --> EncFmt["ENC:iv_b64:cipher_b64; ENC2 per il solo attachments.data della creazione da documento"]
   EncFmt --> DB[("SQLite medical.db")]
   PIN["PIN utente"] --> KDF["PBKDF2-SHA256"]
   Salt["users.salt"] --> KDF

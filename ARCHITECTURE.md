@@ -117,7 +117,7 @@ Gli scrittori esistenti salvano i valori protetti in questo formato:
 ENC:<iv_b64>:<cipher_b64>
 ```
 
-Il solo `attachments.data` della creazione del paziente da documento può usare `ENC2:<wrap_iv_b64>:<wrapped_key_b64>:<iv_b64>:<cipher_b64>`, cifrato dal client con chiave casuale per file avvolta dalla master key. Gli scrittori esistenti mantengono `ENC:` e i dati esistenti non vengono migrati. Il contratto è nell’appendice di [ADR 0042](./docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
+Il solo `attachments.data` della creazione del paziente da documento usa `ENC2:<wrap_iv_b64>:<wrapped_key_b64>:<iv_b64>:<cipher_b64>`, cifrato dal client con chiave casuale per file avvolta dalla master key e AAD dell’appendice di [ADR 0042](./docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md); nome, percorso e altri campi mantengono `ENC:<iv_b64>:<cipher_b64>`, senza migrare gli allegati preesistenti.
 
 Lo swap di manutenzione conserva una snapshot SQLite autonoma dell'originale
 in `medical.db.swap-recovery` prima di rinominare il database. La snapshot
