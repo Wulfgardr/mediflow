@@ -135,6 +135,7 @@ const nextConfig: NextConfig = {
       "./scripts/document-child-network-guard.mjs",
       "./scripts/anydoc-local-extraction-worker.mjs",
       "./scripts/anydoc-pdf-page-worker.mjs",
+      "./lib/pdf-raster-preflight.mjs",
       "./scripts/anydoc-tesseract-artifacts.json", // @Codex
       "./scripts/anydoc-pdf-renderer-profiles.json", // @Codex
       "./node_modules/mediflow-ocr-tesseract/**/*", // @Codex: optional offline artifacts

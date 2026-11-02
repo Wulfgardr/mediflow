@@ -287,8 +287,18 @@ async function renderPage(engine, bytes) {
     let task = null;
     let canvas = null;
     try {
+        const { preparePdfRasterInput, PdfRasterLimit } = await import('../lib/pdf-raster-preflight.mjs');
+        let checkedBytes;
+        try {
+            checkedBytes = await boundedUntil(preparePdfRasterInput(bytes, {
+                maxPixels: MAX_PIXELS, maxDimension: MAX_DIMENSION_PIXELS, maxBytes: MAX_SOURCE_BYTES,
+            }), deadline);
+        } catch (error) {
+            if (error instanceof PdfRasterLimit) throw new ResourceLimit();
+            throw error;
+        }
         loading = engine.getDocument({
-            data: new Uint8Array(bytes),
+            data: checkedBytes,
             disableWorker: true,
             isEvalSupported: false,
             useSystemFonts: false,
