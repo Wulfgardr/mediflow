@@ -980,16 +980,19 @@ class MedicalApiClient {
         return { name, path, data: file.data, fileKey: file.fileKey, original: encodeBase64(bytes) };
     }
 
-    /** Opens the attachment named by an applied receipt with the master key and compares its bytes. */
-    async verifyPatientDocumentAttachment(attachmentId: string, patientId: string, original: Uint8Array | null, signal: AbortSignal): Promise<boolean> {
+    /** Opens the attachment named by an applied receipt with the master key. With the chosen
+     * document still in memory it compares the bytes ('matched'); after a reload it can only
+     * attest that the attachment opens as a PDF ('opened'). */
+    async verifyPatientDocumentAttachment(attachmentId: string, patientId: string, original: Uint8Array | null, signal: AbortSignal): Promise<'matched' | 'opened' | 'failed'> {
         const attachment = await this.attachments.get(attachmentId, { signal });
         signal.throwIfAborted();
         if (!attachment || attachment.patientId !== patientId || typeof attachment.data !== 'string'
-            || !attachment.data.startsWith('data:application/pdf;base64,')) return false;
+            || !attachment.data.startsWith('data:application/pdf;base64,')) return 'failed';
         const opened = decodeBase64(attachment.data.slice('data:application/pdf;base64,'.length));
         try {
-            if (opened.subarray(0, 5).some((byte, index) => byte !== '%PDF-'.charCodeAt(index))) return false;
-            return original === null || (opened.length === original.length && opened.every((byte, index) => byte === original[index]));
+            if (opened.subarray(0, 5).some((byte, index) => byte !== '%PDF-'.charCodeAt(index))) return 'failed';
+            if (original === null) return 'opened';
+            return opened.length === original.length && opened.every((byte, index) => byte === original[index]) ? 'matched' : 'failed';
         } finally { opened.fill(0); }
     }
 

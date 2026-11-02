@@ -1,4 +1,5 @@
 import { clientArchiveGeneration } from './security/client-auth-api';
+import { fitImageForLocalOcr } from './patient-document-image-geometry';
 
 export const PATIENT_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 export const PATIENT_DOCUMENT_ACCEPT = 'application/pdf,image/jpeg,image/png';
@@ -41,13 +42,37 @@ export function parsePatientDocumentReceipt(value: unknown): PatientDocumentRece
     return null;
 }
 
-export type PreparedPatientDocument = Readonly<{ bytes: Uint8Array<ArrayBuffer>; fileName: string; converted: boolean }>;
+export type PreparedPatientDocument = Readonly<{ bytes: Uint8Array<ArrayBuffer>; fileName: string; converted: boolean; reduction: number }>;
 export class PatientDocumentFileRejected extends Error {
-    constructor(readonly reason: 'type' | 'size' | 'empty') { super(`Patient document rejected: ${reason}`); }
+    constructor(readonly reason: 'type' | 'size' | 'empty' | 'image-too-large' | 'image-unreadable') { super(`Patient document rejected: ${reason}`); }
+}
+
+/** Decodes with the EXIF orientation applied, reduces within the local renderer limits and returns JPEG bytes. */
+async function rasterize(file: File): Promise<{ jpeg: Uint8Array; width: number; height: number; pageWidth: number; pageHeight: number; reduction: number }> {
+    let bitmap: ImageBitmap;
+    try { bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+    catch { throw new PatientDocumentFileRejected('image-unreadable'); }
+    try {
+        const fit = fitImageForLocalOcr(bitmap.width, bitmap.height);
+        if (!fit.ok) throw new PatientDocumentFileRejected(fit.reason === 'too-large' ? 'image-too-large' : 'image-unreadable');
+        const canvas = document.createElement('canvas');
+        canvas.width = fit.width; canvas.height = fit.height;
+        const context = canvas.getContext('2d');
+        if (!context) throw new PatientDocumentFileRejected('image-unreadable');
+        context.fillStyle = '#ffffff'; context.fillRect(0, 0, fit.width, fit.height);
+        context.imageSmoothingQuality = 'high';
+        context.drawImage(bitmap, 0, 0, fit.width, fit.height);
+        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+        canvas.width = 0; canvas.height = 0;
+        if (!blob) throw new PatientDocumentFileRejected('image-unreadable');
+        return { jpeg: new Uint8Array(await blob.arrayBuffer()), width: fit.width, height: fit.height,
+            pageWidth: fit.pageWidth, pageHeight: fit.pageHeight, reduction: fit.scale };
+    } finally { bitmap.close(); }
 }
 
 /** A PDF passes unchanged. A JPEG or PNG becomes a one-page PDF so that the server contract,
- * the local OCR of scans and the ENC2 attachment stay the ones already used by the native window. */
+ * the local OCR of scans and the ENC2 attachment stay the ones already used by the native window.
+ * The page measures half a point per pixel: the renderer at 144 DPI returns the kept pixels. */
 export async function preparePatientDocumentFile(file: File): Promise<PreparedPatientDocument> {
     if (file.size === 0) throw new PatientDocumentFileRejected('empty');
     if (file.size > PATIENT_DOCUMENT_MAX_BYTES) throw new PatientDocumentFileRejected('size');
@@ -55,25 +80,34 @@ export async function preparePatientDocumentFile(file: File): Promise<PreparedPa
     const isPdf = input.length >= 5 && String.fromCharCode(...input.subarray(0, 5)) === '%PDF-';
     const isJpeg = input.length >= 3 && input[0] === 0xff && input[1] === 0xd8 && input[2] === 0xff;
     const isPng = input.length >= 8 && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((byte, index) => input[index] === byte);
-    if (isPdf) return { bytes: input, fileName: file.name, converted: false };
-    if (!isJpeg && !isPng) { input.fill(0); throw new PatientDocumentFileRejected('type'); }
+    if (isPdf) return { bytes: input, fileName: file.name, converted: false, reduction: 1 };
+    input.fill(0);
+    if (!isJpeg && !isPng) throw new PatientDocumentFileRejected('type');
+    const image = await rasterize(file);
     try {
         const { PDFDocument } = await import('pdf-lib');
         const pdf = await PDFDocument.create();
-        const image = isJpeg ? await pdf.embedJpg(input) : await pdf.embedPng(input);
-        pdf.addPage([image.width, image.height]).drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+        const embedded = await pdf.embedJpg(image.jpeg);
+        pdf.addPage([image.pageWidth, image.pageHeight]).drawImage(embedded, { x: 0, y: 0, width: image.pageWidth, height: image.pageHeight });
         const bytes = new Uint8Array(await pdf.save());
         if (bytes.length > PATIENT_DOCUMENT_MAX_BYTES) { bytes.fill(0); throw new PatientDocumentFileRejected('size'); }
-        return { bytes, fileName: `${file.name.replace(/\.(jpe?g|png)$/iu, '')}.pdf`, converted: true };
+        return { bytes, fileName: `${file.name.replace(/\.(jpe?g|png)$/iu, '')}.pdf`, converted: true, reduction: image.reduction };
     } catch (error) {
         if (error instanceof PatientDocumentFileRejected) throw error;
-        throw new PatientDocumentFileRejected('type');
-    } finally { input.fill(0); }
+        throw new PatientDocumentFileRejected('image-unreadable');
+    } finally { image.jpeg.fill(0); }
 }
 
 /** Local reference to an issued command, kept until its outcome is read: a lost response or a
  * reload then shows the work to verify instead of offering a second creation. Not an authority. */
-function markerKey(): string { return `mediflow:patient-document-command:v1:${encodeURIComponent(clientArchiveGeneration())}`; }
+function selectedAmbulatory(): string {
+    const values = document.cookie.split(';').map(value => value.trim()).filter(value => value.startsWith('ambulatory_id='));
+    return values.length === 1 ? decodeURIComponent(values[0].slice('ambulatory_id='.length)) : 'predefinito';
+}
+/** One reference per archive and selected ambulatory: another ambulatory does not see it. */
+function markerKey(): string {
+    return `mediflow:patient-document-command:v2:${encodeURIComponent(clientArchiveGeneration())}:${encodeURIComponent(selectedAmbulatory())}`;
+}
 export const patientDocumentMarker = {
     read(): string | null {
         try {

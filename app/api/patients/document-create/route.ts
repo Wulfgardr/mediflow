@@ -5,7 +5,7 @@ import { requireSession } from '@/lib/security/server-auth';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { webPatientDocumentScope, webPatientDocumentService } from '@/lib/web-patient-document-production';
 import { PatientDocumentDuplicateReviewRequired, type PatientDocumentCreateReview } from '@/lib/patient-document-create-command';
-import { NativePatientDocumentExtractionFailed } from '@/lib/native-patient-document';
+import { NativePatientDocumentExtractionFailed, PatientDocumentIntakeBusy } from '@/lib/native-patient-document';
 import { COMMAND_UUID } from '@/lib/therapy-status-command-contract';
 
 export const runtime = 'nodejs';
@@ -50,6 +50,7 @@ export async function POST(request: Request): Promise<Response> {
         return reply({ status: 'denied' }, 400);
     } catch (error) {
         if (error instanceof NativePatientDocumentExtractionFailed) return reply({ status: 'review-required', detail: error.detail }, 409);
+        if (error instanceof PatientDocumentIntakeBusy) return reply({ status: error.reason === 'session' ? 'in-progress' : 'busy' }, error.reason === 'session' ? 409 : 503);
         return error instanceof PatientDocumentDuplicateReviewRequired
             ? reply({ status: 'duplicate-review-required' }, 409) : reply({ status: 'denied' }, 403);
     } finally {

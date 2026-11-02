@@ -147,6 +147,15 @@ test('duplicate identity requires the explicit separate choice and never merges'
     assert.deepEqual(effects(), before.map(n => n + 1));
 });
 
+test('a second document while the session still holds one is refused as work in progress, not as a lock', async () => {
+    state.session = operator('in-progress');
+    const first = await staged();
+    assert.deepEqual(await call({ operation: 'stage', source: (await documentSource()).source }), { status: 409, body: { status: 'in-progress' } });
+    assert.deepEqual((await call({ operation: 'revoke', commandId: first.view.commandId })).body, { outcome: 'retired' });
+    const second = await staged();
+    assert.deepEqual((await call({ operation: 'revoke', commandId: second.view.commandId })).body, { outcome: 'retired' });
+});
+
 test('the route admits only an authenticated local Web admin with the current archive', async () => {
     const { source } = await documentSource();
     state.session = null;

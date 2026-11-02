@@ -16,22 +16,38 @@ import {
     type PatientDocumentReceipt,
     type PatientDocumentView,
 } from '@/lib/patient-document-create-client';
+import { OCR_MAX_PIXELS, OCR_MAX_SIDE_PIXELS } from '@/lib/patient-document-image-geometry';
 
 type Fields = { firstName: string; lastName: string; taxCode: string; birthDate: string };
-type Source = { fileName: string; size: number; converted: boolean };
+type Source = { fileName: string; size: number; converted: boolean; reduction: number };
 type Phase =
     | { kind: 'idle'; notice?: { tone: 'info' | 'critical'; text: string } }
     | { kind: 'reading'; fileName: string }
     | { kind: 'review'; view: PatientDocumentView; source: Source; markerKept: boolean; duplicate: boolean }
     | { kind: 'confirm'; view: PatientDocumentView; source: Source; markerKept: boolean; duplicate: boolean }
     | { kind: 'sending'; commandId: string }
-    | { kind: 'applied'; patientId: string; verified: boolean; commandId: string }
+    | { kind: 'applied'; patientId: string; verified: 'matched' | 'opened' | 'failed'; commandId: string }
     | { kind: 'uncertain'; commandId: string; text: string; forgettable?: boolean };
 
 const EMPTY: Fields = { firstName: '', lastName: '', taxCode: '', birthDate: '' };
 const UNCERTAIN = 'Esito da verificare. Non ripetere la creazione: rileggi l’esito oppure ritira la lavorazione.';
 const RETIRED = 'Lavorazione ritirata. Nessuna scheda creata.';
 const EXPIRED = 'La revisione non è più valida: la lavorazione scade dopo cinque minuti o al cambio di sessione o ambulatorio.';
+
+/** The cause of a refused stage, in the physician's terms: never a generic hint about the lock. */
+function stageRefusal(status: number, code: unknown, detail: unknown): string {
+    if (status === 409 && code === 'review-required') return detail === 'image_or_scan'
+        ? `Documento non acquisito: è una scansione e l’OCR locale non ha prodotto testo. Può mancare l’OCR su questo computer, oppure la pagina supera ${OCR_MAX_SIDE_PIXELS} px per lato o ${OCR_MAX_PIXELS / 1_000_000} milioni di pixel a 144 dpi.`
+        : 'Documento non acquisito: l’estrazione locale non ha prodotto un testo leggibile.';
+    if (status === 409 && code === 'in-progress') return 'Questa sessione ha già una lavorazione da documento aperta, forse in un’altra scheda del browser: concludila o annullala, oppure attendi cinque minuti che scada.';
+    if (status === 409 && code === 'scope-unavailable') return 'L’ambulatorio selezionato non esiste più: scegline un altro e riprova.';
+    if (status === 503) return 'Il computer sta già leggendo due documenti: riprova tra poco.';
+    if (status === 413) return 'Documento non acquisito: supera il limite di 10 MiB.';
+    if (status === 401) return 'Sessione scaduta o bloccata: sblocca e riprova.';
+    if (status === 409) return 'I dati sono stati ripristinati da un backup: ricarica la pagina prima di continuare.';
+    if (status === 403) return 'Richiesta non ammessa: serve un operatore amministratore con la sessione sbloccata su questo computer.';
+    return 'Documento non acquisito per un errore del server.';
+}
 
 function fieldError(fields: Fields): string | null {
     if (!fields.firstName.trim() || !fields.lastName.trim() || !fields.taxCode.trim()) return 'Inserisci nome, cognome e codice fiscale.';
@@ -73,11 +89,11 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
             setPhase({ kind: 'idle', notice: { tone: reason ? 'critical' : 'info', text: `${reason ? `${reason} ` : ''}${RETIRED} Puoi scegliere di nuovo il documento.` } });
             return;
         }
-        let verified = false;
+        let verified: 'matched' | 'opened' | 'failed' = 'failed';
         try { verified = await db.verifyPatientDocumentAttachment(receipt.attachmentId, receipt.patientId, work.current.original, work.current.controller.signal); }
-        catch { verified = false; }
+        catch { verified = 'failed'; }
         if (work.current.epoch !== token.epoch) return;
-        if (verified) patientDocumentMarker.clear(commandId);
+        if (verified !== 'failed') patientDocumentMarker.clear(commandId);
         work.current.original?.fill(0); work.current.original = null;
         setPin('');
         setPhase({ kind: 'applied', patientId: receipt.patientId, verified, commandId });
@@ -113,28 +129,32 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
         setPhase({ kind: 'reading', fileName: file.name });
         try {
             const prepared = await preparePatientDocumentFile(file);
+            // A document cancelled while it was being read is erased, never kept as the next work's original.
+            if (!current(token)) { prepared.bytes.fill(0); return; }
             work.current.original = prepared.bytes;
             const source = await db.sealPatientDocumentSource(prepared.bytes, prepared.fileName);
-            const response = await requestPatientDocument({ operation: 'stage', source }, token.controller.signal);
+            let response: Awaited<ReturnType<typeof requestPatientDocument>>;
+            // The per-file key leaves this array once serialized; the request string itself is not erasable in the browser.
+            try { response = await requestPatientDocument({ operation: 'stage', source }, token.controller.signal); }
+            finally { source.fileKey.fill(0); }
             if (!current(token)) return;
             const view = response.body as PatientDocumentView | null;
             if (response.status === 200 && view && typeof view.commandId === 'string' && typeof view.viewId === 'string' && typeof view.text === 'string') {
                 const markerKept = patientDocumentMarker.write(view.commandId);
-                setPhase({ kind: 'review', view, source: { fileName: prepared.fileName, size: prepared.bytes.length, converted: prepared.converted }, markerKept, duplicate: false });
+                setPhase({ kind: 'review', view, source: { fileName: prepared.fileName, size: prepared.bytes.length, converted: prepared.converted, reduction: prepared.reduction }, markerKept, duplicate: false });
                 return;
             }
             restart();
-            setPhase({ kind: 'idle', notice: { tone: 'critical', text: response.status === 409 && response.body?.status === 'review-required'
-                ? 'Documento non acquisito: l’estrazione locale non ha prodotto un testo leggibile. Nessuna scheda creata.'
-                : response.status === 413 ? 'Documento non acquisito: supera il limite di 10 MiB. Nessuna scheda creata.'
-                    : 'Documento non acquisito. Controlla di aver sbloccato la sessione e riprova. Nessuna scheda creata.' } });
+            setPhase({ kind: 'idle', notice: { tone: 'critical', text: `${stageRefusal(response.status, response.body?.status, response.body?.detail)} Nessuna scheda creata.` } });
         } catch (error) {
             if (work.current.epoch !== token.epoch) return;
             restart();
             const text = error instanceof PatientDocumentFileRejected
                 ? error.reason === 'size' ? 'Il file supera il limite di 10 MiB. Nessuna scheda creata.'
                     : error.reason === 'empty' ? 'Il file è vuoto. Nessuna scheda creata.'
-                        : 'Formato non ammesso: scegli un PDF, un JPEG o un PNG. Nessuna scheda creata.'
+                        : error.reason === 'image-too-large' ? `Immagine troppo grande per l’estrazione locale: per rientrare nei limiti di ${OCR_MAX_SIDE_PIXELS} px per lato e ${OCR_MAX_PIXELS / 1_000_000} milioni di pixel andrebbe ridotta a meno della metà, e il testo potrebbe non essere più leggibile. Usa una scansione a 300 dpi o una foto a risoluzione minore. Nessuna scheda creata.`
+                            : error.reason === 'image-unreadable' ? 'Immagine non leggibile dal browser. Nessuna scheda creata.'
+                                : 'Formato non ammesso: scegli un PDF, un JPEG o un PNG. Nessuna scheda creata.'
                 : 'Lettura del documento interrotta. Nessuna scheda creata.';
             setPhase({ kind: 'idle', notice: { tone: 'critical', text } });
         }
@@ -153,7 +173,7 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
             const receipt = response.status === 200 ? parsePatientDocumentReceipt(response.body) : null;
             if (receipt?.outcome === 'unknown') {
                 if (work.current.epoch !== token.epoch) return;
-                setPhase({ kind: 'uncertain', commandId, forgettable: true, text: 'Il server non conserva più questa lavorazione e non ha registrato alcuna creazione: non può più essere completata. Puoi dimenticare il riferimento e ricominciare dal documento.' });
+                setPhase({ kind: 'uncertain', commandId, forgettable: true, text: 'Questa sessione non può leggere né ritirare la lavorazione: può appartenere a un altro operatore o a un altro ambulatorio, oppure il server è stato riavviato. Non è possibile dire da qui se la scheda è stata creata. Per verificarlo, nell’ambulatorio e con l’operatore che l’hanno avviata cerca nell’elenco pazienti il nome e il codice fiscale inseriti.' });
                 return;
             }
             if (receipt?.outcome === 'retired') showToast({ tone: 'info', title: RETIRED });
@@ -188,6 +208,15 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
         }
     }
 
+    /** Only after the physician states that the list was checked: the outcome stays unknown to this session. */
+    async function closeUnreadable(commandId: string) {
+        const { confirmed } = await confirm({ title: 'Hai verificato l’elenco pazienti?',
+            message: 'Da questa sessione l’esito non è leggibile: se la scheda è stata creata resta nell’archivio. Chiudendo l’avviso MediFlow non potrà più mostrarti l’esito di questa lavorazione.',
+            confirmLabel: 'Ho verificato, chiudi', cancelLabel: 'Non ancora' });
+        if (!confirmed) return;
+        patientDocumentMarker.clear(commandId); restart(); setPhase({ kind: 'idle' });
+    }
+
     function drop(event: DragEvent<HTMLElement>) {
         event.preventDefault(); setDragging(false);
         if (event.dataTransfer.files.length !== 1) {
@@ -197,7 +226,8 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
         void choose(event.dataTransfer.files[0]);
     }
 
-    const sourceLine = (source: Source) => `${source.fileName}, ${(source.size / 1024).toLocaleString('it-IT', { maximumFractionDigits: 0 })} KiB${source.converted ? ', immagine allegata come PDF di una pagina' : ''}`;
+    const sourceLine = (source: Source) => `${source.fileName}, ${(source.size / 1024).toLocaleString('it-IT', { maximumFractionDigits: 0 })} KiB${source.converted
+        ? `, immagine allegata come PDF di una pagina${source.reduction < 1 ? `, ridotta al ${Math.round(source.reduction * 100)}% per l’estrazione locale` : ''}` : ''}`;
 
     return (
         <div className="space-y-5" data-testid="patient-document-create">
@@ -275,7 +305,11 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
                                     <label htmlFor={`patient-document-${key}`} className="mf-field-label">{label}</label>
                                     <input id={`patient-document-${key}`} className="mf-input" type={key === 'birthDate' ? 'date' : 'text'} autoComplete={autoComplete}
                                         value={fields[key]} required={key !== 'birthDate'} maxLength={256}
-                                        onChange={(event) => setFields((value) => ({ ...value, [key]: event.target.value }))} />
+                                        onChange={(event) => {
+                                            setFields((value) => ({ ...value, [key]: event.target.value }));
+                                            // A changed identity is checked again: the earlier duplicate and separate choice no longer apply.
+                                            if (key !== 'birthDate' && phase.kind === 'review' && phase.duplicate) { setSeparate(false); setPhase({ ...phase, duplicate: false }); }
+                                        }} />
                                 </div>
                             ))}
                             {phase.duplicate && (
@@ -316,16 +350,17 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
             )}
 
             {phase.kind === 'applied' && (
-                <div className={`mf-alert ${phase.verified ? 'mf-alert-success' : 'mf-alert-warning'}`} role="alert">
-                    <h3 ref={heading} tabIndex={-1} className="font-semibold">{phase.verified ? 'Scheda creata' : 'Scheda creata, allegato da verificare'}</h3>
+                <div className={`mf-alert ${phase.verified !== 'failed' ? 'mf-alert-success' : 'mf-alert-warning'}`} role="alert">
+                    <h3 ref={heading} tabIndex={-1} className="font-semibold">{phase.verified !== 'failed' ? 'Scheda creata' : 'Scheda creata, allegato da verificare'}</h3>
                     <p className="text-sm">
-                        {phase.verified ? 'Il documento è allegato alla nuova scheda: è stato riletto, aperto e verificato.'
-                            : 'La creazione risulta registrata, ma l’allegato non si apre o non corrisponde al documento scelto. Non ripetere la creazione; il riferimento resta conservato.'}
+                        {phase.verified === 'matched' ? 'Il documento è allegato alla nuova scheda: è stato riletto, aperto e verificato.'
+                            : phase.verified === 'opened' ? 'Il documento è allegato alla nuova scheda e si apre come PDF. Dopo il ricaricamento della pagina il file scelto non è più in memoria: il confronto byte per byte non è stato possibile.'
+                                : 'La creazione risulta registrata, ma l’allegato non si apre o non corrisponde al documento scelto. Non ripetere la creazione; il riferimento resta conservato.'}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-3">
                         <Link href={`/patients/${phase.patientId}`} className="mf-button-primary">Apri la scheda</Link>
-                        {!phase.verified && <button type="button" className="mf-button-secondary" onClick={() => void readReceipt(phase.commandId, work.current)}>Rileggi esito e allegato</button>}
-                        {phase.verified && <button type="button" className="mf-button-secondary" onClick={() => { restart(); setPhase({ kind: 'idle' }); }}>Nuova scheda da documento</button>}
+                        {phase.verified === 'failed' && <button type="button" className="mf-button-secondary" onClick={() => void readReceipt(phase.commandId, work.current)}>Rileggi esito e allegato</button>}
+                        {phase.verified !== 'failed' && <button type="button" className="mf-button-secondary" onClick={() => { restart(); setPhase({ kind: 'idle' }); }}>Nuova scheda da documento</button>}
                     </div>
                 </div>
             )}
@@ -337,7 +372,7 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
                     <div className="mt-3 flex flex-wrap gap-3">
                         <button type="button" className="mf-button-secondary" onClick={() => void readReceipt(phase.commandId, work.current)}>Rileggi esito</button>
                         {!phase.forgettable && <button type="button" className="mf-button-secondary" onClick={() => void withdraw(phase.commandId, false)}>Ritira la lavorazione</button>}
-                        {phase.forgettable && <button type="button" className="mf-button-text" onClick={() => { patientDocumentMarker.clear(phase.commandId); restart(); setPhase({ kind: 'idle' }); }}>Dimentica il riferimento</button>}
+                        {phase.forgettable && <button type="button" className="mf-button-text" onClick={() => void closeUnreadable(phase.commandId)}>Ho verificato, chiudi l’avviso</button>}
                     </div>
                 </div>
             )}
