@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { secureLaunch } from './fixtures/secure-browser';
 
 const primaryHrefs = ['#quadro', '#terapie', '#parametri', '#documenti'];
 const secondaryHrefs = ['#attenzione', '#identita', '#clinica', '#amministrazione', '#prestazioni', '#protesica', '#scale', '#siss', '#timeline', '#diario', '#follow-up'];
@@ -181,8 +182,8 @@ test('zoom browser reale al 200% conserva il menu nel viewport', async () => {
     fs.mkdirSync(extension);
     fs.writeFileSync(path.join(extension, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'Synthetic navigation zoom test', version: '1.0', permissions: ['tabs'], background: { service_worker: 'worker.js' } }));
     fs.writeFileSync(path.join(extension, 'worker.js'), 'chrome.runtime.onInstalled.addListener(() => {});');
-    const context = await chromium.launchPersistentContext(path.join(root, 'profile'), { channel: 'chromium', headless: true,
-        viewport: { width: 1440, height: 960 }, args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`] });
+    const context = await chromium.launchPersistentContext(path.join(root, 'profile'), secureLaunch({ channel: 'chromium', headless: true,
+        viewport: { width: 1440, height: 960 }, args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`] }));
     try {
         const worker = await test.step('estensione zoom pronta', async () => context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker', { timeout: 10_000 }));
         const page = await context.newPage();
