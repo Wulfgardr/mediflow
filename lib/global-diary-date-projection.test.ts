@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { stripMarkdownMarks } from './clinical-rich-text';
 import { clinicalEntryTypeLabel, formatWorkspaceDate, type Kree8Patient } from './patient-workspace';
+import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiaryWorkflowState } from './patient-diary-metadata';
 
 const diarySource = ts.createSourceFile('cockpit-shared.tsx', readFileSync(new URL('../components/kree8/cockpit-shared.tsx', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const diaryFunctions = ['metadataRecord', 'firstText', 'entryPresentation', 'compactClinicalText', 'buildGlobalDiaryState'];
@@ -14,7 +15,7 @@ const declarations = diaryFunctions.map(name => {
     return declaration.getText(diarySource);
 }).join('\n');
 const buildDiary = runInNewContext(ts.transpileModule(declarations, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText + '\nbuildGlobalDiaryState;',
-    { stripMarkdownMarks, clinicalEntryTypeLabel, formatWorkspaceDate }) as (entries: { id: string; patientId: string; date: unknown; content: string }[], patients: Kree8Patient[]) => { entries: { monthLabel: string; dateLabel: string }[] };
+    { stripMarkdownMarks, clinicalEntryTypeLabel, formatWorkspaceDate, patientDiaryWorkflowState, PATIENT_DIARY_WORKFLOW_LABELS }) as (entries: { id: string; patientId: string; date: unknown; content: string }[], patients: Kree8Patient[]) => { entries: { monthLabel: string; dateLabel: string }[] };
 
 for (const [label, date] of [['invalid', 'not-a-date'], ['null', null], ['absent', undefined]] as const) {
     test(`global diary month remains readable for ${label} date`, () => {
