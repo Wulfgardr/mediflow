@@ -87,7 +87,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Unsupported SISS handoff outcome' }, { status: 400 });
         }
 
-        const completedAt = parseDate(body.completedAt);
+        // WUL-800: un passaggio avviato non ha chiusura, uno con un altro esito ce l'ha.
+        const completedAt = outcome === 'started' ? null : parseDate(body.completedAt) ?? new Date();
         const id = optionalText(body.id) ?? uuidv4();
         const moduleLabel = optionalText(body.moduleLabel) ?? ACTION_LABELS[action] ?? action;
 
@@ -129,7 +130,8 @@ export async function POST(request: Request) {
                 sourceSurface: auditContext.sourceSurface,
                 requestId,
                 redactedMetadata: withAuditContextMetadata(auditContext, {
-                    changedFields: listChangedFields(body as Record<string, unknown>, ['id']),
+                    changedFields: [...new Set([...listChangedFields(body as Record<string, unknown>, ['id']),
+                        ...(completedAt ? ['completedAt'] : [])])],
                     flags: [`action:${action}`, `outcome:${outcome}`],
                 }),
             });

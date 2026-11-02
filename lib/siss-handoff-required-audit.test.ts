@@ -293,9 +293,91 @@ test('a compiled closure draft cannot adopt a refreshed version, pending record 
     assert.equal(calls, 1);
     const source = readFileSync('components/siss-handoff-diary.tsx', 'utf8');
     for (const field of ['Outcome', 'Notes', 'NextAction']) {
-        assert.ok(source.includes(`if (beginClosureDraft()) setClosure${field}`));
+        assert.ok(source.includes(`if (beginDraft()) set${field}`));
     }
-    const submitSource = source.slice(source.indexOf('const closePendingHandoff'), source.indexOf('const deleteItem'));
-    assert.match(submitSource, /resolveSissHandoffDraftPrecondition\(closurePrecondition.current, pendingHandoff\)/);
+    const submitSource = source.slice(source.indexOf('const close = async'), source.indexOf('const title ='));
+    assert.match(submitSource, /resolveSissHandoffDraftPrecondition\(precondition.current, handoff\)/);
     assert.match(submitSource, /update\(sissPrecondition.id/);
+});
+
+/* WUL-800, coorte 5: esiti dei passaggi SISS e data di chiusura sul server. */
+const decidedHandoff = (JSON.parse(readFileSync(new URL('../docs/domain/clinical-status-transitions.json', import.meta.url), 'utf8')) as
+    { sissHandoff: Record<string, string[]> }).sissHandoff;
+const HANDOFF_OUTCOMES = ['started', 'completed', 'blocked', 'cancelled'] as const;
+const savedClosure = new Date('2026-01-02T00:00:00Z');
+function seedOutcome(outcome: string, completedAt: Date | null) {
+    reset();
+    dbServer.insert(sissHandoffEvents).values({ id: 'synthetic-handoff', patientId: 'synthetic-patient', action: 'menu.open',
+        moduleLabel: 'Menu SISS', startedAt: new Date('2026-01-01T00:00:00Z'), outcome, completedAt }).run();
+}
+function handoffRow() {
+    return snapshot().handoffs[0] as { outcome: string; completed_at: number | null; version: number };
+}
+
+test('the handoff table is exactly the decided one', () => {
+    const { SISS_HANDOFF_TRANSITIONS } = load('./clinical-status-transitions.ts') as typeof import('./clinical-status-transitions.ts');
+    const sorted = (table: Record<string, readonly string[]>) => Object.fromEntries(Object.entries(table).map(([from, to]) => [from, [...to].sort()]));
+    assert.deepEqual(sorted(SISS_HANDOFF_TRANSITIONS), sorted(decidedHandoff));
+});
+
+test('every pair of handoff outcomes is accepted or refused before any write', async () => {
+    for (const from of HANDOFF_OUTCOMES) {
+        for (const to of HANDOFF_OUTCOMES) {
+            seedOutcome(from, from === 'started' ? null : savedClosure);
+            const before = snapshot();
+            const expected = from === to || decidedHandoff[from].includes(to);
+            const response = await invoke('PUT', writeBody({ outcome: to }));
+            assert.equal(response.status, expected ? 200 : 409, `${from} -> ${to}`);
+            if (!expected) {
+                assert.equal((await response.json()).code, 'status_transition_not_allowed');
+                assert.deepEqual(snapshot(), before);
+            } else assert.equal(handoffRow().outcome, to);
+        }
+    }
+});
+
+test('closing uses a given date or the server moment, never the date of an earlier block; reopening clears it', async () => {
+    seedOutcome('blocked', savedClosure);
+    const closing = Date.now() / 1000 - 1;
+    assert.equal((await invoke('PUT', writeBody({ outcome: 'completed' }))).status, 200);
+    assert.ok((handoffRow().completed_at ?? 0) >= closing, 'un bloccato poi completato non eredita la data del blocco');
+
+    seedOutcome('blocked', savedClosure);
+    const given = new Date('2026-02-03T10:00:00Z');
+    assert.equal((await invoke('PUT', writeBody({ outcome: 'completed', completedAt: given.toISOString() }))).status, 200);
+    assert.equal(handoffRow().completed_at, given.getTime() / 1000);
+
+    seedOutcome('completed', savedClosure);
+    assert.equal((await invoke('PUT', writeBody({ outcome: 'started' }))).status, 200);
+    assert.equal(handoffRow().completed_at, null);
+    const audit = snapshot().audit.at(-1) as { redacted_metadata: string };
+    assert.ok(JSON.parse(audit.redacted_metadata).changedFields.includes('completedAt'));
+
+    seedOutcome('started', null);
+    const before = Date.now() / 1000 - 1;
+    assert.equal((await invoke('PUT', writeBody({ outcome: 'cancelled', completedAt: null }))).status, 200);
+    assert.ok((handoffRow().completed_at ?? 0) >= before);
+});
+
+test('outcome and closure date cannot contradict each other without a change of outcome', async () => {
+    for (const [outcome, completedAt, change] of [['started', null, { completedAt: '2026-03-01T00:00:00Z' }],
+        ['completed', savedClosure, { completedAt: null }]] as const) {
+        seedOutcome(outcome, completedAt);
+        const before = snapshot();
+        const response = await invoke('PUT', writeBody(change));
+        assert.equal(response.status, 409, outcome);
+        assert.equal((await response.json()).code, 'siss_handoff_completed_at_mismatch');
+        assert.deepEqual(snapshot(), before);
+    }
+});
+
+test('a new handoff is open without closure, or closed with one', async () => {
+    reset();
+    assert.equal((await invoke('POST', JSON.stringify({ id: 'synthetic-open', patientId: 'synthetic-patient', action: 'menu.open',
+        outcome: 'started', completedAt: '2026-03-01T00:00:00Z' }))).status, 201);
+    assert.equal((await invoke('POST', JSON.stringify({ id: 'synthetic-closed', patientId: 'synthetic-patient', action: 'menu.open',
+        outcome: 'completed' }))).status, 201);
+    const rows = Object.fromEntries((snapshot().handoffs as Array<{ id: string; completed_at: number | null }>).map((row) => [row.id, row.completed_at]));
+    assert.equal(rows['synthetic-open'], null);
+    assert.notEqual(rows['synthetic-closed'], null);
 });

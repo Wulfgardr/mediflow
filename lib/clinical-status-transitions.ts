@@ -183,6 +183,56 @@ export function planProstheticStatusChange(
     return { ok: true };
 }
 
+export type SissHandoffOutcome = 'started' | 'completed' | 'blocked' | 'cancelled';
+
+/* Un passaggio aperto si chiude, si blocca o si annulla; un bloccato riparte o si chiude; un chiuso si riapre. */
+export const SISS_HANDOFF_TRANSITIONS: Readonly<Record<SissHandoffOutcome, readonly SissHandoffOutcome[]>> = {
+    started: ['completed', 'blocked', 'cancelled'],
+    blocked: ['started', 'completed', 'cancelled'],
+    completed: ['started'],
+    cancelled: ['started'],
+};
+
+export function isSissHandoffTransitionAllowed(from: string, to: string): boolean {
+    if (!Object.prototype.hasOwnProperty.call(SISS_HANDOFF_TRANSITIONS, to)) return false;
+    if (from === to || !Object.prototype.hasOwnProperty.call(SISS_HANDOFF_TRANSITIONS, from)) return true;
+    return SISS_HANDOFF_TRANSITIONS[from as SissHandoffOutcome].includes(to as SissHandoffOutcome);
+}
+
+export type CompletedAtMismatchDenial = {
+    status: 409;
+    value: { error: string; code: 'siss_handoff_completed_at_mismatch' };
+};
+
+/**
+ * Esito e chiusura di un passaggio SISS non si contraddicono (WUL-800): un
+ * passaggio avviato non ha data di chiusura, uno con un altro esito ce l'ha.
+ * Cambiando esito verso uno diverso da started vale la data indicata, altrimenti
+ * quella del passaggio (orologio del server): un bloccato poi completato non
+ * eredita la data del blocco. Tornando a started la data si svuota. Senza cambio di esito si
+ * rifiuta solo una richiesta che porterebbe la riga in contraddizione; una riga
+ * storica incoerente resta com'è finché non cambia esito.
+ */
+export function planSissHandoffOutcomeChange(
+    saved: { outcome: string; completedAt: Date | null },
+    requested: { outcome?: string; completedAt?: Date | null },
+    now: Date,
+): { ok: true; completedAt?: Date | null } | { ok: false; denial: StatusTransitionDenial | CompletedAtMismatchDenial } {
+    const to = requested.outcome;
+    if (to !== undefined && !isSissHandoffTransitionAllowed(saved.outcome, to)) {
+        return { ok: false, denial: statusTransitionDenial('siss_handoff', saved.outcome, to) };
+    }
+    if (to === undefined || to === saved.outcome) {
+        const contradicts = saved.outcome === 'started' ? requested.completedAt instanceof Date
+            : requested.completedAt === null && saved.completedAt !== null;
+        return contradicts
+            ? { ok: false, denial: { status: 409, value: { error: 'Outcome and completion date of a SISS handoff must agree', code: 'siss_handoff_completed_at_mismatch' } } }
+            : { ok: true };
+    }
+    if (to === 'started') return { ok: true, completedAt: null };
+    return { ok: true, completedAt: requested.completedAt ?? now };
+}
+
 export type StatusTransitionDenial = {
     status: 409;
     value: { error: string; code: 'status_transition_not_allowed'; entity: string; from: string; to: string };

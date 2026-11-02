@@ -43,6 +43,8 @@ const OUTCOME_OPTIONS: Array<{ value: SissHandoffOutcome; label: string }> = [
     { value: 'cancelled', label: 'Annullato' },
 ];
 
+const PENDING_SHOWN = 3;
+
 function emptyForm(): FormState {
     return {
         action: 'registry.lookup',
@@ -81,10 +83,6 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
-    const closurePrecondition = useRef<SissHandoffWritePrecondition | null>(null);
-    const [closureNotes, setClosureNotes] = useState('');
-    const [closureNextAction, setClosureNextAction] = useState('');
-    const [closureOutcome, setClosureOutcome] = useState<SissHandoffOutcome>('completed');
 
     const handoffs = useLiveQuery(
         async () => {
@@ -101,14 +99,17 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
     const formId = useId();
     const createRef = useRef<HTMLButtonElement>(null);
     const formRef = useRef<HTMLFormElement>(null);
-    const closureDraftDirty = Boolean(closureNotes || closureNextAction || closureOutcome !== 'completed');
-    useRuntimeTwinPendingForm(isFormOpen || closureDraftDirty);
+    useRuntimeTwinPendingForm(isFormOpen);
     useEffect(() => { if (isFormOpen) formRef.current?.querySelector<HTMLSelectElement>('select')?.focus(); }, [isFormOpen]);
 
-    const pendingHandoff = useMemo(
-        () => handoffs?.find((item) => item.outcome === 'started') ?? null,
+    // WUL-800: più passaggi aperti per lo stesso paziente sono ammessi. Ogni apertura del portale ne crea
+    // uno: si mostrano i più recenti e si dice quanti altri restano aperti, senza nasconderli.
+    const pendingHandoffs = useMemo(
+        () => (handoffs ?? []).filter((item) => item.outcome === 'started'),
         [handoffs],
     );
+    const [showAllPending, setShowAllPending] = useState(false);
+    const visiblePending = showAllPending ? pendingHandoffs : pendingHandoffs.slice(0, PENDING_SHOWN);
 
     const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
         setForm((current) => ({ ...current, [key]: value }));
@@ -152,41 +153,6 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
         }
     };
 
-    const beginClosureDraft = () => {
-        if (!pendingHandoff) return false;
-        try {
-            closurePrecondition.current = resolveSissHandoffDraftPrecondition(closurePrecondition.current, pendingHandoff);
-            return true;
-        } catch (draftError) {
-            setError(draftError instanceof Error ? draftError.message : 'Ricarica il diario SISS.');
-            return false;
-        }
-    };
-
-    const closePendingHandoff = async () => {
-        if (!pendingHandoff) return;
-        setError(null);
-        setIsSaving(true);
-        try {
-            const sissPrecondition = resolveSissHandoffDraftPrecondition(closurePrecondition.current, pendingHandoff);
-            await db.sissHandoffs.update(sissPrecondition.id, {
-                outcome: closureOutcome,
-                completedAt: new Date(),
-                nextAction: optionalValue(closureNextAction),
-                notes: optionalValue(closureNotes),
-                updatedAt: new Date(),
-            }, { sissPrecondition });
-            closurePrecondition.current = null;
-            setClosureNotes('');
-            setClosureNextAction('');
-            setClosureOutcome('completed');
-        } catch (submitError) {
-            setError(submitError instanceof Error ? submitError.message : 'Chiusura passaggio SISS non riuscita.');
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
     const deleteItem = async (item: SissHandoffEvent) => {
         setError(null);
         try {
@@ -209,44 +175,11 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
         <section className={styles.register}>
             {!embedded ? <div className={styles.toolbar}><h2>Diario locale dei passaggi</h2>{createButton}</div> : null}
             <p className={local.caption}>Registro locale: l’atto regionale e il suo esito si verificano nel portale ufficiale.</p>
-            {pendingHandoff ? (
-                <div className={local.pending} aria-label="Chiusura del passaggio aperto">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">Da chiudere</p>
-                            <h3 className="mt-1 text-sm font-semibold text-[color:var(--lume-ink)]">
-                                {pendingHandoff.moduleLabel} aperto {formatDate(pendingHandoff.startedAt)}
-                            </h3>
-                            {pendingHandoff.reason ? (
-                                <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">{pendingHandoff.reason}</p>
-                            ) : null}
-                        </div>
-                        <select
-                            className="input-field h-10 max-w-44" aria-label="Esito del passaggio aperto"
-                            value={closureOutcome}
-                            onChange={(event) => { if (beginClosureDraft()) setClosureOutcome(event.target.value as SissHandoffOutcome); }}
-                        >
-                            {OUTCOME_OPTIONS.filter((item) => item.value !== 'started').map((item) => (
-                                <option key={item.value} value={item.value}>{item.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
-                            Cosa va ricordato
-                            <textarea className="input-field min-h-20" value={closureNotes} onChange={(event) => { if (beginClosureDraft()) setClosureNotes(event.target.value); }} />
-                        </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
-                            Prossima azione
-                            <textarea className="input-field min-h-20" value={closureNextAction} onChange={(event) => { if (beginClosureDraft()) setClosureNextAction(event.target.value); }} />
-                        </label>
-                    </div>
-                    <Button variant={isFormOpen ? 'secondary' : closureDraftDirty ? 'primary' : 'text'}
-                        disabled={isSaving} onClick={() => void closePendingHandoff()} className="mt-3">
-                        {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                        Chiudi passaggio
-                    </Button>
-                </div>
+            {visiblePending.map((item) => <PendingHandoffClosure key={item.id} handoff={item} formOpen={isFormOpen} />)}
+            {pendingHandoffs.length > PENDING_SHOWN && !showAllPending ? (
+                <Button variant="text" className="mb-4" onClick={() => setShowAllPending(true)}>
+                    {formatCountLabel(pendingHandoffs.length - PENDING_SHOWN, 'Mostra un altro passaggio aperto', 'Mostra altri {count} passaggi aperti', { template: true })}
+                </Button>
             ) : null}
 
             <div id={formId} hidden={!isFormOpen}>
@@ -321,4 +254,88 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
         headerAction={createButton} defaultOpen={isFormOpen} keepMounted surfaceClassName={styles.therapySection}>
         {content}
     </CollapsibleSection> : content;
+}
+
+function PendingHandoffClosure({ handoff, formOpen }: { handoff: SissHandoffEvent; formOpen: boolean }) {
+    const precondition = useRef<SissHandoffWritePrecondition | null>(null);
+    const [notes, setNotes] = useState('');
+    const [nextAction, setNextAction] = useState('');
+    const [outcome, setOutcome] = useState<SissHandoffOutcome>('completed');
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const dirty = Boolean(notes || nextAction || outcome !== 'completed');
+    useRuntimeTwinPendingForm(dirty);
+
+    const beginDraft = () => {
+        try {
+            precondition.current = resolveSissHandoffDraftPrecondition(precondition.current, handoff);
+            return true;
+        } catch (draftError) {
+            setError(draftError instanceof Error ? draftError.message : 'Ricarica il diario SISS.');
+            return false;
+        }
+    };
+
+    const close = async () => {
+        setError(null);
+        setIsSaving(true);
+        try {
+            const sissPrecondition = resolveSissHandoffDraftPrecondition(precondition.current, handoff);
+            // La data di chiusura la mette il server: il momento del passaggio non dipende dall'orologio del browser.
+            await db.sissHandoffs.update(sissPrecondition.id, {
+                outcome,
+                nextAction: optionalValue(nextAction),
+                notes: optionalValue(notes),
+                updatedAt: new Date(),
+            }, { sissPrecondition });
+            precondition.current = null;
+            setNotes('');
+            setNextAction('');
+            setOutcome('completed');
+        } catch (submitError) {
+            setError(submitError instanceof Error ? submitError.message : 'Chiusura passaggio SISS non riuscita.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const title = `${handoff.moduleLabel} aperto ${formatDate(handoff.startedAt)}`;
+    return (
+        <div className={local.pending} role="group" aria-label={`Chiusura del passaggio ${title}`}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">Da chiudere</p>
+                    <h3 className="mt-1 text-sm font-semibold text-[color:var(--lume-ink)]">{title}</h3>
+                    {handoff.reason ? (
+                        <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">{handoff.reason}</p>
+                    ) : null}
+                </div>
+                <select
+                    className="input-field h-10 max-w-44" aria-label="Esito del passaggio aperto"
+                    value={outcome}
+                    onChange={(event) => { if (beginDraft()) setOutcome(event.target.value as SissHandoffOutcome); }}
+                >
+                    {OUTCOME_OPTIONS.filter((item) => item.value !== 'started').map((item) => (
+                        <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                </select>
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
+                    Cosa va ricordato
+                    <textarea className="input-field min-h-20" value={notes} onChange={(event) => { if (beginDraft()) setNotes(event.target.value); }} />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
+                    Prossima azione
+                    <textarea className="input-field min-h-20" value={nextAction} onChange={(event) => { if (beginDraft()) setNextAction(event.target.value); }} />
+                </label>
+            </div>
+            {error ? <p role="alert" className="mt-3 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p> : null}
+            <Button variant={formOpen ? 'secondary' : dirty ? 'primary' : 'text'}
+                disabled={isSaving} onClick={() => void close()} className="mt-3">
+                {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                Chiudi passaggio
+            </Button>
+        </div>
+    );
 }
