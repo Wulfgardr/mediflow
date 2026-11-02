@@ -62,7 +62,8 @@ export async function clearDrugDatabase(expectedSnapshot: string): Promise<AifaC
     if (response.status === 409 && payload?.code === 'AIFA_CATALOG_CHANGED') {
         throw new AifaCatalogChangedBeforeClear(payload.error ?? 'Catalogo AIFA modificato dopo l’ultima lettura; nessuna voce rimossa');
     }
-    if (!response.ok) throw new Error(payload?.error ?? 'Svuotamento catalogo AIFA non riuscito');
+    if (response.status === 403) throw new Error('Svuotamento catalogo AIFA non riuscito: è riservato all’amministratore. Nessuna voce rimossa.');
+    if (!response.ok) throw new Error('Svuotamento catalogo AIFA non riuscito');
     if (!payload || payload.state !== 'not-imported' || payload.count !== 0 || payload.receipt?.operation !== 'aifa-catalog-clear'
         || typeof payload.receipt.auditEventId !== 'string') {
         throw new Error('Ricevuta dello svuotamento non leggibile. Rileggi stato.');
