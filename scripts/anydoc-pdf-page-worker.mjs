@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 /* @Codex */
 import { createRequire, registerHooks } from 'node:module';
+import { channel } from 'node:diagnostics_channel';
 import { performance } from 'node:perf_hooks';
 import { writeSync, readFileSync, realpathSync, lstatSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const smokePhase = channel('mediflow.anydoc.pdf.phase');
+const phase = (value) => { if (smokePhase.hasSubscribers) smokePhase.publish(value); };
+phase('boot');
 
 const SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1';
 const MAX_HEADER_BYTES = 64 * 1024;
@@ -233,6 +238,7 @@ async function loadRenderer() {
     } catch { throw new EngineUnavailable(); }
     if (installedPdfJs !== PDFJS_VERSION || installedCanvas !== CANVAS_VERSION
         || installedProfile !== CANVAS_VERSION) throw new EngineUnavailable();
+    phase('verified');
     try {
         const [pdfjs, canvas] = await Promise.all([
             import('pdfjs-dist/legacy/build/pdf.mjs'),
@@ -240,6 +246,7 @@ async function loadRenderer() {
         ]);
         if (pdfjs.version !== PDFJS_VERSION || typeof pdfjs.getDocument !== 'function'
             || typeof canvas.createCanvas !== 'function') throw new EngineUnavailable();
+        phase('engine');
         return { getDocument: pdfjs.getDocument, createCanvas: canvas.createCanvas };
     } catch (error) {
         if (error instanceof EngineUnavailable) throw error;
@@ -313,6 +320,7 @@ async function renderPage(engine, bytes) {
         canvas = engine.createCanvas(width, height);
         task = page.render({ canvasContext: canvas.getContext('2d'), viewport, background: '#ffffff' });
         await boundedUntil(task.promise, deadline, () => task?.cancel());
+        phase('painted');
         const pngBytes = Buffer.from(canvas.toBuffer('image/png'));
         const durationMs = Math.max(0, Math.ceil(performance.now() - started));
         if (durationMs > PAGE_TIMEOUT_MS) throw new PageTimeout();
@@ -469,6 +477,7 @@ if (selfTest === '--self-test=sync-hang') {
 } else {
     try {
         const frame = decodeFrame(await readInput());
+        phase('input');
         if (frame?.header?.operation === 'recognize_tesseract') {
             const result = await recognizeTesseract(frame);
             if (result.failure) emitFailure(result.failure);
