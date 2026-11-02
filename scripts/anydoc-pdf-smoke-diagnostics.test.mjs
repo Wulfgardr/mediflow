@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
+import { runPdfSmokeChild, formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SCHEMA = 'mediflow.anydoc_pdf_child_protocol.v1';
@@ -205,4 +205,32 @@ test('real checker still exits 1 on an intentionally incomplete physical package
   assert.equal(info.completion, 'completed');
   assert.equal(info.reason, 'invalid_request');
   assert.equal(info.frame, 'worker_error');
+});
+
+
+test('smoke transport keeps phase receipts separate from the binary response', async () => {
+  const result = await runPdfSmokeChild(['--input-type=module', '--eval', `
+    import { channel } from 'node:diagnostics_channel';
+    channel('mediflow.anydoc.pdf.phase').publish('boot');
+    process.stdout.write(Buffer.from([0, 1, 255]));
+  `], { env: {}, input: Buffer.alloc(0), timeout: 1000, maxBuffer: 1024 });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.stdout, Buffer.from([0, 1, 255]));
+  assert.equal(result.stderr.length, 0);
+});
+
+test('smoke transport kills a stalled child and bounds hostile output', async () => {
+  for (const [code, expected] of [
+    ['setInterval(() => {}, 1000)', 'ETIMEDOUT'],
+    ['process.stdout.write(Buffer.alloc(4096)); setInterval(() => {}, 1000)', 'ENOBUFS'],
+    ["const {channel}=await import('node:diagnostics_channel'); channel('mediflow.anydoc.pdf.phase').publish('unsafe'); setInterval(() => {}, 1000)", 'EIO'],
+  ]) {
+    const result = await runPdfSmokeChild(['--input-type=module', '--eval', code], {
+      env: {}, input: Buffer.alloc(0), timeout: 500, maxBuffer: 1024,
+    });
+    assert.equal(result.error?.code, expected);
+    assert.notEqual(result.signal, null);
+    assert.ok(result.stdout.length <= 1024);
+  }
 });
