@@ -9,6 +9,7 @@ import { initializeWindowsSystemCommand } from './windows-system-command.mjs';
 import { readProductIdentity, probeRunningInstance } from './launcher-helpers.mjs';
 
 const windows = process.platform === 'win32';
+const FRESH_ARCHIVE_FIRST_REQUEST_MS = 60_000;
 if (windows) {
   initializeWindowsSystemCommand();
   await import('./windows-launcher-bootstrap/observe-command.mjs');
@@ -113,7 +114,10 @@ try {
   let firstGeneration, token;
   if (windows) {
     firstGeneration = await generation();
-    const health = await fetch(new URL('/api/auth/check', url), { signal: AbortSignal.timeout(8000) });
+    // The first database request creates the fresh synthetic archive. On windows-latest it took
+    // 0.8-7.3 s in 30 green runs and over 8 s twice (2 Nov 2026), while the same request after the
+    // restart, with the archive already created, stayed under 0.8 s and keeps the 8 s bound below.
+    const health = await fetch(new URL('/api/auth/check', url), { signal: AbortSignal.timeout(FRESH_ARCHIVE_FIRST_REQUEST_MS) });
     assert.equal(health.status, 200); assert.equal((await health.json()).db.state, 'ready');
     token = crypto.randomUUID(); integrity.committedArchiveProbe(data, token, true);
   }
