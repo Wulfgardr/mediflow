@@ -9,7 +9,7 @@ import rendererProfiles from '../../../scripts/anydoc-pdf-renderer-profiles.json
 import tesseractArtifacts from '../../../scripts/anydoc-tesseract-artifacts.json' with { type: 'json' };
 
 export const ANYDOC_PDF_CHILD_PROTOCOL_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1' as const;
-export const ANYDOC_PDF_CHILD_WORKER_SHA256 = '438a8a5c417abbdc7268888a4202c4bad112089425cf5dfda952e9981844d9ae' as const;
+export const ANYDOC_PDF_CHILD_WORKER_SHA256 = '117a18131c8371f1a173b84fcfedd9308f4fdb3b1e0c5fc215fe64a58fdf38c8' as const;
 export const ANYDOC_PDF_CHILD_JOB_TIMEOUT_MS = 30_000;
 export const ANYDOC_PDF_CHILD_MAX_HEADER_BYTES = 64 * 1024;
 export const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = DOCUMENT_CHILD_HEAP_MB;

@@ -11,7 +11,7 @@ import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SCHEMA = 'mediflow.anydoc_pdf_child_protocol.v1';
-const WORKER_HASH = '438a8a5c417abbdc7268888a4202c4bad112089425cf5dfda952e9981844d9ae';
+const WORKER_HASH = '117a18131c8371f1a173b84fcfedd9308f4fdb3b1e0c5fc215fe64a58fdf38c8';
 const SENTINEL = 'SYNTHETIC_PRIVATE_FIELD_NOT_FOR_DIAGNOSTICS';
 // Match the production runner's explicit test-data rule before invoking any child.
 if (!process.env.MEDIFLOW_DATA_DIR?.trim()) {
@@ -205,4 +205,53 @@ test('real checker still exits 1 on an intentionally incomplete physical package
   assert.equal(info.completion, 'completed');
   assert.equal(info.reason, 'invalid_request');
   assert.equal(info.frame, 'worker_error');
+});
+
+test('real PDF renderer does not enumerate host fonts and preserves graphics', {
+  skip: !JSON.parse(fs.readFileSync(path.join(root, 'scripts', 'anydoc-pdf-renderer-profiles.json'), 'utf8'))
+    .some(profile => profile.platform === process.platform && profile.arch === process.arch),
+}, async () => {
+  const { PDFDocument, rgb } = await import('pdf-lib');
+  const document = await PDFDocument.create();
+  const page = document.addPage([144, 72]);
+  page.drawRectangle({ x: 4, y: 4, width: 20, height: 20, color: rgb(0, 0, 0) });
+  const pdf = Buffer.from(await document.save({ useObjectStreams: false }));
+  const request = frame({ schemaVersion: SCHEMA, operation: 'render',
+    pages: [{ page: 1, byteLength: pdf.length }], bodyByteLength: pdf.length }, pdf);
+  const hook = `const dlopen = process.dlopen;
+    process.dlopen = function(module, ...args) {
+      const result = Reflect.apply(dlopen, this, [module, ...args]);
+      for (const name of ['loadSystemFonts', 'loadFontsFromDir']) {
+        if (module.exports.GlobalFonts) module.exports.GlobalFonts[name] = () => { throw Error('HOST_FONT_ENUMERATION_FORBIDDEN'); };
+      }
+      return result;
+    };`;
+  const worker = path.join(root, 'scripts', 'anydoc-pdf-page-worker.mjs');
+  const options = { cwd: root, env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
+    input: request, timeout: 30_000, maxBuffer: 4 * 1024 * 1024, encoding: 'buffer', windowsHide: true };
+  const args = ['--max-old-space-size=256', '--permission', '--disable-warning=SecurityWarning',
+    `--allow-fs-read=${root}`, '--allow-addons'];
+  const baseline = spawnSync(process.execPath, [...args, worker], options);
+  const guarded = spawnSync(process.execPath, [...args, '--import', `data:text/javascript,${encodeURIComponent(hook)}`, worker], options);
+  for (const result of [baseline, guarded]) {
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr.length, 0);
+    const size = result.stdout.readUInt32BE(0);
+    assert.ok(size <= 65536, result.stdout.toString('utf8'));
+    assert.equal(JSON.parse(result.stdout.subarray(4, 4 + size)).status, 'rendered');
+  }
+  const body = result => result.stdout.subarray(4 + result.stdout.readUInt32BE(0));
+  assert.deepEqual(body(guarded), body(baseline), 'font enumeration cannot change the page pixels');
+  const { createCanvas, loadImage } = await import('@napi-rs/canvas');
+  const image = await loadImage(body(guarded));
+  const canvas = createCanvas(image.width, image.height);
+  const context = canvas.getContext('2d');
+  context.drawImage(image, 0, 0);
+  const pixels = context.getImageData(0, 0, image.width, image.height).data;
+  let ink = 0;
+  for (let index = 0; index < pixels.length; index += 4) {
+    if (pixels[index] < 128 && pixels[index + 1] < 128 && pixels[index + 2] < 128) ink++;
+  }
+  assert.ok(ink >= 1500, 'the synthetic rectangle must actually be painted');
 });

@@ -153,10 +153,14 @@ jobs:
             # Serialize files on the shared runner; concurrency inside those tests stays intact.
             node scripts/run-strip-types.mjs --test --test-concurrency=1 lib/sqlite-durability.test.ts lib/sqlite-maintenance-admission.test.ts lib/sqlite-swap-recovery.test.ts lib/sqlite-repair.test.ts lib/backup-total-roundtrip.test.ts lib/scheduled-backup-runtime-contract.test.ts lib/backup-scheduler-route.test.ts lib/backup-scheduler.test.ts lib/recovery-backup.test.ts
             if ($LASTEXITCODE -ne 0) { throw 'Windows SQLite durability and recovery tests failed' }
+            node --test --test-name-pattern='does not enumerate host fonts' scripts/anydoc-pdf-smoke-diagnostics.test.mjs
+            if ($LASTEXITCODE -ne 0) { throw 'PDF renderer host font independence test failed' }
           } finally {
             Remove-Item -LiteralPath $fixture -Recurse -Force
           }
       - name: Unified launcher smoke (first build and verified boot)
+        env:
+          MEDIFLOW_PDF_SMOKE_TIMINGS: '1'
         run: node scripts/ci-start-smoke.mjs
 
   static-checks:

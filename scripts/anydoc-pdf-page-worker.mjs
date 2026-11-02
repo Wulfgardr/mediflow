@@ -233,6 +233,7 @@ async function loadRenderer() {
     } catch { throw new EngineUnavailable(); }
     if (installedPdfJs !== PDFJS_VERSION || installedCanvas !== CANVAS_VERSION
         || installedProfile !== CANVAS_VERSION) throw new EngineUnavailable();
+    process.env.DISABLE_SYSTEM_FONTS_LOAD = '1';
     try {
         const [pdfjs, canvas] = await Promise.all([
             import('pdfjs-dist/legacy/build/pdf.mjs'),

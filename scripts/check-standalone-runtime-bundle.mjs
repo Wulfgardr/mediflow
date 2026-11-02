@@ -79,7 +79,7 @@ class PdfPageWorkerSmokeError extends Error {}
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
-const ANYDOC_PDF_PAGE_WORKER_SHA256 = '438a8a5c417abbdc7268888a4202c4bad112089425cf5dfda952e9981844d9ae';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = '117a18131c8371f1a173b84fcfedd9308f4fdb3b1e0c5fc215fe64a58fdf38c8';
 const ANYDOC_PDF_CHILD_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1';
 const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
 const ANYDOC_LOCAL_EXTRACTION_ROUTE_DIRECTORY = path.join(
@@ -315,7 +315,8 @@ function runPdfChild(workerPath, input, { allowAddons = false, args = [] } = {})
     workerPath,
     ...args,
   ];
-  return spawnSync(process.execPath, runtimeArguments, {
+  const started = performance.now();
+  const result = spawnSync(process.execPath, runtimeArguments, {
     cwd: path.dirname(workerPath),
     env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
     input,
@@ -324,6 +325,12 @@ function runPdfChild(workerPath, input, { allowAddons = false, args = [] } = {})
     maxBuffer: 4 * 1024 * 1024,
     windowsHide: true,
   });
+  if (process.env.MEDIFLOW_PDF_SMOKE_TIMINGS === '1') {
+    console.log(JSON.stringify({ type: 'pdf-smoke-timing', stage: allowAddons ? 'render' : 'materialize',
+      elapsedMs: Math.round(performance.now() - started), status: result.status,
+      signal: result.signal, error: result.error?.code ?? null }));
+  }
+  return result;
 }
 
 /* follow the pinned worker's desktop profiles and minimum glibc version.
