@@ -84,10 +84,29 @@ function listed(ids: Seeded) {
     return itemRows(ids).map((row) => ({ id: row.id, version: row.version }));
 }
 
-test('every pair of states is accepted or refused on the server exactly as the table says', async () => {
+/*
+ * La decisione del 1/11/2026 (WUL-800) scritta qui per esteso, separata dalla
+ * costante del prodotto: se la tabella cambia senza che cambi la decisione,
+ * questo test se ne accorge.
+ */
+const DECIDED_TRANSITIONS = new Set([
+    'prescribed>booked', 'prescribed>performed', 'prescribed>report_received', 'prescribed>cancelled',
+    'booked>performed', 'booked>report_received', 'booked>cancelled', 'booked>prescribed',
+    'performed>report_received', 'performed>booked',
+    'report_received>performed',
+    'cancelled>prescribed',
+]);
+
+test('the product table is exactly the decided one', () => {
+    const product = new Set(Object.entries(SERVICE_PRESCRIPTION_TRANSITIONS)
+        .flatMap(([from, targets]) => targets.map((to) => `${from}>${to}`)));
+    assert.deepEqual([...product].sort(), [...DECIDED_TRANSITIONS].sort());
+});
+
+test('every pair of states is accepted or refused on the server exactly as decided', async () => {
     for (const from of SERVICE_PRESCRIPTION_STATUSES) {
         for (const to of SERVICE_PRESCRIPTION_STATUSES) {
-            const expected = from === to || SERVICE_PRESCRIPTION_TRANSITIONS[from].includes(to);
+            const expected = from === to || DECIDED_TRANSITIONS.has(`${from}>${to}`);
             assert.equal(isServicePrescriptionTransitionAllowed(from, to), expected, `${from} -> ${to}`);
 
             const parent = seed(from);
@@ -170,6 +189,45 @@ test('a failure on the second item rolls back the prescription and the first ite
             { version: 3, status: 'booked', scheduledAt: '2026-06-01T10:00:00.000Z', items: listed(ids) }));
     } finally {
         sql.exec('DROP TRIGGER synthetic_second_item_fault');
+    }
+    assert.deepEqual({ parent: parentRow(ids), items: itemRows(ids), audit: auditCount(ids) }, before);
+});
+
+test('the items list must name each current item once; a stale item blocks even if it would not move', async () => {
+    const duplicated = seed('prescribed', ['prescribed', 'prescribed']);
+    const [first] = listed(duplicated);
+    const duplicatedResult = await writer.updateHostServicePrescription({ ...host, id: duplicated.prescriptionId },
+        { version: 3, status: 'booked', items: [first, first] });
+    assert.equal(duplicatedResult.value.code, 'service_prescription_items_changed');
+
+    const stale = seed('prescribed', ['prescribed', 'cancelled']);
+    const staleList = listed(stale).map((item, index) => index === 1 ? { ...item, version: 1 } : item);
+    const staleResult = await writer.updateHostServicePrescription({ ...host, id: stale.prescriptionId },
+        { version: 3, status: 'booked', items: staleList });
+    assert.equal(staleResult.value.code, 'VERSION_CONFLICT');
+
+    for (const ids of [duplicated, stale]) {
+        assert.equal(parentRow(ids).status, 'prescribed');
+        assert.equal(auditCount(ids), 0);
+    }
+
+    const empty = seed('prescribed');
+    const emptyResult = await writer.updateHostServicePrescription({ ...host, id: empty.prescriptionId },
+        { version: 3, status: 'booked', items: [] });
+    assert.equal(emptyResult.status, 200);
+    assert.equal(parentRow(empty).status, 'booked');
+});
+
+test('a refused audit during the cascade rolls back everything', async () => {
+    const ids = seed('booked', ['booked', 'booked']);
+    const before = { parent: parentRow(ids), items: itemRows(ids), audit: auditCount(ids) };
+    sql.exec(`CREATE TRIGGER synthetic_cascade_audit_fault BEFORE INSERT ON audit_events
+        WHEN NEW.subject_ref = '${ids.itemIds[1]}' BEGIN SELECT RAISE(FAIL, 'synthetic audit failure'); END`);
+    try {
+        await assert.rejects(writer.updateNetworkScopedServicePrescription({ ...paired, prescriptionId: ids.prescriptionId },
+            { version: 3, status: 'performed', items: listed(ids) }));
+    } finally {
+        sql.exec('DROP TRIGGER synthetic_cascade_audit_fault');
     }
     assert.deepEqual({ parent: parentRow(ids), items: itemRows(ids), audit: auditCount(ids) }, before);
 });
