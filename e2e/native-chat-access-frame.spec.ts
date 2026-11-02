@@ -123,7 +123,7 @@ test('receipt recovery is an explicit read using only the opaque command referen
     await expect.poll(() => page.evaluate(() => (window as unknown as { accessFixture: { calls: unknown[] } }).accessFixture.calls)).toContainEqual({ name: 'mediflow_native_access', arguments: { command: 'receipt', commandId: id } });
 });
 
-for (const outcome of ['applied', 'rejected', 'unknown'] as const) test(`booking sends no fields from the chat and shows the ${outcome} receipt without retrying`, async ({ page }) => {
+for (const outcome of ['applied', 'applied-historical', 'rejected', 'unknown'] as const) test(`booking sends no fields from the chat and shows the ${outcome} receipt without retrying`, async ({ page }) => {
     const frame = page.frameLocator('#access');
     await frame.getByRole('button', { name: 'Prenota controllo' }).click();
     await expect(frame.getByRole('status')).toContainText('Scegli data e ora e conferma con PIN nella finestra MediFlow');
@@ -133,9 +133,13 @@ for (const outcome of ['applied', 'rejected', 'unknown'] as const) test(`booking
         const fixture = (window as unknown as { accessFixture: { status: string; receipt: unknown } }).accessFixture;
         fixture.status = outcome === 'unknown' ? 'uncertain' : outcome; fixture.receipt = { commandId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', outcome };
     }, outcome);
-    const expected = { applied: 'Controllo prenotato e auditato', rejected: 'Conflitto di versione dell’agenda: nessun controllo prenotato', unknown: 'Esito ignoto: rileggi la ricevuta, senza ripetere la prenotazione' }[outcome];
+    const expected = { applied: 'Controllo prenotato e auditato', 'applied-historical': 'Controllo presente in agenda, da un archivio ripristinato', rejected: 'Conflitto di versione dell’agenda: nessun controllo prenotato', unknown: 'Esito ignoto: rileggi la ricevuta, senza ripetere la prenotazione' }[outcome];
     await expect(frame.locator('#therapy-receipt')).toContainText(expected);
     if (outcome === 'rejected') await expect(frame.getByRole('status')).toContainText('l’agenda è cambiata prima della conferma');
+    if (outcome === 'applied-historical') {
+        await expect(frame.getByRole('status')).toContainText('ricevuta di audit originale non è disponibile');
+        await expect(frame.locator('body')).not.toContainText('auditato');
+    }
     await expect(frame.getByRole('region', { name: 'Scheda sintetica' })).toBeHidden();
     const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: Record<string, unknown> }[] } }).accessFixture.calls);
     const bookings = calls.filter(c => c.arguments.command === 'booking');

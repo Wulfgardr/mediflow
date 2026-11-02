@@ -148,6 +148,16 @@ impl ChatAccess {
     }
 }
 
+fn booking_omitted_notice(omitted: u64) -> String {
+    if omitted == 1 {
+        "Mostrati i 20 controlli più vicini a oggi. Un altro controllo futuro non è in elenco: lo trovi nella cartella.".into()
+    } else {
+        format!(
+            "Mostrati i 20 controlli più vicini a oggi. Altri {omitted} controlli futuri non sono in elenco: li trovi nella cartella."
+        )
+    }
+}
+
 /// Local date, time and state of each checkup the booking view read; no titles or notes.
 fn booking_agenda_lines(agenda: &mediflow_runtime_client::ChatBookingView) -> Vec<String> {
     agenda
@@ -597,15 +607,15 @@ impl ClinicalApp {
             .when_some(therapy, |mut el, (target, rows, selected, result, booking)| {
                 if let Some(booking) = booking {
                     if let Some(agenda) = booking.agenda.as_ref() {
-                        el = el.child(text!("Agenda della cartella, letta all’apertura").with_id("native-chat-booking-agenda-title"));
+                        el = el.child(text!("Controlli da oggi in avanti, letti all’apertura").with_id("native-chat-booking-agenda-title"));
                         if agenda.rows.is_empty() {
-                            el = el.child(notice("native-chat-booking-agenda-empty", "Nessun controllo in agenda per questa cartella.", theme, false));
+                            el = el.child(notice("native-chat-booking-agenda-empty", "Nessun controllo da oggi in avanti per questa cartella.", theme, false));
                         }
                         for (index, line) in booking_agenda_lines(agenda).into_iter().enumerate() {
                             el = el.child(text!(line).with_id(format!("native-chat-booking-agenda-{index}")));
                         }
-                        if agenda.truncated {
-                            el = el.child(notice("native-chat-booking-agenda-truncated", "Mostrati i primi 20 controlli per data; l’agenda completa è nella cartella.", theme, false));
+                        if agenda.omitted > 0 {
+                            el = el.child(notice("native-chat-booking-agenda-truncated", booking_omitted_notice(agenda.omitted), theme, false));
                         }
                     }
                     if let Some(chosen) = booking.chosen {

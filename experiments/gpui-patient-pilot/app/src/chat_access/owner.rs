@@ -782,20 +782,30 @@ pub(crate) fn prepare_card(pending: &Pending) {
             Some((t.selected.as_ref()?.1.clone(), t.is_booking()))
         });
         if let Some((id, booking)) = recovery {
-            // The owning route comes from the button, then from the stored reference; an unknown
-            // reference is asked of the granted routes, never answered by an unrelated one.
+            // The stored kind owns the reference; the button only names it when nothing is stored.
+            // A booking reread of a reference stored as another kind asks no route and stays uncertain,
+            // so the other route's marker is neither read nor removed here.
             let stored = pending.lock().ok().and_then(|p| p.references.kind(&id));
-            let kind = booking.then_some(ChatWriteKind::CheckupBooking).or(stored);
-            let recovery = session.chat_write_recovery_for(&context, &id, kind);
+            let button = booking.then_some(ChatWriteKind::CheckupBooking);
+            let kind = stored.or(button);
+            let mismatch =
+                matches!((stored, button), (Some(stored), Some(button)) if stored != button);
+            let recovery = if mismatch {
+                Err(mediflow_runtime_client::RuntimeError::Forbidden)
+            } else {
+                session.chat_write_recovery_for(&context, &id, kind)
+            };
             if let Ok(mut p) = pending.lock() {
                 if p.status() != State::Preparing {
                     return;
                 }
                 p.recovery = recovery.ok();
-                let _ = match kind {
-                    Some(kind) => p.references.remember_kind(&id, kind),
-                    None => p.references.remember(&id),
-                };
+                if !mismatch {
+                    let _ = match kind {
+                        Some(kind) => p.references.remember_kind(&id, kind),
+                        None => p.references.remember(&id),
+                    };
+                }
                 p.reconcile_therapy();
             }
             return;
@@ -1209,7 +1219,7 @@ pub(crate) mod tests {
                             200,
                             json!({"viewId":"bbbbbbbb-aaaa-4aaa-8aaa-aaaaaaaaaaaa","agendaRevision":"7".repeat(64),
                                 "rows":if state == 9 {json!([{"date":"2026-11-15T09:00:00.000Z","status":"pending","title":"testo libero"}])} else {json!([{"date":"2026-11-15T09:00:00.000Z","status":"pending"},{"date":"2026-10-01T08:30:00.000Z","status":"completed"}])},
-                                "truncated":false}),
+                                "omitted":3}),
                         ),
                         "preview" => {
                             let c = &body["command"];
@@ -1242,6 +1252,10 @@ pub(crate) mod tests {
                             (200, json!({"outcome":"applied"}))
                         }
                         "receipt" if state == 4 => (200, terminal("applied")),
+                        "receipt" if state == 10 => (
+                            200,
+                            json!({"outcome":"terminal", "receipt":{"outcome":"applied","historical":true},"current":null}),
+                        ),
                         "receipt" if state == 8 => (200, terminal("rejected")),
                         "receipt" => (200, json!({"outcome":"unknown"})),
                         "revoke" => (
@@ -1825,6 +1839,7 @@ pub(crate) mod tests {
             let booking = p.therapy().unwrap().booking.as_ref().unwrap();
             let agenda = booking.agenda.as_ref().unwrap();
             assert_eq!(agenda.revision, "7".repeat(64));
+            assert_eq!(agenda.omitted, 3);
             assert_eq!(
                 agenda.rows,
                 [
@@ -1934,6 +1949,44 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn booking_reread_never_reads_or_removes_a_reference_stored_as_therapy() {
+        let (session, _host) = native_session();
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        let (a, _remote) = UnixStream::pair().unwrap();
+        let pending = Request::for_booking_receipt(Peer::test_peer(), a, BOOKED).unwrap();
+        assert!(pending.lock().unwrap().bind(session, context));
+        let references = pending.lock().unwrap().references.clone();
+        references
+            .remember_kind(BOOKED, ChatWriteKind::TherapyStatus)
+            .unwrap();
+        prepare_card(&pending);
+        assert_eq!(
+            pending.lock().unwrap().status(),
+            State::Write(ChatWriteResolution::Uncertain)
+        );
+        assert_eq!(references.pending().unwrap(), [BOOKED]);
+        assert_eq!(references.kind(BOOKED), Some(ChatWriteKind::TherapyStatus));
+    }
+
+    #[test]
+    fn restored_booking_without_its_audit_is_read_as_historical_not_audited() {
+        let (session, host) = native_session();
+        host.state.store(10, Ordering::Release);
+        let historical = State::Write(ChatWriteResolution::Confirmed(
+            ChatWriteOutcome::AppliedHistorical,
+        ));
+        assert_eq!(
+            card_receipt(&session, Some(ChatWriteKind::CheckupBooking)),
+            historical
+        );
+        assert!(
+            !ChatWriteResolution::Confirmed(ChatWriteOutcome::AppliedHistorical)
+                .message()
+                .contains("auditat")
+        );
+    }
+
+    #[test]
     fn restart_recovery_uses_the_stored_route_and_skips_a_route_the_client_was_never_granted() {
         let (session, host) = native_session();
         let recover = |kind| {
@@ -1943,11 +1996,22 @@ pub(crate) mod tests {
                 .reconcile()
         };
         let retired = ChatWriteResolution::Confirmed(ChatWriteOutcome::Retired);
-        for grant in [1, 2, 3] {
+        for grant in [1, 2] {
             host.grants.store(grant, Ordering::Release);
             session.refresh_capabilities().unwrap();
             assert_eq!(recover(None), retired, "grant {grant}");
         }
+        // Announced but refused by the host: the refusing route may own the command, so a
+        // "no command" from the other route is not a retirement.
+        host.grants.store(3, Ordering::Release);
+        session.refresh_capabilities().unwrap();
+        assert_eq!(recover(None), ChatWriteResolution::Uncertain);
+        host.state.store(4, Ordering::Release);
+        assert_eq!(
+            recover(None),
+            ChatWriteResolution::Confirmed(ChatWriteOutcome::Applied)
+        );
+        host.state.store(0, Ordering::Release);
         host.grants.store(1, Ordering::Release);
         session.refresh_capabilities().unwrap();
         assert_eq!(recover(Some(ChatWriteKind::CheckupBooking)), retired);

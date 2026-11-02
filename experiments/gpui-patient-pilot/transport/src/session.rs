@@ -75,12 +75,14 @@ impl AmbulatoryCommandContext {
         self.context.cancel();
     }
 }
-/// Agenda seen in the native booking window: (RFC 3339 date, state) rows and the opaque revision.
+/// Agenda seen in the native booking window: upcoming (RFC 3339 date, state) rows, nearest first,
+/// and the opaque revision of the whole set.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChatBookingView {
     pub revision: String,
     pub rows: Vec<(String, String)>,
-    pub truncated: bool,
+    /// Upcoming checkups beyond the listed ones; the revision still covers the whole set.
+    pub omitted: u64,
     pub view_id: String,
 }
 #[derive(Clone)]
@@ -118,14 +120,24 @@ impl ChatWriteRecovery {
         )
     }
     fn confirmed(&self) -> Result<(Option<ChatWriteKind>, ChatWriteOutcome)> {
-        // An untyped reference probes several routes: a 403 on one of them says nothing about the
-        // command and must not keep the other route from settling it.
+        // An untyped reference probes several routes. A 403 on one of them is skipped only when another
+        // route actually finds the command; if the others answer "no command", the outcome stays uncertain,
+        // because the refusing route may own it.
         let probing = self.kinds.len() > 1;
+        let mut refused = false;
         for &kind in &self.kinds {
             if let Ok(receipt) = self.call(kind, "receipt", crate::http::JSON_LIMIT) {
                 match receipt["outcome"].as_str() {
                     Some("terminal") => {
-                        return Ok((Some(kind), Self::outcome(&receipt["receipt"])?));
+                        let outcome = match Self::outcome(&receipt["receipt"])? {
+                            ChatWriteOutcome::Applied
+                                if receipt["receipt"]["historical"] == true =>
+                            {
+                                ChatWriteOutcome::AppliedHistorical
+                            }
+                            outcome => outcome,
+                        };
+                        return Ok((Some(kind), outcome));
                     }
                     Some("unknown") => {}
                     _ => return Err(RuntimeError::InvalidResponse),
@@ -135,7 +147,10 @@ impl ChatWriteRecovery {
         let mut admitted = None;
         for &kind in &self.kinds {
             let result = match self.call(kind, "revoke", 4096) {
-                Err(error) if probing && error.status_code() == Some(403) => continue,
+                Err(error) if probing && error.status_code() == Some(403) => {
+                    refused = true;
+                    continue;
+                }
                 other => other?,
             };
             if result.as_object().is_none_or(|o| o.len() != 1) {
@@ -148,6 +163,7 @@ impl ChatWriteRecovery {
             admitted.get_or_insert(kind);
         }
         match admitted {
+            Some(_) if refused => Err(RuntimeError::Forbidden),
             Some(kind) if !probing => Ok((Some(kind), ChatWriteOutcome::Retired)),
             Some(_) => Ok((None, ChatWriteOutcome::Retired)),
             None => Err(RuntimeError::Forbidden),
@@ -765,11 +781,11 @@ impl RuntimeSession {
                     .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
         });
         let rows = view["rows"].as_array().filter(|rows| rows.len() <= 20);
-        let (Some(view_id), Some(revision), Some(rows), Some(truncated), 4) = (
+        let (Some(view_id), Some(revision), Some(rows), Some(omitted), 4) = (
             view["viewId"].as_str(),
             revision,
             rows,
-            view["truncated"].as_bool(),
+            view["omitted"].as_u64(),
             object.len(),
         ) else {
             return Err(RuntimeError::InvalidResponse);
@@ -792,7 +808,7 @@ impl RuntimeSession {
         Ok(ChatBookingView {
             revision: revision.to_owned(),
             rows,
-            truncated,
+            omitted,
             view_id: view_id.to_owned(),
         })
     }
