@@ -46,14 +46,18 @@ export function createTherapyOperation(input: CreateInput): Result {
 
         const duplicate = tx.select({ id: therapies.id }).from(therapies).where(eq(therapies.id, input.therapyId)).get();
         if (duplicate) return { status: 409, value: { error: 'Conflict' } };
-        const inserted = tx.insert(therapies).values(input.values).run();
+        // WUL-800: una terapia registrata già conclusa ha sempre una data di fine.
+        const values = parseTherapyStatus(input.values.status) === 'completed' && !input.values.endDate
+            ? { ...input.values, endDate: new Date() } : input.values;
+        const inserted = tx.insert(therapies).values(values).run();
         if (inserted.changes !== 1) throw new Error('Therapy create did not write exactly one row');
         writeAuditEventInTransaction(tx, {
             eventType: 'therapy.created', outcome: 'success',
             archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
             subjectType: 'therapy', subjectRef: input.therapyId,
             sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
-            redactedMetadata: { changedFields: input.changedFields, resourceVersion: 1, flags: input.audit.flags },
+            redactedMetadata: { changedFields: values === input.values || input.changedFields.includes('endDate')
+                ? input.changedFields : [...input.changedFields, 'endDate'], resourceVersion: 1, flags: input.audit.flags },
         });
         return { status: 201, value: { id: input.therapyId, version: 1 } };
     }, { behavior: 'immediate' });
@@ -79,7 +83,7 @@ export function updateTherapyOperationInTransaction(tx: Tx, input: TherapyUpdate
     const plan = planTherapyStatusChange(
         { status: parseTherapyStatus(existing.status) ?? existing.status ?? '', endDate: existing.endDate ?? null },
         { status: input.values.status ?? undefined, endDate: input.values.endDate },
-        input.occurredAt ?? input.values.updatedAt ?? new Date());
+        input.occurredAt ?? new Date());
     if (!plan.ok) return plan.denial;
     const values = plan.endDate === undefined ? input.values : { ...input.values, endDate: plan.endDate };
     const changedFields = plan.endDate === undefined || input.changedFields.includes('endDate')

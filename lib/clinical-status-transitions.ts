@@ -82,11 +82,13 @@ export function isTherapyTransitionAllowed(from: string, to: string): boolean {
 
 /**
  * Stato e data di fine di una terapia non si contraddicono (WUL-800). Passando
- * a completed resta la data indicata o già salvata, altrimenti quella del
- * passaggio, anche se la richiesta la manda vuota. A una terapia completed non
- * si può togliere la data che ha. Passando ad active la data si svuota se la
- * richiesta non ne indica una (una fine programmata resta possibile).
- * suspended non tocca la data.
+ * a completed resta la data indicata, o quella già salvata se non è futura,
+ * altrimenti quella del passaggio, anche se la richiesta la manda vuota: una
+ * fine programmata e poi anticipata si conclude oggi, come dal comando di stato.
+ * A una terapia completed non si può togliere la data che ha. Riattivando una
+ * terapia completed la data di conclusione si svuota; resta solo una nuova fine
+ * programmata, cioè una data futura. suspended e il ritorno da suspended ad
+ * active non toccano la data.
  */
 export function planTherapyStatusChange(
     saved: { status: string; endDate: Date | null },
@@ -102,8 +104,13 @@ export function planTherapyStatusChange(
         const removesEnd = saved.status === 'completed' && requested.endDate === null && saved.endDate !== null;
         return removesEnd ? { ok: false, denial: endDateRequiredDenial() } : { ok: true };
     }
-    if (to === 'completed' && !requested.endDate) return { ok: true, endDate: saved.endDate ?? now };
-    if (to === 'active' && requested.endDate === undefined) return { ok: true, endDate: null };
+    if (to === 'completed' && !requested.endDate) {
+        return { ok: true, endDate: saved.endDate && saved.endDate.getTime() <= now.getTime() ? saved.endDate : now };
+    }
+    // Apple manda sempre la data in modifica: quella vecchia di conclusione non diventa una fine programmata.
+    if (to === 'active' && saved.status === 'completed' && !(requested.endDate && requested.endDate.getTime() > now.getTime())) {
+        return { ok: true, endDate: null };
+    }
     return { ok: true };
 }
 
