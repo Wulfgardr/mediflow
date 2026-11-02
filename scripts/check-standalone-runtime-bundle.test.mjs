@@ -180,6 +180,11 @@ test('standalone checker pins and smokes the isolated PDF page worker', () => {
   assert.match(source, /symlinked PDF page worker passed/u);
 });
 
+test('standalone Windows bootstrap check rejects a loader copied as an asset and a missing prebuild', () => {
+  const result = runSelfTest('--self-test=windows-bootstrap');
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
 test('standalone Windows ICU preflight rejects missing/corrupt/nonphysical data before native entry', () => {
   const result = runSelfTest('--self-test=windows-icu');
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
