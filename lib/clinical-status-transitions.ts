@@ -65,6 +65,64 @@ export function isCheckupTransitionAllowed(from: string, to: string): boolean {
     return CHECKUP_TRANSITIONS[from as CheckupStatus].includes(to as CheckupStatus);
 }
 
+export type TherapyStatus = 'active' | 'suspended' | 'completed';
+
+/* Mai da conclusa a sospesa: una terapia conclusa si riattiva. */
+export const THERAPY_TRANSITIONS: Readonly<Record<TherapyStatus, readonly TherapyStatus[]>> = {
+    active: ['suspended', 'completed'],
+    suspended: ['active', 'completed'],
+    completed: ['active'],
+};
+
+export function isTherapyTransitionAllowed(from: string, to: string): boolean {
+    if (!Object.prototype.hasOwnProperty.call(THERAPY_TRANSITIONS, to)) return false;
+    if (from === to || !Object.prototype.hasOwnProperty.call(THERAPY_TRANSITIONS, from)) return true;
+    return THERAPY_TRANSITIONS[from as TherapyStatus].includes(to as TherapyStatus);
+}
+
+/**
+ * Stato e data di fine di una terapia non si contraddicono (WUL-800). Passando
+ * a completed resta la data indicata, o quella già salvata se non è futura,
+ * altrimenti quella del passaggio, anche se la richiesta la manda vuota: una
+ * fine programmata e poi anticipata si conclude oggi, come dal comando di stato.
+ * A una terapia completed non si può togliere la data che ha. Riattivando una
+ * terapia completed la data di conclusione si svuota; resta solo una nuova fine
+ * programmata, cioè una data futura. suspended e il ritorno da suspended ad
+ * active non toccano la data.
+ */
+export function planTherapyStatusChange(
+    saved: { status: string; endDate: Date | null },
+    requested: { status?: string; endDate?: Date | null },
+    now: Date,
+): { ok: true; endDate?: Date | null } | { ok: false; denial: StatusTransitionDenial | EndDateRequiredDenial } {
+    const to = requested.status;
+    if (to !== undefined && !isTherapyTransitionAllowed(saved.status, to)) {
+        return { ok: false, denial: statusTransitionDenial('therapy', saved.status, to) };
+    }
+    if (to === undefined || to === saved.status) {
+        // Senza passaggio si rifiuta solo la rimozione di una data che c'era; una riga storica resta com'è.
+        const removesEnd = saved.status === 'completed' && requested.endDate === null && saved.endDate !== null;
+        return removesEnd ? { ok: false, denial: endDateRequiredDenial() } : { ok: true };
+    }
+    if (to === 'completed' && !requested.endDate) {
+        return { ok: true, endDate: saved.endDate && saved.endDate.getTime() <= now.getTime() ? saved.endDate : now };
+    }
+    // Apple manda sempre la data in modifica: quella vecchia di conclusione non diventa una fine programmata.
+    if (to === 'active' && saved.status === 'completed' && !(requested.endDate && requested.endDate.getTime() > now.getTime())) {
+        return { ok: true, endDate: null };
+    }
+    return { ok: true };
+}
+
+export type EndDateRequiredDenial = {
+    status: 409;
+    value: { error: string; code: 'therapy_end_date_required' };
+};
+
+function endDateRequiredDenial(): EndDateRequiredDenial {
+    return { status: 409, value: { error: 'A completed therapy needs an end date', code: 'therapy_end_date_required' } };
+}
+
 export type StatusTransitionDenial = {
     status: 409;
     value: { error: string; code: 'status_transition_not_allowed'; entity: string; from: string; to: string };

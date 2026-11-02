@@ -140,8 +140,8 @@ test('therapy required-audit guard follows all eight handlers and rejects detach
         const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
         if (operation === 'create') {
             assert.notDeepEqual(validate({ coreSource: change(coreSource,
-                'const inserted = tx.insert(therapies).values(input.values).run();',
-                'const inserted = ({ run: () => ({ changes: 1 }), pending: () => tx.insert(therapies).values(input.values).run() }).run();') }), []);
+                'const inserted = tx.insert(therapies).values(values).run();',
+                'const inserted = ({ run: () => ({ changes: 1 }), pending: () => tx.insert(therapies).values(values).run() }).run();') }), []);
         }
         const source = original[sourceKey];
         assert.notDeepEqual(validate({ [sourceKey]: change(source, `mode: '${mode}'`, "mode: 'unadmitted'") }), []);

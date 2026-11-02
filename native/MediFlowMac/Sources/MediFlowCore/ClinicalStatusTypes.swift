@@ -45,6 +45,20 @@ public enum PairedTherapyStatus: String, CaseIterable, Identifiable {
             return "Conclusa"
         }
     }
+
+    /// Stati raggiungibili da questo, compreso sé stesso (WUL-800): una terapia
+    /// conclusa si riattiva, non si sospende. Il server applica la stessa tabella;
+    /// i test la confrontano con docs/domain/clinical-status-transitions.json.
+    public var allowedTargets: [PairedTherapyStatus] {
+        switch self {
+        case .active:
+            return [.active, .suspended, .completed]
+        case .suspended:
+            return [.active, .suspended, .completed]
+        case .completed:
+            return [.active, .completed]
+        }
+    }
 }
 
 /* @Codex */
