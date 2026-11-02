@@ -55,9 +55,9 @@
     "lib/sqlite-schema-open.ts": "c02714ffe295b36dd297e9417605382a41566a8d68afe67c96d99568f0c32362",
     "lib/backup-restore-executor.ts": "227af5f5806ab46a081e660b4462a628db9e3f44ecfeff30ea3e14cf9dbe03ea",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
-    "lib/clinical-status-transitions.ts": "d93b2ab7383a6733a8908a4d32ac018e734be680f301f15b11b19f7df0aaa0d2",
+    "lib/clinical-status-transitions.ts": "ea8a0df7422fc5df0163eb5e5e402096fe0fc98085c92056aa41b230f75399ef",
     "lib/status-normalization.ts": "fa2bbdeef55384ed1bf4a851f09a5d899d56e6331cde018f68f3d8a74d3a4e51",
-    "docs/domain/clinical-status-transitions.json": "b9686f2e6a7e1a270c913792b16017c5c6416d6bec1d158fa452f4aed6fb47cb"
+    "docs/domain/clinical-status-transitions.json": "ed1a8c774564a9a51b383f722add62a4a3bc79fbe44ee35d5d8649648a38805c"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
