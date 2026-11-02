@@ -394,3 +394,86 @@ Il runner completo senza opzioni mantiene cancellazione e 10 MiB nella procedura
 manuale sopra. L'inventario verifica build ottimizzata e invocazione successiva,
 senza dichiarare copertura automatica dei tre casi manuali. Restano invariati
 ambito e limiti della prova di memoria.
+
+## Appendice: consumer Web locale, 2 novembre 2026
+
+La pagina «Nuova scheda» del Web locale usa lo stesso comando, la stessa intake
+e la stessa rilettura della route nativa. `lib/native-patient-document.ts`
+espone ora `createPatientDocumentIntake`, parametrizzata dalla porta host;
+la route nativa la compone con l'host nativo esistente, senza cambiare
+operazioni, limiti o risposte. `POST /api/patients/document-create` la compone
+con un host Web: stesse operazioni chiuse `stage`, `preview`, `execute`,
+`receipt`, `revoke`, stesso limite di 10 MiB, stessa verifica ENC2 dei byte
+prima di AnyDoc e OCR locale, stessi esiti `applied`, `retired`, `unknown`.
+
+L'host Web richiede una sessione Web autentica di amministratore, la richiesta
+locale e la generazione d'archivio corrente (`archiveWriteRequestDenial`, come
+gli altri comandi Web) e l'ambulatorio selezionato, o quello predefinito, come
+il flusso di creazione esistente. La lavorazione appartiene alla generazione
+di autenticazione della sessione Web: blocco, logout, scadenza o un nuovo login
+la ritirano tramite il disposer del proprietario delle sessioni; il cambio di
+ambulatorio la ritira tramite l'epoca del contesto documento. La conferma
+verifica il PIN dell'operatore con `verifyHostCredentials`, lo stesso verificatore
+del PIN nativo, e ricontrolla sessione e archivio prima e dopo. La biometria
+non è collegata.
+
+Il formato prodotto dal client Web è quello del client GPUI: nome e percorso
+`ENC:`, byte del PDF in ENC2 con chiave casuale per file avvolta dalla master
+key, `fileKey` inviata solo per la verifica di `stage`. La custodia in memoria
+invece è diversa: il browser azzera l'array della chiave dopo l'invio, o subito
+se la sessione si blocca durante la cifratura, ma non può azzerare la stringa
+JSON della richiesta né altre copie del motore JavaScript; non c'è un
+equivalente di `Zeroizing`. Lo stesso vale per il documento: il client azzera
+i propri array di byte (originale, JPEG ricodificato, PDF troppo grande), ma
+restano nella memoria della pagina, fino alla raccolta del motore, il `File`
+scelto, l'immagine decodificata, il blob del canvas e le copie interne di
+`pdf-lib`. Formato ENC2 e claim di cifratura invariati.
+
+Un JPEG o un PNG viene convertito nel browser in un PDF di una pagina prima
+della cifratura, così l'OCR locale delle scansioni, il tipo dell'allegato e il
+contratto del comando restano quelli già provati. L'immagine viene decodificata
+con l'orientamento EXIF applicato e ridotta, se serve, entro 4096 px per lato
+e 8 milioni di pixel. Il renderer locale ammette 12 milioni di pixel, ma rifiuta
+anche una pagina il cui PNG supera 16 MiB, e il PNG di una foto cresce con la
+grana del sensore: a 12 milioni di pixel una foto di un foglio con grana di
+luminanza σ 8 e una piccola grana di colore arriva a circa 17 MiB, a 8 milioni
+a circa 11. Una pagina A4 a 8 milioni di pixel conserva circa 290 dpi. La pagina
+misura mezzo punto per pixel, così il render a 144 dpi restituisce esattamente
+i pixel conservati. Una riduzione che lascerebbe il lato corto sotto 1200 px
+non viene fatta (su un A4 sono circa 145 dpi, vicino ai 150 dpi di solito
+considerati il minimo per l'OCR del testo corrente): l'immagine, di fatto molto
+allungata, è rifiutata con la misura. Un'immagine già piccola non viene ridotta
+e quindi non viene rifiutata. La riduzione applicata è indicata nella revisione.
+`lib/patient-document-image-geometry.test.ts` prova la geometria con la
+preflight reale su A4 a 150, 200, 300 e 600 dpi, foto da 12, 48 e 50 Mpx, una
+pagina legal a 600 dpi e uno screenshot di iPhone, e renderizza con lo stesso
+motore del worker la foto granulosa sintetica, che deve restare sotto l'80%
+dei 16 MiB.
+
+Come per il nativo, la risposta di `execute`, `receipt` e `revoke` aggiunge,
+solo per `applied`, `patientId` e `attachmentId` con
+`attachmentReadback: client-verification-required`. Il Web rilegge l'allegato,
+lo apre con la master key e confronta i byte con il documento scelto prima di
+dichiarare la scheda creata; altrimenti mostra la verifica incompleta e conserva
+il riferimento. Il riferimento del comando è conservato nel `localStorage` del
+browser, per generazione d'archivio, prima della conferma: una risposta persa
+o un ricaricamento mostrano la lavorazione da verificare invece di offrire
+una seconda creazione. Senza riferimento conservato la conferma è bloccata.
+
+La revoca senza stato RAM resta riservata al nativo paired: per il Web una
+lavorazione non più in memoria e senza terminale durevole resta `unknown`.
+Lo stesso `unknown` arriva anche quando la lavorazione appartiene a un altro
+operatore o a un altro ambulatorio (`concealForeign`): la sessione corrente non
+può distinguere i casi. La UI quindi non esclude che la scheda sia stata creata,
+dice come verificarlo nell'elenco pazienti e chiude l'avviso solo dopo una
+conferma esplicita. Il riferimento locale è conservato per generazione
+d'archivio e ambulatorio, risolto come fa il server: quello selezionato o,
+senza scelta, il predefinito, così la chiave è la stessa nei due casi. Le preparazioni simultanee sono limitate
+a due per ciascuna route. Sul Web una lavorazione ancora aperta nella stessa
+sessione e la saturazione dell'host sono rese come stati distinti (`in-progress`,
+`busy`) invece che come diniego; la route nativa continua a rispondere 403.
+
+Prove: `lib/web-patient-document.test.ts` attraversa la route con sessioni Web
+sintetiche reali, SQLite e AnyDoc reali, PIN verificato; `e2e/patient-document-create.spec.ts`
+prova nel browser il percorso felice, la risposta persa e l'annullamento su un
+archivio isolato vuoto.

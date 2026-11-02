@@ -25,20 +25,20 @@ const deny = (): never => { throw new Error('Native patient document denied'); }
 const sealed = (value: unknown): value is string => typeof value === 'string'
     && /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/u.test(value);
 type Source = { host: PatientDocumentCreateHost; viewId: string; release: () => void };
+/** Admission refused for capacity, not authority: the same session already holds a work, or the host is full.
+ * The native route keeps answering 403 as before; the Web route tells the physician which case it is. */
+export class PatientDocumentIntakeBusy extends Error {
+    constructor(readonly reason: 'session' | 'host') { super('Patient document intake busy'); }
+}
 export class NativePatientDocumentExtractionFailed extends Error {
     constructor(readonly detail: LocalExtractionFailureDetail | 'invalid_contract_input') {
         super('Native patient document extraction failed');
     }
 }
 
-/** Intake accepts bytes selected by the authenticated native client, never a URL, path or chat attachment ID.
- * The client seals the PDF; stage consumes its file key to verify the original before extraction. */
-export function createNativePatientDocumentService(database: typeof dbServer, clock: () => number = Date.now) {
-    const commands = createPatientDocumentCommandService(database, clock);
-    const sources = new Map<string, Source>();
-    let preparing = 0;
-    const reservations = new Map<object, () => void>();
-    async function host(context: NetworkWriteContext): Promise<PatientDocumentCreateHost> {
+/** Native host: paired client, native session, ambulatory and paired grants reread on every use. */
+function nativeHost(database: typeof dbServer) {
+    return async (context: NetworkWriteContext): Promise<PatientDocumentCreateHost> => {
         if (context.session.authChannel !== 'native' || context.session.role !== 'admin') return deny();
         const lifecycle = observeNativeDocumentContext(context.session, context.scopeAmbulatoryId);
         const guard = await prepareNetworkPatientCommitGuard(context, CAPABILITIES);
@@ -79,7 +79,22 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
         };
         database.transaction(tx => result.assertCurrent(tx), { behavior: 'immediate' });
         return result;
-    }
+    };
+}
+
+export function createNativePatientDocumentService(database: typeof dbServer, clock: () => number = Date.now) {
+    return createPatientDocumentIntake(database, nativeHost(database), clock);
+}
+
+/** Intake accepts bytes selected by an authenticated client, never a URL, path or chat attachment ID.
+ * The client seals the PDF; stage consumes its file key to verify the original before extraction.
+ * The host port decides which session, scope and confirmation own the work: native or local Web. */
+export function createPatientDocumentIntake<Context extends { request: Request }>(database: typeof dbServer,
+    host: (context: Context) => Promise<PatientDocumentCreateHost>, clock: () => number = Date.now) {
+    const commands = createPatientDocumentCommandService(database, clock);
+    const sources = new Map<string, Source>();
+    let preparing = 0;
+    const reservations = new Map<object, () => void>();
     function owned(owner: PatientDocumentCreateHost, commandId: string) {
         const entry = sources.get(commandId);
         if (entry && entry.host.session !== owner.session) return deny();
@@ -109,10 +124,11 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
         }, { behavior: 'immediate' });
     }
     return {
-        async stage(context: NetworkWriteContext, value: unknown) {
+        async stage(context: Context, value: unknown) {
             try {
                 const owner = await host(context);
-                if (preparing >= 2 || reservations.size >= 16 || reservations.has(owner.session)) return deny();
+                if (reservations.has(owner.session)) throw new PatientDocumentIntakeBusy('session');
+                if (preparing >= 2 || reservations.size >= 16) throw new PatientDocumentIntakeBusy('host');
                 if (!value || typeof value !== 'object' || Array.isArray(value)
                     || Object.keys(value).sort().join(',') !== 'data,fileKey,name,original,path') return deny();
                 const input = value as Record<string, unknown>;
@@ -170,14 +186,14 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
                 finally { preparing -= 1; bytes.fill(0); }
             } finally { erasePatientDocumentFileKey(value); }
         },
-        async preview(context: NetworkWriteContext, commandId: string, viewId: string, review: PatientDocumentCreateReview) {
+        async preview(context: Context, commandId: string, viewId: string, review: PatientDocumentCreateReview) {
             const owner = await host(context);
             if (owned(owner, commandId)?.viewId !== viewId) return deny();
             const result = commands.preview(owner, viewId, review);
             if (result.commandId !== commandId) return deny();
             return result;
         },
-        async execute(context: NetworkWriteContext, commandId: string, pin: string) {
+        async execute(context: Context, commandId: string, pin: string) {
             const owner = await host(context);
             const entry = owned(owner, commandId);
             if (!entry) return deny();
@@ -186,8 +202,8 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
                 return reread(owner, commandId);
             } finally { entry?.release(); }
         },
-        async receipt(context: NetworkWriteContext, commandId: string) { return reread(await host(context), commandId); },
-        async revoke(context: NetworkWriteContext, commandId: string) {
+        async receipt(context: Context, commandId: string) { return reread(await host(context), commandId); },
+        async revoke(context: Context, commandId: string) {
             const owner = await host(context);
             const entry = sources.get(commandId);
             const result = commands.revoke(owner, commandId);

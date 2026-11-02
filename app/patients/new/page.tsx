@@ -15,14 +15,12 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, FileSearch, FileSpreadsheet } from 'lucide-react'; // manual CSV entrypoint
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
-import PdfImporter from '@/components/pdf-importer';
+import PatientDocumentCreate from '@/components/patient-document-create';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import type { ExtractedPatientData } from '@/lib/pdf-service';
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import PatientDocumentImportReview from '@/components/patient-document-import-review';
 import {
-    buildPatientDocumentReviewDraft,
     type PatientDocumentReviewDraft,
     type ReviewedPatientImportDefaults,
 } from '@/lib/domain/documents/patient-document-review';
@@ -97,6 +95,7 @@ export default function NewPatientPage() {
     const confirm = useConfirm();
     const [importedData, setImportedData] = useState<ImportedPatientDraft | null>(null);
     const [pendingImportReview, setPendingImportReview] = useState<PatientDocumentReviewDraft | null>(null);
+    const [documentFlowActive, setDocumentFlowActive] = useState(false);
     const [formSeed, setFormSeed] = useState(0);
     const [importMeta, setImportMeta] = useState<{
         quality?: { level: string; reason?: string };
@@ -245,24 +244,16 @@ export default function NewPatientPage() {
                         <div className="space-y-1">
                             <p className="mf-eyebrow">Documento clinico</p>
                             <h2 className="text-lg font-semibold tracking-tight text-[color:var(--lume-ink)]">
-                                Usa un documento quando è utile
+                                Crea la scheda da un documento
                             </h2>
                             <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
-                                MediFlow propone anagrafica, diagnosi e terapie dal documento: confermi tu cosa usare.
+                                Il testo viene estratto su questo computer. Nome, cognome e codice fiscale li scrivi tu leggendolo, poi confermi
+                                con il PIN: la scheda nasce con il documento allegato. Diagnosi e terapie si aggiungono dopo, nella scheda.
                             </p>
                         </div>
                     </div>
                 </div>
-                <PdfImporter onDataExtracted={(data) => {
-                    const imported = data as ExtractedPatientData;
-                    setPendingImportReview(buildPatientDocumentReviewDraft(imported));
-                    setImportMeta({
-                        quality: imported.documentQuality,
-                        diagnosisCount: imported.reviewDiagnoses?.length || imported.diagnoses?.length || 0,
-                        medicationCount: imported.reviewTherapies?.length || imported.medications?.length || 0,
-                        reviewPending: true,
-                    });
-                }} />
+                <PatientDocumentCreate onActiveChange={setDocumentFlowActive} />
             </section>
 
             {importMeta && (
@@ -331,7 +322,7 @@ export default function NewPatientPage() {
                 </section>
             )}
 
-            <div id="dati" className="scroll-mt-40">
+            <div id="dati" className="scroll-mt-40" hidden={documentFlowActive}>
                 <PatientForm
                     onSubmit={onSubmit}
                     defaultValues={importedData || undefined}

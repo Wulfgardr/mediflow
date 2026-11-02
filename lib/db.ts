@@ -1,4 +1,4 @@
-import { openPatientDocumentFile } from './security/attachment-file-envelope';
+import { decodeBase64, encodeBase64, openPatientDocumentFile, sealPatientDocumentFile } from './security/attachment-file-envelope';
 import backupEncryptedFields from './backup-encrypted-fields.json';
 import type { ProstheticsCatalogSelection, ProstheticsSnapshot } from './reference-data/prosthetics-catalog-contract';
 // API Client Facade for SQLite Backend
@@ -966,6 +966,35 @@ class MedicalApiClient {
         const encrypted = await encryptData(value, key);
         signal.throwIfAborted();
         return `ENC:${encrypted.iv}:${encrypted.data}`;
+    }
+
+    /** Seals a document for the patient-document command: name and path as ENC, bytes as ENC2
+     * with a per-file key, plus the original the server compares before extraction. */
+    async sealPatientDocumentSource(bytes: Uint8Array<ArrayBuffer>, fileName: string) {
+        const signal = this.getSessionReadSignal(); signal.throwIfAborted();
+        const key = this.masterKey;
+        if (!key) throw new Error('Sessione bloccata.');
+        const field = async (value: string) => { const sealed = await encryptData(value, key); return `ENC:${sealed.iv}:${sealed.data}`; };
+        const [name, path, file] = await Promise.all([field(fileName), field(`uploads/${fileName}`), sealPatientDocumentFile(bytes, key)]);
+        // A lock during sealing aborts the work: the per-file key is erased before the caller loses it.
+        try { signal.throwIfAborted(); } catch (error) { file.fileKey.fill(0); throw error; }
+        return { name, path, data: file.data, fileKey: file.fileKey, original: encodeBase64(bytes) };
+    }
+
+    /** Opens the attachment named by an applied receipt with the master key. With the chosen
+     * document still in memory it compares the bytes ('matched'); after a reload it can only
+     * attest that the attachment opens as a PDF ('opened'). */
+    async verifyPatientDocumentAttachment(attachmentId: string, patientId: string, original: Uint8Array | null, signal: AbortSignal): Promise<'matched' | 'opened' | 'failed'> {
+        const attachment = await this.attachments.get(attachmentId, { signal });
+        signal.throwIfAborted();
+        if (!attachment || attachment.patientId !== patientId || typeof attachment.data !== 'string'
+            || !attachment.data.startsWith('data:application/pdf;base64,')) return 'failed';
+        const opened = decodeBase64(attachment.data.slice('data:application/pdf;base64,'.length));
+        try {
+            if (opened.subarray(0, 5).some((byte, index) => byte !== '%PDF-'.charCodeAt(index))) return 'failed';
+            if (original === null) return 'opened';
+            return opened.length === original.length && opened.every((byte, index) => byte === original[index]) ? 'matched' : 'failed';
+        } finally { opened.fill(0); }
     }
 
     async openLocalDraft(value: string): Promise<unknown> {
