@@ -2,7 +2,7 @@ use super::native::{self, Peer};
 #[cfg(all(test, target_os = "macos"))]
 use mediflow_runtime_client::ChatWriteOutcome;
 use mediflow_runtime_client::{
-    ChatAccessContext, ChatWriteRecovery, ChatWriteResolution, RuntimeSession,
+    ChatAccessContext, ChatWriteKind, ChatWriteRecovery, ChatWriteResolution, RuntimeSession,
 };
 use std::{
     os::unix::net::UnixStream,
@@ -68,8 +68,13 @@ pub(crate) struct TherapyWrite {
     pub(crate) rows: Vec<mediflow_runtime_client::Therapy>,
     pub(crate) selected: Option<(usize, String)>,
     pub(crate) result: Option<serde_json::Value>,
-    /// Agenda revision read when the booking view opened, and the instant chosen in the native window.
-    pub(crate) booking: Option<(u64, Option<String>)>,
+    /// Agenda seen when the booking view opened and the instant chosen in the native window.
+    pub(crate) booking: Option<BookingDraft>,
+}
+#[derive(Clone, Default)]
+pub(crate) struct BookingDraft {
+    pub(crate) agenda: Option<mediflow_runtime_client::ChatBookingView>,
+    pub(crate) chosen: Option<String>,
 }
 impl TherapyWrite {
     pub(crate) fn is_booking(&self) -> bool {
@@ -77,20 +82,56 @@ impl TherapyWrite {
     }
 }
 
-/// Parses the physician's local `GG/MM/AAAA HH:MM`: today or later, at most two years ahead.
-pub(crate) fn booking_instant(text: &str, now: chrono::DateTime<chrono::Local>) -> Option<String> {
-    use chrono::{Duration as Days, NaiveDateTime, TimeZone, Utc};
-    let naive = NaiveDateTime::parse_from_str(text.trim(), "%d/%m/%Y %H:%M").ok()?;
-    let local = chrono::Local.from_local_datetime(&naive).single()?;
-    let today = now.date_naive();
-    if local.date_naive() < today || local > now + Days::days(730) {
-        return None;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BookingDateError {
+    Format,
+    Range,
+    /// Skipped by the move to daylight saving time.
+    Nonexistent,
+    /// Repeated by the return to standard time.
+    Ambiguous,
+}
+impl BookingDateError {
+    pub(crate) fn message(self) -> &'static str {
+        match self {
+            Self::Format => "Scrivi data e ora come GG/MM/AAAA HH:MM.",
+            Self::Range => "Scegli una data da oggi a due anni.",
+            Self::Nonexistent => {
+                "Quest’ora non esiste: in quella notte gli orologi passano all’ora legale. Scegli un altro orario."
+            }
+            Self::Ambiguous => {
+                "Quest’ora si ripete: in quella notte gli orologi tornano all’ora solare. Scegli un altro orario."
+            }
+        }
     }
-    Some(
-        local
-            .with_timezone(&Utc)
-            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-    )
+}
+
+/// Parses the physician's local `GG/MM/AAAA HH:MM`: from today (local day) up to two years ahead.
+pub(crate) fn booking_instant(
+    text: &str,
+    now: chrono::DateTime<chrono::Local>,
+) -> Result<String, BookingDateError> {
+    booking_instant_in(text, now, &chrono::Local)
+}
+fn booking_instant_in<Tz: chrono::TimeZone>(
+    text: &str,
+    now: chrono::DateTime<Tz>,
+    zone: &Tz,
+) -> Result<String, BookingDateError> {
+    use chrono::{Duration as Days, LocalResult, NaiveDateTime, Utc};
+    let naive = NaiveDateTime::parse_from_str(text.trim(), "%d/%m/%Y %H:%M")
+        .map_err(|_| BookingDateError::Format)?;
+    let local = match zone.from_local_datetime(&naive) {
+        LocalResult::Single(local) => local,
+        LocalResult::None => return Err(BookingDateError::Nonexistent),
+        LocalResult::Ambiguous(..) => return Err(BookingDateError::Ambiguous),
+    };
+    if local.date_naive() < now.date_naive() || local > now + Days::days(730) {
+        return Err(BookingDateError::Range);
+    }
+    Ok(local
+        .with_timezone(&Utc)
+        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
 }
 pub(crate) struct ClinicalSelection {
     pub(crate) copies: std::collections::BTreeMap<usize, String>,
@@ -227,7 +268,7 @@ impl Request {
             rows: Vec::new(),
             selected: None,
             result: None,
-            booking: target.starts_with("booking").then_some((0, None)),
+            booking: target.starts_with("booking").then(BookingDraft::default),
         });
         Some(request)
     }
@@ -536,7 +577,10 @@ pub(crate) fn choose_therapy(pending: &Pending, index: usize) {
             return;
         }
         if let Ok((id, recovery)) = result {
-            if p.references.remember(&id).is_err() {
+            if p.references
+                .remember_kind(&id, ChatWriteKind::TherapyStatus)
+                .is_err()
+            {
                 p.state = State::Write(recovery.reconcile());
                 return;
             }
@@ -562,8 +606,8 @@ pub(crate) fn choose_booking(pending: &Pending, text: &str) -> bool {
         if t.selected.is_some() {
             return None;
         }
-        let instant = booking_instant(text, chrono::Local::now())?;
-        let revision = t.booking.as_ref()?.0;
+        let instant = booking_instant(text, chrono::Local::now()).ok()?;
+        let revision = t.booking.as_ref()?.agenda.as_ref()?.revision.clone();
         let view_id = t.view_id.clone()?;
         let b = p.binding.as_ref()?;
         let result = (
@@ -580,7 +624,7 @@ pub(crate) fn choose_booking(pending: &Pending, text: &str) -> bool {
         return false;
     };
     let result = session
-        .preview_chat_booking(&context, revision, &instant, &view_id)
+        .preview_chat_booking(&context, &revision, &instant, &view_id)
         .and_then(|id| {
             session
                 .chat_booking_recovery(&context, &id)
@@ -596,14 +640,19 @@ pub(crate) fn choose_booking(pending: &Pending, text: &str) -> bool {
         p.withdraw();
         return false;
     };
-    if p.references.remember(&id).is_err() {
+    if p.references
+        .remember_kind(&id, ChatWriteKind::CheckupBooking)
+        .is_err()
+    {
         p.state = State::Write(recovery.reconcile());
         return false;
     }
     p.recovery = Some(recovery);
     if let Some(t) = p.therapy.as_mut() {
         t.selected = Some((0, id));
-        t.booking = Some((revision, Some(text.trim().to_owned())));
+        if let Some(booking) = t.booking.as_mut() {
+            booking.chosen = Some(text.trim().to_owned());
+        }
     }
     p.deadline = Some((p.clock)() + CHALLENGE);
     p.state = State::Challenge;
@@ -619,7 +668,12 @@ pub(crate) fn execute_therapy(pending: &Pending, attempt: Attempt, pin: &str) ->
         let booking = t.is_booking();
         let (_, id) = t.selected.as_ref()?;
         let b = p.binding.as_ref()?;
-        p.references.remember(id).ok()?;
+        let kind = if booking {
+            ChatWriteKind::CheckupBooking
+        } else {
+            ChatWriteKind::TherapyStatus
+        };
+        p.references.remember_kind(id, kind).ok()?;
         let result = (b.session.clone(), b.context.clone(), id.clone(), booking);
         p.state = State::Consuming;
         Some(result)
@@ -728,17 +782,20 @@ pub(crate) fn prepare_card(pending: &Pending) {
             Some((t.selected.as_ref()?.1.clone(), t.is_booking()))
         });
         if let Some((id, booking)) = recovery {
-            let recovery = if booking {
-                session.chat_booking_recovery(&context, &id)
-            } else {
-                session.chat_therapy_recovery(&context, &id)
-            };
+            // The owning route comes from the button, then from the stored reference; an unknown
+            // reference is asked of the granted routes, never answered by an unrelated one.
+            let stored = pending.lock().ok().and_then(|p| p.references.kind(&id));
+            let kind = booking.then_some(ChatWriteKind::CheckupBooking).or(stored);
+            let recovery = session.chat_write_recovery_for(&context, &id, kind);
             if let Ok(mut p) = pending.lock() {
                 if p.status() != State::Preparing {
                     return;
                 }
                 p.recovery = recovery.ok();
-                let _ = p.references.remember(&id);
+                let _ = match kind {
+                    Some(kind) => p.references.remember_kind(&id, kind),
+                    None => p.references.remember(&id),
+                };
                 p.reconcile_therapy();
             }
             return;
@@ -753,9 +810,12 @@ pub(crate) fn prepare_card(pending: &Pending) {
                     return;
                 }
                 match (view, p.therapy.as_mut()) {
-                    (Ok((revision, view_id)), Some(t)) => {
-                        t.booking = Some((revision, None));
-                        t.view_id = Some(view_id);
+                    (Ok(view), Some(t)) => {
+                        t.view_id = Some(view.view_id.clone());
+                        t.booking = Some(BookingDraft {
+                            agenda: Some(view),
+                            chosen: None,
+                        });
                         p.state = State::Challenge;
                     }
                     _ => p.withdraw(),
@@ -959,6 +1019,9 @@ pub(crate) mod tests {
 
     pub(crate) struct Host {
         state: Arc<AtomicUsize>,
+        /// Paired grant of the chat write routes: 0 both, 1 checkups only, 2 therapies only,
+        /// 3 both announced by discovery while the host denies therapies.
+        grants: Arc<AtomicUsize>,
         worker: Option<std::thread::JoinHandle<()>>,
     }
     impl Drop for Host {
@@ -978,6 +1041,8 @@ pub(crate) mod tests {
         let url = format!("http://{}", listener.local_addr().unwrap());
         let state = Arc::new(AtomicUsize::new(0));
         let current = state.clone();
+        let grants = Arc::new(AtomicUsize::new(0));
+        let granted = grants.clone();
         let worker = std::thread::spawn(move || {
             let vector: Value = serde_json::from_str(include_str!(
                 "../../../../../native/contracts/crypto-golden-vectors.v3.json"
@@ -1041,7 +1106,12 @@ pub(crate) mod tests {
                 } else if first.starts_with("GET /api/v1/network/capabilities ") {
                     (
                         200,
-                        json!({"protocolVersion":"1.13.0","operatingMode":"network-home-base","capabilities":[],"hostPorts":ports}),
+                        json!({"protocolVersion":"1.13.0","operatingMode":"network-home-base","capabilities":match granted.load(Ordering::Acquire) {
+                            1 => json!([{"key":"network.replica.write-checkups","requiresPairing":true,"status":"available"}]),
+                            2 => json!([{"key":"network.replica.write-therapies","requiresPairing":true,"status":"available"}]),
+                            3 => json!([{"key":"network.replica.write-checkups","requiresPairing":true,"status":"available"},{"key":"network.replica.write-therapies","requiresPairing":true,"status":"available"}]),
+                            _ => json!([]),
+                        },"hostPorts":ports}),
                     )
                 } else if first.starts_with("GET /api/v1/network/ambulatories ") {
                     (
@@ -1087,6 +1157,12 @@ pub(crate) mod tests {
                         200,
                         json!([{"id":"therapy-a", "patientId":"patient-a", "drugName":"Synthetic medicine", "dosage":"Synthetic dose", "status":"active", "startDate":"2026-10-30", "version":1}]),
                     )
+                } else if first.starts_with("POST /api/auth/native/therapy-status ")
+                    && [1, 3].contains(&granted.load(Ordering::Acquire))
+                    || first.starts_with("POST /api/auth/native/checkup-booking ")
+                        && granted.load(Ordering::Acquire) == 2
+                {
+                    (403, json!({"status":"denied"}))
                 } else if first.starts_with("POST /api/auth/native/therapy-status ") {
                     let end = bytes.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
                     let body: Value = serde_json::from_slice(&bytes[end + 4..]).unwrap();
@@ -1131,13 +1207,15 @@ pub(crate) mod tests {
                     match body["operation"].as_str().unwrap() {
                         "open" => (
                             200,
-                            json!({"viewId":"bbbbbbbb-aaaa-4aaa-8aaa-aaaaaaaaaaaa","agendaRevision":7}),
+                            json!({"viewId":"bbbbbbbb-aaaa-4aaa-8aaa-aaaaaaaaaaaa","agendaRevision":"7".repeat(64),
+                                "rows":if state == 9 {json!([{"date":"2026-11-15T09:00:00.000Z","status":"pending","title":"testo libero"}])} else {json!([{"date":"2026-11-15T09:00:00.000Z","status":"pending"},{"date":"2026-10-01T08:30:00.000Z","status":"completed"}])},
+                                "truncated":false}),
                         ),
                         "preview" => {
                             let c = &body["command"];
                             if c.as_object().map(|o| o.len()) == Some(7)
                                 && c["protocol"] == "checkup.booking.v1"
-                                && c["expectedAgendaRevision"] == 7
+                                && c["expectedAgendaRevision"] == "7".repeat(64)
                                 && c["title"] == "Controllo"
                                 && c["patientId"] == "patient-a"
                                 && c["date"].as_str().is_some_and(|d| d.ends_with(":00.000Z"))
@@ -1210,6 +1288,7 @@ pub(crate) mod tests {
             session,
             Host {
                 state,
+                grants,
                 worker: Some(worker),
             },
         )
@@ -1697,16 +1776,40 @@ pub(crate) mod tests {
                 .single()
                 .unwrap()
         );
-        assert!(booking_instant("02/11/2026 08:00", now).is_some());
-        for invalid in [
-            "01/11/2026 09:00",
-            "03/11/2030 09:00",
-            "2026-11-03 09:00",
-            "31/02/2027 09:00",
-            "domani",
+        assert!(booking_instant("02/11/2026 08:00", now).is_ok());
+        for (invalid, error) in [
+            ("01/11/2026 23:59", BookingDateError::Range),
+            ("03/11/2030 09:00", BookingDateError::Range),
+            ("2026-11-03 09:00", BookingDateError::Format),
+            ("31/02/2027 09:00", BookingDateError::Format),
+            ("domani", BookingDateError::Format),
         ] {
-            assert!(booking_instant(invalid, now).is_none(), "{invalid}");
+            assert_eq!(booking_instant(invalid, now), Err(error), "{invalid}");
         }
+    }
+
+    #[test]
+    fn booking_names_the_daylight_saving_hour_instead_of_a_format_error() {
+        use chrono::TimeZone;
+        let zone = chrono_tz::Europe::Rome;
+        let now = zone
+            .with_ymd_and_hms(2026, 3, 1, 10, 0, 0)
+            .single()
+            .unwrap();
+        assert_eq!(
+            booking_instant_in("29/03/2026 02:30", now, &zone),
+            Err(BookingDateError::Nonexistent)
+        );
+        assert_eq!(
+            booking_instant_in("25/10/2026 02:30", now, &zone),
+            Err(BookingDateError::Ambiguous)
+        );
+        assert!(booking_instant_in("29/03/2026 03:30", now, &zone).is_ok());
+        assert!(
+            BookingDateError::Nonexistent
+                .message()
+                .contains("ora legale")
+        );
     }
 
     fn booking_request(scenario: usize) -> (Pending, UnixStream, RuntimeSession, Host) {
@@ -1717,10 +1820,20 @@ pub(crate) mod tests {
         assert!(pending.lock().unwrap().bind(session.clone(), context));
         prepare_card(&pending);
         assert_eq!(pending.lock().unwrap().status(), State::Challenge);
-        assert_eq!(
-            pending.lock().unwrap().therapy().unwrap().booking,
-            Some((7, None))
-        );
+        {
+            let p = pending.lock().unwrap();
+            let booking = p.therapy().unwrap().booking.as_ref().unwrap();
+            let agenda = booking.agenda.as_ref().unwrap();
+            assert_eq!(agenda.revision, "7".repeat(64));
+            assert_eq!(
+                agenda.rows,
+                [
+                    ("2026-11-15T09:00:00.000Z".into(), "pending".into()),
+                    ("2026-10-01T08:30:00.000Z".into(), "completed".into())
+                ]
+            );
+            assert!(booking.chosen.is_none());
+        }
         assert!(pending.lock().unwrap().begin().is_none());
         assert!(!choose_booking(&pending, "31/02/2027 09:00"));
         assert_eq!(pending.lock().unwrap().status(), State::Challenge);
@@ -1780,34 +1893,74 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn booking_reference_reads_its_outcome_after_a_restart_through_either_route() {
+    fn booking_view_with_free_text_in_the_agenda_is_withdrawn() {
         let (session, host) = native_session();
-        host.state.store(4, Ordering::Release);
-        let id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
-        assert_eq!(
-            session
-                .recover_chat_write_command("scope-a", id)
-                .unwrap()
-                .reconcile(),
-            ChatWriteResolution::Confirmed(ChatWriteOutcome::Applied)
-        );
+        host.state.store(9, Ordering::Release);
         let context = session.chat_access_context("scope-a", "patient-a").unwrap();
         let (a, _remote) = UnixStream::pair().unwrap();
-        let pending = Request::for_booking_receipt(Peer::test_peer(), a, id).unwrap();
+        let pending = Request::for_booking(Peer::test_peer(), a).unwrap();
         assert!(pending.lock().unwrap().bind(session, context));
         prepare_card(&pending);
+        assert_eq!(pending.lock().unwrap().status(), State::Withdrawn);
+    }
+
+    const BOOKED: &str = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+    fn card_receipt(session: &RuntimeSession, kind: Option<ChatWriteKind>) -> State {
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        let (a, _remote) = UnixStream::pair().unwrap();
+        let pending = Request::for_receipt(Peer::test_peer(), a, BOOKED).unwrap();
+        assert!(pending.lock().unwrap().bind(session.clone(), context));
+        if let Some(kind) = kind {
+            let p = pending.lock().unwrap();
+            p.references.remember_kind(BOOKED, kind).unwrap();
+        }
+        prepare_card(&pending);
+        pending.lock().unwrap().status()
+    }
+
+    #[test]
+    fn card_reread_of_a_booking_reference_asks_the_booking_route_not_the_therapy_one() {
+        let (session, host) = native_session();
+        host.state.store(4, Ordering::Release);
+        let applied = State::Write(ChatWriteResolution::Confirmed(ChatWriteOutcome::Applied));
         assert_eq!(
-            pending.lock().unwrap().status(),
-            State::Write(ChatWriteResolution::Confirmed(ChatWriteOutcome::Applied))
+            card_receipt(&session, Some(ChatWriteKind::CheckupBooking)),
+            applied
         );
-        host.state.store(0, Ordering::Release);
-        let (other, _host) = native_session();
-        assert_eq!(
-            other
-                .recover_chat_write_command("scope-a", id)
+        host.grants.store(1, Ordering::Release);
+        session.refresh_capabilities().unwrap();
+        assert_eq!(card_receipt(&session, None), applied);
+    }
+
+    #[test]
+    fn restart_recovery_uses_the_stored_route_and_skips_a_route_the_client_was_never_granted() {
+        let (session, host) = native_session();
+        let recover = |kind| {
+            session
+                .recover_chat_write_command("scope-a", BOOKED, kind)
                 .unwrap()
-                .reconcile(),
-            ChatWriteResolution::Confirmed(ChatWriteOutcome::Retired)
+                .reconcile()
+        };
+        let retired = ChatWriteResolution::Confirmed(ChatWriteOutcome::Retired);
+        for grant in [1, 2, 3] {
+            host.grants.store(grant, Ordering::Release);
+            session.refresh_capabilities().unwrap();
+            assert_eq!(recover(None), retired, "grant {grant}");
+        }
+        host.grants.store(1, Ordering::Release);
+        session.refresh_capabilities().unwrap();
+        assert_eq!(recover(Some(ChatWriteKind::CheckupBooking)), retired);
+        host.state.store(4, Ordering::Release);
+        assert_eq!(
+            recover(None),
+            ChatWriteResolution::Confirmed(ChatWriteOutcome::Applied)
+        );
+        host.grants.store(2, Ordering::Release);
+        session.refresh_capabilities().unwrap();
+        assert_eq!(
+            recover(Some(ChatWriteKind::CheckupBooking)),
+            ChatWriteResolution::Uncertain
         );
     }
 

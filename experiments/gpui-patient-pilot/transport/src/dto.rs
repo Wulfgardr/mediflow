@@ -461,6 +461,33 @@ mod patient_name_tests {
     }
 }
 
+/// Native chat write domain that owns a command; stored with the local reference so recovery
+/// never depends on authorization for an unrelated domain.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ChatWriteKind {
+    TherapyStatus,
+    CheckupBooking,
+}
+impl ChatWriteKind {
+    pub const ALL: [Self; 2] = [Self::TherapyStatus, Self::CheckupBooking];
+    /// Also the route segment under `/api/auth/native/`.
+    pub fn wire(self) -> &'static str {
+        match self {
+            Self::TherapyStatus => "therapy-status",
+            Self::CheckupBooking => "checkup-booking",
+        }
+    }
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|kind| kind.wire() == value)
+    }
+    /// Write capability the route admits; the discovery projection only hints at it.
+    pub fn capability(self) -> &'static str {
+        match self {
+            Self::TherapyStatus => "network.replica.write-therapies",
+            Self::CheckupBooking => "network.replica.write-checkups",
+        }
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChatWriteOutcome {
     Retired,

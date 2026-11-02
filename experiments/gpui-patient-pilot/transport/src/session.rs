@@ -1,5 +1,5 @@
 pub mod patient_document;
-use crate::{ChatWriteOutcome, ChatWriteResolution};
+use crate::{ChatWriteKind, ChatWriteOutcome, ChatWriteResolution};
 use crate::{
     account_profile::{
         ACCOUNT_PROFILE_LIMIT, ACCOUNT_PROFILE_PATH, AccountProfileRead, AccountProfileSnapshot,
@@ -75,61 +75,83 @@ impl AmbulatoryCommandContext {
         self.context.cancel();
     }
 }
-const THERAPY_STATUS_ROUTE: &str = "therapy-status";
-const CHECKUP_BOOKING_ROUTE: &str = "checkup-booking";
+/// Agenda seen in the native booking window: (RFC 3339 date, state) rows and the opaque revision.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChatBookingView {
+    pub revision: String,
+    pub rows: Vec<(String, String)>,
+    pub truncated: bool,
+    pub view_id: String,
+}
 #[derive(Clone)]
 pub struct ChatWriteRecovery {
     session: RuntimeSession,
     scope: String,
     command_id: String,
-    /// Native write routes that may own the command; a stored reference does not record which one.
-    routes: &'static [&'static str],
+    /// The owning route of a typed reference, or the granted candidates of an untyped one.
+    kinds: Vec<ChatWriteKind>,
 }
 impl ChatWriteRecovery {
     /// Idempotently retires the command or reports its already committed outcome.
     /// Receipt reading and retirement survive selection cancellation; neither can execute.
     pub fn reconcile(&self) -> ChatWriteResolution {
         self.confirmed()
-            .map(ChatWriteResolution::Confirmed)
+            .map(|(_, outcome)| ChatWriteResolution::Confirmed(outcome))
             .unwrap_or(ChatWriteResolution::Uncertain)
     }
-    fn confirmed(&self) -> Result<ChatWriteOutcome> {
-        for route in self.routes {
-            if let Ok(receipt) = self.session.request(
-                Method::POST,
-                &["api", "auth", "native", route],
-                &[],
-                Some(&self.scope),
-                Some(&json!({"operation":"receipt", "commandId":self.command_id})),
-                true,
-                crate::http::JSON_LIMIT,
-            ) {
+    /// Same as `reconcile`, also naming the route that answered with a terminal outcome.
+    pub fn reconcile_kind(&self) -> (Option<ChatWriteKind>, ChatWriteResolution) {
+        match self.confirmed() {
+            Ok((kind, outcome)) => (kind, ChatWriteResolution::Confirmed(outcome)),
+            Err(_) => (None, ChatWriteResolution::Uncertain),
+        }
+    }
+    fn call(&self, kind: ChatWriteKind, operation: &str, limit: usize) -> Result<Value> {
+        self.session.request(
+            Method::POST,
+            &["api", "auth", "native", kind.wire()],
+            &[],
+            Some(&self.scope),
+            Some(&json!({"operation":operation, "commandId":self.command_id})),
+            true,
+            limit,
+        )
+    }
+    fn confirmed(&self) -> Result<(Option<ChatWriteKind>, ChatWriteOutcome)> {
+        // An untyped reference probes several routes: a 403 on one of them says nothing about the
+        // command and must not keep the other route from settling it.
+        let probing = self.kinds.len() > 1;
+        for &kind in &self.kinds {
+            if let Ok(receipt) = self.call(kind, "receipt", crate::http::JSON_LIMIT) {
                 match receipt["outcome"].as_str() {
-                    Some("terminal") => return Self::outcome(&receipt["receipt"]),
+                    Some("terminal") => {
+                        return Ok((Some(kind), Self::outcome(&receipt["receipt"])?));
+                    }
                     Some("unknown") => {}
                     _ => return Err(RuntimeError::InvalidResponse),
                 }
             }
         }
-        for route in self.routes {
-            let result = self.session.request(
-                Method::POST,
-                &["api", "auth", "native", route],
-                &[],
-                Some(&self.scope),
-                Some(&json!({"operation":"revoke", "commandId":self.command_id})),
-                true,
-                4096,
-            )?;
+        let mut admitted = None;
+        for &kind in &self.kinds {
+            let result = match self.call(kind, "revoke", 4096) {
+                Err(error) if probing && error.status_code() == Some(403) => continue,
+                other => other?,
+            };
             if result.as_object().is_none_or(|o| o.len() != 1) {
                 return Err(RuntimeError::InvalidResponse);
             }
             let outcome = Self::outcome(&result)?;
             if outcome != ChatWriteOutcome::Retired {
-                return Ok(outcome);
+                return Ok((Some(kind), outcome));
             }
+            admitted.get_or_insert(kind);
         }
-        Ok(ChatWriteOutcome::Retired)
+        match admitted {
+            Some(kind) if !probing => Ok((Some(kind), ChatWriteOutcome::Retired)),
+            Some(_) => Ok((None, ChatWriteOutcome::Retired)),
+            None => Err(RuntimeError::Forbidden),
+        }
     }
     fn outcome(result: &Value) -> Result<ChatWriteOutcome> {
         match result["outcome"].as_str() {
@@ -663,27 +685,41 @@ impl RuntimeSession {
         scope: &str,
         command_id: &str,
     ) -> Result<ChatWriteRecovery> {
-        self.chat_write_recovery(scope, command_id, &[THERAPY_STATUS_ROUTE])
+        self.chat_write_recovery(scope, command_id, vec![ChatWriteKind::TherapyStatus])
     }
 
-    /// Recovery of a stored reference after a restart: either native write route may own it.
+    /// Recovery of a stored reference after a restart. A typed reference is read only on its
+    /// own route. An untyped one (stored before the kind was recorded) tries the routes the
+    /// discovery projection grants; with no hint at all, the therapy route, the only kind that
+    /// existed before typed references.
     pub fn recover_chat_write_command(
         &self,
         scope: &str,
         command_id: &str,
+        kind: Option<ChatWriteKind>,
     ) -> Result<ChatWriteRecovery> {
-        self.chat_write_recovery(
-            scope,
-            command_id,
-            &[THERAPY_STATUS_ROUTE, CHECKUP_BOOKING_ROUTE],
-        )
+        let kinds = match kind {
+            Some(kind) => vec![kind],
+            None => {
+                let granted: Vec<_> = ChatWriteKind::ALL
+                    .into_iter()
+                    .filter(|kind| self.can_write(kind.capability()))
+                    .collect();
+                if granted.is_empty() {
+                    vec![ChatWriteKind::TherapyStatus]
+                } else {
+                    granted
+                }
+            }
+        };
+        self.chat_write_recovery(scope, command_id, kinds)
     }
 
     fn chat_write_recovery(
         &self,
         scope: &str,
         command_id: &str,
-        routes: &'static [&'static str],
+        kinds: Vec<ChatWriteKind>,
     ) -> Result<ChatWriteRecovery> {
         validate_scope_id(scope)?;
         if command_id.len() != 36
@@ -704,35 +740,68 @@ impl RuntimeSession {
             },
             scope: scope.into(),
             command_id: command_id.into(),
-            routes,
+            kinds,
         })
     }
 
     pub fn chat_therapy_request(&self, context: &ChatAccessContext, body: &Value) -> Result<Value> {
-        self.chat_write_request(context, THERAPY_STATUS_ROUTE, body)
+        self.chat_write_request(context, ChatWriteKind::TherapyStatus, body)
     }
 
     pub fn chat_booking_request(&self, context: &ChatAccessContext, body: &Value) -> Result<Value> {
-        self.chat_write_request(context, CHECKUP_BOOKING_ROUTE, body)
+        self.chat_write_request(context, ChatWriteKind::CheckupBooking, body)
     }
 
-    /// Opens the native booking view; the agenda revision is the CAS value the booking must still match.
-    pub fn chat_booking_open(&self, context: &ChatAccessContext) -> Result<(u64, String)> {
+    /// Opens the native booking view. The agenda rows (dates and states only) are read in the same
+    /// host transaction as the opaque revision the booking must still match, so the CAS protects
+    /// exactly what the physician sees.
+    pub fn chat_booking_open(&self, context: &ChatAccessContext) -> Result<ChatBookingView> {
         self.revalidate_chat_access_context(context)?;
         let view = self.chat_booking_request(context, &json!({"operation":"open", "patientId":context.patient, "selectionEpoch":context.selection_epoch}))?;
-        match (view["viewId"].as_str(), view["agendaRevision"].as_u64()) {
-            (Some(id), Some(revision)) if view.as_object().is_some_and(|o| o.len() == 2) => {
-                Ok((revision, id.to_owned()))
-            }
-            _ => Err(RuntimeError::InvalidResponse),
-        }
+        let object = view.as_object().ok_or(RuntimeError::InvalidResponse)?;
+        let revision = view["agendaRevision"].as_str().filter(|r| {
+            r.len() == 64
+                && r.bytes()
+                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        });
+        let rows = view["rows"].as_array().filter(|rows| rows.len() <= 20);
+        let (Some(view_id), Some(revision), Some(rows), Some(truncated), 4) = (
+            view["viewId"].as_str(),
+            revision,
+            rows,
+            view["truncated"].as_bool(),
+            object.len(),
+        ) else {
+            return Err(RuntimeError::InvalidResponse);
+        };
+        let rows = rows
+            .iter()
+            .map(|row| {
+                let date = row["date"]
+                    .as_str()
+                    .filter(|d| chrono::DateTime::parse_from_rfc3339(d).is_ok());
+                let status = row["status"]
+                    .as_str()
+                    .filter(|s| ["pending", "completed", "cancelled"].contains(s));
+                match (date, status, row.as_object().map(|o| o.len())) {
+                    (Some(date), Some(status), Some(2)) => Ok((date.to_owned(), status.to_owned())),
+                    _ => Err(RuntimeError::InvalidResponse),
+                }
+            })
+            .collect::<Result<_>>()?;
+        Ok(ChatBookingView {
+            revision: revision.to_owned(),
+            rows,
+            truncated,
+            view_id: view_id.to_owned(),
+        })
     }
 
     /// `date` is the RFC 3339 instant the physician typed and saw in the native window.
     pub fn preview_chat_booking(
         &self,
         context: &ChatAccessContext,
-        revision: u64,
+        revision: &str,
         date: &str,
         view_id: &str,
     ) -> Result<String> {
@@ -752,25 +821,40 @@ impl RuntimeSession {
         Ok(command_id)
     }
 
+    /// Card reread of a reference under the bound chat context; same route choice as a restart.
+    pub fn chat_write_recovery_for(
+        &self,
+        context: &ChatAccessContext,
+        command_id: &str,
+        kind: Option<ChatWriteKind>,
+    ) -> Result<ChatWriteRecovery> {
+        self.check_chat_access_context(context)?;
+        self.recover_chat_write_command(&context.scope, command_id, kind)
+    }
+
     pub fn chat_booking_recovery(
         &self,
         context: &ChatAccessContext,
         command_id: &str,
     ) -> Result<ChatWriteRecovery> {
         self.check_chat_access_context(context)?;
-        self.chat_write_recovery(&context.scope, command_id, &[CHECKUP_BOOKING_ROUTE])
+        self.chat_write_recovery(
+            &context.scope,
+            command_id,
+            vec![ChatWriteKind::CheckupBooking],
+        )
     }
 
     fn chat_write_request(
         &self,
         context: &ChatAccessContext,
-        route: &str,
+        kind: ChatWriteKind,
         body: &Value,
     ) -> Result<Value> {
         self.check_chat_access_context(context)?;
         let result = self.request_with_profile_intent(
             Method::POST,
-            &["api", "auth", "native", route],
+            &["api", "auth", "native", kind.wire()],
             &[],
             Some(&context.scope),
             Some(body),

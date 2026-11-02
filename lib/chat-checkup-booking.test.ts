@@ -20,7 +20,7 @@ const cookies = { cookies: new Map<string, string>() };
 const cleanup = installNetworkPatientCookieFixture(data, cookies);
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server'); openDbServer();
 const { nativeProfileSelectionOwner } = load('./security/native-profile-selection-owner.ts') as typeof import('./security/native-profile-selection-owner');
-const { createChatCheckupBookingService } = load('./chat-checkup-booking.ts') as typeof import('./chat-checkup-booking');
+const { createChatCheckupBookingService, agendaRevision, parseCheckupBookingCommand } = load('./chat-checkup-booking.ts') as typeof import('./chat-checkup-booking');
 const { createCheckupOperation } = load('./checkup-write-operation.ts') as typeof import('./checkup-write-operation');
 const { issueSyntheticWebSession } = load('./security/web-auth-lifecycle-owner-test-fixture.ts') as typeof import('./security/web-auth-lifecycle-owner-test-fixture');
 const pin = ['2', '4', '6', '8'].join('');
@@ -43,10 +43,10 @@ async function fixture() {
     owner.issueSelection({ expectedEpoch: 0, patientId, ambulatoryId: scope });
     const epoch = owner.snapshotSelectionEpoch(context.session);
     const service = createChatCheckupBookingService(() => tick);
-    const { viewId, agendaRevision } = await service.open(context, patientId, epoch);
+    const view = await service.open(context, patientId, epoch);
     const command = { commandId: randomUUID(), protocol: 'checkup.booking.v1' as const, archiveGeneration: currentArchiveGeneration(), patientId,
-        expectedAgendaRevision: agendaRevision, date: tomorrow, title: 'Controllo' };
-    return { context, command, epoch, service, owner, viewId, patientId };
+        expectedAgendaRevision: view.agendaRevision, date: tomorrow, title: 'Controllo' };
+    return { context, command, epoch, service, owner, viewId: view.viewId, view, patientId };
 }
 function effects(patientId: string, commandId: string) {
     const db = dbServer.$client;
@@ -58,7 +58,8 @@ function effects(patientId: string, commandId: string) {
 
 test('booking with native preview, real PIN, shared writer, audit and receipt that survives a restart', async () => {
     const f = await fixture();
-    assert.equal(f.command.expectedAgendaRevision, 0);
+    assert.match(f.command.expectedAgendaRevision, /^[0-9a-f]{64}$/u);
+    assert.deepEqual([f.view.rows, f.view.truncated], [[], false]);
     await f.service.preview(f.context, f.command, f.epoch, f.viewId);
     const receipt = await f.service.execute(f.context, f.command.commandId, pin);
     assert.equal(receipt.outcome, 'applied'); assert.equal(receipt.resultVersion, 1); assert.equal(receipt.checkupId, f.command.commandId);
@@ -71,6 +72,7 @@ test('booking with native preview, real PIN, shared writer, audit and receipt th
     if (recovered.outcome === 'terminal') {
         assert.equal(recovered.receipt.auditEventId, receipt.auditEventId);
         assert.deepEqual(recovered.current, { version: 1, status: 'pending' });
+        assert.equal(recovered.receipt.historical, false);
     }
     assert.deepEqual(await restarted.revoke(f.context, f.command.commandId), { outcome: 'applied' });
     await assert.rejects(restarted.revoke({ ...f.context, scopeAmbulatoryId: randomUUID() }, f.command.commandId));
@@ -165,6 +167,7 @@ test('the portable backup still exports and validates after a chat booking and a
     assert.equal((await f.service.execute(f.context, f.command.commandId, pin)).outcome, 'applied');
     const stale = await fixture(); await stale.service.preview(stale.context, stale.command, stale.epoch, stale.viewId);
     const other = await stale.service.open(stale.context, stale.patientId, stale.epoch);
+    assert.equal(other.agendaRevision, stale.command.expectedAgendaRevision);
     const winner = { ...stale.command, commandId: randomUUID() };
     await stale.service.preview(stale.context, winner, stale.epoch, other.viewId);
     assert.equal((await stale.service.execute(stale.context, winner.commandId, pin)).outcome, 'applied');
@@ -183,6 +186,68 @@ test('the portable backup still exports and validates after a chat booking and a
             assert.ok((artifact.payload.auditEvents ?? []).some(row => row.requestId === id && row.sourceSurface === 'native' && row.outcome === outcome));
         }
     } finally { auth.requireSession = original; }
+});
+
+test('the native view shows the agenda read with the same revision: dates and states only, no free text', async () => {
+    const f = await fixture();
+    const db = dbServer.$client;
+    const at = (days: number) => Math.floor(Date.now() / 1000) + days * 86_400;
+    db.prepare("INSERT INTO checkups (id,patient_id,date,title,notes,status,version) VALUES (?,?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(9), 'Testo libero da non mostrare', 'ENC:a:b', 'done');
+    db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version,deleted_at) VALUES (?,?,?,?,?,1,?)").run(randomUUID(), f.patientId, at(3), 'Eliminato', 'pending', at(0));
+    db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(2), 'Altro', 'pending');
+    const view = await f.service.open(f.context, f.patientId, f.epoch);
+    assert.deepEqual(view.rows, [{ date: new Date(at(2) * 1000).toISOString(), status: 'pending' }, { date: new Date(at(9) * 1000).toISOString(), status: 'completed' }]);
+    assert.equal(view.truncated, false);
+    assert.equal(JSON.stringify(view).includes('Testo libero'), false);
+    assert.notEqual(view.agendaRevision, f.command.expectedAgendaRevision);
+    await assert.rejects(f.service.preview(f.context, f.command, f.epoch, view.viewId));
+    for (let i = 0; i < 20; i++) db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(10 + i), 'Serie', 'pending');
+    const full = await f.service.open(f.context, f.patientId, f.epoch);
+    assert.deepEqual([full.rows.length, full.truncated], [20, true]);
+});
+
+test('the revision changes when a row is replaced even if count and version sum stay equal', async () => {
+    const f = await fixture();
+    const db = dbServer.$client;
+    const insert = (id: string) => db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(id, f.patientId, Math.floor(Date.now() / 1000) + 86_400, 'Controllo', 'pending');
+    insert(randomUUID());
+    const view = await f.service.open(f.context, f.patientId, f.epoch);
+    const command = { ...f.command, expectedAgendaRevision: view.agendaRevision };
+    await f.service.preview(f.context, command, f.epoch, view.viewId);
+    db.prepare('DELETE FROM checkups WHERE patient_id=?').run(f.patientId);
+    insert(randomUUID());
+    const outcome = await f.service.execute(f.context, command.commandId, pin);
+    assert.deepEqual([outcome.outcome, outcome.reason], ['rejected', 'version_conflict']);
+    const revision = dbServer.transaction(tx => agendaRevision(tx, f.patientId), { behavior: 'immediate' });
+    assert.notEqual(revision, view.agendaRevision);
+});
+
+test('a booked row restored without its audit reads as applied, never as retired', async () => {
+    const f = await fixture();
+    dbServer.$client.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(f.command.commandId, f.patientId, Math.floor(Date.now() / 1000) + 86_400, 'Controllo', 'pending');
+    const restarted = createChatCheckupBookingService(() => tick);
+    const recovered = await restarted.receipt(f.context, f.command.commandId);
+    assert.equal(recovered.outcome, 'terminal');
+    if (recovered.outcome === 'terminal') assert.deepEqual([recovered.receipt.outcome, recovered.receipt.historical, recovered.receipt.auditEventId], ['applied', true, null]);
+    assert.deepEqual(await restarted.revoke(f.context, f.command.commandId), { outcome: 'applied' });
+    await assert.rejects(restarted.revoke({ ...f.context, scopeAmbulatoryId: randomUUID() }, f.command.commandId));
+});
+
+test('a receipt imported by a restore is marked historical', async () => {
+    const f = await fixture(); await f.service.preview(f.context, f.command, f.epoch, f.viewId);
+    const receipt = await f.service.execute(f.context, f.command.commandId, pin);
+    dbServer.$client.prepare("INSERT INTO portable_import_origins (kind,ref,import_event_id,origin) VALUES ('audit',?,?,'imported')").run(receipt.auditEventId, receipt.auditEventId);
+    const recovered = await createChatCheckupBookingService(() => tick).receipt(f.context, f.command.commandId);
+    assert.equal(recovered.outcome === 'terminal' && recovered.receipt.historical, true);
+});
+
+test('dates are accepted from the start of the local day, not from 24 hours earlier', () => {
+    const now = new Date(); now.setHours(10, 0, 0, 0);
+    const local = (days: number, hours: number) => { const at = new Date(now); at.setDate(at.getDate() + days); at.setHours(hours, 0, 0, 0); return at.toISOString(); };
+    const command = { commandId: randomUUID(), protocol: 'checkup.booking.v1', archiveGeneration: currentArchiveGeneration(), patientId: 'p', expectedAgendaRevision: 'a'.repeat(64), title: 'Controllo' };
+    assert.ok(parseCheckupBookingCommand({ ...command, date: local(0, 8) }, now.getTime()));
+    assert.equal(parseCheckupBookingCommand({ ...command, date: local(-1, 20) }, now.getTime()), null);
+    assert.equal(parseCheckupBookingCommand({ ...command, date: local(0, 9), expectedAgendaRevision: 7 }, now.getTime()), null);
 });
 
 test.after(() => { cleanup(); dbServer.$client.close(); });

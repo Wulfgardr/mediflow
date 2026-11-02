@@ -2,7 +2,8 @@ import 'server-only';
 /* C-9b: confirmed chat booking of an internal checkup. Same one-shot native approval, PIN and selection
    binding as the chat therapy command; the shared checkup writer owns admission, insert and audit.
    The durable receipt is the audit row keyed by the commandId, so backup and restore carry it with the agenda. */
-import { and, eq, sql } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { createNativeChatWriteApprovals } from './native-chat-write-approval';
 import { dbServer } from './db-server';
 import { auditEvents, checkups, patientsToAmbulatories } from './schema';
@@ -15,6 +16,8 @@ import type { PairedNativeSession } from './security/paired-native-session';
 import { writeAuditEventInTransaction } from './security/audit';
 import { createCheckupOperation } from './checkup-write-operation';
 import { COMMAND_UUID } from './therapy-status-command-contract';
+import { auditOrigin } from './backup-import-provenance';
+import { normalizeCheckupStatus } from './status-normalization';
 
 export const CHECKUP_BOOKING_PROTOCOL = 'checkup.booking.v1' as const;
 export const CHECKUP_BOOKING_TITLE = 'Controllo';
@@ -22,15 +25,19 @@ const FLAGS = ['auth:paired-client', 'chat:checkup-booking'];
 const CAPABILITIES = ['network.replica.readonly-checkups', 'network.replica.write-checkups', 'network.replica.readonly-patients'] as const;
 const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00(?:\.000)?(?:Z|[+-]\d{2}:\d{2})$/u;
 const DAY = 86_400_000;
+const AGENDA_ROWS = 20;
+const REVISION = /^[0-9a-f]{64}$/u;
 
 export type CheckupBookingCommand = {
     commandId: string; protocol: typeof CHECKUP_BOOKING_PROTOCOL; archiveGeneration: string;
-    patientId: string; expectedAgendaRevision: number; date: string; title: string;
+    patientId: string; expectedAgendaRevision: string; date: string; title: string;
 };
 export type CheckupBookingReceipt = {
-    commandId: string; protocol: typeof CHECKUP_BOOKING_PROTOCOL; actorRef: string;
-    outcome: 'applied' | 'rejected'; reason: 'version_conflict' | null; committedAt: number;
-    checkupId: string | null; resultVersion: 1 | null; auditEventId: string;
+    commandId: string; protocol: typeof CHECKUP_BOOKING_PROTOCOL; actorRef: string | null;
+    outcome: 'applied' | 'rejected'; reason: 'version_conflict' | null; committedAt: number | null;
+    checkupId: string | null; resultVersion: 1 | null; auditEventId: string | null;
+    /* imported by a restore, or a booked row whose audit did not travel with it: a past archive's outcome. */
+    historical: boolean;
 };
 type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 export class CheckupBookingDenied extends Error { constructor() { super('Checkup booking denied'); } }
@@ -46,35 +53,56 @@ export function parseCheckupBookingCommand(value: unknown, now: number): Checkup
         || typeof v.commandId !== 'string' || !COMMAND_UUID.test(v.commandId)
         || typeof v.archiveGeneration !== 'string' || !COMMAND_UUID.test(v.archiveGeneration)
         || typeof v.patientId !== 'string' || v.patientId.length < 1 || v.patientId.length > 256 || v.patientId !== v.patientId.trim()
-        || !Number.isSafeInteger(v.expectedAgendaRevision) || (v.expectedAgendaRevision as number) < 0
+        || typeof v.expectedAgendaRevision !== 'string' || !REVISION.test(v.expectedAgendaRevision)
         || v.title !== CHECKUP_BOOKING_TITLE
         || typeof v.date !== 'string' || !RFC3339.test(v.date)) return null;
-    const at = Date.parse(v.date);
-    // A booking is for today or later, within two years; the native window shows the same bounds.
-    if (!Number.isFinite(at) || at < now - DAY || at > now + 731 * DAY) return null;
+    const at = Date.parse(v.date), today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    // From the start of the host's local day, within two years; the native window applies its own local day.
+    if (!Number.isFinite(at) || at < today.getTime() || at > now + 731 * DAY) return null;
     return v as CheckupBookingCommand;
 }
 
-/* Every create adds a version-1 row and every update bumps a version, so any agenda write changes the revision. */
-export function agendaRevision(tx: Tx, patientId: string): number {
-    const row = tx.get<{ revision: number }>(sql`SELECT count(*) + coalesce(sum(version), 0) AS revision FROM checkups WHERE patient_id = ${patientId}`);
-    return Number(row?.revision ?? 0);
+/* Fingerprint of the patient's whole agenda (id, version, deletion): any insert, update, soft or physical
+   delete changes it, without relying on versions only growing. */
+export function agendaRevision(tx: Tx, patientId: string): string {
+    const rows = tx.select({ id: checkups.id, version: checkups.version, deletedAt: checkups.deletedAt }).from(checkups)
+        .where(eq(checkups.patientId, patientId)).orderBy(asc(checkups.id)).all();
+    const hash = createHash('sha256').update('mediflow.checkup-agenda-revision.v1\n');
+    for (const row of rows) hash.update(`${row.id}:${row.version}:${row.deletedAt ? row.deletedAt.getTime() : ''}\n`);
+    return hash.digest('hex');
+}
+
+/* What the physician sees in the native window, read with the same revision: dates and states only. */
+function agendaView(tx: Tx, patientId: string) {
+    const rows = tx.select({ date: checkups.date, status: checkups.status }).from(checkups)
+        .where(and(eq(checkups.patientId, patientId), isNull(checkups.deletedAt))).orderBy(asc(checkups.date), asc(checkups.id))
+        .limit(AGENDA_ROWS + 1).all();
+    return { rows: rows.slice(0, AGENDA_ROWS).map(row => ({ date: row.date.toISOString(), status: normalizeCheckupStatus(row.status) })),
+        truncated: rows.length > AGENDA_ROWS };
 }
 
 function receiptFor(tx: Tx, commandId: string): CheckupBookingReceipt | null {
     const rows = tx.select().from(auditEvents).where(and(eq(auditEvents.requestId, commandId), eq(auditEvents.eventType, 'checkup.created'),
         eq(auditEvents.subjectType, 'checkup'), eq(auditEvents.subjectRef, commandId))).all();
-    if (rows.length === 0) return null;
+    if (rows.length === 0) {
+        // A restore from an export without audit brings the booked row back without its receipt:
+        // the row itself proves the booking, so it is never reported as retired.
+        if (!tx.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, commandId)).get()) return null;
+        return { commandId, protocol: CHECKUP_BOOKING_PROTOCOL, actorRef: null, outcome: 'applied', reason: null, committedAt: null,
+            checkupId: commandId, resultVersion: 1, auditEventId: null, historical: true };
+    }
     const metadata = rows.length === 1 && rows[0]!.redactedMetadata ? JSON.parse(rows[0]!.redactedMetadata) as { flags?: unknown; reasonCode?: unknown } : null;
     const row = rows[0]!;
     if (!metadata || !Array.isArray(metadata.flags) || !metadata.flags.includes('chat:checkup-booking') || row.sourceSurface !== 'native' || row.actorType !== 'user') {
         throw new Error('Checkup booking receipt is divergent');
     }
     const committedAt = Math.floor(row.occurredAt.getTime() / 1000);
+    const historical = tx.get<{ origin: string }>(sql`SELECT ${auditOrigin(sql`${row.eventId}`)} AS origin`)?.origin !== 'local';
     if (row.outcome === 'success') return { commandId, protocol: CHECKUP_BOOKING_PROTOCOL, actorRef: row.actorRef, outcome: 'applied', reason: null,
-        committedAt, checkupId: commandId, resultVersion: 1, auditEventId: row.eventId };
+        committedAt, checkupId: commandId, resultVersion: 1, auditEventId: row.eventId, historical };
     if (row.outcome === 'denied' && metadata.reasonCode === 'version_conflict') return { commandId, protocol: CHECKUP_BOOKING_PROTOCOL, actorRef: row.actorRef,
-        outcome: 'rejected', reason: 'version_conflict', committedAt, checkupId: null, resultVersion: null, auditEventId: row.eventId };
+        outcome: 'rejected', reason: 'version_conflict', committedAt, checkupId: null, resultVersion: null, auditEventId: row.eventId, historical };
     throw new Error('Checkup booking receipt is divergent');
 }
 
@@ -95,7 +123,7 @@ function executeBooking(command: CheckupBookingCommand, actorRef: string, scopeA
             admit(tx);
             const existing = receiptFor(tx, command.commandId);
             if (existing) {
-                if (existing.actorRef !== actorRef) deny();
+                if (existing.actorRef !== null && existing.actorRef !== actorRef) deny();
                 settled = existing;
                 return stop;
             }
@@ -135,12 +163,12 @@ export function createChatCheckupBookingService(clock: () => number = Date.now) 
         async open(context: NetworkWriteContext, patientId: string, epoch: number) {
             if (typeof patientId !== 'string' || !patientId || !Number.isSafeInteger(epoch) || epoch < 0) return deny();
             const guard = await authority(context);
-            const revision = dbServer.transaction(tx => {
+            const view = dbServer.transaction(tx => {
                 guard(tx); selected(context, patientId, epoch);
                 if (!inScope(tx, patientId, context.scopeAmbulatoryId)) deny();
-                return agendaRevision(tx, patientId);
+                return { agendaRevision: agendaRevision(tx, patientId), ...agendaView(tx, patientId) };
             }, { behavior: 'immediate' });
-            return { viewId: approvals.open(binding(context, epoch, patientId)), agendaRevision: revision };
+            return { viewId: approvals.open(binding(context, epoch, patientId)), ...view };
         },
         async preview(context: NetworkWriteContext, value: unknown, epoch: number, viewId: string) {
             const parsed = parseCheckupBookingCommand(value, clock());
@@ -178,7 +206,7 @@ export function createChatCheckupBookingService(clock: () => number = Date.now) 
                 const receipt = receiptFor(tx, commandId);
                 if (receipt) {
                     const booked = receipt.checkupId ? tx.select({ patientId: checkups.patientId }).from(checkups).where(eq(checkups.id, receipt.checkupId)).get() : undefined;
-                    if (receipt.actorRef !== context.session.userId || (receipt.checkupId && (!booked || !inScope(tx, booked.patientId, context.scopeAmbulatoryId)))) return deny();
+                    if ((receipt.actorRef !== null && receipt.actorRef !== context.session.userId) || (receipt.checkupId && (!booked || !inScope(tx, booked.patientId, context.scopeAmbulatoryId)))) return deny();
                     return { outcome: receipt.outcome };
                 }
                 approvals.revoke(commandId, { session: context.session, scope: context.scopeAmbulatoryId });
@@ -192,7 +220,7 @@ export function createChatCheckupBookingService(clock: () => number = Date.now) 
                 guard(tx);
                 const receipt = receiptFor(tx, commandId);
                 if (!receipt) return { outcome: 'unknown' as const };
-                if (receipt.actorRef !== context.session.userId) return deny();
+                if (receipt.actorRef !== null && receipt.actorRef !== context.session.userId) return deny();
                 const current = receipt.checkupId ? tx.select({ version: checkups.version, status: checkups.status, patientId: checkups.patientId })
                     .from(checkups).where(eq(checkups.id, receipt.checkupId)).get() : undefined;
                 // An applied booking is shown only to the selection and scope that own its patient.
