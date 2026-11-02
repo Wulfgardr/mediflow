@@ -106,7 +106,7 @@ export type AuditContext = {
 export const AUDIT_SOURCE_SURFACE_HEADER = 'x-mediflow-source-surface';
 
 export type AifaAuditChange = {
-    mode: 'remote' | 'manual' | 'clear';
+    mode: 'remote' | 'manual' | 'clear' | 'legacy-replace';
     before: AifaCatalogManifest | null;
     after: AifaCatalogManifest | null;
     forcedReduction: boolean;
@@ -337,7 +337,7 @@ export function sanitizeAuditMetadata(value: AuditRedactedMetadata | null | unde
         sanitized.patientDocumentCreate = command;
     }
     const change = value.aifaCatalog;
-    if (change && (change.mode === 'remote' || change.mode === 'manual' || change.mode === 'clear') && typeof change.forcedReduction === 'boolean') {
+    if (change && (change.mode === 'remote' || change.mode === 'manual' || change.mode === 'clear' || change.mode === 'legacy-replace') && typeof change.forcedReduction === 'boolean') {
         const canonical = (manifest: AifaCatalogManifest | null): AifaCatalogManifest | null => {
             if (!manifest) return null;
             const parsed = parseStoredAifaCatalogManifest(JSON.stringify(manifest));
