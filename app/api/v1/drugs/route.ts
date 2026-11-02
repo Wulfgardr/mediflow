@@ -22,7 +22,17 @@ type DrugPayload = {
     atc?: string | null;
 };
 
+const OPTIONAL_TEXT_FIELDS = ['activePrinciple', 'company', 'packaging', 'class', 'atc'] as const;
+
+/** A malformed item (wrong field types included) is refused as a whole, never coerced or thrown. */
+function hasValidDrugFieldTypes(item: Record<string, unknown>): boolean {
+    if (typeof item.aic !== 'string' || typeof item.name !== 'string') return false;
+    if (item.price !== undefined && item.price !== null && typeof item.price !== 'number') return false;
+    return OPTIONAL_TEXT_FIELDS.every((field) => item[field] === undefined || item[field] === null || typeof item[field] === 'string');
+}
+
 function normalizeDrug(item: DrugPayload): typeof drugs.$inferInsert | null {
+    if (!hasValidDrugFieldTypes(item as Record<string, unknown>)) return null;
     const aic = (item.aic || '').trim();
     const name = (item.name || '').trim();
     if (!aic || !name) return null;

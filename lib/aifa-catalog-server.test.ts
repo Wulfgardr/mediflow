@@ -1,7 +1,6 @@
 import { syntheticExemptionRequest, syntheticExemptionSession } from '../scripts/fixtures/exemption-import-session';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -870,6 +869,9 @@ test('v1 legacy replacement: local token, administrator, current snapshot and co
             assert.equal((await unchanged(snapshot, events, await post(items), 400)).code, 'AIFA_LEGACY_REPLACE_COMMAND_REQUIRED');
             await unchanged(snapshot, events, await post({ items, expectedSnapshot: snapshot }), 400);
             await unchanged(snapshot, events, await post({ items: [{ aic: '' }], expectedSnapshot: snapshot, confirmation }), 400);
+            for (const malformed of [{ aic: 123, name: 'FARMACO SINTETICO' }, { aic: '000000123', name: 'FARMACO SINTETICO', packaging: 7 }, { aic: '000000123', name: 'FARMACO SINTETICO', price: '12' }]) {
+                await unchanged(snapshot, events, await post({ items: [malformed], expectedSnapshot: snapshot, confirmation }), 400);
+            }
             current = clinician;
             assert.equal((await unchanged(snapshot, events, await post({ items, expectedSnapshot: snapshot, confirmation }), 403)).code, 'AIFA_LEGACY_REPLACE_ADMIN_REQUIRED');
         });
