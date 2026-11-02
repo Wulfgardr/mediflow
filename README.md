@@ -170,6 +170,8 @@ Intelligence Fabric coordina quattro funzioni:
 - **Smart Import:** proposta di dati strutturati a partire da una fonte.
 - **Document Synthesis:** sintesi del contenuto dei documenti.
 - **Treatment Reasoning (Ragionamento terapeutico):** supporto al riesame della terapia.
+  Nella 0.9.1 non è disponibile su nessuna superficie, anche con i pesi
+  presenti: è rinviato a dopo la 0.9.1 insieme ad ATHENA.
 
 Ogni risultato resta una proposta da rivedere; nessuna proposta modifica
 la cartella automaticamente. Si scelgono solo modelli ammessi dal sistema
