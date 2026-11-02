@@ -17,6 +17,7 @@ import { chromium, expect, type Browser, type BrowserContext, type Page } from '
 import { createBrowserResponseOracle, type BrowserResponseOracle, type SameResponseTicket } from './chatgpt-browser-response.ts';
 import { checkBrowserResponseContract } from './chatgpt-browser-response.contract.ts';
 import type { ProductOperation } from '../lib/chatgpt-product/product-contract';
+import { secureLaunch } from './fixtures/secure-browser';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dataDir = process.env.MEDIFLOW_DATA_DIR;
 assert.ok(dataDir && isAbsolute(dataDir), 'Absolute run-owned synthetic directory required');
@@ -377,7 +378,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
     }
     assert.match(logs.join(''), /UI_FIXTURE_FETCH_PROBE_READY/);
     assert.doesNotMatch(logs.join(''), /UI_FIXTURE_UNGUARDED_FETCH/);
-    const browser = await chromium.launch({ headless: true }); resources.browser = browser;
+    const browser = await chromium.launch(secureLaunch({ headless: true })); resources.browser = browser;
     const oracles = new WeakMap<Page, BrowserResponseOracle>();
     async function scenario(name: string, run: (page: Page, f: ReturnType<typeof createProductFixture>) => Promise<void>, width = 1280, held = false) {
         const f = createProductFixture(); if (held) f.setQualification({ platform: 'test-unqualified', state: 'unqualified', revision: 'not-admitted', missing: ['fixture-held-test'] });

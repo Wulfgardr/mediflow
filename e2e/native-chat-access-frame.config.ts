@@ -1,6 +1,8 @@
+import { secureBrowserUse } from './fixtures/secure-browser';
+
 export default {
     testDir: '.', testMatch: 'native-chat-access-frame.spec.ts',
-    use: { browserName: 'chromium', headless: true },
+    use: { browserName: 'chromium', headless: true, ...secureBrowserUse },
     projects: [
         { name: 'desktop', use: { viewport: { width: 1440, height: 900 } } },
         { name: 'compact', use: { viewport: { width: 390, height: 844 } } },
