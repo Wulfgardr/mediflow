@@ -25,6 +25,11 @@ const deny = (): never => { throw new Error('Native patient document denied'); }
 const sealed = (value: unknown): value is string => typeof value === 'string'
     && /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/u.test(value);
 type Source = { host: PatientDocumentCreateHost; viewId: string; release: () => void };
+/** Admission refused for capacity, not authority: the same session already holds a work, or the host is full.
+ * The native route keeps answering 403 as before; the Web route tells the physician which case it is. */
+export class PatientDocumentIntakeBusy extends Error {
+    constructor(readonly reason: 'session' | 'host') { super('Patient document intake busy'); }
+}
 export class NativePatientDocumentExtractionFailed extends Error {
     constructor(readonly detail: LocalExtractionFailureDetail | 'invalid_contract_input') {
         super('Native patient document extraction failed');
@@ -122,7 +127,8 @@ export function createPatientDocumentIntake<Context extends { request: Request }
         async stage(context: Context, value: unknown) {
             try {
                 const owner = await host(context);
-                if (preparing >= 2 || reservations.size >= 16 || reservations.has(owner.session)) return deny();
+                if (reservations.has(owner.session)) throw new PatientDocumentIntakeBusy('session');
+                if (preparing >= 2 || reservations.size >= 16) throw new PatientDocumentIntakeBusy('host');
                 if (!value || typeof value !== 'object' || Array.isArray(value)
                     || Object.keys(value).sort().join(',') !== 'data,fileKey,name,original,path') return deny();
                 const input = value as Record<string, unknown>;

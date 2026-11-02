@@ -417,12 +417,26 @@ verifica il PIN dell'operatore con `verifyHostCredentials`, lo stesso verificato
 del PIN nativo, e ricontrolla sessione e archivio prima e dopo. La biometria
 non è collegata.
 
-Il client Web cifra come il client GPUI: nome e percorso `ENC:`, byte del PDF
-in ENC2 con chiave casuale per file avvolta dalla master key, `fileKey` inviata
-solo per la verifica di `stage`. Un JPEG o un PNG viene convertito nel browser
-in un PDF di una pagina prima della cifratura, così l'OCR locale delle scansioni,
-il tipo dell'allegato e il contratto del comando restano quelli già provati.
-Formato ENC2 e claim di cifratura invariati.
+Il formato prodotto dal client Web è quello del client GPUI: nome e percorso
+`ENC:`, byte del PDF in ENC2 con chiave casuale per file avvolta dalla master
+key, `fileKey` inviata solo per la verifica di `stage`. La custodia in memoria
+invece è diversa: il browser azzera l'array della chiave dopo l'invio, ma non
+può azzerare la stringa JSON della richiesta né altre copie del motore
+JavaScript; non c'è un equivalente di `Zeroizing`. Formato ENC2 e claim di
+cifratura invariati.
+
+Un JPEG o un PNG viene convertito nel browser in un PDF di una pagina prima
+della cifratura, così l'OCR locale delle scansioni, il tipo dell'allegato e il
+contratto del comando restano quelli già provati. L'immagine viene decodificata
+con l'orientamento EXIF applicato e ridotta, se serve, entro i limiti del
+renderer locale (4096 px per lato, 12 milioni di pixel). La pagina misura mezzo
+punto per pixel, così il render a 144 dpi restituisce esattamente i pixel
+conservati. Una riduzione sotto la metà della risoluzione lineare originale
+non viene fatta: l'immagine è rifiutata con la causa, perché il testo potrebbe
+non essere più leggibile dall'OCR. La riduzione applicata è indicata nella
+revisione. `lib/patient-document-image-geometry.test.ts` prova la geometria
+con la preflight reale su A4 a 150, 200, 300 e 600 dpi, una foto da 12 Mpx e
+uno screenshot di iPhone.
 
 Come per il nativo, la risposta di `execute`, `receipt` e `revoke` aggiunge,
 solo per `applied`, `patientId` e `attachmentId` con
@@ -436,10 +450,15 @@ una seconda creazione. Senza riferimento conservato la conferma è bloccata.
 
 La revoca senza stato RAM resta riservata al nativo paired: per il Web una
 lavorazione non più in memoria e senza terminale durevole resta `unknown`.
-Non può più essere eseguita, perché le approvazioni non sopravvivono al
-riavvio né al ritiro della sessione; la UI lo dice e consente di dimenticare
-il riferimento locale. Le preparazioni simultanee sono limitate a due per
-ciascuna route.
+Lo stesso `unknown` arriva anche quando la lavorazione appartiene a un altro
+operatore o a un altro ambulatorio (`concealForeign`): la sessione corrente non
+può distinguere i casi. La UI quindi non esclude che la scheda sia stata creata,
+dice come verificarlo nell'elenco pazienti e chiude l'avviso solo dopo una
+conferma esplicita. Il riferimento locale è conservato per generazione
+d'archivio e ambulatorio selezionato. Le preparazioni simultanee sono limitate
+a due per ciascuna route. Sul Web una lavorazione ancora aperta nella stessa
+sessione e la saturazione dell'host sono rese come stati distinti (`in-progress`,
+`busy`) invece che come diniego; la route nativa continua a rispondere 403.
 
 Prove: `lib/web-patient-document.test.ts` attraversa la route con sessioni Web
 sintetiche reali, SQLite e AnyDoc reali, PIN verificato; `e2e/patient-document-create.spec.ts`
