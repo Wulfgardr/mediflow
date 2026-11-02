@@ -254,9 +254,11 @@ export type AifaCatalogClearReceipt = {
 export type AifaCatalogClearResult = AifaCatalogStatus & { snapshot: string; receipt: AifaCatalogClearReceipt };
 
 /**
- * The only catalog clear: web administrator, compare-and-swap on the observed
- * snapshot, explicit versioned confirmation, audit row in the same immediate
- * transaction. Any failure leaves drugs and manifest untouched.
+ * The only explicit catalog clear: web administrator, compare-and-swap on the
+ * observed snapshot, explicit versioned confirmation, audit row in the same
+ * immediate transaction. Any failure leaves drugs and manifest untouched.
+ * POST /api/v1/drugs still replaces the whole catalog without an audit row:
+ * declared out of scope here and tracked separately.
  */
 export function clearAifaCatalogWithAuthority(input: {
     session: ServerSession | null;

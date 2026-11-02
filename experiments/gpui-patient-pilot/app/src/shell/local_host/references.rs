@@ -1050,7 +1050,7 @@ impl ClinicalApp {
             .as_ref()
             .and_then(|s| s.data["count"].as_u64());
         match count {
-            Some(0) => div().child(text!("Catalogo vuoto: non c’è nulla da svuotare.")),
+            Some(0) => div(),
             Some(_) => div().child(
                 button(
                     "references-aifa-clear",
