@@ -394,3 +394,54 @@ Il runner completo senza opzioni mantiene cancellazione e 10 MiB nella procedura
 manuale sopra. L'inventario verifica build ottimizzata e invocazione successiva,
 senza dichiarare copertura automatica dei tre casi manuali. Restano invariati
 ambito e limiti della prova di memoria.
+
+## Appendice: consumer Web locale, 2 novembre 2026
+
+La pagina «Nuova scheda» del Web locale usa lo stesso comando, la stessa intake
+e la stessa rilettura della route nativa. `lib/native-patient-document.ts`
+espone ora `createPatientDocumentIntake`, parametrizzata dalla porta host;
+la route nativa la compone con l'host nativo esistente, senza cambiare
+operazioni, limiti o risposte. `POST /api/patients/document-create` la compone
+con un host Web: stesse operazioni chiuse `stage`, `preview`, `execute`,
+`receipt`, `revoke`, stesso limite di 10 MiB, stessa verifica ENC2 dei byte
+prima di AnyDoc e OCR locale, stessi esiti `applied`, `retired`, `unknown`.
+
+L'host Web richiede una sessione Web autentica di amministratore, la richiesta
+locale e la generazione d'archivio corrente (`archiveWriteRequestDenial`, come
+gli altri comandi Web) e l'ambulatorio selezionato, o quello predefinito, come
+il flusso di creazione esistente. La lavorazione appartiene alla generazione
+di autenticazione della sessione Web: blocco, logout, scadenza o un nuovo login
+la ritirano tramite il disposer del proprietario delle sessioni; il cambio di
+ambulatorio la ritira tramite l'epoca del contesto documento. La conferma
+verifica il PIN dell'operatore con `verifyHostCredentials`, lo stesso verificatore
+del PIN nativo, e ricontrolla sessione e archivio prima e dopo. La biometria
+non è collegata.
+
+Il client Web cifra come il client GPUI: nome e percorso `ENC:`, byte del PDF
+in ENC2 con chiave casuale per file avvolta dalla master key, `fileKey` inviata
+solo per la verifica di `stage`. Un JPEG o un PNG viene convertito nel browser
+in un PDF di una pagina prima della cifratura, così l'OCR locale delle scansioni,
+il tipo dell'allegato e il contratto del comando restano quelli già provati.
+Formato ENC2 e claim di cifratura invariati.
+
+Come per il nativo, la risposta di `execute`, `receipt` e `revoke` aggiunge,
+solo per `applied`, `patientId` e `attachmentId` con
+`attachmentReadback: client-verification-required`. Il Web rilegge l'allegato,
+lo apre con la master key e confronta i byte con il documento scelto prima di
+dichiarare la scheda creata; altrimenti mostra la verifica incompleta e conserva
+il riferimento. Il riferimento del comando è conservato nel `localStorage` del
+browser, per generazione d'archivio, prima della conferma: una risposta persa
+o un ricaricamento mostrano la lavorazione da verificare invece di offrire
+una seconda creazione. Senza riferimento conservato la conferma è bloccata.
+
+La revoca senza stato RAM resta riservata al nativo paired: per il Web una
+lavorazione non più in memoria e senza terminale durevole resta `unknown`.
+Non può più essere eseguita, perché le approvazioni non sopravvivono al
+riavvio né al ritiro della sessione; la UI lo dice e consente di dimenticare
+il riferimento locale. Le preparazioni simultanee sono limitate a due per
+ciascuna route.
+
+Prove: `lib/web-patient-document.test.ts` attraversa la route con sessioni Web
+sintetiche reali, SQLite e AnyDoc reali, PIN verificato; `e2e/patient-document-create.spec.ts`
+prova nel browser il percorso felice, la risposta persa e l'annullamento su un
+archivio isolato vuoto.

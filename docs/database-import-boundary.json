@@ -33,7 +33,8 @@
     "ambulatory-destructive-command": "ADR0169: named clear-test/delete host composition rechecks original paired device and fresh same-admin WebP3, generation and frozen plan under one IMMEDIATE with common Tx core, mandatory audit and terminal receipt; read/close do not require a surviving scope and never grant generic paired administration.",
     "archive-restore-receipt": "Named admin archive preview and receipt reads use the existing admitted Node handle; receipt insertion takes that handle from the canonical restore transaction. No new driver, Rust SQL authority or alternative archive writer.",
     "chat-therapy-status": "Paired native therapy-status preview/authorization/receipt boundary. Uses the existing dbServer transaction and shared therapy-status command writer; no independent SQLite connection or clinical writer.",
-    "native-patient-document": "ADR0042: named native document intake composition injects the existing Node handle into the common patient creation command and its readback. No driver, new connection, generic writer or agent source locator."
+    "native-patient-document": "ADR0042: named native document intake composition injects the existing Node handle into the common patient creation command and its readback. No driver, new connection, generic writer or agent source locator.",
+    "web-patient-document": "ADR0042: local Web document intake composition injects the existing Node handle into the same patient creation command, intake and readback used by the native route, and reads the selected or default ambulatory as the existing create flow does. No driver, new connection or writer."
   },
   "semantics": {
     "edge": "Exact source path, resolved target, capability, import form, imported symbols and occurrence count. Value imports are conservatively treated as runtime dependencies; explicit type-only imports are not authority.",
@@ -1944,6 +1945,17 @@
       ],
       "count": 1,
       "classification": "native-patient-document"
+    },
+    {
+      "file": "lib/web-patient-document-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "web-patient-document"
     }
   ],
   "opaqueLoaders": [
