@@ -3426,16 +3426,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         await updateServicePrescriptionWithItems(
             prescription,
             status: .booked,
-            parentPayload: HomeBaseServicePrescriptionUpdatePayload(
-                version: prescription.version,
-                status: PairedServicePrescriptionStatus.booked.rawValue,
-                scheduledAt: .value(scheduledAt)
-            ),
-            childPayload: { item in
-                HomeBaseServicePrescriptionItemUpdatePayload(
-                    version: item.version,
+            payload: { items in
+                HomeBaseServicePrescriptionUpdatePayload(
+                    version: prescription.version,
                     status: PairedServicePrescriptionStatus.booked.rawValue,
-                    scheduledAt: .value(item.scheduledAt ?? scheduledAt)
+                    scheduledAt: .value(scheduledAt),
+                    items: items
                 )
             },
             successMessage: "Prestazione prenotata."
@@ -3447,16 +3443,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         await updateServicePrescriptionWithItems(
             prescription,
             status: .performed,
-            parentPayload: HomeBaseServicePrescriptionUpdatePayload(
-                version: prescription.version,
-                status: PairedServicePrescriptionStatus.performed.rawValue,
-                performedAt: .value(performedAt)
-            ),
-            childPayload: { item in
-                HomeBaseServicePrescriptionItemUpdatePayload(
-                    version: item.version,
+            payload: { items in
+                HomeBaseServicePrescriptionUpdatePayload(
+                    version: prescription.version,
                     status: PairedServicePrescriptionStatus.performed.rawValue,
-                    performedAt: .value(item.performedAt ?? performedAt)
+                    performedAt: .value(performedAt),
+                    items: items
                 )
             },
             successMessage: "Prestazione eseguita."
@@ -3468,16 +3460,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         await updateServicePrescriptionWithItems(
             prescription,
             status: .reportReceived,
-            parentPayload: HomeBaseServicePrescriptionUpdatePayload(
-                version: prescription.version,
-                status: PairedServicePrescriptionStatus.reportReceived.rawValue,
-                reportReceivedAt: .value(reportReceivedAt)
-            ),
-            childPayload: { item in
-                HomeBaseServicePrescriptionItemUpdatePayload(
-                    version: item.version,
+            payload: { items in
+                HomeBaseServicePrescriptionUpdatePayload(
+                    version: prescription.version,
                     status: PairedServicePrescriptionStatus.reportReceived.rawValue,
-                    reportReceivedAt: .value(item.reportReceivedAt ?? reportReceivedAt)
+                    reportReceivedAt: .value(reportReceivedAt),
+                    items: items
                 )
             },
             successMessage: "Referto prestazione ricevuto."
@@ -3488,14 +3476,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         await updateServicePrescriptionWithItems(
             prescription,
             status: .cancelled,
-            parentPayload: HomeBaseServicePrescriptionUpdatePayload(
-                version: prescription.version,
-                status: PairedServicePrescriptionStatus.cancelled.rawValue
-            ),
-            childPayload: { item in
-                HomeBaseServicePrescriptionItemUpdatePayload(
-                    version: item.version,
-                    status: PairedServicePrescriptionStatus.cancelled.rawValue
+            payload: { items in
+                HomeBaseServicePrescriptionUpdatePayload(
+                    version: prescription.version,
+                    status: PairedServicePrescriptionStatus.cancelled.rawValue,
+                    items: items
                 )
             },
             successMessage: "Prescrizione prestazioni annullata."
@@ -4804,11 +4789,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
+    /// Prescrizione e voci cambiano stato con una sola richiesta e una sola
+    /// transazione sul server (WUL-800): il server sposta le voci che erano nello
+    /// stato della prescrizione e lascia com'è una voce portata altrove a parte.
     private func updateServicePrescriptionWithItems(
         _ prescription: HomeBaseServicePrescriptionSummary,
         status: PairedServicePrescriptionStatus,
-        parentPayload: HomeBaseServicePrescriptionUpdatePayload,
-        childPayload: @escaping (HomeBaseServicePrescriptionItemSummary) -> HomeBaseServicePrescriptionItemUpdatePayload,
+        payload: ([HomeBaseServicePrescriptionCascadeItem]) -> HomeBaseServicePrescriptionUpdatePayload,
         successMessage: String
     ) async {
         guard canMutateServicePrescription(prescription),
@@ -4822,26 +4809,19 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         case .cancelled where !canCancelServicePrescription(prescription): return
         default: break
         }
+        let items = servicePrescriptionItems
+            .filter { $0.prescriptionId == prescription.id }
+            .map { HomeBaseServicePrescriptionCascadeItem(id: $0.id, version: $0.version) }
+        let request = payload(items)
         await runTask {
             let acknowledgement = try await self.makeClient().updateServicePrescription(
                 prescriptionId: prescription.id,
-                payload: parentPayload,
+                payload: request,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
             guard acknowledgement.success else { throw HomeBaseClientError.contract }
-            let children = self.servicePrescriptionItems.filter { $0.prescriptionId == prescription.id }
-            for item in children {
-                let itemAcknowledgement = try await self.makeClient().updateServicePrescriptionItem(
-                    itemId: item.id,
-                    payload: childPayload(item),
-                    credentials: credentials,
-                    sessionCookie: sessionCookie,
-                    ambulatoryId: self.ambulatoryId.trimmedOrNil
-                )
-                guard itemAcknowledgement.success else { throw HomeBaseClientError.contract }
-            }
             self.servicePrescriptions = try await self.fetchServicePrescriptions(
                 patientId: prescription.patientId, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)

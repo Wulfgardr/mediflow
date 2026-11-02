@@ -352,12 +352,14 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
         update: Partial<ServicePrescription>,
     ) => {
         const children = itemsByPrescription.get(item.id) ?? [];
+        const changes: Partial<ServicePrescription> & { items: Array<{ id: string; version: number }> } = {
+            ...update,
+            version: item.version,
+            updatedAt: new Date(),
+            items: children.map((child) => ({ id: child.id, version: child.version })),
+        };
         try {
-            await db.servicePrescriptions.update(item.id, {
-                ...update,
-                version: item.version,
-                updatedAt: new Date(),
-            }, { cascadeItems: children.map((child) => ({ id: child.id, version: child.version })) });
+            await db.servicePrescriptions.update(item.id, changes);
         } finally {
             notifyDbChange('service_prescription_items');
         }

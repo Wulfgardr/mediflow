@@ -3,7 +3,7 @@ import XCTest
 @testable import MediFlowAppleShared
 
 final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
-    func testServiceTransitionPropagatesStatusDateAndChildVersions() async throws {
+    func testServiceTransitionSendsOneRequestWithEveryChildVersion() async throws {
         let patient = detail(id: "p1")
         let prescribedAt = Date(timeIntervalSince1970: 1_750_000_000)
         let source = S6MockDataSource(
@@ -28,10 +28,13 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
         let serviceUpdate = await source.lastServiceUpdate
         XCTAssertEqual(serviceUpdate?.id, "rx1")
         XCTAssertEqual(serviceUpdate?.payload.version, 4)
+        XCTAssertEqual(serviceUpdate?.payload.status, "performed")
+        XCTAssertEqual(serviceUpdate?.payload.items, [
+            HomeBaseServicePrescriptionCascadeItem(id: "i1", version: 10),
+            HomeBaseServicePrescriptionCascadeItem(id: "i2", version: 11),
+        ])
         let itemUpdates = await source.itemUpdates
-        XCTAssertEqual(itemUpdates.map(\.id), ["i1", "i2"])
-        XCTAssertEqual(itemUpdates.map(\.payload.version), [10, 11])
-        XCTAssertEqual(itemUpdates.map(\.payload.status), ["performed", "performed"])
+        XCTAssertTrue(itemUpdates.isEmpty, "le voci cambiano stato nella richiesta della prescrizione")
     }
 
     func testServiceAndProstheticGuardsRequireOnlineAndAllowedState() async {
