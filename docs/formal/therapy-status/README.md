@@ -708,8 +708,7 @@ di versione e prima dell'UPDATE, applica la tabella dei passaggi
 sospesa verso attiva o conclusa, conclusa verso attiva. Un passaggio fuori
 tabella, o la rimozione della data di fine di una terapia conclusa, risponde
 409 senza scrittura né audit. Lo stesso writer allinea la data di fine al
-passaggio: conclusa conserva la data indicata o salvata, altrimenti quella del
-passaggio; attiva la svuota se la richiesta non ne indica una.
+passaggio secondo le regole precisate più sotto, dopo la review indipendente.
 
 Nel modello questo è un caso di `HostReject`: l'host può già rifiutare un
 tentativo pendente senza effetti, a qualunque versione. Il nuovo rifiuto non
