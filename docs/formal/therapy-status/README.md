@@ -97,6 +97,19 @@ future derive non riesaminate. Modello, invarianti, testimoni, mutanti e
 limiti restano invariati. Backup e ricevute G-3 restano fuori dal modello
 TLC e sono verificati dai rispettivi test di transazione, crash e trasporto.
 
+## Raccordo C-6 Web del 2 novembre 2026: documento del nuovo paziente
+
+Fra le sorgenti coperte cambia soltanto `lib/db.ts`: l'import da
+`attachment-file-envelope` aggiunge tre funzioni già esistenti e il client
+aggiunge `sealPatientDocumentSource` e `verifyPatientDocumentAttachment`,
+chiamati esclusivamente dal pannello «Nuova scheda da documento». Il primo
+usa la master key già sbloccata e il segnale di lettura della sessione per
+cifrare nome, percorso e byte del documento; il secondo rilegge un allegato
+con la `get` esistente e ne confronta i byte. Non inviano scritture, non
+toccano terapie, chiave o segnale. Tutti i metodi preesistenti restano
+identici alla base. Modello, statechart, invarianti, testimoni, mutanti e
+limiti restano invariati; è aggiornato il solo digest di `lib/db.ts`.
+
 ## Raccordo WUL-757 del 29 ottobre 2026: copia locale della bozza
 
 Riesaminato il runtime `e9e170e4790159ae1f4d10922f7508c4c128981c`

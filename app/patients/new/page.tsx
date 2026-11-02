@@ -15,14 +15,12 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, FileSearch, FileSpreadsheet } from 'lucide-react'; // manual CSV entrypoint
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
-import PdfImporter from '@/components/pdf-importer';
+import PatientDocumentCreate from '@/components/patient-document-create';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import type { ExtractedPatientData } from '@/lib/pdf-service';
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import PatientDocumentImportReview from '@/components/patient-document-import-review';
 import {
-    buildPatientDocumentReviewDraft,
     type PatientDocumentReviewDraft,
     type ReviewedPatientImportDefaults,
 } from '@/lib/domain/documents/patient-document-review';
@@ -248,21 +246,13 @@ export default function NewPatientPage() {
                                 Usa un documento quando è utile
                             </h2>
                             <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
-                                MediFlow propone anagrafica, diagnosi e terapie dal documento: confermi tu cosa usare.
+                                Il testo viene estratto su questo computer. Inserisci tu nome, cognome e codice fiscale leggendolo,
+                                poi conferma con il PIN: la scheda nasce con il documento allegato. Diagnosi e terapie restano da aggiungere nella scheda.
                             </p>
                         </div>
                     </div>
                 </div>
-                <PdfImporter onDataExtracted={(data) => {
-                    const imported = data as ExtractedPatientData;
-                    setPendingImportReview(buildPatientDocumentReviewDraft(imported));
-                    setImportMeta({
-                        quality: imported.documentQuality,
-                        diagnosisCount: imported.reviewDiagnoses?.length || imported.diagnoses?.length || 0,
-                        medicationCount: imported.reviewTherapies?.length || imported.medications?.length || 0,
-                        reviewPending: true,
-                    });
-                }} />
+                <PatientDocumentCreate />
             </section>
 
             {importMeta && (
