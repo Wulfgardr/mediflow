@@ -95,6 +95,7 @@ export default function NewPatientPage() {
     const confirm = useConfirm();
     const [importedData, setImportedData] = useState<ImportedPatientDraft | null>(null);
     const [pendingImportReview, setPendingImportReview] = useState<PatientDocumentReviewDraft | null>(null);
+    const [documentFlowActive, setDocumentFlowActive] = useState(false);
     const [formSeed, setFormSeed] = useState(0);
     const [importMeta, setImportMeta] = useState<{
         quality?: { level: string; reason?: string };
@@ -243,16 +244,16 @@ export default function NewPatientPage() {
                         <div className="space-y-1">
                             <p className="mf-eyebrow">Documento clinico</p>
                             <h2 className="text-lg font-semibold tracking-tight text-[color:var(--lume-ink)]">
-                                Usa un documento quando è utile
+                                Crea la scheda da un documento
                             </h2>
                             <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
-                                Il testo viene estratto su questo computer. Inserisci tu nome, cognome e codice fiscale leggendolo,
-                                poi conferma con il PIN: la scheda nasce con il documento allegato. Diagnosi e terapie restano da aggiungere nella scheda.
+                                Il testo viene estratto su questo computer. Nome, cognome e codice fiscale li scrivi tu leggendolo, poi confermi
+                                con il PIN: la scheda nasce con il documento allegato. Diagnosi e terapie si aggiungono dopo, nella scheda.
                             </p>
                         </div>
                     </div>
                 </div>
-                <PatientDocumentCreate />
+                <PatientDocumentCreate onActiveChange={setDocumentFlowActive} />
             </section>
 
             {importMeta && (
@@ -321,7 +322,7 @@ export default function NewPatientPage() {
                 </section>
             )}
 
-            <div id="dati" className="scroll-mt-40">
+            <div id="dati" className="scroll-mt-40" hidden={documentFlowActive}>
                 <PatientForm
                     onSubmit={onSubmit}
                     defaultValues={importedData || undefined}
