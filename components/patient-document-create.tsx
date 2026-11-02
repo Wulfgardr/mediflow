@@ -41,10 +41,12 @@ function fieldError(fields: Fields): string | null {
 
 /** Creates a patient from one document through the shared command: local extraction, field-by-field
  * entry by the physician, explicit PIN confirmation, CAS and audit on the server, attachment readback here. */
-export default function PatientDocumentCreate() {
+export default function PatientDocumentCreate({ onActiveChange }: { onActiveChange?: (active: boolean) => void } = {}) {
     const { showToast } = useToast();
     const confirm = useConfirm();
     const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+    // Una sola strada di creazione alla volta: con un documento in corso il modulo manuale si nasconde.
+    useEffect(() => { onActiveChange?.(phase.kind !== 'idle'); }, [onActiveChange, phase.kind]);
     const [fields, setFields] = useState<Fields>(EMPTY);
     const [separate, setSeparate] = useState(false);
     const [pin, setPin] = useState('');
@@ -216,8 +218,7 @@ export default function PatientDocumentCreate() {
                         <FileUp className="h-6 w-6 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
                         <h3 id="patient-document-create-title" ref={heading} tabIndex={-1} className="font-semibold text-[color:var(--lume-ink)]">Nuova scheda da documento</h3>
                         <p className="max-w-xl text-sm text-[color:var(--lume-ink-muted)]">
-                            Trascina qui un solo PDF o un’immagine (JPEG, PNG), fino a 10 MiB. Il testo viene estratto su questo computer;
-                            la scheda nasce solo dopo che hai inserito i dati e confermato con il PIN.
+                            Trascina qui un PDF o un’immagine (JPEG, PNG) fino a 10 MiB, oppure sceglilo.
                         </p>
                         <input ref={fileInput} type="file" accept={PATIENT_DOCUMENT_ACCEPT} className="sr-only" id="patient-document-create-file"
                             onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void choose(file); }} />
@@ -242,7 +243,7 @@ export default function PatientDocumentCreate() {
                 }}>
                     <div className="mf-alert mf-alert-warning">
                         <h3 ref={heading} tabIndex={-1} className="font-semibold">{phase.kind === 'review' ? 'Revisione dei dati' : 'Conferma della creazione'}</h3>
-                        <p className="text-sm">Identità e dati da verificare: il documento non sceglie la persona. Inserisci personalmente ogni campo leggendo il testo estratto.</p>
+                        <p className="text-sm">MediFlow non compila i dati dal documento: leggi il testo estratto e scrivi tu ogni campo.</p>
                         <p className="mt-1 text-xs">Fonte: {sourceLine(phase.source)}</p>
                     </div>
                     {!phase.markerKept && (
@@ -252,18 +253,18 @@ export default function PatientDocumentCreate() {
                     )}
                     {phase.duplicate && (
                         <div className="mf-alert mf-alert-warning" role="alert">
-                            Esiste già una scheda con lo stesso codice fiscale o lo stesso nome e cognome. Verifica l’identità; se è una persona diversa scegli di creare una scheda separata. Nessuna unione.
+                            Esiste già una scheda con lo stesso codice fiscale o lo stesso nome e cognome. Verifica l’identità: se è una persona diversa, scegli di creare una scheda separata. Le schede non vengono unite.
                         </div>
                     )}
                     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                         <section aria-labelledby="patient-document-create-text" className="space-y-2 min-w-0">
-                            <h4 id="patient-document-create-text" className="mf-field-label">Testo estratto</h4>
+                            <h4 id="patient-document-create-text" className="mf-eyebrow">Testo estratto</h4>
                             <pre className="mf-input max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed" tabIndex={0}>
                                 {phase.view.text.trim() || 'Il documento non contiene testo leggibile.'}
                             </pre>
                         </section>
                         <fieldset className="space-y-4 min-w-0" disabled={phase.kind === 'confirm'}>
-                            <legend className="mf-field-label">Dati della nuova scheda</legend>
+                            <legend className="mf-eyebrow mb-2">Dati della nuova scheda</legend>
                             {([
                                 ['firstName', 'Nome', 'given-name'],
                                 ['lastName', 'Cognome', 'family-name'],
@@ -290,7 +291,7 @@ export default function PatientDocumentCreate() {
                     {phase.kind === 'confirm' && (
                         <div className="space-y-2">
                             <p className="text-sm">
-                                {separate ? 'La conferma creerà una scheda separata con il documento allegato. Nessuna unione.' : 'La conferma creerà una nuova scheda con il documento allegato, dopo il controllo dei duplicati.'}
+                                {separate ? 'La conferma creerà una scheda separata con il documento allegato. Le schede non vengono unite.' : 'La conferma creerà una nuova scheda con il documento allegato, dopo il controllo dei duplicati.'}
                             </p>
                             <label htmlFor="patient-document-pin" className="mf-field-label">PIN di conferma</label>
                             <input id="patient-document-pin" className="mf-input max-w-48" type="password" inputMode="numeric" autoComplete="off"
