@@ -15,7 +15,6 @@ on:
   push:
     branches:
       - main
-      - codex/091-pdf-smoke-windows
 
 permissions:
   contents: read
@@ -67,7 +66,7 @@ jobs:
           if-no-files-found: error
 
   headless-contracts:
-    if: github.ref != 'refs/heads/codex/091-pdf-smoke-windows' && (github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap)
+    if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
     needs: windows-bootstrap
     name: Headless contracts (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -111,7 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.ref == 'refs/heads/codex/091-pdf-smoke-windows' && '["windows-latest"]' || '["ubuntu-22.04","windows-latest","macos-latest"]') }}
+        os: [ubuntu-22.04, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Verify full production source identity
@@ -165,7 +164,7 @@ jobs:
         run: node scripts/ci-start-smoke.mjs
 
   static-checks:
-    if: github.ref != 'refs/heads/codex/091-pdf-smoke-windows' && (github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap)
+    if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
     name: lint + typecheck (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -185,7 +184,7 @@ jobs:
         run: npm run typecheck
 
   windows-x64-emulation:
-    if: github.ref != 'refs/heads/codex/091-pdf-smoke-windows' && (github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap)
+    if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
     name: SQLite and launcher (Windows ARM, Node x64)
     runs-on: windows-11-arm
     steps:
