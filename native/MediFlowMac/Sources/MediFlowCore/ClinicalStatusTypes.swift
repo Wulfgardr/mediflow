@@ -65,6 +65,20 @@ public enum PairedCheckupStatus: String, CaseIterable, Identifiable {
             return "Annullato"
         }
     }
+
+    /// Stati raggiungibili da questo, compreso sé stesso (WUL-800): mai
+    /// direttamente fra completato e annullato. Il server applica la stessa
+    /// tabella; i test la confrontano con docs/domain/clinical-status-transitions.json.
+    public var allowedTargets: [PairedCheckupStatus] {
+        switch self {
+        case .pending:
+            return [.pending, .completed, .cancelled]
+        case .completed:
+            return [.pending, .completed]
+        case .cancelled:
+            return [.pending, .cancelled]
+        }
+    }
 }
 
 // ADR 0071 Fase 2: status value canonicalization, 1:1 with lib/status-normalization.ts

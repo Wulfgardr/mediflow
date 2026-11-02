@@ -6,6 +6,8 @@ import { SERVICE_PRESCRIPTION_STATUSES } from './prescription-domain';
  * avvenuto fuori da MediFlow; indietro si torna di un solo passo, come correzione
  * tracciata in audit; si blocca solo ciò che non ha senso. Non è un parere
  * clinico: se l'uso reale blocca una correzione legittima, si allarga la tabella.
+ * La decisione è scritta in docs/domain/clinical-status-transitions.json e i
+ * test di server e client Swift confrontano le loro tabelle con quel file.
  */
 
 export type ServicePrescriptionStatus = typeof SERVICE_PRESCRIPTION_STATUSES[number];
@@ -46,6 +48,21 @@ export function isServicePrescriptionForwardStep(from: string, to: string): bool
     const toRank = SERVICE_PRESCRIPTION_PROGRESS[to];
     if (fromRank === undefined || toRank === undefined) return false;
     return toRank > fromRank && isServicePrescriptionTransitionAllowed(from, to);
+}
+
+export type CheckupStatus = 'pending' | 'completed' | 'cancelled';
+
+/* Mai direttamente fra completata e annullata: si torna prima da fare. */
+export const CHECKUP_TRANSITIONS: Readonly<Record<CheckupStatus, readonly CheckupStatus[]>> = {
+    pending: ['completed', 'cancelled'],
+    completed: ['pending'],
+    cancelled: ['pending'],
+};
+
+export function isCheckupTransitionAllowed(from: string, to: string): boolean {
+    if (!Object.prototype.hasOwnProperty.call(CHECKUP_TRANSITIONS, to)) return false;
+    if (from === to || !Object.prototype.hasOwnProperty.call(CHECKUP_TRANSITIONS, from)) return true;
+    return CHECKUP_TRANSITIONS[from as CheckupStatus].includes(to as CheckupStatus);
 }
 
 export type StatusTransitionDenial = {
