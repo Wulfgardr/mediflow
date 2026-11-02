@@ -69,6 +69,7 @@ struct PairedPatientClinicalSections: View {
                     checkupTitle: $model.editCheckupTitle,
                     notes: $model.editCheckupNotes,
                     status: $model.editCheckupStatus,
+                    statusOptions: model.editCheckupStatusOptions,
                     date: $model.editCheckupDate,
                     primaryLabel: "Salva modifiche",
                     primaryIdentifier: "homebase-update-checkup-button",
@@ -414,6 +415,7 @@ struct PairedPatientClinicalSections: View {
         checkupTitle: Binding<String>,
         notes: Binding<String>,
         status: Binding<PairedCheckupStatus>,
+        statusOptions: [PairedCheckupStatus] = PairedCheckupStatus.allCases,
         date: Binding<Date>,
         primaryLabel: String,
         primaryIdentifier: String,
@@ -436,7 +438,7 @@ struct PairedPatientClinicalSections: View {
             } trailing: {
                 ChartGroup("Programmazione") {
                     Picker("Stato", selection: status) {
-                        ForEach(PairedCheckupStatus.allCases) { status in
+                        ForEach(statusOptions) { status in
                             Text(status.title).tag(status)
                         }
                     }
