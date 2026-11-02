@@ -714,10 +714,22 @@ passaggio; attiva la svuota se la richiesta non ne indica una.
 Nel modello questo è un caso di `HostReject`: l'host può già rifiutare un
 tentativo pendente senza effetti, a qualunque versione. Il nuovo rifiuto non
 aggiunge scritture, non cambia l'ordine delle guardie né l'atomicità host, e
-lo stato raggiunto da un commit resta il bersaglio del tentativo. Nel comando
+lo stato raggiunto da un commit resta il bersaglio del tentativo. Dopo la review
+indipendente il writer comune segue anche le regole di data del comando:
+concludendo prima di una fine programmata vale l'istante del passaggio,
+riattivando una terapia conclusa la vecchia data si svuota anche se il client la
+rimanda, e il momento del passaggio è l'orologio del server. Le sorgenti fissate
+comprendono ora la tabella (`lib/clinical-status-transitions.ts`), la mappa
+degli alias (`lib/status-normalization.ts`) e il file di decisione. Nel comando
 durevole un rifiuto di passaggio non è più registrato come `version_conflict`:
 il servizio lo nega come una risorsa non ammessa (`denied`), senza ricevuta e
-senza effetti, lo stesso esito già previsto per il 404. La data di fine
+senza effetti, lo stesso esito già previsto per il 404. Nel modello il cammino è
+`HostReject` seguito da `LoseResponse`, non una risposta negativa consegnata: il
+client che ha già inviato resta `uncertain` finché il medico non rilegge o
+chiude, e la chiusura scrive la ricevuta `closed`. Il Web non offre questi
+passaggi (per una terapia conclusa propone solo «Riattiva») e l'anteprima della
+chat li nega prima del PIN, quindi il cammino resta raggiungibile solo da un
+client che costruisce il comando da sé. La data di fine
 scritta dal comando resta quella di prima: conclusa usa l'istante del commit,
 attiva la svuota, sospesa la conserva.
 

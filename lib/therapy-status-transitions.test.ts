@@ -106,6 +106,47 @@ test('reactivating clears the end date unless the request sets a planned one', (
     assert.equal(row(planned).endDate, seconds(plannedEnd));
 });
 
+test('reactivating a completed therapy drops the old end even when the client sends it back', () => {
+    const therapyId = seed('completed', savedEnd);
+    assert.equal(update(therapyId, { status: 'active', endDate: savedEnd }).status, 200);
+    assert.equal(row(therapyId).endDate, null);
+    const audit = sql.prepare('SELECT redacted_metadata AS metadata FROM audit_events WHERE subject_ref=?').get(therapyId) as { metadata: string };
+    assert.ok((JSON.parse(audit.metadata) as { changedFields: string[] }).changedFields.includes('endDate'));
+});
+
+test('resuming a suspended therapy keeps its planned end', () => {
+    const plannedEnd = new Date('2026-07-01T00:00:00.000Z');
+    const therapyId = seed('suspended', plannedEnd);
+    assert.equal(update(therapyId, { status: 'active' }).status, 200);
+    assert.equal(row(therapyId).endDate, seconds(plannedEnd));
+});
+
+test('completing ahead of a planned end uses the moment of the change, like the status command', () => {
+    const therapyId = seed('active', new Date('2026-12-31T00:00:00.000Z'));
+    assert.equal(update(therapyId, { status: 'completed' }).status, 200);
+    assert.equal(row(therapyId).endDate, seconds(moment));
+});
+
+test('a therapy created as already completed always has an end date, and the audit names it', async () => {
+    const { createTherapyOperation } = await import('./therapy-write-operation.ts');
+    const patientId = `synthetic-therapy-patient-${++n}`;
+    dbServer.insert(patients).values({ id: patientId, firstName: 'Synthetic', lastName: 'Patient', taxCode: `synthetic-tax-${n}` }).run();
+    const therapyId = `synthetic-therapy-${n}`;
+    const created = createTherapyOperation({ patientId, therapyId, mode: 'web', audit, changedFields: ['status'],
+        values: { id: therapyId, patientId, drugName: 'ENC:synthetic:drug', dosage: 'ENC:synthetic:dose', status: 'stopped', startDate: new Date('2026-01-01') } });
+    assert.equal(created.status, 201);
+    assert.notEqual(row(therapyId).endDate, null);
+    const audit2 = sql.prepare('SELECT redacted_metadata AS metadata FROM audit_events WHERE subject_ref=?').get(therapyId) as { metadata: string };
+    assert.ok((JSON.parse(audit2.metadata) as { changedFields: string[] }).changedFields.includes('endDate'));
+});
+
+test('a stored status that is neither canonical nor an alias can be brought to any valid one', () => {
+    const therapyId = seed('active');
+    sql.prepare("UPDATE therapies SET status='legacy-unknown' WHERE id=?").run(therapyId);
+    assert.equal(update(therapyId, { status: 'suspended' }).status, 200);
+    assert.equal(row(therapyId).status, 'suspended');
+});
+
 test('suspending leaves the end date alone', () => {
     const therapyId = seed('active', savedEnd);
     assert.equal(update(therapyId, { status: 'suspended' }).status, 200);

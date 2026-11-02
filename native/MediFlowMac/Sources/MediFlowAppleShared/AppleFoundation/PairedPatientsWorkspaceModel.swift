@@ -234,7 +234,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editTherapyActivePrinciple = ""
     @Published var editTherapyDosage = ""
     @Published var editTherapyMotivation = ""
-    @Published var editTherapyStatus: PairedTherapyStatus = .active
+    @Published var editTherapyStatus: PairedTherapyStatus = .active {
+        didSet {
+            // WUL-800: riattivando una terapia conclusa la data di conclusione non resta come fine programmata.
+            if editTherapyStatus == .active, oldValue != .active, editTherapySavedStatus == .completed {
+                editTherapyHasEndDate = false
+            }
+        }
+    }
     /// Stato salvato della terapia in modifica: limita le scelte ai passaggi ammessi.
     @Published var editTherapySavedStatus: PairedTherapyStatus?
     var editTherapyStatusOptions: [PairedTherapyStatus] {

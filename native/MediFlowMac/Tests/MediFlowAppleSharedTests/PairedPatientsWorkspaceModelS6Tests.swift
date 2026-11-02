@@ -86,6 +86,20 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
         }
     }
 
+    func testEditingACompletedTherapyOffersOnlyReachableStatesAndReactivatingDropsTheOldEnd() async {
+        let patient = detail(id: "p1")
+        let model = await makeModel(source: S6MockDataSource(details: ["p1": patient]))
+        await model.configurePairedOnlineForTests(selectedPatient: patient)
+        await model.startEditingTherapy(therapy(id: "t1", status: "completed", endDate: Date(timeIntervalSince1970: 1_780_000_000)))
+        let options = await model.editTherapyStatusOptions
+        XCTAssertEqual(options, [.active, .completed])
+        let hadEnd = await model.editTherapyHasEndDate
+        XCTAssertTrue(hadEnd)
+        await MainActor.run { model.editTherapyStatus = .active }
+        let keepsEnd = await model.editTherapyHasEndDate
+        XCTAssertFalse(keepsEnd, "la data di conclusione non diventa una fine programmata")
+    }
+
     func testEditingACompletedCheckupNeverOffersCancelled() async {
         let patient = detail(id: "p1")
         let model = await makeModel(source: S6MockDataSource(details: ["p1": patient]))
@@ -1041,6 +1055,15 @@ private func checkup(id: String, status: String) -> HomeBaseCheckupSummary {
     HomeBaseCheckupSummary(
         id: id, patientId: "p1", date: Date(timeIntervalSince1970: 1_750_000_000), title: "Controllo sintetico",
         notes: nil, status: status, source: "manual", version: 1,
+        createdAt: nil, updatedAt: nil, deletedAt: nil, deletionReason: nil
+    )
+}
+
+private func therapy(id: String, status: String, endDate: Date?) -> HomeBaseTherapySummary {
+    HomeBaseTherapySummary(
+        id: id, patientId: "p1", drugName: "Farmaco sintetico", aic: nil, atc: nil, activePrinciple: nil,
+        dosage: "1 cp", motivation: nil, diagnosisCode: nil, diagnosisName: nil, status: status,
+        startDate: Date(timeIntervalSince1970: 1_750_000_000), endDate: endDate, version: 1,
         createdAt: nil, updatedAt: nil, deletedAt: nil, deletionReason: nil
     )
 }
