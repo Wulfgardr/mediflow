@@ -30,7 +30,7 @@ function fresh(data, options) {
     const child = spawn(process.execPath, ['--input-type=module', '-e',
       `import {archiveBrowserPort} from ${JSON.stringify(new URL('./local-ui-runtime.mjs', import.meta.url).href)}; console.log(await archiveBrowserPort(process.argv[1], JSON.parse(process.argv[2])));`, data, JSON.stringify(options)], { stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '', err = ''; child.stdout.on('data', bytes => out += bytes); child.stderr.on('data', bytes => err += bytes);
-    child.once('error', reject); child.once('exit', code => code === 0 ? resolve(Number(out.trim())) : reject(new Error(err)));
+    child.once('error', reject); child.once('close', code => code === 0 ? resolve(Number(out.trim())) : reject(new Error(err)));
   });
 }
 test('two stopped archives with the same preferred port receive exclusive persistent reservations', async t => {
