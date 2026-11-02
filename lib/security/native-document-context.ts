@@ -1,7 +1,6 @@
-import type { ServerSession } from './server-session';
-
 type Context = { scope: string | null; epoch: number; dependents: Set<() => void> };
-const contexts = new WeakMap<ServerSession, Context>();
+/** Keyed by the owning session identity: a native session or a Web authentication generation. */
+const contexts = new WeakMap<object, Context>();
 
 function retire(context: Context) {
     context.epoch += 1;
@@ -10,7 +9,7 @@ function retire(context: Context) {
     for (const dispose of retired) dispose();
 }
 
-export function observeNativeDocumentContext(session: ServerSession, scope: string | null) {
+export function observeNativeDocumentContext(session: object, scope: string | null) {
     let context = contexts.get(session);
     if (!context) {
         context = { scope, epoch: 0, dependents: new Set() };
