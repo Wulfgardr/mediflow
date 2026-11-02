@@ -510,6 +510,51 @@
       "change": "PUT /api/v1/network/patients/{id}/checkups/{checkupId} response 409.recordId was removed",
       "trackingIssue": "WUL-800",
       "reason": "WUL-800 coorte 2, OpenAPI 1.49.0: the original CheckupVersionConflictResponse remains unchanged in the first oneOf branch of CheckupWriteConflict. The added branch carries status_transition_not_allowed from the server-side checkup transition table. The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client in the same release limits the status picker to the allowed transitions; an older build shows a refused choice as an HTTP 409 error."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/therapies/{therapyId} response 409.code was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 3, OpenAPI 1.50.0: the original TherapyVersionConflictResponse remains unchanged in the first oneOf branch of TherapyWriteConflict. The added branches carry status_transition_not_allowed (server-side therapy transition table) and therapy_end_date_required (a completed therapy cannot lose its end date). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client in the same release limits the status picker to the allowed transitions; an older build shows a refused choice as an HTTP 409 error."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/therapies/{therapyId} response 409.currentSnapshot was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 3, OpenAPI 1.50.0: the original TherapyVersionConflictResponse remains unchanged in the first oneOf branch of TherapyWriteConflict. The added branches carry status_transition_not_allowed (server-side therapy transition table) and therapy_end_date_required (a completed therapy cannot lose its end date). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client in the same release limits the status picker to the allowed transitions; an older build shows a refused choice as an HTTP 409 error."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/therapies/{therapyId} response 409.currentState was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 3, OpenAPI 1.50.0: the original TherapyVersionConflictResponse remains unchanged in the first oneOf branch of TherapyWriteConflict. The added branches carry status_transition_not_allowed (server-side therapy transition table) and therapy_end_date_required (a completed therapy cannot lose its end date). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client in the same release limits the status picker to the allowed transitions; an older build shows a refused choice as an HTTP 409 error."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/therapies/{therapyId} response 409.currentUpdatedAt was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 3, OpenAPI 1.50.0: the original TherapyVersionConflictResponse remains unchanged in the first oneOf branch of TherapyWriteConflict. The added branches carry status_transition_not_allowed (server-side therapy transition table) and therapy_end_date_required (a completed therapy cannot lose its end date). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client in the same release limits the status picker to the allowed transitions; an older build shows a refused choice as an HTTP 409 error."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/therapies/{therapyId} response 409.currentVersion was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 3, OpenAPI 1.50.0: the original TherapyVersionConflictResponse remains unchanged in the first oneOf branch of TherapyWriteConflict. The added branches carry status_transition_not_allowed (server-side therapy transition table) and therapy_end_date_required (a completed therapy cannot lose its end date). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client in the same release limits the status picker to the allowed transitions; an older build shows a refused choice as an HTTP 409 error."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/therapies/{therapyId} response 409.entity was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 3, OpenAPI 1.50.0: the original TherapyVersionConflictResponse remains unchanged in the first oneOf branch of TherapyWriteConflict. The added branches carry status_transition_not_allowed (server-side therapy transition table) and therapy_end_date_required (a completed therapy cannot lose its end date). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client in the same release limits the status picker to the allowed transitions; an older build shows a refused choice as an HTTP 409 error."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/therapies/{therapyId} response 409.error was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 3, OpenAPI 1.50.0: the original TherapyVersionConflictResponse remains unchanged in the first oneOf branch of TherapyWriteConflict. The added branches carry status_transition_not_allowed (server-side therapy transition table) and therapy_end_date_required (a completed therapy cannot lose its end date). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client in the same release limits the status picker to the allowed transitions; an older build shows a refused choice as an HTTP 409 error."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/therapies/{therapyId} response 409.expectedVersion was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 3, OpenAPI 1.50.0: the original TherapyVersionConflictResponse remains unchanged in the first oneOf branch of TherapyWriteConflict. The added branches carry status_transition_not_allowed (server-side therapy transition table) and therapy_end_date_required (a completed therapy cannot lose its end date). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client in the same release limits the status picker to the allowed transitions; an older build shows a refused choice as an HTTP 409 error."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/therapies/{therapyId} response 409.recordId was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 3, OpenAPI 1.50.0: the original TherapyVersionConflictResponse remains unchanged in the first oneOf branch of TherapyWriteConflict. The added branches carry status_transition_not_allowed (server-side therapy transition table) and therapy_end_date_required (a completed therapy cannot lose its end date). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client in the same release limits the status picker to the allowed transitions; an older build shows a refused choice as an HTTP 409 error."
     }
   ]
 }

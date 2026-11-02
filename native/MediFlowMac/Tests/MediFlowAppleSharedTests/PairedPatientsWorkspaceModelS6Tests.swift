@@ -76,6 +76,44 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
         }
     }
 
+    func testTherapyStatusChoicesFollowTheDecidedTable() throws {
+        let decided = try decidedTransitions("therapy")
+        XCTAssertEqual(Set(decided.keys), Set(PairedTherapyStatus.allCases.map(\.rawValue)))
+        for status in PairedTherapyStatus.allCases {
+            let offered = Set(status.allowedTargets.map(\.rawValue)).subtracting([status.rawValue])
+            XCTAssertEqual(offered, decided[status.rawValue], status.rawValue)
+            XCTAssertTrue(status.allowedTargets.contains(status), "restare nello stesso stato è ammesso")
+        }
+    }
+
+    func testEditingACompletedTherapyOffersOnlyReachableStatesAndReactivatingDropsTheOldEnd() async {
+        let patient = detail(id: "p1")
+        let model = await makeModel(source: S6MockDataSource(details: ["p1": patient]))
+        await model.configurePairedOnlineForTests(selectedPatient: patient)
+        await model.startEditingTherapy(therapy(id: "t1", status: "completed", endDate: Date(timeIntervalSince1970: 1_780_000_000)))
+        let options = await model.editTherapyStatusOptions
+        XCTAssertEqual(options, [.active, .completed])
+        let hadEnd = await model.editTherapyHasEndDate
+        XCTAssertTrue(hadEnd)
+        await MainActor.run { model.editTherapyStatus = .active }
+        let keepsEnd = await model.editTherapyHasEndDate
+        XCTAssertFalse(keepsEnd, "la data di conclusione non diventa una fine programmata")
+        await MainActor.run { model.editTherapyStatus = .completed }
+        let restored = await (model.editTherapyHasEndDate, model.editTherapyEndDate)
+        XCTAssertTrue(restored.0, "tornando a Conclusa la data salvata ritorna")
+        XCTAssertEqual(restored.1, Date(timeIntervalSince1970: 1_780_000_000))
+    }
+
+    func testCompletingAheadOfAPlannedEndProposesToday() async {
+        let patient = detail(id: "p1")
+        let model = await makeModel(source: S6MockDataSource(details: ["p1": patient]))
+        await model.configurePairedOnlineForTests(selectedPatient: patient)
+        await model.startEditingTherapy(therapy(id: "t2", status: "active", endDate: Date().addingTimeInterval(60 * 86_400)))
+        await MainActor.run { model.editTherapyStatus = .completed }
+        let end = await model.editTherapyEndDate
+        XCTAssertLessThanOrEqual(end, Date())
+    }
+
     func testEditingACompletedCheckupNeverOffersCancelled() async {
         let patient = detail(id: "p1")
         let model = await makeModel(source: S6MockDataSource(details: ["p1": patient]))
@@ -1031,6 +1069,15 @@ private func checkup(id: String, status: String) -> HomeBaseCheckupSummary {
     HomeBaseCheckupSummary(
         id: id, patientId: "p1", date: Date(timeIntervalSince1970: 1_750_000_000), title: "Controllo sintetico",
         notes: nil, status: status, source: "manual", version: 1,
+        createdAt: nil, updatedAt: nil, deletedAt: nil, deletionReason: nil
+    )
+}
+
+private func therapy(id: String, status: String, endDate: Date?) -> HomeBaseTherapySummary {
+    HomeBaseTherapySummary(
+        id: id, patientId: "p1", drugName: "Farmaco sintetico", aic: nil, atc: nil, activePrinciple: nil,
+        dosage: "1 cp", motivation: nil, diagnosisCode: nil, diagnosisName: nil, status: status,
+        startDate: Date(timeIntervalSince1970: 1_750_000_000), endDate: endDate, version: 1,
         createdAt: nil, updatedAt: nil, deletedAt: nil, deletionReason: nil
     )
 }
