@@ -7,7 +7,7 @@ import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home
 import { Button } from '@/components/ui/button';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { InkState } from '@/components/ui/ink-state';
-import { patientDiarySource, readPatientDiaryMetadata } from '@/lib/patient-diary-metadata';
+import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiarySource, patientDiaryWorkflowState, readPatientDiaryMetadata } from '@/lib/patient-diary-metadata';
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
@@ -56,16 +56,15 @@ function firstMetadataText(metadata: unknown, keys: string[]): string | undefine
     return undefined;
 }
 
-function presentEntry(entry: TimelineEntryData): EntryPresentation {
-    const workflowState = firstMetadataText(entry.metadata, ['workflowStatus', 'status'])?.toLocaleLowerCase('it-IT');
-    const draft = workflowState === 'draft' || workflowState === 'bozza';
-    const signed = workflowState === 'signed' || workflowState === 'firmata';
+function presentEntry(entry: TimelineEntryData, readableMetadata: unknown = entry.metadata): EntryPresentation & { stateKnown: boolean } {
+    const workflowState = patientDiaryWorkflowState(entry.metadata);
 
     return {
-        author: firstMetadataText(entry.metadata, ['authorName', 'author', 'signedBy']),
-        draft,
+        author: firstMetadataText(readableMetadata, ['authorName', 'author', 'signedBy']),
+        draft: workflowState === 'draft',
         source: patientDiarySource(entry.metadata, entry.setting),
-        stateLabel: entry.deletedAt ? 'Eliminata' : draft ? 'Bozza' : signed ? 'Firmata' : 'Registrata',
+        stateLabel: entry.deletedAt ? 'Eliminata' : PATIENT_DIARY_WORKFLOW_LABELS[workflowState],
+        stateKnown: !!entry.deletedAt || (workflowState !== 'unrecognized' && workflowState !== 'unreadable'),
     };
 }
 
@@ -135,14 +134,11 @@ export function TimelineEntryCard({
     const Icon = TYPE_ICONS[entry.type] || FileText;
     const diaryMetadata = diaryPresentation ? readPatientDiaryMetadata(entry.metadata) : null;
     const metadataUnreadable = diaryMetadata?.state === 'unreadable';
-    const workflowStatus = firstMetadataText(diaryMetadata?.value, ['workflowStatus', 'status'])?.toLocaleLowerCase('it-IT');
-    const stateRecognized = !workflowStatus || ['draft', 'bozza', 'signed', 'firmata', 'registered', 'registrata'].includes(workflowStatus);
     const settingLabel = entry.setting === 'home' ? 'Assistenza domiciliare' : entry.setting === 'hospital' ? 'Ospedale' : entry.setting === 'ambulatory' ? 'Ambulatorio' : undefined;
-    const basePresentation = presentEntry(diaryMetadata ? { ...entry, metadata: diaryMetadata.value } : entry);
-    const stateKnown = isDeleted || (!metadataUnreadable && stateRecognized);
+    const basePresentation = presentEntry(entry, diaryMetadata ? diaryMetadata.value : entry.metadata);
+    const stateKnown = basePresentation.stateKnown;
     const presentation = { ...basePresentation,
         source: metadataUnreadable ? 'Non leggibile' : basePresentation.source,
-        stateLabel: isDeleted ? basePresentation.stateLabel : metadataUnreadable ? 'Stato non leggibile' : !stateRecognized ? 'Stato non riconosciuto' : basePresentation.stateLabel,
     };
 
     return (
