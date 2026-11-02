@@ -293,9 +293,10 @@ la ricevuta durevole del comando e non viene presentato come tale.
 La coppia minima lettura/prenotazione è collegata nel codice. Il comando
 `booking` della card non porta campi. All’apertura la finestra GPUI riceve,
 dalla stessa transazione, la revisione dell’agenda della cartella selezionata
-e i suoi controlli (primi 20 per data, solo data e stato, nessun testo
-libero), e li mostra prima del campo data: la CAS protegge quello che il
-medico ha visto. Il medico scrive data e ora (`GG/MM/AAAA HH:MM`, dal giorno
+e i controlli da oggi in avanti (i 20 più vicini, solo data e stato, nessun
+testo libero) con il numero dei controlli futuri rimasti fuori, e li mostra
+prima del campo data. La CAS copre l’intero insieme, passati ed eliminati
+compresi. Il medico scrive data e ora (`GG/MM/AAAA HH:MM`, dal giorno
 locale corrente a due anni; per l’ora saltata o ripetuta del cambio d’ora un
 messaggio dedicato) e vede l’anteprima. Il titolo è fisso
 («Controllo»), nessuna nota, stato da svolgere. La conferma usa il PIN nativo e
@@ -318,14 +319,18 @@ Sta nelle tabelle già esportate dal backup portabile, quindi sopravvive al
 riavvio e al backup senza un nuovo registro; il test del backup esporta e
 valida un archivio con una prenotazione applicata e una respinta. Se un
 ripristino da un’esportazione senza audit riporta il controllo senza la sua
-ricevuta, la rilettura risponde applicata (storica), mai ritirata; una
-ricevuta importata da un ripristino è marcata storica.
+ricevuta, la rilettura risponde applicata e storica, mai ritirata, solo se il
+controllo è della cartella selezionata nell’ambito; l’esecuzione non usa mai
+questo ripiego. Una ricevuta importata da un ripristino è marcata storica e la
+card la mostra come presente in agenda senza dire «auditato».
 
 Il riferimento del comando resta nel deposito locale della GPUI insieme al
 tipo (terapia o prenotazione). Dopo un riavvio, e dal pulsante «Rileggi
-esito» della card, la rilettura usa solo la route di quel tipo. Un
-riferimento salvato prima che il tipo venisse registrato prova le route che
-l’abbinamento concede; una route che risponde 403 non blocca l’altra. Una
+esito» della card, la rilettura usa solo la route di quel tipo; il pulsante
+della prenotazione non legge né cancella un riferimento salvato come terapia.
+Un riferimento salvato prima che il tipo venisse registrato prova le route che
+l’abbinamento concede; un 403 viene superato solo se l’altra route trova
+davvero il comando, altrimenti l’esito resta incerto. Una
 risposta persa si riconcilia dalla ricevuta senza ripetere la scrittura.
 
 C-9b resta aperta per le prove sui due desktop reali, non eseguite qui.
