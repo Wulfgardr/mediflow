@@ -9,6 +9,7 @@ import { asc, eq, or, sql } from 'drizzle-orm';
 import {
     AIFA_CATALOG_MANIFEST_SETTING_KEY,
     AIFA_CLEAR_CONFIRMATION,
+    AIFA_LEGACY_REPLACE_CONFIRMATION,
     buildAifaCatalogManifest,
     normalizeAifaSearchText,
     parseAifaCsv,
@@ -239,6 +240,10 @@ export class AifaClearDeniedError extends AifaUpdateError {
     constructor() { super('Svuotamento del catalogo riservato all’amministratore', 403); }
 }
 
+export class AifaLegacyReplaceDeniedError extends AifaUpdateError {
+    constructor() { super('Sostituzione del catalogo riservata all’amministratore', 403); }
+}
+
 export type AifaCatalogClearReceipt = {
     operation: 'aifa-catalog-clear';
     confirmation: typeof AIFA_CLEAR_CONFIRMATION;
@@ -253,26 +258,53 @@ export type AifaCatalogClearReceipt = {
 
 export type AifaCatalogClearResult = AifaCatalogStatus & { snapshot: string; receipt: AifaCatalogClearReceipt };
 
-/**
- * The only explicit catalog clear: web administrator, compare-and-swap on the
- * observed snapshot, explicit versioned confirmation, audit row in the same
- * immediate transaction. Any failure leaves drugs and manifest untouched.
- * POST /api/v1/drugs still replaces the whole catalog without an audit row:
- * declared out of scope here and tracked separately.
- */
-export function clearAifaCatalogWithAuthority(input: {
+export type AifaLegacyReplaceReceipt = {
+    operation: 'aifa-catalog-legacy-replace';
+    confirmation: typeof AIFA_LEGACY_REPLACE_CONFIRMATION;
+    auditEventId: string;
+    replacedAt: string;
+    previousSnapshot: string;
+    previousCount: number;
+    previousState: AifaCatalogStatus['state'];
+    previousManifestSha256: string | null;
+    count: number;
+    snapshot: string;
+};
+
+export type AifaLegacyReplaceResult = AifaCatalogStatus & { snapshot: string; receipt: AifaLegacyReplaceReceipt };
+
+type AifaAdminCommandInput = {
     session: ServerSession | null;
     expectedSnapshot: unknown;
     confirmation: unknown;
     audit: AifaAuditInput;
-}): AifaCatalogClearResult {
-    if (!isWebAdminSession(input.session)) throw new AifaClearDeniedError();
+};
+
+type AifaAdminCommandContext = {
+    transaction: Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
+    previous: AifaCatalogStatus;
+    expectedSnapshot: string;
+};
+
+/**
+ * Shared boundary for every whole-catalog command that has no verified source file:
+ * web administrator (role and name re-read inside the transaction), compare-and-swap on
+ * the observed snapshot, explicit versioned confirmation, one audit row in the same
+ * immediate transaction. Any failure leaves drugs and manifest untouched.
+ */
+function runAifaAdminCommand<T>(
+    input: AifaAdminCommandInput,
+    expectedConfirmation: string,
+    deny: () => Error,
+    apply: (context: AifaAdminCommandContext) => T,
+): T {
+    if (!isWebAdminSession(input.session)) throw deny();
     const session = input.session;
     if (typeof input.expectedSnapshot !== 'string' || !/^[a-f0-9]{64}$/.test(input.expectedSnapshot)) {
         throw new AifaUpdateError('Versione attesa AIFA non valida', 400);
     }
-    if (input.confirmation !== AIFA_CLEAR_CONFIRMATION) {
-        throw new AifaUpdateError('Conferma dello svuotamento AIFA assente o non valida', 400);
+    if (input.confirmation !== expectedConfirmation) {
+        throw new AifaUpdateError('Conferma dell’operazione AIFA assente o non valida', 400);
     }
     const expectedSnapshot = input.expectedSnapshot;
     const release = acquireAifaCatalogOperation();
@@ -280,38 +312,48 @@ export function clearAifaCatalogWithAuthority(input: {
         return dbServer.transaction((transaction) => {
             const user = transaction.select({ role: users.role, username: users.username }).from(users)
                 .where(eq(users.id, session.userId)).get();
-            if (!user || user.role !== 'admin' || user.username !== session.username) throw new AifaClearDeniedError();
+            if (!user || user.role !== 'admin' || user.username !== session.username) throw deny();
             if (catalogSnapshot(transaction) !== expectedSnapshot) throw new AifaCatalogConflictError();
-            const previous = readCatalogStatus(transaction);
-            transaction.delete(drugs).run();
-            transaction.delete(settings)
-                .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
-                .run();
-            const auditEventId = writeAuditEventInTransaction(transaction, { ...input.audit, outcome: 'success',
-                redactedMetadata: { ...input.audit.redactedMetadata, counts: previous.count,
-                    flags: [...(input.audit.redactedMetadata?.flags ?? []), 'mode:clear'],
-                    aifaCatalog: { mode: 'clear', before: previous.manifest, after: null, forcedReduction: false } } });
-            const snapshot = catalogSnapshot(transaction);
-            return { ...readCatalogStatus(transaction), snapshot, receipt: {
-                operation: 'aifa-catalog-clear', confirmation: AIFA_CLEAR_CONFIRMATION, auditEventId,
-                clearedAt: new Date().toISOString(), previousSnapshot: expectedSnapshot, previousCount: previous.count,
-                previousState: previous.state, previousManifestSha256: previous.manifest?.sha256 ?? null, snapshot,
-            } };
+            return apply({ transaction, previous: readCatalogStatus(transaction), expectedSnapshot });
         }, { behavior: 'immediate' });
     } finally { release(); }
 }
 
-export function replaceUnverifiedDrugCatalog(items: readonly (typeof drugs.$inferInsert)[]): void {
-    const release = acquireAifaCatalogOperation();
-    try {
-        if (items.length === 0) throw new Error('Catalogo farmaci legacy vuoto');
+/** The only explicit catalog clear (ADR 0125). */
+export function clearAifaCatalogWithAuthority(input: AifaAdminCommandInput): AifaCatalogClearResult {
+    return runAifaAdminCommand(input, AIFA_CLEAR_CONFIRMATION, () => new AifaClearDeniedError(), ({ transaction, previous, expectedSnapshot }) => {
+        transaction.delete(drugs).run();
+        transaction.delete(settings)
+            .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
+            .run();
+        const auditEventId = writeAuditEventInTransaction(transaction, { ...input.audit, outcome: 'success',
+            redactedMetadata: { ...input.audit.redactedMetadata, counts: previous.count,
+                flags: [...(input.audit.redactedMetadata?.flags ?? []), 'mode:clear'],
+                aifaCatalog: { mode: 'clear', before: previous.manifest, after: null, forcedReduction: false } } });
+        const snapshot = catalogSnapshot(transaction);
+        return { ...readCatalogStatus(transaction), snapshot, receipt: {
+            operation: 'aifa-catalog-clear', confirmation: AIFA_CLEAR_CONFIRMATION, auditEventId,
+            clearedAt: new Date().toISOString(), previousSnapshot: expectedSnapshot, previousCount: previous.count,
+            previousState: previous.state, previousManifestSha256: previous.manifest?.sha256 ?? null, snapshot,
+        } };
+    });
+}
 
-        const normalizedItems = items.map((item) => ({
-            ...item,
-            packagingSearch: item.packagingSearch ?? normalizeAifaSearchText(item.packaging || ''),
-        }));
-
-        dbServer.transaction((transaction) => {
+/**
+ * Legacy whole-catalog replacement from POST /api/v1/drugs (WUL-802). The rows carry no
+ * source file or hash, so the manifest is removed and the catalog becomes `unverified`;
+ * it therefore needs the same authority as the clear, and its audit row is part of the write.
+ */
+export function replaceLegacyDrugCatalogWithAuthority(
+    input: AifaAdminCommandInput & { items: readonly (typeof drugs.$inferInsert)[] },
+): AifaLegacyReplaceResult {
+    if (input.items.length === 0) throw new AifaUpdateError('Catalogo farmaci legacy vuoto', 400);
+    const normalizedItems = input.items.map((item) => ({
+        ...item,
+        packagingSearch: item.packagingSearch ?? normalizeAifaSearchText(item.packaging || ''),
+    }));
+    return runAifaAdminCommand(input, AIFA_LEGACY_REPLACE_CONFIRMATION, () => new AifaLegacyReplaceDeniedError(),
+        ({ transaction, previous, expectedSnapshot }) => {
             transaction.delete(drugs).run();
             for (let offset = 0; offset < normalizedItems.length; offset += INSERT_BATCH_SIZE) {
                 transaction.insert(drugs).values(normalizedItems.slice(offset, offset + INSERT_BATCH_SIZE)).run();
@@ -319,8 +361,19 @@ export function replaceUnverifiedDrugCatalog(items: readonly (typeof drugs.$infe
             transaction.delete(settings)
                 .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
                 .run();
+            const auditEventId = writeAuditEventInTransaction(transaction, { ...input.audit, outcome: 'success',
+                redactedMetadata: { ...input.audit.redactedMetadata, counts: normalizedItems.length,
+                    flags: [...(input.audit.redactedMetadata?.flags ?? []), 'mode:legacy-replace'],
+                    aifaCatalog: { mode: 'legacy-replace', before: previous.manifest, after: null, forcedReduction: false } } });
+            const snapshot = catalogSnapshot(transaction);
+            const status = readCatalogStatus(transaction);
+            return { ...status, snapshot, receipt: {
+                operation: 'aifa-catalog-legacy-replace', confirmation: AIFA_LEGACY_REPLACE_CONFIRMATION, auditEventId,
+                replacedAt: new Date().toISOString(), previousSnapshot: expectedSnapshot, previousCount: previous.count,
+                previousState: previous.state, previousManifestSha256: previous.manifest?.sha256 ?? null,
+                count: status.count, snapshot,
+            } };
         });
-    } finally { release(); }
 }
 
 export async function searchAifaCatalog(

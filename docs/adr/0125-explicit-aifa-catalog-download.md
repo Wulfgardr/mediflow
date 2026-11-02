@@ -154,10 +154,45 @@ riuscite conserva attore, superficie, modalità remota/manuale, manifest prima
 e dopo ed eventuale riduzione confermata nella stessa transazione IMMEDIATE.
 Un audit mancante o ignorato annulla catalogo e manifest. I rifiuti delle route
 sono tracciati separatamente senza testi clinici o eccezioni di rete grezze.
-La pulizia e il caricamento legacy non sono nuovi percorsi di acquisizione
-AIFA e restano fuori da questa estensione dell'audit.
+La pulizia e il caricamento legacy non sono percorsi di acquisizione AIFA;
+dal 2026-11 entrambi scrivono comunque il proprio evento nella stessa
+transazione (vedi l'emendamento sotto).
 
 Le prove sono sintetiche: HEAD 200/304, scadenza, redirect, metadati assenti,
 egress negato, debounce persistente, CSV reale nelle intestazioni, troncamento,
 riduzione e rollback audit. Non attestano un aggiornamento live del catalogo
 AIFA o l'installazione su una postazione clinica.
+
+## Emendamento 2026-11: sostituzione legacy da `/api/v1/drugs` (WUL-802)
+
+Fino a OpenAPI 1.51.0 il POST di `/api/v1/drugs` accettava con il solo token
+locale un array o un oggetto singolo, sostituiva l'intero catalogo, cancellava
+il manifest e non scriveva audit: una sola voce bastava a sostituire migliaia
+di righe AIFA verificate.
+
+Il POST resta, perché lo usa lo smoke del catalogo in rete
+(`scripts/network-home-base-catalog-read.test.mjs`) per seminare un farmaco
+inventato, ma ha la stessa autorità dello svuotamento di `DELETE /api/drugs`
+e lo stesso servizio: token locale, sessione web di amministratore con ruolo
+e nome riletti su `users` dentro la transazione, generazione d'archivio,
+`expectedSnapshot` letto da `GET /api/drugs?count=1`, conferma
+`mediflow.aifa-catalog-legacy-replace.v1`. Righe, rimozione del manifest ed
+evento `reference_data.aifa.updated` con `aifaCatalog.mode = legacy-replace`
+(manifest precedente, `after` nullo, conteggio delle righe nuove) stanno in
+una transazione IMMEDIATE: se l'audit non viene scritto il catalogo resta
+com'era. La risposta porta una ricevuta con `auditEventId`, snapshot
+precedente e nuovo, conteggio e sha del manifest rimosso.
+
+Il corpo legacy (array nudo o oggetto singolo) risponde 400
+`AIFA_LEGACY_REPLACE_COMMAND_REQUIRED` senza effetti; una voce senza `aic` o
+`name` rifiuta l'intero comando invece di essere scartata in silenzio. Un
+clinico riceve 403 `AIFA_LEGACY_REPLACE_ADMIN_REQUIRED`, uno snapshot vecchio
+409 `AIFA_CATALOG_CHANGED`, un'altra operazione AIFA in corso 409. Il catalogo
+che ne risulta è `unverified`, come prima; i prezzi restano nella scala data.
+OpenAPI 1.52.0 documenta il POST; il GET resta fuori dal contratto stabile.
+
+Verifica: `lib/aifa-catalog-server.test.ts`, su SQLite reale con tutte le
+migrazioni e sessioni emesse dal lifecycle owner reale. Un trigger che fa
+fallire l'audit restituisce 500 e lascia snapshot, stato e numero di eventi
+invariati; togliendo il controllo d'autorità, il confronto di versione o
+l'audit dalla transazione il test diventa rosso.
