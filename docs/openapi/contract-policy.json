@@ -12,11 +12,10 @@
       "path": "/api/v1/drugs",
       "methods": [
         "GET",
-        "POST",
-        "DELETE"
+        "POST"
       ],
       "trackingIssue": "WUL-40",
-      "reason": "Drug catalog operations stay implementation-only until the stable client-facing contract is extended beyond patients."
+      "reason": "Drug catalog operations stay implementation-only until the stable client-facing contract is extended beyond patients. DELETE was removed: clearing the catalog requires the audited administrative command on /api/drugs (web administrator, expected snapshot, versioned confirmation)."
     },
     {
       "path": "/api/v1/exemptions",

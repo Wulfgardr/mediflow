@@ -1,5 +1,6 @@
 import type { AifaDownloadProgress } from './aifa-catalog-download';
 import {
+    AIFA_CLEAR_CONFIRMATION,
     type AifaCatalogManifest,
     type AifaCatalogManifestInput,
 } from './aifa-catalog';
@@ -8,6 +9,8 @@ export type AifaCatalogClientStatus = {
     count: number;
     manifest: AifaCatalogManifest | null;
     state: 'ready' | 'unverified' | 'not-imported';
+    /** Present on the versioned status read; required to clear. */
+    snapshot?: string;
 };
 
 export type AifaImportClientResult = AifaCatalogClientStatus & {
@@ -42,9 +45,29 @@ export async function importAifaCsv(
     return payload as AifaImportClientResult;
 }
 
-export async function clearDrugDatabase(): Promise<void> {
-    const response = await fetch('/api/drugs', { method: 'DELETE' });
-    if (!response.ok) throw new Error('Svuotamento catalogo AIFA non riuscito');
+export class AifaCatalogChangedBeforeClear extends Error {}
+
+export type AifaClearClientResult = AifaCatalogClientStatus & {
+    receipt: { operation: 'aifa-catalog-clear'; auditEventId: string; previousCount: number; clearedAt: string };
+};
+
+/** Sends one administrative clear bound to the snapshot the user saw; never retried. */
+export async function clearDrugDatabase(expectedSnapshot: string): Promise<AifaClearClientResult> {
+    const response = await fetch('/api/drugs', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedSnapshot, confirmation: AIFA_CLEAR_CONFIRMATION }),
+    });
+    const payload = await response.json().catch(() => null) as (AifaClearClientResult & { code?: string; error?: string }) | null;
+    if (response.status === 409 && payload?.code === 'AIFA_CATALOG_CHANGED') {
+        throw new AifaCatalogChangedBeforeClear(payload.error ?? 'Catalogo AIFA modificato dopo l’ultima lettura; nessuna voce rimossa');
+    }
+    if (!response.ok) throw new Error(payload?.error ?? 'Svuotamento catalogo AIFA non riuscito');
+    if (!payload || payload.state !== 'not-imported' || payload.count !== 0 || payload.receipt?.operation !== 'aifa-catalog-clear'
+        || typeof payload.receipt.auditEventId !== 'string') {
+        throw new Error('Ricevuta dello svuotamento non leggibile. Rileggi stato.');
+    }
+    return payload;
 }
 
 export async function getDrugCatalogStatus(): Promise<AifaCatalogClientStatus> {

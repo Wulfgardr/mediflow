@@ -616,6 +616,10 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     }
 
     async clear(): Promise<void> {
+        /* the AIFA catalog is cleared only through the audited administrative command. */
+        if (this.tableName === 'drugs') {
+            throw new Error('AIFA_CLEAR_REQUIRES_ADMIN_CONFIRMATION');
+        }
         const res = await fetch(this.endpoint, { method: 'DELETE' });
         if (res.ok) {
             this.emitChange();

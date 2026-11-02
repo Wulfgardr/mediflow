@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { AifaUpdateError } from '@/lib/aifa-catalog-lock';
 import { normalizeAifaSearchText } from '@/lib/aifa-catalog';
-import { clearAifaCatalog, replaceUnverifiedDrugCatalog } from '@/lib/aifa-catalog-server';
+import { replaceUnverifiedDrugCatalog } from '@/lib/aifa-catalog-server';
 import { drugs } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { readDrugCatalog } from '@/lib/network-catalog-read';
@@ -86,18 +86,4 @@ export async function POST(request: Request) {
     }
 }
 
-export async function DELETE(request: Request) {
-    const authError = requireLocalApiToken(request);
-    if (authError) return authError;
-
-    try {
-        clearAifaCatalog();
-        return NextResponse.json({ success: true });
-    } catch (error) {
-        if (error instanceof AifaUpdateError && error.status === 409) {
-            return NextResponse.json({ error: 'Operazione AIFA già in corso' }, { status: 409 });
-        }
-        console.error('API DELETE /api/v1/drugs error:', error);
-        return NextResponse.json({ error: 'Failed to clear drugs' }, { status: 500 });
-    }
-}
+/* No DELETE here: clearing the catalog needs the audited administrative path on /api/drugs. */
