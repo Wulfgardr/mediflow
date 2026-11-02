@@ -586,6 +586,81 @@ impl LocalHostAccess {
     }
 }
 
+/// Versioned administrative confirmation accepted by the host catalog owner.
+pub const AIFA_CLEAR_CONFIRMATION: &str = "mediflow.aifa-catalog-clear.v1";
+/// One administrative clear bound to the AIFA status the operator saw.
+pub struct PreparedAifaClear {
+    owner: Weak<()>,
+    snapshot: String,
+    count: u64,
+    submitted: AtomicBool,
+}
+impl PreparedAifaClear {
+    pub fn count(&self) -> u64 {
+        self.count
+    }
+}
+pub enum AifaClearResult {
+    /// Host receipt: empty status plus the audit event written with the clear.
+    Cleared(Value),
+    /// The catalog changed after the observed read; nothing was removed.
+    CatalogChanged,
+}
+impl LocalHostAccess {
+    /// Builds the command from an observed status only; no request is sent.
+    pub fn prepare_aifa_clear(&self, observed: &ReferenceStatus) -> Result<PreparedAifaClear> {
+        self.headers()?;
+        let snapshot = observed.data["snapshot"]
+            .as_str()
+            .filter(|s| reference_hash(s))
+            .ok_or(RuntimeError::ReadRequired)?;
+        let count = observed.data["count"].as_u64().unwrap_or(0);
+        if observed.catalog != ReferenceCatalog::Aifa || count == 0 {
+            return Err(RuntimeError::InvalidInput);
+        }
+        Ok(PreparedAifaClear {
+            owner: Arc::downgrade(&self.owner),
+            snapshot: snapshot.to_owned(),
+            count,
+            submitted: AtomicBool::new(false),
+        })
+    }
+    /// Sends the clear once. A conflict means no effect; any later attempt needs a new read.
+    pub fn clear_aifa_catalog(&self, command: &PreparedAifaClear) -> Result<AifaClearResult> {
+        if !command.owner.ptr_eq(&Arc::downgrade(&self.owner)) {
+            return Err(RuntimeError::ReadRequired);
+        }
+        self.headers()?;
+        if command.submitted.swap(true, Ordering::AcqRel) {
+            return Err(RuntimeError::ReadRequired);
+        }
+        let value = match self.request(
+            Method::DELETE,
+            &["api", "drugs"],
+            Some(&json!({"expectedSnapshot":command.snapshot,"confirmation":AIFA_CLEAR_CONFIRMATION})),
+            true,
+        ) {
+            Err(RuntimeError::Conflict) => return Ok(AifaClearResult::CatalogChanged),
+            other => other?,
+        };
+        let receipt = &value["receipt"];
+        if value["state"] != "not-imported"
+            || value["count"] != 0
+            || !value["manifest"].is_null()
+            || receipt["operation"] != "aifa-catalog-clear"
+            || receipt["confirmation"] != AIFA_CLEAR_CONFIRMATION
+            || receipt["previousSnapshot"] != command.snapshot.as_str()
+            || receipt["previousCount"] != command.count
+            || receipt["auditEventId"].as_str().is_none_or(str::is_empty)
+            || !receipt["clearedAt"].is_string()
+        {
+            return Err(RuntimeError::Indeterminate);
+        }
+        self.headers()?;
+        Ok(AifaClearResult::Cleared(value))
+    }
+}
+
 pub struct PreparedProstheticsDocument {
     owner: Weak<()>,
     payload: Value,

@@ -124,6 +124,7 @@ impl LocalAdministration {
         match page {
             SettingsPage::References => {
                 self.references.preview.is_some()
+                    || self.references.clear.is_some()
                     || self.references.who_consent
                     || self.who_administration.rollback.is_some()
             }
@@ -443,9 +444,11 @@ impl ClinicalApp {
             && self.settings_page == SettingsPage::References
             && !self.local_host.references.busy
             && (self.local_host.references.preview.is_some()
+                || self.local_host.references.clear.is_some()
                 || self.local_host.references.who_consent)
         {
             self.local_host.references.preview = None;
+            self.local_host.references.clear = None;
             self.local_host.references.who_consent = false;
             cx.notify();
             return;

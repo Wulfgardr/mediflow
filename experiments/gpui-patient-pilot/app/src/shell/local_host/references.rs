@@ -1,6 +1,7 @@
 use super::*;
 use mediflow_runtime_client::{
-    PreparedReferenceImport, ReferenceCatalog, ReferenceImportResult, ReferenceStatus,
+    AifaClearResult, PreparedAifaClear, PreparedReferenceImport, ReferenceCatalog,
+    ReferenceImportResult, ReferenceStatus,
 };
 use serde_json::{Value, json};
 
@@ -8,6 +9,8 @@ pub(super) struct ReferencesArea {
     pub(super) catalog: ReferenceCatalog,
     pub(super) snapshot: Option<ReferenceStatus>,
     pub(super) preview: Option<Arc<PreparedReferenceImport>>,
+    /// Administrative AIFA clear awaiting explicit confirmation.
+    pub(super) clear: Option<Arc<PreparedAifaClear>>,
     pub(super) busy: bool,
     message: Option<String>,
     receipt: Option<Value>,
@@ -41,6 +44,7 @@ impl ReferencesArea {
             catalog: ReferenceCatalog::Aifa,
             snapshot: None,
             preview: None,
+            clear: None,
             busy: false,
             message: None,
             receipt: None,
@@ -96,6 +100,7 @@ impl ReferencesArea {
         self.progress = None;
         self.snapshot = None;
         self.preview = None;
+        self.clear = None;
         self.busy = false;
         self.message = None;
         self.receipt = None;
@@ -325,6 +330,7 @@ impl ClinicalApp {
         area.busy = true;
         area.snapshot = None;
         area.preview = None;
+        area.clear = None;
         area.who_consent = false;
         self.local_host.who_administration.rollback = None;
         area.message = None;
@@ -669,6 +675,7 @@ impl ClinicalApp {
                                     area.catalog = catalog;
                                     area.snapshot = None;
                                     area.preview = None;
+                                    area.clear = None;
                                     area.message = None;
                                     area.receipt = None;
                                     area.who_consent = false;
@@ -813,9 +820,7 @@ impl ClinicalApp {
                 for field in &area.fields {
                     pane = pane.child(field.clone());
                 }
-                pane = pane.child(text!(
-                    "Svuotamento amministrativo non disponibile. Il catalogo resta conservato."
-                ));
+                pane = pane.child(self.aifa_clear_view(cx));
                 pane = pane.child(
                     div()
                         .flex()
@@ -983,7 +988,175 @@ fn prosthetics_options(fields: &[String]) -> std::result::Result<Value, &'static
     }
     Ok(options)
 }
+fn aifa_clear_outcome(value: &Value) -> String {
+    let count = value["receipt"]["previousCount"].as_u64().unwrap_or(0);
+    format!(
+        "Svuotamento registrato: {} confezioni rimosse. Evento nel registro attività: {}.",
+        count,
+        value["receipt"]["auditEventId"].as_str().unwrap_or("")
+    )
+}
 impl ClinicalApp {
+    fn aifa_clear_view(&self, cx: &Context<Self>) -> Div {
+        let theme = self.theme;
+        let area = &self.local_host.references;
+        let enabled = !self.local_host.has_work();
+        if let Some(command) = &area.clear {
+            return div()
+                .flex()
+                .flex_col()
+                .gap(px(8.))
+                .child(notice(
+                    "references-aifa-clear-review",
+                    format!(
+                        "Lo svuotamento rimuove le {} confezioni lette e il manifest di provenienza. Terapie e prescrizioni salvate non cambiano. È riservato all’amministratore e viene registrato nel registro attività. Se il catalogo è cambiato dopo la lettura, non viene rimosso nulla.",
+                        command.count()
+                    ),
+                    theme,
+                    true,
+                ))
+                .child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .gap(px(8.))
+                        .child(
+                            button(
+                                "references-aifa-clear-confirm",
+                                "Confermo: svuota il catalogo AIFA",
+                                theme,
+                                false,
+                                enabled,
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| this.commit_aifa_clear(cx))),
+                        )
+                        .child(
+                            button(
+                                "references-aifa-clear-cancel",
+                                "Annulla",
+                                theme,
+                                false,
+                                enabled,
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.local_host.references.clear = None;
+                                cx.notify();
+                            })),
+                        ),
+                );
+        }
+        let count = area
+            .snapshot
+            .as_ref()
+            .and_then(|s| s.data["count"].as_u64());
+        match count {
+            Some(0) => div().child(text!("Catalogo vuoto: non c’è nulla da svuotare.")),
+            Some(_) => div().child(
+                button(
+                    "references-aifa-clear",
+                    "Svuota catalogo AIFA…",
+                    theme,
+                    false,
+                    enabled,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.prepare_aifa_clear(cx))),
+            ),
+            None => div(),
+        }
+    }
+    fn prepare_aifa_clear(&mut self, cx: &mut Context<Self>) {
+        if self.local_host.has_work() {
+            return;
+        }
+        let Some(access) = self.local_host.access() else {
+            return;
+        };
+        let area = &mut self.local_host.references;
+        let Some(observed) = area.snapshot.as_ref() else {
+            return;
+        };
+        match access.prepare_aifa_clear(observed) {
+            Ok(command) => {
+                area.clear = Some(Arc::new(command));
+                area.message = None;
+                area.receipt = None;
+            }
+            Err(error) => area.message = Some(ui_error(error)),
+        }
+        cx.notify();
+    }
+    fn commit_aifa_clear(&mut self, cx: &mut Context<Self>) {
+        if self.local_host.has_work() {
+            return;
+        }
+        let Some(access) = self.local_host.access() else {
+            return;
+        };
+        let Some(command) = self.local_host.references.clear.take() else {
+            return;
+        };
+        let area = &mut self.local_host.references;
+        area.busy = true;
+        area.message = None;
+        area.receipt = None;
+        self.run_local_host(
+            move || {
+                let result = access.clear_aifa_catalog(&command)?;
+                let reread = matches!(result, AifaClearResult::Cleared(_))
+                    .then(|| access.read_reference_catalog(ReferenceCatalog::Aifa));
+                Ok((result, reread))
+            },
+            |this, result, cx| {
+                let area = &mut this.local_host.references;
+                area.busy = false;
+                match result {
+                    Ok((AifaClearResult::CatalogChanged, _)) => {
+                        area.snapshot = None;
+                        area.message = Some("Il catalogo AIFA è cambiato dopo l’ultima lettura: nessuna voce rimossa. Rileggi lo stato prima di decidere.".into());
+                    }
+                    Ok((AifaClearResult::Cleared(receipt), reread)) => {
+                        let outcome = aifa_clear_outcome(&receipt);
+                        area.receipt = Some(receipt);
+                        match reread {
+                            Some(Ok(s)) => {
+                                let empty = s.data["count"] == 0;
+                                area.snapshot = Some(s);
+                                area.message = Some(if empty {
+                                    format!("{outcome} Stato riletto.")
+                                } else {
+                                    format!("{outcome} Il catalogo riletto non è vuoto: verifica lo stato corrente.")
+                                });
+                            }
+                            Some(Err(e)) if e.retires_session() => {
+                                this.disconnect(cx);
+                                this.message = Some((ui_error(e), true));
+                                cx.notify();
+                                return;
+                            }
+                            _ => {
+                                area.snapshot = None;
+                                area.message =
+                                    Some(format!("{outcome} Rilettura non riuscita. Rileggi lo stato."));
+                            }
+                        }
+                    }
+                    Err(RuntimeError::Forbidden) => {
+                        area.message = Some("Svuotamento riservato all’amministratore dell’archivio. Catalogo conservato.".into());
+                    }
+                    Err(e) => {
+                        area.snapshot = None;
+                        area.message = Some(format!(
+                            "{} L’esito dello svuotamento potrebbe non essere noto. Rileggi lo stato prima di riprovare.",
+                            ui_error(e)
+                        ));
+                    }
+                }
+                cx.notify();
+            },
+            cx,
+        );
+        cx.notify();
+    }
     fn prepare_aifa_acquisition(&mut self, cx: &mut Context<Self>) {
         if self.local_host.has_work() || self.local_host.references.snapshot.is_none() {
             return;
@@ -1422,6 +1595,146 @@ mod tests {
             assert!(app.local_host.references.in_flight.is_none());
             assert!(!app.local_host.references.busy);
         });
+    }
+    #[gpui::test]
+    fn aifa_clear_requires_confirmation_and_reports_conflict_denial_and_receipt(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let observed = || ReferenceStatus {
+            catalog: ReferenceCatalog::Aifa,
+            data: json!({"count":3,"state":"ready","snapshot":"a".repeat(64),"manifest":null}),
+            sources: None,
+        };
+        view.update(cx, |app, _| {
+            app.session = Some(host.session.clone());
+            app.area = Area::Settings;
+            app.settings_page = SettingsPage::References;
+            app.local_host.authority = Authority::Open(access);
+            app.local_host.references.snapshot = Some(observed());
+        });
+        // Each command must be drawn in this frame; the click runs the same handler as on_click.
+        let click = |cx: &mut gpui::VisualTestContext, id: &'static str| {
+            notes_recovery_tests::draw(cx);
+            let ids = rendered_command::button_ids(|| {
+                cx.update(|window, cx| {
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                })
+            });
+            assert!(ids.contains(&id.to_owned()), "{id} not drawn");
+            view.update(cx, |app, cx| match id {
+                "references-aifa-clear" => app.prepare_aifa_clear(cx),
+                "references-aifa-clear-confirm" => app.commit_aifa_clear(cx),
+                "references-aifa-clear-cancel" => app.local_host.references.clear = None,
+                _ => unreachable!(),
+            });
+            notes_recovery_tests::draw(cx);
+        };
+        let deletes = |host: &notes_recovery_tests::Host| {
+            host.routes()
+                .iter()
+                .filter(|r| *r == "DELETE /api/drugs")
+                .count()
+        };
+        click(cx, "references-aifa-clear");
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.local_host.references.clear.as_ref().unwrap().count(), 3)
+        });
+        click(cx, "references-aifa-clear-cancel");
+        view.read_with(cx, |app, _| {
+            assert!(app.local_host.references.clear.is_none())
+        });
+        assert_eq!(deletes(&host), 0, "opening and cancelling sends nothing");
+
+        host.plan("DELETE /api/drugs")
+            .send((
+                409,
+                json!({"code":"AIFA_CATALOG_CHANGED","error":"invented"}),
+            ))
+            .unwrap();
+        click(cx, "references-aifa-clear");
+        click(cx, "references-aifa-clear-confirm");
+        view.read_with(cx, |app, _| {
+            let area = &app.local_host.references;
+            assert!(area.snapshot.is_none() && area.receipt.is_none());
+            assert!(
+                area.message
+                    .as_deref()
+                    .unwrap()
+                    .contains("nessuna voce rimossa")
+            );
+        });
+        assert_eq!(deletes(&host), 1);
+
+        view.update(cx, |app, _| {
+            app.local_host.references.snapshot = Some(observed())
+        });
+        host.plan("DELETE /api/drugs")
+            .send((
+                403,
+                json!({"code":"AIFA_CLEAR_ADMIN_REQUIRED","error":"invented"}),
+            ))
+            .unwrap();
+        click(cx, "references-aifa-clear");
+        click(cx, "references-aifa-clear-confirm");
+        view.read_with(cx, |app, _| {
+            let area = &app.local_host.references;
+            assert!(
+                area.snapshot.is_some(),
+                "a denied clear keeps the observed status"
+            );
+            assert!(
+                area.message
+                    .as_deref()
+                    .unwrap()
+                    .contains("riservato all’amministratore")
+            );
+        });
+
+        host.plan("DELETE /api/drugs").send((200, json!({"count":0,"state":"not-imported",
+            "manifest":null,"snapshot":"b".repeat(64),"receipt":{"operation":"aifa-catalog-clear",
+            "confirmation":"mediflow.aifa-catalog-clear.v1","auditEventId":"synthetic-audit",
+            "clearedAt":"2026-11-02T10:00:00.000Z","previousSnapshot":"a".repeat(64),"previousCount":3}}))).unwrap();
+        host.plan("GET /api/drugs")
+            .send((
+                200,
+                json!({"count":0,"state":"not-imported","manifest":null,"snapshot":"b".repeat(64)}),
+            ))
+            .unwrap();
+        click(cx, "references-aifa-clear");
+        click(cx, "references-aifa-clear-confirm");
+        view.read_with(cx, |app, _| {
+            let area = &app.local_host.references;
+            let message = area.message.as_deref().unwrap();
+            assert!(message.contains("3 confezioni rimosse") && message.contains("Stato riletto"));
+            assert_eq!(
+                area.receipt.as_ref().unwrap()["receipt"]["auditEventId"],
+                "synthetic-audit"
+            );
+            assert_eq!(area.snapshot.as_ref().unwrap().data["count"], 0);
+        });
+        assert_eq!(deletes(&host), 3);
+        let ids = rendered_command::button_ids(|| {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            })
+        });
+        assert!(
+            !ids.iter().any(|id| id.starts_with("references-aifa-clear")),
+            "an empty catalog offers no clear"
+        );
     }
     #[test]
     fn truncated_aifa_review_reports_total_before_and_after_import() {
