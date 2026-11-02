@@ -888,7 +888,16 @@ mod tests {
         #[cfg(windows)]
         mediflow_local_state::create_directory(&pending).unwrap();
         let marker = "0f0e0d0c-0b0a-4908-8706-050403020100";
+        // Same writer as a real marker: on Windows the file must carry the
+        // private descriptor that the orphan check verifies.
+        #[cfg(unix)]
         std::fs::write(pending.join(marker), marker).unwrap();
+        #[cfg(windows)]
+        std::io::Write::write_all(
+            &mut mediflow_local_state::create_file(&pending.join(marker)).unwrap(),
+            marker.as_bytes(),
+        )
+        .unwrap();
         let (view, cx) =
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
         view.update(cx, |app, cx| {

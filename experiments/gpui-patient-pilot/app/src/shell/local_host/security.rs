@@ -650,6 +650,8 @@ mod review738 {
         cx: &mut gpui::TestAppContext,
     ) {
         let fixture = crate::shell::local_preferences::tests::Fixture::new();
+        // Creates the private state directory on Windows, as the real store does.
+        fixture.store();
         let path = fixture.0.join("passphrase-change-outcome.json");
         let host = notes_recovery_tests::Host::new();
         let notice = RetirementNotice::new(None);
