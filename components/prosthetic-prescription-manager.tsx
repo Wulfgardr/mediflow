@@ -20,6 +20,7 @@ import { ProstheticsCatalogLookup } from '@/components/prosthetics-catalog-manag
 import { Badge } from '@/components/ui/badge';
 import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 import type { SemanticSignal } from '@/lib/ui-semantic-signal';
+import { isProstheticTransitionAllowed } from '@/lib/clinical-status-transitions';
 
 type Props = {
     patientId: string;
@@ -206,11 +207,11 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
         }
     };
 
+    // WUL-800: il collaudo non inventa un esito; il server tiene la data già salvata.
     const markTested = async (item: ProstheticPrescription) => {
         await db.prostheticPrescriptions.update(item.id, {
             status: 'tested',
             collaudoAt: item.collaudoAt ?? new Date(),
-            collaudoOutcome: item.collaudoOutcome ?? 'Collaudo registrato in MediFlow.',
             version: item.version,
             updatedAt: new Date(),
         });
@@ -361,7 +362,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                             <td><Badge tone={prostheticStatusSignal(item.status)} size="xs" className={styles.status}>{statusLabel(item.status)}</Badge></td>
                             <td>
                                 <div className={styles.therapyActions}>
-                                    {item.status !== 'tested' ? <Button variant="text" onClick={() => void markTested(item)}>Collaudo</Button> : null}
+                                    {isProstheticTransitionAllowed(item.status, 'tested') && item.status !== 'tested' ? <Button variant="text" onClick={() => void markTested(item)}>Collaudo</Button> : null}
                                     <PatientSheetMenu label={`Azioni voce protesica ${item.description}`}
                                         trigger={props => <Button {...props} variant="icon" aria-label={`Azioni voce protesica ${item.description}`}><MoreHorizontal size={16} aria-hidden /></Button>}>
                                         <button type="button" role="menuitem" onClick={() => void deleteItem(item)}>Elimina voce protesica</button>

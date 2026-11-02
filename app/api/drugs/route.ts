@@ -5,7 +5,8 @@ import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request'
 import { NextResponse } from 'next/server';
 import {
     recordAifaCatalogRejection,
-    clearAifaCatalog,
+    AifaClearDeniedError,
+    clearAifaCatalogWithAuthority,
     getAifaCatalogVersionedStatus,
     replaceAifaCatalog,
     searchAifaCatalog,
@@ -131,13 +132,28 @@ export async function DELETE(request: Request) {
     const archiveDenial = archiveWriteRequestDenial(request, session);
     if (archiveDenial) return archiveDenial;
 
+    const body = await request.json().catch(() => null) as { expectedSnapshot?: unknown; confirmation?: unknown } | null;
     try {
-        clearAifaCatalog();
-        return NextResponse.json({ success: true });
+        const result = clearAifaCatalogWithAuthority({
+            session,
+            expectedSnapshot: body?.expectedSnapshot,
+            confirmation: body?.confirmation,
+            audit: buildAuditWriteInputFromRequest(request, session, { eventType: 'reference_data.aifa.updated', subjectType: 'reference_data', subjectRef: 'aifa' }),
+        });
+        return NextResponse.json(result, { headers: { [CATALOG_STATUS_HEADER]: result.state } });
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
+        if (error instanceof AifaClearDeniedError) {
+            return NextResponse.json({ error: error.message, code: 'AIFA_CLEAR_ADMIN_REQUIRED' }, { status: 403 });
+        }
+        if (error instanceof AifaCatalogConflictError) {
+            return NextResponse.json({ error: 'Catalogo AIFA modificato dopo l’ultima lettura; nessuna voce rimossa', code: 'AIFA_CATALOG_CHANGED' }, { status: 409 });
+        }
+        if (error instanceof AifaUpdateError) {
+            return NextResponse.json({ error: error.message }, { status: error.status });
+        }
         console.error('[MediFlow] AIFA catalog clear failed:', error);
-        return NextResponse.json({ error: 'Failed to clear drug catalog' }, { status: 500 });
+        return NextResponse.json({ error: 'Svuotamento AIFA non riuscito; catalogo conservato' }, { status: 500 });
     }
 }

@@ -23,6 +23,8 @@ const status = (version = 'synthetic-old', count = 3): AifaImportClientResult =>
         reuseTermsUrl: 'https://www.aifa.gov.it/copyright', reuseStatus: 'source-artifact-review-required',
         sha256: (version === 'synthetic-old' ? 'a' : 'b').repeat(64), fileName: 'synthetic.csv', rowCount: count,
         importedAt: '2026-09-01T12:00:00.000Z' },
+    // The read now carries the observed catalog fingerprint that a clear must name.
+    snapshot: (version === 'synthetic-old' ? 'c' : 'd').repeat(64),
 });
 const csv = { name: 'synthetic.csv', mimeType: 'text/csv', buffer: Buffer.from('CODICE_AIC;DENOMINAZIONE\n000000701;CONFEZIONE INVENTATA') };
 

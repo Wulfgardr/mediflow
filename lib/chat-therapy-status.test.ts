@@ -186,3 +186,12 @@ test('another session cannot revoke a pending command or read a foreign receipt'
     assert.equal((await f.service.execute(f.context, f.command.commandId, pin)).outcome, 'applied');
     await assert.rejects(f.service.revoke({ ...f.context, scopeAmbulatoryId: randomUUID() }, f.command.commandId));
 });
+
+test('preview refuses a step outside the table or onto the same canonical state, before the PIN is spent', async () => {
+    for (const [saved, target] of [['completed', 'suspended'], ['stopped', 'completed']] as const) {
+        const f = await fixture();
+        dbServer.update(therapies).set({ status: saved, endDate: new Date('2026-01-01') }).where(eq(therapies.id, f.command.therapyId)).run();
+        await assert.rejects(f.service.preview(f.context, { ...f.command, target }, f.epoch, f.viewId), `${saved} -> ${target}`);
+        assert.deepEqual(effects(f.command.therapyId), { therapy: { version: 1, status: saved }, audits: 0 });
+    }
+});

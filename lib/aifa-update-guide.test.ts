@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { assertAifaGuideStatus, createAifaUpdateGuide, type AifaGuideState } from './aifa-update-guide.ts';
-import { AifaReductionConfirmationRequired, updateAifaCatalog } from './aifa-importer.ts';
+import { AifaCatalogChangedBeforeClear, AifaReductionConfirmationRequired, clearDrugDatabase, updateAifaCatalog } from './aifa-importer.ts';
 import type { AifaCatalogClientStatus, AifaImportClientResult } from './aifa-importer.ts';
 import type { AifaCatalogManifestInput } from './aifa-catalog.ts';
 
@@ -13,7 +13,7 @@ function deferred<T>() {
     return { promise, resolve, reject };
 }
 function catalog(version = 'synthetic-old', count = 3): AifaImportClientResult {
-    return { state: 'ready', count, rejectedRecords: 0, totalRecords: count, manifest: {
+    return { state: 'ready', count, rejectedRecords: 0, totalRecords: count, snapshot: (version === 'synthetic-old' ? 'c' : 'd').repeat(64), manifest: {
         format: 'mediflow.aifa-catalog-manifest.v1', source: 'Agenzia Italiana del Farmaco (AIFA)',
         sourceUrl: 'https://example.invalid/synthetic.csv', downloadedAt: '2026-09-01', version,
         reuseTermsUrl: 'https://www.aifa.gov.it/copyright', reuseStatus: 'source-artifact-review-required',
@@ -21,7 +21,8 @@ function catalog(version = 'synthetic-old', count = 3): AifaImportClientResult {
         importedAt: '2026-09-01T12:00:00.000Z',
     } };
 }
-const empty: AifaCatalogClientStatus = { count: 0, manifest: null, state: 'not-imported' };
+const empty: AifaCatalogClientStatus = { count: 0, manifest: null, state: 'not-imported', snapshot: 'e'.repeat(64) };
+const clearReceipt = (previousCount = 3) => ({ ...empty, receipt: { operation: 'aifa-catalog-clear' as const, auditEventId: 'synthetic-audit', previousCount, clearedAt: '2026-11-02T10:00:00.000Z' } });
 const file = () => new File(['entirely invented CSV fixture'], 'synthetic.csv', { type: 'text/csv' });
 const metadata = (): AifaCatalogManifestInput => ({ sourceUrl: 'https://example.invalid/synthetic.csv', downloadedAt: '2026-09-01', version: 'synthetic-input' });
 const yes = async () => true;
@@ -33,7 +34,7 @@ function fixture() {
         read: async () => { calls.read++; return observed; },
         update: async (_signal: AbortSignal) => { calls.update++; const result = catalog('synthetic-new', 4); observed = result; return result; },
         importFile: async (_file: File, _manifest: AifaCatalogManifestInput) => { calls.import++; const result = catalog('synthetic-manual', 5); observed = result; return result; },
-        clear: async () => { calls.clear++; observed = empty; },
+        clear: async (snapshot: string) => { void snapshot; calls.clear++; observed = empty; return clearReceipt(); },
     };
     const guide = createAifaUpdateGuide(ports, state => events.push(state));
     return { guide, ports, events, calls, last: () => events.at(-1)!, setObserved: (value: AifaCatalogClientStatus) => { observed = value; } };
@@ -174,12 +175,47 @@ test('clear failure is recovered inline; success is reported only after reading 
     f.ports.clear = async () => { throw new Error('invented delete failure'); };
     await f.guide.clear(yes); assert.equal(f.last().phase, 'idle'); assert.equal(f.last().catalog?.count, 3);
     assert.equal(f.last().reconciliationRequired, true); await f.guide.refresh();
-    f.ports.clear = async () => { f.setObserved(empty); }; await f.guide.clear(yes);
+    f.ports.clear = async () => { f.setObserved(empty); return clearReceipt(); }; await f.guide.clear(yes);
     assert.equal(f.last().catalog?.count, 0); assert.match(f.last().notice!.text, /Svuotamento confermato/u);
 });
 
+test('clear sends only the observed snapshot; a changed catalog keeps the rows and forces a reread', async () => {
+    const f = fixture();
+    await f.guide.clear(yes);
+    assert.equal(f.calls.clear, 0, 'without an observed snapshot nothing is sent');
+    assert.match(f.last().notice!.text, /Rileggi stato prima di svuotare/u);
+    await f.guide.refresh();
+    const sent: string[] = [];
+    f.ports.clear = async (snapshot: string) => { f.calls.clear++; sent.push(snapshot); throw new AifaCatalogChangedBeforeClear('invented conflict'); };
+    const reads = f.calls.read;
+    await f.guide.clear(yes);
+    assert.deepEqual(sent, ['c'.repeat(64)]);
+    assert.equal(f.calls.read, reads, 'a refused clear does not claim a reconciliation');
+    assert.equal(f.last().catalog?.count, 3); assert.equal(f.last().reconciliationRequired, true);
+    assert.match(f.last().notice!.text, /nessuna voce rimossa/u);
+    await f.guide.clear(yes); assert.equal(f.calls.clear, 1, 'no retry before a fresh read');
+    f.ports.clear = async () => { f.setObserved(empty); return clearReceipt(3); };
+    await f.guide.refresh(); await f.guide.clear(yes);
+    assert.match(f.last().notice!.text, /3 confezioni rimosse/u); assert.equal(f.last().catalog?.count, 0);
+});
+
+test('real clear client posts the snapshot with the versioned confirmation and reads the conflict', async t => {
+    const bodies: unknown[] = [];
+    let status = 409;
+    t.mock.method(globalThis, 'fetch', async (url: unknown, init?: RequestInit) => {
+        assert.equal(url, '/api/drugs'); assert.equal(init?.method, 'DELETE');
+        bodies.push(JSON.parse(String(init?.body)));
+        return status === 409 ? Response.json({ code: 'AIFA_CATALOG_CHANGED', error: 'invented' }, { status })
+            : Response.json(clearReceipt(), { status });
+    });
+    await assert.rejects(clearDrugDatabase('f'.repeat(64)), AifaCatalogChangedBeforeClear);
+    status = 200;
+    assert.equal((await clearDrugDatabase('f'.repeat(64))).receipt.previousCount, 3);
+    assert.deepEqual(bodies[0], { expectedSnapshot: 'f'.repeat(64), confirmation: 'mediflow.aifa-catalog-clear.v1' });
+});
+
 test('confirmation errors do not mark a never-sent mutation as having an unknown server result', async () => {
-    const f = fixture(); await f.guide.clear(async () => { throw new Error('invented dialog failure'); });
+    const f = fixture(); await f.guide.refresh(); await f.guide.clear(async () => { throw new Error('invented dialog failure'); });
     assert.equal(f.last().phase, 'idle'); assert.equal(f.last().reconciliationRequired, false);
     assert.equal(f.calls.clear, 0); assert.equal(f.last().notice?.tone, 'error');
 });
@@ -224,7 +260,7 @@ test('reduction retry requires explicit confirmation and sends only the bound co
         const confirmations: (string | undefined)[] = [];
         const bound = `${'a'.repeat(64)}:${'b'.repeat(64)}`;
         const result = catalog('synthetic-reduced', 2);
-        const guide = createAifaUpdateGuide({ read: async () => result, importFile: async () => result, clear: async () => undefined,
+        const guide = createAifaUpdateGuide({ read: async () => result, importFile: async () => result, clear: async () => clearReceipt(),
             update: async (_signal, confirmation) => {
                 confirmations.push(confirmation);
                 if (!confirmation) throw new AifaReductionConfirmationRequired('Riduzione sotto il 90%', bound);

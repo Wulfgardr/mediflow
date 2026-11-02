@@ -234,7 +234,31 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editTherapyActivePrinciple = ""
     @Published var editTherapyDosage = ""
     @Published var editTherapyMotivation = ""
-    @Published var editTherapyStatus: PairedTherapyStatus = .active
+    @Published var editTherapyStatus: PairedTherapyStatus = .active {
+        didSet {
+            guard editTherapyStatus != oldValue else { return }
+            // WUL-800: riattivando una terapia conclusa la data di conclusione non resta come fine programmata.
+            if editTherapyStatus == .active, editTherapySavedStatus == .completed {
+                editTherapyHasEndDate = false
+            }
+            // Tornando a «Conclusa» ritorna la data salvata; concludendo prima di una fine programmata vale oggi.
+            if editTherapyStatus == .completed {
+                if editTherapySavedStatus == .completed, let saved = editTherapySavedEndDate {
+                    editTherapyHasEndDate = true
+                    editTherapyEndDate = saved
+                } else if editTherapyHasEndDate, editTherapyEndDate > Date() {
+                    editTherapyEndDate = Date()
+                }
+            }
+        }
+    }
+    /// Data di fine salvata della terapia in modifica, per tornare a «Conclusa» senza perderla.
+    var editTherapySavedEndDate: Date?
+    /// Stato salvato della terapia in modifica: limita le scelte ai passaggi ammessi.
+    @Published var editTherapySavedStatus: PairedTherapyStatus?
+    var editTherapyStatusOptions: [PairedTherapyStatus] {
+        editTherapySavedStatus?.allowedTargets ?? PairedTherapyStatus.allCases
+    }
     @Published var editTherapyStartDate = Date()
     @Published var editTherapyHasEndDate = false
     @Published var editTherapyEndDate = Date()
@@ -2869,7 +2893,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editTherapyActivePrinciple = therapy.activePrinciple ?? ""
         editTherapyDosage = therapy.dosage
         editTherapyMotivation = therapy.motivation ?? ""
-        editTherapyStatus = PairedTherapyStatus(rawValue: therapy.status) ?? .active
+        editTherapySavedEndDate = therapy.endDate
+        editTherapySavedStatus = PairedTherapyStatus(rawValue: therapy.status)
+        editTherapyStatus = editTherapySavedStatus ?? .active
         editTherapyStartDate = therapy.startDate
         editTherapyHasEndDate = therapy.endDate != nil
         editTherapyEndDate = therapy.endDate ?? Date()
@@ -2888,6 +2914,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editTherapyDosage = ""
         editTherapyMotivation = ""
         editTherapyStatus = .active
+        editTherapySavedStatus = nil
         editTherapyStartDate = Date()
         editTherapyHasEndDate = false
         editTherapyEndDate = Date()
@@ -3560,8 +3587,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 payload: HomeBaseProstheticPrescriptionUpdatePayload(
                     version: prescription.version,
                     status: PairedProstheticPrescriptionStatus.tested.rawValue,
-                    collaudoAt: .value(prescription.collaudoAt ?? Date()),
-                    collaudoOutcome: .value(prescription.collaudoOutcome ?? "Collaudo registrato in MediFlow.")
+                    collaudoAt: .value(prescription.collaudoAt ?? Date())
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -5678,8 +5704,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && sessionCookie != nil
             && pairedCredentials != nil
             && connectionState == .pairedOnline
-            && prescription.status != PairedProstheticPrescriptionStatus.tested.rawValue
-            && prescription.status != PairedProstheticPrescriptionStatus.cancelled.rawValue
+            // WUL-800: il collaudo si offre solo dove la tabella lo ammette; uno stato sconosciuto lo decide il server.
+            && (PairedProstheticPrescriptionStatus(rawValue: prescription.status).map { $0.allowedTargets.contains(.tested) } ?? true)
             && !isWorking
     }
 }

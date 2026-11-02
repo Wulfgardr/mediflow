@@ -49,6 +49,7 @@ struct PairedPatientTherapiesSection: View {
                     dosage: $model.editTherapyDosage,
                     motivation: $model.editTherapyMotivation,
                     status: $model.editTherapyStatus,
+                    statusOptions: model.editTherapyStatusOptions,
                     startDate: $model.editTherapyStartDate,
                     hasEndDate: $model.editTherapyHasEndDate,
                     endDate: $model.editTherapyEndDate,
@@ -291,6 +292,7 @@ struct PairedPatientTherapiesSection: View {
         dosage: Binding<String>,
         motivation: Binding<String>,
         status: Binding<PairedTherapyStatus>,
+        statusOptions: [PairedTherapyStatus] = PairedTherapyStatus.allCases,
         startDate: Binding<Date>,
         hasEndDate: Binding<Bool>,
         endDate: Binding<Date>,
@@ -356,7 +358,7 @@ struct PairedPatientTherapiesSection: View {
             } trailing: {
                 ChartGroup("Periodo e stato") {
                     Picker("Stato", selection: status) {
-                        ForEach(PairedTherapyStatus.allCases) { status in
+                        ForEach(statusOptions) { status in
                             Text(status.title).tag(status)
                         }
                     }

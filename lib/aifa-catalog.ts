@@ -2,6 +2,8 @@ export const AIFA_DOWNLOAD_URL = 'https://drive.aifa.gov.it/farmaci/confezioni_f
 export const AIFA_DOWNLOAD_MAX_BYTES = 100 * 1024 * 1024;
 
 export const AIFA_CATALOG_MANIFEST_SETTING_KEY = 'aifaCatalogManifest';
+/** Versioned administrative confirmation for the audited catalog clear. */
+export const AIFA_CLEAR_CONFIRMATION = 'mediflow.aifa-catalog-clear.v1';
 export const AIFA_CATALOG_SOURCE = 'Agenzia Italiana del Farmaco (AIFA)';
 export const AIFA_CATALOG_DEFAULT_SOURCE_URL = 'https://www.aifa.gov.it/open-data';
 export const AIFA_REUSE_TERMS_URL = 'https://www.aifa.gov.it/copyright';

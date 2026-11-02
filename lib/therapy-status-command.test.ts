@@ -138,3 +138,11 @@ test('retired real owner projection cannot use a delayed request after lock', ()
     assert.deepEqual(counts(command), before);
 });
 test.after(() => dbServer.$client.close());
+test('a completed therapy cannot be suspended by command: denied without receipt or effect (WUL-800)', () => {
+    const command = fixture();
+    sql.prepare("UPDATE therapies SET status='completed' WHERE id=?").run(command.therapyId);
+    const before = counts(command);
+    assert.throws(() => executeTherapyStatusCommand(session, { ...command, target: 'suspended' }), /denied/);
+    assert.deepEqual(counts(command), before);
+    assert.equal(counts(command).receipt, undefined);
+});
