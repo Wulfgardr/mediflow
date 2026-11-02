@@ -107,3 +107,49 @@ export function formatPdfSmokeFailure(operation, failedCheck, result) {
   };
   return `Standalone PDF page worker failed the ${stage} smoke. Diagnostic: ${JSON.stringify(observation)}`;
 }
+
+export async function runPdfSmokeChild(args, options) {
+  const { spawn } = await import('node:child_process');
+  const hook = `import { subscribe } from 'node:diagnostics_channel';
+    import { writeSync } from 'node:fs';
+    subscribe('mediflow.anydoc.pdf.phase', phase => writeSync(3, phase + '\\n'));`;
+  const started = performance.now();
+  return new Promise(resolve => {
+    const child = spawn(process.execPath, ['--import', `data:text/javascript,${encodeURIComponent(hook)}`, ...args], {
+      cwd: options.cwd, env: options.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+    });
+    const stdout = [], stderr = [], phases = [];
+    let bytes = 0, phaseBuffer = '', error;
+    const stop = code => { error ||= Object.assign(new Error(code), { code }); child.kill('SIGKILL'); };
+    const timer = setTimeout(() => stop('ETIMEDOUT'), options.timeout);
+    child.once('error', value => { error = value; });
+    child.stdin.on('error', () => {});
+    child.stdin.end(options.input);
+    for (const [stream, output] of [[child.stdout, stdout], [child.stderr, stderr]]) {
+      stream.on('data', chunk => {
+        bytes += chunk.length;
+        if (bytes > options.maxBuffer) stop('ENOBUFS');
+        else output.push(chunk);
+      });
+    }
+    child.stdio[3].on('data', chunk => {
+      phaseBuffer += chunk.toString('utf8');
+      if (phaseBuffer.length > 256 || phases.length > 8) { stop('EIO'); return; }
+      for (;;) {
+        const end = phaseBuffer.indexOf('\n');
+        if (end < 0) break;
+        const phase = phaseBuffer.slice(0, end); phaseBuffer = phaseBuffer.slice(end + 1);
+        if (!['boot', 'input', 'verified', 'engine', 'painted'].includes(phase)) { stop('EIO'); return; }
+        phases.push({ phase, elapsedMs: Math.round(performance.now() - started) });
+      }
+    });
+    child.once('close', (status, signal) => {
+      clearTimeout(timer);
+      const elapsedMs = Math.round(performance.now() - started);
+      if (process.env.MEDIFLOW_PDF_SMOKE_TIMINGS === '1') {
+        console.log(JSON.stringify({ type: 'pdf-smoke-timing', phases, elapsedMs, status, signal, error: error?.code ?? null }));
+      }
+      resolve({ status, signal, error, stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr) });
+    });
+  });
+}

@@ -11,7 +11,7 @@ import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SCHEMA = 'mediflow.anydoc_pdf_child_protocol.v1';
-const WORKER_HASH = '438a8a5c417abbdc7268888a4202c4bad112089425cf5dfda952e9981844d9ae';
+const WORKER_HASH = '57b0c1d7d83c78a7bb4c26b3ee6e5c525bf4781af8ac2f3af708f6f4b86384c8';
 const SENTINEL = 'SYNTHETIC_PRIVATE_FIELD_NOT_FOR_DIAGNOSTICS';
 // Match the production runner's explicit test-data rule before invoking any child.
 if (!process.env.MEDIFLOW_DATA_DIR?.trim()) {
