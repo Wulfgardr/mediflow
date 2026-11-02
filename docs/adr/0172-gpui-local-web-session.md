@@ -78,12 +78,20 @@ a ingresso loopback attestato, Origin esatto e richiesta JSON same-origin.
 Non chiama il controller del Supervisor e non cancella
 altre sessioni. Il 204 attesta il ritiro remoto; un errore mantiene distinta
 la chiusura locale dal ritiro non confermato. Le chiusure automatiche registrano
-prima del tentativo un contatore locale senza credenziali o dati clinici.
-Solo il ritiro confermato decrementa quel tentativo. Un insuccesso resta
+prima del tentativo un marcatore locale per ritiro, senza credenziali o dati
+clinici, nella cartella privata `local-session-retirement.pending`. Solo il
+ritiro confermato rimuove il proprio marcatore. Un insuccesso resta
 visibile nella finestra bloccata e al successivo avvio; la chiusura di una
 sessione successiva non nasconde un ritiro precedente non confermato.
-Il contatore usa la cartella di stato GPUI già prevista per le preferenze.
-Non è aggiunto un writer clinico.
+L'istanza che crea il marcatore lo tiene aperto con un lock esclusivo finché
+resta in esecuzione; il sistema operativo rilascia il lock alla chiusura del
+processo. Al riavvio, un marcatore completo che nessun processo tiene è
+orfano: l'avviso aggiunge l'azione «Ho verificato le sessioni dell’host», che
+rimuove soltanto i marcatori orfani. I ritiri di un'altra istanza ancora
+aperta, quelli di questa istanza e le voci illeggibili restano segnalati.
+I marcatori non scadono: il server non offre una durata massima della sessione
+locale che la shell possa verificare. La cartella è quella di stato GPUI già
+prevista per le preferenze. Non è aggiunto un writer clinico.
 
 ## Limiti
 
