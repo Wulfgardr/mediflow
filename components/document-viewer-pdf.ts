@@ -1,5 +1,5 @@
 /* PDF.js adapter. Imported only by the local preview, never by an API. */
-import { preparePdfRasterInput } from '../lib/pdf-raster-preflight.mjs';
+import { PdfRasterEncrypted, preparePdfRasterInput } from '../lib/pdf-raster-preflight.mjs';
 import type { RenderTask } from 'pdfjs-dist';
 import { assertImageSize, PREVIEW_LIMITS, PreviewError } from './document-viewer-policy.ts';
 import { PreviewScope } from './document-viewer-scope.ts';
@@ -35,7 +35,10 @@ export async function renderPdfPreview(bytes: Uint8Array, number: number, canvas
                 maxDimension: PREVIEW_LIMITS.imageDimension,
                 maxBytes: PREVIEW_LIMITS.sourceBytes,
             }));
-        } catch (error) { throw error instanceof PreviewError ? error : new PreviewError('invalid_pdf'); }
+        } catch (error) {
+            if (error instanceof PreviewError) throw error;
+            throw new PreviewError(error instanceof PdfRasterEncrypted ? 'encrypted_pdf' : 'invalid_pdf');
+        }
         const createEngine: PreviewPdfEngineFactory = (source, fail) => {
             let port: Worker;
             try {
