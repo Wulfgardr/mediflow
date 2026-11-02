@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
 import { assertScheduledBackupRuntime } from './scheduled-backup-runtime-contract.mjs';
-import { runPdfSmokeChild, formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
+import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
 
 import http from 'node:http';
 import https from 'node:https';
@@ -76,13 +76,10 @@ const { bundledTreatmentPortableFailure, treatmentPortablePrivateArtifact, runTr
 // only safe, failure-only smoke diagnostics omit the CLI exception stack.
 class PdfPageWorkerSmokeError extends Error {}
 
-const measuringPdfStartup = process.argv[2]?.startsWith('--measure-pdf-startup=');
-const measureWithoutSystemFonts = process.argv[2] === '--measure-pdf-startup=no-system-fonts';
-
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
-const ANYDOC_PDF_PAGE_WORKER_SHA256 = '57b0c1d7d83c78a7bb4c26b3ee6e5c525bf4781af8ac2f3af708f6f4b86384c8';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = '117a18131c8371f1a173b84fcfedd9308f4fdb3b1e0c5fc215fe64a58fdf38c8';
 const ANYDOC_PDF_CHILD_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1';
 const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
 const ANYDOC_LOCAL_EXTRACTION_ROUTE_DIRECTORY = path.join(
@@ -318,16 +315,22 @@ function runPdfChild(workerPath, input, { allowAddons = false, args = [] } = {})
     workerPath,
     ...args,
   ];
-  return runPdfSmokeChild(runtimeArguments, {
+  const started = performance.now();
+  const result = spawnSync(process.execPath, runtimeArguments, {
     cwd: path.dirname(workerPath),
-    env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1',
-      ...(measureWithoutSystemFonts ? { DISABLE_SYSTEM_FONTS_LOAD: '1' } : {}) },
+    env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
     input,
     encoding: 'buffer',
-    timeout: measuringPdfStartup ? 120_000 : 30_000,
+    timeout: 30_000,
     maxBuffer: 4 * 1024 * 1024,
     windowsHide: true,
   });
+  if (process.env.MEDIFLOW_PDF_SMOKE_TIMINGS === '1') {
+    console.log(JSON.stringify({ type: 'pdf-smoke-timing', stage: allowAddons ? 'render' : 'materialize',
+      elapsedMs: Math.round(performance.now() - started), status: result.status,
+      signal: result.signal, error: result.error?.code ?? null }));
+  }
+  return result;
 }
 
 /* follow the pinned worker's desktop profiles and minimum glibc version.
@@ -341,9 +344,9 @@ function supportsPdfRendering(profiles, platform, arch, glibcVersion) {
   return major > 2 || (major === 2 && minor >= 18);
 }
 
-async function framedPdfPageWorkerSmokeFailure(workerPath) {
+function framedPdfPageWorkerSmokeFailure(workerPath) {
   const source = syntheticPdfPage();
-  const materialize = await runPdfChild(workerPath, encodePdfChildFrame({
+  const materialize = runPdfChild(workerPath, encodePdfChildFrame({
     schemaVersion: ANYDOC_PDF_CHILD_SCHEMA_VERSION,
     operation: 'materialize',
     pageCount: 1,
@@ -364,7 +367,7 @@ async function framedPdfPageWorkerSmokeFailure(workerPath) {
     return formatPdfSmokeFailure('materialize', 'response', materialize);
   }
 
-  const render = await runPdfChild(workerPath, encodePdfChildFrame({
+  const render = runPdfChild(workerPath, encodePdfChildFrame({
     schemaVersion: ANYDOC_PDF_CHILD_SCHEMA_VERSION,
     operation: 'render',
     pages: [{ page: 1, byteLength: materialized.body.byteLength }],
@@ -849,7 +852,7 @@ function runSelfTest() {
   }
 }
 
-async function runPdfPageWorkerSelfTest() {
+function runPdfPageWorkerSelfTest() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-pdf-page-worker-checker-'));
   const standaloneDir = path.join(root, '.next-self-test', 'standalone');
   const scriptsDir = path.join(standaloneDir, 'scripts');
@@ -901,7 +904,7 @@ async function runPdfPageWorkerSelfTest() {
     if (bundledPdfPageWorkerTraceFailure(standaloneDir) !== null) {
       throw new Error('expected the AnyDoc route trace to reference the PDF page worker');
     }
-    const smokeFailure = await framedPdfPageWorkerSmokeFailure(sourceWorker);
+    const smokeFailure = framedPdfPageWorkerSmokeFailure(sourceWorker);
     if (smokeFailure) throw new PdfPageWorkerSmokeError(smokeFailure);
 
     fs.rmSync(workerPath);
@@ -1074,9 +1077,9 @@ if (process.argv[2] === '--self-test=apple-vision-canvas') {
   runAppleVisionCanvasSelfTest();
   process.exit(0);
 }
-if (process.argv[2] === '--self-test=pdf-page-worker' || measuringPdfStartup) {
+if (process.argv[2] === '--self-test=pdf-page-worker') {
   try {
-    await runPdfPageWorkerSelfTest();
+    runPdfPageWorkerSelfTest();
   } catch (error) {
     if (!(error instanceof PdfPageWorkerSmokeError)) throw error;
     console.error(error.message);
@@ -1149,7 +1152,7 @@ const pdfPageWorkerFailure = bundledPdfPageWorkerFailure(standaloneDir);
 if (pdfPageWorkerFailure) fail(pdfPageWorkerFailure);
 const pdfPageWorkerTraceFailure = bundledPdfPageWorkerTraceFailure(standaloneDir);
 if (pdfPageWorkerTraceFailure) fail(pdfPageWorkerTraceFailure);
-const pdfPageWorkerSmokeFailure = await framedPdfPageWorkerSmokeFailure(
+const pdfPageWorkerSmokeFailure = framedPdfPageWorkerSmokeFailure(
   path.join(standaloneDir, 'scripts', ANYDOC_PDF_PAGE_WORKER_FILE),
 );
 if (pdfPageWorkerSmokeFailure) fail(pdfPageWorkerSmokeFailure);
