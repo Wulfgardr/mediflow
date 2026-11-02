@@ -461,10 +461,39 @@ mod patient_name_tests {
     }
 }
 
+/// Native chat write domain that owns a command; stored with the local reference so recovery
+/// never depends on authorization for an unrelated domain.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ChatWriteKind {
+    TherapyStatus,
+    CheckupBooking,
+}
+impl ChatWriteKind {
+    pub const ALL: [Self; 2] = [Self::TherapyStatus, Self::CheckupBooking];
+    /// Also the route segment under `/api/auth/native/`.
+    pub fn wire(self) -> &'static str {
+        match self {
+            Self::TherapyStatus => "therapy-status",
+            Self::CheckupBooking => "checkup-booking",
+        }
+    }
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|kind| kind.wire() == value)
+    }
+    /// Write capability the route admits; the discovery projection only hints at it.
+    pub fn capability(self) -> &'static str {
+        match self {
+            Self::TherapyStatus => "network.replica.write-therapies",
+            Self::CheckupBooking => "network.replica.write-checkups",
+        }
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChatWriteOutcome {
     Retired,
     Applied,
+    /// Present in the current archive, restored from another one; its original audit receipt is not here.
+    AppliedHistorical,
     Rejected,
     Closed,
 }
@@ -473,6 +502,7 @@ impl ChatWriteOutcome {
         match self {
             Self::Retired => "retired",
             Self::Applied => "applied",
+            Self::AppliedHistorical => "applied-historical",
             Self::Rejected => "rejected",
             Self::Closed => "closed",
         }
@@ -497,6 +527,9 @@ impl ChatWriteResolution {
             }
             Self::Confirmed(ChatWriteOutcome::Applied) => {
                 "Modifica registrata e auditata. Il ritiro non annulla il salvataggio."
+            }
+            Self::Confirmed(ChatWriteOutcome::AppliedHistorical) => {
+                "Presente nell’archivio, ripristinato da un altro archivio. La ricevuta di audit originale non è disponibile qui. Non ripetere la scrittura."
             }
             Self::Confirmed(ChatWriteOutcome::Retired) => {
                 "Ritiro confermato. Nessuna scrittura eseguita."

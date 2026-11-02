@@ -1,4 +1,4 @@
-use mediflow_runtime_client::ChatWriteOutcome;
+use mediflow_runtime_client::{ChatWriteKind, ChatWriteOutcome};
 use std::{
     ffi::OsString,
     fs,
@@ -10,6 +10,8 @@ use std::{
 #[derive(Default)]
 pub(crate) struct ReferenceScan {
     pub(crate) ids: Vec<String>,
+    /// Owning write route of each typed reference; untyped (older) references are absent.
+    pub(crate) kinds: std::collections::BTreeMap<String, ChatWriteKind>,
     pub(crate) invalid: Vec<OsString>,
 }
 
@@ -95,6 +97,10 @@ impl CommandReferences {
     pub(crate) fn pending(&self) -> io::Result<Vec<String>> {
         Ok(self.scan()?.ids)
     }
+    /// Recorded owning route of a stored chat command, if the marker has one.
+    pub(crate) fn kind(&self, id: &str) -> Option<ChatWriteKind> {
+        self.scan().ok()?.kinds.get(id).copied()
+    }
     pub(crate) fn scan(&self) -> io::Result<ReferenceScan> {
         if self.path.is_none() {
             return Ok(ReferenceScan::default());
@@ -107,8 +113,12 @@ impl CommandReferences {
             let name = entry?.file_name();
             match name.to_str() {
                 Some(id) if Self::valid(id) => {
-                    if self.verify(id).is_err() {
-                        scan.invalid.push(name.clone());
+                    match self.verify(id) {
+                        Ok(Some(kind)) => {
+                            scan.kinds.insert(id.to_owned(), kind);
+                        }
+                        Ok(None) => {}
+                        Err(_) => scan.invalid.push(name.clone()),
                     }
                     scan.ids.push(id.to_owned());
                 }
@@ -133,7 +143,8 @@ impl CommandReferences {
         getrandom::fill(&mut random).map_err(io::Error::other)?;
         Ok(format!(".pending-{:032x}", u128::from_ne_bytes(random)))
     }
-    fn verify(&self, id: &str) -> io::Result<()> {
+    /// A marker holds the id alone (older markers and non-chat commands) or `id` + newline + kind.
+    fn verify(&self, id: &str) -> io::Result<Option<ChatWriteKind>> {
         if !Self::valid(id) {
             return Err(io::ErrorKind::InvalidInput.into());
         }
@@ -142,14 +153,20 @@ impl CommandReferences {
         if !meta.is_file()
             || meta.uid() != super::native::uid()
             || meta.permissions().mode() & 0o777 != 0o600
-            || meta.len() != 36
-            || fs::read_to_string(&path)? != id
+            || meta.len() > 64
         {
             return Err(io::ErrorKind::PermissionDenied.into());
         }
-        Ok(())
+        let content = fs::read_to_string(&path)?;
+        match content.split_once('\n') {
+            None if content == id => Ok(None),
+            Some((stored, kind)) if stored == id => ChatWriteKind::parse(kind)
+                .map(Some)
+                .ok_or_else(|| io::ErrorKind::PermissionDenied.into()),
+            _ => Err(io::ErrorKind::PermissionDenied.into()),
+        }
     }
-    fn stage(&self, id: &str) -> io::Result<PathBuf> {
+    fn stage(&self, id: &str, kind: Option<ChatWriteKind>) -> io::Result<PathBuf> {
         let path = self.directory()?.join(Self::temporary_name()?);
         let mut file = fs::OpenOptions::new()
             .write(true)
@@ -157,10 +174,20 @@ impl CommandReferences {
             .mode(0o600)
             .open(&path)?;
         file.write_all(id.as_bytes())?;
+        if let Some(kind) = kind {
+            file.write_all(format!("\n{}", kind.wire()).as_bytes())?;
+        }
         file.sync_all()?;
         Ok(path)
     }
     pub(crate) fn remember(&self, id: &str) -> io::Result<()> {
+        self.publish(id, None)
+    }
+    /// Records which chat write route owns the command, so recovery asks only that route.
+    pub(crate) fn remember_kind(&self, id: &str, kind: ChatWriteKind) -> io::Result<()> {
+        self.publish(id, Some(kind))
+    }
+    fn publish(&self, id: &str, kind: Option<ChatWriteKind>) -> io::Result<()> {
         if !Self::valid(id) {
             return Err(io::ErrorKind::InvalidInput.into());
         }
@@ -168,11 +195,19 @@ impl CommandReferences {
         let lock = fs::File::open(directory)?;
         lock.lock()?;
         match fs::symlink_metadata(directory.join(id)) {
-            Ok(_) => return self.verify(id),
+            // An existing marker is never rewritten; a different recorded kind is a collision.
+            Ok(_) => {
+                let stored = self.verify(id)?;
+                return if kind.is_none() || stored.is_none() || stored == kind {
+                    Ok(())
+                } else {
+                    Err(io::ErrorKind::AlreadyExists.into())
+                };
+            }
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error),
         }
-        let temporary = self.stage(id)?;
+        let temporary = self.stage(id, kind)?;
         fs::rename(temporary, directory.join(id))?;
         fs::File::open(directory)?.sync_all()
     }
@@ -197,7 +232,7 @@ mod tests {
         let lock = fs::File::open(&directory).unwrap();
         lock.lock().unwrap();
         let id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-        let temporary = store.stage(id).unwrap();
+        let temporary = store.stage(id, None).unwrap();
         let (send, receive) = std::sync::mpsc::channel();
         let reader = store.clone();
         let worker = std::thread::spawn(move || {
@@ -294,12 +329,46 @@ mod tests {
     }
 
     #[test]
+    fn typed_reference_survives_restart_and_older_markers_stay_untyped() {
+        let store = CommandReferences::default();
+        let typed = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+        let older = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+        store
+            .remember_kind(typed, ChatWriteKind::CheckupBooking)
+            .unwrap();
+        store.remember(older).unwrap();
+        let reopened = CommandReferences {
+            root: store.root.clone(),
+            path: store.path.clone(),
+        };
+        let scan = reopened.scan().unwrap();
+        assert_eq!(scan.ids, [typed, older]);
+        assert!(scan.invalid.is_empty());
+        assert_eq!(
+            scan.kinds.into_iter().collect::<Vec<_>>(),
+            [(typed.to_owned(), ChatWriteKind::CheckupBooking)]
+        );
+        reopened
+            .remember_kind(typed, ChatWriteKind::CheckupBooking)
+            .unwrap();
+        assert!(
+            reopened
+                .remember_kind(typed, ChatWriteKind::TherapyStatus)
+                .is_err()
+        );
+        let directory = store.directory().unwrap().to_owned();
+        fs::write(directory.join(older), format!("{older}\nunknown-route")).unwrap();
+        assert_eq!(reopened.scan().unwrap().invalid, [OsString::from(older)]);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn interrupted_staging_never_publishes_a_partial_command() {
         let store = CommandReferences::default();
         let valid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
         let staged = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
         store.remember(valid).unwrap();
-        let temporary = store.stage(staged).unwrap();
+        let temporary = store.stage(staged, None).unwrap();
         assert!(
             !store.directory().unwrap().join(staged).exists(),
             "staging published the final filename before rename"

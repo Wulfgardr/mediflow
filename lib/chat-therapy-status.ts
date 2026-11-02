@@ -11,6 +11,8 @@ import { archiveGenerationForSession } from './security/archive-session-generati
 import type { PairedNativeSession } from './security/paired-native-session';
 import { executeTherapyStatusInTransaction, TherapyStatusCommandDenied } from './therapy-status-command-service';
 import { COMMAND_UUID, parseTherapyStatusCommand, type TherapyStatusExecute } from './therapy-status-command-contract';
+import { isTherapyTransitionAllowed } from './clinical-status-transitions';
+import { parseTherapyStatus } from './status-normalization';
 
 const CAPABILITIES = ['network.replica.readonly-therapies', 'network.replica.write-therapies', 'network.replica.readonly-patients'] as const;
 const deny = (): never => { throw new TherapyStatusCommandDenied('denied'); };
@@ -45,7 +47,10 @@ export function createChatTherapyStatusService(clock: () => number = Date.now) {
                 guard(tx); selected(context, command, epoch);
                 if (command.archiveGeneration !== archiveGenerationForSession(context.session)) deny();
                 const row = tx.select().from(therapies).where(and(eq(therapies.id, command.therapyId), eq(therapies.patientId, command.patientId))).get();
-                if (!row || row.deletedAt || row.version !== command.expectedVersion || row.status === command.target
+                // WUL-800: l'anteprima nega già ciò che il server rifiuterebbe, prima che il medico spenda il PIN.
+                const saved = row ? parseTherapyStatus(row.status) ?? row.status : null;
+                if (!row || row.deletedAt || row.version !== command.expectedVersion || saved === command.target
+                    || !isTherapyTransitionAllowed(saved ?? '', command.target)
                     || tx.select().from(therapyStatusCommands).where(eq(therapyStatusCommands.commandId, command.commandId)).get()) deny();
             }, { behavior: 'immediate' }));
             return { commandId: command.commandId, status: 'preview' as const };

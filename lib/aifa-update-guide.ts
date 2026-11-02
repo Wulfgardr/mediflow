@@ -1,6 +1,6 @@
-import { AifaReductionConfirmationRequired } from './aifa-importer';
+import { AifaCatalogChangedBeforeClear, AifaReductionConfirmationRequired } from './aifa-importer';
 /* UI-only operation lifetime; no authority, writer or HTTP contract is minted here. */
-import type { AifaCatalogClientStatus, AifaImportClientResult } from './aifa-importer';
+import type { AifaCatalogClientStatus, AifaClearClientResult, AifaImportClientResult } from './aifa-importer';
 import type { AifaCatalogManifestInput } from './aifa-catalog';
 
 export type AifaGuidePhase = 'idle' | 'updating' | 'cancelling' | 'verifying'
@@ -20,7 +20,7 @@ type Ports = {
     read: () => Promise<AifaCatalogClientStatus>;
     update: (signal: AbortSignal, confirmation?: string) => Promise<AifaImportClientResult>;
     importFile: (file: File, manifest: AifaCatalogManifestInput, confirmation?: string) => Promise<AifaImportClientResult>;
-    clear: () => Promise<void>;
+    clear: (expectedSnapshot: string) => Promise<AifaClearClientResult>;
 };
 type Confirm = () => Promise<boolean>;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -186,6 +186,11 @@ export function createAifaUpdateGuide(ports: Ports, publish: (state: AifaGuideSt
             } finally { finish(token); }
         },
         async clear(confirm: Confirm) {
+            const snapshot = state.catalog?.snapshot;
+            if (!snapshot || !/^[a-f0-9]{64}$/u.test(snapshot)) {
+                if (!disposed && operation === null) emit({ notice: { tone: 'warning', text: 'Rileggi stato prima di svuotare: lo svuotamento vale solo per il catalogo osservato.' } });
+                return;
+            }
             const token = begin('confirming-clear');
             if (token === null) return;
             let sent = false;
@@ -194,12 +199,17 @@ export function createAifaUpdateGuide(ports: Ports, publish: (state: AifaGuideSt
                 if (!await confirm() || !current(token)) return;
                 emit({ phase: 'clearing' });
                 sent = true;
-                await ports.clear();
+                const result = await ports.clear(snapshot);
                 if (!current(token)) return;
                 acknowledged = true;
-                await reconcile(token, null, 'Svuotamento confermato. Stato del catalogo riletto.');
+                await reconcile(token, null, `Svuotamento confermato: ${result.receipt.previousCount.toLocaleString('it-IT')} confezioni rimosse, operazione registrata nel registro attività. Stato del catalogo riletto.`);
             } catch (error) {
-                if (current(token)) emit({ reconciliationRequired: sent, notice: { tone: 'error', text: acknowledged
+                if (!current(token)) return;
+                if (error instanceof AifaCatalogChangedBeforeClear) {
+                    emit({ reconciliationRequired: true, notice: { tone: 'warning', text: 'Il catalogo è cambiato dopo l’ultima lettura: nessuna voce rimossa. Rileggi stato prima di decidere.' } });
+                    return;
+                }
+                emit({ reconciliationRequired: sent, notice: { tone: 'error', text: acknowledged
                     ? 'Svuotamento confermato; rilettura non riuscita. Rileggi stato.'
                     : `${errorText(error)}${sent ? ' Rileggi stato prima di riprovare.' : ''}` } });
             } finally { finish(token); }
