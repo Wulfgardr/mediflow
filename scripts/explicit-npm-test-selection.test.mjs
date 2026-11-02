@@ -25,7 +25,7 @@ test('Playwright CI requires complete shards and a fail-closed aggregate', t => 
   const original = load(fs.readFileSync(path.join(sourceRoot, workflowPath), 'utf8'));
   write(root, 'package.json', fs.readFileSync(path.join(sourceRoot, 'package.json'), 'utf8'));
   write(root, workflowPath, original);
-  assert.deepEqual(collectShardedPlaywrightBinding(root).matrix, { shard: [1, 2, 3] });
+  assert.deepEqual(collectShardedPlaywrightBinding(root).matrix, { shard: [1, 2, 3, 4] });
   const gate = original.jobs.e2e.steps[0];
   for (const result of ['success', 'failure', 'cancelled', 'skipped', '']) {
     const run = spawnSync('bash', ['-e', '-c', gate.run], { env: { ...process.env, SHARD_RESULT: result } });
@@ -34,8 +34,9 @@ test('Playwright CI requires complete shards and a fail-closed aggregate', t => 
   for (const mutate of [
     w => { w.jobs['e2e-shard'].strategy.matrix.shard = [1]; },
     w => { w.jobs['e2e-shard'].strategy.matrix.shard = [1, 2]; },
+    w => { w.jobs['e2e-shard'].strategy.matrix.shard = [1, 2, 3]; },
     w => { w.jobs['e2e-shard'].steps.find(s => s.name === 'Run Playwright suite').run = 'npm run test:e2e -- --shard=${{ matrix.shard }}/2'; },
-    w => { w.jobs['e2e-shard'].strategy.matrix.shard = [1, 1]; },
+    w => { w.jobs['e2e-shard'].strategy.matrix.shard = [1, 2, 3, 3]; },
     w => { w.jobs['e2e-shard'].strategy['fail-fast'] = true; },
     w => { w.jobs['e2e-shard'].if = false; },
     w => { w.jobs['e2e-shard']['continue-on-error'] = true; },
