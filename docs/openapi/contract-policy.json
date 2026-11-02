@@ -375,6 +375,96 @@
       "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} response 409.recordId was removed",
       "trackingIssue": "WUL-768",
       "reason": "HC-A2 / ADR0053, OpenAPI 1.45.0: the original EntryVersionConflictResponse remains unchanged in the first oneOf branch. The added SCALE_PATIENT_INACTIVE branch implements the required atomic active-patient gate for scale results. The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary entry CAS responses retain every original field. Apple and Web clients handle the scale denial without discarding the draft."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescriptions/{id} response 409.code was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescriptions/{id} response 409.currentSnapshot was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescriptions/{id} response 409.currentState was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescriptions/{id} response 409.currentUpdatedAt was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescriptions/{id} response 409.currentVersion was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescriptions/{id} response 409.entity was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescriptions/{id} response 409.error was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescriptions/{id} response 409.expectedVersion was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescriptions/{id} response 409.recordId was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescription-items/{id} response 409.code was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescription-items/{id} response 409.currentSnapshot was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescription-items/{id} response 409.currentState was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescription-items/{id} response 409.currentUpdatedAt was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescription-items/{id} response 409.currentVersion was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescription-items/{id} response 409.entity was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescription-items/{id} response 409.error was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescription-items/{id} response 409.expectedVersion was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescription-items/{id} response 409.recordId was removed",
+      "trackingIssue": "WUL-800",
+      "reason": "WUL-800 coorte 1, OpenAPI 1.48.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ServicePrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side transition table) and service_prescription_items_changed (atomic prescription and items cascade). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client still decodes VERSION_CONFLICT and shows the other two as an HTTP 409 error; its actions are forward steps already inside the table."
     }
   ]
 }

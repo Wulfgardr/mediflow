@@ -6,6 +6,7 @@ import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import { ViewState } from '@/components/ui/view-state';
 import { Disclosure } from '@/components/disclosure';
 import { formatCountLabel } from '@/lib/format-count';
+import { isServicePrescriptionForwardStep, isServicePrescriptionTransitionAllowed } from '@/lib/clinical-status-transitions';
 import styles from './clinical-register.module.css';
 import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
@@ -341,63 +342,41 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
         }
     };
 
+    /*
+     * Prescrizione e voci cambiano stato in una sola richiesta e una sola
+     * transazione sul server (WUL-800). Il server sposta le voci che erano nello
+     * stato della prescrizione e lascia com'è una voce portata altrove a parte.
+     */
     const updatePrescriptionAndItems = async (
         item: ServicePrescription,
         update: Partial<ServicePrescription>,
-        childUpdate: Partial<ServicePrescriptionItem>,
     ) => {
-        await db.servicePrescriptions.update(item.id, {
-            ...update,
-            version: item.version,
-            updatedAt: new Date(),
-        });
         const children = itemsByPrescription.get(item.id) ?? [];
-        await Promise.all(children.map((child) => db.servicePrescriptionItems.update(child.id, {
-            ...childUpdate,
-            version: child.version,
-            updatedAt: new Date(),
-        })));
+        try {
+            await db.servicePrescriptions.update(item.id, {
+                ...update,
+                version: item.version,
+                updatedAt: new Date(),
+            }, { cascadeItems: children.map((child) => ({ id: child.id, version: child.version })) });
+        } finally {
+            notifyDbChange('service_prescription_items');
+        }
     };
 
     const markBooked = async (item: ServicePrescription) => {
-        const scheduledAt = item.scheduledAt ?? new Date();
-        await updatePrescriptionAndItems(item, {
-            status: 'booked',
-            scheduledAt,
-        }, {
-            status: 'booked',
-            scheduledAt,
-        });
+        await updatePrescriptionAndItems(item, { status: 'booked', scheduledAt: item.scheduledAt ?? new Date() });
     };
 
     const markPerformed = async (item: ServicePrescription) => {
-        const performedAt = item.performedAt ?? new Date();
-        await updatePrescriptionAndItems(item, {
-            status: 'performed',
-            performedAt,
-        }, {
-            status: 'performed',
-            performedAt,
-        });
+        await updatePrescriptionAndItems(item, { status: 'performed', performedAt: item.performedAt ?? new Date() });
     };
 
     const markReportReceived = async (item: ServicePrescription) => {
-        const reportReceivedAt = item.reportReceivedAt ?? new Date();
-        await updatePrescriptionAndItems(item, {
-            status: 'report_received',
-            reportReceivedAt,
-        }, {
-            status: 'report_received',
-            reportReceivedAt,
-        });
+        await updatePrescriptionAndItems(item, { status: 'report_received', reportReceivedAt: item.reportReceivedAt ?? new Date() });
     };
 
     const cancelItem = async (item: ServicePrescription) => {
-        await updatePrescriptionAndItems(item, {
-            status: 'cancelled',
-        }, {
-            status: 'cancelled',
-        });
+        await updatePrescriptionAndItems(item, { status: 'cancelled' });
     };
 
     const deleteItem = async (item: ServicePrescription) => {
@@ -661,10 +640,10 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                     {prescriptions.map((item) => {
                         const refs = parseDocumentRefs(item.documentRefs);
                         const isClosed = item.status === 'performed' || item.status === 'report_received' || item.status === 'cancelled';
-                        const canBook = item.status === 'prescribed';
-                        const canPerform = item.status === 'prescribed' || item.status === 'booked';
-                        const canReceiveReport = item.status !== 'report_received' && item.status !== 'cancelled';
-                        const canCancel = item.status !== 'cancelled' && item.status !== 'performed' && item.status !== 'report_received';
+                        const canBook = isServicePrescriptionForwardStep(item.status, 'booked');
+                        const canPerform = isServicePrescriptionForwardStep(item.status, 'performed');
+                        const canReceiveReport = isServicePrescriptionForwardStep(item.status, 'report_received');
+                        const canCancel = item.status !== 'cancelled' && isServicePrescriptionTransitionAllowed(item.status, 'cancelled');
                         const priority = item.priority ?? 'unknown';
                         const childItems = itemsByPrescription.get(item.id) ?? [];
                         const primaryAction = canBook ? { label: 'Segna prenotata', run: () => void markBooked(item) }
