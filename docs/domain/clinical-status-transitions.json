@@ -49,5 +49,48 @@
       "active"
     ]
   },
-  "therapyLinkedFields": "Passando a completed, endDate resta quello indicato o già salvato, altrimenti la data del passaggio, anche se la richiesta lo manda vuoto. A una terapia completed non si può togliere la data che ha. Passando a active, endDate si svuota se la richiesta non ne indica uno. suspended non lo tocca."
+  "therapyLinkedFields": "Passando a completed, endDate resta quello indicato o già salvato, altrimenti la data del passaggio, anche se la richiesta lo manda vuoto. A una terapia completed non si può togliere la data che ha. Passando a active, endDate si svuota se la richiesta non ne indica uno. suspended non lo tocca.",
+  "prostheticPrescription": {
+    "draft": [
+      "prescribed",
+      "submitted",
+      "authorized",
+      "delivered",
+      "cancelled"
+    ],
+    "prescribed": [
+      "submitted",
+      "authorized",
+      "delivered",
+      "tested",
+      "cancelled",
+      "draft"
+    ],
+    "submitted": [
+      "authorized",
+      "delivered",
+      "tested",
+      "cancelled",
+      "prescribed"
+    ],
+    "authorized": [
+      "delivered",
+      "tested",
+      "cancelled",
+      "submitted"
+    ],
+    "delivered": [
+      "tested",
+      "cancelled",
+      "authorized"
+    ],
+    "tested": [
+      "delivered"
+    ],
+    "cancelled": [
+      "draft",
+      "prescribed"
+    ]
+  },
+  "prostheticLinkedFields": "Passando a tested, collaudoAt resta quello indicato, o quello già salvato se non è futuro, altrimenti la data del passaggio; l'esito non viene scritto se il medico non lo inserisce. Tornando indietro da tested, collaudoAt si svuota e l'audit lo nomina; l'esito scritto dal medico resta. A una prescrizione tested non si può togliere la data di collaudo."
 }
