@@ -35,6 +35,11 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "e2e/fixtures/secure-browser.ts",
+    "reason": "Opzioni di avvio di Chromium (sandbox e rete solo loopback) usate da playwright.config.ts, e2e/native-chat-access-frame.config.ts e dagli spec che avviano il browser da soli; nessun test autonomo.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "e2e/fixtures/isolated-runtime.ts",
     "reason": "WUL-729: Playwright fixture/test extension consumed by the route spec, no standalone spec.",
     "owner": "@Wulfgardr"
