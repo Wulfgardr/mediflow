@@ -112,7 +112,26 @@ export async function runPdfSmokeChild(args, options) {
   const { spawn } = await import('node:child_process');
   const hook = `import { subscribe } from 'node:diagnostics_channel';
     import { writeSync } from 'node:fs';
-    subscribe('mediflow.anydoc.pdf.phase', phase => writeSync(3, phase + '\\n'));`;
+    const emit = phase => writeSync(3, phase + '\\n');
+    subscribe('mediflow.anydoc.pdf.phase', emit);
+    const dlopen = process.dlopen;
+    process.dlopen = function(module, ...args) {
+      emit('native_start');
+      const result = Reflect.apply(dlopen, this, [module, ...args]);
+      emit('native_end');
+      for (const name of ['loadSystemFonts', 'loadFontsFromDir']) {
+        const fonts = module.exports.GlobalFonts;
+        if (typeof fonts?.[name] !== 'function') continue;
+        const original = fonts[name];
+        fonts[name] = function(...args) {
+          emit(name + '_start');
+          const result = Reflect.apply(original, this, args);
+          emit(name + '_end');
+          return result;
+        };
+      }
+      return result;
+    };`;
   const started = performance.now();
   return new Promise(resolve => {
     const child = spawn(process.execPath, ['--import', `data:text/javascript,${encodeURIComponent(hook)}`, ...args], {
@@ -134,12 +153,13 @@ export async function runPdfSmokeChild(args, options) {
     }
     child.stdio[3].on('data', chunk => {
       phaseBuffer += chunk.toString('utf8');
-      if (phaseBuffer.length > 256 || phases.length > 8) { stop('EIO'); return; }
+      if (phaseBuffer.length > 256 || phases.length > 32) { stop('EIO'); return; }
       for (;;) {
         const end = phaseBuffer.indexOf('\n');
         if (end < 0) break;
         const phase = phaseBuffer.slice(0, end); phaseBuffer = phaseBuffer.slice(end + 1);
-        if (!['boot', 'input', 'verified', 'engine', 'painted'].includes(phase)) { stop('EIO'); return; }
+        if (!['boot', 'input', 'verified', 'engine', 'painted', 'native_start', 'native_end',
+          'loadSystemFonts_start', 'loadSystemFonts_end', 'loadFontsFromDir_start', 'loadFontsFromDir_end'].includes(phase)) { stop('EIO'); return; }
         phases.push({ phase, elapsedMs: Math.round(performance.now() - started) });
       }
     });

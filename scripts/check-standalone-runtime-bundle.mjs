@@ -76,6 +76,9 @@ const { bundledTreatmentPortableFailure, treatmentPortablePrivateArtifact, runTr
 // only safe, failure-only smoke diagnostics omit the CLI exception stack.
 class PdfPageWorkerSmokeError extends Error {}
 
+const measuringPdfStartup = process.argv[2]?.startsWith('--measure-pdf-startup=');
+const measureWithoutSystemFonts = process.argv[2] === '--measure-pdf-startup=no-system-fonts';
+
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
@@ -317,10 +320,11 @@ function runPdfChild(workerPath, input, { allowAddons = false, args = [] } = {})
   ];
   return runPdfSmokeChild(runtimeArguments, {
     cwd: path.dirname(workerPath),
-    env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
+    env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1',
+      ...(measureWithoutSystemFonts ? { DISABLE_SYSTEM_FONTS_LOAD: '1' } : {}) },
     input,
     encoding: 'buffer',
-    timeout: 30_000,
+    timeout: measuringPdfStartup ? 120_000 : 30_000,
     maxBuffer: 4 * 1024 * 1024,
     windowsHide: true,
   });
@@ -1070,7 +1074,7 @@ if (process.argv[2] === '--self-test=apple-vision-canvas') {
   runAppleVisionCanvasSelfTest();
   process.exit(0);
 }
-if (process.argv[2] === '--self-test=pdf-page-worker') {
+if (process.argv[2] === '--self-test=pdf-page-worker' || measuringPdfStartup) {
   try {
     await runPdfPageWorkerSelfTest();
   } catch (error) {
