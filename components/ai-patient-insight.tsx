@@ -44,6 +44,9 @@ function safeError(preview: Exclude<PatientInsightPreviewWire, { status: 'availa
     if (preview.code === 'model_unavailable' || preview.code === 'provider_unready' || preview.code === 'provider_binding_denied') {
         return 'Il modello clinico locale non è disponibile. Verifica le Impostazioni AI.';
     }
+    if (preview.status === 'failed' && preview.code === 'provider_failed') {
+        return 'Il modello locale non ha completato la risposta, per esempio per un limite d’uso o un errore del servizio. Nessuna bozza creata: riprova più tardi o verifica le Impostazioni AI.';
+    }
     return preview.status === 'failed'
         ? 'La risposta del modello locale non ha superato i controlli clinici.'
         : 'Patient Insight non è disponibile in questo momento.';
