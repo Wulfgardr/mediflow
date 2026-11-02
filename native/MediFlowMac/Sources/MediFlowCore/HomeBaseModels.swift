@@ -1527,8 +1527,19 @@ public struct HomeBaseServicePrescriptionCreatePayload: Encodable, Sendable {
     }
 }
 
+/// Voce da portare allo stato della prescrizione nella stessa transazione (WUL-800).
+public struct HomeBaseServicePrescriptionCascadeItem: Encodable, Sendable, Equatable {
+    public let id: String
+    public let version: Int
+
+    public init(id: String, version: Int) {
+        self.id = id; self.version = version
+    }
+}
+
 public struct HomeBaseServicePrescriptionUpdatePayload: Encodable, Sendable {
     public let version: Int
+    public let items: [HomeBaseServicePrescriptionCascadeItem]?
     public let prescribedAt: Date?
     public let status: String?
     public let category: String?
@@ -1554,19 +1565,22 @@ public struct HomeBaseServicePrescriptionUpdatePayload: Encodable, Sendable {
                 scheduledAt: PatchValue<Date> = .omit, performedAt: PatchValue<Date> = .omit,
                 reportReceivedAt: PatchValue<Date> = .omit, outcomeNote: PatchValue<String> = .omit,
                 requestReference: PatchValue<String> = .omit, source: String? = nil,
-                documentRefs: PatchValue<String> = .omit, notes: PatchValue<String> = .omit) {
+                documentRefs: PatchValue<String> = .omit, notes: PatchValue<String> = .omit,
+                items: [HomeBaseServicePrescriptionCascadeItem]? = nil) {
+        self.items = items
         self.version = version; self.prescribedAt = prescribedAt; self.status = status; self.category = category; self.priority = priority; self.codeSystem = codeSystem; self.serviceCode = serviceCode; self.serviceName = serviceName; self.clinicalQuestion = clinicalQuestion; self.provider = provider; self.scheduledAt = scheduledAt; self.performedAt = performedAt; self.reportReceivedAt = reportReceivedAt; self.outcomeNote = outcomeNote; self.requestReference = requestReference; self.source = source; self.documentRefs = documentRefs; self.notes = notes
     }
 
     private enum CodingKeys: String, CodingKey {
         case version, prescribedAt, status, category, priority, codeSystem, serviceCode, serviceName
         case clinicalQuestion, provider, scheduledAt, performedAt, reportReceivedAt, outcomeNote
-        case requestReference, source, documentRefs, notes
+        case requestReference, source, documentRefs, notes, items
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(version, forKey: .version)
+        try container.encodeIfPresent(items, forKey: .items)
         try container.encodeIfPresent(prescribedAt, forKey: .prescribedAt)
         try container.encodeIfPresent(status, forKey: .status)
         try container.encodeIfPresent(category, forKey: .category)
