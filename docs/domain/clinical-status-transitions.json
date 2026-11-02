@@ -111,5 +111,5 @@
       "started"
     ]
   },
-  "sissHandoffLinkedFields": "Un passaggio started non ha completedAt, uno con un altro esito ce l'ha. Uscendo da started resta la data indicata o salvata, altrimenti quella del passaggio; tornando a started completedAt si svuota. Più passaggi aperti per lo stesso paziente sono ammessi: l'interfaccia li mostra tutti."
+  "sissHandoffLinkedFields": "Un passaggio started non ha completedAt, uno con un altro esito ce l'ha. Cambiando esito verso uno diverso da started vale la data indicata, altrimenti quella del passaggio secondo l'orologio del server; tornando a started completedAt si svuota. Più passaggi aperti per lo stesso paziente sono ammessi: l'interfaccia mostra i più recenti e dice quanti altri restano aperti."
 }

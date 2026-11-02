@@ -207,8 +207,9 @@ export type CompletedAtMismatchDenial = {
 /**
  * Esito e chiusura di un passaggio SISS non si contraddicono (WUL-800): un
  * passaggio avviato non ha data di chiusura, uno con un altro esito ce l'ha.
- * Uscendo da started resta la data indicata o salvata, altrimenti quella del
- * passaggio; tornando a started la data si svuota. Senza cambio di esito si
+ * Cambiando esito verso uno diverso da started vale la data indicata, altrimenti
+ * quella del passaggio (orologio del server): un bloccato poi completato non
+ * eredita la data del blocco. Tornando a started la data si svuota. Senza cambio di esito si
  * rifiuta solo una richiesta che porterebbe la riga in contraddizione; una riga
  * storica incoerente resta com'è finché non cambia esito.
  */
@@ -229,7 +230,7 @@ export function planSissHandoffOutcomeChange(
             : { ok: true };
     }
     if (to === 'started') return { ok: true, completedAt: null };
-    return { ok: true, completedAt: requested.completedAt ?? saved.completedAt ?? now };
+    return { ok: true, completedAt: requested.completedAt ?? now };
 }
 
 export type StatusTransitionDenial = {

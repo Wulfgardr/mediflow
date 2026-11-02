@@ -336,10 +336,16 @@ test('every pair of handoff outcomes is accepted or refused before any write', a
     }
 });
 
-test('closing keeps a given or saved date, reopening clears it, and the audit names it', async () => {
+test('closing uses a given date or the server moment, never the date of an earlier block; reopening clears it', async () => {
     seedOutcome('blocked', savedClosure);
+    const closing = Date.now() / 1000 - 1;
     assert.equal((await invoke('PUT', writeBody({ outcome: 'completed' }))).status, 200);
-    assert.equal(handoffRow().completed_at, savedClosure.getTime() / 1000);
+    assert.ok((handoffRow().completed_at ?? 0) >= closing, 'un bloccato poi completato non eredita la data del blocco');
+
+    seedOutcome('blocked', savedClosure);
+    const given = new Date('2026-02-03T10:00:00Z');
+    assert.equal((await invoke('PUT', writeBody({ outcome: 'completed', completedAt: given.toISOString() }))).status, 200);
+    assert.equal(handoffRow().completed_at, given.getTime() / 1000);
 
     seedOutcome('completed', savedClosure);
     assert.equal((await invoke('PUT', writeBody({ outcome: 'started' }))).status, 200);

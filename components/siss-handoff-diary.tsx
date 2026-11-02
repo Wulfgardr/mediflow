@@ -43,6 +43,8 @@ const OUTCOME_OPTIONS: Array<{ value: SissHandoffOutcome; label: string }> = [
     { value: 'cancelled', label: 'Annullato' },
 ];
 
+const PENDING_SHOWN = 3;
+
 function emptyForm(): FormState {
     return {
         action: 'registry.lookup',
@@ -100,11 +102,14 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
     useRuntimeTwinPendingForm(isFormOpen);
     useEffect(() => { if (isFormOpen) formRef.current?.querySelector<HTMLSelectElement>('select')?.focus(); }, [isFormOpen]);
 
-    // WUL-800: più passaggi aperti per lo stesso paziente sono ammessi; si mostrano tutti, il più vecchio per primo.
+    // WUL-800: più passaggi aperti per lo stesso paziente sono ammessi. Ogni apertura del portale ne crea
+    // uno: si mostrano i più recenti e si dice quanti altri restano aperti, senza nasconderli.
     const pendingHandoffs = useMemo(
-        () => (handoffs ?? []).filter((item) => item.outcome === 'started').reverse(),
+        () => (handoffs ?? []).filter((item) => item.outcome === 'started'),
         [handoffs],
     );
+    const [showAllPending, setShowAllPending] = useState(false);
+    const visiblePending = showAllPending ? pendingHandoffs : pendingHandoffs.slice(0, PENDING_SHOWN);
 
     const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
         setForm((current) => ({ ...current, [key]: value }));
@@ -170,7 +175,12 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
         <section className={styles.register}>
             {!embedded ? <div className={styles.toolbar}><h2>Diario locale dei passaggi</h2>{createButton}</div> : null}
             <p className={local.caption}>Registro locale: l’atto regionale e il suo esito si verificano nel portale ufficiale.</p>
-            {pendingHandoffs.map((item) => <PendingHandoffClosure key={item.id} handoff={item} formOpen={isFormOpen} />)}
+            {visiblePending.map((item) => <PendingHandoffClosure key={item.id} handoff={item} formOpen={isFormOpen} />)}
+            {pendingHandoffs.length > PENDING_SHOWN && !showAllPending ? (
+                <Button variant="text" className="mb-4" onClick={() => setShowAllPending(true)}>
+                    {formatCountLabel(pendingHandoffs.length - PENDING_SHOWN, 'Mostra un altro passaggio aperto', 'Mostra altri {count} passaggi aperti', { template: true })}
+                </Button>
+            ) : null}
 
             <div id={formId} hidden={!isFormOpen}>
             {isFormOpen && (
@@ -271,9 +281,9 @@ function PendingHandoffClosure({ handoff, formOpen }: { handoff: SissHandoffEven
         setIsSaving(true);
         try {
             const sissPrecondition = resolveSissHandoffDraftPrecondition(precondition.current, handoff);
+            // La data di chiusura la mette il server: il momento del passaggio non dipende dall'orologio del browser.
             await db.sissHandoffs.update(sissPrecondition.id, {
                 outcome,
-                completedAt: new Date(),
                 nextAction: optionalValue(nextAction),
                 notes: optionalValue(notes),
                 updatedAt: new Date(),
@@ -320,7 +330,7 @@ function PendingHandoffClosure({ handoff, formOpen }: { handoff: SissHandoffEven
                     <textarea className="input-field min-h-20" value={nextAction} onChange={(event) => { if (beginDraft()) setNextAction(event.target.value); }} />
                 </label>
             </div>
-            {error ? <p className="mt-3 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p> : null}
+            {error ? <p role="alert" className="mt-3 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p> : null}
             <Button variant={formOpen ? 'secondary' : dirty ? 'primary' : 'text'}
                 disabled={isSaving} onClick={() => void close()} className="mt-3">
                 {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
