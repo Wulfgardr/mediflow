@@ -488,12 +488,8 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         return this.add(item, options as AddOptions);
     }
 
-    async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean; signal?: AbortSignal; attachmentPrecondition?: AttachmentWritePrecondition; sissPrecondition?: SissHandoffWritePrecondition; cascadeItems?: ReadonlyArray<{ id: string; version: number }> }): Promise<void> {
+    async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean; signal?: AbortSignal; attachmentPrecondition?: AttachmentWritePrecondition; sissPrecondition?: SissHandoffWritePrecondition }): Promise<void> {
         const precondition = this.sissWritePayload(id, options?.sissPrecondition) ?? this.attachmentWritePayload(id, options?.attachmentPrecondition);
-        if (options?.cascadeItems && this.tableName !== 'service_prescriptions') {
-            throw new Error('Items cascade is only defined for service prescriptions');
-        }
-        const cascade = options?.cascadeItems ? { items: options.cascadeItems.map(({ id: itemId, version }) => ({ id: itemId, version })) } : null;
         const maybeVersion = (changes as Record<string, unknown> | undefined)?.version;
         if (this.requiresVersionedWrite() && typeof maybeVersion !== 'number') {
             throw new Error(`Missing required version for ${this.versionedEntityLabel()} update`);
@@ -504,7 +500,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             method: 'PUT',
             ...(options?.signal ? { signal: options.signal } : {}),
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...encryptedChanges, ...precondition, ...cascade })
+            body: JSON.stringify({ ...encryptedChanges, ...precondition })
         });
         if (!res.ok) {
             const payload = await res.json().catch(() => null);
