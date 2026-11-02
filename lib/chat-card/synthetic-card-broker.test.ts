@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
 import { mockOrdinaryModule } from '../chatgpt-execution/ordinary-module.test-support.ts';
+import { corpusEntitySpans } from './corpus-entity-spans.test-support.ts';
 import corpus from '../../scripts/fixtures/chat-card-corpus.json' with { type: 'json' };
 import { evidenceHash, redactionIdentityDigest } from '../ai-redaction-evidence';
 import { isValidItalianTaxCodeChecksum } from '../ai-egress-gate';
@@ -29,15 +30,7 @@ mockOrdinaryModule(import.meta.url, '../gliner-redaction-runner', { namedExports
             extracted++;
             if (hold) await hold;
             const entities = new Map(corpus.flatMap(entry => entry.gold.entities).map(entity => [entity.text, entity]));
-            const spans: NeuralRedactionSpan[] = [];
-            for (const entity of entities.values()) {
-                if (omitted.has(entity.text)) continue;
-                let start = text.indexOf(entity.text);
-                while (start >= 0) {
-                    spans.push({ type: entity.type as NeuralRedactionSpan['type'], start, end: start + entity.text.length, text: entity.text, confidence: 1 });
-                    start = text.indexOf(entity.text, start + entity.text.length);
-                }
-            }
+            const spans = corpusEntitySpans(text, entities.values(), omitted) as NeuralRedactionSpan[];
             if (overRedact) {
                 const start = text.indexOf('metformina');
                 if (start >= 0) spans.push({ type: 'person', start, end: start + 10, text: 'metformina', confidence: 1 });
