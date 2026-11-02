@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.47.0
+  version: 1.48.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -1746,6 +1746,8 @@ paths:
         scalar bodies return 400 before mutation; oversized bodies return 413.
         Applies a compare-on-write update to a service prescription in scope.
         `version` is required and stale versions return `VERSION_CONFLICT`.
+        A `status` change must follow the allowed transition table, otherwise
+        the request returns 409 `status_transition_not_allowed` before any write.
         This route requires `network.replica.write-service-prescriptions`.
       security:
         - pairedClientId: []
@@ -1780,7 +1782,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/PrescriptionVersionConflict'
+          $ref: '#/components/responses/ServicePrescriptionWriteConflict'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -1899,7 +1901,9 @@ paths:
         scalar bodies return 400 before mutation; oversized bodies return 413.
         Applies a compare-on-write update to a service prescription item in
         scope. `version` is required and stale versions return
-        `VERSION_CONFLICT`. This route requires
+        `VERSION_CONFLICT`. A `status` change must follow the allowed
+        transition table, otherwise the request returns 409
+        `status_transition_not_allowed` before any write. This route requires
         `network.replica.write-service-prescriptions`.
       security:
         - pairedClientId: []
@@ -1934,7 +1938,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/PrescriptionVersionConflict'
+          $ref: '#/components/responses/ServicePrescriptionWriteConflict'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -4595,6 +4599,18 @@ components:
                 currentUpdatedAt: null
                 currentState: missing
                 currentSnapshot: null
+    ServicePrescriptionWriteConflict:
+      description: |
+        Compare-on-write conflict, a status transition outside the allowed
+        table, or an items list that no longer matches the prescription.
+        Nothing is written in any of these cases.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/PrescriptionVersionConflictResponse'
+              - $ref: '#/components/schemas/StatusTransitionDeniedResponse'
+              - $ref: '#/components/schemas/ServicePrescriptionItemsChangedResponse'
     PrescriptionVersionConflict:
       description: |
         Prescription compare-on-write conflict. The payload exposes only
@@ -8748,6 +8764,25 @@ components:
           type:
             - string
             - 'null'
+        items:
+          type: array
+          maxItems: 500
+          description: |
+            Optional. Lists every current item of the prescription with the
+            version the client read; requires `status`. The prescription and the
+            items that were in its previous status move to `status` in one
+            transaction. Items in any other status stay as they are. An item
+            added, removed or changed meanwhile makes the whole request a 409.
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, version]
+            properties:
+              id:
+                type: string
+              version:
+                type: integer
+                minimum: 1
     ServicePrescriptionItemDetail:
       type: object
       additionalProperties: false
@@ -9393,6 +9428,32 @@ components:
             - string
             - 'null'
           format: date-time
+    StatusTransitionDeniedResponse:
+      type: object
+      additionalProperties: false
+      required: [error, code, entity, from, to]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [status_transition_not_allowed]
+        entity:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+    ServicePrescriptionItemsChangedResponse:
+      type: object
+      additionalProperties: false
+      required: [error, code]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [service_prescription_items_changed]
     PrescriptionVersionConflictResponse:
       type: object
       additionalProperties: false
