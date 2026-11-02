@@ -105,8 +105,10 @@ con interruzione alla cancellazione della richiesta o della sessione. Nessun
 cookie, credenziale, ricerca o dato clinico viene inviato ad AIFA. Il controllo
 non è un job in background: occorre aprire una delle due aree. Verifica,
 download, importazione manuale, caricamento legacy e svuotamento condividono
-un'esclusione per processo. Anche POST e DELETE di `/api/v1/drugs` rispondono
-409 quando un'operazione detiene l'esclusione; non attendono né scrivono.
+un'esclusione per processo. Anche il POST di `/api/v1/drugs` risponde 409 quando
+un'operazione detiene l'esclusione; non attende né scrive. La DELETE v1 è
+ritirata: lo svuotamento passa soltanto dal comando amministrativo con
+conferma, confronto di versione e audit di `DELETE /api/drugs`.
 
 `aifaCatalogRemoteState`, separato dal manifest, conserva ETag, Last-Modified,
 Content-Length, checkedAt ed esito della verifica. La prenotazione del tentativo

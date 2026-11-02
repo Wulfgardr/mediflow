@@ -3,9 +3,12 @@ import { createHash } from 'node:crypto';
 import { AifaUpdateError, AifaReductionError, AifaCatalogConflictError, acquireAifaCatalogOperation } from './aifa-catalog-lock';
 import { currentArchiveGeneration } from './security/archive-session-generation';
 import { writeAuditEventInTransaction, type buildAuditWriteInputFromRequest } from './security/audit';
+import { isWebAdminSession } from './security/server-auth-policy';
+import type { ServerSession } from './security/server-session';
 import { asc, eq, or, sql } from 'drizzle-orm';
 import {
     AIFA_CATALOG_MANIFEST_SETTING_KEY,
+    AIFA_CLEAR_CONFIRMATION,
     buildAifaCatalogManifest,
     normalizeAifaSearchText,
     parseAifaCsv,
@@ -23,7 +26,7 @@ import {
     buildDrugSearchPredicate,
     normalizeDrugSearchQuery,
 } from './drug-search-query';
-import { drugs, settings } from './schema';
+import { drugs, settings, users } from './schema';
 
 const INSERT_BATCH_SIZE = 400;
 const MAX_AIFA_CSV_BYTES = 100 * 1024 * 1024;
@@ -232,15 +235,69 @@ export async function confirmAifaCatalogUnchanged(snapshot: string, assertCurren
     return { ...status, rejectedRecords: 0, totalRecords: status.count, notModified: true };
 }
 
-export function clearAifaCatalog(): void {
+export class AifaClearDeniedError extends AifaUpdateError {
+    constructor() { super('Svuotamento del catalogo riservato all’amministratore', 403); }
+}
+
+export type AifaCatalogClearReceipt = {
+    operation: 'aifa-catalog-clear';
+    confirmation: typeof AIFA_CLEAR_CONFIRMATION;
+    auditEventId: string;
+    clearedAt: string;
+    previousSnapshot: string;
+    previousCount: number;
+    previousState: AifaCatalogStatus['state'];
+    previousManifestSha256: string | null;
+    snapshot: string;
+};
+
+export type AifaCatalogClearResult = AifaCatalogStatus & { snapshot: string; receipt: AifaCatalogClearReceipt };
+
+/**
+ * The only explicit catalog clear: web administrator, compare-and-swap on the
+ * observed snapshot, explicit versioned confirmation, audit row in the same
+ * immediate transaction. Any failure leaves drugs and manifest untouched.
+ * POST /api/v1/drugs still replaces the whole catalog without an audit row:
+ * declared out of scope here and tracked separately.
+ */
+export function clearAifaCatalogWithAuthority(input: {
+    session: ServerSession | null;
+    expectedSnapshot: unknown;
+    confirmation: unknown;
+    audit: AifaAuditInput;
+}): AifaCatalogClearResult {
+    if (!isWebAdminSession(input.session)) throw new AifaClearDeniedError();
+    const session = input.session;
+    if (typeof input.expectedSnapshot !== 'string' || !/^[a-f0-9]{64}$/.test(input.expectedSnapshot)) {
+        throw new AifaUpdateError('Versione attesa AIFA non valida', 400);
+    }
+    if (input.confirmation !== AIFA_CLEAR_CONFIRMATION) {
+        throw new AifaUpdateError('Conferma dello svuotamento AIFA assente o non valida', 400);
+    }
+    const expectedSnapshot = input.expectedSnapshot;
     const release = acquireAifaCatalogOperation();
     try {
-        dbServer.transaction((transaction) => {
+        return dbServer.transaction((transaction) => {
+            const user = transaction.select({ role: users.role, username: users.username }).from(users)
+                .where(eq(users.id, session.userId)).get();
+            if (!user || user.role !== 'admin' || user.username !== session.username) throw new AifaClearDeniedError();
+            if (catalogSnapshot(transaction) !== expectedSnapshot) throw new AifaCatalogConflictError();
+            const previous = readCatalogStatus(transaction);
             transaction.delete(drugs).run();
             transaction.delete(settings)
                 .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
                 .run();
-        });
+            const auditEventId = writeAuditEventInTransaction(transaction, { ...input.audit, outcome: 'success',
+                redactedMetadata: { ...input.audit.redactedMetadata, counts: previous.count,
+                    flags: [...(input.audit.redactedMetadata?.flags ?? []), 'mode:clear'],
+                    aifaCatalog: { mode: 'clear', before: previous.manifest, after: null, forcedReduction: false } } });
+            const snapshot = catalogSnapshot(transaction);
+            return { ...readCatalogStatus(transaction), snapshot, receipt: {
+                operation: 'aifa-catalog-clear', confirmation: AIFA_CLEAR_CONFIRMATION, auditEventId,
+                clearedAt: new Date().toISOString(), previousSnapshot: expectedSnapshot, previousCount: previous.count,
+                previousState: previous.state, previousManifestSha256: previous.manifest?.sha256 ?? null, snapshot,
+            } };
+        }, { behavior: 'immediate' });
     } finally { release(); }
 }
 
