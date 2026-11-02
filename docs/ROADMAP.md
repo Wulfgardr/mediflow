@@ -46,10 +46,10 @@ attivo; la versione minima è macOS 27.2 su questo target, senza promessa su
 altri Mac. G-9 fissa toolchain, runtime e bundle. Web/headless Windows e Linux
 restano nelle VM Parallels di Q-6; GPUI su quei sistemi, mobile e installatori
 completi restano in 0.9.6.
-La tranche intelligente comprende 13 celle: tre funzioni su quattro venue e
-Treatment Reasoning ATHENA/MLX locale. I-3b separa il metodo ATHENA dal runner;
-le tre possibili celle remote, inclusa la quarta generazione ChatGPT, sono
-condizionate all’ADR accettato e alla prova di qualità I-7. Build dei client
+La tranche intelligente comprende 12 celle: tre funzioni su quattro venue.
+L'emendamento del 30 ottobre 2026 rinvia ATHENA e Treatment Reasoning oltre la
+0.9.1: I-3, I-3b e I-7 escono dai requisiti e Treatment Reasoning resta non
+disponibile su ogni superficie; le quattro celle rinviate sono censite a parte. Build dei client
 Codex/Claude (D1), D2–D5, account/quote/spesa (D-I1), revisori e scenario,
 Moduli e SISS restano decisioni aperte. WUL-760/764 restano nel progetto
 Moduli prima degli adapter. U0 anticipa solo i contributi nominati delle
