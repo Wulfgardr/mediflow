@@ -104,7 +104,8 @@ Fra le sorgenti coperte cambia soltanto `lib/db.ts`: l'import da
 aggiunge `sealPatientDocumentSource` e `verifyPatientDocumentAttachment`,
 chiamati esclusivamente dal pannello «Nuova scheda da documento». Il primo
 usa la master key già sbloccata e il segnale di lettura della sessione per
-cifrare nome, percorso e byte del documento; il secondo rilegge un allegato
+cifrare nome, percorso e byte del documento, e azzera la chiave del file se
+la sessione si blocca durante la cifratura; il secondo rilegge un allegato
 con la `get` esistente e ne confronta i byte, o dichiara soltanto che si apre
 come PDF quando l'originale non è più in memoria. Non inviano scritture, non
 toccano terapie, chiave o segnale. Tutti i metodi preesistenti restano

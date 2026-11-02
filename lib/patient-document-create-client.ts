@@ -44,7 +44,7 @@ export function parsePatientDocumentReceipt(value: unknown): PatientDocumentRece
 
 export type PreparedPatientDocument = Readonly<{ bytes: Uint8Array<ArrayBuffer>; fileName: string; converted: boolean; reduction: number }>;
 export class PatientDocumentFileRejected extends Error {
-    constructor(readonly reason: 'type' | 'size' | 'empty' | 'image-too-large' | 'image-unreadable') { super(`Patient document rejected: ${reason}`); }
+    constructor(readonly reason: 'type' | 'size' | 'empty' | 'image-too-elongated' | 'image-unreadable', readonly shortSide?: number) { super(`Patient document rejected: ${reason}`); }
 }
 
 /** Decodes with the EXIF orientation applied, reduces within the local renderer limits and returns JPEG bytes. */
@@ -54,7 +54,7 @@ async function rasterize(file: File): Promise<{ jpeg: Uint8Array; width: number;
     catch { throw new PatientDocumentFileRejected('image-unreadable'); }
     try {
         const fit = fitImageForLocalOcr(bitmap.width, bitmap.height);
-        if (!fit.ok) throw new PatientDocumentFileRejected(fit.reason === 'too-large' ? 'image-too-large' : 'image-unreadable');
+        if (!fit.ok) throw new PatientDocumentFileRejected(fit.reason === 'too-elongated' ? 'image-too-elongated' : 'image-unreadable', fit.shortSide);
         const canvas = document.createElement('canvas');
         canvas.width = fit.width; canvas.height = fit.height;
         const context = canvas.getContext('2d');
@@ -100,29 +100,32 @@ export async function preparePatientDocumentFile(file: File): Promise<PreparedPa
 
 /** Local reference to an issued command, kept until its outcome is read: a lost response or a
  * reload then shows the work to verify instead of offering a second creation. Not an authority. */
-function selectedAmbulatory(): string {
+/** The ambulatory the server will use: the selected one, or the default when no cookie is set, as the
+ * route resolves it. The same scope must give the same key whether it was chosen or defaulted. */
+export async function patientDocumentScope(readDefault: () => Promise<string | null>): Promise<string> {
     const values = document.cookie.split(';').map(value => value.trim()).filter(value => value.startsWith('ambulatory_id='));
-    return values.length === 1 ? decodeURIComponent(values[0].slice('ambulatory_id='.length)) : 'predefinito';
+    if (values.length === 1) return decodeURIComponent(values[0].slice('ambulatory_id='.length));
+    try { return (await readDefault()) ?? 'nessun-ambulatorio'; } catch { return 'predefinito-non-letto'; }
 }
-/** One reference per archive and selected ambulatory: another ambulatory does not see it. */
-function markerKey(): string {
-    return `mediflow:patient-document-command:v2:${encodeURIComponent(clientArchiveGeneration())}:${encodeURIComponent(selectedAmbulatory())}`;
+/** One reference per archive and ambulatory: another ambulatory does not see it. */
+function markerKey(scope: string): string {
+    return `mediflow:patient-document-command:v2:${encodeURIComponent(clientArchiveGeneration())}:${encodeURIComponent(scope)}`;
 }
 export const patientDocumentMarker = {
-    read(): string | null {
+    read(scope: string): string | null {
         try {
-            const raw = window.localStorage.getItem(markerKey());
+            const raw = window.localStorage.getItem(markerKey(scope));
             const value = raw === null ? null : JSON.parse(raw) as { commandId?: unknown };
             return value && typeof value.commandId === 'string' && UUID.test(value.commandId) ? value.commandId : null;
         } catch { return null; }
     },
-    write(commandId: string): boolean {
+    write(scope: string, commandId: string): boolean {
         try {
-            window.localStorage.setItem(markerKey(), JSON.stringify({ commandId }));
-            return this.read() === commandId;
+            window.localStorage.setItem(markerKey(scope), JSON.stringify({ commandId }));
+            return this.read(scope) === commandId;
         } catch { return false; }
     },
-    clear(commandId: string) {
-        try { if (this.read() === commandId) window.localStorage.removeItem(markerKey()); } catch { /* nothing stored */ }
+    clear(scope: string, commandId: string) {
+        try { if (this.read(scope) === commandId) window.localStorage.removeItem(markerKey(scope)); } catch { /* nothing stored */ }
     },
 };

@@ -11,12 +11,13 @@ import {
     PatientDocumentFileRejected,
     parsePatientDocumentReceipt,
     patientDocumentMarker,
+    patientDocumentScope,
     preparePatientDocumentFile,
     requestPatientDocument,
     type PatientDocumentReceipt,
     type PatientDocumentView,
 } from '@/lib/patient-document-create-client';
-import { OCR_MAX_PIXELS, OCR_MAX_SIDE_PIXELS } from '@/lib/patient-document-image-geometry';
+import { OCR_MIN_SHORT_SIDE_PIXELS } from '@/lib/patient-document-image-geometry';
 
 type Fields = { firstName: string; lastName: string; taxCode: string; birthDate: string };
 type Source = { fileName: string; size: number; converted: boolean; reduction: number };
@@ -35,10 +36,12 @@ const RETIRED = 'Lavorazione ritirata. Nessuna scheda creata.';
 const EXPIRED = 'La revisione non è più valida: la lavorazione scade dopo cinque minuti o al cambio di sessione o ambulatorio.';
 
 /** The cause of a refused stage, in the physician's terms: never a generic hint about the lock. */
-function stageRefusal(status: number, code: unknown, detail: unknown): string {
-    if (status === 409 && code === 'review-required') return detail === 'image_or_scan'
-        ? `Documento non acquisito: è una scansione e l’OCR locale non ha prodotto testo. Può mancare l’OCR su questo computer, oppure la pagina supera ${OCR_MAX_SIDE_PIXELS} px per lato o ${OCR_MAX_PIXELS / 1_000_000} milioni di pixel a 144 dpi.`
-        : 'Documento non acquisito: l’estrazione locale non ha prodotto un testo leggibile.';
+function stageRefusal(status: number, code: unknown, detail: unknown, converted: boolean): string {
+    if (status === 409 && code === 'review-required' && detail === 'image_or_scan') return converted
+        // The browser already brought the image within the renderer limits: the cause is elsewhere.
+        ? 'Documento non acquisito: l’OCR locale non ha letto testo nell’immagine. Può mancare l’OCR su questo computer, oppure la foto è sfocata, scura o troppo sgranata: riprova con più luce o con una scansione.'
+        : 'Documento non acquisito: è una scansione e l’OCR locale non ha prodotto testo. Può mancare l’OCR su questo computer, oppure la pagina è troppo grande o troppo pesante per il lettore locale.';
+    if (status === 409 && code === 'review-required') return 'Documento non acquisito: l’estrazione locale non ha prodotto un testo leggibile.';
     if (status === 409 && code === 'in-progress') return 'Questa sessione ha già una lavorazione da documento aperta, forse in un’altra scheda del browser: concludila o annullala, oppure attendi cinque minuti che scada.';
     if (status === 409 && code === 'scope-unavailable') return 'L’ambulatorio selezionato non esiste più: scegline un altro e riprova.';
     if (status === 503) return 'Il computer sta già leggendo due documenti: riprova tra poco.';
@@ -67,6 +70,12 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
     const [separate, setSeparate] = useState(false);
     const [pin, setPin] = useState('');
     const [dragging, setDragging] = useState(false);
+    // The ambulatory scope of the local reference, resolved like the server does (selected, else default).
+    const scope = useRef('predefinito-non-letto');
+    const resolveScope = useCallback(async () => {
+        scope.current = await patientDocumentScope(async () => (await db.ambulatories.toArray()).find(item => item.isDefault)?.id ?? null);
+        return scope.current;
+    }, []);
     const work = useRef<{ epoch: number; controller: AbortController; original: Uint8Array | null }>({ epoch: 0, controller: new AbortController(), original: null });
     const heading = useRef<HTMLHeadingElement>(null);
     const fileInput = useRef<HTMLInputElement>(null);
@@ -84,7 +93,7 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
         if (work.current.epoch !== token.epoch) return;
         if (!receipt || receipt.outcome === 'unknown') { setPhase({ kind: 'uncertain', commandId, text: UNCERTAIN }); return; }
         if (receipt.outcome === 'retired') {
-            patientDocumentMarker.clear(commandId);
+            patientDocumentMarker.clear(scope.current, commandId);
             restart();
             setPhase({ kind: 'idle', notice: { tone: reason ? 'critical' : 'info', text: `${reason ? `${reason} ` : ''}${RETIRED} Puoi scegliere di nuovo il documento.` } });
             return;
@@ -93,7 +102,7 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
         try { verified = await db.verifyPatientDocumentAttachment(receipt.attachmentId, receipt.patientId, work.current.original, work.current.controller.signal); }
         catch { verified = 'failed'; }
         if (work.current.epoch !== token.epoch) return;
-        if (verified !== 'failed') patientDocumentMarker.clear(commandId);
+        if (verified !== 'failed') patientDocumentMarker.clear(scope.current, commandId);
         work.current.original?.fill(0); work.current.original = null;
         setPin('');
         setPhase({ kind: 'applied', patientId: receipt.patientId, verified, commandId });
@@ -109,13 +118,13 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
     useEffect(() => {
         // The marker lives in browser storage, read after hydration so server and client render the same first frame.
         let live = true;
-        void Promise.resolve().then(() => {
-            const commandId = patientDocumentMarker.read();
+        void resolveScope().then((resolved) => {
+            const commandId = patientDocumentMarker.read(resolved);
             if (live && commandId) setPhase({ kind: 'uncertain', commandId, text: 'Una lavorazione da documento richiede verifica. Rileggi l’esito oppure ritira la lavorazione prima di iniziarne un’altra.' });
         });
         const owned = work;
         return () => { live = false; owned.current.controller.abort(); owned.current.original?.fill(0); };
-    }, []);
+    }, [resolveScope]);
     const moved = useRef(false);
     useEffect(() => {
         // Focus follows the work after the first change of step, never on page load.
@@ -128,6 +137,7 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
         const token = restart();
         setPhase({ kind: 'reading', fileName: file.name });
         try {
+            const stageScope = await resolveScope();
             const prepared = await preparePatientDocumentFile(file);
             // A document cancelled while it was being read is erased, never kept as the next work's original.
             if (!current(token)) { prepared.bytes.fill(0); return; }
@@ -140,19 +150,19 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
             if (!current(token)) return;
             const view = response.body as PatientDocumentView | null;
             if (response.status === 200 && view && typeof view.commandId === 'string' && typeof view.viewId === 'string' && typeof view.text === 'string') {
-                const markerKept = patientDocumentMarker.write(view.commandId);
+                const markerKept = patientDocumentMarker.write(stageScope, view.commandId);
                 setPhase({ kind: 'review', view, source: { fileName: prepared.fileName, size: prepared.bytes.length, converted: prepared.converted, reduction: prepared.reduction }, markerKept, duplicate: false });
                 return;
             }
             restart();
-            setPhase({ kind: 'idle', notice: { tone: 'critical', text: `${stageRefusal(response.status, response.body?.status, response.body?.detail)} Nessuna scheda creata.` } });
+            setPhase({ kind: 'idle', notice: { tone: 'critical', text: `${stageRefusal(response.status, response.body?.status, response.body?.detail, prepared.converted)} Nessuna scheda creata.` } });
         } catch (error) {
             if (work.current.epoch !== token.epoch) return;
             restart();
             const text = error instanceof PatientDocumentFileRejected
                 ? error.reason === 'size' ? 'Il file supera il limite di 10 MiB. Nessuna scheda creata.'
                     : error.reason === 'empty' ? 'Il file è vuoto. Nessuna scheda creata.'
-                        : error.reason === 'image-too-large' ? `Immagine troppo grande per l’estrazione locale: per rientrare nei limiti di ${OCR_MAX_SIDE_PIXELS} px per lato e ${OCR_MAX_PIXELS / 1_000_000} milioni di pixel andrebbe ridotta a meno della metà, e il testo potrebbe non essere più leggibile. Usa una scansione a 300 dpi o una foto a risoluzione minore. Nessuna scheda creata.`
+                        : error.reason === 'image-too-elongated' ? `Immagine troppo allungata per l’estrazione locale: ridotta entro i limiti del lettore, il lato corto resterebbe di ${error.shortSide ?? 0} px, sotto i ${OCR_MIN_SHORT_SIDE_PIXELS} px che servono a leggere il testo. Fotografa o scansiona il documento in più parti. Nessuna scheda creata.`
                             : error.reason === 'image-unreadable' ? 'Immagine non leggibile dal browser. Nessuna scheda creata.'
                                 : 'Formato non ammesso: scegli un PDF, un JPEG o un PNG. Nessuna scheda creata.'
                 : 'Lettura del documento interrotta. Nessuna scheda creata.';
@@ -214,7 +224,7 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
             message: 'Da questa sessione l’esito non è leggibile: se la scheda è stata creata resta nell’archivio. Chiudendo l’avviso MediFlow non potrà più mostrarti l’esito di questa lavorazione.',
             confirmLabel: 'Ho verificato, chiudi', cancelLabel: 'Non ancora' });
         if (!confirmed) return;
-        patientDocumentMarker.clear(commandId); restart(); setPhase({ kind: 'idle' });
+        patientDocumentMarker.clear(scope.current, commandId); restart(); setPhase({ kind: 'idle' });
     }
 
     function drop(event: DragEvent<HTMLElement>) {
