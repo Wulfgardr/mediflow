@@ -419,7 +419,7 @@ attribuite alle revisioni precedenti, non una nuova attestazione della 0.8.6.
 | Fallback `needsOcr` | Integrato sul Mac | Routing, manifest, rendering selettivo e riconoscimento Apple Vision | Review-only; fail-closed fuori da macOS o senza motore disponibile |
 | Selector Fabric | Integrato | Discovery compatibile, smoke sintetico e binding atomico per cinque capability | Nessun segreto persistito; discovery non equivale a readiness |
 | Ollama | Provider locale capability-specific | Percorsi generativi Fabric ammessi dalla capability | Solo loopback; nessun OCR o fallback implicito |
-| ATHENA/MLX | Provider locale capability-specific | Solo Treatment Reasoning review-only | Nessuna prescrizione o apply clinico |
+| ATHENA/MLX | Provider locale capability-specific | Solo Treatment Reasoning review-only; nella 0.9.1 negato su ogni superficie per l'emendamento del 30/10/2026 | Nessuna prescrizione o apply clinico |
 | OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe amministrativa Document Synthesis review-only con policy e secret reference host-owned | Solo transport fake nel tree; nessuna credenziale, rete live o runtime readiness |
 | MCP | Superficie figlia locale | Catalogo, terminology search, Open Loops patient-scoped, proposta follow-up e query semantica bounded read-only | Usa il Supervisor locale della 0.8.5; nessuna authority caller-supplied |
 | Mini | Lane WUL-696: callsite Supervisor | Parità dei comandi CLI su NDJSON; ricerca terminologica production su fixture | Attivazione Web e parent AIP obbligatori; stesso perimetro di capability, nessun apply |

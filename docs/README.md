@@ -41,13 +41,14 @@ le tappe 0.9.0–1.0 definite nel
 Il [contratto U0 approvato della 0.9.1](./releases/0.9.1-contract.md) registra
 le decisioni di Leonardo del 23 ottobre 2026: W=36, G=10, C/P/I/Q, soglia
 6/6 con al massimo un intervento e GPUI sul solo MacBook Pro M4 Max/36 GB,
-macOS 27.2. Treatment Reasoning resta ATHENA/MLX locale; I-3b definisce il
-filone riutilizzabile e condiziona le celle remote. Le decisioni ancora aperte
-sono nominate nel contratto; U0 e pilota chiuso non attestano il completamento
-della release.
+macOS 27.2. L'[emendamento del 30 ottobre 2026](./releases/0.9.1-contract.md#emendamento-del-30-ottobre-2026-athena-e-conservazione)
+rinvia ATHENA e Treatment Reasoning oltre la 0.9.1: I-3, I-3b e I-7 escono dai
+requisiti e Treatment Reasoning resta non disponibile su ogni superficie, anche
+con i pesi presenti. Le decisioni ancora aperte sono nominate nel contratto; U0
+e pilota chiuso non attestano il completamento della release.
 La [prima analisi I-3b](./analysis/2026-10-26-athena-method.md) ricostruisce
-metodo, fonti e runner ATHENA con REA e prove locali; distingue l'estrazione
-equivalente del builder dal probe Fabric negato e dalla qualità I-7 aperta.
+metodo, fonti e runner ATHENA con REA e prove locali; resta come base per la
+ripresa dopo la 0.9.1 secondo l'ADR 0166 Proposed.
 Il [censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) confronta la
 base `0a1980f32` con le 66 righe di parità, tutte le route Web e Punto
 d'inchiostro. Assegna i residui alle unità G-1–9, distingue il pilota
