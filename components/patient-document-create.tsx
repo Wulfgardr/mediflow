@@ -102,8 +102,12 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
         try { verified = await db.verifyPatientDocumentAttachment(receipt.attachmentId, receipt.patientId, work.current.original, work.current.controller.signal); }
         catch { verified = 'failed'; }
         if (work.current.epoch !== token.epoch) return;
-        if (verified !== 'failed') patientDocumentMarker.clear(scope.current, commandId);
-        work.current.original?.fill(0); work.current.original = null;
+        // A failed comparison keeps the original: «Rileggi esito e allegato» must compare again, not
+        // settle for a PDF that merely opens. It is erased after success, abandonment or a new document.
+        if (verified !== 'failed') {
+            patientDocumentMarker.clear(scope.current, commandId);
+            work.current.original?.fill(0); work.current.original = null;
+        }
         setPin('');
         setPhase({ kind: 'applied', patientId: receipt.patientId, verified, commandId });
     }, [restart]);
