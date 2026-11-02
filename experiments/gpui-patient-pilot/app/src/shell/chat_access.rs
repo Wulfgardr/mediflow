@@ -22,6 +22,7 @@ pub(super) struct ChatAccess {
     archive: String,
     pin: Entity<TextInput>,
     excerpt: Entity<TextInput>,
+    booking: Entity<TextInput>,
     task: Option<gpui::Task<()>>,
     message: Option<String>,
     last_state: Option<(State, bool)>,
@@ -52,6 +53,16 @@ impl ChatAccess {
                     "Copia qui un passo delle note",
                     "Passo delle note",
                     true,
+                    theme,
+                    cx,
+                )
+            }),
+            booking: cx.new(|cx| {
+                TextInput::new(
+                    "chat-booking-date",
+                    "Data e ora del controllo",
+                    "GG/MM/AAAA HH:MM",
+                    false,
                     theme,
                     cx,
                 )
@@ -123,6 +134,8 @@ impl ChatAccess {
         self.patient = mediflow_patient_client::PersonName::default();
         self.archive.clear();
         self.excerpt
+            .update(cx, |input, cx| input.set_content("", cx));
+        self.booking
             .update(cx, |input, cx| input.set_content("", cx));
         self.last_state = None;
         self.recovery_messages.clear();
@@ -388,7 +401,7 @@ impl ClinicalApp {
             let mut storage_error = false;
             for id in scan.ids {
                 let resolution = session
-                    .recover_chat_therapy_command(&scope, &id)
+                    .recover_chat_write_command(&scope, &id)
                     .map_or(ChatWriteResolution::Uncertain, |r| r.reconcile());
                 if let ChatWriteResolution::Confirmed(outcome) = resolution {
                     storage_error |= references.confirm(&id, outcome).is_err();
@@ -481,6 +494,7 @@ impl ClinicalApp {
                     t.rows.clone(),
                     t.selected.clone(),
                     t.result.clone(),
+                    t.booking.clone(),
                 )
             })
         });
@@ -505,11 +519,12 @@ impl ClinicalApp {
         let enabled = state == State::Challenge
             && (review.is_some() || therapy.as_ref().is_some_and(|t| t.2.is_some()));
         let therapy_mode = therapy.is_some();
+        let booking_mode = therapy.as_ref().is_some_and(|t| t.4.is_some());
         let catalog_mode = pending.lock().is_ok_and(|p| p.is_catalog());
         let (catalog_title, catalog_notice) = if pending.lock().is_ok_and(|p| p.is_agenda()) {
             (
                 "Mostra l’agenda interna nella vista della chat?",
-                "Sola lettura dei primi 20 controlli interni, ordinati per data. Solo date e stato, senza nomi, titoli o note. Non sono candidati da calendario né prenotazioni confermate. Conferma una sola consultazione entro 30 secondi.",
+                "Sola lettura dei primi 20 controlli interni, ordinati per data. Solo date e stato, senza nomi, titoli o note. La lettura non prenota nulla e non include candidati da calendario. Conferma una sola consultazione entro 30 secondi.",
             )
         } else {
             catalog_copy(pending.lock().is_ok_and(|p| p.is_prosthetics_catalog()))
@@ -519,11 +534,11 @@ impl ClinicalApp {
             .aria_label("Conferma accesso della chat").flex_1().min_h_0().overflow_y_scroll()
             .p(px(20.)).border_1().border_color(theme.rule)
             .flex().flex_col().gap(px(12.))
-            .child(heading("native-chat-access-title", if therapy_mode { "Conferma il cambio di stato della terapia" } else if catalog_mode { catalog_title } else if clinical_mode { "Scegli diagnosi e passi delle note" } else { "Condividi la scheda di prova nella chat?" }, theme))
+            .child(heading("native-chat-access-title", if booking_mode { "Conferma la prenotazione del controllo" } else if therapy_mode { "Conferma il cambio di stato della terapia" } else if catalog_mode { catalog_title } else if clinical_mode { "Scegli diagnosi e passi delle note" } else { "Condividi la scheda di prova nella chat?" }, theme))
             .child(text!(format!("App richiedente: {app}")).with_id("native-chat-access-app"))
             .child(text!(format!("Archivio: {}", self.chat_access.archive)).with_id("native-chat-access-archive"))
             .child(div().id("native-chat-access-patient").child(crate::title::title(crate::title::TitleText::patient_question("Paziente: ", self.chat_access.patient.clone(), ""), theme)))
-            .child(notice("native-chat-access-operation", if therapy_mode { "Scegli la terapia della cartella selezionata e controlla il nuovo stato. La scrittura usa il PIN nativo, una sola volta entro 30 secondi. I nomi restano qui. Touch ID per questa scrittura non è ancora abilitato." } else if catalog_mode { catalog_notice } else if clinical_mode { "Spunta le diagnosi e i passi da condividere. Copia un passo esatto delle note nel campo sotto e aggiungilo, poi spuntalo. La nota intera non è ammessa. Il testo viene dalle tue note, anche con refusi o errori OCR. Il controllo è un aiuto e non è anonimizzazione. Un dato sconosciuto offuscato di proposito può sfuggire. Sei responsabile di ciò che esce: controlla i byte esatti prima della conferma. Il testo non viene riscritto. Puoi togliere la spunta o modificare una copia qui, senza cambiare la cartella. Le date complete sono escluse." } else { "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico." }, theme, false))
+            .child(notice("native-chat-access-operation", if booking_mode { "Prenotazione di un controllo nell’agenda interna della cartella selezionata. Scrivi data e ora, controlla l’anteprima e conferma con il PIN nativo, una sola volta entro 30 secondi. Titolo fisso «Controllo», nessuna nota. Se l’agenda cambia prima della conferma la prenotazione viene respinta. Nessun calendario personale o servizio esterno." } else if therapy_mode { "Scegli la terapia della cartella selezionata e controlla il nuovo stato. La scrittura usa il PIN nativo, una sola volta entro 30 secondi. I nomi restano qui. Touch ID per questa scrittura non è ancora abilitato." } else if catalog_mode { catalog_notice } else if clinical_mode { "Spunta le diagnosi e i passi da condividere. Copia un passo esatto delle note nel campo sotto e aggiungilo, poi spuntalo. La nota intera non è ammessa. Il testo viene dalle tue note, anche con refusi o errori OCR. Il controllo è un aiuto e non è anonimizzazione. Un dato sconosciuto offuscato di proposito può sfuggire. Sei responsabile di ciò che esce: controlla i byte esatti prima della conferma. Il testo non viene riscritto. Puoi togliere la spunta o modificare una copia qui, senza cambiare la cartella. Le date complete sono escluse." } else { "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico." }, theme, false))
             .when_some(clinical.filter(|_| state == State::Selecting), |mut el, (notes, rows, selected)| {
                 el = el.child(notice("chat-clinical-notes", notes, theme, false)).child(self.chat_access.excerpt.clone());
                 el = el.child(button("chat-clinical-add", "Aggiungi passo", theme, false, true)
@@ -558,7 +573,33 @@ impl ClinicalApp {
                 el.child(button("chat-clinical-prepare", "Prepara selezione", theme, true, !selected.is_empty())
                     .on_click(cx.listener(move |_, _, _, cx| { let request = request.clone(); std::thread::spawn(move || crate::chat_access::owner::prepare_clinical(&request)); cx.notify(); })))
             })
-            .when_some(therapy, |mut el, (target, rows, selected, result)| {
+            .when_some(therapy, |mut el, (target, rows, selected, result, booking)| {
+                if let Some((revision, chosen)) = booking {
+                    if let Some(chosen) = chosen {
+                        el = el.child(notice("native-chat-booking-preview", format!("Controllo · {chosen} · stato da svolgere · agenda alla versione {revision}"), theme, false));
+                    } else if selected.is_none() {
+                        let ready = state == State::Challenge;
+                        el = el.child(self.chat_access.booking.clone())
+                            .child(button("native-chat-booking-prepare", "Prepara prenotazione", theme, false, ready)
+                                .when(ready, |button| button.on_click(cx.listener(|this, _, _, cx| {
+                                    let text = this.chat_access.booking.read(cx).value().to_owned();
+                                    let Some(request) = this.chat_access.pending.clone() else { return; };
+                                    if crate::chat_access::owner::booking_instant(&text, chrono::Local::now()).is_none() {
+                                        this.chat_access.message = Some("Scrivi data e ora come GG/MM/AAAA HH:MM, da oggi a due anni.".into());
+                                    } else {
+                                        this.chat_access.message = None;
+                                        std::thread::spawn(move || crate::chat_access::owner::choose_booking(&request, &text));
+                                    }
+                                    cx.notify();
+                                }))));
+                    }
+                    if let Some((_, id)) = selected { el = el.child(notice("native-chat-therapy-command", format!("Comando: {id}. Conserva questo riferimento per rileggere l’esito."), theme, false)); }
+                    if let Some(result) = result { el = el.child(notice("native-chat-therapy-receipt", format!("Ricevuta e rilettura: {result}"), theme, false)); }
+                    if state == State::Write(ChatWriteResolution::Confirmed(mediflow_runtime_client::ChatWriteOutcome::Rejected)) {
+                        el = el.child(notice("native-chat-booking-conflict", "L’agenda della cartella è cambiata dopo l’apertura. Nessun controllo prenotato: apri una nuova richiesta e ricontrolla.", theme, true));
+                    }
+                    return el;
+                }
                 el = el.child(text!(format!("Nuovo stato: {target}")).with_id("native-chat-therapy-target"));
                 for (index, row) in rows.iter().enumerate() {
                     if selected.as_ref().is_none_or(|s| s.0 == index) {

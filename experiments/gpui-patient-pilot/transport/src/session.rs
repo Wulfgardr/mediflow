@@ -75,11 +75,15 @@ impl AmbulatoryCommandContext {
         self.context.cancel();
     }
 }
+const THERAPY_STATUS_ROUTE: &str = "therapy-status";
+const CHECKUP_BOOKING_ROUTE: &str = "checkup-booking";
 #[derive(Clone)]
 pub struct ChatWriteRecovery {
     session: RuntimeSession,
     scope: String,
     command_id: String,
+    /// Native write routes that may own the command; a stored reference does not record which one.
+    routes: &'static [&'static str],
 }
 impl ChatWriteRecovery {
     /// Idempotently retires the command or reports its already committed outcome.
@@ -90,34 +94,42 @@ impl ChatWriteRecovery {
             .unwrap_or(ChatWriteResolution::Uncertain)
     }
     fn confirmed(&self) -> Result<ChatWriteOutcome> {
-        if let Ok(receipt) = self.session.request(
-            Method::POST,
-            &["api", "auth", "native", "therapy-status"],
-            &[],
-            Some(&self.scope),
-            Some(&json!({"operation":"receipt", "commandId":self.command_id})),
-            true,
-            crate::http::JSON_LIMIT,
-        ) {
-            match receipt["outcome"].as_str() {
-                Some("terminal") => return Self::outcome(&receipt["receipt"]),
-                Some("unknown") => {}
-                _ => return Err(RuntimeError::InvalidResponse),
+        for route in self.routes {
+            if let Ok(receipt) = self.session.request(
+                Method::POST,
+                &["api", "auth", "native", route],
+                &[],
+                Some(&self.scope),
+                Some(&json!({"operation":"receipt", "commandId":self.command_id})),
+                true,
+                crate::http::JSON_LIMIT,
+            ) {
+                match receipt["outcome"].as_str() {
+                    Some("terminal") => return Self::outcome(&receipt["receipt"]),
+                    Some("unknown") => {}
+                    _ => return Err(RuntimeError::InvalidResponse),
+                }
             }
         }
-        let result = self.session.request(
-            Method::POST,
-            &["api", "auth", "native", "therapy-status"],
-            &[],
-            Some(&self.scope),
-            Some(&json!({"operation":"revoke", "commandId":self.command_id})),
-            true,
-            4096,
-        )?;
-        if result.as_object().is_none_or(|o| o.len() != 1) {
-            return Err(RuntimeError::InvalidResponse);
+        for route in self.routes {
+            let result = self.session.request(
+                Method::POST,
+                &["api", "auth", "native", route],
+                &[],
+                Some(&self.scope),
+                Some(&json!({"operation":"revoke", "commandId":self.command_id})),
+                true,
+                4096,
+            )?;
+            if result.as_object().is_none_or(|o| o.len() != 1) {
+                return Err(RuntimeError::InvalidResponse);
+            }
+            let outcome = Self::outcome(&result)?;
+            if outcome != ChatWriteOutcome::Retired {
+                return Ok(outcome);
+            }
         }
-        Self::outcome(&result)
+        Ok(ChatWriteOutcome::Retired)
     }
     fn outcome(result: &Value) -> Result<ChatWriteOutcome> {
         match result["outcome"].as_str() {
@@ -651,6 +663,28 @@ impl RuntimeSession {
         scope: &str,
         command_id: &str,
     ) -> Result<ChatWriteRecovery> {
+        self.chat_write_recovery(scope, command_id, &[THERAPY_STATUS_ROUTE])
+    }
+
+    /// Recovery of a stored reference after a restart: either native write route may own it.
+    pub fn recover_chat_write_command(
+        &self,
+        scope: &str,
+        command_id: &str,
+    ) -> Result<ChatWriteRecovery> {
+        self.chat_write_recovery(
+            scope,
+            command_id,
+            &[THERAPY_STATUS_ROUTE, CHECKUP_BOOKING_ROUTE],
+        )
+    }
+
+    fn chat_write_recovery(
+        &self,
+        scope: &str,
+        command_id: &str,
+        routes: &'static [&'static str],
+    ) -> Result<ChatWriteRecovery> {
         validate_scope_id(scope)?;
         if command_id.len() != 36
             || !command_id.bytes().enumerate().all(|(i, b)| {
@@ -670,14 +704,73 @@ impl RuntimeSession {
             },
             scope: scope.into(),
             command_id: command_id.into(),
+            routes,
         })
     }
 
     pub fn chat_therapy_request(&self, context: &ChatAccessContext, body: &Value) -> Result<Value> {
+        self.chat_write_request(context, THERAPY_STATUS_ROUTE, body)
+    }
+
+    pub fn chat_booking_request(&self, context: &ChatAccessContext, body: &Value) -> Result<Value> {
+        self.chat_write_request(context, CHECKUP_BOOKING_ROUTE, body)
+    }
+
+    /// Opens the native booking view; the agenda revision is the CAS value the booking must still match.
+    pub fn chat_booking_open(&self, context: &ChatAccessContext) -> Result<(u64, String)> {
+        self.revalidate_chat_access_context(context)?;
+        let view = self.chat_booking_request(context, &json!({"operation":"open", "patientId":context.patient, "selectionEpoch":context.selection_epoch}))?;
+        match (view["viewId"].as_str(), view["agendaRevision"].as_u64()) {
+            (Some(id), Some(revision)) if view.as_object().is_some_and(|o| o.len() == 2) => {
+                Ok((revision, id.to_owned()))
+            }
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
+
+    /// `date` is the RFC 3339 instant the physician typed and saw in the native window.
+    pub fn preview_chat_booking(
+        &self,
+        context: &ChatAccessContext,
+        revision: u64,
+        date: &str,
+        view_id: &str,
+    ) -> Result<String> {
+        self.revalidate_chat_access_context(context)?;
+        if chrono::DateTime::parse_from_rfc3339(date).is_err() {
+            return Err(RuntimeError::InvalidInput);
+        }
+        let command_id = crate::http::operation_uuid()?;
+        let body = json!({"operation":"preview", "selectionEpoch":context.selection_epoch, "viewId":view_id,
+            "command":{"protocol":"checkup.booking.v1", "commandId":command_id,
+                "archiveGeneration":self.inner.user.archive_generation, "patientId":context.patient,
+                "expectedAgendaRevision":revision, "date":date, "title":"Controllo"}});
+        let result = self.chat_booking_request(context, &body)?;
+        if result != json!({"commandId":command_id, "status":"preview"}) {
+            return Err(RuntimeError::Forbidden);
+        }
+        Ok(command_id)
+    }
+
+    pub fn chat_booking_recovery(
+        &self,
+        context: &ChatAccessContext,
+        command_id: &str,
+    ) -> Result<ChatWriteRecovery> {
+        self.check_chat_access_context(context)?;
+        self.chat_write_recovery(&context.scope, command_id, &[CHECKUP_BOOKING_ROUTE])
+    }
+
+    fn chat_write_request(
+        &self,
+        context: &ChatAccessContext,
+        route: &str,
+        body: &Value,
+    ) -> Result<Value> {
         self.check_chat_access_context(context)?;
         let result = self.request_with_profile_intent(
             Method::POST,
-            &["api", "auth", "native", "therapy-status"],
+            &["api", "auth", "native", route],
             &[],
             Some(&context.scope),
             Some(body),

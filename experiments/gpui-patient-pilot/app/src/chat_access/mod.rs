@@ -208,6 +208,19 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                 pending = Some(request);
                 State::Requested
             }
+            Ok(value) if pending.is_none() && value == json!({"command":"booking"}) => {
+                let Ok(copy) = stream.try_clone() else {
+                    break;
+                };
+                let Some(request) = Request::for_booking(peer, copy) else {
+                    break;
+                };
+                if incoming.try_send(request.clone()).is_err() {
+                    break;
+                }
+                pending = Some(request);
+                State::Requested
+            }
             Ok(value) if pending.is_none() && value == json!({"command":"local-voice"}) => {
                 let Ok(copy) = stream.try_clone() else {
                     break;
@@ -259,7 +272,10 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
             Ok(value)
                 if pending.is_none()
                     && value.as_object().is_some_and(|v| v.len() == 2)
-                    && value["command"] == "receipt"
+                    && matches!(
+                        value["command"].as_str(),
+                        Some("receipt" | "booking-receipt")
+                    )
                     && value["commandId"].as_str().is_some_and(|id| {
                         id.len() == 36 && id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
                     }) =>
@@ -267,9 +283,12 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                 let Ok(copy) = stream.try_clone() else {
                     break;
                 };
-                let Some(request) =
-                    Request::for_receipt(peer, copy, value["commandId"].as_str().unwrap())
-                else {
+                let id = value["commandId"].as_str().unwrap();
+                let Some(request) = (if value["command"] == "booking-receipt" {
+                    Request::for_booking_receipt(peer, copy, id)
+                } else {
+                    Request::for_receipt(peer, copy, id)
+                }) else {
                     break;
                 };
                 if incoming.try_send(request.clone()).is_err() {
