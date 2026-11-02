@@ -50,6 +50,9 @@ jobs:
         run: npm run verify:therapy-status
       - run: npm run lint
       - run: npm run typecheck
+      # La prova di installabilità sul Mac compila con webpack; il launcher ordinario con Turbopack.
+      - name: Build with webpack
+        run: npm run build -- --webpack
       - run: npm run build
       - run: npm run check:type-scale
       - run: npm run check:lume-tokens
