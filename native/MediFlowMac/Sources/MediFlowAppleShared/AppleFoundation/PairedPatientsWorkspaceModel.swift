@@ -235,6 +235,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editTherapyDosage = ""
     @Published var editTherapyMotivation = ""
     @Published var editTherapyStatus: PairedTherapyStatus = .active
+    /// Stato salvato della terapia in modifica: limita le scelte ai passaggi ammessi.
+    @Published var editTherapySavedStatus: PairedTherapyStatus?
+    var editTherapyStatusOptions: [PairedTherapyStatus] {
+        editTherapySavedStatus?.allowedTargets ?? PairedTherapyStatus.allCases
+    }
     @Published var editTherapyStartDate = Date()
     @Published var editTherapyHasEndDate = false
     @Published var editTherapyEndDate = Date()
@@ -2869,7 +2874,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editTherapyActivePrinciple = therapy.activePrinciple ?? ""
         editTherapyDosage = therapy.dosage
         editTherapyMotivation = therapy.motivation ?? ""
-        editTherapyStatus = PairedTherapyStatus(rawValue: therapy.status) ?? .active
+        editTherapySavedStatus = PairedTherapyStatus(rawValue: therapy.status)
+        editTherapyStatus = editTherapySavedStatus ?? .active
         editTherapyStartDate = therapy.startDate
         editTherapyHasEndDate = therapy.endDate != nil
         editTherapyEndDate = therapy.endDate ?? Date()
@@ -2888,6 +2894,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editTherapyDosage = ""
         editTherapyMotivation = ""
         editTherapyStatus = .active
+        editTherapySavedStatus = nil
         editTherapyStartDate = Date()
         editTherapyHasEndDate = false
         editTherapyEndDate = Date()
