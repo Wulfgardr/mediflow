@@ -741,3 +741,7 @@ diniego del comando su una terapia conclusa) e il gate completo
 WUL-800 coorte 4 (prescrizioni protesiche) aggiunge la sua tabella a `lib/clinical-status-transitions.ts` e al file di decisione.
 Righe, regole e funzioni delle terapie restano identiche: le impronte dei due
 file cambiano per le parti di altre entità, il modello no.
+
+WUL-800 coorte 5 (handoff SISS) aggiunge la sua tabella agli stessi due file,
+con lo stesso esito per il modello delle terapie: nessuna riga o regola delle
+terapie cambia.
