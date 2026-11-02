@@ -198,12 +198,14 @@ test('the items list must name each current item once; a stale item blocks even 
     const [first] = listed(duplicated);
     const duplicatedResult = await writer.updateHostServicePrescription({ ...host, id: duplicated.prescriptionId },
         { version: 3, status: 'booked', items: [first, first] });
+    assert.equal(duplicatedResult.status, 409);
     assert.equal(duplicatedResult.value.code, 'service_prescription_items_changed');
 
     const stale = seed('prescribed', ['prescribed', 'cancelled']);
     const staleList = listed(stale).map((item, index) => index === 1 ? { ...item, version: 1 } : item);
     const staleResult = await writer.updateHostServicePrescription({ ...host, id: stale.prescriptionId },
         { version: 3, status: 'booked', items: staleList });
+    assert.equal(staleResult.status, 409);
     assert.equal(staleResult.value.code, 'VERSION_CONFLICT');
 
     for (const ids of [duplicated, stale]) {
