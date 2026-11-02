@@ -1,4 +1,5 @@
 /* PDF.js adapter. Imported only by the local preview, never by an API. */
+import { preparePdfRasterInput } from '../lib/pdf-raster-preflight.mjs';
 import type { RenderTask } from 'pdfjs-dist';
 import { assertImageSize, PREVIEW_LIMITS, PreviewError } from './document-viewer-policy.ts';
 import { PreviewScope } from './document-viewer-scope.ts';
@@ -19,6 +20,7 @@ export function adaptPdfRenderTask(task: Pick<RenderTask, 'promise' | 'cancel' |
 
 export async function renderPdfPreview(bytes: Uint8Array, number: number, canvas: HTMLCanvasElement, signal: AbortSignal) {
     const moduleScope = new PreviewScope(signal, PREVIEW_LIMITS.pageTimeoutMs);
+    let checkedBytes: Uint8Array | undefined;
     try {
         moduleScope.check();
         // Lazy client import. A failed chunk/worker is an explicit local-engine
@@ -27,6 +29,13 @@ export async function renderPdfPreview(bytes: Uint8Array, number: number, canvas
         try { pdfjs = await moduleScope.wait(import('pdfjs-dist')); }
         catch (error) { throw error instanceof PreviewError ? error : new PreviewError('runtime_unavailable'); }
         moduleScope.check();
+        try {
+            checkedBytes = await moduleScope.wait(preparePdfRasterInput(bytes, {
+                maxPixels: PREVIEW_LIMITS.imagePixels,
+                maxDimension: PREVIEW_LIMITS.imageDimension,
+                maxBytes: PREVIEW_LIMITS.sourceBytes,
+            }));
+        } catch (error) { throw error instanceof PreviewError ? error : new PreviewError('invalid_pdf'); }
         const createEngine: PreviewPdfEngineFactory = (source, fail) => {
             let port: Worker;
             try {
@@ -172,8 +181,9 @@ export async function renderPdfPreview(bytes: Uint8Array, number: number, canvas
         };
         // One total deadline spans import and paint; the inner scope additionally
         // owns cancellation of every PDF API operation and its native worker.
-        return await paintPdfPage(bytes, number, canvas, moduleScope.signal, createEngine);
+        return await paintPdfPage(checkedBytes, number, canvas, moduleScope.signal, createEngine);
     } finally {
+        checkedBytes?.fill(0);
         moduleScope.finish();
     }
 }

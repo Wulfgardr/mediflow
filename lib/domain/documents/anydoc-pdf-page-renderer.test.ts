@@ -281,7 +281,7 @@ test('pins the isolated local engine graph and excludes direct engine imports fr
     assert.equal(ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID, `mediflow.pdfjs_png.node24.${process.platform}_${process.arch}.v1`);
     assert.equal(sha256(ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR), ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256);
     if (process.platform === 'darwin' && process.arch === 'arm64')
-        assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, '3bde678c9152c95f8387659f4a73ce71f215e4c0b27c22d26cdf3623bae03658');
+        assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, '7c3f340dcd41e1684e82829c5a9f80664e9de761c6ad59885ebb3f25358929e4');
     assert.match(source, /1011b38553532d7078c59f26b15a471f8dae00f101b60e2add9b8511737a1ce0/u);
     assert.match(source, /ec7dc504d4ade7fd36846d16643e50eed5c914335f3a86b6a2a8d632391e5bfa/u);
     assert.equal(profiles.find((entry) => entry.platform === 'darwin')?.tarballSha256,
@@ -289,5 +289,17 @@ test('pins the isolated local engine graph and excludes direct engine imports fr
     for (const entry of profiles) {
         assert.equal(lock.packages[`node_modules/${entry.package}`]?.integrity, entry.integrity);
         assert.match(entry.binarySha256, /^[a-f0-9]{64}$/);
+    }
+});
+
+
+test('real child refuses oversized soft and explicit masks before rendering', { skip: !SUPPORTS_REAL_RENDERER }, async () => {
+    const { runAnyDocPdfRenderingChild } = await import('./anydoc-pdf-child-process-owner');
+    for (const name of ['smask', 'mask']) {
+        const pdfBytes = readFileSync(new URL(`../../../scripts/fixtures/preview-large-${name}.pdf`, import.meta.url));
+        const result = await runAnyDocPdfRenderingChild([{ page: 1, pdfBytes }]);
+        assert.equal(result.status, 'failed');
+        if (result.status !== 'failed') throw new Error('expected resource rejection');
+        assert.equal(result.reason, 'resource_limit');
     }
 });
