@@ -420,23 +420,35 @@ non è collegata.
 Il formato prodotto dal client Web è quello del client GPUI: nome e percorso
 `ENC:`, byte del PDF in ENC2 con chiave casuale per file avvolta dalla master
 key, `fileKey` inviata solo per la verifica di `stage`. La custodia in memoria
-invece è diversa: il browser azzera l'array della chiave dopo l'invio, ma non
-può azzerare la stringa JSON della richiesta né altre copie del motore
-JavaScript; non c'è un equivalente di `Zeroizing`. Formato ENC2 e claim di
-cifratura invariati.
+invece è diversa: il browser azzera l'array della chiave dopo l'invio, o subito
+se la sessione si blocca durante la cifratura, ma non può azzerare la stringa
+JSON della richiesta né altre copie del motore JavaScript; non c'è un
+equivalente di `Zeroizing`. Lo stesso vale per il documento: il client azzera
+i propri array di byte (originale, JPEG ricodificato, PDF troppo grande), ma
+restano nella memoria della pagina, fino alla raccolta del motore, il `File`
+scelto, l'immagine decodificata, il blob del canvas e le copie interne di
+`pdf-lib`. Formato ENC2 e claim di cifratura invariati.
 
 Un JPEG o un PNG viene convertito nel browser in un PDF di una pagina prima
 della cifratura, così l'OCR locale delle scansioni, il tipo dell'allegato e il
 contratto del comando restano quelli già provati. L'immagine viene decodificata
-con l'orientamento EXIF applicato e ridotta, se serve, entro i limiti del
-renderer locale (4096 px per lato, 12 milioni di pixel). La pagina misura mezzo
-punto per pixel, così il render a 144 dpi restituisce esattamente i pixel
-conservati. Una riduzione sotto la metà della risoluzione lineare originale
-non viene fatta: l'immagine è rifiutata con la causa, perché il testo potrebbe
-non essere più leggibile dall'OCR. La riduzione applicata è indicata nella
-revisione. `lib/patient-document-image-geometry.test.ts` prova la geometria
-con la preflight reale su A4 a 150, 200, 300 e 600 dpi, una foto da 12 Mpx e
-uno screenshot di iPhone.
+con l'orientamento EXIF applicato e ridotta, se serve, entro 4096 px per lato
+e 8 milioni di pixel. Il renderer locale ammette 12 milioni di pixel, ma rifiuta
+anche una pagina il cui PNG supera 16 MiB, e il PNG di una foto cresce con la
+grana del sensore: a 12 milioni di pixel una foto di un foglio con grana di
+luminanza σ 8 e una piccola grana di colore arriva a circa 17 MiB, a 8 milioni
+a circa 11. Una pagina A4 a 8 milioni di pixel conserva circa 290 dpi. La pagina
+misura mezzo punto per pixel, così il render a 144 dpi restituisce esattamente
+i pixel conservati. Una riduzione che lascerebbe il lato corto sotto 1200 px
+non viene fatta (su un A4 sono circa 145 dpi, vicino ai 150 dpi di solito
+considerati il minimo per l'OCR del testo corrente): l'immagine, di fatto molto
+allungata, è rifiutata con la misura. Un'immagine già piccola non viene ridotta
+e quindi non viene rifiutata. La riduzione applicata è indicata nella revisione.
+`lib/patient-document-image-geometry.test.ts` prova la geometria con la
+preflight reale su A4 a 150, 200, 300 e 600 dpi, foto da 12, 48 e 50 Mpx, una
+pagina legal a 600 dpi e uno screenshot di iPhone, e renderizza con lo stesso
+motore del worker la foto granulosa sintetica, che deve restare sotto l'80%
+dei 16 MiB.
 
 Come per il nativo, la risposta di `execute`, `receipt` e `revoke` aggiunge,
 solo per `applied`, `patientId` e `attachmentId` con
@@ -455,7 +467,8 @@ operatore o a un altro ambulatorio (`concealForeign`): la sessione corrente non
 può distinguere i casi. La UI quindi non esclude che la scheda sia stata creata,
 dice come verificarlo nell'elenco pazienti e chiude l'avviso solo dopo una
 conferma esplicita. Il riferimento locale è conservato per generazione
-d'archivio e ambulatorio selezionato. Le preparazioni simultanee sono limitate
+d'archivio e ambulatorio, risolto come fa il server: quello selezionato o,
+senza scelta, il predefinito, così la chiave è la stessa nei due casi. Le preparazioni simultanee sono limitate
 a due per ciascuna route. Sul Web una lavorazione ancora aperta nella stessa
 sessione e la saturazione dell'host sono rese come stati distinti (`in-progress`,
 `busy`) invece che come diniego; la route nativa continua a rispondere 403.

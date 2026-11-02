@@ -976,7 +976,8 @@ class MedicalApiClient {
         if (!key) throw new Error('Sessione bloccata.');
         const field = async (value: string) => { const sealed = await encryptData(value, key); return `ENC:${sealed.iv}:${sealed.data}`; };
         const [name, path, file] = await Promise.all([field(fileName), field(`uploads/${fileName}`), sealPatientDocumentFile(bytes, key)]);
-        signal.throwIfAborted();
+        // A lock during sealing aborts the work: the per-file key is erased before the caller loses it.
+        try { signal.throwIfAborted(); } catch (error) { file.fileKey.fill(0); throw error; }
         return { name, path, data: file.data, fileKey: file.fileKey, original: encodeBase64(bytes) };
     }
 
