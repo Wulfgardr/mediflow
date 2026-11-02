@@ -37,6 +37,7 @@ import {
 /* WUL-362 C1: il candidato AI passa dal view-model canonico condiviso. */
 import { coerceInsightToReadable } from '@/lib/patient-insight-view-model';
 import { stripMarkdownMarks } from '@/lib/clinical-rich-text';
+import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiaryWorkflowState, type PatientDiaryWorkflowState } from '@/lib/patient-diary-metadata';
 import styles from './kree8-clinical-cockpit-foundation.module.css';
 import shellStyles from './kree8-clinical-cockpit-shell.module.css';
 
@@ -120,7 +121,7 @@ type Kree8AgendaClientState = {
   plannedCount?: number;
 };
 
-type DiaryEntryState = 'draft' | 'signed' | 'recorded' | 'deleted';
+type DiaryEntryState = PatientDiaryWorkflowState | 'deleted';
 
 type DiaryEntryPresentation = {
   author?: string;
@@ -158,12 +159,7 @@ function entryPresentation(entry: Kree8DiaryEntry, raw?: ClinicalEntry): DiaryEn
   }
 
   const metadata = metadataRecord(raw?.metadata);
-  const workflowState = firstText(metadata, ['workflowStatus', 'status'])?.toLocaleLowerCase('it-IT');
-  const state: DiaryEntryState = workflowState === 'draft' || workflowState === 'bozza'
-    ? 'draft'
-    : workflowState === 'signed' || workflowState === 'firmata'
-      ? 'signed'
-      : 'recorded';
+  const state = patientDiaryWorkflowState(raw?.metadata);
   const settingSource = raw?.setting === 'home'
     ? 'Assistenza domiciliare'
     : raw?.setting === 'hospital'
@@ -176,7 +172,7 @@ function entryPresentation(entry: Kree8DiaryEntry, raw?: ClinicalEntry): DiaryEn
     author: firstText(metadata, ['authorName', 'author', 'signedBy']),
     source: firstText(metadata, ['sourceLabel', 'source']) ?? settingSource ?? 'Diario locale',
     state,
-    stateLabel: state === 'draft' ? 'Bozza' : state === 'signed' ? 'Firmata' : 'Registrata',
+    stateLabel: PATIENT_DIARY_WORKFLOW_LABELS[state],
   };
 }
 

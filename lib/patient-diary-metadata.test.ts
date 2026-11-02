@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readPatientDiaryMetadata } from './patient-diary-metadata';
+import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiaryWorkflowState, readPatientDiaryMetadata } from './patient-diary-metadata';
 import { LOCKED_DATA_PLACEHOLDER, LEGACY_LOCKED_DATA_PLACEHOLDER } from './locked-field-guard';
 
 test('object and serialized JSON retain the same recorded metadata without mutation', () => {
@@ -34,4 +34,22 @@ test('history and diary share recorded source, setting fallback and unreadable p
     assert.equal(patientDiarySource(null, 'ambulatory'), 'Ambulatorio');
     assert.equal(patientDiarySource(null), 'Diario locale');
     assert.equal(patientDiarySource('ENC:synthetic', 'ambulatory'), 'Fonte non disponibile');
+});
+
+test('one workflow rule for cockpit and timeline: an unknown value is never a certain state', () => {
+    const label = (metadata: unknown) => PATIENT_DIARY_WORKFLOW_LABELS[patientDiaryWorkflowState(metadata)];
+    assert.equal(label({ workflowStatus: 'future-unrecognized-state' }), 'Stato non riconosciuto');
+    assert.equal(label(JSON.stringify({ status: 'approvata' })), 'Stato non riconosciuto');
+    assert.equal(label({ workflowStatus: 'ENC:synthetic' }), 'Stato non leggibile');
+    assert.equal(label('ENC:synthetic'), 'Stato non leggibile');
+    assert.equal(label({ workflowStatus: ' Firmata ' }), 'Firmata');
+    assert.equal(label({ status: 'BOZZA' }), 'Bozza');
+    assert.equal(label({ workflowStatus: 'registered' }), 'Registrata');
+    assert.equal(label({ workflowStatus: 'signed', status: 'draft' }), 'Firmata');
+});
+
+test('a saved entry without any workflow value is the recorded entry', () => {
+    for (const metadata of [undefined, null, '', {}, { authorName: 'Ada Sintetica' }]) {
+        assert.equal(patientDiaryWorkflowState(metadata), 'recorded');
+    }
 });
