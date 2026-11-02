@@ -38,7 +38,7 @@ for (const mask of ['smask', 'mask']) test(`real PDF ${mask} refuses the resolve
 });
 
 import { PDFDocument, PDFName, PDFNumber } from 'pdf-lib';
-import { preparePdfRasterInput } from '../lib/pdf-raster-preflight.mjs';
+import { PdfRasterEncrypted, PdfRasterLimit, preparePdfRasterInput } from '../lib/pdf-raster-preflight.mjs';
 
 const limits = { maxPixels: 12_000_000, maxDimension: 8192, maxBytes: 25 * 1024 * 1024 };
 
@@ -103,4 +103,14 @@ test('small soft mask survives structural validation and real PDF.js painting', 
         await page.render({ canvasContext: canvas.getContext('2d'), viewport: page.getViewport({ scale: 1 }) }).promise;
         assert.ok(canvas.getContext('2d').getImageData(10, 10, 1, 1).data[0] < 128);
     } finally { await task.destroy(); }
+});
+
+test('a PDF that declares encryption is reported as protected, not as damaged', async () => {
+    const pdf = await PDFDocument.create();
+    pdf.addPage([20, 20]);
+    const encrypt = pdf.context.register(pdf.context.obj({ Filter: 'Standard', V: 1, R: 2 }));
+    pdf.context.trailerInfo.Encrypt = encrypt;
+    const bytes = await pdf.save({ useObjectStreams: false });
+    await assert.rejects(preparePdfRasterInput(bytes, limits), (error: unknown) =>
+        error instanceof PdfRasterEncrypted && !(error instanceof PdfRasterLimit));
 });
