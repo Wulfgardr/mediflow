@@ -34,7 +34,7 @@ function fixture() {
         read: async () => { calls.read++; return observed; },
         update: async (_signal: AbortSignal) => { calls.update++; const result = catalog('synthetic-new', 4); observed = result; return result; },
         importFile: async (_file: File, _manifest: AifaCatalogManifestInput) => { calls.import++; const result = catalog('synthetic-manual', 5); observed = result; return result; },
-        clear: async () => { calls.clear++; observed = empty; return clearReceipt(); },
+        clear: async (snapshot: string) => { void snapshot; calls.clear++; observed = empty; return clearReceipt(); },
     };
     const guide = createAifaUpdateGuide(ports, state => events.push(state));
     return { guide, ports, events, calls, last: () => events.at(-1)!, setObserved: (value: AifaCatalogClientStatus) => { observed = value; } };
