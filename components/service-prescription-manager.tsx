@@ -253,6 +253,10 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
         [form.itemsText, form.serviceName],
     );
 
+    /*
+     * «Cosa resta da fare»: l'eseguita è chiusa. Gli open loop di
+     * lib/patient-open-loops.ts la tengono aperta finché manca il referto (WUL-799).
+     */
     const openCount = useMemo(
         () => prescriptions?.filter((item) => item.status !== 'performed' && item.status !== 'report_received' && item.status !== 'cancelled').length ?? 0,
         [prescriptions],

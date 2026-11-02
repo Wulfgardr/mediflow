@@ -9,6 +9,7 @@ export const MIN_TYPICAL_INTERVAL_DAYS = 1;
 export const MAX_TYPICAL_INTERVAL_DAYS = 180;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const REPORT_AWAITED_STATUSES = new Set(['prescribed', 'booked', 'performed']);
 
 export type OpenLoopStatus = {
     sinceDate: Date;
@@ -126,7 +127,14 @@ export function deriveOpenLoops(input: {
     const loops: OpenLoop[] = [];
 
     for (const item of input.items) {
-        if (item.status !== 'prescribed' && item.status !== 'performed') continue;
+        /*
+         * Qui la domanda è «quale referto manca»: prescritta, prenotata o eseguita
+         * restano aperte finché non arriva il referto. La lista delle prescrizioni
+         * risponde invece a «cosa resta da fare» e considera chiusa l'eseguita
+         * (components/service-prescription-manager.tsx, openCount). Decisione del
+         * 1/11/2026, WUL-799.
+         */
+        if (!REPORT_AWAITED_STATUSES.has(item.status)) continue;
         if (validDate(item.reportReceivedAt) || linkedItemIds.has(item.id)) continue;
         const referenceDate = validDate(item.scheduledAt) ?? validDate(item.createdAt);
         if (!referenceDate) continue;
