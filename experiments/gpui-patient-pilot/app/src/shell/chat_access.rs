@@ -4,7 +4,7 @@ use crate::chat_access::{
     self,
     owner::{Pending, State},
 };
-use mediflow_runtime_client::ChatWriteResolution;
+use mediflow_runtime_client::{ChatWriteOutcome, ChatWriteResolution};
 use std::{collections::BTreeMap, time::Duration};
 
 pub(super) struct ChatAccess {
@@ -12,6 +12,10 @@ pub(super) struct ChatAccess {
     listener: Option<chat_access::Listener>,
     references: CommandReferences,
     recovery_messages: BTreeMap<String, ChatWriteResolution>,
+    /// Commands the server confirmed whose local reference could not be
+    /// removed. They stay known until the cleanup succeeds, so the scan that
+    /// still finds the file never turns them into an uncertain outcome.
+    cleanup_failed: BTreeMap<String, ChatWriteOutcome>,
     recovery_namespace: Option<String>,
     recovery_error: bool,
     recovery_busy: bool,
@@ -39,6 +43,7 @@ impl ChatAccess {
             listener: chat_access::Listener::configured(),
             references: CommandReferences::new(directory),
             recovery_messages: BTreeMap::new(),
+            cleanup_failed: BTreeMap::new(),
             recovery_namespace: None,
             recovery_error: false,
             recovery_busy: false,
@@ -139,6 +144,7 @@ impl ChatAccess {
             .update(cx, |input, cx| input.set_content("", cx));
         self.last_state = None;
         self.recovery_messages.clear();
+        self.cleanup_failed.clear();
         self.recovery_namespace = None;
         self.recovery_error = false;
         self.recovery_busy = false;
@@ -421,28 +427,40 @@ impl ClinicalApp {
         let namespace = session.chat_write_reference_namespace();
         if self.chat_access.recovery_namespace.as_ref() != Some(&namespace) {
             self.chat_access.recovery_messages.clear();
+            self.chat_access.cleanup_failed.clear();
         }
         self.chat_access.recovery_namespace = Some(namespace.clone());
         self.chat_access.recovery_error = false;
         let references = self.chat_access.references.for_session(&session);
         let epoch = self.chat_access.recovery_epoch;
+        let known = self.chat_access.cleanup_failed.clone();
         let task = cx.background_executor().spawn(async move {
             let mut resolutions = BTreeMap::new();
-            let mut storage_error = false;
+            let mut cleanup_failed = BTreeMap::new();
             for id in scan.ids {
-                let kind = scan.kinds.get(&id).copied();
-                let resolution = session
-                    .recover_chat_write_command(&scope, &id, kind)
-                    .map_or(ChatWriteResolution::Uncertain, |r| r.reconcile());
-                if let ChatWriteResolution::Confirmed(outcome) = resolution {
-                    storage_error |= references.confirm(&id, outcome).is_err();
+                // A server confirmation already received is not asked again:
+                // only the local cleanup is retried.
+                let resolution = match known.get(&id) {
+                    Some(outcome) => ChatWriteResolution::Confirmed(*outcome),
+                    None => {
+                        let kind = scan.kinds.get(&id).copied();
+                        session
+                            .recover_chat_write_command(&scope, &id, kind)
+                            .map_or(ChatWriteResolution::Uncertain, |r| r.reconcile())
+                    }
+                };
+                if let ChatWriteResolution::Confirmed(outcome) = resolution
+                    && references.confirm(&id, outcome).is_err()
+                {
+                    cleanup_failed.insert(id.clone(), outcome);
                 }
                 resolutions.insert(id, resolution);
             }
-            (resolutions, storage_error, session)
+            (resolutions, cleanup_failed, session)
         });
         cx.spawn(async move |this, cx| {
-            let (resolutions, storage_error, owner) = task.await;
+            let (resolutions, cleanup_failed, owner) = task.await;
+            let storage_error = !cleanup_failed.is_empty();
             let _ = this.update(cx, |this, cx| {
                 if !owner.is_locked()
                     && this.session.as_ref().is_some_and(|s| {
@@ -452,6 +470,7 @@ impl ClinicalApp {
                 {
                     this.chat_access.recovery_busy = false;
                     this.chat_access.recovery_messages.extend(resolutions);
+                    this.chat_access.cleanup_failed = cleanup_failed;
                     this.chat_access.recovery_error = storage_error;
                     cx.notify();
                 }
@@ -471,7 +490,9 @@ impl ClinicalApp {
         } else {
             BTreeMap::new()
         };
-        let mut storage_error = self.chat_access.recovery_error || recovery.is_err();
+        let mut storage_error = self.chat_access.recovery_error
+            || recovery.is_err()
+            || !self.chat_access.cleanup_failed.is_empty();
         let mut invalid = false;
         let mut pending = false;
         if let Ok(scan) = recovery {
@@ -485,9 +506,10 @@ impl ClinicalApp {
         if messages.is_empty() && !storage_error {
             return None;
         }
-        let confirmed = messages
-            .values()
-            .any(|r| matches!(r, ChatWriteResolution::Confirmed(_)));
+        let confirmed = messages.iter().any(|(id, r)| {
+            matches!(r, ChatWriteResolution::Confirmed(_))
+                && !self.chat_access.cleanup_failed.contains_key(id)
+        });
         Some(div().id("native-chat-recovery").flex().flex_col().gap(px(12.)).p(px(20.))
             .children(messages.into_iter().enumerate().map(|(index, (id, resolution))|
                 notice(format!("native-chat-recovery-warning-{index}"), format!("Comando {id}: {}", resolution.message()), self.theme, resolution == ChatWriteResolution::Uncertain)))
@@ -497,10 +519,15 @@ impl ClinicalApp {
             .when(storage_error && !pending, |el| el.child(button("native-chat-recovery-retry-storage", "Riprova lettura riferimenti locali", self.theme, false, self.scope.is_some())
                 .on_click(cx.listener(|this, _, _, cx| this.reread_chat_recovery(cx)))))
             .when(confirmed, |el| el.child(button("native-chat-recovery-dismiss", "Chiudi gli esiti confermati", self.theme, false, true)
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.chat_access.recovery_messages.retain(|_, r| !matches!(r, ChatWriteResolution::Confirmed(_)));
-                    cx.notify();
-                })))))
+                .on_click(cx.listener(|this, _, _, cx| this.dismiss_confirmed_chat_recovery(cx))))))
+    }
+
+    fn dismiss_confirmed_chat_recovery(&mut self, cx: &mut Context<Self>) {
+        let cleanup_failed = &self.chat_access.cleanup_failed;
+        self.chat_access.recovery_messages.retain(|id, r| {
+            !matches!(r, ChatWriteResolution::Confirmed(_)) || cleanup_failed.contains_key(id)
+        });
+        cx.notify();
     }
 
     pub(super) fn chat_access_view(&self, cx: &Context<Self>) -> Option<Stateful<Div>> {
@@ -873,7 +900,6 @@ mod tests {
 #[cfg(all(test, target_os = "macos"))]
 mod recovery_regressions {
     use super::*;
-    use mediflow_runtime_client::ChatWriteOutcome;
     const A: &str = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const B: &str = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
     fn directory() -> std::path::PathBuf {
@@ -1024,6 +1050,81 @@ mod recovery_regressions {
                 "original partition lost durable recovery"
             );
         });
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+    #[gpui::test]
+    fn confirmed_command_whose_reference_cannot_be_removed_is_never_shown_as_uncertain(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let directory = directory();
+        let (session, host) = crate::chat_access::owner::tests::native_session();
+        let references = CommandReferences::new(Some(directory.clone())).for_session(&session);
+        references.remember(A).unwrap();
+        let marker = directory
+            .join(session.chat_write_reference_namespace())
+            .join(A);
+        assert!(marker.is_file());
+        // A deny-delete ACL keeps the reference readable with its 0600 mode,
+        // like an ACL set on the file by another tool.
+        let acl = |flag: &[&str]| {
+            assert!(
+                std::process::Command::new("/bin/chmod")
+                    .args(flag)
+                    .arg(&marker)
+                    .status()
+                    .unwrap()
+                    .success()
+            )
+        };
+        acl(&["+a", "everyone deny delete"]);
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+        app.update(cx, |app, cx| {
+            app.chat_access = ChatAccess::new(app.theme, Some(directory.clone()), cx);
+            app.session = Some(session);
+            app.scope = Some("scope-a".into());
+        });
+        click(cx, "control-label:Rileggi esito e completa il ritiro");
+        let confirmed_with_storage_error = |labels: Vec<String>| {
+            assert!(
+                labels
+                    .iter()
+                    .any(|s| s.contains(A) && s.contains("Modifica registrata")),
+                "server confirmation lost: {labels:?}"
+            );
+            assert!(
+                labels
+                    .iter()
+                    .any(|s| s.contains("Problema di conservazione locale")),
+                "storage error lost: {labels:?}"
+            );
+            assert!(
+                !labels.iter().any(|s| s.contains("Esito da verificare")),
+                "a confirmed command became uncertain: {labels:?}"
+            );
+        };
+        confirmed_with_storage_error(painted(cx));
+        assert_eq!(references.pending().unwrap(), [A]);
+        // Taking note of the confirmed outcomes keeps the known command.
+        app.update(cx, |app, cx| app.dismiss_confirmed_chat_recovery(cx));
+        confirmed_with_storage_error(painted(cx));
+        // A new cleanup attempt that still fails keeps the same distinction,
+        // without asking the server again: with the host gone, a new read
+        // could only answer an uncertain outcome.
+        drop(host);
+        click(cx, "control-label:Rileggi esito e completa il ritiro");
+        confirmed_with_storage_error(painted(cx));
+        acl(&["-N"]);
+        click(cx, "control-label:Rileggi esito e completa il ritiro");
+        assert!(references.pending().unwrap().is_empty());
+        let labels = painted(cx);
+        assert!(
+            !labels
+                .iter()
+                .any(|s| s.contains("Problema di conservazione locale"))
+        );
+        assert!(!labels.iter().any(|s| s.contains("Esito da verificare")));
         std::fs::remove_dir_all(directory).unwrap();
     }
     #[gpui::test]
