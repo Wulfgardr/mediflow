@@ -3,7 +3,7 @@ import 'server-only';
    binding as the chat therapy command; the shared checkup writer owns admission, insert and audit.
    The durable receipt is the audit row keyed by the commandId, so backup and restore carry it with the agenda. */
 import { createHash } from 'node:crypto';
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, sql } from 'drizzle-orm';
 import { createNativeChatWriteApprovals } from './native-chat-write-approval';
 import { dbServer } from './db-server';
 import { auditEvents, checkups, patientsToAmbulatories } from './schema';
@@ -73,22 +73,29 @@ export function agendaRevision(tx: Tx, patientId: string): string {
     return hash.digest('hex');
 }
 
-/* What the physician sees in the native window, read with the same revision: dates and states only. */
-function agendaView(tx: Tx, patientId: string) {
+/* What the physician sees in the native window, read with the same revision: the checkups from the start of
+   the host's local day onward, nearest first, dates and states only, and how many later ones are left out.
+   The revision still covers the whole set, past and deleted rows included. */
+function agendaView(tx: Tx, patientId: string, now: number) {
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const upcoming = and(eq(checkups.patientId, patientId), isNull(checkups.deletedAt), gte(checkups.date, today));
     const rows = tx.select({ date: checkups.date, status: checkups.status }).from(checkups)
-        .where(and(eq(checkups.patientId, patientId), isNull(checkups.deletedAt))).orderBy(asc(checkups.date), asc(checkups.id))
-        .limit(AGENDA_ROWS + 1).all();
-    return { rows: rows.slice(0, AGENDA_ROWS).map(row => ({ date: row.date.toISOString(), status: normalizeCheckupStatus(row.status) })),
-        truncated: rows.length > AGENDA_ROWS };
+        .where(upcoming).orderBy(asc(checkups.date), asc(checkups.id)).limit(AGENDA_ROWS).all();
+    const total = tx.select({ count: sql<number>`count(*)` }).from(checkups).where(upcoming).get()?.count ?? 0;
+    return { rows: rows.map(row => ({ date: row.date.toISOString(), status: normalizeCheckupStatus(row.status) })),
+        omitted: Math.max(0, Number(total) - rows.length) };
 }
 
-function receiptFor(tx: Tx, commandId: string): CheckupBookingReceipt | null {
+/* `restored`: rereading after a restart. Only there a row without audit counts as this command's booking. */
+function receiptFor(tx: Tx, commandId: string, restored = false): CheckupBookingReceipt | null {
     const rows = tx.select().from(auditEvents).where(and(eq(auditEvents.requestId, commandId), eq(auditEvents.eventType, 'checkup.created'),
         eq(auditEvents.subjectType, 'checkup'), eq(auditEvents.subjectRef, commandId))).all();
     if (rows.length === 0) {
         // A restore from an export without audit brings the booked row back without its receipt:
-        // the row itself proves the booking, so it is never reported as retired.
-        if (!tx.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, commandId)).get()) return null;
+        // the row itself proves the booking, so a reread never reports it as retired. The callers
+        // still require the row's patient to be the current selection inside the session scope.
+        if (!restored || !tx.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, commandId)).get()) return null;
         return { commandId, protocol: CHECKUP_BOOKING_PROTOCOL, actorRef: null, outcome: 'applied', reason: null, committedAt: null,
             checkupId: commandId, resultVersion: 1, auditEventId: null, historical: true };
     }
@@ -166,7 +173,7 @@ export function createChatCheckupBookingService(clock: () => number = Date.now) 
             const view = dbServer.transaction(tx => {
                 guard(tx); selected(context, patientId, epoch);
                 if (!inScope(tx, patientId, context.scopeAmbulatoryId)) deny();
-                return { agendaRevision: agendaRevision(tx, patientId), ...agendaView(tx, patientId) };
+                return { agendaRevision: agendaRevision(tx, patientId), ...agendaView(tx, patientId, clock()) };
             }, { behavior: 'immediate' });
             return { viewId: approvals.open(binding(context, epoch, patientId)), ...view };
         },
@@ -203,10 +210,12 @@ export function createChatCheckupBookingService(clock: () => number = Date.now) 
             const guard = await authority(context);
             return dbServer.transaction(tx => {
                 guard(tx);
-                const receipt = receiptFor(tx, commandId);
+                const receipt = receiptFor(tx, commandId, true);
                 if (receipt) {
                     const booked = receipt.checkupId ? tx.select({ patientId: checkups.patientId }).from(checkups).where(eq(checkups.id, receipt.checkupId)).get() : undefined;
                     if ((receipt.actorRef !== null && receipt.actorRef !== context.session.userId) || (receipt.checkupId && (!booked || !inScope(tx, booked.patientId, context.scopeAmbulatoryId)))) return deny();
+                    // Without an audit row nothing binds the command to an actor: the row must belong to the selection.
+                    if (receipt.auditEventId === null && booked) selected(context, booked.patientId, nativeProfileSelectionOwner.registry.acquire(context.session).snapshotSelectionEpoch(context.session));
                     return { outcome: receipt.outcome };
                 }
                 approvals.revoke(commandId, { session: context.session, scope: context.scopeAmbulatoryId });
@@ -218,7 +227,7 @@ export function createChatCheckupBookingService(clock: () => number = Date.now) 
             const guard = await authority(context);
             return dbServer.transaction(tx => {
                 guard(tx);
-                const receipt = receiptFor(tx, commandId);
+                const receipt = receiptFor(tx, commandId, true);
                 if (!receipt) return { outcome: 'unknown' as const };
                 if (receipt.actorRef !== null && receipt.actorRef !== context.session.userId) return deny();
                 const current = receipt.checkupId ? tx.select({ version: checkups.version, status: checkups.status, patientId: checkups.patientId })

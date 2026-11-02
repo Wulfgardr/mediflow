@@ -56,6 +56,7 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
             "uncertain",
             "retired",
             "applied",
+            "applied-historical",
             "rejected",
             "closed",
         ]
@@ -75,7 +76,13 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
                 })
                 || !value["receipt"]["outcome"].as_str().is_some_and(|s| {
                     [
-                        "pending", "unknown", "applied", "rejected", "closed", "retired",
+                        "pending",
+                        "unknown",
+                        "applied",
+                        "applied-historical",
+                        "rejected",
+                        "closed",
+                        "retired",
                     ]
                     .contains(&s)
                 })))

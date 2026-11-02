@@ -492,6 +492,8 @@ impl ChatWriteKind {
 pub enum ChatWriteOutcome {
     Retired,
     Applied,
+    /// Present in the current archive, restored from another one; its original audit receipt is not here.
+    AppliedHistorical,
     Rejected,
     Closed,
 }
@@ -500,6 +502,7 @@ impl ChatWriteOutcome {
         match self {
             Self::Retired => "retired",
             Self::Applied => "applied",
+            Self::AppliedHistorical => "applied-historical",
             Self::Rejected => "rejected",
             Self::Closed => "closed",
         }
@@ -524,6 +527,9 @@ impl ChatWriteResolution {
             }
             Self::Confirmed(ChatWriteOutcome::Applied) => {
                 "Modifica registrata e auditata. Il ritiro non annulla il salvataggio."
+            }
+            Self::Confirmed(ChatWriteOutcome::AppliedHistorical) => {
+                "Presente nell’archivio, ripristinato da un altro archivio. La ricevuta di audit originale non è disponibile qui. Non ripetere la scrittura."
             }
             Self::Confirmed(ChatWriteOutcome::Retired) => {
                 "Ritiro confermato. Nessuna scrittura eseguita."

@@ -59,7 +59,7 @@ function effects(patientId: string, commandId: string) {
 test('booking with native preview, real PIN, shared writer, audit and receipt that survives a restart', async () => {
     const f = await fixture();
     assert.match(f.command.expectedAgendaRevision, /^[0-9a-f]{64}$/u);
-    assert.deepEqual([f.view.rows, f.view.truncated], [[], false]);
+    assert.deepEqual([f.view.rows, f.view.omitted], [[], 0]);
     await f.service.preview(f.context, f.command, f.epoch, f.viewId);
     const receipt = await f.service.execute(f.context, f.command.commandId, pin);
     assert.equal(receipt.outcome, 'applied'); assert.equal(receipt.resultVersion, 1); assert.equal(receipt.checkupId, f.command.commandId);
@@ -197,13 +197,37 @@ test('the native view shows the agenda read with the same revision: dates and st
     db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(2), 'Altro', 'pending');
     const view = await f.service.open(f.context, f.patientId, f.epoch);
     assert.deepEqual(view.rows, [{ date: new Date(at(2) * 1000).toISOString(), status: 'pending' }, { date: new Date(at(9) * 1000).toISOString(), status: 'completed' }]);
-    assert.equal(view.truncated, false);
+    assert.equal(view.omitted, 0);
     assert.equal(JSON.stringify(view).includes('Testo libero'), false);
     assert.notEqual(view.agendaRevision, f.command.expectedAgendaRevision);
     await assert.rejects(f.service.preview(f.context, f.command, f.epoch, view.viewId));
     for (let i = 0; i < 20; i++) db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(10 + i), 'Serie', 'pending');
     const full = await f.service.open(f.context, f.patientId, f.epoch);
-    assert.deepEqual([full.rows.length, full.truncated], [20, true]);
+    assert.deepEqual([full.rows.length, full.omitted], [20, 2]);
+});
+
+test('a long history does not hide the upcoming agenda: only checkups from today, nearest first, with the count left out', async () => {
+    const f = await fixture();
+    const db = dbServer.$client;
+    const day = 86_400, now = Math.floor(Date.now() / 1000);
+    for (let i = 0; i < 25; i++) db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, now - (400 + i) * day, 'Storico', 'completed');
+    db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, now + 13 * day, 'Collega', 'pending');
+    const view = await f.service.open(f.context, f.patientId, f.epoch);
+    assert.deepEqual(view.rows, [{ date: new Date((now + 13 * day) * 1000).toISOString(), status: 'pending' }]);
+    assert.equal(view.omitted, 0);
+    db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, now - 500 * day, 'Storico', 'completed');
+    await assert.rejects(f.service.preview(f.context, { ...f.command, expectedAgendaRevision: view.agendaRevision }, f.epoch, view.viewId));
+});
+
+test('a row created with the command id after the preview is never this booking: no applied receipt from execute', async () => {
+    const f = await fixture(); await f.service.preview(f.context, f.command, f.epoch, f.viewId);
+    const other = randomUUID();
+    dbServer.$client.prepare("INSERT INTO patients (id,first_name,last_name,tax_code) VALUES (?,?,?,?)").run(other, 'Altro', 'Paziente', randomUUID());
+    dbServer.$client.prepare("INSERT INTO patients_to_ambulatories (patient_id,ambulatory_id) VALUES (?,?)").run(other, f.context.scopeAmbulatoryId);
+    dbServer.$client.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(f.command.commandId, other, Math.floor(Date.now() / 1000) + 86_400, 'Scelto da un altro canale', 'pending');
+    const result = await f.service.execute(f.context, f.command.commandId, pin).then(r => r.outcome, () => 'denied');
+    assert.notEqual(result, 'applied');
+    assert.equal(effects(f.patientId, f.command.commandId).checkups.length, 0);
 });
 
 test('the revision changes when a row is replaced even if count and version sum stay equal', async () => {
@@ -231,6 +255,12 @@ test('a booked row restored without its audit reads as applied, never as retired
     if (recovered.outcome === 'terminal') assert.deepEqual([recovered.receipt.outcome, recovered.receipt.historical, recovered.receipt.auditEventId], ['applied', true, null]);
     assert.deepEqual(await restarted.revoke(f.context, f.command.commandId), { outcome: 'applied' });
     await assert.rejects(restarted.revoke({ ...f.context, scopeAmbulatoryId: randomUUID() }, f.command.commandId));
+    const other = randomUUID();
+    dbServer.insert(patients).values({ id: other, firstName: 'Altro', lastName: 'Paziente', taxCode: randomUUID() }).run();
+    dbServer.insert(patientsToAmbulatories).values({ patientId: other, ambulatoryId: f.context.scopeAmbulatoryId }).run();
+    f.owner.issueSelection({ expectedEpoch: f.epoch, patientId: other, ambulatoryId: f.context.scopeAmbulatoryId });
+    await assert.rejects(restarted.revoke(f.context, f.command.commandId));
+    await assert.rejects(restarted.receipt(f.context, f.command.commandId));
 });
 
 test('a receipt imported by a restore is marked historical', async () => {
