@@ -87,7 +87,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                     value={installedSelection ?? ''} disabled={loading || Boolean(error) || installedModels.length === 0}
                     onChange={event => { if (event.target.value) onChange(event.target.value); }}
                     aria-describedby={`installed-status-${selectorId}`}>
-                    <option value="">{value && !installedSelection ? `Selezione attuale: ${value}` : 'Scegli un modello installato'}</option>
+                    <option value="">{value && !installedSelection ? `${value} · non installato` : 'Scegli un modello installato'}</option>
                     {installedModels.map(model => <option key={model} value={model}>{model}</option>)}
                 </ChoiceField>
                 <button type="button" onClick={checkInstalled} disabled={loading || !targetUrl}
