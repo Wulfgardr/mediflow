@@ -696,3 +696,33 @@ v0.9.0 restano evidenze separate dal modello. Modello, invarianti,
 assunzioni, mutanti e testimoni legacy restano invariati. Le impronte vengono
 aggiornate dopo questo confronto; `verify:therapy-status` deve ancora
 rieseguire TLC, i mutanti e tutti i test causali sull'head consegnato.
+
+## Raccordo WUL-800 del 2 novembre 2026: passaggi di stato sul server
+
+Confrontati `lib/therapy-write-operation.ts` e `lib/therapy-status-command-service.ts`
+di `1c97e50bcc00ad06edcad6df78b85b62ae4272d0` con il runtime sincronizzato
+`1c6fdef4ff091d8c912bbc5a2f08fe8a3ebb868d`. Il writer comune, dopo il controllo
+di versione e prima dell'UPDATE, applica la tabella dei passaggi
+(`lib/clinical-status-transitions.ts`, decisione in
+`docs/domain/clinical-status-transitions.json`): attiva verso sospesa o conclusa,
+sospesa verso attiva o conclusa, conclusa verso attiva. Un passaggio fuori
+tabella, o la rimozione della data di fine di una terapia conclusa, risponde
+409 senza scrittura né audit. Lo stesso writer allinea la data di fine al
+passaggio: conclusa conserva la data indicata o salvata, altrimenti quella del
+passaggio; attiva la svuota se la richiesta non ne indica una.
+
+Nel modello questo è un caso di `HostReject`: l'host può già rifiutare un
+tentativo pendente senza effetti, a qualunque versione. Il nuovo rifiuto non
+aggiunge scritture, non cambia l'ordine delle guardie né l'atomicità host, e
+lo stato raggiunto da un commit resta il bersaglio del tentativo. Nel comando
+durevole un rifiuto di passaggio non è più registrato come `version_conflict`:
+il servizio lo nega come una risorsa non ammessa (`denied`), senza ricevuta e
+senza effetti, lo stesso esito già previsto per il 404. La data di fine
+scritta dal comando resta quella di prima: conclusa usa l'istante del commit,
+attiva la svuota, sospesa la conserva.
+
+Il modello non cambia: statechart, invarianti, limiti, testimoni e mutanti
+restano identici. Prima di aggiornare i due digest e `syncCommit` sono passati
+i test delle terapie (339, compresi i nuovi `therapy-status-transitions` e il
+diniego del comando su una terapia conclusa) e il gate completo
+`npm run verify:therapy-status` su questo commit.
