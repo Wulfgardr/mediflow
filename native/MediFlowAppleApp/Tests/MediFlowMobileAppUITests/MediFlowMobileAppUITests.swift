@@ -3626,10 +3626,10 @@ final class MediFlowMobileAppUITests: XCTestCase {
         try probe.checkpoint(module: "prosthetic", recordID: recordID, version: 1, expected: expected)
         tapInteropButton("prosthetic-test-\(recordID)")
         let row = sectionView("prosthetic-prescription-row-\(recordID)")
-        XCTAssertTrue(row.staticTexts["Collaudo registrato in MediFlow."].waitForExistence(timeout: 20))
+        XCTAssertTrue(row.staticTexts["Collaudata"].waitForExistence(timeout: 20))
         XCTAssertFalse(app.buttons["prosthetic-test-\(recordID)"].isEnabled)
+        // WUL-800: il collaudo non inventa un esito; resta vuoto finché il medico non lo scrive.
         expected["status"] = "tested"
-        expected["collaudoOutcome"] = "Collaudo registrato in MediFlow."
         try probe.checkpoint(module: "prosthetic", recordID: recordID, version: 2, expected: expected)
         attachScreenshot(named: "interop-prosthetic-tested")
         try probe.complete()
