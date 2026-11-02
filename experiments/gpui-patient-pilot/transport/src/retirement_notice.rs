@@ -1,15 +1,19 @@
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     fs,
-    io::{self, Write},
+    io::{self, Read, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
 pub const RETIREMENT_WARNING: &str = "Ritiro di una sessione locale non confermato. Verifica le sessioni dell’host prima di lasciare la postazione.";
+pub const RETIREMENT_ORPHAN_GUIDANCE: &str = "Il ritiro non confermato risale a un avvio dell’app ormai chiuso. Dopo aver verificato nell’host che la sessione non è più attiva, puoi chiudere l’avviso. I ritiri ancora in corso in un’altra finestra aperta restano segnalati.";
 
 struct State {
-    markers: HashSet<String>,
+    /// Markers begun by this instance. The open file keeps an exclusive lock
+    /// for as long as the instance lives; the OS releases it when the process
+    /// ends, which is what tells a later start that the marker is orphaned.
+    markers: HashMap<String, Option<fs::File>>,
     path: Option<PathBuf>,
     failed: bool,
 }
@@ -21,7 +25,7 @@ impl RetirementNotice {
             .as_ref()
             .is_some_and(|path| create_directory(&path.with_extension("pending")).is_err());
         Self(Arc::new(Mutex::new(State {
-            markers: HashSet::new(),
+            markers: HashMap::new(),
             path,
             failed,
         })))
@@ -33,17 +37,39 @@ impl RetirementNotice {
         state.failed
             || !state.markers.is_empty()
             || state.path.as_ref().is_some_and(|path| {
-                let legacy = match fs::read(path) {
-                    Ok(bytes) => serde_json::from_slice::<usize>(&bytes).unwrap_or(1) > 0,
-                    Err(error) if error.kind() == io::ErrorKind::NotFound => false,
+                match fs::read_dir(path.with_extension("pending")) {
+                    Ok(mut entries) => entries.next().is_some(),
                     Err(_) => true,
-                };
-                legacy
-                    || match fs::read_dir(path.with_extension("pending")) {
-                        Ok(mut entries) => entries.next().is_some(),
-                        Err(_) => true,
-                    }
+                }
             })
+    }
+    /// True when at least one marker on disk belongs to no running instance:
+    /// its owner's lock is free and the file carries its complete name.
+    pub fn orphaned(&self) -> bool {
+        let Ok(state) = self.0.lock() else {
+            return false;
+        };
+        foreign_markers(&state)
+            .is_ok_and(|markers| markers.iter().any(|marker| claim_orphan(marker).is_some()))
+    }
+    /// Removes only orphaned markers. Markers held by a running instance,
+    /// unreadable entries and this instance's own retirements stay pending.
+    pub fn dismiss_orphaned(&self) -> io::Result<()> {
+        let state = self
+            .0
+            .lock()
+            .map_err(|_| io::Error::other("retirement state"))?;
+        for marker in foreign_markers(&state)? {
+            if let Some(claim) = claim_orphan(&marker) {
+                drop(claim);
+                match fs::remove_file(&marker) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+        Ok(())
     }
     pub(crate) fn begin(&self) -> String {
         let Ok(mut state) = self.0.lock() else {
@@ -56,36 +82,87 @@ impl RetirementNotice {
                 return String::new();
             }
         };
-        state.markers.insert(marker.clone());
+        let mut held = None;
         if let Some(path) = &state.path {
-            let saved = (|| -> io::Result<()> {
+            let saved = (|| -> io::Result<fs::File> {
                 let directory = path.with_extension("pending");
                 create_directory(&directory)?;
                 let mut file = create_file(&directory.join(&marker))?;
+                file.lock()?;
                 file.write_all(marker.as_bytes())?;
-                file.sync_all()
+                file.sync_all()?;
+                Ok(file)
             })();
-            if saved.is_err() {
-                state.failed = true;
-                eprintln!("{RETIREMENT_WARNING}");
+            match saved {
+                Ok(file) => held = Some(file),
+                Err(_) => {
+                    state.failed = true;
+                    eprintln!("{RETIREMENT_WARNING}");
+                }
             }
         }
+        state.markers.insert(marker.clone(), held);
         marker
     }
     pub(crate) fn confirm(&self, marker: &str) {
         if let Ok(mut state) = self.0.lock() {
-            if !state.markers.contains(marker) {
+            let Some(held) = state.markers.get_mut(marker) else {
                 return;
-            }
-            if let Some(path) = &state.path
-                && fs::remove_file(path.with_extension("pending").join(marker)).is_err()
-            {
-                state.failed = true;
-                return;
+            };
+            // Windows refuses to delete a file that is still open.
+            drop(held.take());
+            if let Some(path) = &state.path {
+                match fs::remove_file(path.with_extension("pending").join(marker)) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                    Err(_) => {
+                        state.failed = true;
+                        return;
+                    }
+                }
             }
             state.markers.remove(marker);
         }
     }
+}
+
+fn foreign_markers(state: &State) -> io::Result<Vec<PathBuf>> {
+    let Some(path) = &state.path else {
+        return Ok(Vec::new());
+    };
+    let mut markers = Vec::new();
+    for entry in fs::read_dir(path.with_extension("pending"))? {
+        let entry = entry?;
+        let own = entry
+            .file_name()
+            .to_str()
+            .is_some_and(|name| state.markers.contains_key(name));
+        if !own {
+            markers.push(entry.path());
+        }
+    }
+    Ok(markers)
+}
+
+/// Returns the locked marker when nobody else holds it and its content is
+/// its own name. A marker still being written, a directory, a link or a file
+/// another process keeps open is never treated as orphaned.
+fn claim_orphan(marker: &Path) -> Option<fs::File> {
+    let name = marker.file_name()?.to_str()?;
+    if !fs::symlink_metadata(marker).ok()?.is_file() {
+        return None;
+    }
+    #[cfg(windows)]
+    let mut file = mediflow_local_state::open_write(marker).ok()?;
+    #[cfg(not(windows))]
+    let mut file = fs::File::open(marker).ok()?;
+    file.try_lock().ok()?;
+    let mut content = Vec::new();
+    (&mut file)
+        .take(name.len() as u64 + 1)
+        .read_to_end(&mut content)
+        .ok()?;
+    (content == name.as_bytes()).then_some(file)
 }
 
 #[cfg(windows)]
@@ -196,15 +273,37 @@ mod tests {
         assert!(!RetirementNotice::new(Some(path)).pending());
     }
     #[test]
-    fn legacy_warning_cannot_be_confirmed_by_an_unrelated_retirement() {
+    fn orphaned_marker_after_restart_is_dismissed_but_an_active_one_stays() {
         let fixture = Fixture::new();
         fs::create_dir_all(&fixture.0).unwrap();
         let path = fixture.0.join("retirement.json");
-        fs::write(&path, b"1").unwrap();
+        let active = RetirementNotice::new(Some(path.clone()));
+        let active_marker = active.begin();
+        let closed = RetirementNotice::new(Some(path.clone()));
+        let closed_marker = closed.begin();
+        drop(closed);
+        let restarted = RetirementNotice::new(Some(path.clone()));
+        assert!(restarted.pending());
+        assert!(restarted.orphaned());
+        restarted.dismiss_orphaned().unwrap();
+        assert!(!path.with_extension("pending").join(&closed_marker).exists());
+        assert!(path.with_extension("pending").join(&active_marker).exists());
+        assert!(!restarted.orphaned());
+        assert!(RetirementNotice::new(Some(path.clone())).pending());
+        active.confirm(&active_marker);
+        assert!(!RetirementNotice::new(Some(path)).pending());
+    }
+    #[test]
+    fn a_running_instance_does_not_offer_its_own_marker_as_orphaned() {
+        let fixture = Fixture::new();
+        fs::create_dir_all(&fixture.0).unwrap();
+        let path = fixture.0.join("retirement.json");
         let notice = RetirementNotice::new(Some(path.clone()));
         let marker = notice.begin();
-        notice.confirm(&marker);
-        assert!(RetirementNotice::new(Some(path)).pending());
+        assert!(!notice.orphaned());
+        notice.dismiss_orphaned().unwrap();
+        assert!(notice.pending());
+        assert!(path.with_extension("pending").join(marker).exists());
     }
     #[test]
     fn unreadable_marker_directory_keeps_warning() {

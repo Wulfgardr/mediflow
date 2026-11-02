@@ -5768,6 +5768,39 @@ impl Render for ClinicalApp {
                                     .debug_selector(|| "local-session-retirement-warning".into())
                                     .flex_shrink_0(),
                                 )
+                                .when(
+                                    self.local_host.retirement.orphaned(),
+                                    |el| {
+                                        el.child(
+                                            div()
+                                                .flex()
+                                                .flex_col()
+                                                .gap(px(8.))
+                                                .flex_shrink_0()
+                                                .child(notice(
+                                                    "local-session-retirement-orphan",
+                                                    local_host::RETIREMENT_ORPHAN_GUIDANCE,
+                                                    theme,
+                                                    false,
+                                                ))
+                                                .child(
+                                                    button(
+                                                        "local-session-retirement-dismiss",
+                                                        "Ho verificato le sessioni dell’host",
+                                                        theme,
+                                                        false,
+                                                        true,
+                                                    )
+                                                    .debug_selector(|| {
+                                                        "local-session-retirement-dismiss".into()
+                                                    })
+                                                    .on_click(cx.listener(|this, _, _, cx| {
+                                                        this.dismiss_orphaned_retirement(cx)
+                                                    })),
+                                                ),
+                                        )
+                                    },
+                                )
                             })
                             .child(content),
                     ),
