@@ -13,10 +13,9 @@ const regular = file => {
   return fs.readFileSync(file);
 };
 
-export function loadSystemDirectoryBinding() {
-  const arch = process.arch;
-  if (process.platform !== 'win32' || !['x64', 'arm64'].includes(arch) || Number(process.versions.napi) < 1) deny();
-  const root = fileURLToPath(new URL('.', import.meta.url));
+/** Verifies the pinned prebuild for one architecture under `root` and returns the binary path. */
+export function verifySystemDirectoryArtifact(root, arch) {
+  if (!['x64', 'arm64'].includes(arch)) deny();
   const directory = path.join(root, 'prebuilds', `win32-${arch}`);
   const manifest = JSON.parse(regular(path.join(directory, 'manifest.json')).toString('utf8'));
   const binary = path.join(directory, 'system-directory.node');
@@ -34,6 +33,13 @@ export function loadSystemDirectoryBinding() {
     || bytes.readUInt32LE(offset) !== 0x4550 || bytes.readUInt16LE(offset + 4) !== (arch === 'x64' ? 0x8664 : 0xaa64)) deny();
   if (!Array.isArray(manifest.dependencies) || manifest.dependencies.length !== 3
     || [...manifest.dependencies].sort().join(',').toLowerCase() !== 'advapi32.dll,kernel32.dll,node.exe') deny();
+  return binary;
+}
+
+export function loadSystemDirectoryBinding() {
+  const arch = process.arch;
+  if (process.platform !== 'win32' || !['x64', 'arm64'].includes(arch) || Number(process.versions.napi) < 1) deny();
+  const binary = verifySystemDirectoryArtifact(fileURLToPath(new URL('.', import.meta.url)), arch);
   const binding = createRequire(import.meta.url)(/* turbopackIgnore: true */ binary);
   const names = Reflect.ownKeys(binding);
   if (names.length !== exports.length || exports.some(name => !names.includes(name) || typeof binding[name] !== 'function')) deny();
