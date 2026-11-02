@@ -15,6 +15,7 @@ import { dbServer } from './db-server';
 import { activePatients } from './patient-lifecycle';
 import type { NetworkWriteContext } from './network-write-context';
 import { buildPrescriptionVersionConflictPayload, parsePrescriptionExpectedVersion } from './prescription-concurrency';
+import { isServicePrescriptionTransitionAllowed, statusTransitionDenial } from './clinical-status-transitions';
 import {
     SERVICE_PRESCRIPTION_CATEGORY_SET,
     SERVICE_PRESCRIPTION_ITEM_CONFIDENCE_SET,
@@ -431,6 +432,68 @@ export async function updateHostServicePrescription(context: HostContext & { id:
     return updateServicePrescription(context, parsed.data, 'host');
 }
 
+const CASCADE_DATE_FIELDS = ['scheduledAt', 'performedAt', 'reportReceivedAt'] as const;
+
+type ServicePrescriptionWriteTx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
+type ServicePrescriptionItemRow = typeof servicePrescriptionItems.$inferSelect;
+
+/*
+ * Cascata dello stato dalla prescrizione alle voci (WUL-800). Il client elenca
+ * tutte le voci correnti con la versione letta: una voce aggiunta, tolta o
+ * modificata nel frattempo rende la richiesta un conflitto e nulla viene scritto.
+ * Si spostano solo le voci che erano nello stato della prescrizione: una voce
+ * portata altrove a parte, per esempio annullata da sola, resta com'è. La data
+ * della voce, se c'è, prevale su quella della prescrizione.
+ */
+function planServicePrescriptionItemCascade(
+    tx: ServicePrescriptionWriteTx,
+    parent: { id: string; status: string },
+    nextStatus: string | undefined,
+    listed: ReadonlyArray<{ id: string; version: number }>,
+): { ok: true; moves: ServicePrescriptionItemRow[] } | { ok: false; response: MutationResponse } {
+    if (nextStatus === undefined) return { ok: false, response: badRequest('Items cascade requires a status') };
+    const listedVersions = new Map(listed.map((item) => [item.id, item.version]));
+    const children = tx.select().from(servicePrescriptionItems).where(eq(servicePrescriptionItems.prescriptionId, parent.id)).all();
+    if (listedVersions.size !== listed.length || listedVersions.size !== children.length
+        || children.some((child) => !listedVersions.has(child.id))) {
+        return { ok: false, response: { status: 409, value: { error: 'Service prescription items changed', code: 'service_prescription_items_changed' } } };
+    }
+    for (const child of children) {
+        const listedVersion = listedVersions.get(child.id) as number;
+        if (child.version !== listedVersion) {
+            return { ok: false, response: { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription_item', listedVersion, child.id, selectServicePrescriptionItemConflictSnapshot(tx, child.id)) } };
+        }
+    }
+    if (nextStatus === parent.status) return { ok: true, moves: [] };
+    return { ok: true, moves: children.filter((child) => child.status === parent.status) };
+}
+
+/* Scrive le voci pianificate, ciascuna con il suo audit, nella transazione della prescrizione. */
+function applyServicePrescriptionItemCascade(
+    tx: ServicePrescriptionWriteTx,
+    context: HostContext | NetworkWriteContext,
+    surface: 'host' | 'network',
+    moves: ServicePrescriptionItemRow[],
+    parentValues: Partial<typeof servicePrescriptions.$inferInsert>,
+): void {
+    for (const child of moves) {
+        const values: Partial<typeof servicePrescriptionItems.$inferInsert> = { status: parentValues.status, updatedAt: parentValues.updatedAt };
+        const changedFields = ['status'];
+        for (const field of CASCADE_DATE_FIELDS) {
+            const parentValue = parentValues[field];
+            if (parentValue === undefined || child[field]) continue;
+            values[field] = parentValue;
+            changedFields.push(field);
+        }
+        const moved = tx.update(servicePrescriptionItems).set({ ...values, version: child.version + 1 })
+            .where(and(eq(servicePrescriptionItems.id, child.id), eq(servicePrescriptionItems.version, child.version))).run();
+        if (moved.changes !== 1) throw new Error('Service prescription item cascade did not write exactly one row');
+        writeAuditEventInTransaction(tx, serviceAuditInput(context, surface, 'service.prescription_item.updated', 'service_prescription_item', child.id, {
+            changedFields, resourceVersion: child.version + 1,
+        }));
+    }
+}
+
 async function updateServicePrescription(
     context: (HostContext | NetworkWriteContext) & { id: string },
     body: ServicePrescriptionUpdatePayload,
@@ -448,11 +511,18 @@ async function updateServicePrescription(
         if (!existing) return { status: 404, value: { error: surface === 'host' ? 'Service prescription not found' : 'Not found' } };
         if (!activeParentExists(tx, existing.patientId) || (surface === 'network' && !patientIsInScope(tx, existing.patientId, (context as NetworkWriteContext).scopeAmbulatoryId))) return { status: 404, value: { error: 'Not found' } };
         if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription', expectedVersion, context.id, selectServicePrescriptionConflictSnapshot(tx, context.id)) };
+        const nextStatus = normalized.values.status;
+        if (nextStatus !== undefined && !isServicePrescriptionTransitionAllowed(existing.status, nextStatus)) {
+            return statusTransitionDenial('service_prescription', existing.status, nextStatus);
+        }
+        const cascade = body.items === undefined ? null : planServicePrescriptionItemCascade(tx, existing, nextStatus, body.items);
+        if (cascade && !cascade.ok) return cascade.response;
         const updated = tx.update(servicePrescriptions).set({ ...normalized.values, version: expectedVersion + 1 })
             .where(and(eq(servicePrescriptions.id, context.id), eq(servicePrescriptions.version, expectedVersion))).run();
         if (updated.changes !== 1) throw new Error('Service prescription update did not write exactly one row');
+        if (cascade) applyServicePrescriptionItemCascade(tx, context, surface, cascade.moves, normalized.values);
         writeAuditEventInTransaction(tx, serviceAuditInput(context, surface, 'service.prescription.updated', 'service_prescription', context.id, {
-            changedFields: listChangedFields(body as Record<string, unknown>, ['version']), resourceVersion: expectedVersion + 1,
+            changedFields: listChangedFields(body as Record<string, unknown>, ['version', 'items']), resourceVersion: expectedVersion + 1,
         }));
         return { status: 200, value: { success: true } };
     }, { behavior: 'immediate' });
@@ -528,6 +598,10 @@ async function updateServicePrescriptionItem(context: (HostContext | NetworkWrit
         const parent = tx.select({ patientId: servicePrescriptions.patientId }).from(servicePrescriptions).where(eq(servicePrescriptions.id, existing.prescriptionId)).get();
         if (!parent || parent.patientId !== existing.patientId || !activeParentExists(tx, existing.patientId) || (surface === 'network' && !patientIsInScope(tx, existing.patientId, (context as NetworkWriteContext).scopeAmbulatoryId))) return { status: 404, value: { error: 'Not found' } };
         if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription_item', expectedVersion, context.id, selectServicePrescriptionItemConflictSnapshot(tx, context.id)) };
+        const nextStatus = normalized.values.status;
+        if (nextStatus !== undefined && !isServicePrescriptionTransitionAllowed(existing.status, nextStatus)) {
+            return statusTransitionDenial('service_prescription_item', existing.status, nextStatus);
+        }
         const updated = tx.update(servicePrescriptionItems).set({ ...normalized.values, version: expectedVersion + 1 })
             .where(and(eq(servicePrescriptionItems.id, context.id), eq(servicePrescriptionItems.version, expectedVersion))).run();
         if (updated.changes !== 1) throw new Error('Service prescription item update did not write exactly one row');
