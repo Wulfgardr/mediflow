@@ -1052,6 +1052,8 @@ mod recovery_regressions {
         });
         std::fs::remove_dir_all(directory).unwrap();
     }
+    // The deny-delete ACL (`chmod +a`) exists only on macOS.
+    #[cfg(target_os = "macos")]
     #[gpui::test]
     fn confirmed_command_whose_reference_cannot_be_removed_is_never_shown_as_uncertain(
         cx: &mut gpui::TestAppContext,
