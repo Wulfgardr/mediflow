@@ -276,7 +276,7 @@ cambiamento dei contratti consumati da Swift.
 | --- | --- | --- | --- |
 | Agenda interna | `lib/network-checkup-read.ts`, `RuntimeSession.list_agenda_with_filter` | Lettura app-only con consenso nativo, massimo 20 controlli, data e stato | Prova desktop sui due host; limite distinto da elenco completo |
 | Candidati da calendario | `lib/clinical-agenda-bridge.ts`, `/api/clinical-agenda/candidates` | Non collegati; nessuna lettura dei calendari introdotta | Restano candidati da revisionare, senza equivalenza con appuntamenti confermati |
-| Prenotazione confermata | `lib/network-checkup-write.ts`, `lib/checkup-write-operation.ts` | Non collegata, nessun comando di scrittura ammesso | Occorre comando durevole con PIN e approvazione monouso di `lib/native-chat-write-approval.ts`, binding della selezione, CAS, audit e ricevuta riconciliabile attorno al writer comune |
+| Prenotazione confermata | `lib/chat-checkup-booking.ts` sopra `createCheckupOperation` di `lib/checkup-write-operation.ts`; route `/api/auth/native/checkup-booking` | Comando `booking` senza campi dal modello: data e ora scritte e viste nella finestra nativa, titolo fisso, PIN, approvazione monouso, selezione ricontrollata, CAS sulla revisione dell’agenda, audit `native` e ricevuta durevole | Prova desktop sui due host; nessuna modifica o annullamento da chat |
 | Attività territoriali | `lib/territorial-pack-store.ts`, writer territoriali nominati | Nessun grant chat e nessuna azione esposta | Collegare soltanto operazioni nominate con controllo del pacchetto sotto la transazione del writer; pacchetto spento deve negarle |
 | Invio istituzionale | Nessun servizio ammesso da questo raccordo | Non disponibile | Nessun invio autorizzato |
 
@@ -288,8 +288,36 @@ ha un writer comune con audit obbligatorio e CAS sugli aggiornamenti; non è
 una prenotazione chat confermata. Il solo `201` della creazione non fornisce
 la ricevuta durevole del comando e non viene presentato come tale.
 
-C-9b resta aperto: questa tranche consegna soltanto la lettura, non la coppia
-minima lettura/prenotazione richiesta. La prenotazione deve mantenere campi
-scelti e visti dal medico nella finestra nativa, consumo prima delle attese,
-nessuna nuova esecuzione dopo un esito indeterminato e riconciliazione senza
-secondo writer. Il profilo clinico della PR #765 non viene modificato.
+### Prenotazione confermata (corsia c9b-prenotazione)
+
+La coppia minima lettura/prenotazione è collegata nel codice. Il comando
+`booking` della card non porta campi: la finestra GPUI apre la vista con la
+revisione dell’agenda della cartella selezionata, il medico scrive data e ora
+(`GG/MM/AAAA HH:MM`, da oggi a due anni) e vede l’anteprima. Il titolo è fisso
+(«Controllo»), nessuna nota, stato da svolgere. La conferma usa il PIN nativo e
+l’approvazione monouso di `lib/native-chat-write-approval.ts`, consumata prima
+dell’attesa del PIN; sessione, archivio, selezione e scadenza sono ricontrollati
+dentro la transazione.
+
+La scrittura passa da `createCheckupOperation`, il writer comune di Web e
+paired, senza modificarlo. Ammissione, ricevuta già presente e CAS girano come
+guardia di commit nella stessa transazione IMMEDIATE del writer. La revisione
+dell’agenda è `count(*) + sum(version)` dei controlli del paziente: ogni
+creazione o modifica la cambia. Se è cambiata dall’apertura la prenotazione è
+respinta con `version_conflict`.
+
+La ricevuta è l’evento di audit legato al `commandId` (`checkup.created`,
+superficie `native`, flag `chat:checkup-booking`): `success` con il controllo
+creato con id uguale al comando, oppure `denied` con motivo `version_conflict`.
+Sta nelle tabelle già esportate dal backup portabile, quindi sopravvive al
+riavvio e al backup senza un nuovo registro; il test del backup esporta e
+valida un archivio con una prenotazione applicata e una respinta. Il
+riferimento del comando resta nel deposito locale della GPUI; dopo un riavvio
+la rilettura interroga entrambe le route di scrittura chat, terapia e
+prenotazione, e una risposta persa si riconcilia dalla ricevuta senza
+ripetere la scrittura.
+
+C-9b resta aperta per le prove sui due desktop reali, non eseguite qui.
+Candidati da calendario, calendari personali, attività territoriali e invii
+istituzionali restano non collegati. Il profilo clinico della PR #765 non viene
+modificato.
