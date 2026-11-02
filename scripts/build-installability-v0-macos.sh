@@ -19,10 +19,10 @@ fail() {
 [[ -n "$NODE_BINARY" && -x "$NODE_BINARY" ]] || fail "Node non trovato o non eseguibile"
 [[ -x "$LAUNCHER_SOURCE" ]] || fail "launcher sorgente non eseguibile: $LAUNCHER_SOURCE"
 
-NODE_MAJOR="$($NODE_BINARY -p 'process.versions.node.split(".")[0]')"
-NODE_PLATFORM="$($NODE_BINARY -p 'process.platform')"
-NODE_ARCH="$($NODE_BINARY -p 'process.arch')"
-[[ "$NODE_MAJOR" == "24" ]] || fail "serve Node 24, trovato $($NODE_BINARY --version)"
+NODE_MAJOR="$("$NODE_BINARY" -p 'process.versions.node.split(".")[0]')"
+NODE_PLATFORM="$("$NODE_BINARY" -p 'process.platform')"
+NODE_ARCH="$("$NODE_BINARY" -p 'process.arch')"
+[[ "$NODE_MAJOR" == "24" ]] || fail "serve Node 24, trovato $("$NODE_BINARY" --version)"
 [[ "$NODE_PLATFORM" == "darwin" ]] || fail "il runtime Node deve essere per macOS"
 
 case "$NODE_ARCH" in
@@ -127,7 +127,7 @@ fi
 
 REVISION="$(git -C "$ROOT_DIR" rev-parse --short=12 HEAD)"
 BRANCH="$(git -C "$ROOT_DIR" branch --show-current)"
-WORKTREE_HASH="$($NODE_BINARY - "$ROOT_DIR" <<'NODE'
+WORKTREE_HASH="$("$NODE_BINARY" - "$ROOT_DIR" <<'NODE'
 const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 
@@ -149,7 +149,7 @@ fs.writeFileSync(process.argv[2], `${JSON.stringify({
 }, null, 2)}\n`);
 NODE
 
-VERSION="$($NODE_BINARY -p "require('$ROOT_DIR/package.json').version")"
+VERSION="$("$NODE_BINARY" -p "require('$ROOT_DIR/package.json').version")"
 PLIST="$APP/Contents/Info.plist"
 plutil -create xml1 "$PLIST"
 plutil -insert CFBundleDevelopmentRegion -string it "$PLIST"
@@ -184,5 +184,5 @@ CONTRACT="$APP/Contents/Resources/WebRuntime/mediflow-runtime-contract.json"
 
 echo "[installabilita-v0] COMPLETATO"
 echo "Artefatto: $APP"
-echo "Runtime: $($APP/Contents/Resources/Node/bin/node --version), $NODE_PLATFORM/$NODE_ARCH"
+echo "Runtime: $("$APP/Contents/Resources/Node/bin/node" --version), $NODE_PLATFORM/$NODE_ARCH"
 du -sh "$APP"
