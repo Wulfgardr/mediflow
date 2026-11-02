@@ -8,7 +8,7 @@ import {spawnSync} from 'node:child_process';
 import {countWindowsIcuPngInk} from './anydoc-windows-icu-png-oracle.mjs';
 const SOURCE_ROOT=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PROFILE_SHA256='e18c156831781d8324331d37b71c0f702165d731b77d2bf719c499d3267a75bf';
-const WORKER_SHA256='438a8a5c417abbdc7268888a4202c4bad112089425cf5dfda952e9981844d9ae';
+const WORKER_SHA256='117a18131c8371f1a173b84fcfedd9308f4fdb3b1e0c5fc215fe64a58fdf38c8';
 const FONT_SHA256='f8ace1f892b2bd9dc1792ba7f097fa7588f84fed48321480e04de5390828221f';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const demand=(condition,message)=>{if(!condition)throw Error(message);};
