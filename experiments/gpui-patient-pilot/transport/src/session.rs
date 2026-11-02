@@ -9806,6 +9806,137 @@ mod g2_settings_tests {
         assert!(crate::test_loopback::accept(&listener).is_err());
     }
     #[test]
+    fn g2_aifa_clear_sends_the_observed_snapshot_once_and_reads_conflict_denial_and_receipt() {
+        use crate::{AifaClearResult, ReferenceCatalog};
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let snapshot = "a".repeat(64);
+        let expected = snapshot.clone();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let status = |stream: &mut std::net::TcpStream, snapshot: &str| {
+                assert!(read_request(stream).starts_with("GET /api/drugs?count=1 "));
+                local_host_reply(
+                    stream,
+                    200,
+                    json!({"count":3,"state":"ready","snapshot":snapshot,"manifest":{"version":"synthetic"}}),
+                    "",
+                );
+            };
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+            status(&mut stream, &expected);
+            let replies = [
+                (
+                    409,
+                    json!({"code":"AIFA_CATALOG_CHANGED","error":"invented"}),
+                ),
+                (
+                    403,
+                    json!({"code":"AIFA_CLEAR_ADMIN_REQUIRED","error":"invented"}),
+                ),
+                (
+                    200,
+                    json!({"count":0,"state":"not-imported","manifest":null,"snapshot":"b".repeat(64),
+                    "receipt":{"operation":"aifa-catalog-clear","confirmation":"mediflow.aifa-catalog-clear.v1",
+                    "auditEventId":"synthetic-audit","clearedAt":"2026-11-02T10:00:00.000Z",
+                    "previousSnapshot":expected,"previousCount":3}}),
+                ),
+            ];
+            for (code, body) in replies {
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("DELETE /api/drugs "));
+                assert!(request.contains(&format!("\"expectedSnapshot\":\"{expected}\"")));
+                assert!(request.contains("\"confirmation\":\"mediflow.aifa-catalog-clear.v1\""));
+                local_host_reply(&mut stream, code, body, "");
+            }
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let observed = access
+            .read_reference_catalog(ReferenceCatalog::Aifa)
+            .unwrap();
+        let empty = crate::ReferenceStatus {
+            catalog: ReferenceCatalog::Aifa,
+            data: json!({"count":0,"state":"not-imported","snapshot":"c".repeat(64),"manifest":null}),
+            sources: None,
+        };
+        assert!(matches!(
+            access.prepare_aifa_clear(&empty),
+            Err(RuntimeError::InvalidInput)
+        ));
+        let changed = access.prepare_aifa_clear(&observed).unwrap();
+        assert_eq!(changed.count(), 3);
+        assert!(matches!(
+            access.clear_aifa_catalog(&changed),
+            Ok(AifaClearResult::CatalogChanged)
+        ));
+        assert!(
+            matches!(
+                access.clear_aifa_catalog(&changed),
+                Err(RuntimeError::ReadRequired)
+            ),
+            "a refused command is never resent"
+        );
+        let denied = access.prepare_aifa_clear(&observed).unwrap();
+        assert!(matches!(
+            access.clear_aifa_catalog(&denied),
+            Err(RuntimeError::Forbidden)
+        ));
+        let cleared = access.prepare_aifa_clear(&observed).unwrap();
+        let Ok(AifaClearResult::Cleared(receipt)) = access.clear_aifa_catalog(&cleared) else {
+            panic!("not cleared");
+        };
+        assert_eq!(receipt["receipt"]["auditEventId"], "synthetic-audit");
+        assert_eq!(receipt["receipt"]["previousSnapshot"], snapshot.as_str());
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(crate::test_loopback::accept(&listener).is_err());
+    }
+    #[test]
+    fn g2_aifa_clear_receipt_that_does_not_name_the_observed_snapshot_is_not_a_clear() {
+        use crate::ReferenceCatalog;
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            for body in [
+                json!({"count":0,"state":"not-imported","manifest":null,"receipt":{"operation":"aifa-catalog-clear",
+                    "confirmation":"mediflow.aifa-catalog-clear.v1","auditEventId":"synthetic-audit",
+                    "clearedAt":"2026-11-02T10:00:00.000Z","previousSnapshot":"d".repeat(64),"previousCount":3}}),
+                json!({"success":true}),
+            ] {
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                assert!(read_request(&mut stream).starts_with("DELETE /api/drugs "));
+                local_host_reply(&mut stream, 200, body, "");
+            }
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let observed = crate::ReferenceStatus {
+            catalog: ReferenceCatalog::Aifa,
+            data: json!({"count":3,"state":"ready","snapshot":"a".repeat(64),"manifest":{}}),
+            sources: None,
+        };
+        for _ in 0..2 {
+            let command = access.prepare_aifa_clear(&observed).unwrap();
+            assert!(matches!(
+                access.clear_aifa_catalog(&command),
+                Err(RuntimeError::Indeterminate)
+            ));
+        }
+        worker.join().unwrap();
+    }
+    #[test]
     fn g2_references_aifa_missing_receipt_counts_is_not_recorded() {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));

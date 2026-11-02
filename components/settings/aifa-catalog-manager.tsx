@@ -62,7 +62,7 @@ export default function AifaCatalogManager({ expanded, onExpandedChange }: { exp
     const handleClearDrugs = () => {
         void guide.current?.clear(async () => {
             const result = await confirm({ title: 'Svuotare il database farmaci?',
-                message: 'L’intero elenco dei farmaci indicizzati verrà cancellato. Questa azione non può essere annullata.',
+                message: 'Vengono rimosse tutte le confezioni lette e il manifest di provenienza. Terapie e prescrizioni salvate non cambiano. Operazione riservata all’amministratore e registrata nel registro attività. Se il catalogo è cambiato dopo l’ultima lettura, non viene rimosso nulla. Non può essere annullata.',
                 confirmLabel: 'Svuota', tone: 'danger' });
             return result.confirmed;
         });
