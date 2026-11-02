@@ -276,10 +276,15 @@ mod tests {
         #[cfg(windows)]
         {
             mediflow_local_state::verify_directory(&path.with_extension("pending")).unwrap();
-            mediflow_local_state::open_read(&path.with_extension("pending").join(&a_marker))
-                .unwrap();
+            // A live instance keeps its marker open without sharing, so no
+            // other process can read, claim or delete it as an orphan.
+            let held =
+                mediflow_local_state::open_read(&path.with_extension("pending").join(&a_marker))
+                    .unwrap_err();
+            assert_eq!(held.raw_os_error(), Some(32), "{held}");
         }
         assert!(RetirementNotice::new(Some(path.clone())).pending());
+        #[cfg(not(windows))]
         assert_eq!(
             fs::read_to_string(path.with_extension("pending").join(&a_marker)).unwrap(),
             a_marker
