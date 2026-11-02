@@ -92,5 +92,5 @@
       "prescribed"
     ]
   },
-  "prostheticLinkedFields": "Passando a tested, collaudoAt resta quello indicato o già salvato, altrimenti la data del passaggio; l'esito non viene scritto se il medico non lo inserisce. Tornando indietro da tested, collaudoAt e collaudoOutcome si svuotano e l'audit registra i campi cambiati. A una prescrizione tested non si può togliere la data di collaudo."
+  "prostheticLinkedFields": "Passando a tested, collaudoAt resta quello indicato, o quello già salvato se non è futuro, altrimenti la data del passaggio; l'esito non viene scritto se il medico non lo inserisce. Tornando indietro da tested, collaudoAt si svuota e l'audit lo nomina; l'esito scritto dal medico resta. A una prescrizione tested non si può togliere la data di collaudo."
 }

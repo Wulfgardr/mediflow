@@ -270,7 +270,7 @@ export async function createHostProstheticPrescription(context: HostContext, raw
         const inserted = tx.insert(prostheticPrescriptions).values(normalized.values).run();
         if (inserted.changes !== 1) throw new Error('Prosthetic prescription create did not write exactly one row');
         writeAuditEventInTransaction(tx, prostheticAuditInput(context, 'host', 'prosthetic.prescription.created', normalized.values.id, {
-            changedFields: listChangedFields(rawBody, ['id']),
+            changedFields: [...new Set([...listChangedFields(rawBody, ['id']), ...(normalized.values.status === 'tested' ? ['collaudoAt'] : [])])],
             flags: [`source:${normalized.values.source}`, `status:${normalized.values.status}`, `category:${normalized.values.category}`],
             resourceVersion: 1,
         }));
@@ -377,7 +377,7 @@ export async function createNetworkScopedProstheticPrescription(context: Network
         const inserted = tx.insert(prostheticPrescriptions).values(normalized.values).run();
         if (inserted.changes !== 1) throw new Error('Prosthetic prescription create did not write exactly one row');
         writeAuditEventInTransaction(tx, prostheticAuditInput(context, 'network', 'prosthetic.prescription.created', normalized.values.id,
-            { changedFields: listChangedFields(rawBody, ['id']), resourceVersion: 1 }));
+            { changedFields: [...new Set([...listChangedFields(rawBody, ['id']), ...(normalized.values.status === 'tested' ? ['collaudoAt'] : [])])], resourceVersion: 1 }));
         return { status: 201, value: { id: normalized.values.id, version: 1 } };
     }, { behavior: 'immediate' });
     return commit;

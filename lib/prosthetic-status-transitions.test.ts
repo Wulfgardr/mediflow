@@ -110,13 +110,21 @@ test('testing keeps a given or saved date, otherwise uses the moment, and never 
     assert.deepEqual(row(given), { status: 'tested', version: 3, collaudoAt: seconds(new Date('2026-06-01')), collaudoOutcome: 'ENC:synthetic:outcome' });
 });
 
-test('stepping back from tested clears date and outcome, and the audit names both fields', async () => {
+test('stepping back from tested clears the date, keeps the outcome the doctor wrote, and the audit names the date', async () => {
     const id = seed('tested', savedCollaudo, 'ENC:synthetic:outcome');
     assert.equal((await update(id, { status: 'delivered' })).status, 200);
-    assert.deepEqual(row(id), { status: 'delivered', version: 3, collaudoAt: null, collaudoOutcome: null });
+    assert.deepEqual(row(id), { status: 'delivered', version: 3, collaudoAt: null, collaudoOutcome: 'ENC:synthetic:outcome' });
     const [event] = audits(id);
     const changed = (JSON.parse(event.metadata) as { changedFields: string[] }).changedFields;
-    assert.ok(changed.includes('collaudoAt') && changed.includes('collaudoOutcome'), changed.join(','));
+    assert.ok(changed.includes('collaudoAt'), changed.join(','));
+});
+
+test('a saved collaudo date in the future does not survive testing: the moment of the change wins', async () => {
+    const before = Math.floor(Date.now() / 1000);
+    const id = seed('delivered', new Date(Date.now() + 30 * 86_400_000));
+    assert.equal((await update(id, { status: 'tested' })).status, 200);
+    const stored = row(id).collaudoAt!;
+    assert.ok(stored >= before && stored <= Math.floor(Date.now() / 1000) + 1);
 });
 
 test('a tested aid cannot lose its collaudo date', async () => {
@@ -138,6 +146,8 @@ test('an aid created as already tested always has a collaudo date', async () => 
     assert.equal(stored.status, 'tested');
     assert.notEqual(stored.collaudoAt, null);
     assert.equal(stored.collaudoOutcome, null);
+    const [event] = audits((created.value as { id: string }).id);
+    assert.ok((JSON.parse(event.metadata) as { changedFields: string[] }).changedFields.includes('collaudoAt'));
 });
 
 test('the paired client goes through the same table', async () => {

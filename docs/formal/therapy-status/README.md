@@ -738,7 +738,6 @@ i test delle terapie (339, compresi i nuovi `therapy-status-transitions` e il
 diniego del comando su una terapia conclusa) e il gate completo
 `npm run verify:therapy-status` su questo commit.
 
-WUL-800 coorti 4 e 5 (prescrizioni protesiche, handoff SISS) aggiungono le
-loro tabelle a `lib/clinical-status-transitions.ts` e al file di decisione.
+WUL-800 coorte 4 (prescrizioni protesiche) aggiunge la sua tabella a `lib/clinical-status-transitions.ts` e al file di decisione.
 Righe, regole e funzioni delle terapie restano identiche: le impronte dei due
 file cambiano per le parti di altre entità, il modello no.
