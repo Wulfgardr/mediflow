@@ -6,6 +6,8 @@ import { activePatients } from './patient-lifecycle';
 import { writeAuditEventInTransaction, type RequiredAuditContext } from './security/audit';
 import { patients, patientsToAmbulatories, therapies } from './schema';
 import { buildTherapyVersionConflictPayload } from './therapy-concurrency';
+import { planTherapyStatusChange } from './clinical-status-transitions';
+import { parseTherapyStatus } from './status-normalization';
 
 type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 type Mode = 'web' | 'v1' | 'network';
@@ -73,8 +75,17 @@ export function updateTherapyOperationInTransaction(tx: Tx, input: TherapyUpdate
     if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
     if (existing.version !== input.expectedVersion) return { status: 409,
         value: buildTherapyVersionConflictPayload(input.expectedVersion, input.therapyId, existing) as unknown as Record<string, unknown> };
+    // WUL-800: passaggio di stato e data di fine coerenti; gli alias salvati valgono come lo stato canonico.
+    const plan = planTherapyStatusChange(
+        { status: parseTherapyStatus(existing.status) ?? existing.status ?? '', endDate: existing.endDate ?? null },
+        { status: input.values.status ?? undefined, endDate: input.values.endDate },
+        input.occurredAt ?? input.values.updatedAt ?? new Date());
+    if (!plan.ok) return plan.denial;
+    const values = plan.endDate === undefined ? input.values : { ...input.values, endDate: plan.endDate };
+    const changedFields = plan.endDate === undefined || input.changedFields.includes('endDate')
+        ? input.changedFields : [...input.changedFields, 'endDate'];
 
-    const changed = tx.update(therapies).set({ ...input.values, version: input.expectedVersion + 1 })
+    const changed = tx.update(therapies).set({ ...values, version: input.expectedVersion + 1 })
         .where(and(eq(therapies.id, input.therapyId), eq(therapies.patientId, existing.patientId),
             eq(therapies.version, input.expectedVersion))).run();
     if (changed.changes !== 1) throw new Error('Therapy update did not write exactly one row');
@@ -83,7 +94,7 @@ export function updateTherapyOperationInTransaction(tx: Tx, input: TherapyUpdate
         archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
         subjectType: 'therapy', subjectRef: input.therapyId,
         sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
-        redactedMetadata: { changedFields: input.changedFields,
+        redactedMetadata: { changedFields,
             resourceVersion: input.expectedVersion + 1, flags: input.audit.flags },
     });
     return { status: 200, value: { success: true }, auditEventId };

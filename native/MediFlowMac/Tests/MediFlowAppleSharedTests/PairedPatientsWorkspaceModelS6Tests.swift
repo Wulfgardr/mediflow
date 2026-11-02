@@ -76,6 +76,16 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
         }
     }
 
+    func testTherapyStatusChoicesFollowTheDecidedTable() throws {
+        let decided = try decidedTransitions("therapy")
+        XCTAssertEqual(Set(decided.keys), Set(PairedTherapyStatus.allCases.map(\.rawValue)))
+        for status in PairedTherapyStatus.allCases {
+            let offered = Set(status.allowedTargets.map(\.rawValue)).subtracting([status.rawValue])
+            XCTAssertEqual(offered, decided[status.rawValue], status.rawValue)
+            XCTAssertTrue(status.allowedTargets.contains(status), "restare nello stesso stato è ammesso")
+        }
+    }
+
     func testEditingACompletedCheckupNeverOffersCancelled() async {
         let patient = detail(id: "p1")
         let model = await makeModel(source: S6MockDataSource(details: ["p1": patient]))

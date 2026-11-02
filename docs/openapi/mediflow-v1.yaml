@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.49.0
+  version: 1.50.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -3412,6 +3412,11 @@ paths:
         checked in the same transaction: a missing or soft-deleted parent
         returns 404; archived-only is allowed. Restoring a therapy never
         restores its parent implicitly.
+        A `status` change must follow the allowed transition table, otherwise
+        the request returns 409 `status_transition_not_allowed`. Completing a
+        therapy keeps the given or saved end date, otherwise sets the moment of
+        the change; reactivating clears it unless one is given; removing the
+        end date of a completed therapy returns 409 `therapy_end_date_required`.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -3461,7 +3466,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/TherapyVersionConflict'
+          $ref: '#/components/responses/TherapyWriteConflict'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -4493,6 +4498,18 @@ components:
                 currentUpdatedAt: null
                 currentState: missing
                 currentSnapshot: null
+    TherapyWriteConflict:
+      description: |
+        Compare-on-write conflict, a status transition outside the allowed
+        table (completed never goes directly to suspended), or a request that
+        would remove the end date of a completed therapy. Nothing is written.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/TherapyVersionConflictResponse'
+              - $ref: '#/components/schemas/StatusTransitionDeniedResponse'
+              - $ref: '#/components/schemas/TherapyEndDateRequiredResponse'
     TherapyVersionConflict:
       description: |
         Therapy compare-on-write conflict. The payload exposes only PHI-safe
@@ -9441,6 +9458,16 @@ components:
             - string
             - 'null'
           format: date-time
+    TherapyEndDateRequiredResponse:
+      type: object
+      additionalProperties: false
+      required: [error, code]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [therapy_end_date_required]
     StatusTransitionDeniedResponse:
       type: object
       additionalProperties: false
