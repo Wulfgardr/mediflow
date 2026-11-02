@@ -690,6 +690,27 @@ test('concurrent launcher acquisition retains a single live writer', async t => 
     assert.equal(JSON.parse(readFileSync(launcherReceiptFile(lock))).pid, winners[0].pid);
 });
 
+// The ordinary launcher binds a fixed PORT some time after the fixture chose it. A port
+// picked with listen(0) comes from the OS ephemeral range, where the kernel can hand it
+// to any parallel test's listen(0) or outgoing connection before the launcher binds it
+// (EADDRINUSE seen on ubuntu web-core, 2 Nov 2026). Ephemeral ranges start at 32768
+// (Linux) and 49152 (macOS, Windows), so a port below 32768 is never auto-assigned.
+const NON_EPHEMERAL_PORTS = { first: 20000, last: 32767 };
+async function reservedNonEphemeralPort() {
+    for (let attempt = 0; attempt < 64; attempt++) {
+        const port = NON_EPHEMERAL_PORTS.first + crypto.randomInt(NON_EPHEMERAL_PORTS.last - NON_EPHEMERAL_PORTS.first + 1);
+        const probe = createHttpServer();
+        const free = await new Promise(resolve => { probe.once('error', () => resolve(false)); probe.listen(port, '127.0.0.1', () => resolve(true)); });
+        if (free) { await new Promise(resolve => probe.close(resolve)); return port; }
+    }
+    throw new Error('No free non-ephemeral loopback port for the launcher fixture.');
+}
+
+test('launcher fixture ports stay outside every OS ephemeral range', async () => {
+    const ports = await Promise.all(Array.from({ length: 16 }, () => reservedNonEphemeralPort()));
+    for (const port of ports) assert.ok(port >= 1024 && port < 32768, String(port));
+});
+
 async function fakeRuntime(t, fingerprint = cleanIdentity.sourceFingerprint) {
     const server = http.createServer((_req, res) => {
         res.setHeader('Content-Type', 'application/json');
@@ -1020,7 +1041,11 @@ test('Windows terminal entry requires a confirmed stop on the same original hand
             assert.equal(child.listenerCount('exit'),0);
         }
         assert.equal(calls,0);assert.equal(frames,0);
-        child=make();await stopOwnedChild(child,30);await stopOwnedChild(child,30);
+        // A confirmed stop checks its deadline right after taskkill returns. Keep this
+        // success path far above a shared runner's scheduling pause: with 30 ms a single
+        // stall expired the confirmed stop (macOS CI, 2 Nov 2026).
+        const confirmedGraceMs=1000;
+        child=make();await stopOwnedChild(child,confirmedGraceMs);await stopOwnedChild(child,confirmedGraceMs);
         assert.equal(calls,1,'A confirmed stop was not retained on its original handle');
         await assert.rejects(stopOwnedChild(make(0),30),error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
         assert.equal(calls,1,'A distinct handle sharing the PID inherited stop authority');
@@ -1028,9 +1053,9 @@ test('Windows terminal entry requires a confirmed stop on the same original hand
         child.exitCode=0;child.emit('exit',0);
         await assert.rejects(stopOwnedChild(child,30),error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
         assert.equal(calls,2);assert.equal(frames,0);
-        await new Promise(resolve=>setTimeout(resolve,40));assert.equal(calls,2);
+        await new Promise(resolve=>setTimeout(resolve,confirmedGraceMs+100));assert.equal(calls,2);
         console.log(JSON.stringify({simulatedWindows:true,calls,frames,sameHandleOnly:true,failedStopNotRetained:true,lateCalls:false}));
-    `], {encoding:'utf8',timeout:2000});
+    `], {encoding:'utf8',timeout:6000});
     assert.equal(result.status,0,result.stdout+result.stderr);
     t.diagnostic(result.stdout.trim());
 });
@@ -1918,9 +1943,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         atomicJson(path.join(stateFiles.lockDirectory, 'instance.json'), { checkoutPath: identity.checkoutPath, ...initialOwner });
     }
     let output = '';
-    const socket = createHttpServer();
-    await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
-    const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
+    const port = await reservedNonEphemeralPort();
     const child = spawn(process.execPath, [...fixtureImportArguments(ownerLoader), ...(lifecycle && !lifecycle.job ? fixtureImportArguments(stopLoader) : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), ...(args.includes('--scegli') ? [] : ['--senza-browser']), ...args], {
         env: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
     const closed = Promise.all([once(child, 'exit'), once(child.stderr, 'close')]).then(([exit]) => exit);
