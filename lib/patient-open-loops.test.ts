@@ -42,6 +42,35 @@ test('signals a pending result after the waiting window', () => {
     assert.equal(loops[0].sourceRef.serviceName, 'Glicemia');
 });
 
+test('a booked exam never performed is a missing report once past the window from its date', () => {
+    const loops = deriveOpenLoops({
+        items: [item({ status: 'booked', scheduledAt: '2026-06-10T09:00:00.000Z' })],
+        observations: [],
+        now,
+    });
+    assert.equal(loops.length, 1);
+    assert.equal(loops[0].kind, 'results_pending');
+    assert.deepEqual(loops[0].status, {
+        sinceDate: new Date('2026-06-10T09:00:00.000Z'),
+        elapsedDays: 21,
+    });
+});
+
+test('a booked exam with a future date or still inside the window is not signalled', () => {
+    for (const scheduledAt of ['2026-07-20T09:00:00.000Z', '2026-06-25T09:00:00.000Z']) {
+        assert.deepEqual(
+            deriveOpenLoops({ items: [item({ status: 'booked', scheduledAt })], observations: [], now }),
+            [],
+        );
+    }
+});
+
+test('cancelled items and received reports never signal a missing report', () => {
+    for (const status of ['cancelled', 'report_received']) {
+        assert.deepEqual(deriveOpenLoops({ items: [item({ status })], observations: [], now }), []);
+    }
+});
+
 test('closes a pending result with a linked observation or a received report', () => {
     assert.deepEqual(
         deriveOpenLoops({
