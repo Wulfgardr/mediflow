@@ -5,10 +5,10 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
 import { assertScheduledBackupRuntime } from './scheduled-backup-runtime-contract.mjs';
 import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
-import { verifySystemDirectoryArtifact } from './windows-launcher-bootstrap/index.mjs';
 
 import http from 'node:http';
 import https from 'node:https';
@@ -244,8 +244,9 @@ function standaloneWindowsIcuDataFailure(standaloneDir, platform = process.platf
 }
 
 /* The Web backup needs the Windows DACL binding. The bundled loader must find its
-   prebuilds beside its own module, never beside a copy emitted as a server asset. */
-function windowsBootstrapBundleFailure(standaloneDir) {
+   prebuilds beside its own module, never beside a copy emitted as a server asset.
+   The verifier is the loader packaged in the standalone, not the checkout copy. */
+async function windowsBootstrapBundleFailure(standaloneDir) {
   const containsLoaderCopy = directory => {
     if (!fs.existsSync(directory)) return false;
     return fs.readdirSync(directory, { withFileTypes: true }).some(entry => {
@@ -259,6 +260,9 @@ function windowsBootstrapBundleFailure(standaloneDir) {
       return 'Standalone server copies the Windows bootstrap loader as an asset: on Windows it would not find its prebuilds and the full backup would stop.';
     }
     const bootstrap = path.join(fs.realpathSync(standaloneDir), 'scripts', 'windows-launcher-bootstrap');
+    const loader = path.join(bootstrap, 'index.mjs');
+    if (!fs.lstatSync(loader).isFile()) throw new Error('Packaged Windows bootstrap loader is not a regular file.');
+    const { verifySystemDirectoryArtifact } = await import(pathToFileURL(loader).href);
     for (const arch of ['x64', 'arm64']) verifySystemDirectoryArtifact(bootstrap, arch);
   } catch {
     return 'Standalone runtime does not contain the verified Windows bootstrap prebuilds for x64 and arm64.';
@@ -266,7 +270,7 @@ function windowsBootstrapBundleFailure(standaloneDir) {
   return null;
 }
 
-function runWindowsBootstrapSelfTest() {
+async function runWindowsBootstrapSelfTest() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-windows-bootstrap-checker-')));
   const scripts = path.join(root, 'scripts');
   const assets = path.join(root, '.next', 'server', 'assets');
@@ -275,13 +279,15 @@ function runWindowsBootstrapSelfTest() {
     fs.cpSync(path.join(process.cwd(), 'scripts', 'windows-launcher-bootstrap'), path.join(scripts, 'windows-launcher-bootstrap'), { recursive: true });
     fs.copyFileSync(path.join(process.cwd(), 'scripts', 'prepare-windows-launcher-bootstrap.mjs'), path.join(scripts, 'prepare-windows-launcher-bootstrap.mjs'));
     fs.writeFileSync(path.join(assets, 'unrelated.3f2a.mjs'), 'export const unrelated = true;\n');
-    if (windowsBootstrapBundleFailure(root) !== null) throw new Error('valid Windows bootstrap bundle rejected');
+    if (await windowsBootstrapBundleFailure(root) !== null) throw new Error('valid Windows bootstrap bundle rejected');
     const copy = path.join(assets, 'index.3lys9iswpjt-2.mjs');
     fs.copyFileSync(path.join(scripts, 'windows-launcher-bootstrap', 'index.mjs'), copy);
-    if (!windowsBootstrapBundleFailure(root)) throw new Error('loader copied as a server asset passed');
+    if (!await windowsBootstrapBundleFailure(root)) throw new Error('loader copied as a server asset passed');
     fs.rmSync(copy);
     fs.rmSync(path.join(scripts, 'windows-launcher-bootstrap', 'prebuilds', 'win32-arm64', 'system-directory.node'));
-    if (!windowsBootstrapBundleFailure(root)) throw new Error('missing arm64 prebuild passed');
+    if (!await windowsBootstrapBundleFailure(root)) throw new Error('missing arm64 prebuild passed');
+    fs.rmSync(path.join(scripts, 'windows-launcher-bootstrap', 'index.mjs'));
+    if (!await windowsBootstrapBundleFailure(root)) throw new Error('missing packaged loader passed');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }
 
@@ -1098,7 +1104,7 @@ function runPdfRetirementSelfTest() {
 
 
 if (process.argv[2] === '--self-test=windows-bootstrap') {
-  runWindowsBootstrapSelfTest(); process.exit(0);
+  await runWindowsBootstrapSelfTest(); process.exit(0);
 }
 if (process.argv[2] === '--self-test=windows-icu') {
   runWindowsIcuSelfTest(); process.exit(0);
@@ -1202,7 +1208,7 @@ const pdfPageWorkerSmokeFailure = framedPdfPageWorkerSmokeFailure(
   path.join(standaloneDir, 'scripts', ANYDOC_PDF_PAGE_WORKER_FILE),
 );
 if (pdfPageWorkerSmokeFailure) fail(pdfPageWorkerSmokeFailure);
-const windowsBootstrapFailure = windowsBootstrapBundleFailure(standaloneDir);
+const windowsBootstrapFailure = await windowsBootstrapBundleFailure(standaloneDir);
 if (windowsBootstrapFailure) fail(windowsBootstrapFailure);
 
 function assertRealpathInsideStandalone(candidatePath, label) {
