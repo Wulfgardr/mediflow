@@ -71,6 +71,7 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
         'lib/api-v1-clinical-lifecycle.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts',
         'lib/api-error-response.ts', 'lib/archive-generation.ts', 'lib/security/archive-write-request.ts',
         'lib/security/loopback-ingress.mjs', 'lib/checkup-json-body.ts', 'lib/bounded-request-body.ts', 'lib/checkup-write-operation.ts',
+        'lib/clinical-status-transitions.ts', 'lib/prescription-domain.ts',
     ]);
     const auditDouble = {
         listChangedFields: (body, excluded) => Object.keys(body).filter(k => !excluded.includes(k)),

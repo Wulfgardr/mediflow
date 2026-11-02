@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.48.0
+  version: 1.49.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -3647,6 +3647,8 @@ paths:
         the home-base node. Remote hard delete, AI fields, and
         document-derived writes are excluded; soft delete and restore use
         `deletedAt` and `deletionReason`.
+        A `status` change must follow the allowed transition table, otherwise
+        the request returns 409 `status_transition_not_allowed` before any write.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -3696,7 +3698,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/CheckupVersionConflict'
+          $ref: '#/components/responses/CheckupWriteConflict'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -4527,6 +4529,17 @@ components:
                 currentUpdatedAt: null
                 currentState: missing
                 currentSnapshot: null
+    CheckupWriteConflict:
+      description: |
+        Compare-on-write conflict or a status transition outside the allowed
+        table (pending to completed or cancelled, back to pending; never
+        directly between completed and cancelled). Nothing is written.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/CheckupVersionConflictResponse'
+              - $ref: '#/components/schemas/StatusTransitionDeniedResponse'
     CheckupVersionConflict:
       description: |
         Checkup compare-on-write conflict. The payload exposes only PHI-safe

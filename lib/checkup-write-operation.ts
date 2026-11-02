@@ -6,6 +6,7 @@ import { activePatients } from './patient-lifecycle';
 import { writeAuditEventInTransaction, type RequiredAuditContext } from './security/audit';
 import { checkups, patients, patientsToAmbulatories } from './schema';
 import { buildCheckupVersionConflictPayload } from './checkup-concurrency';
+import { isCheckupTransitionAllowed, statusTransitionDenial } from './clinical-status-transitions';
 
 type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 type Mode = 'web' | 'v1' | 'network';
@@ -81,6 +82,9 @@ export function updateCheckupOperation(input: UpdateInput): Result {
 
         if (existing.version >= Number.MAX_SAFE_INTEGER) return { status: 409,
             value: buildCheckupVersionConflictPayload(input.expectedVersion, input.checkupId, existing) as unknown as Record<string, unknown> };
+        if (typeof input.values.status === 'string' && !isCheckupTransitionAllowed(existing.status ?? '', input.values.status)) {
+            return statusTransitionDenial('checkup', existing.status ?? '', input.values.status);
+        }
 
         const changed = tx.update(checkups).set({ ...input.values, version: input.expectedVersion + 1 })
             .where(and(eq(checkups.id, input.checkupId), eq(checkups.patientId, existing.patientId),

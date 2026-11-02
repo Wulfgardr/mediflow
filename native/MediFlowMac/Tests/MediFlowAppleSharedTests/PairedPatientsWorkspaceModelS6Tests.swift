@@ -55,6 +55,58 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
         XCTAssertFalse(canExportOffline)
     }
 
+    /// La decisione WUL-800 sta in docs/domain/clinical-status-transitions.json ed
+    /// è letta anche dai test del server: Swift non può divergere senza che un test lo dica.
+    private func decidedTransitions(_ entity: String) throws -> [String: Set<String>] {
+        var root = URL(fileURLWithPath: #filePath)
+        for _ in 0..<5 { root.deleteLastPathComponent() }
+        let data = try Data(contentsOf: root.appendingPathComponent("docs/domain/clinical-status-transitions.json"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let table = try XCTUnwrap(json[entity] as? [String: [String]])
+        return table.mapValues(Set.init)
+    }
+
+    func testCheckupStatusChoicesFollowTheDecidedTable() throws {
+        let decided = try decidedTransitions("checkup")
+        XCTAssertEqual(Set(decided.keys), Set(PairedCheckupStatus.allCases.map(\.rawValue)))
+        for status in PairedCheckupStatus.allCases {
+            let offered = Set(status.allowedTargets.map(\.rawValue)).subtracting([status.rawValue])
+            XCTAssertEqual(offered, decided[status.rawValue], status.rawValue)
+            XCTAssertTrue(status.allowedTargets.contains(status), "restare nello stesso stato è ammesso")
+        }
+    }
+
+    func testEditingACompletedCheckupNeverOffersCancelled() async {
+        let patient = detail(id: "p1")
+        let model = await makeModel(source: S6MockDataSource(details: ["p1": patient]))
+        await model.configurePairedOnlineForTests(selectedPatient: patient)
+        await model.startEditingCheckup(checkup(id: "c1", status: "completed"))
+        let options = await model.editCheckupStatusOptions
+        XCTAssertEqual(options, [.pending, .completed])
+        await model.cancelEditingCheckup()
+        let resetOptions = await model.editCheckupStatusOptions
+        XCTAssertEqual(resetOptions, PairedCheckupStatus.allCases)
+    }
+
+    func testServicePrescriptionActionsAreStepsInsideTheDecidedTable() async throws {
+        let decided = try decidedTransitions("servicePrescription")
+        let patient = detail(id: "p1")
+        let model = await makeModel(source: S6MockDataSource(details: ["p1": patient]))
+        await model.configurePairedOnlineForTests(selectedPatient: patient)
+        for from in PairedServicePrescriptionStatus.allCases {
+            let prescription = service(id: "rx-\(from.rawValue)", date: Date(), status: from.rawValue, version: 1)
+            let offered: [(Bool, PairedServicePrescriptionStatus)] = [
+                (await model.canBookServicePrescription(prescription), .booked),
+                (await model.canPerformServicePrescription(prescription), .performed),
+                (await model.canReceiveReportServicePrescription(prescription), .reportReceived),
+                (await model.canCancelServicePrescription(prescription), .cancelled),
+            ]
+            for (isOffered, to) in offered where isOffered {
+                XCTAssertTrue(decided[from.rawValue, default: []].contains(to.rawValue), "\(from.rawValue) -> \(to.rawValue)")
+            }
+        }
+    }
+
     func testCreatePayloadsUseWebDefaultWireValues() async {
         let patient = detail(id: "p1")
         let source = S6MockDataSource(details: ["p1": patient])
@@ -973,4 +1025,12 @@ private extension PairedPatientsWorkspaceModelS6Tests {
             )
         )
     }
+}
+
+private func checkup(id: String, status: String) -> HomeBaseCheckupSummary {
+    HomeBaseCheckupSummary(
+        id: id, patientId: "p1", date: Date(timeIntervalSince1970: 1_750_000_000), title: "Controllo sintetico",
+        notes: nil, status: status, source: "manual", version: 1,
+        createdAt: nil, updatedAt: nil, deletedAt: nil, deletionReason: nil
+    )
 }
