@@ -20,6 +20,8 @@ fn wire_command(command: &str) -> Value {
         json!({"command":"prosthetics", "query":query})
     } else if let Some(query) = command.strip_prefix("drugs:") {
         json!({"command":"drugs", "query":query})
+    } else if let Some(id) = command.strip_prefix("booking-receipt-") {
+        json!({"command":"booking-receipt", "commandId":id})
     } else if let Some(id) = command.strip_prefix("receipt-") {
         json!({"command":"receipt", "commandId":id})
     } else if let Some(target) = command.strip_prefix("therapy-") {
@@ -54,6 +56,7 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
             "uncertain",
             "retired",
             "applied",
+            "applied-historical",
             "rejected",
             "closed",
         ]
@@ -73,7 +76,13 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
                 })
                 || !value["receipt"]["outcome"].as_str().is_some_and(|s| {
                     [
-                        "pending", "unknown", "applied", "rejected", "closed", "retired",
+                        "pending",
+                        "unknown",
+                        "applied",
+                        "applied-historical",
+                        "rejected",
+                        "closed",
+                        "retired",
                     ]
                     .contains(&s)
                 })))
@@ -133,7 +142,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["model"]}}},
                 {"name": CONTROL, "description":"Scheda sintetica monouso dopo consenso nella GPUI; payload riservato alla vista.",
-                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","clinical-profile","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","receipt","drugs","prosthetics","agenda"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
+                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","clinical-profile","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","receipt","drugs","prosthetics","agenda","booking","booking-receipt"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
                     "annotations":{"readOnlyHint":false,"destructiveHint":true,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["app"]}}}]}),
             "resources/list" => {
@@ -186,7 +195,10 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                         }
                     }
                 } else if attached
-                    && args["command"] == "receipt"
+                    && matches!(
+                        args["command"].as_str(),
+                        Some("receipt" | "booking-receipt")
+                    )
                     && args.as_object().map(|v| v.len()) == Some(2)
                     && args["commandId"].as_str().is_some_and(|id| {
                         id.len() == 36 && id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
@@ -194,7 +206,11 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                 {
                     match call(
                         &mut socket,
-                        &format!("receipt-{}", args["commandId"].as_str().unwrap()),
+                        &format!(
+                            "{}-{}",
+                            args["command"].as_str().unwrap(),
+                            args["commandId"].as_str().unwrap()
+                        ),
                     ) {
                         Ok(status) => {
                             json!({"content":[{"type":"text","text":"Ricevuta disponibile nella vista."}],"_meta":status})
@@ -210,6 +226,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                             "request",
                             "clinical-profile",
                             "agenda",
+                            "booking",
                             "patient-document",
                             "local-voice",
                             "status",
@@ -260,6 +277,19 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn booking_carries_no_chat_fields_and_each_receipt_keeps_its_route() {
+        let id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+        assert_eq!(wire_command("booking"), json!({"command":"booking"}));
+        assert_eq!(
+            wire_command(&format!("booking-receipt-{id}")),
+            json!({"command":"booking-receipt", "commandId":id})
+        );
+        assert_eq!(
+            wire_command(&format!("receipt-{id}")),
+            json!({"command":"receipt", "commandId":id})
+        );
+    }
     #[test]
     fn catalog_query_is_data_and_cannot_choose_another_command() {
         for (prefix, expected) in [("prosthetics", "prosthetics"), ("drugs", "drugs")] {

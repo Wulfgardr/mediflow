@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-lTz4Dtnlq07OoUkqiYM2HiS9GWueGGWj/KW61Wz/TpM='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
+<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CZVirrdDWtA4pANcqSjEO+3aD7UbG4Ajq3C0rCEZeCk='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
 <style>html{color-scheme:light dark;font:17px system-ui}body{margin:24px;max-width:40rem}h1{font-size:1.4rem;font-weight:500}button{font:inherit;margin:8px 8px 8px 0;padding:10px 16px}p{line-height:1.5}section{overflow-wrap:anywhere;border-top:1px solid GrayText;margin-top:20px}h2{font-size:1.15rem}li{margin-block:12px;line-height:1.5}</style></head>
 <body><h1>MediFlow</h1><p>Conferma l’accesso nella finestra MediFlow già sbloccata. La selezione clinica viene redatta localmente e condivisa dopo la tua revisione nella finestra nativa. Il rilevatore può sbagliare: il medico è responsabile di controllare i byte prima della conferma.</p>
 <p id="status" role="status" aria-live="polite">Collegamento alla chat…</p>
 <details><summary>Funzioni nella chat</summary><table><caption>Ogni azione richiede la verifica dei permessi nella finestra MediFlow.</caption><tbody>
 <tr><th scope="row">Scheda e terapie</th><td>Diagnosi e passi delle note scelti nella finestra MediFlow. Terapie non incluse.</td></tr>
 <tr><th scope="row">Stato terapia</th><td>Selezione, revisione e conferma nella finestra MediFlow.</td></tr>
+<tr><th scope="row">Agenda interna</th><td>Lettura di date e stati. Prenotazione di un controllo con data scelta e PIN nella finestra MediFlow.</td></tr>
 <tr><th scope="row">Nuovo paziente da PDF</th><td>Scelta file, revisione dei campi e conferma nella finestra MediFlow.</td></tr>
 <tr><td>Farmaci</td><td>Ricerca AIFA locale in sola lettura, con conferma nativa. Aggiornamento non verificato.</td></tr>
 <tr><td>Protesica</td><td>Ricerca catalogo locale in sola lettura con conferma nativa. Prescrizioni archivio non collegate.</td></tr>
@@ -14,31 +15,33 @@
 <tr><th scope="row">Altre funzioni e comandi</th><td>Non collegati alla chat. Continua in MediFlow.</td></tr>
 </tbody></table></details>
 <label for="drug-query">Ricerca catalogo: nome, codice o principio attivo</label><input id="drug-query" maxlength="80"><button id="drugs" disabled>Cerca farmaci</button>
-<button id="agenda" disabled>Consulta agenda interna</button><p>Candidati da calendario e prenotazione confermata non disponibili in questa vista.</p>
+<button id="agenda" disabled>Consulta agenda interna</button><p>Candidati da calendario non disponibili in questa vista.</p>
+<div id="booking-controls"><p>Prenotazione di un controllo nell’agenda interna: data, ora e PIN nella finestra MediFlow. La chat non sceglie data né contenuto.</p><button id="booking" disabled>Prenota controllo</button></div>
 <button id="prosthetics" disabled>Cerca protesica e ausili</button>
 <button id="clinical-profile" disabled>Scegli dati clinici</button>
 <section id="card" hidden aria-label="Scheda sintetica"></section>
-<div id="therapy-controls"><p>Cambio di stato della terapia: selezione e conferma nella finestra MediFlow.</p><button id="therapy-active" disabled>Attiva terapia</button><button id="therapy-suspended" disabled>Sospendi terapia</button><button id="therapy-completed" disabled>Completa terapia</button><p>Per recuperare un esito dopo un riavvio, seleziona la stessa cartella in MediFlow e inserisci il riferimento del comando.</p><input id="command-id" aria-label="Riferimento del comando" maxlength="36"><button id="receipt" disabled>Rileggi esito</button><p id="therapy-receipt"></p></div>
+<div id="therapy-controls"><p>Cambio di stato della terapia: selezione e conferma nella finestra MediFlow.</p><button id="therapy-active" disabled>Attiva terapia</button><button id="therapy-suspended" disabled>Sospendi terapia</button><button id="therapy-completed" disabled>Completa terapia</button><p>Per recuperare un esito dopo un riavvio, di una terapia o di una prenotazione, seleziona la stessa cartella in MediFlow e inserisci il riferimento del comando. MediFlow lo rilegge sulla funzione che lo ha emesso.</p><input id="command-id" aria-label="Riferimento del comando" maxlength="36"><button id="receipt" disabled>Rileggi esito</button><button id="booking-receipt" disabled>Rileggi esito prenotazione</button><p id="therapy-receipt"></p></div>
 <p>Per creare un paziente, scegli il PDF nella finestra MediFlow. Gli allegati del compositore restano nella chat: non vengono scaricati né usati per creare la cartella.</p><button id="patient-document" disabled>Nuovo paziente da PDF</button>
 <p>Puoi dettare nella finestra MediFlow, rivedere il testo e preparare una voce di diario. Audio e identificativi restano nella finestra nativa.</p><button id="local-voice" disabled>Detta in MediFlow</button>
 <button id="request" disabled>Richiedi accesso</button><button id="consume" disabled>Mostra scheda monouso</button><button id="revoke" disabled>Revoca</button>
 <script>
 (() => {
     let clinicalMode = false;
-    let sequence = 0, ready = false, started = false, terminal = false, generation = 0, timer, expiry, therapyMode = false, documentMode = false, voiceMode = false, drugMode = false, prostheticsMode = false, agendaMode = false;
+    let sequence = 0, ready = false, started = false, terminal = false, generation = 0, timer, expiry, therapyMode = false, documentMode = false, voiceMode = false, drugMode = false, prostheticsMode = false, agendaMode = false, bookingMode = false;
+    const bookingLabels = { requested: 'Richiesta inviata. Scegli data e ora nella finestra MediFlow.', challenge: 'Scegli data e ora e conferma con PIN nella finestra MediFlow entro 30 secondi.', retired: 'Ritiro confermato. Nessun controllo prenotato.', applied: 'Controllo prenotato e auditato. Il ritiro non annulla la prenotazione.', 'applied-historical': 'Controllo presente in agenda, da un archivio ripristinato. La ricevuta di audit originale non è disponibile qui. Non ripetere la prenotazione.', rejected: 'Prenotazione respinta: l’agenda è cambiata prima della conferma. Nessun controllo prenotato.' };
     const pending = new Map(), element = id => document.getElementById(id);
-    const labels = { 'voice-opened': 'Continua in MediFlow: consenti la cattura locale, rivedi il testo e prepara la bozza. Nessun audio o testo viene restituito alla chat.', 'document-opened': 'Continua nella finestra MediFlow: scegli il PDF, rivedi i dati e conferma con PIN. L’apertura non conferma la creazione.', selecting: 'Scegli diagnosi e passi nella finestra MediFlow.', preparing: 'Redazione locale della scheda sintetica…', requested: 'Richiesta inviata alla finestra MediFlow.', challenge: 'Conferma nella finestra MediFlow entro 30 secondi.', approving: 'Conferma nativa in corso…', consuming: 'Verifica dell’accesso in corso…', approved: 'Accesso monouso autorizzato.', consumed: 'Scheda condivisa. Autorizzazione consumata.', uncertain: 'Esito da verificare. Rileggi nella finestra MediFlow; non ripetere la scrittura.', retired: 'Ritiro confermato. Nessuna modifica alla terapia.', applied: 'Modifica registrata e auditata. Il ritiro non annulla il salvataggio.', rejected: 'Scrittura respinta. Nessuna modifica.', closed: 'Comando chiuso senza modifica.', withdrawn: 'Accesso ritirato. Apri una nuova vista per richiederlo di nuovo.' };
+    const labels = { 'voice-opened': 'Continua in MediFlow: consenti la cattura locale, rivedi il testo e prepara la bozza. Nessun audio o testo viene restituito alla chat.', 'document-opened': 'Continua nella finestra MediFlow: scegli il PDF, rivedi i dati e conferma con PIN. L’apertura non conferma la creazione.', selecting: 'Scegli diagnosi e passi nella finestra MediFlow.', preparing: 'Redazione locale della scheda sintetica…', requested: 'Richiesta inviata alla finestra MediFlow.', challenge: 'Conferma nella finestra MediFlow entro 30 secondi.', approving: 'Conferma nativa in corso…', consuming: 'Verifica dell’accesso in corso…', approved: 'Accesso monouso autorizzato.', consumed: 'Scheda condivisa. Autorizzazione consumata.', uncertain: 'Esito da verificare. Rileggi nella finestra MediFlow; non ripetere la scrittura.', retired: 'Ritiro confermato. Nessuna modifica alla terapia.', applied: 'Modifica registrata e auditata. Il ritiro non annulla il salvataggio.', 'applied-historical': 'Presente nell’archivio, ripristinato da un altro archivio. La ricevuta di audit originale non è disponibile qui. Non ripetere la scrittura.', rejected: 'Scrittura respinta. Nessuna modifica.', closed: 'Comando chiuso senza modifica.', withdrawn: 'Accesso ritirato. Apri una nuova vista per richiederlo di nuovo.' };
     function rpc(method, params) { return new Promise((resolve, reject) => { const id = ++sequence; const timeout = setTimeout(() => { pending.delete(id); reject(new Error('timeout')); }, 10000); pending.set(id, { resolve, reject, timeout }); window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*'); }); }
-    function stop() { element('drug-query').disabled = true; terminal = true; generation++; clearTimeout(timer); for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document', 'request', 'consume', 'revoke', 'therapy-active', 'therapy-suspended', 'therapy-completed', 'receipt'])
+    function stop() { element('drug-query').disabled = true; terminal = true; generation++; clearTimeout(timer); for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document', 'request', 'consume', 'revoke', 'therapy-active', 'therapy-suspended', 'therapy-completed', 'receipt','booking','booking-receipt'])
         element(id).disabled = true; }
     function show(state) {
         if (state !== 'consumed' || therapyMode || documentMode) { element('card').replaceChildren(); element('card').hidden = true; clearTimeout(expiry); }
-        element('status').textContent = agendaMode && state === 'consumed' ? 'Agenda interna consultata. Autorizzazione consumata.' : agendaMode && state === 'preparing' ? 'Lettura dell’agenda interna in corso…' : drugMode && state === 'consumed' ? 'Risultati condivisi nella vista. Autorizzazione consumata.' : drugMode && state === 'withdrawn' ? 'Ricerca non disponibile o accesso ritirato. Apri una nuova vista e verifica MediFlow.' : labels[state] || labels.withdrawn;
+        element('status').textContent = bookingMode && Object.hasOwn(bookingLabels, state) ? bookingLabels[state] : agendaMode && state === 'consumed' ? 'Agenda interna consultata. Autorizzazione consumata.' : agendaMode && state === 'preparing' ? 'Lettura dell’agenda interna in corso…' : drugMode && state === 'consumed' ? 'Risultati condivisi nella vista. Autorizzazione consumata.' : drugMode && state === 'withdrawn' ? 'Ricerca non disponibile o accesso ritirato. Apri una nuova vista e verifica MediFlow.' : labels[state] || labels.withdrawn;
         element('request').disabled = true;
         element('consume').disabled = state !== 'approved' || therapyMode;
         element('revoke').disabled = state === 'withdrawn';
         element('revoke').textContent = state === 'uncertain' ? 'Rileggi esito e completa il ritiro' : 'Revoca';
-        if (['withdrawn','retired','applied','rejected','closed'].includes(state)) stop();
+        if (['withdrawn','retired','applied','applied-historical','rejected','closed'].includes(state)) stop();
     }
     function checkedDrugs(payload) {
         if (typeof payload !== 'string' || payload.length > 60000) throw new Error('denied');
@@ -181,7 +184,7 @@
         const target = element('card'); target.replaceChildren(); target.setAttribute('aria-label', 'Agenda interna');
         const add = (tag, text) => { const node = document.createElement(tag); node.textContent = text; target.append(node); return node; };
         add('h2', 'Agenda interna');
-        add('p', 'Controlli interni in sola lettura. Nessuna prenotazione confermata e nessun candidato da calendario. Nomi, titoli e note restano in MediFlow.');
+        add('p', 'Controlli interni in sola lettura. La lettura non prenota nulla e non include candidati da calendario. Nomi, titoli e note restano in MediFlow.');
         const states = { pending: 'Da svolgere', completed: 'Completato', cancelled: 'Annullato' };
         value.rows.forEach((row, i) => {
             add('p', row.date + ' · ' + states[row.status]);
@@ -219,19 +222,19 @@
             }
             return;
         }
-        if (value?._meta?.receipt || ['uncertain','applied','retired','rejected','closed'].includes(state)) { therapyMode = true; started = true; }
+        if (value?._meta?.receipt || ['uncertain','applied','applied-historical','retired','rejected','closed'].includes(state)) { therapyMode = true; started = true; }
         if (!Object.hasOwn(labels, state)) {
             show(therapyMode ? 'uncertain' : 'withdrawn');
             return;
         }
         if (therapyMode && value?._meta?.receipt) {
             const receipt = value._meta.receipt;
-            if (!/^[0-9a-f-]{36}$/.test(receipt.commandId) || !['pending','unknown','applied','rejected','closed','retired'].includes(receipt.outcome)) { show(therapyMode ? 'uncertain' : 'withdrawn'); return; }
+            if (!/^[0-9a-f-]{36}$/.test(receipt.commandId) || !['pending','unknown','applied','applied-historical','rejected','closed','retired'].includes(receipt.outcome)) { show(therapyMode ? 'uncertain' : 'withdrawn'); return; }
             if (receipt.outcome === 'unknown') state = 'uncertain';
-            else if (['applied','retired','rejected','closed'].includes(receipt.outcome)) state = receipt.outcome;
-            else if (['withdrawn','applied','retired','rejected','closed'].includes(state)) state = 'uncertain';
+            else if (['applied','applied-historical','retired','rejected','closed'].includes(receipt.outcome)) state = receipt.outcome;
+            else if (['withdrawn','applied','applied-historical','retired','rejected','closed'].includes(state)) state = 'uncertain';
             element('command-id').value = receipt.commandId;
-            const outcomes = { retired: 'Ritiro confermato: nessuna modifica.', pending: 'Anteprima pronta. Conferma soltanto nella finestra MediFlow.', unknown: 'Esito ignoto: rileggi la ricevuta, senza ripetere la scrittura.', applied: 'Modifica registrata e auditata.', rejected: 'Conflitto di versione: nessuna modifica.', closed: 'Comando chiuso senza modifica.' };
+            const outcomes = bookingMode ? { retired: 'Ritiro confermato: nessun controllo prenotato.', pending: 'Anteprima pronta. Conferma soltanto nella finestra MediFlow.', unknown: 'Esito ignoto: rileggi la ricevuta, senza ripetere la prenotazione.', applied: 'Controllo prenotato e auditato.', 'applied-historical': 'Controllo presente in agenda, da un archivio ripristinato: ricevuta di audit originale non disponibile.', rejected: 'Conflitto di versione dell’agenda: nessun controllo prenotato.', closed: 'Comando chiuso senza modifica.' } : { retired: 'Ritiro confermato: nessuna modifica.', pending: 'Anteprima pronta. Conferma soltanto nella finestra MediFlow.', unknown: 'Esito ignoto: rileggi la ricevuta, senza ripetere la scrittura.', applied: 'Modifica registrata e auditata.', 'applied-historical': 'Presente nell’archivio, da un archivio ripristinato: ricevuta di audit originale non disponibile.', rejected: 'Conflitto di versione: nessuna modifica.', closed: 'Comando chiuso senza modifica.' };
             element('therapy-receipt').textContent = outcomes[receipt.outcome];
         }
         if (state === 'consumed' && !therapyMode) {
@@ -276,7 +279,7 @@
     element('agenda').onclick = () => {
         if (!ready || started || terminal) return;
         agendaMode = true; started = true;
-        for (const id of ['agenda','prosthetics','drugs','local-voice','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt']) element(id).disabled = true;
+        for (const id of ['agenda','prosthetics','drugs','local-voice','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
         command('agenda');
     };
     for (const catalog of ['drugs','prosthetics']) element(catalog).onclick = () => {
@@ -284,42 +287,55 @@
         if (!ready || started || terminal || query.length < 2 || query.length > 80 || /[\u0000-\u001f\u007f]/u.test(query)) return;
         element('drug-query').value = query; element('drug-query').disabled = true;
         drugMode = true; prostheticsMode = catalog === 'prosthetics'; started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
         command(catalog, undefined, query);
     };
     element('local-voice').onclick = () => {
         if (!ready || started || terminal) return;
         voiceMode = true; started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','request','consume']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request','consume']) element(id).disabled = true;
         command('local-voice');
     };
     element('patient-document').onclick = () => {
         if (!ready || started || terminal) return;
         documentMode = true; started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','request','consume']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request','consume']) element(id).disabled = true;
         command('patient-document');
     };
     element('clinical-profile').onclick = () => { if (!ready || started || terminal) return;
         clinicalMode = true; started = true;
-        for (const id of ['clinical-profile','prosthetics','drugs','local-voice','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt']) element(id).disabled = true;
+        for (const id of ['clinical-profile','prosthetics','drugs','local-voice','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
         command('clinical-profile');
     };
     element('request').onclick = () => { if (ready && !terminal) {
         started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
         command('request');
     } };
     for (const target of ['active','suspended','completed']) element('therapy-' + target).onclick = () => {
         if (!ready || started || terminal) return;
         therapyMode = true; started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','request']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(id).disabled = true;
         command('therapy-' + target);
+    };
+    element('booking').onclick = () => {
+        if (!ready || started || terminal) return;
+        therapyMode = true; bookingMode = true; started = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(id).disabled = true;
+        command('booking');
+    };
+    element('booking-receipt').onclick = () => {
+        const id = element('command-id').value;
+        if (!ready || started || terminal || !/^[0-9a-f-]{36}$/.test(id)) return;
+        therapyMode = true; bookingMode = true; started = true;
+        for (const key of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(key).disabled = true;
+        command('booking-receipt', id);
     };
     element('receipt').onclick = () => {
         const id = element('command-id').value;
         if (!ready || started || terminal || !/^[0-9a-f-]{36}$/.test(id)) return;
         therapyMode = true; started = true;
-        for (const key of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','request']) element(key).disabled = true;
+        for (const key of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(key).disabled = true;
         command('receipt', id);
     };
     element('consume').onclick = () => { clearTimeout(timer); element('consume').disabled = true; command('consume'); };
@@ -332,7 +348,7 @@
         ready = true;
         if (attach?._meta?.status === 'ready') {
             element('status').textContent = 'MediFlow richiede una conferma nella finestra nativa.';
-            for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt']) element(id).disabled = false;
+            for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = false;
         } else {
             therapyMode = true; started = true;
             applyResult(attach, 'attach');

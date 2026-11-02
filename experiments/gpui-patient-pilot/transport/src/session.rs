@@ -1,5 +1,5 @@
 pub mod patient_document;
-use crate::{ChatWriteOutcome, ChatWriteResolution};
+use crate::{ChatWriteKind, ChatWriteOutcome, ChatWriteResolution};
 use crate::{
     account_profile::{
         ACCOUNT_PROFILE_LIMIT, ACCOUNT_PROFILE_PATH, AccountProfileRead, AccountProfileSnapshot,
@@ -75,49 +75,99 @@ impl AmbulatoryCommandContext {
         self.context.cancel();
     }
 }
+/// Agenda seen in the native booking window: upcoming (RFC 3339 date, state) rows, nearest first,
+/// and the opaque revision of the whole set.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChatBookingView {
+    pub revision: String,
+    pub rows: Vec<(String, String)>,
+    /// Upcoming checkups beyond the listed ones; the revision still covers the whole set.
+    pub omitted: u64,
+    pub view_id: String,
+}
 #[derive(Clone)]
 pub struct ChatWriteRecovery {
     session: RuntimeSession,
     scope: String,
     command_id: String,
+    /// The owning route of a typed reference, or the granted candidates of an untyped one.
+    kinds: Vec<ChatWriteKind>,
 }
 impl ChatWriteRecovery {
     /// Idempotently retires the command or reports its already committed outcome.
     /// Receipt reading and retirement survive selection cancellation; neither can execute.
     pub fn reconcile(&self) -> ChatWriteResolution {
         self.confirmed()
-            .map(ChatWriteResolution::Confirmed)
+            .map(|(_, outcome)| ChatWriteResolution::Confirmed(outcome))
             .unwrap_or(ChatWriteResolution::Uncertain)
     }
-    fn confirmed(&self) -> Result<ChatWriteOutcome> {
-        if let Ok(receipt) = self.session.request(
+    /// Same as `reconcile`, also naming the route that answered with a terminal outcome.
+    pub fn reconcile_kind(&self) -> (Option<ChatWriteKind>, ChatWriteResolution) {
+        match self.confirmed() {
+            Ok((kind, outcome)) => (kind, ChatWriteResolution::Confirmed(outcome)),
+            Err(_) => (None, ChatWriteResolution::Uncertain),
+        }
+    }
+    fn call(&self, kind: ChatWriteKind, operation: &str, limit: usize) -> Result<Value> {
+        self.session.request(
             Method::POST,
-            &["api", "auth", "native", "therapy-status"],
+            &["api", "auth", "native", kind.wire()],
             &[],
             Some(&self.scope),
-            Some(&json!({"operation":"receipt", "commandId":self.command_id})),
+            Some(&json!({"operation":operation, "commandId":self.command_id})),
             true,
-            crate::http::JSON_LIMIT,
-        ) {
-            match receipt["outcome"].as_str() {
-                Some("terminal") => return Self::outcome(&receipt["receipt"]),
-                Some("unknown") => {}
-                _ => return Err(RuntimeError::InvalidResponse),
+            limit,
+        )
+    }
+    fn confirmed(&self) -> Result<(Option<ChatWriteKind>, ChatWriteOutcome)> {
+        // An untyped reference probes several routes. A 403 on one of them is skipped only when another
+        // route actually finds the command; if the others answer "no command", the outcome stays uncertain,
+        // because the refusing route may own it.
+        let probing = self.kinds.len() > 1;
+        let mut refused = false;
+        for &kind in &self.kinds {
+            if let Ok(receipt) = self.call(kind, "receipt", crate::http::JSON_LIMIT) {
+                match receipt["outcome"].as_str() {
+                    Some("terminal") => {
+                        let outcome = match Self::outcome(&receipt["receipt"])? {
+                            ChatWriteOutcome::Applied
+                                if receipt["receipt"]["historical"] == true =>
+                            {
+                                ChatWriteOutcome::AppliedHistorical
+                            }
+                            outcome => outcome,
+                        };
+                        return Ok((Some(kind), outcome));
+                    }
+                    Some("unknown") => {}
+                    _ => return Err(RuntimeError::InvalidResponse),
+                }
             }
         }
-        let result = self.session.request(
-            Method::POST,
-            &["api", "auth", "native", "therapy-status"],
-            &[],
-            Some(&self.scope),
-            Some(&json!({"operation":"revoke", "commandId":self.command_id})),
-            true,
-            4096,
-        )?;
-        if result.as_object().is_none_or(|o| o.len() != 1) {
-            return Err(RuntimeError::InvalidResponse);
+        let mut admitted = None;
+        for &kind in &self.kinds {
+            let result = match self.call(kind, "revoke", 4096) {
+                Err(error) if probing && error.status_code() == Some(403) => {
+                    refused = true;
+                    continue;
+                }
+                other => other?,
+            };
+            if result.as_object().is_none_or(|o| o.len() != 1) {
+                return Err(RuntimeError::InvalidResponse);
+            }
+            let outcome = Self::outcome(&result)?;
+            if outcome != ChatWriteOutcome::Retired {
+                return Ok((Some(kind), outcome));
+            }
+            admitted.get_or_insert(kind);
         }
-        Self::outcome(&result)
+        match admitted {
+            Some(_) if refused => Err(RuntimeError::Forbidden),
+            Some(kind) if !probing => Ok((Some(kind), ChatWriteOutcome::Retired)),
+            Some(_) => Ok((None, ChatWriteOutcome::Retired)),
+            None => Err(RuntimeError::Forbidden),
+        }
     }
     fn outcome(result: &Value) -> Result<ChatWriteOutcome> {
         match result["outcome"].as_str() {
@@ -651,6 +701,42 @@ impl RuntimeSession {
         scope: &str,
         command_id: &str,
     ) -> Result<ChatWriteRecovery> {
+        self.chat_write_recovery(scope, command_id, vec![ChatWriteKind::TherapyStatus])
+    }
+
+    /// Recovery of a stored reference after a restart. A typed reference is read only on its
+    /// own route. An untyped one (stored before the kind was recorded) tries the routes the
+    /// discovery projection grants; with no hint at all, the therapy route, the only kind that
+    /// existed before typed references.
+    pub fn recover_chat_write_command(
+        &self,
+        scope: &str,
+        command_id: &str,
+        kind: Option<ChatWriteKind>,
+    ) -> Result<ChatWriteRecovery> {
+        let kinds = match kind {
+            Some(kind) => vec![kind],
+            None => {
+                let granted: Vec<_> = ChatWriteKind::ALL
+                    .into_iter()
+                    .filter(|kind| self.can_write(kind.capability()))
+                    .collect();
+                if granted.is_empty() {
+                    vec![ChatWriteKind::TherapyStatus]
+                } else {
+                    granted
+                }
+            }
+        };
+        self.chat_write_recovery(scope, command_id, kinds)
+    }
+
+    fn chat_write_recovery(
+        &self,
+        scope: &str,
+        command_id: &str,
+        kinds: Vec<ChatWriteKind>,
+    ) -> Result<ChatWriteRecovery> {
         validate_scope_id(scope)?;
         if command_id.len() != 36
             || !command_id.bytes().enumerate().all(|(i, b)| {
@@ -670,14 +756,121 @@ impl RuntimeSession {
             },
             scope: scope.into(),
             command_id: command_id.into(),
+            kinds,
         })
     }
 
     pub fn chat_therapy_request(&self, context: &ChatAccessContext, body: &Value) -> Result<Value> {
+        self.chat_write_request(context, ChatWriteKind::TherapyStatus, body)
+    }
+
+    pub fn chat_booking_request(&self, context: &ChatAccessContext, body: &Value) -> Result<Value> {
+        self.chat_write_request(context, ChatWriteKind::CheckupBooking, body)
+    }
+
+    /// Opens the native booking view. The agenda rows (dates and states only) are read in the same
+    /// host transaction as the opaque revision the booking must still match, so the CAS protects
+    /// exactly what the physician sees.
+    pub fn chat_booking_open(&self, context: &ChatAccessContext) -> Result<ChatBookingView> {
+        self.revalidate_chat_access_context(context)?;
+        let view = self.chat_booking_request(context, &json!({"operation":"open", "patientId":context.patient, "selectionEpoch":context.selection_epoch}))?;
+        let object = view.as_object().ok_or(RuntimeError::InvalidResponse)?;
+        let revision = view["agendaRevision"].as_str().filter(|r| {
+            r.len() == 64
+                && r.bytes()
+                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        });
+        let rows = view["rows"].as_array().filter(|rows| rows.len() <= 20);
+        let (Some(view_id), Some(revision), Some(rows), Some(omitted), 4) = (
+            view["viewId"].as_str(),
+            revision,
+            rows,
+            view["omitted"].as_u64(),
+            object.len(),
+        ) else {
+            return Err(RuntimeError::InvalidResponse);
+        };
+        let rows = rows
+            .iter()
+            .map(|row| {
+                let date = row["date"]
+                    .as_str()
+                    .filter(|d| chrono::DateTime::parse_from_rfc3339(d).is_ok());
+                let status = row["status"]
+                    .as_str()
+                    .filter(|s| ["pending", "completed", "cancelled"].contains(s));
+                match (date, status, row.as_object().map(|o| o.len())) {
+                    (Some(date), Some(status), Some(2)) => Ok((date.to_owned(), status.to_owned())),
+                    _ => Err(RuntimeError::InvalidResponse),
+                }
+            })
+            .collect::<Result<_>>()?;
+        Ok(ChatBookingView {
+            revision: revision.to_owned(),
+            rows,
+            omitted,
+            view_id: view_id.to_owned(),
+        })
+    }
+
+    /// `date` is the RFC 3339 instant the physician typed and saw in the native window.
+    pub fn preview_chat_booking(
+        &self,
+        context: &ChatAccessContext,
+        revision: &str,
+        date: &str,
+        view_id: &str,
+    ) -> Result<String> {
+        self.revalidate_chat_access_context(context)?;
+        if chrono::DateTime::parse_from_rfc3339(date).is_err() {
+            return Err(RuntimeError::InvalidInput);
+        }
+        let command_id = crate::http::operation_uuid()?;
+        let body = json!({"operation":"preview", "selectionEpoch":context.selection_epoch, "viewId":view_id,
+            "command":{"protocol":"checkup.booking.v1", "commandId":command_id,
+                "archiveGeneration":self.inner.user.archive_generation, "patientId":context.patient,
+                "expectedAgendaRevision":revision, "date":date, "title":"Controllo"}});
+        let result = self.chat_booking_request(context, &body)?;
+        if result != json!({"commandId":command_id, "status":"preview"}) {
+            return Err(RuntimeError::Forbidden);
+        }
+        Ok(command_id)
+    }
+
+    /// Card reread of a reference under the bound chat context; same route choice as a restart.
+    pub fn chat_write_recovery_for(
+        &self,
+        context: &ChatAccessContext,
+        command_id: &str,
+        kind: Option<ChatWriteKind>,
+    ) -> Result<ChatWriteRecovery> {
+        self.check_chat_access_context(context)?;
+        self.recover_chat_write_command(&context.scope, command_id, kind)
+    }
+
+    pub fn chat_booking_recovery(
+        &self,
+        context: &ChatAccessContext,
+        command_id: &str,
+    ) -> Result<ChatWriteRecovery> {
+        self.check_chat_access_context(context)?;
+        self.chat_write_recovery(
+            &context.scope,
+            command_id,
+            vec![ChatWriteKind::CheckupBooking],
+        )
+    }
+
+    fn chat_write_request(
+        &self,
+        context: &ChatAccessContext,
+        kind: ChatWriteKind,
+        body: &Value,
+    ) -> Result<Value> {
         self.check_chat_access_context(context)?;
         let result = self.request_with_profile_intent(
             Method::POST,
-            &["api", "auth", "native", "therapy-status"],
+            &["api", "auth", "native", kind.wire()],
             &[],
             Some(&context.scope),
             Some(body),
