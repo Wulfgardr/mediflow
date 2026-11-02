@@ -48,7 +48,9 @@ const ALLOWLIST = [
             "Il messaggio proviene da replaceAifaCatalog ed e' una diagnosi di dominio sull'import "
             + "(file malformato, colonne mancanti), non il testo di un'eccezione di sistema. Rimuoverlo "
             + 'lascerebbe l\'operatore senza indicazione su un import da centinaia di righe. Status 400, '
-            + 'non 500: e\' un rifiuto, non un guasto.',
+            + 'non 500: e\' un rifiuto, non un guasto. Lo stesso vale per i rifiuti dello svuotamento '
+            + 'amministrativo (AifaUpdateError con testo autoriale su conferma e versione attesa); '
+            + 'il guasto imprevisto restituisce un messaggio fisso.',
     },
     {
         file: 'app/api/siss/context/route.ts',
