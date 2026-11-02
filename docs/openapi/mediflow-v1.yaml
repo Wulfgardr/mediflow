@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.51.0
+  version: 1.52.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -71,6 +71,8 @@ tags:
     description: Stable patient read contract plus compare-on-write patient mutations shared across web/native flows.
   - name: Network
     description: Home-base network contract for explicit pairing, capability discovery, and PHI-safe session gating.
+  - name: Catalogs
+    description: Host-local reference catalog commands that require administrator authority and write their audit in the same transaction.
 paths:
   /api/v1/network/analytics/demographics:
     get:
@@ -416,6 +418,75 @@ paths:
           description: Catalog, preference revision, command or binding conflict. Reread before a new command.
         '503':
           description: Configuration unavailable or corrupt; no fallback.
+  /api/v1/drugs:
+    # GET stays outside the stable spec (contract-policy.json, WUL-40).
+    post:
+      tags:
+        - Catalogs
+      operationId: replaceLegacyDrugCatalog
+      summary: Replace the whole drug catalog with unverified legacy rows (administrative command)
+      description: |
+        Replaces every row of the AIFA drug catalog with the given rows and
+        removes the provenance manifest, so the catalog becomes `unverified`
+        (WUL-802, ADR 0125). It needs the same authority as the administrative
+        clear on `DELETE /api/drugs`: the local API token, a web administrator
+        session (role and username re-read inside the transaction), the archive
+        generation header, the `snapshot` read from `GET /api/drugs?count=1`
+        before the change, and the versioned confirmation
+        `mediflow.aifa-catalog-legacy-replace.v1`. Rows, manifest removal and
+        one `reference_data.aifa.updated` audit event with
+        `aifaCatalog.mode = legacy-replace` are written in one immediate
+        SQLite transaction: if the audit write fails, the catalog stays as it
+        was. Until 1.51.0 a bare array or a single object replaced the catalog
+        with the token alone and no audit; that shape now returns 400
+        `AIFA_LEGACY_REPLACE_COMMAND_REQUIRED` and changes nothing. Every item
+        must carry `aic` and `name`; one invalid item refuses the whole command.
+      security:
+        - bearerAuth: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AifaLegacyReplaceCommand'
+      responses:
+        '200':
+          description: Catalog replaced; the receipt names the audit event written in the same transaction.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AifaLegacyReplaceResponse'
+        '400':
+          description: Legacy body shape, invalid item, malformed snapshot or missing confirmation; nothing written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AifaCatalogCommandError'
+        '401':
+          description: Missing local API token or missing operator session; nothing written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AifaCatalogCommandError'
+        '403':
+          description: The session is not a web administrator (`AIFA_LEGACY_REPLACE_ADMIN_REQUIRED`) or the request is not local; nothing written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AifaCatalogCommandError'
+        '409':
+          description: The catalog changed after the snapshot was read (`AIFA_CATALOG_CHANGED`), another AIFA operation holds the lock, or the archive was replaced (`ARCHIVE_REPLACED`); nothing written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AifaCatalogCommandError'
+        '500':
+          description: The write or its audit failed; the transaction is rolled back and the catalog is unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AifaCatalogCommandError'
   /api/v1/patients:
     # Existing POST remains outside the stable spec; patient body contract: ADR 0139.
     get:
@@ -5527,6 +5598,124 @@ components:
         command: {$ref: '#/components/schemas/NativeFunctionCommand'}
         proposed: {$ref: '#/components/schemas/NativeFunctionPreferences'}
         writesPerformed: {type: integer, enum: [0]}
+    AifaLegacyReplaceCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - expectedSnapshot
+        - confirmation
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - aic
+              - name
+            properties:
+              aic:
+                type: string
+              name:
+                type: string
+              activePrinciple:
+                type: [string, 'null']
+              company:
+                type: [string, 'null']
+              packaging:
+                type: [string, 'null']
+              class:
+                type: [string, 'null']
+              price:
+                type: [number, 'null']
+                description: Stored as given, rounded to an integer; no AIFA cents conversion.
+              atc:
+                type: [string, 'null']
+        expectedSnapshot:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+          description: The `snapshot` returned by `GET /api/drugs?count=1` before the change.
+        confirmation:
+          type: string
+          const: mediflow.aifa-catalog-legacy-replace.v1
+    AifaLegacyReplaceResponse:
+      type: object
+      required:
+        - success
+        - count
+        - state
+        - manifest
+        - snapshot
+        - receipt
+      properties:
+        success:
+          type: boolean
+          const: true
+        count:
+          type: integer
+        state:
+          type: string
+          const: unverified
+        manifest:
+          type: 'null'
+        snapshot:
+          type: string
+        receipt:
+          type: object
+          required:
+            - operation
+            - confirmation
+            - auditEventId
+            - replacedAt
+            - previousSnapshot
+            - previousCount
+            - previousState
+            - previousManifestSha256
+            - count
+            - snapshot
+          properties:
+            operation:
+              type: string
+              const: aifa-catalog-legacy-replace
+            confirmation:
+              type: string
+              const: mediflow.aifa-catalog-legacy-replace.v1
+            auditEventId:
+              type: string
+            replacedAt:
+              type: string
+              format: date-time
+            previousSnapshot:
+              type: string
+            previousCount:
+              type: integer
+            previousState:
+              type: string
+              enum: [ready, unverified, not-imported]
+            previousManifestSha256:
+              type: [string, 'null']
+            count:
+              type: integer
+            snapshot:
+              type: string
+    AifaCatalogCommandError:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum:
+            - AIFA_LEGACY_REPLACE_COMMAND_REQUIRED
+            - AIFA_LEGACY_REPLACE_ADMIN_REQUIRED
+            - AIFA_CATALOG_CHANGED
+            - ARCHIVE_REPLACED
+        confirmation:
+          type: string
+          description: Present with `AIFA_LEGACY_REPLACE_COMMAND_REQUIRED`; the confirmation value the command expects.
     ErrorResponse:
       type: object
       additionalProperties: false

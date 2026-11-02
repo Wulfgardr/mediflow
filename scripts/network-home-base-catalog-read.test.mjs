@@ -34,15 +34,15 @@ after(() => {
 test('home-base catalog read is paired, capability-gated and response-compatible', async () => {
     await assertServerReady();
     await enableHomeBaseMode();
-    await seedCatalogs();
-
-    const catalogClient = await pairClient([CATALOG_READ_CAPABILITY], 'Desk iPad catalog');
-    const noCatalogClient = await pairClient(['network.replica.readonly-patients'], 'Desk iPad patients-only');
 
     const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(login.response.status, 200);
     const cookieHeader = login.cookieHeader;
     assert.ok(cookieHeader);
+    await seedCatalogs(login.webHeaders);
+
+    const catalogClient = await pairClient([CATALOG_READ_CAPABILITY], 'Desk iPad catalog');
+    const noCatalogClient = await pairClient(['network.replica.readonly-patients'], 'Desk iPad patients-only');
 
     const catalogHeaders = pairedHeaders(catalogClient);
 
@@ -179,13 +179,28 @@ async function enableHomeBaseMode() {
     assert.equal(clinicName.response.status, 200);
 }
 
-async function seedCatalogs() {
-    const drugs = await request('POST', '/api/v1/drugs', {
-        headers: localApiHeaders(),
+async function seedCatalogs(webHeaders) {
+    // WUL-802: the legacy replacement is an administrative command (token, admin session, snapshot, confirmation).
+    const legacyBody = await request('POST', '/api/v1/drugs', {
+        headers: { ...localApiHeaders(), ...webHeaders },
         body: [TERMINOLOGY_PARITY.webDrug],
+    });
+    assert.equal(legacyBody.response.status, 400);
+    assert.equal(legacyBody.json?.code, 'AIFA_LEGACY_REPLACE_COMMAND_REQUIRED');
+
+    const status = await request('GET', '/api/drugs?count=1', { headers: { Cookie: webHeaders.Cookie } });
+    assert.equal(status.response.status, 200);
+    const drugs = await request('POST', '/api/v1/drugs', {
+        headers: { ...localApiHeaders(), ...webHeaders },
+        body: {
+            items: [TERMINOLOGY_PARITY.webDrug],
+            expectedSnapshot: status.json?.snapshot,
+            confirmation: legacyBody.json?.confirmation,
+        },
     });
     assert.equal(drugs.response.status, 200);
     assert.equal(drugs.json?.success, true);
+    assert.equal(typeof drugs.json?.receipt?.auditEventId, 'string');
 
     const exemptions = await request('POST', '/api/v1/exemptions', {
         headers: localApiHeaders(),
