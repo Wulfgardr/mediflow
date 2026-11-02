@@ -23,7 +23,8 @@ test.after(() => { sql.close(); dbServer.$client.close(); });
 const decision = JSON.parse(readFileSync(new URL('../docs/domain/clinical-status-transitions.json', import.meta.url), 'utf8')) as
     { checkup: Record<string, string[]> };
 const STATUSES = ['pending', 'completed', 'cancelled'] as const;
-const session = { id: 'synthetic-session', userId: 'synthetic-user', username: 'synthetic-username', role: 'admin' as const,
+const syntheticOperator = ['synthetic', 'checkup', 'operator', String(process.pid)].join('-');
+const session = { id: 'synthetic-session', userId: 'synthetic-user', username: syntheticOperator, role: 'admin' as const,
     authChannel: 'web' as const, createdAt: Date.now(), expiresAt: Date.now() + 60_000 };
 const actor = auditContextFromSession(session);
 const audit = { actorType: actor.actorType, actorRef: actor.actorRef, sourceSurface: actor.sourceSurface, requestId: 'synthetic-request',
