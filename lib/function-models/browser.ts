@@ -8,7 +8,7 @@ export class ModelUiError extends Error { constructor(readonly code: 'unavailabl
 export const errorText = (error: unknown) => error instanceof AiFunctionUnavailableError ? error.message : error instanceof ModelUiError && error.code === 'conflict'
     ? 'Le impostazioni sono cambiate. Rileggi e decidi di nuovo; nulla viene ritentato automaticamente.'
     : error instanceof ModelUiError && error.code === 'stale' ? 'La scelta del modello non è più attuale. Rileggi e scegli di nuovo: nessun modello alternativo viene usato.'
-    : error instanceof ModelUiError && error.code === 'provider_unavailable' ? 'provider_unavailable: il provider locale selezionato non è disponibile. Nessuna modifica e nessun fallback. Scegli esplicitamente OpenAI oppure rendi disponibile il provider locale.'
+    : error instanceof ModelUiError && error.code === 'provider_unavailable' ? 'Il provider locale selezionato non è disponibile. Nessuna modifica e nessun modello alternativo: avvia il provider locale oppure scegli un altro canale tra quelli configurati.'
     : error instanceof ModelUiError && error.code === 'locked' ? 'Sessione non disponibile. Sblocca MediFlow e rileggi.'
     : 'Impossibile confermare le impostazioni. Rileggi prima di continuare.';
 const record = (x: unknown): Record<string, unknown> => { if (!x || typeof x !== 'object' || Array.isArray(x) || Object.getPrototypeOf(x) !== Object.prototype || Reflect.ownKeys(x).some(key => typeof key !== 'string' || !Object.getOwnPropertyDescriptor(x, key)?.enumerable || !('value' in Object.getOwnPropertyDescriptor(x, key)!))) throw new ModelUiError('invalid'); return x as Record<string, unknown>; };
