@@ -25,9 +25,9 @@ function freePort() {
   });
 }
 
-function fixture() {
+function fixture({ bundleParent = '' } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-installability-v0-test-'));
-  const contents = path.join(root, 'MediFlow.app', 'Contents');
+  const contents = path.join(root, bundleParent, 'MediFlow.app', 'Contents');
   const dataDir = path.join(root, 'data');
   const logDir = path.join(root, 'logs');
   fs.mkdirSync(path.join(contents, 'MacOS'), { recursive: true });
@@ -170,6 +170,20 @@ test('launcher discards a stale dead PID and starts the bundled server', async (
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /server MediFlow pronto/);
 
+});
+
+test('launcher starts the bundled server when the bundle path contains a space', async (t) => {
+  // Volumi come «LP 1» o cartelle utente con spazi: il bundle deve partire lo stesso.
+  const scenario = fixture({ bundleParent: 'Cartella con spazio' });
+  t.after(() => {
+    stopScenarioServer(scenario);
+    fs.rmSync(scenario.root, { recursive: true, force: true });
+  });
+  const port = await freePort();
+
+  const result = runLauncher(scenario, port);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /server MediFlow pronto/);
 });
 
 test('launcher rejects a live foreign service referenced by the PID file', async (t) => {

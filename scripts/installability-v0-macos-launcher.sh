@@ -38,10 +38,10 @@ exec 9>"$LOCK_FILE"
 
 trap 'rm -f "$PROBE_FILE"' EXIT
 
-EXPECTED_REVISION="$($NODE_BINARY -p 'require(process.argv[1]).revision' "$IDENTITY_FILE")"
-EXPECTED_SOURCE_FINGERPRINT="$($NODE_BINARY -p 'require(process.argv[1]).sourceFingerprint' "$IDENTITY_FILE")"
-EXPECTED_NODE_REALPATH="$($NODE_BINARY -p 'require("node:fs").realpathSync(process.argv[1])' "$NODE_BINARY")"
-EXPECTED_WEB_RUNTIME_REALPATH="$($NODE_BINARY -p 'require("node:fs").realpathSync(process.argv[1])' "$WEB_RUNTIME")"
+EXPECTED_REVISION="$("$NODE_BINARY" -p 'require(process.argv[1]).revision' "$IDENTITY_FILE")"
+EXPECTED_SOURCE_FINGERPRINT="$("$NODE_BINARY" -p 'require(process.argv[1]).sourceFingerprint' "$IDENTITY_FILE")"
+EXPECTED_NODE_REALPATH="$("$NODE_BINARY" -p 'require("node:fs").realpathSync(process.argv[1])' "$NODE_BINARY")"
+EXPECTED_WEB_RUNTIME_REALPATH="$("$NODE_BINARY" -p 'require("node:fs").realpathSync(process.argv[1])' "$WEB_RUNTIME")"
 [[ -n "$EXPECTED_REVISION" && -n "$EXPECTED_SOURCE_FINGERPRINT" ]] || fail "identita bundle incompleta"
 
 http_status() {
