@@ -236,12 +236,24 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editTherapyMotivation = ""
     @Published var editTherapyStatus: PairedTherapyStatus = .active {
         didSet {
+            guard editTherapyStatus != oldValue else { return }
             // WUL-800: riattivando una terapia conclusa la data di conclusione non resta come fine programmata.
-            if editTherapyStatus == .active, oldValue != .active, editTherapySavedStatus == .completed {
+            if editTherapyStatus == .active, editTherapySavedStatus == .completed {
                 editTherapyHasEndDate = false
+            }
+            // Tornando a «Conclusa» ritorna la data salvata; concludendo prima di una fine programmata vale oggi.
+            if editTherapyStatus == .completed {
+                if editTherapySavedStatus == .completed, let saved = editTherapySavedEndDate {
+                    editTherapyHasEndDate = true
+                    editTherapyEndDate = saved
+                } else if editTherapyHasEndDate, editTherapyEndDate > Date() {
+                    editTherapyEndDate = Date()
+                }
             }
         }
     }
+    /// Data di fine salvata della terapia in modifica, per tornare a «Conclusa» senza perderla.
+    var editTherapySavedEndDate: Date?
     /// Stato salvato della terapia in modifica: limita le scelte ai passaggi ammessi.
     @Published var editTherapySavedStatus: PairedTherapyStatus?
     var editTherapyStatusOptions: [PairedTherapyStatus] {
@@ -2881,6 +2893,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editTherapyActivePrinciple = therapy.activePrinciple ?? ""
         editTherapyDosage = therapy.dosage
         editTherapyMotivation = therapy.motivation ?? ""
+        editTherapySavedEndDate = therapy.endDate
         editTherapySavedStatus = PairedTherapyStatus(rawValue: therapy.status)
         editTherapyStatus = editTherapySavedStatus ?? .active
         editTherapyStartDate = therapy.startDate

@@ -98,6 +98,20 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
         await MainActor.run { model.editTherapyStatus = .active }
         let keepsEnd = await model.editTherapyHasEndDate
         XCTAssertFalse(keepsEnd, "la data di conclusione non diventa una fine programmata")
+        await MainActor.run { model.editTherapyStatus = .completed }
+        let restored = await (model.editTherapyHasEndDate, model.editTherapyEndDate)
+        XCTAssertTrue(restored.0, "tornando a Conclusa la data salvata ritorna")
+        XCTAssertEqual(restored.1, Date(timeIntervalSince1970: 1_780_000_000))
+    }
+
+    func testCompletingAheadOfAPlannedEndProposesToday() async {
+        let patient = detail(id: "p1")
+        let model = await makeModel(source: S6MockDataSource(details: ["p1": patient]))
+        await model.configurePairedOnlineForTests(selectedPatient: patient)
+        await model.startEditingTherapy(therapy(id: "t2", status: "active", endDate: Date().addingTimeInterval(60 * 86_400)))
+        await MainActor.run { model.editTherapyStatus = .completed }
+        let end = await model.editTherapyEndDate
+        XCTAssertLessThanOrEqual(end, Date())
     }
 
     func testEditingACompletedCheckupNeverOffersCancelled() async {
