@@ -3587,8 +3587,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 payload: HomeBaseProstheticPrescriptionUpdatePayload(
                     version: prescription.version,
                     status: PairedProstheticPrescriptionStatus.tested.rawValue,
-                    collaudoAt: .value(prescription.collaudoAt ?? Date()),
-                    collaudoOutcome: .value(prescription.collaudoOutcome ?? "Collaudo registrato in MediFlow.")
+                    collaudoAt: .value(prescription.collaudoAt ?? Date())
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -5705,8 +5704,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && sessionCookie != nil
             && pairedCredentials != nil
             && connectionState == .pairedOnline
-            && prescription.status != PairedProstheticPrescriptionStatus.tested.rawValue
-            && prescription.status != PairedProstheticPrescriptionStatus.cancelled.rawValue
+            // WUL-800: il collaudo si offre solo dove la tabella lo ammette; uno stato sconosciuto lo decide il server.
+            && (PairedProstheticPrescriptionStatus(rawValue: prescription.status).map { $0.allowedTargets.contains(.tested) } ?? true)
             && !isWorking
     }
 }

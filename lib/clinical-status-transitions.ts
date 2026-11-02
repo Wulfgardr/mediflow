@@ -123,6 +123,66 @@ function endDateRequiredDenial(): EndDateRequiredDenial {
     return { status: 409, value: { error: 'A completed therapy needs an end date', code: 'therapy_end_date_required' } };
 }
 
+export type ProstheticStatus = 'draft' | 'prescribed' | 'submitted' | 'authorized' | 'delivered' | 'tested' | 'cancelled';
+
+/*
+ * Avanti lungo il percorso, anche saltando passi, ma il collaudo solo da
+ * prescritta in poi. Annullabile da ogni stato tranne collaudata. Indietro di
+ * un passo. Un'annullata riparte da bozza o da prescritta.
+ */
+export const PROSTHETIC_TRANSITIONS: Readonly<Record<ProstheticStatus, readonly ProstheticStatus[]>> = {
+    draft: ['prescribed', 'submitted', 'authorized', 'delivered', 'cancelled'],
+    prescribed: ['submitted', 'authorized', 'delivered', 'tested', 'cancelled', 'draft'],
+    submitted: ['authorized', 'delivered', 'tested', 'cancelled', 'prescribed'],
+    authorized: ['delivered', 'tested', 'cancelled', 'submitted'],
+    delivered: ['tested', 'cancelled', 'authorized'],
+    tested: ['delivered'],
+    cancelled: ['draft', 'prescribed'],
+};
+
+export function isProstheticTransitionAllowed(from: string, to: string): boolean {
+    if (!Object.prototype.hasOwnProperty.call(PROSTHETIC_TRANSITIONS, to)) return false;
+    if (from === to || !Object.prototype.hasOwnProperty.call(PROSTHETIC_TRANSITIONS, from)) return true;
+    return PROSTHETIC_TRANSITIONS[from as ProstheticStatus].includes(to as ProstheticStatus);
+}
+
+export type CollaudoDateRequiredDenial = {
+    status: 409;
+    value: { error: string; code: 'prosthetic_collaudo_date_required' };
+};
+
+/**
+ * Stato e collaudo di una prescrizione protesica non si contraddicono (WUL-800).
+ * Passando a tested resta la data indicata, o quella già salvata se non è
+ * futura, altrimenti quella del passaggio; l'esito non viene mai inventato.
+ * Tornando indietro da tested la data si svuota; l'esito scritto dal medico
+ * resta, perché l'audit è redatto e non lo conserverebbe. A una prescrizione
+ * collaudata non si toglie la data che ha.
+ */
+export function planProstheticStatusChange(
+    saved: { status: string; collaudoAt: Date | null },
+    requested: { status?: string; collaudoAt?: Date | null },
+    now: Date,
+): { ok: true; collaudo?: { collaudoAt: Date | null } }
+    | { ok: false; denial: StatusTransitionDenial | CollaudoDateRequiredDenial } {
+    const to = requested.status;
+    if (to !== undefined && !isProstheticTransitionAllowed(saved.status, to)) {
+        return { ok: false, denial: statusTransitionDenial('prosthetic_prescription', saved.status, to) };
+    }
+    if (to === undefined || to === saved.status) {
+        const removesDate = saved.status === 'tested' && requested.collaudoAt === null && saved.collaudoAt !== null;
+        return removesDate
+            ? { ok: false, denial: { status: 409, value: { error: 'A tested prosthetic prescription needs a collaudo date', code: 'prosthetic_collaudo_date_required' } } }
+            : { ok: true };
+    }
+    if (to === 'tested') {
+        const savedDate = saved.collaudoAt && saved.collaudoAt.getTime() <= now.getTime() ? saved.collaudoAt : null;
+        return { ok: true, collaudo: { collaudoAt: requested.collaudoAt ?? savedDate ?? now } };
+    }
+    if (saved.status === 'tested') return { ok: true, collaudo: { collaudoAt: null } };
+    return { ok: true };
+}
+
 export type StatusTransitionDenial = {
     status: 409;
     value: { error: string; code: 'status_transition_not_allowed'; entity: string; from: string; to: string };

@@ -114,6 +114,19 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
         XCTAssertLessThanOrEqual(end, Date())
     }
 
+    func testProstheticCollaudoIsOfferedOnlyWhereTheDecidedTableAllowsIt() async throws {
+        let decided = try decidedTransitions("prostheticPrescription")
+        XCTAssertEqual(Set(decided.keys), Set(PairedProstheticPrescriptionStatus.allCases.map(\.rawValue)))
+        let patient = detail(id: "p1")
+        let model = await makeModel(source: S6MockDataSource(details: ["p1": patient]))
+        await model.configurePairedOnlineForTests(selectedPatient: patient)
+        for status in PairedProstheticPrescriptionStatus.allCases {
+            XCTAssertEqual(Set(status.allowedTargets.map(\.rawValue)), decided[status.rawValue], status.rawValue)
+            let canTest = await model.canTestProstheticPrescription(prosthetic(id: "pt-\(status.rawValue)", status: status.rawValue, version: 1))
+            XCTAssertEqual(canTest, decided[status.rawValue]?.contains("tested") == true, status.rawValue)
+        }
+    }
+
     func testEditingACompletedCheckupNeverOffersCancelled() async {
         let patient = detail(id: "p1")
         let model = await makeModel(source: S6MockDataSource(details: ["p1": patient]))

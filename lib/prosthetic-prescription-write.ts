@@ -26,6 +26,7 @@ import {
     parsePrescriptionDate,
 } from './prescription-domain';
 import { patients, patientsToAmbulatories, prostheticPrescriptions } from './schema';
+import { planProstheticStatusChange } from './clinical-status-transitions';
 import {
     listChangedFields,
     auditContextFromSession,
@@ -132,7 +133,8 @@ function normalizeCreate(
             clinicalReason: optionalPrescriptionText(body.clinicalReason),
             regionalPrescriptionId: optionalPrescriptionText(body.regionalPrescriptionId),
             supplier: optionalPrescriptionText(body.supplier),
-            collaudoAt: parsePrescriptionDate(body.collaudoAt),
+            // WUL-800: una voce registrata già collaudata ha sempre la data del collaudo.
+            collaudoAt: parsePrescriptionDate(body.collaudoAt) ?? (status === 'tested' ? new Date() : null),
             collaudoOutcome: optionalPrescriptionText(body.collaudoOutcome),
             source,
             documentRefs: optionalPrescriptionText(body.documentRefs),
@@ -268,7 +270,7 @@ export async function createHostProstheticPrescription(context: HostContext, raw
         const inserted = tx.insert(prostheticPrescriptions).values(normalized.values).run();
         if (inserted.changes !== 1) throw new Error('Prosthetic prescription create did not write exactly one row');
         writeAuditEventInTransaction(tx, prostheticAuditInput(context, 'host', 'prosthetic.prescription.created', normalized.values.id, {
-            changedFields: listChangedFields(rawBody, ['id']),
+            changedFields: [...new Set([...listChangedFields(rawBody, ['id']), ...(normalized.values.status === 'tested' ? ['collaudoAt'] : [])])],
             flags: [`source:${normalized.values.source}`, `status:${normalized.values.status}`, `category:${normalized.values.category}`],
             resourceVersion: 1,
         }));
@@ -308,15 +310,24 @@ async function updateProstheticPrescription(
         if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload(
             'prosthetic_prescription', expectedVersion, context.id, selectConflictSnapshot(tx, context.id)) };
 
-        const selectionError = applyCatalogSelection(normalized.values, body.catalogSelection);
+        // WUL-800: passaggio di stato e collaudo coerenti, prima di qualunque scrittura.
+        const plan = planProstheticStatusChange(
+            { status: existing.status, collaudoAt: existing.collaudoAt ?? null },
+            { status: normalized.values.status, collaudoAt: normalized.values.collaudoAt },
+            normalized.values.updatedAt ?? new Date());
+        if (!plan.ok) return plan.denial;
+        const values = plan.collaudo ? { ...normalized.values, ...plan.collaudo } : normalized.values;
+        const changedFields = [...new Set([...listChangedFields(body as Record<string, unknown>, ['version']), ...Object.keys(plan.collaudo ?? {})])];
+
+        const selectionError = applyCatalogSelection(values, body.catalogSelection);
         if (selectionError) return selectionError;
         const updateResult = tx.update(prostheticPrescriptions)
-            .set({ ...normalized.values, version: expectedVersion + 1 })
+            .set({ ...values, version: expectedVersion + 1 })
             .where(and(eq(prostheticPrescriptions.id, context.id), eq(prostheticPrescriptions.version, expectedVersion)))
             .run();
         if (updateResult.changes !== 1) throw new Error('Prosthetic prescription update did not write exactly one row');
         writeAuditEventInTransaction(tx, prostheticAuditInput(context, surface, 'prosthetic.prescription.updated', context.id, {
-            changedFields: listChangedFields(body as Record<string, unknown>, ['version']),
+            changedFields,
             resourceVersion: expectedVersion + 1,
         }));
         return { status: 200, value: { success: true } };
@@ -366,7 +377,7 @@ export async function createNetworkScopedProstheticPrescription(context: Network
         const inserted = tx.insert(prostheticPrescriptions).values(normalized.values).run();
         if (inserted.changes !== 1) throw new Error('Prosthetic prescription create did not write exactly one row');
         writeAuditEventInTransaction(tx, prostheticAuditInput(context, 'network', 'prosthetic.prescription.created', normalized.values.id,
-            { changedFields: listChangedFields(rawBody, ['id']), resourceVersion: 1 }));
+            { changedFields: [...new Set([...listChangedFields(rawBody, ['id']), ...(normalized.values.status === 'tested' ? ['collaudoAt'] : [])])], resourceVersion: 1 }));
         return { status: 201, value: { id: normalized.values.id, version: 1 } };
     }, { behavior: 'immediate' });
     return commit;
