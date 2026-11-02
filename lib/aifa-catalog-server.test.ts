@@ -1,7 +1,6 @@
-import { syntheticExemptionRequest } from '../scripts/fixtures/exemption-import-session';
+import { syntheticExemptionRequest, syntheticExemptionSession } from '../scripts/fixtures/exemption-import-session';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -12,7 +11,7 @@ import { IncomingMessage } from 'node:http';
 import { Socket } from 'node:net';
 import { NodeNextRequest } from 'next/dist/server/base-http/node.js';
 import { NextRequestAdapter } from 'next/dist/server/web/spec-extension/adapters/next-request.js';
-import { AIFA_CATALOG_DEFAULT_SOURCE_URL } from './aifa-catalog';
+import { AIFA_CATALOG_DEFAULT_SOURCE_URL, normalizeAifaSearchText } from './aifa-catalog';
 
 const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -23,7 +22,8 @@ type CatalogModules = {
     clearAifaCatalogWithAuthority: typeof import('./aifa-catalog-server.ts').clearAifaCatalogWithAuthority;
     getAifaCatalogStatus: typeof import('./aifa-catalog-server.ts').getAifaCatalogStatus;
     replaceAifaCatalog: typeof import('./aifa-catalog-server.ts').replaceAifaCatalog;
-    replaceUnverifiedDrugCatalog: typeof import('./aifa-catalog-server.ts').replaceUnverifiedDrugCatalog;
+    /** test-only legacy seed; production replaces legacy rows only through replaceLegacyDrugCatalogWithAuthority. */
+    seedLegacyCatalog: (items: { aic: string; name: string; [field: string]: unknown }[]) => void;
     readDrugCatalog: typeof import('./network-catalog-read.ts').readDrugCatalog;
     searchAifaCatalog: typeof import('./aifa-catalog-server.ts').searchAifaCatalog;
 };
@@ -57,6 +57,13 @@ async function loadCatalogModules(): Promise<CatalogModules> {
         ]).then(([catalog, network, { dbServer }, { drugs, settings }, { eq }]) => ({ ...catalog, readDrugCatalog: network.readDrugCatalog,
             resetCatalog: () => dbServer.transaction(tx => {
                 tx.delete(drugs).run();
+                tx.delete(settings).where(eq(settings.key, 'aifaCatalogManifest')).run();
+            }),
+            seedLegacyCatalog: (items: { aic: string; name: string; [field: string]: unknown }[]) => dbServer.transaction(tx => {
+                tx.delete(drugs).run();
+                for (const item of items) {
+                    tx.insert(drugs).values({ ...item, packagingSearch: normalizeAifaSearchText(String(item.packaging ?? '')) } as typeof drugs.$inferInsert).run();
+                }
                 tx.delete(settings).where(eq(settings.key, 'aifaCatalogManifest')).run();
             }) }));
     }
@@ -116,7 +123,7 @@ test('legacy replacement removes AIFA rows without changing price scale or prefi
         },
     );
 
-    catalog.replaceUnverifiedDrugCatalog([{
+    catalog.seedLegacyCatalog([{
         aic: '000000901',
         name: 'FARMACO LEGACY',
         activePrinciple: 'Principio legacy',
@@ -154,7 +161,7 @@ test('legacy replacement removes AIFA rows without changing price scale or prefi
 
 test('runtime search applies cross-field tokens before the result cap', async () => {
     const catalog = await loadCatalogModules();
-    catalog.replaceUnverifiedDrugCatalog([
+    catalog.seedLegacyCatalog([
         ...Array.from({ length: 300 }, (_, index) => ({
             aic: `DECOY-${index}`,
             name: `ALFA ${String(index).padStart(3, '0')}`,
@@ -183,9 +190,9 @@ test('guarded replacement detects legacy changes and rolls back actual SQLite wr
     const csv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000101;SINTETICO UNO;A01AA01;Principio sintetico\n000000102;SINTETICO DUE;A01AA02;Principio secondo\n000000103;SINTETICO TRE;A01AA03;Principio terzo';
     const file = () => new File([csv], 'synthetic.csv');
     const manifest = { sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL, downloadedAt: '2026-09-07', version: 'synthetic-guard' };
-    catalog.replaceUnverifiedDrugCatalog([{ aic: '000000999', name: 'SINTETICO' }]);
+    catalog.seedLegacyCatalog([{ aic: '000000999', name: 'SINTETICO' }]);
     const snapshot = getAifaCatalogSnapshot();
-    catalog.replaceUnverifiedDrugCatalog([{ aic: '000000999', name: 'MODIFICATO' }]);
+    catalog.seedLegacyCatalog([{ aic: '000000999', name: 'MODIFICATO' }]);
     await assert.rejects(catalog.replaceAifaCatalog(file(), manifest, { snapshot, assertCurrent() {} }), { status: 409 });
     const before = getAifaCatalogSnapshot();
     const sqlite = new Database(path.join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'));
@@ -584,25 +591,30 @@ test('confirmation rejects a different file or catalog even when reduction is no
 test('manual import excludes legacy replacement and clearing through services and v1 routes', async t => {
     const catalog = await loadCatalogModules();
     const { AifaUpdateError } = await import('./aifa-catalog-lock');
+    const { replaceLegacyDrugCatalogWithAuthority } = await import('./aifa-catalog-server');
     const load = createRequire(import.meta.url);
+    const auth = load('./security/server-auth.ts') as typeof import('./security/server-auth');
     const route = load('../app/api/v1/drugs/route.ts') as typeof import('../app/api/v1/drugs/route');
     const { getOrCreateLocalApiToken } = await import('./security/local-api-token');
+    const { dbServer } = await import('./db-server');
+    const { users } = await import('./schema');
     const token = getOrCreateLocalApiToken();
     const legacy = [{ aic: '000000999', name: 'LEGACY SINTETICO' }];
-    const request = (method: string) => new Request('http://localhost/api/v1/drugs', {
-        method, headers: { authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        ...(method === 'POST' ? { body: JSON.stringify(legacy) } : {}),
-    });
     const csv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000101;SINTETICO;A01AA01;Inventato';
-    const operator = `synthetic-lock-${randomUUID()}`;
-    const admin = { id: `${operator}-session`, userId: operator, username: operator, role: 'admin',
-        authChannel: 'web' as const, createdAt: Date.now(), expiresAt: Date.now() + 60_000 };
+    const admin = syntheticExemptionSession();
+    dbServer.insert(users).values({ id: admin.userId, username: admin.username, role: 'admin', passwordHash: 'synthetic', encryptedMasterKey: 'synthetic', salt: 'synthetic' })
+        .onConflictDoNothing().run();
+    t.mock.method(auth, 'requireSession', async () => admin);
+    const confirmations = { clear: 'mediflow.aifa-catalog-clear.v1', legacy: 'mediflow.aifa-catalog-legacy-replace.v1' };
+    const request = (expectedSnapshot: string) => syntheticExemptionRequest('http://localhost/api/v1/drugs', {
+        method: 'POST', headers: { authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: legacy, expectedSnapshot, confirmation: confirmations.legacy }),
+    });
     const audit = { eventType: 'reference_data.aifa.updated' as const, outcome: 'success' as const, actorType: 'user' as const,
-        actorRef: operator, subjectType: 'reference_data' as const, subjectRef: 'aifa', sourceSurface: 'web' as const };
+        actorRef: admin.userId, subjectType: 'reference_data' as const, subjectRef: 'aifa', sourceSurface: 'web' as const };
     assert.equal('DELETE' in route, false, 'the unaudited v1 clear is no longer exported');
-    for (const writer of ['replace', 'clear', 'POST']) await t.test(writer, async () => {
-        catalog.resetCatalog();
-        catalog.replaceUnverifiedDrugCatalog(legacy);
+    for (const writer of ['legacy', 'clear', 'POST']) await t.test(writer, async () => {
+        catalog.seedLegacyCatalog(legacy);
         const before = catalog.getAifaCatalogSnapshot();
         const file = new File([csv], 'synthetic.csv');
         const bytes = await file.arrayBuffer();
@@ -612,18 +624,19 @@ test('manual import excludes legacy replacement and clearing through services an
             downloadedAt: '2026-10-15', version: 'synthetic-lock' });
         const conflict = (error: unknown) => error instanceof AifaUpdateError && error.status === 409;
         try {
-            if (writer === 'replace') assert.throws(() => catalog.replaceUnverifiedDrugCatalog(legacy), conflict);
+            if (writer === 'legacy') assert.throws(() => replaceLegacyDrugCatalogWithAuthority({ session: admin, items: legacy,
+                expectedSnapshot: before, confirmation: confirmations.legacy, audit }), conflict);
             else if (writer === 'clear') assert.throws(() => catalog.clearAifaCatalogWithAuthority({ session: admin, expectedSnapshot: before,
-                confirmation: 'mediflow.aifa-catalog-clear.v1', audit }), conflict);
+                confirmation: confirmations.clear, audit }), conflict);
             else {
-                const response = await route.POST(request(writer));
+                const response = await route.POST(request(before));
                 assert.equal(response.status, 409);
                 assert.deepEqual(await response.json(), { error: 'Operazione AIFA già in corso' });
             }
             assert.equal(catalog.getAifaCatalogSnapshot(), before);
         } finally { resume(bytes); await pending; }
         assert.equal((await catalog.searchAifaCatalog('sintetico', 10)).rows[0].aic, '000000101');
-        assert.equal((await route.POST(request('POST'))).status, 200);
+        assert.equal((await route.POST(request(catalog.getAifaCatalogSnapshot()))).status, 200);
     });
 });
 
@@ -633,7 +646,7 @@ test('manual expected snapshot rejects a real concurrent SQLite transaction afte
     const { getAifaCatalogVersionedStatus } = await import('./aifa-catalog-server');
     const { AifaCatalogConflictError } = await import('./aifa-catalog-lock');
     catalog.resetCatalog();
-    catalog.replaceUnverifiedDrugCatalog([{ aic: '000000001', name: 'PRIMA' }]);
+    catalog.seedLegacyCatalog([{ aic: '000000001', name: 'PRIMA' }]);
     const baseline = getAifaCatalogVersionedStatus();
     assert.equal(baseline.snapshot, catalog.getAifaCatalogSnapshot());
     const csv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000001;BOZZA OBSOLETA;A01AA01;Inventato';
@@ -663,7 +676,7 @@ test('manual expected snapshot rejects a real concurrent SQLite transaction afte
 test('manual route exposes the snapshot and returns 409 without writes after a concurrent change', async t => {
     const catalog = await loadCatalogModules();
     catalog.resetCatalog();
-    catalog.replaceUnverifiedDrugCatalog([{ aic: '000000001', name: 'PRIMA' }]);
+    catalog.seedLegacyCatalog([{ aic: '000000001', name: 'PRIMA' }]);
     const load = createRequire(import.meta.url);
     const auth = load('./security/server-auth.ts') as typeof import('./security/server-auth');
     const owner = load('./security/web-auth-lifecycle-owner-adapter.ts') as typeof import('./security/web-auth-lifecycle-owner-adapter');
@@ -795,6 +808,106 @@ test('administrative clear: admin, current snapshot and confirmation write rows 
             assert.equal(event.redactedMetadata?.counts, 3);
             const replay = await del({ expectedSnapshot: snapshot, confirmation });
             assert.equal(replay.status, 409, 'the same command cannot clear a second time');
+        });
+    } finally {
+        current = null; owner.retire(admin, 'dispose'); owner.retire(clinician, 'dispose'); catalog.resetCatalog();
+    }
+});
+
+/* WUL-802: the v1 legacy replacement has the clear's authority; real SQLite, real lifecycle owner, invented catalog rows. */
+test('v1 legacy replacement: local token, administrator, current snapshot and confirmation write rows and audit together; every refusal leaves the catalog', async t => {
+    const catalog = await loadCatalogModules();
+    const load = createRequire(import.meta.url);
+    const auth = load('./security/server-auth.ts') as typeof import('./security/server-auth');
+    const owner = load('./security/web-auth-lifecycle-owner-adapter.ts') as typeof import('./security/web-auth-lifecycle-owner-adapter');
+    const route = load('../app/api/v1/drugs/route.ts') as typeof import('../app/api/v1/drugs/route');
+    const { getOrCreateLocalApiToken } = await import('./security/local-api-token');
+    const { listAuditEvents } = await import('./security/audit');
+    const { dbServer } = await import('./db-server');
+    const { users } = await import('./schema');
+    const token = getOrCreateLocalApiToken();
+    const csv = fs.readFileSync(path.join(ROOT_DIR, 'scripts/fixtures/aifa-confezioni-synthetic.csv'));
+    const manifest = { sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL, downloadedAt: '2026-11-02', version: 'synthetic-legacy-replace' };
+    const confirmation = 'mediflow.aifa-catalog-legacy-replace.v1';
+    const items = [{ aic: '000000777', name: 'FARMACO INVENTATO', price: 1234 }];
+    const issue = (id: string, role: string) => {
+        const control = owner.bootstrapControl()!;
+        const attempt = owner.begin('login', { controlId: control.controlId, ifMatch: control.etag, idempotencyKey: `synthetic-legacy-${id}` });
+        const issued = owner.issue(attempt!, { id, username: id, role })!;
+        const resolved = owner.resolve(issued.sessionId, control.controlId);
+        if (resolved.status !== 'active') throw new Error('synthetic session setup failed');
+        bindSyntheticArchiveSessions(resolved.projection.id);
+        dbServer.insert(users).values({ id, username: id, role, passwordHash: 'synthetic', encryptedMasterKey: 'synthetic', salt: 'synthetic' })
+            .onConflictDoUpdate({ target: users.id, set: { role } }).run();
+        return resolved.projection;
+    };
+    let current: Awaited<ReturnType<typeof auth.requireSession>> = null;
+    t.mock.method(auth, 'requireSession', async () => current);
+    const post = (body: unknown, withToken = true) => route.POST(syntheticExemptionRequest('http://localhost/api/v1/drugs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...(withToken ? { authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(body) }));
+    const legacyEvents = async () => (await listAuditEvents({ eventType: 'reference_data.aifa.updated', limit: 200 }))
+        .filter(event => event.redactedMetadata?.aifaCatalog?.mode === 'legacy-replace');
+    const admin = issue('synthetic-legacy-admin', 'admin');
+    const clinician = issue('synthetic-legacy-clinician', 'clinician');
+    const seed = async () => { catalog.resetCatalog(); await catalog.replaceAifaCatalog(new File([csv], 'synthetic.csv'), manifest); return catalog.getAifaCatalogSnapshot(); };
+    const unchanged = async (snapshot: string, events: number, response: Response, status: number) => {
+        assert.equal(response.status, status);
+        assert.equal(catalog.getAifaCatalogSnapshot(), snapshot);
+        assert.equal((await catalog.getAifaCatalogStatus()).state, 'ready');
+        assert.equal((await legacyEvents()).length, events);
+        return response.json();
+    };
+    try {
+        await t.test('token alone, missing token, clinician and bare legacy arrays are refused', async () => {
+            const snapshot = await seed(); const events = (await legacyEvents()).length;
+            current = null;
+            await unchanged(snapshot, events, await post(items), 401);
+            await unchanged(snapshot, events, await post({ items, expectedSnapshot: snapshot, confirmation }), 401);
+            current = admin;
+            await unchanged(snapshot, events, await post({ items, expectedSnapshot: snapshot, confirmation }, false), 401);
+            assert.equal((await unchanged(snapshot, events, await post(items), 400)).code, 'AIFA_LEGACY_REPLACE_COMMAND_REQUIRED');
+            await unchanged(snapshot, events, await post({ items, expectedSnapshot: snapshot }), 400);
+            await unchanged(snapshot, events, await post({ items: [{ aic: '' }], expectedSnapshot: snapshot, confirmation }), 400);
+            for (const malformed of [{ aic: 123, name: 'FARMACO SINTETICO' }, { aic: '000000123', name: 'FARMACO SINTETICO', packaging: 7 }, { aic: '000000123', name: 'FARMACO SINTETICO', price: '12' }]) {
+                await unchanged(snapshot, events, await post({ items: [malformed], expectedSnapshot: snapshot, confirmation }), 400);
+            }
+            current = clinician;
+            assert.equal((await unchanged(snapshot, events, await post({ items, expectedSnapshot: snapshot, confirmation }), 403)).code, 'AIFA_LEGACY_REPLACE_ADMIN_REQUIRED');
+        });
+        await t.test('a stale snapshot is a conflict without effect', async () => {
+            const stale = await seed(); const events = (await legacyEvents()).length; current = admin;
+            await catalog.replaceAifaCatalog(new File([csv], 'synthetic.csv'), { ...manifest, version: 'synthetic-legacy-newer' });
+            const fresh = catalog.getAifaCatalogSnapshot();
+            assert.equal((await unchanged(fresh, events, await post({ items, expectedSnapshot: stale, confirmation }), 409)).code, 'AIFA_CATALOG_CHANGED');
+        });
+        await t.test('audit failure rolls the replacement back', async () => {
+            const snapshot = await seed(); const events = (await legacyEvents()).length; current = admin;
+            const sqlite = new Database(path.join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'));
+            sqlite.exec("CREATE TRIGGER synthetic_aifa_legacy_audit_fail BEFORE INSERT ON audit_events WHEN NEW.event_type = 'reference_data.aifa.updated' BEGIN SELECT RAISE(IGNORE); END");
+            try { await unchanged(snapshot, events, await post({ items, expectedSnapshot: snapshot, confirmation }), 500); }
+            finally { sqlite.exec('DROP TRIGGER synthetic_aifa_legacy_audit_fail'); sqlite.close(); }
+        });
+        await t.test('administrator with the current snapshot replaces and receives the audit receipt', async () => {
+            const snapshot = await seed(); const before = await catalog.getAifaCatalogStatus(); current = admin;
+            const response = await post({ items, expectedSnapshot: snapshot, confirmation });
+            assert.equal(response.status, 200);
+            const body = await response.json();
+            assert.equal(body.success, true); assert.equal(body.count, 1); assert.equal(body.state, 'unverified');
+            assert.equal(body.snapshot, catalog.getAifaCatalogSnapshot());
+            assert.equal(body.receipt.operation, 'aifa-catalog-legacy-replace');
+            assert.equal(body.receipt.previousSnapshot, snapshot); assert.equal(body.receipt.previousCount, 3);
+            assert.equal(body.receipt.previousManifestSha256, before.manifest?.sha256);
+            assert.deepEqual(await catalog.getAifaCatalogStatus(), { count: 1, manifest: null, state: 'unverified' });
+            assert.equal((await catalog.searchAifaCatalog('farmaco', 10)).rows[0].price, 1234);
+            const event = (await legacyEvents()).find(item => item.eventId === body.receipt.auditEventId);
+            assert.ok(event, 'the receipt names the audit row written with the replacement');
+            assert.equal(event.outcome, 'success'); assert.equal(event.actorType, 'user');
+            assert.equal(event.redactedMetadata?.aifaCatalog?.before?.sha256, before.manifest?.sha256);
+            assert.equal(event.redactedMetadata?.aifaCatalog?.after, null);
+            assert.equal(event.redactedMetadata?.counts, 1);
+            const replay = await post({ items, expectedSnapshot: snapshot, confirmation });
+            assert.equal(replay.status, 409, 'the same command cannot replace a second time');
         });
     } finally {
         current = null; owner.retire(admin, 'dispose'); owner.retire(clinician, 'dispose'); catalog.resetCatalog();
