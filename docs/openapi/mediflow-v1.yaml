@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.50.0
+  version: 1.51.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -2165,6 +2165,12 @@ paths:
         scope. `version` is required and stale versions return
         `VERSION_CONFLICT`. This route requires
         `network.replica.write-prosthetic-prescriptions`.
+        A `status` change must follow the allowed transition table, otherwise
+        the request returns 409 `status_transition_not_allowed`. Moving to
+        `tested` keeps the given or saved collaudo date, otherwise sets the
+        moment of the change, and never writes an outcome; stepping back from
+        `tested` clears collaudo date and outcome; removing the collaudo date
+        of a tested prescription returns 409 `prosthetic_collaudo_date_required`.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2198,7 +2204,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/PrescriptionVersionConflict'
+          $ref: '#/components/responses/ProstheticPrescriptionWriteConflict'
         '412':
           description: La revisione del repertorio o gli originali della selezione non sono più validi; nessuna scrittura.
           content:
@@ -4629,6 +4635,19 @@ components:
                 currentUpdatedAt: null
                 currentState: missing
                 currentSnapshot: null
+    ProstheticPrescriptionWriteConflict:
+      description: |
+        Compare-on-write conflict, a status transition outside the allowed
+        table (a draft is never tested directly, a tested prescription is
+        never cancelled), or a request that would remove the collaudo date of
+        a tested prescription. Nothing is written.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/PrescriptionVersionConflictResponse'
+              - $ref: '#/components/schemas/StatusTransitionDeniedResponse'
+              - $ref: '#/components/schemas/ProstheticCollaudoDateRequiredResponse'
     ServicePrescriptionWriteConflict:
       description: |
         Compare-on-write conflict, a status transition outside the allowed
@@ -9468,6 +9487,16 @@ components:
         code:
           type: string
           enum: [therapy_end_date_required]
+    ProstheticCollaudoDateRequiredResponse:
+      type: object
+      additionalProperties: false
+      required: [error, code]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [prosthetic_collaudo_date_required]
     StatusTransitionDeniedResponse:
       type: object
       additionalProperties: false

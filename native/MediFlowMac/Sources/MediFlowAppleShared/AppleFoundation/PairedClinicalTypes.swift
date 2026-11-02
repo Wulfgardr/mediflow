@@ -194,6 +194,22 @@ enum PairedProstheticPrescriptionStatus: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Stati raggiungibili da questo, escluso sé stesso (WUL-800): avanti anche
+    /// saltando passi ma collaudo solo da prescritta in poi, annullabile tranne da
+    /// collaudata, indietro di un passo. Il server applica la stessa tabella; i test
+    /// la confrontano con docs/domain/clinical-status-transitions.json.
+    var allowedTargets: [PairedProstheticPrescriptionStatus] {
+        switch self {
+        case .draft: [.prescribed, .submitted, .authorized, .delivered, .cancelled]
+        case .prescribed: [.submitted, .authorized, .delivered, .tested, .cancelled, .draft]
+        case .submitted: [.authorized, .delivered, .tested, .cancelled, .prescribed]
+        case .authorized: [.delivered, .tested, .cancelled, .submitted]
+        case .delivered: [.tested, .cancelled, .authorized]
+        case .tested: [.delivered]
+        case .cancelled: [.draft, .prescribed]
+        }
+    }
+
     static func title(for rawValue: String) -> String {
         PairedProstheticPrescriptionStatus(rawValue: rawValue)?.title ?? rawValue
     }
