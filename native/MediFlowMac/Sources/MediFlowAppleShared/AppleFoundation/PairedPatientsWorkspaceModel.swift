@@ -251,6 +251,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editCheckupTitle = ""
     @Published var editCheckupNotes = ""
     @Published var editCheckupStatus: PairedCheckupStatus = .pending
+    /// Stato salvato del controllo in modifica: limita le scelte ai passaggi ammessi.
+    @Published var editCheckupSavedStatus: PairedCheckupStatus?
+    var editCheckupStatusOptions: [PairedCheckupStatus] {
+        editCheckupSavedStatus?.allowedTargets ?? PairedCheckupStatus.allCases
+    }
     @Published var editCheckupDate = Date()
     @Published var newObservationDisplay = ""
     @Published var newObservationCode = ""
@@ -3039,7 +3044,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editingCheckupVersion = checkup.version
         editCheckupTitle = checkup.title
         editCheckupNotes = checkup.notes ?? ""
-        editCheckupStatus = PairedCheckupStatus(rawValue: checkup.status) ?? .pending
+        editCheckupSavedStatus = PairedCheckupStatus(rawValue: checkup.status)
+        editCheckupStatus = editCheckupSavedStatus ?? .pending
         editCheckupDate = checkup.date
         statusMessage = "Modifica controllo pronta."
     }
@@ -3050,6 +3056,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editCheckupTitle = ""
         editCheckupNotes = ""
         editCheckupStatus = .pending
+        editCheckupSavedStatus = nil
         editCheckupDate = Date()
     }
 

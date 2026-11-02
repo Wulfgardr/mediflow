@@ -1,0 +1,15 @@
+{
+  "source": "WUL-800, decisione delegata a Claude il 1/11/2026. Avanti si può saltare un passo; indietro si torna di un solo passo, come correzione tracciata in audit; si blocca solo ciò che non ha senso. Restare nello stesso stato è sempre ammesso. I test del server TypeScript e del client Swift confrontano le loro tabelle con questo file.",
+  "servicePrescription": {
+    "prescribed": ["booked", "performed", "report_received", "cancelled"],
+    "booked": ["performed", "report_received", "cancelled", "prescribed"],
+    "performed": ["report_received", "booked"],
+    "report_received": ["performed"],
+    "cancelled": ["prescribed"]
+  },
+  "checkup": {
+    "pending": ["completed", "cancelled"],
+    "completed": ["pending"],
+    "cancelled": ["pending"]
+  }
+}

@@ -3,7 +3,7 @@ import { clearAllSessions } from './security/server-session';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* WUL-800, coorte 1: passaggi di stato di prescrizioni specialistiche e voci su SQLite reale. */
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3';
@@ -85,17 +85,14 @@ function listed(ids: Seeded) {
 }
 
 /*
- * La decisione del 1/11/2026 (WUL-800) scritta qui per esteso, separata dalla
- * costante del prodotto: se la tabella cambia senza che cambi la decisione,
- * questo test se ne accorge.
+ * La decisione (WUL-800) sta in docs/domain/clinical-status-transitions.json,
+ * separata dalla costante del prodotto e letta anche dai test Swift: se la
+ * tabella cambia senza che cambi la decisione, questo test se ne accorge.
  */
-const DECIDED_TRANSITIONS = new Set([
-    'prescribed>booked', 'prescribed>performed', 'prescribed>report_received', 'prescribed>cancelled',
-    'booked>performed', 'booked>report_received', 'booked>cancelled', 'booked>prescribed',
-    'performed>report_received', 'performed>booked',
-    'report_received>performed',
-    'cancelled>prescribed',
-]);
+const decision = JSON.parse(readFileSync(new URL('../docs/domain/clinical-status-transitions.json', import.meta.url), 'utf8')) as
+    { servicePrescription: Record<string, string[]> };
+const DECIDED_TRANSITIONS = new Set(Object.entries(decision.servicePrescription)
+    .flatMap(([from, targets]) => targets.map((to) => `${from}>${to}`)));
 
 test('the product table is exactly the decided one', () => {
     const product = new Set(Object.entries(SERVICE_PRESCRIPTION_TRANSITIONS)
