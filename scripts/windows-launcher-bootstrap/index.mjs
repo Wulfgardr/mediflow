@@ -39,7 +39,9 @@ export function verifySystemDirectoryArtifact(root, arch) {
 export function loadSystemDirectoryBinding() {
   const arch = process.arch;
   if (process.platform !== 'win32' || !['x64', 'arm64'].includes(arch) || Number(process.versions.napi) < 1) deny();
-  const binary = verifySystemDirectoryArtifact(fileURLToPath(new URL('.', import.meta.url)), arch);
+  // The bundler turns `new URL('.', import.meta.url)` into a copied asset, far from the prebuilds:
+  // the directory must come from this module's own path.
+  const binary = verifySystemDirectoryArtifact(path.dirname(fileURLToPath(import.meta.url)), arch);
   const binding = createRequire(import.meta.url)(/* turbopackIgnore: true */ binary);
   const names = Reflect.ownKeys(binding);
   if (names.length !== exports.length || exports.some(name => !names.includes(name) || typeof binding[name] !== 'function')) deny();
