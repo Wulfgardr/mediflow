@@ -130,7 +130,8 @@ export async function POST(request: Request) {
                 sourceSurface: auditContext.sourceSurface,
                 requestId,
                 redactedMetadata: withAuditContextMetadata(auditContext, {
-                    changedFields: listChangedFields(body as Record<string, unknown>, ['id']),
+                    changedFields: [...new Set([...listChangedFields(body as Record<string, unknown>, ['id']),
+                        ...(completedAt ? ['completedAt'] : [])])],
                     flags: [`action:${action}`, `outcome:${outcome}`],
                 }),
             });
