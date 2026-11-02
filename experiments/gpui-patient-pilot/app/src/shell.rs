@@ -5783,18 +5783,31 @@ impl Render for ClinicalApp {
                                 .when(
                                     self.local_host.retirement.orphaned(),
                                     |el| {
+                                        // One row under the warning: the guidance reads
+                                        // first, the action keeps its own width and wraps
+                                        // below the text in a narrow window.
                                         el.child(
                                             div()
                                                 .flex()
-                                                .flex_col()
-                                                .gap(px(8.))
+                                                .flex_wrap()
+                                                .items_center()
+                                                .gap(px(12.))
+                                                .px(px(16.))
+                                                .py(px(8.))
                                                 .flex_shrink_0()
-                                                .child(notice(
-                                                    "local-session-retirement-orphan",
-                                                    local_host::RETIREMENT_ORPHAN_GUIDANCE,
-                                                    theme,
-                                                    false,
-                                                ))
+                                                .child(
+                                                    notice(
+                                                        "local-session-retirement-orphan",
+                                                        local_host::RETIREMENT_ORPHAN_GUIDANCE,
+                                                        theme,
+                                                        false,
+                                                    )
+                                                    .flex_1()
+                                                    .min_w(px(280.))
+                                                    .p_0()
+                                                    .border_0()
+                                                    .bg(gpui::transparent_black()),
+                                                )
                                                 .child(
                                                     button(
                                                         "local-session-retirement-dismiss",

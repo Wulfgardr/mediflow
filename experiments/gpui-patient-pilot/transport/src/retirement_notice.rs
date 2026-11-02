@@ -16,6 +16,9 @@ struct State {
     markers: HashMap<String, Option<fs::File>>,
     path: Option<PathBuf>,
     failed: bool,
+    /// Orphans found at start and after a dismissal. Kept in memory so the
+    /// shell does not open and lock marker files on every frame.
+    orphaned: bool,
 }
 #[derive(Clone)]
 pub struct RetirementNotice(Arc<Mutex<State>>);
@@ -24,11 +27,14 @@ impl RetirementNotice {
         let failed = path
             .as_ref()
             .is_some_and(|path| create_directory(&path.with_extension("pending")).is_err());
-        Self(Arc::new(Mutex::new(State {
+        let mut state = State {
             markers: HashMap::new(),
             path,
             failed,
-        })))
+            orphaned: false,
+        };
+        state.orphaned = scan_orphans(&state);
+        Self(Arc::new(Mutex::new(state)))
     }
     pub fn pending(&self) -> bool {
         let Ok(state) = self.0.lock() else {
@@ -43,33 +49,22 @@ impl RetirementNotice {
                 }
             })
     }
-    /// True when at least one marker on disk belongs to no running instance:
-    /// its owner's lock is free and the file carries its complete name.
+    /// True when, at start or after the last dismissal, at least one marker on
+    /// disk belonged to no running instance: its owner's lock was free and the
+    /// file carried its complete name.
     pub fn orphaned(&self) -> bool {
-        let Ok(state) = self.0.lock() else {
-            return false;
-        };
-        foreign_markers(&state)
-            .is_ok_and(|markers| markers.iter().any(|marker| claim_orphan(marker).is_some()))
+        self.0.lock().is_ok_and(|state| state.orphaned)
     }
     /// Removes only orphaned markers. Markers held by a running instance,
     /// unreadable entries and this instance's own retirements stay pending.
     pub fn dismiss_orphaned(&self) -> io::Result<()> {
-        let state = self
+        let mut state = self
             .0
             .lock()
             .map_err(|_| io::Error::other("retirement state"))?;
-        for marker in foreign_markers(&state)? {
-            if let Some(claim) = claim_orphan(&marker) {
-                drop(claim);
-                match fs::remove_file(&marker) {
-                    Ok(()) => {}
-                    Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-                    Err(error) => return Err(error),
-                }
-            }
-        }
-        Ok(())
+        let removed = remove_orphans(&state);
+        state.orphaned = scan_orphans(&state);
+        removed
     }
     pub(crate) fn begin(&self) -> String {
         let Ok(mut state) = self.0.lock() else {
@@ -124,6 +119,26 @@ impl RetirementNotice {
             state.markers.remove(marker);
         }
     }
+}
+
+fn scan_orphans(state: &State) -> bool {
+    foreign_markers(state)
+        .is_ok_and(|markers| markers.iter().any(|marker| claim_orphan(marker).is_some()))
+}
+
+fn remove_orphans(state: &State) -> io::Result<()> {
+    for marker in foreign_markers(state)? {
+        if let Some(claim) = claim_orphan(&marker) {
+            // Windows refuses to delete a file that is still open.
+            drop(claim);
+            match fs::remove_file(&marker) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+        }
+    }
+    Ok(())
 }
 
 fn foreign_markers(state: &State) -> io::Result<Vec<PathBuf>> {
