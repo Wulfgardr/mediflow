@@ -88,11 +88,25 @@ test('a stale version is a version conflict even when the transition is refused'
     assert.equal(result.value.code, 'VERSION_CONFLICT');
 });
 
+test('saved aliases follow the table of their canonical status', () => {
+    for (const [saved, to, expected] of [
+        ['done', 'cancelled', 409], ['canceled', 'completed', 409],
+        ['done', 'completed', 200], ['canceled', 'cancelled', 200], ['done', 'pending', 200],
+    ] as const) {
+        const { checkupId } = seed('pending');
+        sql.prepare('UPDATE checkups SET status=? WHERE id=?').run(saved, checkupId);
+        const result = update(checkupId, to);
+        assert.equal(result.status, expected, `${saved} -> ${to}`);
+        assert.equal(row(checkupId).status, expected === 200 ? to : saved);
+        assert.equal(auditCount(checkupId), expected === 200 ? 1 : 0);
+    }
+});
+
 test('a legacy status outside the table can be brought to a valid one', () => {
     const { checkupId } = seed('pending');
-    sql.prepare("UPDATE checkups SET status='done' WHERE id=?").run(checkupId);
-    assert.equal(update(checkupId, 'completed').status, 200);
-    assert.equal(row(checkupId).status, 'completed');
+    sql.prepare("UPDATE checkups SET status='in_attesa' WHERE id=?").run(checkupId);
+    assert.equal(update(checkupId, 'cancelled').status, 200);
+    assert.equal(row(checkupId).status, 'cancelled');
 });
 
 test('an update without a status is not a transition', () => {
