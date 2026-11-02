@@ -2051,7 +2051,7 @@
       "file": "scripts/windows-launcher-bootstrap/index.mjs",
       "kind": "require",
       "expression": "createRequire(import.meta.url)(binary)",
-      "sourceSha256": "3829d1db2bc76f64501eaebfd8632b4d0db4ec3b95652f2412b381d3c0ff7bb8",
+      "sourceSha256": "7c31876f125dbe110c62e68b08b80ae9839b60a761c1702b13f21ba39ca3f0f3",
       "count": 1,
       "reason": "Il backup Windows usa il bootstrap esistente per risolvere gli strumenti DACL dalla directory di sistema. Il loader verifica impronte e manifest prima di caricare il modulo; non apre SQLite e non introduce autorita di scrittura clinica."
     }
