@@ -92,5 +92,24 @@
       "prescribed"
     ]
   },
-  "prostheticLinkedFields": "Passando a tested, collaudoAt resta quello indicato, o quello già salvato se non è futuro, altrimenti la data del passaggio; l'esito non viene scritto se il medico non lo inserisce. Tornando indietro da tested, collaudoAt si svuota e l'audit lo nomina; l'esito scritto dal medico resta. A una prescrizione tested non si può togliere la data di collaudo."
+  "prostheticLinkedFields": "Passando a tested, collaudoAt resta quello indicato, o quello già salvato se non è futuro, altrimenti la data del passaggio; l'esito non viene scritto se il medico non lo inserisce. Tornando indietro da tested, collaudoAt si svuota e l'audit lo nomina; l'esito scritto dal medico resta. A una prescrizione tested non si può togliere la data di collaudo.",
+  "sissHandoff": {
+    "started": [
+      "completed",
+      "blocked",
+      "cancelled"
+    ],
+    "blocked": [
+      "started",
+      "completed",
+      "cancelled"
+    ],
+    "completed": [
+      "started"
+    ],
+    "cancelled": [
+      "started"
+    ]
+  },
+  "sissHandoffLinkedFields": "Un passaggio started non ha completedAt, uno con un altro esito ce l'ha. Uscendo da started resta la data indicata o salvata, altrimenti quella del passaggio; tornando a started completedAt si svuota. Più passaggi aperti per lo stesso paziente sono ammessi: l'interfaccia li mostra tutti."
 }
