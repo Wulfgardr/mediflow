@@ -1,5 +1,4 @@
 /* PDF.js adapter. Imported only by the local preview, never by an API. */
-import { PdfRasterEncrypted, preparePdfRasterInput } from '../lib/pdf-raster-preflight.mjs';
 import type { RenderTask } from 'pdfjs-dist';
 import { assertImageSize, PREVIEW_LIMITS, PreviewError } from './document-viewer-policy.ts';
 import { PreviewScope } from './document-viewer-scope.ts';
@@ -18,27 +17,67 @@ export function adaptPdfRenderTask(task: Pick<RenderTask, 'promise' | 'cancel' |
     };
 }
 
+export async function preparePdfPreviewInput(bytes: Uint8Array, scope: PreviewScope): Promise<Uint8Array> {
+    scope.check();
+    let port: Worker;
+    try {
+        port = new Worker(new URL('./document-viewer-pdf-preflight.worker.ts', import.meta.url), { type: 'module' });
+    } catch { throw new PreviewError('runtime_unavailable'); }
+    let transferred: Uint8Array | undefined;
+    let checked: Uint8Array | undefined;
+    let message!: (event: MessageEvent) => void;
+    let failure!: (event: Event) => void;
+    try {
+        const result = new Promise<Uint8Array>((resolve, reject) => {
+            failure = (event) => {
+                event.preventDefault();
+                reject(new PreviewError('runtime_unavailable'));
+            };
+            message = (event) => {
+                const value = event.data;
+                if (value?.status === 'ok' && value.bytes instanceof Uint8Array
+                    && value.bytes.byteLength > 0 && value.bytes.byteLength <= PREVIEW_LIMITS.sourceBytes) {
+                    resolve(value.bytes);
+                } else {
+                    if (value?.bytes instanceof Uint8Array) value.bytes.fill(0);
+                    reject(new PreviewError(value?.status === 'encrypted' ? 'encrypted_pdf'
+                        : value?.status === 'limit' || value?.status === 'invalid' ? 'invalid_pdf' : 'runtime_unavailable'));
+                }
+            };
+            port.addEventListener('message', message);
+            port.addEventListener('error', failure);
+            port.addEventListener('messageerror', failure);
+            transferred = bytes.slice();
+            port.postMessage(transferred, [transferred.buffer]);
+        });
+        checked = await scope.wait(result, (late) => { late.fill(0); });
+        scope.check();
+        return checked;
+    } catch (error) {
+        checked?.fill(0);
+        throw error instanceof PreviewError ? error : new PreviewError('runtime_unavailable');
+    } finally {
+        port.removeEventListener('message', message);
+        port.removeEventListener('error', failure);
+        port.removeEventListener('messageerror', failure);
+        try { port.terminate(); } finally {
+            try { transferred?.fill(0); } catch { /* detached transferred buffer */ }
+        }
+    }
+}
+
 export async function renderPdfPreview(bytes: Uint8Array, number: number, canvas: HTMLCanvasElement, signal: AbortSignal) {
     const moduleScope = new PreviewScope(signal, PREVIEW_LIMITS.pageTimeoutMs);
     let checkedBytes: Uint8Array | undefined;
     try {
         moduleScope.check();
-        // Lazy client import. A failed chunk/worker is an explicit local-engine
-        // error, never a CDN URL or main-thread fake-worker fallback.
+        checkedBytes = await preparePdfPreviewInput(bytes, moduleScope);
+        moduleScope.check();
+        // Lazy client import; no fake-worker fallback.
         let pdfjs: typeof import('pdfjs-dist');
         try { pdfjs = await moduleScope.wait(import('pdfjs-dist')); }
         catch (error) { throw error instanceof PreviewError ? error : new PreviewError('runtime_unavailable'); }
         moduleScope.check();
-        try {
-            checkedBytes = await moduleScope.wait(preparePdfRasterInput(bytes, {
-                maxPixels: PREVIEW_LIMITS.imagePixels,
-                maxDimension: PREVIEW_LIMITS.imageDimension,
-                maxBytes: PREVIEW_LIMITS.sourceBytes,
-            }));
-        } catch (error) {
-            if (error instanceof PreviewError) throw error;
-            throw new PreviewError(error instanceof PdfRasterEncrypted ? 'encrypted_pdf' : 'invalid_pdf');
-        }
         const createEngine: PreviewPdfEngineFactory = (source, fail) => {
             let port: Worker;
             try {

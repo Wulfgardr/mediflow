@@ -1,11 +1,12 @@
 /* explicit synthetic engine seam; NOT a real PDF/browser rendering test. */
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import { paintPdfPage, type PreviewPdfEngineFactory, type PreviewPdfPage, type PreviewPdfDocument, type PreviewRenderTask } from './document-viewer-pdf-core.ts';
 import { PREVIEW_LIMITS, PreviewError, previewCanvasSize } from './document-viewer-policy.ts';
 import { boundedCanvasFactory, checkPdfOperators } from './document-viewer-pdf-resources.ts';
 import { PreviewScope } from './document-viewer-scope.ts';
-import { adaptPdfRenderTask } from './document-viewer-pdf.ts';
+import { PDFDocument } from 'pdf-lib';
+import { adaptPdfRenderTask, preparePdfPreviewInput, renderPdfPreview } from './document-viewer-pdf.ts';
 
 function deferred<T>() {
     let resolve!: (value: T) => void, reject!: (error: unknown) => void;
@@ -332,4 +333,92 @@ test('worker stream errors reject the whole preview before PDF.js can publish a 
     assert.equal(f.calls.paint, 0);
     assert.equal(target.width, 0);
     assert.equal(f.calls.dispose, 1);
+});
+
+
+class PreflightWorkerStub extends EventTarget {
+    static latest: PreflightWorkerStub;
+    input?: Uint8Array;
+    terminated = 0;
+    constructor(readonly url: URL, readonly options: WorkerOptions) {
+        super();
+        PreflightWorkerStub.latest = this;
+    }
+    postMessage(value: Uint8Array, transfer: Transferable[]) {
+        assert.deepEqual(transfer, [value.buffer]);
+        this.input = structuredClone(value, { transfer });
+        assert.equal(value.byteLength, 0);
+    }
+    terminate() { this.terminated++; }
+    reply(data: unknown) { this.dispatchEvent(new MessageEvent('message', { data })); }
+}
+
+function mockPreflightWorker(t: TestContext) {
+    const original = Object.getOwnPropertyDescriptor(globalThis, 'Worker');
+    Object.defineProperty(globalThis, 'Worker', { configurable: true, value: PreflightWorkerStub });
+    t.after(() => {
+        if (original) Object.defineProperty(globalThis, 'Worker', original);
+        else Reflect.deleteProperty(globalThis, 'Worker');
+    });
+}
+
+test('renderPdfPreview delegates preflight without parsing on the main thread; refusal terminates worker', async (t) => {
+    mockPreflightWorker(t);
+    const parse = t.mock.method(PDFDocument, 'load', () => { throw new Error('main-thread parsing'); });
+    for (const [status, code] of [['limit', 'invalid_pdf'], ['invalid', 'invalid_pdf'], ['encrypted', 'encrypted_pdf']]) {
+        const work = renderPdfPreview(bytes, 1, canvas(), new AbortController().signal);
+        const worker = PreflightWorkerStub.latest;
+        assert.ok(worker.url.pathname.endsWith('/document-viewer-pdf-preflight.worker.ts'));
+        assert.equal(worker.options.type, 'module');
+        assert.deepEqual(worker.input, bytes);
+        worker.reply({ status });
+        await assert.rejects(work, fails(code));
+        assert.equal(worker.terminated, 1);
+    }
+    assert.equal(parse.mock.callCount(), 0);
+    assert.equal(bytes[0], 37);
+});
+
+test('preflight transfers canonical bytes and always releases its worker', async (t) => {
+    mockPreflightWorker(t);
+    const scope = new PreviewScope(new AbortController().signal, 1000);
+    try {
+        const work = preparePdfPreviewInput(bytes, scope);
+        const worker = PreflightWorkerStub.latest, canonical = new Uint8Array([1, 2, 3]);
+        worker.reply({ status: 'ok', bytes: canonical });
+        assert.equal(await work, canonical);
+        assert.equal(worker.terminated, 1);
+        canonical.fill(0);
+    } finally { scope.finish(); }
+});
+
+for (const stop of ['abort', 'timeout', 'error', 'messageerror'] as const) {
+    test(`preflight ${stop} terminates a worker that never acknowledges completion`, async (t) => {
+        mockPreflightWorker(t);
+        const controller = new AbortController(), scope = new PreviewScope(controller.signal, stop === 'timeout' ? 10 : 1000);
+        try {
+            const work = preparePdfPreviewInput(bytes, scope), worker = PreflightWorkerStub.latest;
+            if (stop === 'abort') controller.abort();
+            if (stop === 'error' || stop === 'messageerror') worker.dispatchEvent(new Event(stop, { cancelable: true }));
+            await assert.rejects(work, fails(stop === 'abort' ? 'cancelled' : stop === 'timeout' ? 'timeout' : 'runtime_unavailable'));
+            assert.equal(worker.terminated, 1);
+            assert.equal(bytes[0], 37);
+        } finally { scope.finish(); }
+    });
+}
+
+test('preflight clears a queued result when cancellation wins and never starts when already cancelled', async (t) => {
+    mockPreflightWorker(t);
+    const controller = new AbortController(), scope = new PreviewScope(controller.signal, 1000);
+    try {
+        const work = preparePdfPreviewInput(bytes, scope), worker = PreflightWorkerStub.latest;
+        const canonical = new Uint8Array([1, 2, 3]);
+        controller.abort();
+        worker.reply({ status: 'ok', bytes: canonical });
+        await assert.rejects(work, fails('cancelled'));
+        assert.deepEqual(canonical, new Uint8Array(3));
+        assert.equal(worker.terminated, 1);
+        await assert.rejects(preparePdfPreviewInput(bytes, scope), fails('cancelled'));
+        assert.equal(PreflightWorkerStub.latest, worker);
+    } finally { scope.finish(); }
 });
