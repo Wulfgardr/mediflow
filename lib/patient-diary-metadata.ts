@@ -34,3 +34,37 @@ export function patientDiarySource(metadata: unknown, setting?: string): string 
     }
     return ({ home: 'Assistenza domiciliare', hospital: 'Ospedale', ambulatory: 'Ambulatorio' } as Record<string, string>)[setting ?? ''] ?? 'Diario locale';
 }
+
+export type PatientDiaryWorkflowState = 'draft' | 'signed' | 'recorded' | 'unrecognized' | 'unreadable';
+
+export const PATIENT_DIARY_WORKFLOW_LABELS: Readonly<Record<PatientDiaryWorkflowState, string>> = {
+    draft: 'Bozza',
+    signed: 'Firmata',
+    recorded: 'Registrata',
+    unrecognized: 'Stato non riconosciuto',
+    unreadable: 'Stato non leggibile',
+};
+
+const WORKFLOW_VALUES: Readonly<Record<string, PatientDiaryWorkflowState>> = {
+    draft: 'draft', bozza: 'draft',
+    signed: 'signed', firmata: 'signed',
+    registered: 'recorded', registrata: 'recorded',
+};
+
+/**
+ * Stato di lavorazione di una voce di diario, unica regola per cockpit e
+ * timeline (WUL-801). Senza valore la voce è quella salvata nell'archivio:
+ * «Registrata» descrive il salvataggio, non una deduzione dal testo. Un valore
+ * presente ma sconosciuto non diventa mai uno stato clinico certo.
+ */
+export function patientDiaryWorkflowState(metadata: unknown): PatientDiaryWorkflowState {
+    const read = readPatientDiaryMetadata(metadata);
+    if (read.state === 'unreadable') return 'unreadable';
+    for (const key of ['workflowStatus', 'status']) {
+        const value = read.value?.[key];
+        if (typeof value === 'string' && value.trim()) {
+            return WORKFLOW_VALUES[value.trim().toLocaleLowerCase('it-IT')] ?? 'unrecognized';
+        }
+    }
+    return 'recorded';
+}
