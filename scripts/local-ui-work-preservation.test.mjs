@@ -11,11 +11,23 @@ import { localUiArchiveLock } from './launcher-state.mjs';
 
 const real = process.env.MEDIFLOW_PRESERVATION_REAL === '1';
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function until(check, budget = 25000) {
+async function until(check, budget = 25000, label = 'Preservation deadline') {
     const deadline = Date.now() + budget;
-    while (!await check()) { assert.ok(Date.now() < deadline, 'Preservation deadline'); await pause(100); }
+    while (!await check()) { assert.ok(Date.now() < deadline, label); await pause(100); }
 }
 const terminal = child => child.exitCode !== null || child.signalCode !== null;
+// A closed page stops the runtime only through the server-side UI lease expiry: at most 15 s
+// after the last renewal, checked every 250 ms (measured locally under CPU load: 15.1-15.3 s).
+// The launcher then stops its Web runtime with stopOwnedChild(child, 8000), SIGTERM and SIGKILL
+// at half the grace. One 18 s window for both left 3 s for a stop the product allows 8 s for
+// (web-core, 1 Nov 2026); each phase now has its own window and its own failure message.
+const LEASE_EXPIRY_BUDGET_MS = 18000, RUNTIME_STOP_GRACE_MS = 8000;
+async function stopsAfterLease(child, outputOf) {
+    const before = outputOf().split('Arresto in corso.').length;
+    await until(() => terminal(child) || outputOf().split('Arresto in corso.').length > before,
+        LEASE_EXPIRY_BUDGET_MS, 'UI lease did not expire');
+    await until(() => terminal(child), RUNTIME_STOP_GRACE_MS + 2000, 'Runtime stop exceeded the launcher grace');
+}
 
 test('real browser and plugin launcher: UI owns lease, encrypted draft survives final exit and restart', { skip: !real, timeout: 180000 }, async t => {
     const data = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-preservation-')));
@@ -28,11 +40,13 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ baseURL: url });
     let output = '';
+    const outputs = new Map();
     const evidence = process.env.MEDIFLOW_PRESERVATION_EVIDENCE;
     const launch = async () => {
         const child = spawn(process.execPath, ['scripts/mediflow.mjs', '--riusa', '--scelta', 'web', '--senza-browser'], { env, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
         children.push(child);
         let current = ''; child.stdout.on('data', chunk => { current += chunk; output += chunk; }); child.stderr.on('data', chunk => { current += chunk; output += chunk; });
+        outputs.set(child, () => current);
         await until(() => { if (terminal(child)) throw new Error(current); return current.includes('Pronto:'); }, 45000);
         return child;
     };
@@ -114,9 +128,8 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
         assert.equal(terminal(first), false, 'Document navigation killed the browser-owned runtime');
         assert.equal((await page.request.get('/api/auth/check')).status(), 200);
     }
-    const closedAt = Date.now(); await page.close();
-    await until(() => terminal(first), 18000);
-    assert.ok(Date.now() - closedAt < 18000, 'UI lease did not expire');
+    await page.close();
+    await stopsAfterLease(first, outputs.get(first));
     const blocker = net.createServer();
     await new Promise((resolve, reject) => { blocker.once('error', reject); blocker.listen(port, '127.0.0.1', resolve); });
     try {
@@ -136,6 +149,7 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     assert.equal(entries.status(), 200); assert.deepEqual(await entries.json(), []);
     // Missing pagehide: the server must also stop with a silently lost document.
     await page.route('**/api/plugin-local-ui/lease', route => route.abort());
-    second.disconnect(); await page.close(); await until(() => terminal(second), 18000);
+    second.disconnect(); await page.close();
+    await stopsAfterLease(second, outputs.get(second));
     t.diagnostic(JSON.stringify({ stablePort: port, uiSurvivedHostMs: 17000, noClinicalEntries: true, encryptedDraftRecovered: true, silentUiExpiry: true }));
 });
