@@ -72,7 +72,7 @@ for (const functionId of FUNCTION_MODEL_IDS) test(`${functionId}: explicit OpenA
     assert.throws(() => resolveFunctionModelDispatch(source, functionId), /provider_unavailable/u);
     // An explicit unavailable local selection still denies, never choosing OpenAI.
     await picker.read(); await assert.rejects(picker.begin(), /provider_unavailable/u);
-    assert.equal(prepareCalls, 0); assert.match(picker.getSnapshot().error!, /provider_unavailable/u);
+    assert.equal(prepareCalls, 0); assert.match(picker.getSnapshot().error!, /provider locale selezionato non è disponibile/u);
     picker.chooseRemote(); await until(() => !picker.remote.getSnapshot().loading); await picker.begin();
     const output = picker.fetch(`/api/ai/${functionId.replaceAll('_', '-')}/preview`, { method: 'POST', body: '{}' });
     const denied = assert.rejects(output); await until(() => picker.remote.getSnapshot().state?.phase === 'needs_consent');
@@ -120,14 +120,14 @@ test('unavailable local preview is guarded before dispatch; prior list survives 
     for (const defaultModelOptionId of [null, dto.functions[0].defaultModelOptionId]) {
         await client.preview({ action: 'set', functionId: 'patient_insight', enabled: true, defaultModelOptionId });
         assert.equal(calls, 1); assert.equal(client.getSnapshot().dto, previous);
-        assert.equal(client.getSnapshot().proposed, null); assert.match(client.getSnapshot().error!, /provider_unavailable/u);
+        assert.equal(client.getSnapshot().proposed, null); assert.match(client.getSnapshot().error!, /provider locale selezionato non è disponibile/u);
     }
     // Lifecycle can disappear after a valid read: the server denial is equally precise.
     dto = { ...dto, functions: dto.functions.map(row => ({ ...row, options: row.options.map(option => ({ ...option, state: 'available_unqualified' as const })) })) } as typeof dto;
     await client.read(); const available = client.getSnapshot().dto; serverDenial = true;
     await client.preview({ action: 'set', functionId: 'patient_insight', enabled: true, defaultModelOptionId: null });
     assert.equal(calls, 3); assert.equal(client.getSnapshot().dto, available);
-    assert.match(client.getSnapshot().error!, /provider_unavailable/u); assert.doesNotMatch(client.getSnapshot().error!, /PRIVATE/u);
+    assert.match(client.getSnapshot().error!, /provider locale selezionato non è disponibile/u); assert.doesNotMatch(client.getSnapshot().error!, /PRIVATE/u);
     await client.apply(); assert.equal(calls, 3, 'failed preview cannot be applied');
 });
 
