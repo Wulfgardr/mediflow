@@ -1113,6 +1113,7 @@ impl ClinicalApp {
                         this.chat_access.detach(cx);
                         #[cfg(unix)]
                         this.patient_document.detach(cx);
+                        this.local_host.resolve_passphrase_outcome(&session);
                         this.session = Some(session);
                         this.focus_after_render = true;
                         this.message = None;
@@ -3174,6 +3175,17 @@ impl ClinicalApp {
                         cx,
                     ))
                 });
+        }
+        if self.local_host.passphrase_outcome_pending() {
+            panel = panel.child(
+                notice(
+                    "clinical-workspace-passphrase-outcome",
+                    local_host::PASSPHRASE_OUTCOME_GUIDANCE,
+                    theme,
+                    true,
+                )
+                .debug_selector(|| "clinical-workspace-passphrase-outcome".into()),
+            );
         }
         if let Some((message, error)) = &self.message {
             panel = panel.child(notice(

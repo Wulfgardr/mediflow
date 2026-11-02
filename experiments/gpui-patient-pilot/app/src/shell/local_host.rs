@@ -20,6 +20,7 @@ use mediflow_runtime_client::{
 };
 pub(super) use mediflow_runtime_client::{RETIREMENT_ORPHAN_GUIDANCE, RETIREMENT_WARNING};
 use mediflow_runtime_client::{RetirementNotice, RetiringAccess};
+pub(super) use security::PASSPHRASE_OUTCOME_GUIDANCE;
 use std::{path::PathBuf, sync::Arc};
 
 enum Authority {
@@ -99,7 +100,13 @@ impl LocalAdministration {
             controls: controls::ControlsArea::new(theme, cx),
             network: network::NetworkArea::default(),
             references: references::ReferencesArea::new(theme, cx),
-            security: security::SecurityArea::new(theme, cx),
+            security: security::SecurityArea::new(
+                theme,
+                retirement_path
+                    .as_ref()
+                    .map(|p| p.with_file_name("passphrase-change-outcome.json")),
+                cx,
+            ),
             chatgpt: chatgpt::ChatGptArea::default(),
             models: models::ModelsArea::new(theme, cx),
             parameters: parameters::ParametersArea::new(theme, cx),
@@ -131,6 +138,12 @@ impl LocalAdministration {
             SettingsPage::Archives => self.archives.has_work(),
             _ => false,
         }
+    }
+    pub(super) fn passphrase_outcome_pending(&self) -> bool {
+        self.security.outcome.pending()
+    }
+    pub(super) fn resolve_passphrase_outcome(&mut self, session: &RuntimeSession) {
+        self.security.outcome.resolve(session);
     }
     pub(super) fn has_work(&self) -> bool {
         self.controls.busy()
