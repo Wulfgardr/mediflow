@@ -52,8 +52,8 @@ pub use retirement_notice::{RETIREMENT_WARNING, RetirementNotice};
 pub use scales::*;
 pub use session::patient_document::*;
 pub use session::{
-    AiPreferencesContext, AmbulatoryCommandContext, ChatAccessContext, ChatWriteRecovery,
-    FirstAmbulatoryContext, ProfileQueryIntent, RuntimeSession,
+    AiPreferencesContext, AmbulatoryCommandContext, ChatAccessContext, ChatBookingView,
+    ChatWriteRecovery, FirstAmbulatoryContext, ProfileQueryIntent, RuntimeSession,
 };
 pub use who::{
     WHO_ATTRIBUTION, WhoEntry, WhoReadiness, WhoReadinessStatus, WhoReceipt, WhoSearchResponse,

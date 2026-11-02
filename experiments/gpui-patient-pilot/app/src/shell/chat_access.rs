@@ -148,6 +148,26 @@ impl ChatAccess {
     }
 }
 
+/// Local date, time and state of each checkup the booking view read; no titles or notes.
+fn booking_agenda_lines(agenda: &mediflow_runtime_client::ChatBookingView) -> Vec<String> {
+    agenda
+        .rows
+        .iter()
+        .filter_map(|(date, status)| {
+            let local = chrono::DateTime::parse_from_rfc3339(date)
+                .ok()?
+                .with_timezone(&chrono::Local);
+            let state = match status.as_str() {
+                "pending" => "da svolgere",
+                "completed" => "completato",
+                "cancelled" => "annullato",
+                _ => return None,
+            };
+            Some(format!("{} · {state}", local.format("%d/%m/%Y %H:%M")))
+        })
+        .collect()
+}
+
 fn catalog_copy(prosthetics: bool) -> (&'static str, &'static str) {
     if prosthetics {
         (
@@ -400,8 +420,9 @@ impl ClinicalApp {
             let mut resolutions = BTreeMap::new();
             let mut storage_error = false;
             for id in scan.ids {
+                let kind = scan.kinds.get(&id).copied();
                 let resolution = session
-                    .recover_chat_write_command(&scope, &id)
+                    .recover_chat_write_command(&scope, &id, kind)
                     .map_or(ChatWriteResolution::Uncertain, |r| r.reconcile());
                 if let ChatWriteResolution::Confirmed(outcome) = resolution {
                     storage_error |= references.confirm(&id, outcome).is_err();
@@ -574,9 +595,21 @@ impl ClinicalApp {
                     .on_click(cx.listener(move |_, _, _, cx| { let request = request.clone(); std::thread::spawn(move || crate::chat_access::owner::prepare_clinical(&request)); cx.notify(); })))
             })
             .when_some(therapy, |mut el, (target, rows, selected, result, booking)| {
-                if let Some((revision, chosen)) = booking {
-                    if let Some(chosen) = chosen {
-                        el = el.child(notice("native-chat-booking-preview", format!("Controllo · {chosen} · stato da svolgere · agenda alla versione {revision}"), theme, false));
+                if let Some(booking) = booking {
+                    if let Some(agenda) = booking.agenda.as_ref() {
+                        el = el.child(text!("Agenda della cartella, letta all’apertura").with_id("native-chat-booking-agenda-title"));
+                        if agenda.rows.is_empty() {
+                            el = el.child(notice("native-chat-booking-agenda-empty", "Nessun controllo in agenda per questa cartella.", theme, false));
+                        }
+                        for (index, line) in booking_agenda_lines(agenda).into_iter().enumerate() {
+                            el = el.child(text!(line).with_id(format!("native-chat-booking-agenda-{index}")));
+                        }
+                        if agenda.truncated {
+                            el = el.child(notice("native-chat-booking-agenda-truncated", "Mostrati i primi 20 controlli per data; l’agenda completa è nella cartella.", theme, false));
+                        }
+                    }
+                    if let Some(chosen) = booking.chosen {
+                        el = el.child(notice("native-chat-booking-preview", format!("Nuovo controllo · {chosen} · da svolgere. Se l’agenda sopra cambia prima della conferma, la prenotazione viene respinta."), theme, false));
                     } else if selected.is_none() {
                         let ready = state == State::Challenge;
                         el = el.child(self.chat_access.booking.clone())
@@ -584,8 +617,8 @@ impl ClinicalApp {
                                 .when(ready, |button| button.on_click(cx.listener(|this, _, _, cx| {
                                     let text = this.chat_access.booking.read(cx).value().to_owned();
                                     let Some(request) = this.chat_access.pending.clone() else { return; };
-                                    if crate::chat_access::owner::booking_instant(&text, chrono::Local::now()).is_none() {
-                                        this.chat_access.message = Some("Scrivi data e ora come GG/MM/AAAA HH:MM, da oggi a due anni.".into());
+                                    if let Err(error) = crate::chat_access::owner::booking_instant(&text, chrono::Local::now()) {
+                                        this.chat_access.message = Some(error.message().into());
                                     } else {
                                         this.chat_access.message = None;
                                         std::thread::spawn(move || crate::chat_access::owner::choose_booking(&request, &text));

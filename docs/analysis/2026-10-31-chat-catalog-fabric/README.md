@@ -291,9 +291,13 @@ la ricevuta durevole del comando e non viene presentato come tale.
 ### Prenotazione confermata (corsia c9b-prenotazione)
 
 La coppia minima lettura/prenotazione è collegata nel codice. Il comando
-`booking` della card non porta campi: la finestra GPUI apre la vista con la
-revisione dell’agenda della cartella selezionata, il medico scrive data e ora
-(`GG/MM/AAAA HH:MM`, da oggi a due anni) e vede l’anteprima. Il titolo è fisso
+`booking` della card non porta campi. All’apertura la finestra GPUI riceve,
+dalla stessa transazione, la revisione dell’agenda della cartella selezionata
+e i suoi controlli (primi 20 per data, solo data e stato, nessun testo
+libero), e li mostra prima del campo data: la CAS protegge quello che il
+medico ha visto. Il medico scrive data e ora (`GG/MM/AAAA HH:MM`, dal giorno
+locale corrente a due anni; per l’ora saltata o ripetuta del cambio d’ora un
+messaggio dedicato) e vede l’anteprima. Il titolo è fisso
 («Controllo»), nessuna nota, stato da svolgere. La conferma usa il PIN nativo e
 l’approvazione monouso di `lib/native-chat-write-approval.ts`, consumata prima
 dell’attesa del PIN; sessione, archivio, selezione e scadenza sono ricontrollati
@@ -302,8 +306,9 @@ dentro la transazione.
 La scrittura passa da `createCheckupOperation`, il writer comune di Web e
 paired, senza modificarlo. Ammissione, ricevuta già presente e CAS girano come
 guardia di commit nella stessa transazione IMMEDIATE del writer. La revisione
-dell’agenda è `count(*) + sum(version)` dei controlli del paziente: ogni
-creazione o modifica la cambia. Se è cambiata dall’apertura la prenotazione è
+dell’agenda è un’impronta SHA-256 dell’insieme (id, versione, cancellazione)
+dei controlli del paziente: cambia per ogni inserimento, modifica o
+cancellazione, anche fisica, senza contare sulla crescita delle versioni. Se è cambiata dall’apertura la prenotazione è
 respinta con `version_conflict`.
 
 La ricevuta è l’evento di audit legato al `commandId` (`checkup.created`,
@@ -311,11 +316,17 @@ superficie `native`, flag `chat:checkup-booking`): `success` con il controllo
 creato con id uguale al comando, oppure `denied` con motivo `version_conflict`.
 Sta nelle tabelle già esportate dal backup portabile, quindi sopravvive al
 riavvio e al backup senza un nuovo registro; il test del backup esporta e
-valida un archivio con una prenotazione applicata e una respinta. Il
-riferimento del comando resta nel deposito locale della GPUI; dopo un riavvio
-la rilettura interroga entrambe le route di scrittura chat, terapia e
-prenotazione, e una risposta persa si riconcilia dalla ricevuta senza
-ripetere la scrittura.
+valida un archivio con una prenotazione applicata e una respinta. Se un
+ripristino da un’esportazione senza audit riporta il controllo senza la sua
+ricevuta, la rilettura risponde applicata (storica), mai ritirata; una
+ricevuta importata da un ripristino è marcata storica.
+
+Il riferimento del comando resta nel deposito locale della GPUI insieme al
+tipo (terapia o prenotazione). Dopo un riavvio, e dal pulsante «Rileggi
+esito» della card, la rilettura usa solo la route di quel tipo. Un
+riferimento salvato prima che il tipo venisse registrato prova le route che
+l’abbinamento concede; una route che risponde 403 non blocca l’altra. Una
+risposta persa si riconcilia dalla ricevuta senza ripetere la scrittura.
 
 C-9b resta aperta per le prove sui due desktop reali, non eseguite qui.
 Candidati da calendario, calendari personali, attività territoriali e invii
