@@ -10,6 +10,7 @@ import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth
 import { sissHandoffUpdateSchema, sissHandoffWritePreconditionSchema } from '@/lib/api-schemas/siss-handoffs';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
+import { planSissHandoffOutcomeChange } from '@/lib/clinical-status-transitions';
 
 // Local handoff notes and metadata; no documents or attachment payloads.
 const SISS_HANDOFF_JSON_MAX_BYTES = 262_144;
@@ -79,21 +80,23 @@ export async function PUT(request: Request, context: RouteContext) {
         if (Object.prototype.hasOwnProperty.call(body, 'outcome')) {
             if (!outcome || !OUTCOMES.has(outcome)) return NextResponse.json({ error: 'Unsupported SISS handoff outcome' }, { status: 400 });
             updateData.outcome = outcome;
-            if (outcome !== 'started' && !Object.prototype.hasOwnProperty.call(body, 'completedAt')) {
-                updateData.completedAt = new Date();
-            }
         }
 
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
         const result = dbServer.transaction((tx) => {
             const target = and(eq(sissHandoffEvents.id, id), eq(sissHandoffEvents.patientId, body.patientId));
-            const existing = tx.select({ version: sissHandoffEvents.version }).from(sissHandoffEvents)
-                .where(target).get();
+            const existing = tx.select({ version: sissHandoffEvents.version, outcome: sissHandoffEvents.outcome,
+                completedAt: sissHandoffEvents.completedAt }).from(sissHandoffEvents).where(target).get();
             if (!existing) return { status: 404, value: { error: 'SISS handoff not found' } } as const;
             if (existing.version !== body.version) {
                 return { status: 409, value: { error: 'Il passaggio SISS è cambiato. Ricarica il diario prima di riprovare.' } } as const;
             }
+            // WUL-800: esito e data di chiusura coerenti, prima di qualunque scrittura.
+            const plan = planSissHandoffOutcomeChange({ outcome: existing.outcome, completedAt: existing.completedAt ?? null },
+                { outcome: updateData.outcome, completedAt: updateData.completedAt }, updateData.updatedAt ?? new Date());
+            if (!plan.ok) return plan.denial;
+            if (plan.completedAt !== undefined) updateData.completedAt = plan.completedAt;
             const expected = and(target, eq(sissHandoffEvents.version, body.version));
             if (existing.version >= Number.MAX_SAFE_INTEGER) {
                 return { status: 409, value: { error: 'SISS handoff version exhausted' } } as const;
@@ -110,7 +113,8 @@ export async function PUT(request: Request, context: RouteContext) {
                 sourceSurface: auditContext.sourceSurface,
                 requestId,
                 redactedMetadata: withAuditContextMetadata(auditContext, {
-                    changedFields: listChangedFields(body as Record<string, unknown>, ['patientId', 'version']),
+                    changedFields: [...new Set([...listChangedFields(body as Record<string, unknown>, ['patientId', 'version']),
+                        ...(plan.completedAt !== undefined ? ['completedAt'] : [])])],
                 }),
             });
             return { status: 200, value: { success: true, version: existing.version + 1 } } as const;
