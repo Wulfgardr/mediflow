@@ -41,7 +41,7 @@ ma non chiude la 0.9.1. Resta il mandato esteso del 19 ottobre, inclusi
 WUL-787 (unità 7–21 dell'addendum) e WUL-788 (unità 3–10 dell'ADR 0160).
 Il contratto U0 approvato fissa W=36, G=10, C/P/I/Q e la soglia di sei
 compiti su sei con al massimo un intervento. L’unico target GPUI installato
-è il MacBook Pro Mac16,5, M4 Max, 36 GB, macOS 27.2 build 26B118, con Touch ID
+è il MacBook Pro Mac16,5, M4 Max, 36 GB, macOS 27.2 build 26B123, con Touch ID
 attivo; la versione minima è macOS 27.2 su questo target, senza promessa su
 altri Mac. G-9 fissa toolchain, runtime e bundle. Web/headless Windows e Linux
 restano nelle VM Parallels di Q-6; GPUI su quei sistemi, mobile e installatori
