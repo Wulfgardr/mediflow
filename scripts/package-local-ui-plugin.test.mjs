@@ -6,9 +6,65 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { packageLocalUiPlugin } from './package-local-ui-plugin.mjs';
 import { generatePayloadLedger } from './generate-runtime-payload-ledger.mjs';
+import { probeCodexLocalUi } from './codex-local-ui-probe.mjs';
 
 const root = path.resolve('plugins/mediflow-local-ui');
 const json = file => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
+
+test('the documented code-mode recipe calls the real MCP tool through Codex without a model', {
+  skip: !process.env.MEDIFLOW_CODEX_BIN,
+}, async () => {
+  const skill = fs.readFileSync(path.join(root, 'skills/local-ui/SKILL.md'), 'utf8');
+  const script = skill.match(/```javascript\n([\s\S]*?)\n```/u)?.[1];
+  assert.ok(script, 'The plugin must explain code-mode discovery with an executable recipe');
+  const result = await probeCodexLocalUi({ binary: process.env.MEDIFLOW_CODEX_BIN, script,
+    command: process.execPath, args: ['--import', new URL('./register-strip-types-loader.mjs', import.meta.url).href,
+      path.resolve('scripts/codex-local-ui-probe.mjs'), '--mcp-fixture'],
+    environment: { MEDIFLOW_DATA_DIR: process.env.MEDIFLOW_DATA_DIR, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1' },
+    evidenceDirectory: process.env.MEDIFLOW_CODEX_EVIDENCE_DIR });
+  const output = JSON.stringify(result.output);
+  assert.match(output, /continue_in_mediflow/u);
+  assert.doesNotMatch(output, /isError|TypeError|ReferenceError|unavailable/u);
+});
+
+test('the installed plugin default prompt activates its MCP tool in Codex', {
+  skip: !process.env.MEDIFLOW_CODEX_BIN,
+}, async t => {
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-codex-plugin-')));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const home = path.join(directory, 'home'), marketplace = path.join(directory, 'marketplace');
+  const plugin = path.join(marketplace, 'plugin');
+  fs.mkdirSync(home);
+  fs.mkdirSync(path.join(marketplace, '.agents/plugins'), { recursive: true });
+  fs.cpSync(root, plugin, { recursive: true });
+  fs.writeFileSync(path.join(marketplace, '.agents/plugins/marketplace.json'), JSON.stringify({
+    name: 'mediflow-local-test', plugins: [{ name: 'mediflow-local-ui', source: { source: 'local', path: './plugin' },
+      policy: { installation: 'AVAILABLE', authentication: 'ON_USE' }, category: 'Productivity' }],
+  }));
+  fs.writeFileSync(path.join(plugin, 'runtime.json'), JSON.stringify({ nodePath: process.execPath }));
+  fs.writeFileSync(path.join(plugin, 'src/launch.mjs'), `
+    await import(${JSON.stringify(new URL('./register-strip-types-loader.mjs', import.meta.url).href)});
+    process.env.MEDIFLOW_DATA_DIR = ${JSON.stringify(process.env.MEDIFLOW_DATA_DIR)};
+    process.argv[2] = '--mcp-fixture';
+    await import(${JSON.stringify(new URL('./codex-local-ui-probe.mjs', import.meta.url).href)});
+  `);
+  for (const args of [['plugin', 'marketplace', 'add', marketplace],
+    ['plugin', 'add', 'mediflow-local-ui@mediflow-local-test']]) {
+    const result = spawnSync(process.env.MEDIFLOW_CODEX_BIN, args, { encoding: 'utf8',
+      env: { ...process.env, CODEX_HOME: home } });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  const skill = fs.readFileSync(path.join(plugin, 'skills/local-ui/SKILL.md'), 'utf8');
+  const script = skill.match(/```javascript\n([\s\S]*?)\n```/u)?.[1];
+  assert.ok(script);
+  const result = await probeCodexLocalUi({ binary: process.env.MEDIFLOW_CODEX_BIN, script, codexHome: home,
+    prompt: json('.codex-plugin/plugin.json').interface.defaultPrompt.join('\n'),
+    evidenceDirectory: process.env.MEDIFLOW_CODEX_EVIDENCE_DIR
+      ? path.join(process.env.MEDIFLOW_CODEX_EVIDENCE_DIR, 'installed-plugin') : undefined });
+  const output = JSON.stringify(result.output);
+  assert.match(output, /continue_in_mediflow/u);
+  assert.doesNotMatch(output, /isError|TypeError|ReferenceError|non disponibile/u);
+});
 
 test('portable, Codex and Claude manifests share identity and client-specific launch commands', () => {
   const base = json('plugin.json'), codex = json('.codex-plugin/plugin.json'), claude = json('.claude-plugin/plugin.json');
