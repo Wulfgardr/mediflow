@@ -18,10 +18,11 @@ if (process.argv[2] === 'leaf') {
   process.once('SIGTERM', () => exitAfter(child));
   const pids = await new Promise(resolve => child.once('message', resolve));
   const payload = 'synthetic-redacted-payload';
-  let prepared = false;
+  let prepared = false, selection;
   for await (const line of createInterface({ input: process.stdin })) {
-    const { command } = JSON.parse(line);
-    if (command === 'prepare' && !prepared) { prepared = true; process.stdout.write(JSON.stringify({ payload, payloadSha256: 'a'.repeat(64), nativeSource: { pids: [process.pid, ...pids] } }) + '\n'); }
-    else if (command === 'consume') process.stdout.write(JSON.stringify({ payload }) + '\n');
+    const { command, patient } = JSON.parse(line);
+    if (command === 'prepare' && !prepared) { prepared = true; selection = patient; process.stdout.write(JSON.stringify({ payload, payloadSha256: 'a'.repeat(64), nativeSource: { pids: [process.pid, ...pids] } }) + '\n'); }
+    // Like the clinical owner: a card prepared for one selection answers only that selection.
+    else if (command === 'consume') process.stdout.write(JSON.stringify(patient === selection ? { payload } : { status: 'denied' }) + '\n');
   }
 }
