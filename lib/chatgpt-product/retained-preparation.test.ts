@@ -33,7 +33,7 @@ const cleanAudit: MacQualificationAudit = {
     claim: 'candidate_boundary_only_not_live_or_clinical', revision: null, baseContextSha256: '', sourceAvailable: true,
     fullSourceBuildBinding: 'unqualified', consumedProjectionBinding: 'not_observed', omittedToolBinding: 'not_observed',
     protocolRegeneration: 'not_observed', initializeSha256: null, readbackSha256: null, nativeHelperSha256: null,
-    compilerSha256: null, binarySha256: '', osBuild: 'synthetic', cleanupComplete: true, ownedTreeCeased: true,
+    compilerSha256: null, binarySha256: '', osBuild: 'synthetic', boundaryProbe: null, cleanupComplete: true, ownedTreeCeased: true,
     administrativePolicy: 'absent_only_no_overrides', resourcesRetained: false,
 };
 function emptyHold() {
