@@ -209,6 +209,63 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(created, HomeBaseCreatedResource(id: "attachment-1", version: nil))
     }
 
+    private func collectionPayload() throws -> HomeBaseAttachmentCreatePayload {
+        let payload = try ClinicalFieldCrypto.sealAttachmentCreatePayload(
+            name: "referto.pdf", path: "uploads/referto.pdf", data: Data("PDF".utf8).base64EncodedString(),
+            type: "application/pdf", size: 3, masterKey: SymmetricKey(data: Data(repeating: 5, count: 32)))
+        let rows = [HomeBaseAttachmentSummary(id: "attachment-0", patientId: "patient-1", name: "", type: "application/pdf",
+            size: 1, path: "", summarySnapshot: nil, parseEvidenceArtifactSnapshot: nil, ocrQueueState: nil, ocrQueueReason: nil,
+            ocrQueueUpdatedAt: nil, ocrReplayArtifactSnapshot: nil, createdAt: nil,
+            currentness: HomeBaseAttachmentCurrentness(sourceRef: String(repeating: "c", count: 64), revision: 1, freshnessEpoch: 1))]
+        return payload.expecting(try HomeBaseAttachmentCollectionPrecondition.expected(from: rows))
+    }
+
+    func testCreateAttachmentChangedCollectionIsATypedRefusalWithoutRetry() async throws {
+        var calls = 0
+        let client = makeClient { request in
+            calls += 1
+            let object = try self.requestObject(request)
+            let collection = try XCTUnwrap(object["expectedCollection"] as? [[String: Any]])
+            XCTAssertEqual(collection.first?["id"] as? String, "attachment-0")
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(#"{"error":"Attachment collection changed. Review the documents again."}"#.utf8))
+        }
+        do {
+            _ = try await client.createAttachment(patientId: "patient-1", payload: try collectionPayload(),
+                                                  credentials: creds, sessionCookie: cookie, ambulatoryId: "amb-1")
+            XCTFail("A changed collection must not be reported as created")
+        } catch {
+            XCTAssertEqual(error as? HomeBaseClientError, .attachmentCollectionChanged)
+        }
+        XCTAssertEqual(calls, 1)
+    }
+
+    func testCreateAttachmentFallsBackOnlyForAHomeBaseThatRejectsTheFieldByPresence() async throws {
+        var bodies: [[String: Any]] = []
+        let client = makeClient { request in
+            bodies.append(try self.requestObject(request))
+            let legacy = bodies.count == 1
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: legacy ? 400 : 201, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data((legacy
+                ? #"{"error":"Network document write boundary rejects unexpected field expectedCollection"}"#
+                : #"{"id":"attachment-1"}"#).utf8))
+        }
+        let created = try await client.createAttachment(patientId: "patient-1", payload: try collectionPayload(),
+                                                        credentials: creds, sessionCookie: cookie, ambulatoryId: "amb-1")
+        XCTAssertEqual(created.id, "attachment-1")
+        XCTAssertEqual(bodies.count, 2)
+        XCTAssertNotNil(bodies[0]["expectedCollection"])
+        XCTAssertNil(bodies[1]["expectedCollection"])
+        XCTAssertEqual(Set(bodies[1].keys), Set(["name", "path", "data", "type", "size"]))
+    }
+
+    func testAttachmentListDecodesHostCurrentness() throws {
+        let decoded = try JSONDecoder().decode([HomeBaseAttachmentSummary].self, from: Data(#"[{"id":"a1","patientId":"p1","name":"n","type":"t","size":1,"path":"p","currentness":{"sourceRef":"\#(String(repeating: "d", count: 64))","revision":3,"freshnessEpoch":2}}]"#.utf8))
+        XCTAssertEqual(decoded.first?.currentness, HomeBaseAttachmentCurrentness(sourceRef: String(repeating: "d", count: 64), revision: 3, freshnessEpoch: 2))
+    }
+
     func testLoginUsesPairedNativeRouteWithoutSourceSurfaceAuthority() async throws {
         let client = makeClient { request in
             if request.url?.path == "/api/auth/check" { return try self.legacyUnlockCheck(request) }

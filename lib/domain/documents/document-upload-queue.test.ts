@@ -135,3 +135,18 @@ test('pre-aborted FileReader request never constructs or reads a file', async ()
     // Node deliberately has no FileReader: this must reject before touching it.
     await assert.rejects(readDocumentDataUrl(new File(['synthetic'], 'synthetic.txt'), controller.signal), { name: 'AbortError' });
 });
+
+test('a definite refusal holds the refused file and the rest of the batch without writing them', async () => {
+    const writes: string[] = [];
+    const refusal = new Error('synthetic collection changed');
+    const queue = createDocumentUploadQueue({
+        async read(file: { name: string }) { return file.name; },
+        async persist(file) { writes.push(file.name); if (file.name === 'synthetic-b') throw refusal; },
+        holds: (error) => error === refusal,
+    });
+    const files = [source('synthetic-a'), source('synthetic-b'), source('synthetic-c')];
+    assert.deepEqual(await queue.start(files), {
+        saved: 1, unconfirmed: [], notStarted: 2, interrupted: false, held: [files[1], files[2]],
+    });
+    assert.deepEqual(writes, ['synthetic-a', 'synthetic-b']);
+});

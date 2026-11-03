@@ -760,3 +760,25 @@ file cambiano per le parti di altre entità, il modello no.
 WUL-800 coorte 5 (handoff SISS) aggiunge la sua tabella agli stessi due file,
 con lo stesso esito per il modello delle terapie: nessuna riga o regola delle
 terapie cambia.
+
+## Raccordo 0.9.1 del 3 novembre 2026: collezione degli allegati nei writer del browser
+
+Fra le sorgenti coperte cambia soltanto `lib/db.ts`. `ApiTable.add` e
+`ApiTable.delete` accettano un'opzione `attachmentCollection`, una vista
+della collezione degli allegati di un paziente presa dall'elenco che il
+medico ha davanti (`lib/attachment-collection-client.ts`, fuori dalle
+sorgenti fissate perché non tocca terapie). La vista è usata soltanto quando
+la tabella è `attachments` e l'opzione è presente: per ogni altra tabella
+`attachmentCollectionFor` restituisce `undefined` e il corpo, la richiesta,
+gli await e gli errori restano quelli di prima. Il `.catch` che ritira la vista
+dopo una risposta mancata avvolge la `fetch` e il `json` solo in presenza
+della vista, quindi il percorso della terapia, compreso il delete recintato
+con `deleteContext`, non acquista microtask né cambia l'ordine delle guardie.
+
+Non cambiano controller, conferma, CAS, ledger, audit, stato della terapia
+o cifratura. Modello, statechart, invarianti, limiti, testimoni e mutanti
+restano invariati. La precondizione di collezione è verificata dal confine
+reale con SQLite (`lib/attachment-web-create-currentness.test.ts`, caso «due
+finestre») e dai test del client (`lib/attachment-client-preconditions.test.ts`),
+non da TLC. È aggiornato il solo digest di `lib/db.ts`; `syncCommit` resta
+invariato perché nessuna sorgente della terapia cambia comportamento.
