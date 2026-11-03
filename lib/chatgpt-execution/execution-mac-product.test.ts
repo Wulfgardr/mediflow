@@ -14,7 +14,7 @@ const audit = (clean: boolean): MacQualificationAudit => ({
     claim: 'candidate_boundary_only_not_live_or_clinical', revision: null, baseContextSha256: '', sourceAvailable: true,
     fullSourceBuildBinding: 'unqualified', consumedProjectionBinding: 'not_observed', omittedToolBinding: 'not_observed',
     protocolRegeneration: 'not_observed', initializeSha256: null, readbackSha256: null, nativeHelperSha256: null,
-    compilerSha256: null, binarySha256: '', osBuild: 'synthetic', cleanupComplete: clean, ownedTreeCeased: clean,
+    compilerSha256: null, binarySha256: '', osBuild: 'synthetic', boundaryProbe: null, cleanupComplete: clean, ownedTreeCeased: clean,
     administrativePolicy: 'absent_only_no_overrides', resourcesRetained: !clean,
 });
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }

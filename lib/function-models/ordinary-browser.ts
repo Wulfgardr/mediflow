@@ -68,12 +68,38 @@ const preparationErrors: Readonly<Record<string, string>> = Object.freeze({
     model_unavailable: 'Il modello OpenAI scelto non è disponibile. Nessun modello alternativo viene usato.',
     session_expired: 'La sessione MediFlow non è disponibile. Sblocca MediFlow prima di una nuova preparazione.',
 });
+// Fixed labels for the Mac container checks; unknown names are ignored, never shown.
+const boundaryChecks: Readonly<Record<string, string>> = Object.freeze({
+    nproc: 'avvio di altri processi', fork: 'avvio di altri processi', spawn: 'avvio di altri processi',
+    thread: 'funzionamento minimo del processo', descriptors: 'canali ereditati dal sistema',
+    owned_read: 'cartella di lavoro dedicata', owned_write: 'cartella di lavoro dedicata',
+    protected_write: 'protezione della configurazione', protected_rename: 'protezione della configurazione',
+    outside_read: 'lettura fuori dalla cartella dedicata', outside_write: 'scrittura fuori dalla cartella dedicata',
+    home_read: 'lettura della cartella personale', data_read: 'lettura dell’archivio MediFlow', database_read: 'lettura dell’archivio MediFlow',
+    proxy_connect: 'collegamento al servizio ufficiale', loopback_other: 'servizi locali', unix_socket: 'servizi locali',
+    mach_lookup: 'servizi di sistema', external_network: 'rete fuori dalle destinazioni ufficiali',
+});
+const NOTHING_SENT = 'Nessun dato è stato inviato a ChatGPT.';
+/** Honest refusal on the Mac: what is missing, and that nothing left the station. */
+export function boundaryPreparationError(value: unknown): string {
+    const boundary = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>).boundary : null;
+    const notice = boundary && typeof boundary === 'object' && !Array.isArray(boundary) ? boundary as Record<string, unknown> : null;
+    const build = typeof notice?.osBuild === 'string' && /^[0-9]{2}[A-Z][0-9]{1,5}[a-z]?$/u.test(notice.osBuild) ? ` ${notice.osBuild}` : '';
+    const failed = Array.isArray(notice?.failed) ? [...new Set(notice.failed.filter((name): name is string => typeof name === 'string' && Object.hasOwn(boundaryChecks, name)).map(name => boundaryChecks[name]))] : [];
+    if (notice?.stage === 'probe' && notice.probe === 'failed' && failed.length)
+        return `Il contenitore di sicurezza non supera il controllo su macOS${build}: ${failed.join(', ')}. ${NOTHING_SENT}`;
+    if (notice?.stage === 'probe') return `Il controllo del contenitore di sicurezza non si è concluso su macOS${build}. ${NOTHING_SENT}`;
+    if (notice?.stage === 'sources') return `Il programma ChatGPT o il profilo di sistema non corrispondono alle versioni verificate. ${NOTHING_SENT}`;
+    if (notice?.stage === 'build') return `Il custode di sicurezza non si compila: servono gli strumenti da riga di comando di Xcode. ${NOTHING_SENT}`;
+    return `Questa postazione non ha superato le verifiche di sicurezza per ChatGPT. ${NOTHING_SENT}`;
+}
 async function preparationError(response: Response): Promise<string> {
     if (response.status === 401) return preparationErrors.session_expired;
     try {
         const value = await response.clone().json();
         const code = value && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype
             ? Object.getOwnPropertyDescriptor(value, 'code') : undefined;
+        if (code && 'value' in code && code.value === 'unqualified_boundary') return boundaryPreparationError(value);
         if (code && 'value' in code && typeof code.value === 'string' && Object.hasOwn(preparationErrors, code.value)) return preparationErrors[code.value];
     } catch { /* Unknown responses cannot supply UI prose or authority. */ }
     return 'Preparazione OpenAI non riuscita. Verifica l’esito e la chiusura prima di preparare di nuovo; nessuna ripetizione automatica.';

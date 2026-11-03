@@ -1,12 +1,13 @@
 /* per-session preparation with a backend-wide, crash-persistent hold.
  * Files and receipts never qualify a host. Only the concrete issuer does. */
 import 'server-only';
-import { constants, closeSync, fstatSync, lstatSync, mkdirSync, openSync, unlinkSync } from 'node:fs';
+import { constants, closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getDataDir } from '../data-dir';
 import { ExecutionError } from './execution-contract';
 import { prepareMacProductQualification, MacQualificationFailure, type MacQualificationAudit } from './execution-mac-qualification';
 import { resolveInstalledMacExecutionAssets } from './execution-mac-assets';
+import type { MacBoundaryProbeRecord } from './execution-mac-probe';
 import { createReviewedMacProductPlatform, executionPlatformSnapshot, type ProductExecutionPlatform } from './execution-platform';
 import { reportExecutionDiagnostic, type ExecutionDiagnostic, type PreparationDiagnosticStage } from './execution-transport';
 import type { ProductPreparation } from '../chatgpt-product/product-contract';
@@ -61,6 +62,26 @@ function reserveDirectory(directory: string): () => void {
             throw new ExecutionError('unqualified_boundary');
         unlinkSync(path); released = true;
     };
+}
+const PROBE_LOG = 'boundary-probe.json', PROBE_LOG_BUILDS = 16;
+/** Last probe outcome per macOS build, for the person and for support. Written
+ * after the probe, never read to admit anything: the next preparation probes again. */
+export function recordMacBoundaryProbe(record: MacBoundaryProbeRecord | null, directory: () => string = reservationDirectory): void {
+    if (!record) return;
+    const root = directory();
+    mkdirSync(root, { recursive: true, mode: 0o700 });
+    const path = join(root, PROBE_LOG);
+    let builds: Record<string, MacBoundaryProbeRecord> = {};
+    try {
+        const previous = JSON.parse(readFileSync(path, 'utf8'));
+        if (previous?.schema === 'mediflow.mac-boundary-probe-log.v1' && previous.builds && typeof previous.builds === 'object') builds = previous.builds;
+    } catch { /* A missing or unreadable log starts again; it never carried authority. */ }
+    builds[record.osBuild] = record;
+    const kept = Object.fromEntries(Object.entries(builds)
+        .sort(([, a], [, b]) => String(b?.observedAt).localeCompare(String(a?.observedAt))).slice(0, PROBE_LOG_BUILDS));
+    const temporary = `${path}.${process.pid}.tmp`;
+    writeFileSync(temporary, JSON.stringify({ schema: 'mediflow.mac-boundary-probe-log.v1', builds: kept }, null, 2) + '\n', { mode: 0o600, flag: 'w' });
+    renameSync(temporary, path);
 }
 function closed(audit: MacQualificationAudit): boolean {
     return audit.cleanupComplete && audit.ownedTreeCeased && !audit.resourcesRetained;
@@ -135,12 +156,18 @@ export function createMacProductPlatformManager(options: {
                     try {
                         const owned = await issue({ ...assets, signal: local.signal, lifetimeMs, diagnostic });
                         prepared = owned;
+                        // The outcome is recorded before the function is admitted for this build.
+                        try { recordMacBoundaryProbe(owned.audit().boundaryProbe, directory); }
+                        catch { await drain(owned); throw new ExecutionError('unqualified_boundary'); }
                         if (signal.aborted || local.signal.aborted) { await drain(owned); throw new ExecutionError('canceled'); }
                         reviewed = createReviewedMacProductPlatform({ binaryPath: owned.binaryPath, qualification: owned.authority });
                         if (reviewed.snapshot().state !== 'qualified') { await drain(owned); throw new ExecutionError('unqualified_boundary'); }
                         setState('ready');
                     } catch (error) {
                         reviewed = undefined;
+                        if (error instanceof MacQualificationFailure) {
+                            try { recordMacBoundaryProbe(error.audit.boundaryProbe, directory); } catch { /* The refusal stands either way. */ }
+                        }
                         if (!prepared) {
                             if (error instanceof MacQualificationFailure && (closed(error.audit)
                                 || !error.audit.resourcesRetained && ['platform', 'sources'].includes(error.stage))) relinquish();
