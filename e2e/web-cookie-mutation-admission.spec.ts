@@ -37,3 +37,35 @@ test('standalone cookie admission rejects hostile logout before retiring the Web
   expect(await accepted.text()).toBe('');
   expect((await request.get('/api/patients')).status()).toBe(401);
 });
+
+test('a page mutation is admitted on the browser own Origin and Fetch Metadata', async ({ page, baseURL }) => {
+  const origin = new URL(baseURL!).origin;
+  const failed: string[] = [];
+  const subresources: Promise<Record<string, string>>[] = [];
+  page.on('requestfailed', (request) => failed.push(`${request.url()} ${request.failure()?.errorText}`));
+  page.on('requestfinished', (request) => {
+    if (request.method() === 'GET' && request.resourceType() !== 'document' && request.url().startsWith(origin)) {
+      subresources.push(request.allHeaders());
+    }
+  });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+
+  // The browser context carries no forged headers: no-cors GETs (stylesheets,
+  // images) go out without Origin, and Chrome 156+ fails every subresource with
+  // ERR_INVALID_ARGUMENT when a context forges Sec-Fetch-Site.
+  expect(failed.filter((entry) => entry.includes('ERR_INVALID_ARGUMENT'))).toEqual([]);
+  const noCors = (await Promise.all(subresources)).filter((headers) => headers['sec-fetch-mode'] === 'no-cors');
+  expect(noCors.length).toBeGreaterThan(0);
+  for (const headers of noCors) expect(headers.origin).toBeUndefined();
+
+  const sent = page.waitForRequest((request) => request.url() === `${origin}/api/auth/logout`);
+  const status = await page.evaluate(async () => (await fetch('/api/auth/logout', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+  })).status);
+  const headers = await (await sent).allHeaders();
+  expect(headers['sec-fetch-site']).toBe('same-origin');
+  expect(headers.origin).toBe(origin);
+  expect(status).toBe(204);
+  expect((await page.request.get('/api/patients')).status()).toBe(401);
+});

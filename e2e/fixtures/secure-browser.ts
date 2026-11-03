@@ -17,6 +17,15 @@ const LOOPBACK_ONLY_NETWORK = [
   '--proxy-bypass-list=<-loopback>;localhost;127.0.0.1;[::1]',
 ];
 
+// E2E_BROWSER_CHANNEL=chrome runs the suite on the installed Google Chrome
+// instead of the bundled Chromium, with the same hardening. Unset keeps the
+// bundled Chromium (CI). Fixtures that load an unpacked extension pin
+// channel 'chromium', because branded Chrome ignores --load-extension.
+const browserChannel = process.env.E2E_BROWSER_CHANNEL?.trim() || undefined;
+
+export const browserChannelUse: Partial<Pick<PlaywrightWorkerOptions, 'channel'>> =
+  browserChannel ? { channel: browserChannel } : {};
+
 export const secureBrowserUse: Partial<Pick<PlaywrightWorkerOptions, 'launchOptions'>> =
   process.env.CI || process.env.PLAYWRIGHT_ALLOW_EXTERNAL_NETWORK === '1'
     ? {}
@@ -26,6 +35,7 @@ export const secureBrowserUse: Partial<Pick<PlaywrightWorkerOptions, 'launchOpti
 // bypass the config's launchOptions: merges the same hardening into theirs.
 export function secureLaunch<T extends LaunchOptions>(options: T): T {
   const hardening = secureBrowserUse.launchOptions;
-  if (!hardening) return options;
-  return { ...options, ...hardening, args: [...(hardening.args ?? []), ...(options.args ?? [])] };
+  const withChannel = { ...browserChannelUse, ...options };
+  if (!hardening) return withChannel;
+  return { ...withChannel, ...hardening, args: [...(hardening.args ?? []), ...(options.args ?? [])] };
 }

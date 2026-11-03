@@ -7,8 +7,9 @@ test.use({ initialRuntimeServices: true });
 
 const STRONG_AUTH_CONTROL_ETAG = /^"[A-Za-z0-9_-]{32,256}"$/u;
 
-function mutationHeaders(etag: string): Record<string, string> {
+function mutationHeaders(etag: string, baseURL: string | undefined): Record<string, string> {
   return {
+    ...trustedWebRequestHeaders(baseURL),
     'If-Match': etag,
     'Idempotency-Key': randomUUID(),
   };
@@ -41,7 +42,7 @@ test('Web access recovers across application lock, logout, and synthetic admin r
   expect(bootstrapEtag).toMatch(STRONG_AUTH_CONTROL_ETAG);
 
   const login = await request.post('/api/auth/login', {
-    headers: mutationHeaders(bootstrapEtag),
+    headers: mutationHeaders(bootstrapEtag, baseURL),
     data: { username: 'admin', password: pin },
   });
   expect(login.status()).toBe(200);
@@ -52,7 +53,7 @@ test('Web access recovers across application lock, logout, and synthetic admin r
   expect(authenticated.status()).toBe(200);
 
   const lock = await request.post('/api/auth/lock', {
-    headers: mutationHeaders(loginEtag),
+    headers: mutationHeaders(loginEtag, baseURL),
   });
   expect(lock.status()).toBe(200);
   await expect(lock.json()).resolves.toEqual({
@@ -70,13 +71,13 @@ test('Web access recovers across application lock, logout, and synthetic admin r
   await expect(postLockCheck.json()).resolves.toMatchObject({ hasSession: false });
 
   const relogin = await request.post('/api/auth/login', {
-    headers: mutationHeaders(postLockCheck.headers().etag),
+    headers: mutationHeaders(postLockCheck.headers().etag, baseURL),
     data: { username: 'admin', password: pin },
   });
   expect(relogin.status()).toBe(200);
   expect(relogin.headers().etag).toMatch(STRONG_AUTH_CONTROL_ETAG);
 
-  const logout = await request.post('/api/auth/logout');
+  const logout = await request.post('/api/auth/logout', { headers: trustedWebRequestHeaders(baseURL) });
   expect(logout.status()).toBe(204);
   expect(await logout.text()).toBe('');
 
@@ -88,7 +89,7 @@ test('Web access recovers across application lock, logout, and synthetic admin r
   });
   expect(recoveryLoginCheck.status()).toBe(200);
   const recoveryLogin = await request.post('/api/auth/login', {
-    headers: mutationHeaders(recoveryLoginCheck.headers().etag),
+    headers: mutationHeaders(recoveryLoginCheck.headers().etag, baseURL),
     data: { username: 'admin', password: pin },
   });
   expect(recoveryLogin.status()).toBe(200);

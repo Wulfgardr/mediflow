@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { differenceInYears } from 'date-fns';
 import { mkdir } from 'node:fs/promises';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
+import { fetchInterceptedRequest, trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
 test.beforeEach(({ baseURL }) => {
   if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw new Error('Owned synthetic archive and non-3000 loopback required');
@@ -140,7 +141,7 @@ test('second gesture writes once with the shown patient and version; registered 
     let entered = false;
     await page.route('**/api/therapies?*', async route => {
         if (!writes.length) return route.continue();
-        const response = await route.fetch();
+        const response = await fetchInterceptedRequest(route);
         entered = true;
         await gate;
         await route.fulfill({ response });
@@ -200,7 +201,7 @@ for (const applied of [true, false]) {
         const { writes } = network(page);
         await page.route(executeRoute, async route => {
             if (route.request().method() !== 'POST') return route.continue();
-            if (applied) expect((await route.fetch()).status()).toBe(200);
+            if (applied) expect((await fetchInterceptedRequest(route)).status()).toBe(200);
             await route.abort('failed');
         });
         await (await action(page, 'Sospendi')).click();
@@ -333,7 +334,7 @@ test('an ambiguous command survives reload and unrelated advancement until expli
     expect(writes).toHaveLength(1);
     const archive = await (await page.request.get('/api/auth/check')).json();
     const late = await page.request.put(`/api/therapies/${data.therapyId}`, {
-        headers: { 'x-mediflow-archive-generation': archive.archiveGeneration }, data: { version: 1, status: 'suspended' },
+        headers: { ...trustedWebRequestHeaders(page.url()), 'x-mediflow-archive-generation': archive.archiveGeneration }, data: { version: 1, status: 'suspended' },
     });
     expect(late.status()).toBe(200);
     await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
@@ -342,7 +343,7 @@ test('an ambiguous command survives reload and unrelated advancement until expli
     await expect(threshold(page)).toContainText('ID richiesta ritirato');
     const original = commands[0];
     const denied = await page.request.post(`/api/therapy-status-commands/${original.commandId}/execute`, {
-        headers: { 'x-mediflow-archive-generation': archive.archiveGeneration }, data: original,
+        headers: { ...trustedWebRequestHeaders(page.url()), 'x-mediflow-archive-generation': archive.archiveGeneration }, data: original,
     });
     expect(denied.status()).toBe(200); expect((await denied.json()).receipt.outcome).toBe('closed');
     expect(await stored(page, data)).toMatchObject({ version: 2, status: 'suspended' });

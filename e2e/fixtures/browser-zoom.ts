@@ -2,7 +2,6 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, expect } from '@playwright/test';
-import { trustedWebRequestHeaders } from './trusted-web-request';
 import { secureLaunch } from './secure-browser';
 
 export async function openBrowserZoomFixture(baseURL: string) {
@@ -15,7 +14,6 @@ export async function openBrowserZoomFixture(baseURL: string) {
     await writeFile(join(extension, 'worker.js'), 'chrome.runtime.onInstalled.addListener(() => {});');
     const context = await chromium.launchPersistentContext(join(root, 'profile'), secureLaunch({
         baseURL, channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 },
-        extraHTTPHeaders: trustedWebRequestHeaders(baseURL),
         args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
     }));
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
