@@ -337,6 +337,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     return (
         <div className={`${styles.register} ${styles.documentLayout}`} data-testid="patient-documents">
             <div className={styles.documentRail}>
+            <p className="mb-3"><Link href={`/patients/import/dossier?patientId=${encodeURIComponent(patientId)}`} className={disclosure.documentAction} data-lume-action="quiet">Dossier: importa da cartella o riprendi la revisione</Link></p>
             <section ref={uploadArea} aria-label="Caricamento documenti" data-document-area="upload">
                 {currentAttachments?.length === 0 && !listLoading ? (
                     <p className={disclosure.empty}>Nessun documento caricato. Aggiungi un file per consultarlo e, separatamente, richiedere una sintesi.</p>
@@ -391,7 +392,6 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                 {fileRejections.length > 0 && (
                     <div className="mt-3" role="alert"><ul>{fileRejections.map((message) => <li key={message}><PrivacyBlur>{message}</PrivacyBlur></li>)}</ul></div>
                 )}
-                <p className="mt-3"><Link href={`/patients/import/dossier?patientId=${encodeURIComponent(patientId)}`} className={disclosure.documentAction} data-lume-action="quiet">Dossier: importa da cartella o riprendi la revisione</Link></p>
             </section>
 
             <p ref={listStatus} role="status" aria-label="Stato elenco documenti" aria-live="polite" aria-atomic="true" tabIndex={isProcessing || listLoading ? 0 : -1}>
