@@ -768,17 +768,41 @@ public struct NetworkCapability: Codable, Hashable, Sendable {
     }
 }
 
+public struct TerritorialPackCapability: Codable, Hashable, Sendable {
+    public let schemaVersion: String
+    public let revision: Int?
+    public let preset: String
+    public let status: String
+
+    public var showsLombardyFeatures: Bool {
+        guard schemaVersion == "mediflow.territorial-packs.v1", status == "ready",
+              let revision, revision >= 0,
+              ["core", "core+it", "core+it+lom"].contains(preset) else { return true }
+        return preset == "core+it+lom"
+    }
+}
+
 public struct NetworkCapabilitiesResponse: Codable, Hashable, Sendable {
     public let nodeId: String
     public let operatingMode: String
     public let protocolVersion: String
     public let capabilities: [NetworkCapability]
+    public var territorialPacks: TerritorialPackCapability?
 
     public init(nodeId: String, operatingMode: String, protocolVersion: String, capabilities: [NetworkCapability]) {
         self.nodeId = nodeId
         self.operatingMode = operatingMode
         self.protocolVersion = protocolVersion
         self.capabilities = capabilities
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        nodeId = try values.decode(String.self, forKey: .nodeId)
+        operatingMode = try values.decode(String.self, forKey: .operatingMode)
+        protocolVersion = try values.decode(String.self, forKey: .protocolVersion)
+        capabilities = try values.decode([NetworkCapability].self, forKey: .capabilities)
+        territorialPacks = try? values.decode(TerritorialPackCapability.self, forKey: .territorialPacks)
     }
 }
 
@@ -2000,6 +2024,7 @@ public enum HomeBaseClientError: LocalizedError, Equatable {
     case versionConflict(VersionConflictPayload)
     case localAuthorityUnsupported(String)
     case contract
+    case territorialPackDisabled
     /// The home-base refused a document write because the list changed after it was read. Nothing was written.
     case attachmentCollectionChanged
 
@@ -2030,6 +2055,8 @@ public enum HomeBaseClientError: LocalizedError, Equatable {
             return "\(operation) non supportata in modalita autorita locale."
         case .contract:
             return "La risposta dell'home-base non rispetta il contratto atteso."
+        case .territorialPackDisabled:
+            return "Funzione del modulo lombardo, non attiva su questa installazione."
         case .attachmentCollectionChanged:
             return "L'elenco dei documenti è cambiato dopo l'ultima lettura: il documento non è stato caricato. Controlla l'elenco aggiornato, poi riprova."
         }

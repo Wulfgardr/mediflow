@@ -460,6 +460,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /// until something unrelated redrew them.
     @Published private(set) var capabilityGate = ClinicalCapabilityGate()
 
+    @Published private(set) var territorialPacks: TerritorialPackCapability?
+    var showsLombardyFeatures: Bool { territorialPacks?.showsLombardyFeatures ?? true }
+
+    func updateTerritorialPacks(_ packs: TerritorialPackCapability?) {
+        territorialPacks = packs
+    }
+
     func permitsCapability(_ key: String) -> Bool {
         capabilityGate.permits(key)
     }
@@ -3664,6 +3671,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     // paziente), ma il messaggio dichiara onestamente che il CF non e' stato
     // copiato invece di affermare un'azione che non e' avvenuta.
     func openPrregHandoff() async {
+        guard showsLombardyFeatures else {
+            errorMessage = HomeBaseClientError.territorialPackDisabled.localizedDescription
+            return
+        }
         guard let patient = selectedPatient else { return }
         statusMessage = nil
         errorMessage = nil

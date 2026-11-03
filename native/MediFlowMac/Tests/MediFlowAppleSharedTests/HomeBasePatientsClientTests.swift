@@ -2520,6 +2520,20 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertTrue(ack.success)
     }
 
+    func testTerritorialPackDisabledResponseExplainsTheModule() async throws {
+        let client = makeClient { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 403, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"code":"TERRITORIAL_PACK_DISABLED","error":"Forbidden"}"#.utf8))
+        }
+        do {
+            _ = try await client.fetchNetworkCapabilities(credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
+            XCTFail("Expected territorial denial")
+        } catch {
+            XCTAssertEqual(error as? HomeBaseClientError, .territorialPackDisabled)
+            XCTAssertTrue(error.localizedDescription.contains("modulo lombardo"))
+        }
+    }
+
     func testDiscoveryAndRevisionMethodsUsePairedHeadersAndDecodeSamples() async throws {
         var paths: [String] = []
         let client = makeClient { request in

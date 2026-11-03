@@ -20,8 +20,8 @@ function substitute(source, name) {
     'execution-sandbox.ts': [['b973d440acac501fd2594a43e7ca9ce41e0a65b9dfb28d0d7a7837c99e1261e3', digest(syntheticFiles.codex)]],
     'execution-mac-assets.ts': [['bytes: 220584000', `bytes: ${syntheticFiles.codex.length}`]],
     'execution-mac-native.ts': [
-      ['bytes: 20411', `bytes: ${syntheticFiles['mac-owner.c'].length}`],
-      ['c26edcc883e311f279507fc5a80c792242a252d66e99ee97c5f67693bcb14fac', digest(syntheticFiles['mac-owner.c'])],
+      ['bytes: 24627', `bytes: ${syntheticFiles['mac-owner.c'].length}`],
+      ['fe57d4589aded9f5439873d43361def44fbaa42908ba648831c8d48c29a7adb1', digest(syntheticFiles['mac-owner.c'])],
     ],
     'execution-mac-config.ts': [
       ['bytes: 200401', `bytes: ${syntheticFiles['schema/config.schema.json'].length}`],
