@@ -281,7 +281,7 @@ test('pins the isolated local engine graph and excludes direct engine imports fr
     assert.equal(ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID, `mediflow.pdfjs_png.node24.${process.platform}_${process.arch}.v1`);
     assert.equal(sha256(ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR), ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256);
     if (process.platform === 'darwin' && process.arch === 'arm64')
-        assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, 'db5bc68dc3822cd647f2b02fa8f7dc2878b72d84479c3ed7f9e6f4b878017462');
+        assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, '0d0cae109da7e1a91cdfbff66773e6bf208c05753fc74ff6ca3cdfefc73b6c94');
     assert.match(source, /1011b38553532d7078c59f26b15a471f8dae00f101b60e2add9b8511737a1ce0/u);
     assert.match(source, /ec7dc504d4ade7fd36846d16643e50eed5c914335f3a86b6a2a8d632391e5bfa/u);
     assert.equal(profiles.find((entry) => entry.platform === 'darwin')?.tarballSha256,
@@ -326,4 +326,24 @@ test('real child draws non-embedded standard-font overlays on scanned pages', { 
     let dark = 0;
     for (let index = 0; index < data.length; index += 4) if (data[index]! < 96) dark += 1;
     assert.ok(dark > 200, `overlay text not drawn: ${dark} dark pixels`);
+});
+
+test('a page whose digit has no outline never reaches OCR, while a legitimate report page still renders', {
+    skip: !SUPPORTS_REAL_RENDERER,
+}, async () => {
+    const fixture = await acceptedFixture();
+    const glyphs = new URL('../../../components/test-support/pdf-glyphs/', import.meta.url);
+    const substitute = (bytes: Buffer) => ({
+        manifest: { ...fixture.manifest, pages: fixture.manifest.pages.map((page, index) =>
+            index === 0 ? { ...page, pageSha256: sha256(bytes), pageByteLength: bytes.byteLength } : page) },
+        materialization: { ...fixture.materialization, pages: fixture.materialization.pages.map((page, index) =>
+            index === 0 ? { ...page, pdfBytes: bytes, receipt: { ...page.receipt,
+                pageSha256: sha256(bytes), pageByteLength: bytes.byteLength } } : page) },
+    });
+    const missing = substitute(readFileSync(new URL('lab-missing-digit.pdf', glyphs)));
+    const refused = await renderAnyDocNeedsOcrPages(missing.manifest, missing.materialization);
+    assert.equal(refused.status, 'review_required');
+    if (refused.status === 'review_required') assert.equal(refused.reason, 'render_failed');
+    const report = substitute(readFileSync(new URL('laboratory-1.pdf', glyphs)));
+    assert.equal((await renderAnyDocNeedsOcrPages(report.manifest, report.materialization)).status, 'rendered');
 });

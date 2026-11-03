@@ -23,7 +23,7 @@ export const ANYDOC_PDF_PAGE_MATERIALIZER_DESCRIPTOR = [
     `limits=source:${ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES},pages:${ANYDOC_PAGE_ROUTING_MAX_PAGE_COUNT},output:${ANYDOC_PDF_PAGE_MATERIALIZER_MAX_OUTPUT_BYTES}`,
     'options=ignoreEncryption:false,throwOnInvalidObject:true,updateMetadata:false,useObjectStreams:false',
 ].join('\n');
-export const ANYDOC_PDF_PAGE_MATERIALIZER_SHA256 = '15aa0ef5b79bbe69ff8f3720efe19e171baba7290d340533d73c6d2dd1a0321a' as const;
+export const ANYDOC_PDF_PAGE_MATERIALIZER_SHA256 = 'ea12718f14e91e9189709f4d959cb9a6710c3abe25fd875c606c61f653e52466' as const;
 
 export type AnyDocPdfPageMaterializationFailureReason =
     | 'invalid_input' | 'source_digest_mismatch' | 'invalid_routing'

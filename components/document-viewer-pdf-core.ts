@@ -40,6 +40,7 @@ export async function paintPdfPage(
     let continuation: ReturnType<typeof setTimeout> | undefined;
     let success = false;
     let disposed = false;
+    let pages: number | undefined;
     const dispose = () => {
         if (disposed) return;
         disposed = true;
@@ -63,6 +64,7 @@ export async function paintPdfPage(
         if (!Number.isInteger(document.pages) || document.pages < 1) throw new PreviewError('invalid_pdf');
         if (document.pages > PREVIEW_LIMITS.pages) throw new PreviewError('page_limit');
         if (number > document.pages) throw new PreviewError('page_unavailable');
+        pages = document.pages;
         const info = await scope.wait(document.info());
         scope.check();
         if (info.encrypted) throw new PreviewError('encrypted_pdf');
@@ -91,7 +93,10 @@ export async function paintPdfPage(
         success = true;
         return { pages: document.pages, page: number, width: size.width, height: size.height };
     } catch (error) {
-        throw error instanceof PreviewError ? error : new PreviewError('invalid_pdf');
+        if (!(error instanceof PreviewError)) throw new PreviewError('invalid_pdf');
+        // Only this page is refused; the document's other pages stay reachable.
+        if (error.code === 'unresolved_glyph' && pages !== undefined) throw new PreviewError(error.code, pages);
+        throw error;
     } finally {
         if (!success) clearPreviewCanvas(canvas);
         dispose();
