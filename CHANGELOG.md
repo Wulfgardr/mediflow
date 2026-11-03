@@ -113,6 +113,13 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
 - Il messaggio AI iniziale resta visibile finché non parte un'operazione;
   l'avviso di contesto cambiato segue solo un'attività o una proposta
   ([#547](https://github.com/Wulfgardr/mediflow/pull/547)).
+- Le app Apple 0.9.0 già installate cambiano lo stato di una prescrizione
+  specialistica e poi di ogni voce a parte. Il server sposta ora le voci
+  nello stato della prescrizione nella stessa transazione, con un motivo
+  proprio in audit, e accetta senza effetti la chiamata successiva sulla voce
+  già spostata. Una voce annullata a parte resta com'è e l'app mostra un
+  conflitto da ricaricare; prescrizione e altre voci restano allineate anche
+  se l'app si ferma a metà.
 
 ### Interfaccia
 
