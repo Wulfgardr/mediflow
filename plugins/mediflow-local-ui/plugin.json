@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "mediflow-local-ui",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Apri MediFlow locale: ricerca, anagrafica, storia e guida prescrittiva nella UI fidata, senza dati del paziente nella chat.",
   "author": {
     "name": "MediFlow"

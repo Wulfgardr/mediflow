@@ -1,5 +1,10 @@
 [
   {
+    "path": "scripts/codex-local-ui-probe.mjs",
+    "reason": "WUL-757: harness importato da scripts/package-local-ui-plugin.test.mjs; nessun test autonomo.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "components/settings/settings-presentation.test-support.ts",
     "reason": "WUL-729: JSX mounting and inspection helpers; no standalone test registration.",
     "owner": "@Wulfgardr"
