@@ -1,7 +1,80 @@
 use super::*;
+use crate::shell::local_preferences::{read_private, write_private};
 use mediflow_runtime_client::PreparedPassphraseChange;
+use sha2::{Digest, Sha256};
+
+pub(in crate::shell) const PASSPHRASE_OUTCOME_GUIDANCE: &str = "Un cambio della passphrase avviato in precedenza ha un esito da verificare. Accedi con la nuova passphrase; se non riesce, prova quella precedente. Conserva entrambi i kit di recupero, ciascuno con la sua chiave scritta su carta, finché un accesso riuscito non mostra quale coppia è valida.";
+
+/// Survives a restart after an uncertain passphrase change. The file holds
+/// only a digest of archive address and account name: no passphrase, kit,
+/// recovery key or clinical data.
+pub(super) struct PassphraseOutcome {
+    path: Option<PathBuf>,
+    /// `Some(None)` is a marker that exists but cannot be read back.
+    pending: Option<Option<String>>,
+}
+impl PassphraseOutcome {
+    pub(super) fn load(path: Option<PathBuf>) -> Self {
+        let pending = path.as_ref().and_then(|path| match read_private(path) {
+            Ok(bytes) => Some(
+                serde_json::from_slice::<serde_json::Value>(&bytes)
+                    .ok()
+                    .filter(|value| value["version"] == 1)
+                    .and_then(|value| value["binding"].as_str().map(str::to_owned)),
+            ),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(_) => Some(None),
+        });
+        Self { path, pending }
+    }
+    pub(super) fn pending(&self) -> bool {
+        self.pending.is_some()
+    }
+    fn binding(session: &RuntimeSession) -> String {
+        let digest = Sha256::digest(
+            format!("{}\n{}", session.base_url(), session.user().username).as_bytes(),
+        );
+        digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+    /// Records the uncertain outcome. Returns false when it could not be
+    /// stored, so the caller can say the guidance will not survive a restart.
+    pub(super) fn record(&mut self, session: &RuntimeSession) -> bool {
+        let binding = Self::binding(session);
+        self.pending = Some(Some(binding.clone()));
+        let Some(path) = &self.path else {
+            return cfg!(test);
+        };
+        serde_json::to_vec(&serde_json::json!({"version": 1, "binding": binding}))
+            .map_err(std::io::Error::other)
+            .and_then(|bytes| write_private(path, &bytes))
+            .is_ok()
+    }
+    /// A successful sign-in of the same account on the same archive shows
+    /// which credential pair is valid. A marker that cannot be read back is
+    /// cleared by any successful sign-in.
+    pub(super) fn resolve(&mut self, session: &RuntimeSession) {
+        let Some(binding) = &self.pending else {
+            return;
+        };
+        if binding
+            .as_ref()
+            .is_some_and(|binding| *binding != Self::binding(session))
+        {
+            return;
+        }
+        if let Some(path) = &self.path {
+            match std::fs::remove_file(path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(_) => return,
+            }
+        }
+        self.pending = None;
+    }
+}
 
 pub(super) struct SecurityArea {
+    pub(super) outcome: PassphraseOutcome,
     fields: [Entity<TextInput>; 3],
     operation: SecurityOperation,
     saved: bool,
@@ -17,7 +90,11 @@ enum SecurityOperation {
     Applying,
 }
 impl SecurityArea {
-    pub(super) fn new(theme: Theme, cx: &mut Context<ClinicalApp>) -> Self {
+    pub(super) fn new(
+        theme: Theme,
+        outcome: Option<PathBuf>,
+        cx: &mut Context<ClinicalApp>,
+    ) -> Self {
         let fields = [
             ("security-current", "Passphrase attuale"),
             ("security-new", "Nuova passphrase"),
@@ -31,6 +108,7 @@ impl SecurityArea {
             .map(|field| cx.subscribe(field, |_, _, _: &InputChanged, cx| cx.notify()))
             .collect();
         Self {
+            outcome: PassphraseOutcome::load(outcome),
             fields,
             operation: SecurityOperation::Idle,
             saved: false,
@@ -258,10 +336,15 @@ impl ClinicalApp {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
                 if this.account_profile.generation != authority || this.local_host.generation != generation { return; }
+                let stored = match (&result, &this.session) {
+                    (Ok(()), Some(session)) => { this.local_host.security.outcome.resolve(session); true }
+                    (Err(_), Some(session)) => this.local_host.security.outcome.record(session),
+                    _ => true,
+                };
                 this.disconnect(cx);
                 this.message = Some(match result {
                     Ok(()) => ("Nuove credenziali rilette. Rinnova l’accesso e verifica lo sblocco con la nuova passphrase.".into(), false),
-                    Err(error) => (format!("Cambio della passphrase: esito da verificare. {} Conserva il nuovo kit e la chiave scritta su carta, insieme ai precedenti. Accedi di nuovo e prova lo sblocco con la nuova passphrase; se non riesce, prova quella precedente. Verifica l’accesso prima di preparare un’altra operazione.", ui_error(error)), true),
+                    Err(error) => (format!("Cambio della passphrase: esito da verificare. {} Conserva il nuovo kit e la chiave scritta su carta, insieme ai precedenti. Accedi di nuovo e prova lo sblocco con la nuova passphrase; se non riesce, prova quella precedente. Verifica l’accesso prima di preparare un’altra operazione.{}", ui_error(error), if stored { "" } else { " Questa indicazione non è stata salvata e non sarà riproposta dopo la chiusura dell’app: annotala." }), true),
                 });
                 cx.notify();
             });
@@ -561,5 +644,102 @@ mod review738 {
             assert!(reads_after > 0);
             assert!(!success, "the synthetic writer returned 200 without changing credentials: the client must not announce verified success");
         });
+    }
+    #[gpui::test]
+    fn uncertain_passphrase_change_guidance_survives_restart_until_sign_in(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let fixture = crate::shell::local_preferences::tests::Fixture::new();
+        // Creates the private state directory on Windows, as the real store does.
+        fixture.store();
+        let path = fixture.0.join("passphrase-change-outcome.json");
+        let host = notes_recovery_tests::Host::new();
+        let notice = RetirementNotice::new(None);
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host("Synthetic scales fixture passphrase", notice.clone())
+                .unwrap(),
+        );
+        let command = Arc::new(
+            access
+                .prepare_passphrase_change(
+                    "Synthetic scales fixture passphrase",
+                    "New synthetic passphrase for restart guidance",
+                    "New synthetic passphrase for restart guidance",
+                )
+                .unwrap(),
+        );
+        // The writer answers 200 but the readback still shows the old salt.
+        host.plan("POST /api/auth/passphrase/change")
+            .send((200, serde_json::json!({"success":true})))
+            .unwrap();
+        let (first, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        first.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.local_host.retirement = notice;
+            app.local_host.security.outcome = PassphraseOutcome::load(Some(path.clone()));
+            app.local_host.authority = Authority::Open(access);
+            app.local_host.security.operation = SecurityOperation::Review(command);
+            app.local_host.security.saved = true;
+            app.local_host.security.paper = true;
+            app.apply_security_change(cx);
+        });
+        cx.run_until_parked();
+        first.read_with(cx, |app, _| {
+            assert!(
+                app.message
+                    .as_ref()
+                    .unwrap()
+                    .0
+                    .contains("esito da verificare")
+            );
+        });
+        let stored = std::fs::read_to_string(&path).unwrap();
+        assert!(!stored.contains("passphrase"));
+        assert!(!stored.contains("synthetic"));
+
+        // Restart: a new window reads the marker from the private state directory.
+        let restarted = cx.update(|window, cx| {
+            window.replace_root(cx, |window, cx| {
+                let mut app = ClinicalApp::new(String::new(), window, cx);
+                app.local_host.security.outcome = PassphraseOutcome::load(Some(path.clone()));
+                app
+            })
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(
+            cx.debug_bounds("clinical-workspace-passphrase-outcome")
+                .is_some()
+        );
+
+        // A successful sign-in of the same account settles which pair is valid.
+        restarted.update(cx, |app, cx| {
+            app.pairing = Some(StoredPairing {
+                client: RuntimeClient::new(RuntimeConfig {
+                    base_url: host.session.base_url().to_owned(),
+                    tls_pin_sha256: None,
+                })
+                .unwrap(),
+                id: "synthetic-device".into(),
+                token: Zeroizing::new("x".repeat(64)),
+            });
+            app.login_fields[4]
+                .editor
+                .update(cx, |input, cx| input.set_content("synthetic", cx));
+            app.login_fields[5].editor.update(cx, |input, cx| {
+                input.set_content("Synthetic scales fixture passphrase", cx)
+            });
+            app.connect(cx);
+        });
+        cx.run_until_parked();
+        restarted.read_with(cx, |app, _| {
+            assert!(app.session.is_some());
+            assert!(!app.local_host.passphrase_outcome_pending());
+        });
+        assert!(!PassphraseOutcome::load(Some(path)).pending());
     }
 }

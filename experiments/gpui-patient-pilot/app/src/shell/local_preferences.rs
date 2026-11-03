@@ -189,17 +189,7 @@ impl LocalPreferencesStore {
                 Err(io::ErrorKind::NotFound.into())
             };
         };
-        #[cfg(not(windows))]
-        regular_file(path)?;
-        #[cfg(windows)]
-        let file = windows_private_directory::open_read(path)?;
-        #[cfg(not(windows))]
-        let file = fs::File::open(path)?;
-        let mut bytes = Vec::new();
-        file.take(MAX_BYTES + 1).read_to_end(&mut bytes)?;
-        if bytes.len() as u64 > MAX_BYTES {
-            return Err(io::ErrorKind::InvalidData.into());
-        }
+        let bytes = read_private(path)?;
         LocalPreferences::parse(&bytes).ok_or_else(|| io::Error::from(io::ErrorKind::InvalidData))
     }
 
@@ -239,52 +229,75 @@ impl LocalPreferencesStore {
                 Err(io::Error::from(io::ErrorKind::NotFound))
             };
         };
-        let parent = path
-            .parent()
-            .ok_or_else(|| io::Error::from(io::ErrorKind::InvalidInput))?;
-        #[cfg(not(windows))]
-        fs::create_dir_all(parent)?;
-        #[cfg(windows)]
-        windows_private_directory::verify_directory(parent)?;
-        #[cfg(windows)]
-        let existing = windows_private_directory::open_read(path).map(|_| ());
-        #[cfg(not(windows))]
-        let existing = regular_file(path);
-        match existing {
-            Ok(()) => {}
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error),
-        }
-        static NEXT_FILE: AtomicU64 = AtomicU64::new(0);
-        let temporary = parent.join(format!(
-            ".preferences-{}-{}.tmp",
-            std::process::id(),
-            NEXT_FILE.fetch_add(1, Ordering::Relaxed)
-        ));
-        #[cfg(windows)]
-        let mut file = windows_private_directory::create_file(&temporary)?;
-        #[cfg(not(windows))]
-        let mut file = {
-            let mut options = fs::OpenOptions::new();
-            options.write(true).create_new(true);
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::OpenOptionsExt;
-                options.mode(0o600);
-            }
-            options.open(&temporary)?
-        };
-        let result = (|| {
-            file.write_all(&bytes)?;
-            file.sync_all()?;
-            drop(file);
-            fs::rename(&temporary, path)
-        })();
-        if result.is_err() {
-            let _ = fs::remove_file(&temporary);
-        }
-        result
+        write_private(path, &bytes)
     }
+}
+
+/// Reads a small file from the private GPUI state directory. Links,
+/// directories and oversized content are refused.
+pub(crate) fn read_private(path: &Path) -> io::Result<Vec<u8>> {
+    #[cfg(not(windows))]
+    regular_file(path)?;
+    #[cfg(windows)]
+    let file = windows_private_directory::open_read(path)?;
+    #[cfg(not(windows))]
+    let file = fs::File::open(path)?;
+    let mut bytes = Vec::new();
+    file.take(MAX_BYTES + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_BYTES {
+        return Err(io::ErrorKind::InvalidData.into());
+    }
+    Ok(bytes)
+}
+
+/// Replaces a small file in the private GPUI state directory through a
+/// synced temporary file, never following an existing link.
+pub(crate) fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::from(io::ErrorKind::InvalidInput))?;
+    #[cfg(not(windows))]
+    fs::create_dir_all(parent)?;
+    #[cfg(windows)]
+    windows_private_directory::verify_directory(parent)?;
+    #[cfg(windows)]
+    let existing = windows_private_directory::open_read(path).map(|_| ());
+    #[cfg(not(windows))]
+    let existing = regular_file(path);
+    match existing {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+    static NEXT_FILE: AtomicU64 = AtomicU64::new(0);
+    let temporary = parent.join(format!(
+        ".preferences-{}-{}.tmp",
+        std::process::id(),
+        NEXT_FILE.fetch_add(1, Ordering::Relaxed)
+    ));
+    #[cfg(windows)]
+    let mut file = windows_private_directory::create_file(&temporary)?;
+    #[cfg(not(windows))]
+    let mut file = {
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        options.open(&temporary)?
+    };
+    let result = (|| {
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        fs::rename(&temporary, path)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
 }
 
 #[cfg(unix)]

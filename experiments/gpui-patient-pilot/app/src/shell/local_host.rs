@@ -15,11 +15,12 @@ use archives::ArchiveArea;
 pub(in crate::shell) use macos_preferences::effective_preferences;
 #[cfg(not(test))]
 pub(in crate::shell) use macos_preferences::read_system_accessibility;
-pub(super) use mediflow_runtime_client::RETIREMENT_WARNING;
 use mediflow_runtime_client::{
     HostSettingKey, LocalHostAccess, PreparedDocumentDeletion, PreparedHostSetting,
 };
+pub(super) use mediflow_runtime_client::{RETIREMENT_ORPHAN_GUIDANCE, RETIREMENT_WARNING};
 use mediflow_runtime_client::{RetirementNotice, RetiringAccess};
+pub(super) use security::PASSPHRASE_OUTCOME_GUIDANCE;
 use std::{path::PathBuf, sync::Arc};
 
 enum Authority {
@@ -99,7 +100,13 @@ impl LocalAdministration {
             controls: controls::ControlsArea::new(theme, cx),
             network: network::NetworkArea::default(),
             references: references::ReferencesArea::new(theme, cx),
-            security: security::SecurityArea::new(theme, cx),
+            security: security::SecurityArea::new(
+                theme,
+                retirement_path
+                    .as_ref()
+                    .map(|p| p.with_file_name("passphrase-change-outcome.json")),
+                cx,
+            ),
             chatgpt: chatgpt::ChatGptArea::default(),
             models: models::ModelsArea::new(theme, cx),
             parameters: parameters::ParametersArea::new(theme, cx),
@@ -131,6 +138,12 @@ impl LocalAdministration {
             SettingsPage::Archives => self.archives.has_work(),
             _ => false,
         }
+    }
+    pub(super) fn passphrase_outcome_pending(&self) -> bool {
+        self.security.outcome.pending()
+    }
+    pub(super) fn resolve_passphrase_outcome(&mut self, session: &RuntimeSession) {
+        self.security.outcome.resolve(session);
     }
     pub(super) fn has_work(&self) -> bool {
         self.controls.busy()
@@ -221,6 +234,15 @@ impl LocalAdministration {
     }
 }
 impl ClinicalApp {
+    pub(super) fn dismiss_orphaned_retirement(&mut self, cx: &mut Context<Self>) {
+        if self.local_host.retirement.dismiss_orphaned().is_err() {
+            self.message = Some((
+                "Non è stato possibile chiudere l’avviso di ritiro. Controlla i permessi della cartella dei dati locali e riprova.".into(),
+                true,
+            ));
+        }
+        cx.notify();
+    }
     pub(super) fn withdraw_local_host(&mut self, cx: &mut Context<Self>) {
         if let Some(access) = self.local_host.withdraw(cx) {
             let task = cx
@@ -850,15 +872,36 @@ mod tests {
     }
 
     #[gpui::test]
-    fn unconfirmed_retirement_is_visible_on_the_locked_login_screen(cx: &mut gpui::TestAppContext) {
+    fn orphaned_retirement_after_restart_warns_until_the_user_verifies_the_host(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        // A previous run began a retirement, its logout failed and the app closed:
+        // the marker is on disk, complete, and no process holds its lock.
+        let fixture = local_preferences::tests::Fixture::new();
+        let path = fixture.0.join("retirement.json");
+        let pending = path.with_extension("pending");
+        std::fs::create_dir_all(&fixture.0).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700)
+            .create(&pending)
+            .unwrap();
+        #[cfg(windows)]
+        mediflow_local_state::create_directory(&pending).unwrap();
+        let marker = "0f0e0d0c-0b0a-4908-8706-050403020100";
+        // Same writer as a real marker: on Windows the file must carry the
+        // private descriptor that the orphan check verifies.
+        #[cfg(unix)]
+        std::fs::write(pending.join(marker), marker).unwrap();
+        #[cfg(windows)]
+        std::io::Write::write_all(
+            &mut mediflow_local_state::create_file(&pending.join(marker)).unwrap(),
+            marker.as_bytes(),
+        )
+        .unwrap();
         let (view, cx) =
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
         view.update(cx, |app, cx| {
-            let fixture = local_preferences::tests::Fixture::new();
-            std::fs::create_dir_all(&fixture.0).unwrap();
-            let path = fixture.0.join("retirement.json");
-            std::fs::write(&path, b"1").unwrap();
-            app.local_host.retirement = RetirementNotice::new(Some(path));
+            app.local_host.retirement = RetirementNotice::new(Some(path.clone()));
             app.disconnect(cx);
         });
         cx.run_until_parked();
@@ -870,6 +913,20 @@ mod tests {
             cx.debug_bounds("local-session-retirement-warning")
                 .is_some()
         );
+        let dismiss = cx
+            .debug_bounds("local-session-retirement-dismiss")
+            .expect("orphaned marker offers the verification action");
+        cx.simulate_click(dismiss.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(
+            cx.debug_bounds("local-session-retirement-warning")
+                .is_none()
+        );
+        assert!(!RetirementNotice::new(Some(path)).pending());
     }
     #[gpui::test]
     fn local_host_lock_retires_secret_and_pending_confirmation_and_generation(
