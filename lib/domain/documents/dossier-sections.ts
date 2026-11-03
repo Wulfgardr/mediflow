@@ -134,7 +134,12 @@ export function prostheticStatusOf(text: string): string {
     return '';
 }
 
-const SCALE = /\b(Barthel|MMSE|Mini[- ]?Mental(?:\s+State)?|IADL|ADL|Tinetti|Braden|Norton|NRS|VAS|GDS|CIRS|MNA|CDR|Karnofsky|ECOG)\b\s*(?:(?:punteggio|totale|score)(?:\s+di)?\s*)?[:=]?\s*(\d{1,3}(?:[.,]\d+)?)(?![\d.,])(?:\s*(?:\/|su)\s*(\d{1,3})(?!\d))?/giu;
+const SCALE_NAMES = String.raw`Barthel|MMSE|Mini[- ]?Mental(?:\s+State)?|IADL|ADL|Tinetti|Braden|Norton|NRS|VAS|GDS|CIRS|MNA|CDR|Karnofsky|ECOG`;
+const SCALE_DATE = String.raw`(?:\d{1,2}/)?\d{1,2}/\d{4}`;
+const SCORE_LABEL = String.raw`(?:punteggio|totale|score)(?:\s+di)?`;
+// Una data richiede un separatore/etichetta prima del punteggio. Se il ramo data
+// non trova un punteggio, il ramo ordinario non può consumarne soltanto il mese.
+const SCALE = new RegExp(String.raw`\b(${SCALE_NAMES})\b\s*(?:${SCALE_DATE}\s*(?:[:=]\s*(?:${SCORE_LABEL}\s*)?|${SCORE_LABEL}\s*[:=]?\s*)|(?:${SCORE_LABEL}\s*)?[:=]?\s*)(?!${SCALE_DATE}\b)(\d{1,3}(?:[.,]\d+)?)(?![\d.,])(?:\s*(?:/|su)\s*(\d{1,3})(?!\d))?`, 'giu');
 
 export interface DossierScaleMention { scaleName: string; total: string; max: string; start: number; end: number }
 

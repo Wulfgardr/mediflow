@@ -598,3 +598,26 @@ test('parent delta: unknown dispatch error with no record yet must keep an uncer
     const fresh = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
     assert.equal(fresh.record.pendingWrites!.length, 1);
 });
+
+for (const heading of ['Lettera sintetica', 'ASST sintetica - Medicina']) {
+    test(`ambiguous identity (${heading}): acquire and OCR retry cannot write on the wrong patient`, async () => {
+        const text = `%PDF-1.4 sintetico\n${heading}\nSig. Bianchi Luca C.F.: ${CF_B}\nEsenzione 031\nData referto: 01/02/2025`;
+        const first = setup([['D/R/a.pdf', text]]);
+        const [draft] = await buildDossierInventory(first.ports, first.files, live);
+        await assert.rejects(acquireDossierGroup(first.ports, { group: draft, patientId: 'pa', confirmed: true, ...live }), DossierIdentityBlocked);
+        assert.equal(first.attachments.size, 0);
+        const { files, ports, counts } = setup([['D/R/a.pdf', text]], () => ({ status: 'failed', detail: 'unavailable' }));
+        const [group] = await buildDossierInventory(ports, files, live);
+        const [stored] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+        const attachmentId = (stored as { attachmentId: string }).attachmentId;
+        let document = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+        ports.extract = async () => ({ status: 'extracted', markdown: text, ocr: null });
+        await retryDossierExtraction(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+        document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record, facts: record.facts.filter((fact) => fact.kind === 'exemption') }));
+        assert.ok(document.coverage.gaps.includes('identity_conflict'));
+        const result = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+        assert.equal(result.stopped, 'identity');
+        assert.deepEqual((await ports.getPatient('pa', live.signal))!.exemptions, []);
+        assert.equal(counts().clinicalCreates, 0);
+    });
+}

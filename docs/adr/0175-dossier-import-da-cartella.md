@@ -28,8 +28,12 @@ le funzioni AI spente.
    allegato, nessuna scrittura, nessun contenuto nei log. Buste `.p7m`, archivi e
    messaggi di posta si conservano senza estrazione.
 2. **Identità prima dell'archiviazione.** Il nome della cartella non decide il
-   paziente. Più codici fiscali paziente nel gruppo, o un codice diverso da quello
-   della scheda scelta, bloccano il gruppo. Un codice coincidente o assente richiede
+   paziente. Tutti i codici fiscali validi partecipano al confronto, anche quelli
+   di attribuzione incerta: la vicinanza a un’intestazione ASST o al nome di un medico
+   non basta a escluderli. Si escludono solo codici con etichetta professionale
+   direttamente associata a ogni occorrenza. I vecchi artefatti senza questa
+   attestazione restano da confrontare. Più codici distinti nel gruppo, o un codice
+   diverso dalla scheda scelta, bloccano il gruppo; tutti i codici letti sono visibili. Un codice coincidente o assente richiede
    comunque la conferma esplicita del medico.
 3. **Nuova scheda.** Se nessuna scheda è adatta, un PDF del gruppo entra nel comando
    documento→anagrafica esistente (stage, revisione, PIN, allegato ENC2 riletto). Le
@@ -67,9 +71,9 @@ le funzioni AI spente.
      priorità e quesito, ausili con codice ISO solo se scritto e stato documentato,
      invalidità con percentuale e indennità se scritte, valutazione, indicazioni,
      contesto assistenziale;
-   - totali di scale nominate (Barthel, MMSE e altre) con valore direttamente associato al nome o a un’etichetta di punteggio; anni e intervalli futuri restano residui.
+   - totali di scale nominate (Barthel, MMSE e altre) con valore direttamente associato al nome o a un’etichetta di punteggio; anni e intervalli futuri restano residui. Mese/anno o giorno/mese/anno prima del punteggio non diventano un totale; un valore successivo si propone solo dopo un separatore o un’etichetta esplicita.
    Ogni proposta conserva negazione, soggetto (paziente o familiare: una diagnosi di un
-   familiare diventa anamnesi familiare), riferimento temporale e incertezza. Date e
+   familiare diventa anamnesi familiare, valutando la frase e la sezione del codice anche nei paragrafi uniti), riferimento temporale e incertezza. Date e
    codici non si inventano; una terapia da documento è storica salvo scelta esplicita;
    un totale di scala trascritto è una nota, non una scala somministrata; una richiesta
    non è mai un farmaco. Il documento intero è proposto come voce di diario e il testo

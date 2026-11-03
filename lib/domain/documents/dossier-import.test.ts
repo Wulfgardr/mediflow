@@ -179,6 +179,8 @@ test('receipt is aggregate: no names, paths, codes, text or identifiers', () => 
     const serialized = JSON.stringify(receipt);
     for (const forbidden of [CF_A, 'x.pdf', 'Cartella', 'imp-1', 'a'.repeat(64), '031']) assert.equal(serialized.includes(forbidden), false, forbidden);
     assert.equal(receipt.sources, 2);
+    const stale = buildDossierReceipt([{ record: r, coverage: evaluateDossierCoverage(r, true, 'changed-source') }], new Date('2026-11-03T00:00:00Z'));
+    assert.equal(stale.preservedVerified, 0, 'a receipt cannot count a readback of another source version');
     assert.deepEqual(receipt.measuredStoredBytes, { originals: 100, originalsUnmeasured: 1, artifacts: 50, artifactsUnmeasured: 1 }, 'unmeasured is counted, never shown as zero');
 });
 
@@ -319,4 +321,63 @@ test('explicit ICD in family history does not become the patient diagnosis', () 
     const facts = candidates('Anamnesi familiare: madre con ICD-10 E11.9 diabete mellito');
     assert.equal(facts.filter((f) => f.kind === 'diagnosis').length, 0);
     assert.ok(facts.some((f) => f.kind === 'anamnesis' && f.values.subject === 'familiare'));
+});
+
+test('identity: unlabeled and facility-adjacent codes remain visible and block the wrong patient', () => {
+    const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
+    for (const text of [
+        `Lettera di dimissione\nSig. Bianchi Luca nato il 10/12/1985\nC.F.: ${CF_B}`,
+        `ASST Nord Milano - UO Medicina\nSig. Bianchi Luca nato il 10/12/1985 C.F. ${CF_B}`,
+        `Medico curante Dott. Verdi\nAssistito Bianchi Luca\nCF ${CF_B}`,
+    ]) {
+        const document = { taxCodes: collectDossierTaxCodes(text) };
+        const wrong = evaluateDossierGroupIdentity([document], patients, 'pa');
+        assert.equal(wrong.blocking, true, text);
+        assert.deepEqual(wrong.documentPatientCodes, [CF_B]);
+        assert.doesNotMatch(wrong.message, /Nessun codice/u);
+        assert.equal(evaluateDossierGroupIdentity([document], patients, 'pb').blocking, false);
+        assert.deepEqual(evaluateDossierGroupIdentity([document], patients).candidatePatientIds, ['pb']);
+    }
+    // A previous artifact's heuristic professional role is not proof of attribution.
+    assert.equal(evaluateDossierGroupIdentity([{ taxCodes: [{ value: CF_B, role: 'professional_cf', checksumValid: true }] }], patients, 'pa').blocking, true);
+    for (const label of ['CF medico:', 'Codice fiscale del medico prescrittore:', 'Medico CF:']) {
+        const document = { taxCodes: collectDossierTaxCodes(`Paziente CF ${CF_A}\n${label} ${CF_B}`) };
+        assert.equal(evaluateDossierGroupIdentity([document], patients, 'pa').blocking, false, label);
+    }
+    // Repeating the same code without a professional label must not hide that occurrence.
+    const repeated = { taxCodes: collectDossierTaxCodes(`CF medico: ${CF_B}\nC.F.: ${CF_B}`) };
+    assert.equal(evaluateDossierGroupIdentity([repeated], patients, 'pa').blocking, true);
+});
+
+test('ICD subject comes from its own sentence and section in a merged paragraph', () => {
+    for (const text of [
+        'Anamnesi familiare: madre diabetica. Diagnosi: ICD-10 E11 diabete mellito tipo 2',
+        'Madre diabetica. ICD-10 E11 diabete mellito tipo 2',
+        'Diagnosi: madre diabetica. ICD-10 E11 diabete mellito tipo 2',
+    ]) {
+        const facts = candidates(text);
+        assert.deepEqual(facts.filter((f) => f.kind === 'diagnosis').map((f) => f.values.code), ['E11'], text);
+        assert.equal(facts.some((f) => f.kind === 'anamnesis' && f.values.text?.includes('ICD-10 E11')), false);
+    }
+    for (const text of ['Anamnesi familiare:\n- padre ICD-10 I21 infarto miocardico', 'Anamnesi familiare:\nICD-10 I21 infarto miocardico acuto']) {
+        const facts = candidates(text);
+        assert.equal(facts.some((f) => f.kind === 'diagnosis'), false);
+        assert.ok(facts.some((f) => f.kind === 'anamnesis' && f.values.subject === 'familiare'));
+    }
+});
+
+test('scale dates do not become scores and explicit scores after dates retain their evidence', async () => {
+    const { findScaleMentions } = await import('./dossier-sections');
+    for (const [text, total, max] of [
+        ['MMSE 03/2021: 22/30', '22', '30'],
+        ['MMSE 12/2019 punteggio 24', '24', ''],
+        ['Barthel 06/2023 = 45/100', '45', '100'],
+        ['MMSE 01/03/2021: 22/30', '22', '30'],
+        ['MMSE 24/30', '24', '30'], ['Barthel 60/100', '60', '100'], ['CDR 0,5', '0,5', ''],
+    ]) {
+        const mentions = findScaleMentions(text);
+        assert.deepEqual(mentions.map((m) => [m.total, m.max]), [[total, max]], text);
+        assert.equal(text.slice(mentions[0].start, mentions[0].end), text);
+    }
+    for (const text of ['MMSE 03/2021', 'MMSE 01/03/2021', 'MMSE 2019: 24/30']) assert.deepEqual(findScaleMentions(text), [], text);
 });
