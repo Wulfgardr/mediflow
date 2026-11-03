@@ -8,23 +8,26 @@
  * del medico registrata nel record dossier. Nessuna chiamata a modelli, nessun SQL.
  *
  * Garanzie verificate dai test (`lib/document-dossier-session.test.ts`):
- * - l'originale si dichiara conservato solo dopo rilettura byte-identica;
+ * - l'originale si dichiara conservato solo dopo rilettura byte-identica dei byte CORRENTI,
+ *   legata alla currentness host dell'allegato;
  * - la stessa fonte (sha256) non crea un secondo allegato, anche dopo un crash;
- * - ogni record clinico ha un'identità opaca persistita nell'artefatto PRIMA dell'invio;
- * - un esito incerto si rilegge; un 409 non vale mai come successo;
- * - sessione bloccata, cambio paziente o artefatto cambiato fermano l'operazione;
+ * - ogni scrittura clinica ha un'autorizzazione (claim) persistita con CAS PRIMA dell'invio,
+ *   ricontrollata sull'esatta revisione del fatto subito prima di ogni invio;
+ * - la rilettura confronta tutti i campi clinici del payload; un 409 non vale mai come successo;
+ * - sessione bloccata o contesto cambiato fermano l'operazione a ogni confine di scrittura;
  * - un'applicazione parziale resta dichiarata come tale e riprende senza duplicati.
  */
 
 import {
     DOSSIER_FACT_TARGET, DOSSIER_SCHEMA_VERSION, classifyDossierSource, collectDossierTaxCodes,
-    dossierFactBlockers, dossierFactRef, evaluateDossierCoverage, evaluateDossierGroupIdentity, extractDossierCandidates,
-    findExplicitDocumentDate, latestAppliedOutcome, readDossierRecord, reconcileDossierFacts, resolveDossierText,
-    splitDossierUnits, writeDossierRecordIntoSnapshot,
+    dossierFactBlockers, dossierFactFingerprint, dossierFactRef, dossierResidualSegments, evaluateDossierCoverage, evaluateDossierGroupIdentity,
+    extractDossierCandidates, findExplicitDocumentDate, latestAppliedOutcome, preservationIsCurrent, readDossierRecord, reconcileDossierFacts,
+    resolveDossierText, splitDossierUnits, writeDossierRecordIntoSnapshot,
     type DossierAppliedEntry, type DossierCoverage, type DossierCurrentRecords, type DossierExtraction, type DossierFact,
-    type DossierFactAssessment, type DossierHostExtraction, type DossierIdentityEvaluation, type DossierRecord,
-    type DossierSourceClassification, type DossierTaxCodeEvidence,
+    type DossierFactAssessment, type DossierHostExtraction, type DossierIdentityEvaluation, type DossierRecord, type DossierResidualSegment,
+    type DossierSourceClassification, type DossierTaxCodeEvidence, type DossierWriteClaim,
 } from './domain/documents/dossier-import';
+import { sameClinicalText, sameClinicalValue, sameDay, sameDosage, sameOptional, sameUnit } from './domain/documents/dossier-clinical-equality';
 
 // ---------------------------------------------------------------------------
 // Porte: la facade cifrata in produzione, un archivio sintetico nei test
@@ -191,6 +194,27 @@ export function evaluateDraftGroupIdentity(group: DossierDraftGroup, patients: r
 }
 
 // ---------------------------------------------------------------------------
+// Confini di scrittura: la revoca resta revoca, mai un errore di rete
+// ---------------------------------------------------------------------------
+
+type Guard = () => void;
+
+function guardOf(signal: AbortSignal, isCurrent: () => boolean): Guard { return () => assertLive(signal, isCurrent); }
+
+/**
+ * Ogni chiamata che può scrivere passa da qui: controllo prima dell'invio e dopo la
+ * risposta. Se il contesto è stato ritirato durante l'attesa, l'errore originale non
+ * viene trattato come esito incerto o fallimento: si propaga l'interruzione.
+ */
+async function boundary<T>(guard: Guard, operation: () => Promise<T>): Promise<T> {
+    guard();
+    let value: T;
+    try { value = await operation(); } catch (error) { guard(); throw error; }
+    guard();
+    return value;
+}
+
+// ---------------------------------------------------------------------------
 // Acquisizione degli originali
 // ---------------------------------------------------------------------------
 
@@ -222,21 +246,19 @@ export async function acquireDossierGroup(
         onProgress?: (outcome: DossierAcquireOutcome) => void },
 ): Promise<DossierAcquireOutcome[]> {
     const { group, patientId, signal, isCurrent } = input;
+    const guard = guardOf(signal, isCurrent);
     if (!input.confirmed) throw new Error('Collegamento non confermato dal medico.');
     const patients = await ports.listPatients(signal);
-    assertLive(signal, isCurrent);
+    guard();
     const identity = evaluateDraftGroupIdentity(group, patients, patientId);
     if (identity.blocking || !patients.some((patient) => patient.id === patientId)) throw new DossierIdentityBlocked(identity);
     const confirmedAt = ports.now().toISOString();
     const outcomes: DossierAcquireOutcome[] = [];
     for (const source of group.sources) {
-        assertLive(signal, isCurrent);
-        let outcome: DossierAcquireOutcome;
-        if (source.status !== 'ready') {
-            outcome = { key: source.key, status: 'skipped', reason: source.status === 'duplicate_in_selection' ? 'duplicate_in_selection' : source.status };
-        } else {
-            outcome = await acquireOne(ports, source, patientId, identity, confirmedAt, signal, isCurrent);
-        }
+        guard();
+        const outcome: DossierAcquireOutcome = source.status !== 'ready'
+            ? { key: source.key, status: 'skipped', reason: source.status === 'duplicate_in_selection' ? 'duplicate_in_selection' : source.status }
+            : await acquireOne(ports, source, patientId, identity, confirmedAt, signal, guard);
         outcomes.push(outcome);
         input.onProgress?.(outcome);
     }
@@ -255,74 +277,90 @@ function initialRecord(source: DossierDraftSource, ports: DossierPorts, identity
             relativePath: source.relativePath, fileName: source.fileName },
         preservation: { state: 'pending_readback', reusedExisting },
         extraction: source.extraction,
+        extractionAttempts: source.classification.extractable
+            ? [{ at: confirmedAt, outcome: source.extraction.state === 'extracted' ? 'extracted' : 'failed',
+                ...(source.extraction.state === 'failed' ? { detail: source.extraction.detail } : {}) }] : [],
         identity: { taxCodes: source.taxCodes, status: identity.status, confirmedAt },
         documentDate: source.documentDate,
         classification: source.classificationResult,
         facts: source.facts,
         residualReview: { state: 'pending' },
         applied: [],
+        pendingWrites: [],
         updatedAt: confirmedAt,
     };
 }
 
 async function acquireOne(
     ports: DossierPorts, source: DossierDraftSource, patientId: string, identity: DossierIdentityEvaluation, confirmedAt: string,
-    signal: AbortSignal, isCurrent: () => boolean,
+    signal: AbortSignal, guard: Guard,
 ): Promise<DossierAcquireOutcome> {
     let bytes: Uint8Array;
     try { bytes = await source.file.read(); } catch { return { key: source.key, status: 'failed', reason: 'source_changed' }; }
     try {
-        assertLive(signal, isCurrent);
+        guard();
         // La fonte su disco deve essere quella inventariata e mostrata al medico.
         if (await ports.sha256(bytes) !== source.sha256) return { key: source.key, status: 'failed', reason: 'source_changed' };
         for (let attempt = 0; attempt < 2; attempt += 1) {
             const seen = await ports.listAttachments(patientId, signal);
-            assertLive(signal, isCurrent);
+            guard();
             // Senza leggere tutti gli artefatti non si può escludere un duplicato.
             if (seen.some((item) => item.artifactUnreadable)) return { key: source.key, status: 'failed', reason: 'artifact_conflict' };
             const existing = recordsBySha(seen).get(source.sha256);
-            if (existing) return await verifyReadback(ports, existing, bytes, source.key, 'reused', signal, isCurrent);
+            if (existing) return await verifyReadback(ports, existing, bytes, source.key, 'reused', signal, guard);
             // Un allegato già in app senza record dossier: stessa dimensione, poi confronto dei byte.
             for (const candidate of seen.filter((item) => item.size === bytes.byteLength && readDossierRecord(item.parseEvidenceArtifactSnapshot).status === 'absent')) {
                 const stored = await ports.readAttachmentBytes(candidate.id, patientId, signal);
-                assertLive(signal, isCurrent);
-                if (stored && dataEqual(stored, bytes)) {
-                    const record = initialRecord(source, ports, identity, confirmedAt, true);
-                    let snapshot: string;
-                    try {
-                        snapshot = writeDossierRecordIntoSnapshot(candidate.parseEvidenceArtifactSnapshot, withInlineText(record, source.text),
-                            { attachmentId: candidate.id, fileName: source.fileName, text: source.text });
-                    } catch { return { key: source.key, status: 'failed', reason: 'artifact_conflict', attachmentId: candidate.id }; }
-                    if (await ports.measureArtifact(snapshot) > ports.limits.updateRequestBytes) return { key: source.key, status: 'failed', reason: 'too_large', attachmentId: candidate.id };
-                    try { await ports.updateArtifact(candidate, snapshot); }
-                    catch (error) { if (error instanceof DossierVersionConflict) continue; return { key: source.key, status: 'failed', reason: 'write_failed', attachmentId: candidate.id }; }
-                    const reread = (await ports.listAttachments(patientId, signal)).find((item) => item.id === candidate.id);
-                    if (!reread) return { key: source.key, status: 'failed', reason: 'write_failed', attachmentId: candidate.id };
-                    return await verifyReadback(ports, reread, bytes, source.key, 'reused', signal, isCurrent);
+                guard();
+                const same = Boolean(stored && dataEqual(stored, bytes));
+                stored?.fill(0);
+                if (!same) continue;
+                const record = initialRecord(source, ports, identity, confirmedAt, true);
+                let snapshot: string;
+                try {
+                    snapshot = writeDossierRecordIntoSnapshot(candidate.parseEvidenceArtifactSnapshot, withInlineText(record, source.text),
+                        { attachmentId: candidate.id, fileName: source.fileName, text: source.text });
+                } catch { return { key: source.key, status: 'failed', reason: 'artifact_conflict', attachmentId: candidate.id }; }
+                if (await ports.measureArtifact(snapshot) > ports.limits.updateRequestBytes) return { key: source.key, status: 'failed', reason: 'too_large', attachmentId: candidate.id };
+                try { await boundary(guard, () => ports.updateArtifact(candidate, snapshot)); }
+                catch (error) {
+                    if (error instanceof DossierAbortedError) throw error;
+                    if (error instanceof DossierVersionConflict) break;
+                    return { key: source.key, status: 'failed', reason: 'write_failed', attachmentId: candidate.id };
                 }
+                const reread = (await ports.listAttachments(patientId, signal)).find((item) => item.id === candidate.id);
+                guard();
+                if (!reread) return { key: source.key, status: 'failed', reason: 'write_failed', attachmentId: candidate.id };
+                return await verifyReadback(ports, reread, bytes, source.key, 'reused', signal, guard);
             }
+            if (attempt > 0 && recordsBySha(seen).size === 0 && seen.some((item) => item.size === bytes.byteLength)) continue;
             const id = ports.newId();
             const record = initialRecord(source, ports, identity, confirmedAt, false);
-            const snapshot = writeDossierRecordIntoSnapshot(undefined, record, { attachmentId: id, fileName: source.fileName, text: source.text });
-            const create = { id, patientId, name: source.fileName, type: source.classification.mediaType, size: bytes.byteLength, bytes, parseEvidenceArtifactSnapshot: snapshot };
+            const base = { id, patientId, name: source.fileName, type: source.classification.mediaType, size: bytes.byteLength, bytes };
+            const probe = await ports.measureCreate({ ...base, parseEvidenceArtifactSnapshot: writeDossierRecordIntoSnapshot(undefined, record, { attachmentId: id, fileName: source.fileName, text: source.text }) });
+            // La misura dell'originale cifrato resta nel record: lo spazio si attribuisce alla fonte e al paziente.
+            const measuredRecord: DossierRecord = { ...record, storage: { originalCiphertextChars: probe.original, measuredAt: ports.now().toISOString() } };
+            const create = { ...base, parseEvidenceArtifactSnapshot: writeDossierRecordIntoSnapshot(undefined, measuredRecord, { attachmentId: id, fileName: source.fileName, text: source.text }) };
             const measured = await ports.measureCreate(create);
             if (measured.request > ports.limits.createRequestBytes || measured.artifact > ports.limits.updateRequestBytes) {
                 return { key: source.key, status: 'failed', reason: 'too_large' };
             }
-            assertLive(signal, isCurrent);
             try {
-                await ports.createAttachment(create, seen);
+                await boundary(guard, () => ports.createAttachment(create, seen));
             } catch (error) {
+                if (error instanceof DossierAbortedError) throw error;
                 if (error instanceof DossierCollectionChanged) continue;
                 // Esito incerto: si rilegge per sha256, mai per nome.
                 const after = recordsBySha(await ports.listAttachments(patientId, signal)).get(source.sha256);
+                guard();
                 if (!after) return { key: source.key, status: 'failed', reason: 'write_failed' };
-                const verified = await verifyReadback(ports, after, bytes, source.key, 'stored', signal, isCurrent);
+                const verified = await verifyReadback(ports, after, bytes, source.key, 'stored', signal, guard);
                 return verified.status === 'stored' ? { ...verified, measured: { original: measured.original, artifact: measured.artifact } } : verified;
             }
             const created = (await ports.listAttachments(patientId, signal)).find((item) => item.id === id);
+            guard();
             if (!created) return { key: source.key, status: 'failed', reason: 'write_failed', attachmentId: id };
-            const verified = await verifyReadback(ports, created, bytes, source.key, 'stored', signal, isCurrent);
+            const verified = await verifyReadback(ports, created, bytes, source.key, 'stored', signal, guard);
             return verified.status === 'stored' ? { ...verified, measured: { original: measured.original, artifact: measured.artifact } } : verified;
         }
         return { key: source.key, status: 'failed', reason: 'write_failed' };
@@ -334,23 +372,31 @@ function withInlineText(record: DossierRecord, text: string | null): DossierReco
     return { ...record, extraction: { ...record.extraction, text: { ...record.extraction.text, location: 'inline', inline: text } } };
 }
 
+/**
+ * Confronta SEMPRE i byte correnti dell'allegato con la fonte, anche se un'attestazione
+ * precedente esiste, e la riscrive legata alla currentness host osservata.
+ */
 async function verifyReadback(
     ports: DossierPorts, attachment: DossierAttachmentMeta, bytes: Uint8Array, key: string, status: 'stored' | 'reused',
-    signal: AbortSignal, isCurrent: () => boolean,
+    signal: AbortSignal, guard: Guard,
 ): Promise<DossierAcquireOutcome> {
     const read = readDossierRecord(attachment.parseEvidenceArtifactSnapshot);
     if (read.status !== 'present') return { key, status: 'failed', reason: 'artifact_conflict', attachmentId: attachment.id };
-    if (read.record.preservation.state === 'verified') return { key, status, attachmentId: attachment.id, verified: true };
     const stored = await ports.readAttachmentBytes(attachment.id, attachment.patientId, signal);
-    assertLive(signal, isCurrent);
+    guard();
     const same = Boolean(stored && dataEqual(stored, bytes));
     stored?.fill(0);
-    const record: DossierRecord = { ...read.record, preservation: { ...read.record.preservation, state: same ? 'verified' : 'mismatch',
-        ...(same ? { verifiedAt: ports.now().toISOString() } : {}) }, updatedAt: ports.now().toISOString() };
+    const now = ports.now().toISOString();
+    const record: DossierRecord = { ...read.record, updatedAt: now, preservation: same
+        ? { reusedExisting: read.record.preservation.reusedExisting, state: 'verified', verifiedAt: now, ...(attachment.currentness ? { verifiedSourceRef: attachment.currentness.sourceRef } : {}) }
+        : { reusedExisting: read.record.preservation.reusedExisting, state: 'mismatch' } };
     try {
-        await ports.updateArtifact(attachment, writeDossierRecordIntoSnapshot(attachment.parseEvidenceArtifactSnapshot, record,
-            { attachmentId: attachment.id, fileName: record.source.fileName, text: null }));
-    } catch { return { key, status: 'failed', reason: 'write_failed', attachmentId: attachment.id }; }
+        await boundary(guard, () => ports.updateArtifact(attachment, writeDossierRecordIntoSnapshot(attachment.parseEvidenceArtifactSnapshot, record,
+            { attachmentId: attachment.id, fileName: record.source.fileName, text: null })));
+    } catch (error) {
+        if (error instanceof DossierAbortedError) throw error;
+        return { key, status: 'failed', reason: same ? 'write_failed' : 'readback_mismatch', attachmentId: attachment.id };
+    }
     return same ? { key, status, attachmentId: attachment.id, verified: true } : { key, status: 'failed', reason: 'readback_mismatch', attachmentId: attachment.id };
 }
 
@@ -363,7 +409,11 @@ export interface DossierDocumentView {
     record: DossierRecord;
     text: string | null;
     textVerified: boolean;
+    preservationCurrent: boolean;
     coverage: DossierCoverage;
+    residual: DossierResidualSegment[];
+    /** Byte cifrati dell'artefatto misurati alla lettura; null se non misurabile. */
+    artifactCiphertextChars: number | null;
 }
 
 export interface DossierPatientView {
@@ -391,7 +441,13 @@ export async function loadPatientDossier(ports: DossierPorts, patientId: string,
         const text = resolveDossierText(attachment.parseEvidenceArtifactSnapshot!, read.record);
         const textVerified = read.record.extraction.state === 'extracted' && text !== null
             && await ports.sha256(new TextEncoder().encode(text)) === read.record.extraction.text.sha256;
-        documents.push({ attachment, record: read.record, text, textVerified, coverage: evaluateDossierCoverage(read.record, textVerified) });
+        let artifactCiphertextChars: number | null = null;
+        try { artifactCiphertextChars = await ports.measureArtifact(attachment.parseEvidenceArtifactSnapshot!); } catch { artifactCiphertextChars = null; }
+        documents.push({ attachment, record: read.record, text, textVerified,
+            preservationCurrent: preservationIsCurrent(read.record, attachment.currentness?.sourceRef),
+            coverage: evaluateDossierCoverage(read.record, textVerified, attachment.currentness?.sourceRef ?? ''),
+            residual: textVerified && text !== null && read.record.extraction.state === 'extracted' ? dossierResidualSegments(text, read.record.extraction.units, read.record.facts) : [],
+            artifactCiphertextChars });
     }
     documents.sort((a, b) => (a.record.documentDate?.value ?? '9999').localeCompare(b.record.documentDate?.value ?? '9999') || a.attachment.id.localeCompare(b.attachment.id));
     const assessments = reconcileDossierFacts(documents.map((document) => ({ documentKey: document.attachment.id,
@@ -405,6 +461,7 @@ export async function loadPatientDossier(ports: DossierPorts, patientId: string,
 
 export class DossierStaleError extends Error { constructor() { super('Il documento è cambiato: rileggi il dossier prima di continuare.'); } }
 export class DossierArtifactTooLarge extends Error { constructor() { super('Artefatto oltre il limite di aggiornamento.'); } }
+export class DossierWriteInFlight extends Error { constructor() { super('Una scrittura di questo fatto è in corso o ha esito da verificare: riprendi l’applicazione prima di modificarlo.'); } }
 
 function sameCurrentness(left?: DossierCurrentness, right?: DossierCurrentness): boolean {
     return Boolean(left && right && left.sourceRef === right.sourceRef && left.revision === right.revision && left.freshnessEpoch === right.freshnessEpoch);
@@ -416,11 +473,11 @@ async function rereadDocument(ports: DossierPorts, patientId: string, attachment
     return attachment && read?.status === 'present' ? { attachment, record: read.record } : null;
 }
 
-async function persistRecord(ports: DossierPorts, attachment: DossierAttachmentMeta, record: DossierRecord): Promise<void> {
+async function persistRecord(ports: DossierPorts, attachment: DossierAttachmentMeta, record: DossierRecord, guard: Guard): Promise<void> {
     const snapshot = writeDossierRecordIntoSnapshot(attachment.parseEvidenceArtifactSnapshot, record,
         { attachmentId: attachment.id, fileName: record.source.fileName, text: null });
     if (await ports.measureArtifact(snapshot) > ports.limits.updateRequestBytes) throw new DossierArtifactTooLarge();
-    await ports.updateArtifact(attachment, snapshot);
+    await boundary(guard, () => ports.updateArtifact(attachment, snapshot));
 }
 
 /** Salva decisioni o correzioni del medico sulla revisione che stava guardando. */
@@ -429,22 +486,89 @@ export async function saveDossierReview(
     input: { patientId: string; attachmentId: string; expected: DossierCurrentness; signal: AbortSignal; isCurrent: () => boolean;
         change: (record: DossierRecord) => DossierRecord },
 ): Promise<void> {
+    const guard = guardOf(input.signal, input.isCurrent);
     const current = await rereadDocument(ports, input.patientId, input.attachmentId, input.signal);
-    assertLive(input.signal, input.isCurrent);
+    guard();
     if (!current || !sameCurrentness(current.attachment.currentness, input.expected)) throw new DossierStaleError();
     const next = input.change(current.record);
-    // Il registro delle scritture appartiene all'applicazione, mai alla revisione.
-    if (JSON.stringify(next.applied) !== JSON.stringify(current.record.applied) || next.importId !== current.record.importId
-        || next.source.sha256 !== current.record.source.sha256) throw new Error('La revisione non può modificare provenienza o registro.');
+    // Registro, autorizzazioni e provenienza appartengono all'applicazione, mai alla revisione.
+    if (JSON.stringify(next.applied) !== JSON.stringify(current.record.applied)
+        || JSON.stringify(next.pendingWrites ?? []) !== JSON.stringify(current.record.pendingWrites ?? [])
+        || next.importId !== current.record.importId || next.source.sha256 !== current.record.source.sha256
+        || JSON.stringify(next.preservation) !== JSON.stringify(current.record.preservation)) throw new Error('La revisione non può modificare provenienza o registro.');
     for (const fact of next.facts) {
         const before = current.record.facts.find((item) => item.factId === fact.factId);
+        if (!before || JSON.stringify(before) === JSON.stringify(fact)) continue;
+        if (current.record.pendingWrites?.some((claim) => claim.factId === fact.factId)) throw new DossierWriteInFlight();
         const applied = latestAppliedOutcome(current.record, fact.factId);
-        if (before && applied && (applied.outcome === 'applied' || applied.outcome === 'already_present') && JSON.stringify(before) !== JSON.stringify(fact)) {
+        if (applied && (applied.outcome === 'applied' || applied.outcome === 'already_present')) {
             throw new Error('Un fatto già scritto non si modifica dal dossier: correggilo nella scheda.');
         }
     }
-    try { await persistRecord(ports, current.attachment, { ...next, updatedAt: ports.now().toISOString() }); }
+    for (const before of current.record.facts) {
+        if (!next.facts.some((fact) => fact.factId === before.factId)) throw new Error('Un fatto non si elimina dal dossier: rifiutalo.');
+    }
+    try { await persistRecord(ports, current.attachment, { ...next, updatedAt: ports.now().toISOString() }, guard); }
     catch (error) { if (error instanceof DossierVersionConflict) throw new DossierStaleError(); throw error; }
+}
+
+// ---------------------------------------------------------------------------
+// Riprova dell'estrazione locale dall'originale conservato
+// ---------------------------------------------------------------------------
+
+export type DossierRetryOutcome = 'extracted' | 'failed' | 'stale' | 'not_retryable' | 'source_changed';
+
+/**
+ * Rilegge l'originale conservato (byte decifrati, sha256 uguale alla fonte) e ripete
+ * l'estrazione locale. Il nuovo testo entra inline; i fatti già presenti, decisi o no,
+ * restano intatti; le nuove proposte si aggiungono da decidere; il residuo torna da rivedere.
+ */
+export async function retryDossierExtraction(
+    ports: DossierPorts,
+    input: { patientId: string; attachmentId: string; expected: DossierCurrentness; signal: AbortSignal; isCurrent: () => boolean },
+): Promise<DossierRetryOutcome> {
+    const guard = guardOf(input.signal, input.isCurrent);
+    const current = await rereadDocument(ports, input.patientId, input.attachmentId, input.signal);
+    guard();
+    if (!current || !sameCurrentness(current.attachment.currentness, input.expected)) return 'stale';
+    const record = current.record;
+    if (record.extraction.state === 'extracted' || (record.extraction.state === 'not_extracted' && !['pdf', 'image', 'office', 'text'].includes(record.source.kind))) return 'not_retryable';
+    const bytes = await ports.readAttachmentBytes(current.attachment.id, input.patientId, input.signal);
+    guard();
+    if (!bytes) return 'source_changed';
+    let host: DossierHostExtraction;
+    try {
+        if (await ports.sha256(bytes) !== record.source.sha256) return 'source_changed';
+        host = await extractWithRetry(ports, bytes, input.signal);
+        guard();
+    } finally { bytes.fill(0); }
+    const at = ports.now().toISOString();
+    const text = host.status === 'extracted' && host.markdown.trim() ? host.markdown : null;
+    let next: DossierRecord;
+    if (!text) {
+        next = { ...record, updatedAt: at, extractionAttempts: [...(record.extractionAttempts ?? []),
+            { at, outcome: 'failed', detail: host.status === 'failed' ? host.detail : 'empty_extraction' }] };
+    } else {
+        const pageCount = host.status === 'extracted' ? host.ocr?.pageCount ?? null : null;
+        const { units, unitBasis } = splitDossierUnits(text, pageCount);
+        const extraction: DossierExtraction = { state: 'extracted', engine: host.status === 'extracted' && host.ocr ? 'anydoc_ocr' : 'anydoc', pageCount,
+            ocrPageCount: host.status === 'extracted' ? host.ocr?.ocrPageCount ?? 0 : 0, unitBasis, units,
+            text: { location: 'inline', inline: text, sha256: await ports.sha256(new TextEncoder().encode(text)), chars: text.length } };
+        const exemptionCodes = await ports.exemptionCodes(input.signal);
+        guard();
+        const date = record.documentDate ?? (() => { const found = findExplicitDocumentDate(text, record.source.fileName); return found ? { value: found.date, source: found.source } : null; })();
+        const proposed = extractDossierCandidates({ fileName: record.source.fileName, text, units, documentDate: date?.value ?? null, exemptionCodes });
+        const known = new Set(record.facts.map((fact) => fact.factId));
+        next = { ...record, updatedAt: at, extraction, documentDate: date,
+            identity: { ...record.identity, taxCodes: collectDossierTaxCodes(text) },
+            classification: proposed.classification,
+            facts: [...record.facts, ...proposed.facts.filter((fact) => !known.has(fact.factId))],
+            residualReview: { state: 'pending' },
+            extractionAttempts: [...(record.extractionAttempts ?? []), { at, outcome: 'extracted' }] };
+    }
+    try { await persistRecord(ports, current.attachment, next, guard); }
+    catch (error) { if (error instanceof DossierVersionConflict) return 'stale'; throw error; }
+    return text ? 'extracted' : 'failed';
 }
 
 // ---------------------------------------------------------------------------
@@ -459,8 +583,6 @@ export interface DossierApplyResult {
 }
 
 const dateIso = (value: string) => new Date(`${value}T00:00:00.000Z`).toISOString();
-const sliceDay = (value: unknown) => (value instanceof Date ? value.toISOString() : String(value ?? '')).slice(0, 10);
-const norm = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
 function documentRefs(attachmentId: string, fact: DossierFact): string {
     return JSON.stringify([{ attachmentId, factId: fact.factId, ...(fact.evidence ? { unit: fact.evidence.unit } : {}) }]);
@@ -468,45 +590,6 @@ function documentRefs(attachmentId: string, fact: DossierFact): string {
 
 function entryType(kind: DossierFact['kind']): 'exam' | 'note' | 'visit' {
     return kind === 'imaging_report' || kind === 'document_entry' ? 'exam' : kind === 'assessment' ? 'visit' : 'note';
-}
-
-function recordFor(fact: DossierFact, patientId: string, attachmentId: string, now: Date, documentText: string | null): { table: DossierRecordTable; record: Record<string, unknown>; matches: (stored: Record<string, unknown>) => boolean } | null {
-    const v = fact.values; const id = fact.recordId!;
-    const base = { id, patientId };
-    switch (fact.kind) {
-        case 'therapy':
-            return { table: 'therapies', record: { ...base, drugName: v.drugName.trim(), dosage: v.dosage.trim(), status: v.status,
-                startDate: dateIso(v.startDate), ...(v.endDate ? { endDate: dateIso(v.endDate) } : {}),
-                motivation: `Da documento ${fact.evidence ? `(unità ${fact.evidence.unit})` : ''}`.trim(), createdAt: now },
-                matches: (s) => s.patientId === patientId && norm(s.drugName) === norm(v.drugName) && norm(s.dosage) === norm(v.dosage) && sliceDay(s.startDate) === v.startDate };
-        case 'observation':
-            return { table: 'observations', record: { ...base, codeSystem: 'LOINC', code: v.code.trim(), display: v.display.trim(), unitSystem: 'UCUM',
-                unitCode: v.unitCode.trim(), value: v.value.trim(), refLow: v.refLow || null, refHigh: v.refHigh || null, refText: v.refText || null,
-                observedAt: dateIso(v.observedAt), source: 'manual', createdAt: now },
-                matches: (s) => s.patientId === patientId && norm(s.code) === norm(v.code) && norm(s.value) === norm(v.value) && sliceDay(s.observedAt) === v.observedAt };
-        case 'service_prescription':
-            return { table: 'service_prescriptions', record: { ...base, prescribedAt: dateIso(v.prescribedAt), status: 'prescribed', category: v.category,
-                ...(v.priority ? { priority: v.priority } : {}), serviceName: v.serviceName.trim(), ...(v.clinicalQuestion ? { clinicalQuestion: v.clinicalQuestion } : {}),
-                ...(v.requestReference ? { requestReference: v.requestReference } : {}), source: 'document_review', documentRefs: documentRefs(attachmentId, fact),
-                version: 1, createdAt: now },
-                matches: (s) => s.patientId === patientId && norm(s.serviceName) === norm(v.serviceName) && sliceDay(s.prescribedAt) === v.prescribedAt };
-        case 'prosthetic':
-            return { table: 'prosthetic_prescriptions', record: { ...base, prescribedAt: dateIso(v.prescribedAt), status: v.status || 'prescribed', category: v.category,
-                description: v.description.trim(), ...(v.isoCode ? { isoCode: v.isoCode } : {}), source: 'document_review', documentRefs: documentRefs(attachmentId, fact),
-                version: 1, createdAt: now },
-                matches: (s) => s.patientId === patientId && norm(s.description) === norm(v.description) && sliceDay(s.prescribedAt) === v.prescribedAt };
-        case 'diagnosis': case 'exemption': return null;
-        default: {
-            const title = fact.kind === 'reported_scale' ? `Scala riportata: ${v.scaleName} = ${v.scaleTotal}` : (v.title || '').trim() || fact.kind;
-            const content = fact.kind === 'reported_scale'
-                ? `Totale trascritto dal documento, non una somministrazione: ${v.scaleName} ${v.scaleTotal}.${v.text ? `\n\n${v.text}` : ''}`
-                : v.textSource === 'document' ? documentText ?? '' : v.text;
-            return { table: 'entries', record: { ...base, type: entryType(fact.kind), date: dateIso(v.date), title, content,
-                attachments: [attachmentId], metadata: { dossier: { factRef: dossierFactRef(attachmentId, fact.factId), kind: fact.kind } },
-                createdAt: now, updatedAt: now },
-                matches: (s) => s.patientId === patientId && entryFactRef(s.metadata) === dossierFactRef(attachmentId, fact.factId) };
-        }
-    }
 }
 
 export function entryFactRef(metadata: unknown): string | undefined {
@@ -517,47 +600,137 @@ export function entryFactRef(metadata: unknown): string | undefined {
     return typeof ref === 'string' ? ref : undefined;
 }
 
+type FieldRule = 'text' | 'value' | 'unit' | 'day' | 'exact' | 'dosage' | 'factRef' | 'list';
+
+/**
+ * Confronta il record riletto con il payload inviato su TUTTI i campi clinici. Un campo
+ * opzionale non inviato deve tornare vuoto; un record cancellato non è un esito valido.
+ */
+function payloadMatcher(rules: Record<string, FieldRule>, expected: Record<string, unknown>): (stored: Record<string, unknown>) => boolean {
+    return (stored) => {
+        if (stored.deletedAt) return false;
+        return Object.entries(rules).every(([field, rule]) => {
+            const want = expected[field]; const got = stored[field];
+            switch (rule) {
+                case 'text': return sameClinicalText(want as string, got as string);
+                case 'value': return sameClinicalValue(want as string, got as string);
+                case 'unit': return sameUnit(want as string, got as string);
+                case 'day': return sameDay(want, got);
+                case 'dosage': return sameDosage(want as string, got as string);
+                case 'factRef': return entryFactRef(got) === entryFactRef(want);
+                case 'list': return JSON.stringify(Array.isArray(got) ? got : []) === JSON.stringify(Array.isArray(want) ? want : []);
+                default: return sameOptional(want, got);
+            }
+        });
+    };
+}
+
+interface RecordSpec { table: DossierRecordTable; record: Record<string, unknown>; matches: (stored: Record<string, unknown>) => boolean }
+
+function recordFor(fact: DossierFact, patientId: string, attachmentId: string, now: Date, documentText: string | null): RecordSpec | null {
+    const v = fact.values; const id = fact.recordId!;
+    const base = { id, patientId };
+    switch (fact.kind) {
+        case 'therapy': {
+            const record = { ...base, drugName: v.drugName.trim(), dosage: v.dosage.trim(), status: v.status, startDate: dateIso(v.startDate),
+                endDate: v.endDate ? dateIso(v.endDate) : null, motivation: `Da documento ${fact.evidence ? `(unità ${fact.evidence.unit})` : ''}`.trim(), createdAt: now };
+            return { table: 'therapies', record, matches: payloadMatcher({ patientId: 'exact', drugName: 'text', dosage: 'dosage', status: 'exact', startDate: 'day', endDate: 'day', motivation: 'text' }, record) };
+        }
+        case 'observation': {
+            const record = { ...base, codeSystem: 'LOINC', code: v.code.trim(), display: v.display.trim(), unitSystem: 'UCUM', unitCode: v.unitCode.trim(),
+                value: v.value.trim(), refLow: v.refLow || null, refHigh: v.refHigh || null, refText: v.refText || null, observedAt: dateIso(v.observedAt), source: 'manual', createdAt: now };
+            return { table: 'observations', record, matches: payloadMatcher({ patientId: 'exact', codeSystem: 'exact', code: 'exact', display: 'text', unitSystem: 'exact',
+                unitCode: 'unit', value: 'value', refLow: 'value', refHigh: 'value', refText: 'text', observedAt: 'day' }, record) };
+        }
+        case 'service_prescription': {
+            const record = { ...base, prescribedAt: dateIso(v.prescribedAt), status: 'prescribed', category: v.category, priority: v.priority || null,
+                serviceName: v.serviceName.trim(), clinicalQuestion: v.clinicalQuestion || null, requestReference: v.requestReference || null,
+                source: 'document_review', documentRefs: documentRefs(attachmentId, fact), version: 1, createdAt: now };
+            return { table: 'service_prescriptions', record, matches: payloadMatcher({ patientId: 'exact', prescribedAt: 'day', status: 'exact', category: 'exact', priority: 'exact',
+                serviceName: 'text', clinicalQuestion: 'text', requestReference: 'exact', source: 'exact', documentRefs: 'exact' }, record) };
+        }
+        case 'prosthetic': {
+            const record = { ...base, prescribedAt: dateIso(v.prescribedAt), status: v.status, category: v.category, description: v.description.trim(),
+                isoCode: v.isoCode || null, source: 'document_review', documentRefs: documentRefs(attachmentId, fact), version: 1, createdAt: now };
+            return { table: 'prosthetic_prescriptions', record, matches: payloadMatcher({ patientId: 'exact', prescribedAt: 'day', status: 'exact', category: 'exact',
+                description: 'text', isoCode: 'exact', source: 'exact', documentRefs: 'exact' }, record) };
+        }
+        case 'diagnosis': case 'exemption': return null;
+        default: {
+            const title = fact.kind === 'reported_scale' ? `Scala riportata: ${v.scaleName} = ${v.scaleTotal}${v.scaleMax ? `/${v.scaleMax}` : ''}` : (v.title || '').trim() || fact.kind;
+            const qualifiers = [v.subject && v.subject !== 'paziente' ? `Soggetto: ${v.subject}.` : '', v.temporality ? `Riferimento temporale: ${v.temporality}.` : '',
+                v.certainty ? `Certezza: ${v.certainty}.` : ''].filter(Boolean).join(' ');
+            const body = fact.kind === 'reported_scale'
+                ? `Totale trascritto dal documento, non una somministrazione: ${v.scaleName} ${v.scaleTotal}${v.scaleMax ? `/${v.scaleMax}` : ''}.${v.text ? `\n\n${v.text}` : ''}`
+                : v.textSource === 'document' ? documentText ?? '' : v.text;
+            const content = qualifiers ? `${qualifiers}\n\n${body}` : body;
+            const record = { ...base, type: entryType(fact.kind), date: dateIso(v.date), title, content,
+                attachments: [attachmentId], metadata: { dossier: { factRef: dossierFactRef(attachmentId, fact.factId), kind: fact.kind } },
+                createdAt: now, updatedAt: now };
+            return { table: 'entries', record, matches: payloadMatcher({ patientId: 'exact', type: 'exact', date: 'day', title: 'text', content: 'exact', attachments: 'list', metadata: 'factRef' }, record) };
+        }
+    }
+}
+
 function serviceItems(fact: DossierFact): string[] {
     return (fact.values.items ?? '').split('\n').map((item) => item.trim()).filter(Boolean);
 }
 
+type WriteResult = { outcome: DossierAppliedEntry['outcome']; detail?: string };
+
+/**
+ * Lookup → riautorizzazione sull'esatta revisione → invio → rilettura su tutti i campi.
+ * `authorize` rilegge il record dossier subito prima dell'invio; se il fatto o la sua
+ * autorizzazione sono cambiati, non si scrive nulla.
+ */
 async function writeIdempotent(
-    ports: DossierPorts, table: DossierRecordTable, id: string, patientId: string, record: Record<string, unknown>, matches: (stored: Record<string, unknown>) => boolean, signal: AbortSignal,
-): Promise<{ outcome: DossierAppliedEntry['outcome']; detail?: string }> {
-    const before = await ports.getRecord(table, id, patientId, signal);
-    if (before) return matches(before) ? { outcome: 'applied' } : { outcome: 'conflict', detail: 'Un record con questo identificativo esiste con contenuto diverso.' };
+    ports: DossierPorts, spec: RecordSpec, id: string, patientId: string, signal: AbortSignal, guard: Guard, authorize: () => Promise<boolean>,
+): Promise<WriteResult | 'unauthorized'> {
+    const before = await ports.getRecord(spec.table, id, patientId, signal);
+    guard();
+    if (before) return spec.matches(before) ? { outcome: 'applied' } : { outcome: 'conflict', detail: 'Un record con questo identificativo esiste con contenuto diverso.' };
+    if (!await authorize()) return 'unauthorized';
     try {
-        await ports.createRecord(table, record);
-        const after = await ports.getRecord(table, id, patientId, signal);
-        if (!after) return { outcome: 'uncertain', detail: 'Scrittura confermata ma record non riletto.' };
-        return matches(after) ? { outcome: 'applied' } : { outcome: 'conflict', detail: 'Il record riletto non corrisponde.' };
+        await boundary(guard, () => ports.createRecord(spec.table, spec.record));
     } catch (error) {
+        if (error instanceof DossierAbortedError) throw error;
         let after: Record<string, unknown> | undefined;
-        try { after = await ports.getRecord(table, id, patientId, signal); } catch { return { outcome: 'uncertain', detail: 'Esito non verificabile: rileggi prima di riprovare.' }; }
-        if (after) return matches(after) ? { outcome: 'applied' } : { outcome: 'conflict', detail: 'Un record con questo identificativo esiste con contenuto diverso.' };
+        try { after = await ports.getRecord(spec.table, id, patientId, signal); } catch { guard(); return { outcome: 'uncertain', detail: 'Esito non verificabile: rileggi prima di riprovare.' }; }
+        guard();
+        if (after) return spec.matches(after) ? { outcome: 'applied' } : { outcome: 'conflict', detail: 'Il record riletto non corrisponde a quanto inviato.' };
         const status = error instanceof DossierWriteRejected ? error.status : null;
         return { outcome: 'failed', detail: status ? `Scrittura rifiutata (${status}).` : 'Scrittura non riuscita.' };
     }
+    const after = await ports.getRecord(spec.table, id, patientId, signal);
+    guard();
+    if (!after) return { outcome: 'uncertain', detail: 'Scrittura confermata ma record non riletto.' };
+    return spec.matches(after) ? { outcome: 'applied' } : { outcome: 'conflict', detail: 'Il record riletto non corrisponde a quanto inviato.' };
 }
 
-async function applyPatientCode(ports: DossierPorts, patientId: string, fact: DossierFact, signal: AbortSignal): Promise<{ outcome: DossierAppliedEntry['outcome']; detail?: string }> {
+async function applyPatientCode(
+    ports: DossierPorts, patientId: string, fact: DossierFact, signal: AbortSignal, guard: Guard, authorize: () => Promise<boolean>,
+): Promise<WriteResult | 'unauthorized'> {
     const present = (patient: DossierPatient) => fact.kind === 'exemption'
         ? patient.exemptions.some((code) => code.toUpperCase() === fact.values.code.toUpperCase())
         : patient.diagnoses.some((diagnosis) => fact.values.code
             ? diagnosis.code.toUpperCase() === fact.values.code.toUpperCase() && diagnosis.system === fact.values.system
-            : norm(diagnosis.description) === norm(fact.values.description) && sliceDay(diagnosis.date) === fact.values.date);
+            : sameClinicalText(diagnosis.description, fact.values.description) && sameDay(diagnosis.date, fact.values.date));
     const patient = await ports.getPatient(patientId, signal);
+    guard();
     if (!patient) return { outcome: 'failed', detail: 'Scheda non disponibile.' };
     if (present(patient)) return { outcome: 'already_present' };
     if (typeof patient.version !== 'number') return { outcome: 'failed', detail: 'Versione della scheda non disponibile.' };
     const change = fact.kind === 'exemption'
         ? { version: patient.version, exemptions: [...patient.exemptions, fact.values.code.toUpperCase()] }
         : { version: patient.version, diagnoses: [...patient.diagnoses, { code: fact.values.code ?? '', description: fact.values.description.trim(),
-            system: fact.values.system || 'ICD-10', date: dateIso(fact.values.date) }] };
+            system: fact.values.system || (fact.values.code ? 'ICD-10' : ''), date: dateIso(fact.values.date) }] };
+    if (!await authorize()) return 'unauthorized';
     try {
-        await ports.updatePatientCodes(patientId, change);
+        await boundary(guard, () => ports.updatePatientCodes(patientId, change));
     } catch (error) {
+        if (error instanceof DossierAbortedError) throw error;
         const reread = await ports.getPatient(patientId, signal).catch(() => undefined);
+        guard();
         if (error instanceof DossierVersionConflict) {
             // Il 409 di versione garantisce che questa scrittura non è avvenuta.
             return reread && present(reread) ? { outcome: 'already_present', detail: 'Aggiunto nel frattempo da un’altra modifica.' }
@@ -567,93 +740,170 @@ async function applyPatientCode(ports: DossierPorts, patientId: string, fact: Do
         return reread ? { outcome: 'failed', detail: 'Scrittura non riuscita.' } : { outcome: 'uncertain', detail: 'Esito non verificabile.' };
     }
     const after = await ports.getPatient(patientId, signal);
+    guard();
     return after && present(after) ? { outcome: 'applied' } : { outcome: 'uncertain', detail: 'Scrittura confermata ma non riletta.' };
 }
 
+function eligible(record: DossierRecord, fact: DossierFact, exemptionCodes: ReadonlySet<string>): boolean {
+    if (fact.decision !== 'accepted' || dossierFactBlockers(fact, { exemptionCodes }).length) return false;
+    const last = latestAppliedOutcome(record, fact.factId);
+    if (!last || (last.outcome !== 'applied' && last.outcome !== 'already_present')) return true;
+    return false;
+}
+
 /**
- * Applica i fatti accettati di un documento. Ordine per ogni fatto:
- * identità opaca persistita → scrittura idempotente → rilettura → registro (CAS).
- * Ogni await è seguito dal controllo di sessione e contesto.
+ * Applica i fatti accettati di un documento. Per ogni fatto:
+ * 1. autorizzazione (claim) persistita con CAS sull'esatta revisione e impronta del fatto;
+ * 2. lookup, poi nuova rilettura del record dossier subito prima di ogni invio (anche per ogni voce);
+ * 3. scrittura con il writer ordinario e rilettura su tutti i campi del payload;
+ * 4. registro con l'impronta della revisione scritta e rilascio del claim (CAS).
+ * Il claim non rende atomici browser e writer: impedisce alla revisione dossier di cambiare
+ * il fatto mentre la scrittura è in volo e rende recuperabile un esito interrotto.
  */
 export async function applyDossierDocument(
     ports: DossierPorts,
     input: { patientId: string; attachmentId: string; expected: DossierCurrentness; signal: AbortSignal; isCurrent: () => boolean },
 ): Promise<DossierApplyResult> {
-    const { patientId, attachmentId, signal, isCurrent } = input;
+    const { patientId, attachmentId, signal } = input;
+    const guard = guardOf(signal, input.isCurrent);
     const result: DossierApplyResult = { attachmentId, outcomes: [], stopped: null, partial: false };
-    let current = await rereadDocument(ports, patientId, attachmentId, signal);
-    assertLive(signal, isCurrent);
-    if (!current || !sameCurrentness(current.attachment.currentness, input.expected)) return { ...result, stopped: 'stale' };
+    const finish = (stopped: DossierApplyResult['stopped']) => {
+        result.stopped = stopped;
+        result.partial = stopped !== null || result.outcomes.some((entry) => entry.outcome !== 'applied' && entry.outcome !== 'already_present');
+        return result;
+    };
+    const first = await rereadDocument(ports, patientId, attachmentId, signal);
+    guard();
+    if (!first || !sameCurrentness(first.attachment.currentness, input.expected)) return finish('stale');
     const patient = await ports.getPatient(patientId, signal);
-    assertLive(signal, isCurrent);
-    if (!patient || current.attachment.patientId !== patientId || current.record.preservation.state !== 'verified'
-        || ['mixed', 'discordant'].includes(current.record.identity.status)) return { ...result, stopped: 'identity' };
+    guard();
+    if (!patient || first.attachment.patientId !== patientId || !preservationIsCurrent(first.record, first.attachment.currentness?.sourceRef)
+        || ['mixed', 'discordant'].includes(first.record.identity.status)) return finish('identity');
     const exemptionCodes = await ports.exemptionCodes(signal);
-    const pending = current.record.facts.filter((fact) => {
-        if (fact.decision !== 'accepted' || dossierFactBlockers(fact, { exemptionCodes }).length) return false;
-        const last = latestAppliedOutcome(current!.record, fact.factId)?.outcome;
-        return last !== 'applied' && last !== 'already_present';
-    });
-    // 1. Identità opache persistite prima di qualunque invio.
-    const missing = pending.filter((fact) => !fact.recordId && DOSSIER_FACT_TARGET[fact.kind] !== 'patient_diagnoses' && DOSSIER_FACT_TARGET[fact.kind] !== 'patient_exemptions');
-    if (missing.length) {
-        const assigned = new Map(missing.map((fact) => [fact.factId, ports.newId()] as const));
-        try {
-            await persistRecord(ports, current.attachment, { ...current.record, updatedAt: ports.now().toISOString(),
-                facts: current.record.facts.map((fact) => assigned.has(fact.factId) ? { ...fact, recordId: assigned.get(fact.factId) } : fact) });
-        } catch { return { ...result, stopped: 'stale' }; }
-        current = await rereadDocument(ports, patientId, attachmentId, signal);
-        assertLive(signal, isCurrent);
-        if (!current) return { ...result, stopped: 'stale' };
-    }
-    const ready = current.record.facts.filter((fact) => pending.some((item) => item.factId === fact.factId));
-    // Il testo completo entra in una voce solo se coincide con quello estratto e registrato.
-    let documentText: string | null = null;
-    if (current.record.extraction.state === 'extracted' && current.attachment.parseEvidenceArtifactSnapshot) {
-        const text = resolveDossierText(current.attachment.parseEvidenceArtifactSnapshot, current.record);
-        if (text !== null && await ports.sha256(new TextEncoder().encode(text)) === current.record.extraction.text.sha256) documentText = text;
-        assertLive(signal, isCurrent);
-    }
-    for (const fact of ready) {
-        assertLive(signal, isCurrent);
-        let write: { outcome: DossierAppliedEntry['outcome']; detail?: string };
+    guard();
+    const planned = first.record.facts.filter((fact) => eligible(first.record, fact, exemptionCodes)).map((fact) => fact.factId);
+    let documentText: string | null | undefined;
+    for (const factId of planned) {
+        guard();
+        // 1. Autorizzazione persistita.
+        let doc = await rereadDocument(ports, patientId, attachmentId, signal);
+        guard();
+        if (!doc || !preservationIsCurrent(doc.record, doc.attachment.currentness?.sourceRef)) return finish('stale');
+        let fact = doc.record.facts.find((item) => item.factId === factId);
+        if (!fact || !eligible(doc.record, fact, exemptionCodes)) continue;
+        let claim = doc.record.pendingWrites?.find((item) => item.factId === factId);
         const target = DOSSIER_FACT_TARGET[fact.kind];
-        if (target === 'patient_diagnoses' || target === 'patient_exemptions') {
-            write = await applyPatientCode(ports, patientId, fact, signal);
+        const codeTarget = target === 'patient_diagnoses' || target === 'patient_exemptions';
+        if (!claim) {
+            const recordId = codeTarget ? null : fact.recordId ?? ports.newId();
+            const claimed: DossierFact = codeTarget ? fact : { ...fact, recordId: recordId! };
+            claim = { factId, recordId, factFingerprint: dossierFactFingerprint(claimed), at: ports.now().toISOString() };
+            try {
+                await persistRecord(ports, doc.attachment, { ...doc.record, updatedAt: ports.now().toISOString(),
+                    facts: doc.record.facts.map((item) => item.factId === factId ? claimed : item),
+                    pendingWrites: [...(doc.record.pendingWrites ?? []), claim] }, guard);
+            } catch (error) {
+                if (error instanceof DossierAbortedError) throw error;
+                return finish(error instanceof DossierVersionConflict ? 'stale' : 'registry');
+            }
+            doc = await rereadDocument(ports, patientId, attachmentId, signal);
+            guard();
+            if (!doc) return finish('stale');
+            fact = doc.record.facts.find((item) => item.factId === factId);
+            if (!fact) return finish('stale');
+        }
+        const activeClaim = claim;
+        if (dossierFactFingerprint(fact) !== activeClaim.factFingerprint) {
+            // Il fatto è cambiato fuori dalla revisione dossier: non si scrive per la nuova revisione.
+            // Se un invio precedente era in volo, il registro lo attribuisce alla revisione autorizzata.
+            const previous = activeClaim.recordId ? await (async () => {
+                for (const table of ['therapies', 'observations', 'entries', 'service_prescriptions', 'prosthetic_prescriptions'] as const) {
+                    const found = await ports.getRecord(table, activeClaim.recordId!, patientId, signal);
+                    guard();
+                    if (found) return found;
+                }
+                return undefined;
+            })() : undefined;
+            const entry: DossierAppliedEntry | null = previous || codeTarget ? { factId, target, recordId: activeClaim.recordId,
+                outcome: previous ? 'conflict' : 'uncertain', at: ports.now().toISOString(), factFingerprint: activeClaim.factFingerprint,
+                detail: previous ? 'Record scritto per una revisione precedente del fatto: verifica nella scheda.'
+                    : 'Il fatto è cambiato con una scrittura sulla scheda forse in corso: verifica nella scheda.' } : null;
+            if (entry) result.outcomes.push(entry);
+            await releaseClaim(ports, patientId, attachmentId, activeClaim, entry && entry.outcome === 'uncertain' ? { ...entry, outcome: 'conflict' } : entry, signal, guard);
+            return finish('stale');
+        }
+        // 2. Riautorizzazione subito prima di ogni invio.
+        const authorize = async (): Promise<boolean> => {
+            const fresh = await rereadDocument(ports, patientId, attachmentId, signal);
+            guard();
+            const freshFact = fresh?.record.facts.find((item) => item.factId === factId);
+            return Boolean(fresh && freshFact && fresh.record.pendingWrites?.some((item) => item.factId === factId && item.factFingerprint === activeClaim.factFingerprint)
+                && dossierFactFingerprint(freshFact) === activeClaim.factFingerprint && freshFact.decision === 'accepted'
+                && preservationIsCurrent(fresh.record, fresh.attachment.currentness?.sourceRef));
+        };
+        let write: WriteResult | 'unauthorized';
+        if (codeTarget) {
+            write = await applyPatientCode(ports, patientId, fact, signal, guard, authorize);
         } else {
-            if (!fact.recordId) { result.stopped = 'stale'; break; }
+            if (documentText === undefined) {
+                documentText = null;
+                if (doc.record.extraction.state === 'extracted' && doc.attachment.parseEvidenceArtifactSnapshot) {
+                    const text = resolveDossierText(doc.attachment.parseEvidenceArtifactSnapshot, doc.record);
+                    if (text !== null && await ports.sha256(new TextEncoder().encode(text)) === doc.record.extraction.text.sha256) documentText = text;
+                    guard();
+                }
+            }
             const spec = recordFor(fact, patientId, attachmentId, ports.now(), documentText)!;
             write = fact.values.textSource === 'document' && !documentText
                 ? { outcome: 'failed', detail: 'Testo del documento non verificabile: voce non scritta.' }
-                : await writeIdempotent(ports, spec.table, fact.recordId, patientId, spec.record, spec.matches, signal);
-            if (write.outcome === 'applied' && fact.kind === 'service_prescription') {
+                : await writeIdempotent(ports, spec, activeClaim.recordId!, patientId, signal, guard, authorize);
+            if (write !== 'unauthorized' && write.outcome === 'applied' && fact.kind === 'service_prescription') {
                 for (const [index, name] of serviceItems(fact).entries()) {
-                    const itemId = `${fact.recordId}-item-${index + 1}`;
-                    const item = await writeIdempotent(ports, 'service_prescription_items', itemId, patientId, { id: itemId, patientId, prescriptionId: fact.recordId,
-                        ordinal: index + 1, status: 'prescribed', category: fact.values.category, serviceName: name, matchStatus: 'unmatched', version: 1, createdAt: ports.now() },
-                        (s) => s.prescriptionId === fact.recordId && norm(s.serviceName) === norm(name), signal);
-                    if (item.outcome !== 'applied') { write = { outcome: item.outcome, detail: `Voce ${index + 1}: ${item.detail ?? item.outcome}` }; break; }
+                    const itemId = `${activeClaim.recordId}-item-${index + 1}`;
+                    const record = { id: itemId, patientId, prescriptionId: activeClaim.recordId, ordinal: index + 1, status: 'prescribed',
+                        category: fact.values.category, serviceName: name, matchStatus: 'unmatched', version: 1, createdAt: ports.now() };
+                    const item = await writeIdempotent(ports, { table: 'service_prescription_items', record,
+                        matches: payloadMatcher({ prescriptionId: 'exact', ordinal: 'exact', status: 'exact', category: 'exact', serviceName: 'text' }, record) },
+                    itemId, patientId, signal, guard, authorize);
+                    if (item === 'unauthorized') { write = { outcome: 'uncertain', detail: `Prescrizione scritta; voce ${index + 1} non autorizzata: il fatto è cambiato.` }; break; }
+                    if (item.outcome !== 'applied') { write = { outcome: item.outcome === 'conflict' ? 'conflict' : 'uncertain', detail: `Voce ${index + 1}: ${item.detail ?? item.outcome}` }; break; }
                 }
             }
         }
-        assertLive(signal, isCurrent);
-        const entry: DossierAppliedEntry = { factId: fact.factId, target, recordId: fact.recordId ?? null, outcome: write.outcome,
-            at: ports.now().toISOString(), ...(write.detail ? { detail: write.detail } : {}) };
-        result.outcomes.push(entry);
-        // 3. Registro nel record, con CAS; un conflitto rilegge e ritenta una volta.
-        let recorded = false;
-        for (let attempt = 0; attempt < 2 && !recorded; attempt += 1) {
-            const fresh = await rereadDocument(ports, patientId, attachmentId, signal);
-            assertLive(signal, isCurrent);
-            if (!fresh) break;
-            try {
-                await persistRecord(ports, fresh.attachment, { ...fresh.record, applied: [...fresh.record.applied, entry], updatedAt: ports.now().toISOString() });
-                recorded = true;
-            } catch (error) { if (!(error instanceof DossierVersionConflict)) break; }
+        if (write === 'unauthorized') {
+            // Nessun invio: l'autorizzazione si rilascia senza registrare un esito per la nuova revisione.
+            await releaseClaim(ports, patientId, attachmentId, activeClaim, null, signal, guard);
+            return finish('stale');
         }
-        if (!recorded) { result.stopped = 'registry'; break; }
+        const entry: DossierAppliedEntry = { factId, target, recordId: activeClaim.recordId, outcome: write.outcome, at: ports.now().toISOString(),
+            ...(write.detail ? { detail: write.detail } : {}), factFingerprint: activeClaim.factFingerprint };
+        result.outcomes.push(entry);
+        // 4. Registro e rilascio, con CAS; un conflitto rilegge e ritenta una volta.
+        const recorded = await releaseClaim(ports, patientId, attachmentId, activeClaim, entry, signal, guard);
+        if (!recorded) return finish('registry');
     }
-    result.partial = result.stopped !== null || result.outcomes.some((entry) => entry.outcome !== 'applied' && entry.outcome !== 'already_present')
-        || result.outcomes.length < ready.length;
-    return result;
+    return finish(null);
+}
+
+async function releaseClaim(
+    ports: DossierPorts, patientId: string, attachmentId: string, claim: DossierWriteClaim, entry: DossierAppliedEntry | null,
+    signal: AbortSignal, guard: Guard,
+): Promise<boolean> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        const fresh = await rereadDocument(ports, patientId, attachmentId, signal);
+        guard();
+        if (!fresh) return false;
+        try {
+            // Un esito incerto tiene il claim: la ripresa rilegge il record prima di qualunque nuovo invio.
+            const keep = entry?.outcome === 'uncertain';
+            await persistRecord(ports, fresh.attachment, { ...fresh.record, updatedAt: ports.now().toISOString(),
+                applied: entry ? [...fresh.record.applied, entry] : fresh.record.applied,
+                pendingWrites: keep ? fresh.record.pendingWrites : (fresh.record.pendingWrites ?? []).filter((item) => item.factId !== claim.factId) }, guard);
+            return true;
+        } catch (error) {
+            if (error instanceof DossierAbortedError) throw error;
+            if (!(error instanceof DossierVersionConflict)) return false;
+        }
+    }
+    return false;
 }
