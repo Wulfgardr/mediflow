@@ -69,6 +69,11 @@ export const AUDIT_EVENT_TYPES = [
     'territorial.packs.initialized',
     'territorial.packs.migrated',
     'territorial.packs.changed',
+    /* ADR 0178: finestre, blocchi e scarto confermato della conservazione. */
+    'retention.windows.changed',
+    'retention.hold.placed',
+    'retention.hold.released',
+    'retention.fascicolo.discarded',
     'reference_data.aifa.updated',
     'reference_data.drug_catalog.updated',
     'ambulatory.created',
