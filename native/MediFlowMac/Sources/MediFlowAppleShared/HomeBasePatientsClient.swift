@@ -882,14 +882,26 @@ public actor HomeBasePatientsClient {
             .appendingPathComponent("patients")
             .appendingPathComponent(patientId)
             .appendingPathComponent("attachments")
-        let (data, _) = try await send(
-            to: url,
-            method: "POST",
-            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
-            body: HomeBaseAttachmentWirePrecheck.encodedBody(for: payload)
-        )
-        return try decode(HomeBaseCreatedResource.self, from: data)
+        let headers = pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+        do {
+            let (data, _) = try await send(to: url, method: "POST", headers: headers,
+                                           body: HomeBaseAttachmentWirePrecheck.encodedBody(for: payload))
+            return try decode(HomeBaseCreatedResource.self, from: data)
+        } catch HomeBaseClientError.httpStatus(409, let message)
+                    where payload.expectedCollection != nil && message == Self.attachmentCollectionChangedMessage {
+            throw HomeBaseClientError.attachmentCollectionChanged
+        } catch HomeBaseClientError.httpStatus(400, let message)
+                    where payload.expectedCollection != nil && message == Self.legacyAttachmentCollectionRejection {
+            // A home-base older than the precondition refuses the field by presence and writes nothing;
+            // it cannot check the collection either, so the create proceeds as before.
+            let (data, _) = try await send(to: url, method: "POST", headers: headers,
+                                           body: HomeBaseAttachmentWirePrecheck.encodedBody(for: payload.expecting(nil)))
+            return try decode(HomeBaseCreatedResource.self, from: data)
+        }
     }
+
+    static let attachmentCollectionChangedMessage = "Attachment collection changed. Review the documents again."
+    static let legacyAttachmentCollectionRejection = "Network document write boundary rejects unexpected field expectedCollection"
 
     public func computeVisitDraft(
         input: HomeBaseVisitDraftInput,

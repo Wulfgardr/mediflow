@@ -7,6 +7,7 @@ import type { ProstheticsCatalogSelection, ProstheticsSnapshot } from './referen
 import { encryptData, decryptData } from './security/security';
 import type { WhoReference } from './reference-data/icd11-reference';
 import { notifyDbChange } from './live-query';
+import { AttachmentCollectionChangedError, isAttachmentCollectionChangedPayload, type AttachmentCollectionView } from './attachment-collection-client';
 import {
     LOCKED_DATA_PLACEHOLDER,
     isLockedDataPlaceholder,
@@ -231,6 +232,15 @@ export function captureAttachmentWritePrecondition(record: Pick<Attachment, 'id'
     return Object.freeze({ attachmentId: record.id, patientId: record.patientId, expected: Object.freeze({ ...value }) });
 }
 
+/** A write whose answer never arrived may have committed: its collection view cannot be sent again. */
+function retireOnFailure<R>(pending: Promise<R>, view: AttachmentCollectionView): Promise<R> {
+    return pending.catch((error: unknown) => { view.invalidate(); throw error; });
+}
+
+function parseJsonOrNull(text: string): unknown {
+    try { return JSON.parse(text); } catch { return null; }
+}
+
 export type SissHandoffWritePrecondition = Readonly<{ id: string; patientId: string; version: number }>;
 
 export function captureSissHandoffWritePrecondition(record: Pick<SissHandoffEvent, 'id' | 'patientId' | 'version'>): SissHandoffWritePrecondition {
@@ -255,12 +265,14 @@ export function resolveSissHandoffDraftPrecondition(
 type ApiDeleteOptions = {
     sissPrecondition?: SissHandoffWritePrecondition;
     attachmentPrecondition?: AttachmentWritePrecondition;
+    /** The patient's documents as the user reviewed them; refused with AttachmentCollectionChangedError if they changed. */
+    attachmentCollection?: AttachmentCollectionView;
     suppressNotify?: boolean;
     version?: number;
     deletionReason?: string;
     deleteContext?: TherapyDeleteClientContext;
 };
-type ApiAddOptions = { suppressNotify?: boolean };
+type ApiAddOptions = { suppressNotify?: boolean; attachmentCollection?: AttachmentCollectionView };
 export type PatientAddOptions = ApiAddOptions & { createContext?: PatientCreateClientContext };
 
 class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
@@ -449,6 +461,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             context.signal.throwIfAborted();
         };
         assertCurrent();
+        const collection = this.attachmentCollectionFor((item as { patientId?: unknown }).patientId, options?.attachmentCollection);
         const encryptedItem = await this.encryptItem(item);
         assertCurrent();
         // attachment creation time remains owned by the host.
@@ -456,7 +469,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             delete encryptedItem.createdAt;
             delete encryptedItem.currentness;
         }
-        const res = await fetch(this.endpoint, {
+        const request = fetch(this.endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(context ? {
                 'X-MediFlow-Patient-Create-Mode': 'fixed-preview-v1',
@@ -464,16 +477,22 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
                 'X-MediFlow-Patient-Create-Target': context.ambulatoryId,
             } : {}) },
             ...(context ? { signal: context.signal } : {}),
-            body: JSON.stringify(encryptedItem)
+            body: JSON.stringify(collection ? { ...encryptedItem, expectedCollection: collection.expected() } : encryptedItem)
         });
+        const res = await (collection ? retireOnFailure(request, collection) : request);
         assertCurrent();
         if (!res.ok) {
             // Fenced errors never echo server/driver bodies containing patient data.
             if (fenced) throw new Error('Patient create was not confirmed.');
             const errorText = await res.text();
+            if (collection) {
+                if (res.status === 409 && isAttachmentCollectionChangedPayload(parseJsonOrNull(errorText))) throw new AttachmentCollectionChangedError();
+                collection.invalidate();
+            }
             throw new Error(`Failed to add item: ${res.status} ${res.statusText} - ${errorText}`);
         }
-        const data = await res.json();
+        const data = await (collection ? retireOnFailure(res.json(), collection) : res.json());
+        collection?.recordCreated(data?.id, data?.currentness);
         assertCurrent();
         if (!options?.suppressNotify) this.emitChange();
         return data.id;
@@ -517,6 +536,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
 
     async delete(id: string, options?: ApiDeleteOptions): Promise<void> {
         const precondition = this.sissWritePayload(id, options?.sissPrecondition) ?? this.attachmentWritePayload(id, options?.attachmentPrecondition);
+        const collection = this.attachmentCollectionFor(precondition && 'expected' in precondition ? precondition.patientId : undefined, options?.attachmentCollection);
         const fenced = options != null && 'deleteContext' in options;
         const context = fenced ? options.deleteContext : undefined;
         const key = fenced ? this.getMasterKey() : null;
@@ -546,6 +566,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
                 init.headers = { 'Content-Type': 'application/json' };
                 init.body = JSON.stringify({
                     ...precondition,
+                    ...(collection ? { expectedCollection: collection.expected() } : {}),
                     ...(this.tableName !== 'siss_handoff_events' && typeof options?.version === 'number' ? { version: options.version } : {}),
                     ...(typeof deletionReason === 'string' ? { deletionReason } : {}),
                 });
@@ -553,16 +574,23 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
 
             // Encryption is asynchronous: retire the write before dispatch, not just in the UI.
             assertCurrent();
-            const res = await fetch(`${this.endpoint}/${id}`, init);
+            const request = fetch(`${this.endpoint}/${id}`, init);
+            const res = await (collection ? retireOnFailure(request, collection) : request);
             assertCurrent();
             if (!res.ok) {
                 const payload = await res.json().catch(() => null);
                 assertCurrent();
+                if (collection) {
+                    if (res.status === 409 && isAttachmentCollectionChangedPayload(payload)) throw new AttachmentCollectionChangedError();
+                    // A 409 or 404 on the row itself is a definite refusal; anything else may hide a commit.
+                    if (res.status !== 404 && res.status !== 409) collection.invalidate();
+                }
                 if (res.status === 409 && isApiVersionConflictPayload(payload)) {
                     throw this.buildVersionConflictError(payload);
                 }
                 throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
             }
+            collection?.recordDeleted(id);
             if (!options?.suppressNotify) this.emitChange();
         } catch (error) {
             if (fenced && !(error instanceof ApiConflictError)) {
@@ -661,6 +689,12 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         if (!value || value.id !== id) throw new Error('Ricarica il diario SISS prima di modificare questa voce.');
         const captured = captureSissHandoffWritePrecondition(value);
         return { patientId: captured.patientId, version: captured.version };
+    }
+
+    private attachmentCollectionFor(patientId: unknown, view?: AttachmentCollectionView): AttachmentCollectionView | undefined {
+        if (this.tableName !== 'attachments' || !view) return undefined;
+        if (typeof patientId !== 'string' || patientId !== view.patientId) throw new Error('Attachment collection unavailable');
+        return view;
     }
 
     private attachmentWritePayload(id: string, value?: AttachmentWritePrecondition) {

@@ -37,12 +37,17 @@ export const attachmentCreateSchema = z.object({
     ocrQueueReason: ocrQueueReasonSchema,
 }).strict();
 
-export const attachmentDeleteSchema = z.object({
+const attachmentRowPreconditionSchema = z.object({
     patientId: requiredTextSchema,
     expected: z.custom<AttachmentExpectedCurrentness>((value) => parseAttachmentExpectedCurrentness(value) !== null),
 });
 
-export const attachmentUpdateSchema = attachmentDeleteSchema.extend({
+/** Delete changes the collection membership: it accepts the same reviewed-collection precondition as create. */
+export const attachmentDeleteSchema = attachmentRowPreconditionSchema.extend({
+    expectedCollection: attachmentCollectionSchema.optional(),
+});
+
+export const attachmentUpdateSchema = attachmentRowPreconditionSchema.extend({
     summarySnapshot: optionalTextSchema,
     parseEvidenceArtifactSnapshot: optionalTextSchema,
     ocrQueueState: ocrQueueStateSchema,

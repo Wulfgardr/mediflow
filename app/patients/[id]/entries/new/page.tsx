@@ -15,9 +15,10 @@ import { InkState } from '@/components/ui/ink-state';
 import { ClinicalRichTextEditor } from '@/components/clinical-rich-text-editor';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
+import { AttachmentCollectionChangedError, AttachmentCollectionView } from '@/lib/attachment-collection-client';
 import { db, type Attachment, type ClinicalEntry, type Therapy, type Observation, type Checkup } from '@/lib/db';
 import { clinicalRichTextToPlainText, isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
-import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
+import { useLiveQueryState } from '@/lib/live-query';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast-provider';
 import type { VisitMedicationCandidate, VisitSessionEvent, VisitSessionState } from '@/lib/visit-transcript-draft';
@@ -135,12 +136,13 @@ export default function NewEntryPage() {
     );
     const patientEntries = useMemo(() => entriesRead.data ?? [], [entriesRead.data]);
     /* WUL-420 */
-    const patientAttachments = useLiveQuery<Attachment[], Attachment[]>(
+    const attachmentsRead = useLiveQueryState<Attachment[]>(
         async () => db.attachments.query({ patientId: id }).toArray({ signal: db.getSessionReadSignal() }),
         [id],
-        [],
+        undefined,
         ['attachments'],
-    ) ?? [];
+    );
+    const patientAttachments = attachmentsRead.data ?? [];
 
     const activeTherapies = useLiveQueryState<Therapy[]>(
         async () => proposal
@@ -289,11 +291,24 @@ export default function NewEntryPage() {
             return;
         }
 
+        // New files join the documents listed in this page: a list not yet read cannot be the precondition.
+        let attachmentCollection: AttachmentCollectionView | undefined;
+        if (files.length > 0) {
+            try {
+                attachmentCollection = AttachmentCollectionView.capture(id,
+                    attachmentsRead.loading || attachmentsRead.error ? undefined : attachmentsRead.data);
+            } catch {
+                showToast({ tone: 'warning', title: 'Documenti in cartella non disponibili', description: 'Gli allegati non sono stati salvati. Attendi la lettura dei documenti in cartella e registra di nuovo.' });
+                attachmentsRead.refresh();
+                return;
+            }
+        }
+
         setIsSubmitting(true);
         setUploadProgress('Salvataggio allegati...');
 
+        const attachmentIds: string[] = [];
         try {
-            const attachmentIds: string[] = [];
 
             for (const file of files) {
                 const summary = 'Allegato alla voce clinica · revisione documentale richiesta';
@@ -316,7 +331,7 @@ export default function NewEntryPage() {
                     data: base64Data,
                     summarySnapshot: summary,
                     createdAt: new Date(),
-                });
+                }, { attachmentCollection });
                 attachmentIds.push(attachmentId);
             }
 
@@ -346,6 +361,15 @@ export default function NewEntryPage() {
             await localDraft.clear().catch(() => showToast({ tone: 'warning', title: 'Voce registrata', description: 'La copia della bozza non è stata rimossa. Non registrarla di nuovo.' }));
             router.push(`/patients/${id}/modules`);
         } catch (error) {
+            if (error instanceof AttachmentCollectionChangedError) {
+                attachmentsRead.refresh();
+                showToast({ tone: 'warning', title: 'Documenti in cartella cambiati', description: attachmentIds.length
+                    ? 'L’elenco dei documenti è cambiato durante il salvataggio. La voce non è stata registrata e alcuni allegati sono già in cartella: controllali prima di registrare di nuovo.'
+                    : 'L’elenco dei documenti è cambiato dopo l’ultima lettura. La voce e gli allegati non sono stati salvati: i file restano nel modulo, controlla i documenti in cartella e registra di nuovo.' });
+                setIsSubmitting(false);
+                setUploadProgress('');
+                return;
+            }
             console.error(error);
             showToast({ tone: 'error', title: 'Errore durante il salvataggio', description: 'Riprova.' });
             setIsSubmitting(false);

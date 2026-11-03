@@ -1,6 +1,6 @@
 import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 import { attachmentCollectionSchema } from './api-schemas/attachments';
-import { attachmentCollectionMatches } from './attachment-collection-currentness';
+import { ATTACHMENT_COLLECTION_CHANGED_ERROR, attachmentCollectionMatches } from './attachment-collection-currentness';
 import { archiveGenerationForSession } from './security/archive-session-generation';
 import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
@@ -179,7 +179,7 @@ export async function createNetworkScopedAttachment(
             return { status: 404, value: { error: 'Not found' } };
         }
         if (!attachmentCollectionMatches(tx, context.patientId, collection.data)) {
-            return { status: 409, value: { error: 'Attachment collection changed. Review the documents again.' } };
+            return { status: 409, value: { error: ATTACHMENT_COLLECTION_CHANGED_ERROR } };
         }
         const currentness = createHostAttachmentCurrentness();
 

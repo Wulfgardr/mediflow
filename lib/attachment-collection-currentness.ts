@@ -4,6 +4,10 @@ import type { attachmentCollectionSchema } from './api-schemas/attachments';
 import type { dbServer } from './db-server';
 import { attachments } from './schema';
 
+/** Stable machine code for a stale reviewed collection, shared by every writer of the collection. */
+export const ATTACHMENT_COLLECTION_CHANGED = 'ATTACHMENT_COLLECTION_CHANGED';
+export const ATTACHMENT_COLLECTION_CHANGED_ERROR = 'Attachment collection changed. Review the documents again.';
+
 /** Must run inside the same immediate transaction as the insert, after patient authorization. */
 export function attachmentCollectionMatches(
     tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
