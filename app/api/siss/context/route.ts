@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { patients } from '@/lib/schema';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import { lombardyPackDenied, TERRITORIAL_PACK_DISABLED } from '@/lib/territorial-pack-production';
 // WUL-306 (ADR 0066): soft-deleted patients are not addressable for SISS handoffs
 import { activePatients } from '@/lib/patient-lifecycle';
 import { safeWriteAuditEventFromRequest } from '@/lib/security/audit';
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);
     if (archiveDenial) return archiveDenial;
+    if (lombardyPackDenied()) return NextResponse.json(TERRITORIAL_PACK_DISABLED, { status: 403 });
 
     let auditPatientId: string | null = null;
     let shouldAuditPrescriptionLaunch = false;

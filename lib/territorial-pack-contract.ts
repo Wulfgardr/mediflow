@@ -7,3 +7,9 @@ export type TerritorialPackCapability = { schemaVersion: typeof TERRITORIAL_PACK
 export function createDefaultTerritorialPackCapability(): TerritorialPackCapability {
     return { schemaVersion: TERRITORIAL_PACK_SCHEMA, revision: 0, preset: 'core', status: 'ready' };
 }
+
+/** Stato effettivo di un pacchetto: solo una capacità host valida lo abilita. */
+export function territorialPackActive(capability: TerritorialPackCapability | null | undefined, pack: 'it' | 'lom'): boolean {
+    if (!capability || capability.schemaVersion !== TERRITORIAL_PACK_SCHEMA || capability.status !== 'ready') return false;
+    return pack === 'lom' ? capability.preset === 'core+it+lom' : capability.preset !== 'core';
+}

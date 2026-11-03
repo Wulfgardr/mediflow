@@ -60,7 +60,8 @@ import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
 import { resolveStaticTerminology } from '@/lib/terminology';
 import { projectFollowupSuggestions } from '@/lib/patient-followup-projection';
 import { deriveOpenLoopProjection, type OpenLoop } from '@/lib/patient-open-loops';
-import { buildPatientModuleRailGroups } from '@/lib/patient-module-rail-mapping';
+import { buildPatientModuleRailGroups, filterTerritorialRailGroups } from '@/lib/patient-module-rail-mapping';
+import { useTerritorialPacks } from '@/lib/territorial-pack-client';
 import FollowupSuggestions from '@/components/followup-suggestions';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
@@ -204,6 +205,7 @@ export default function PatientDetailPage() {
         undefined,
         ['prosthetic_prescriptions'],
     );
+    const territorialPacks = useTerritorialPacks();
     const sissHandoffCount = useLiveQuery(
         async () => db.sissHandoffs.query({ patientId: id }).count(),
         [id],
@@ -467,7 +469,7 @@ export default function PatientDetailPage() {
         { href: '#diario', label: 'Diario', meta: entries !== undefined ? formatCountLabel(nonScaleEntries.length, 'voce', 'voci') : undefined },
         { href: '#follow-up', label: 'Follow-up', meta: followupRead.count },
     ];
-    const workspaceNavGroups = buildPatientModuleRailGroups(workspaceNavItems);
+    const workspaceNavGroups = filterTerritorialRailGroups(buildPatientModuleRailGroups(workspaceNavItems), territorialPacks);
 
     /* Validates against the FSE and builds the bundle, or returns null
        when the export must not proceed.
@@ -726,7 +728,7 @@ export default function PatientDetailPage() {
 
                     <ProstheticPrescriptionManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection} />
 
-                    <CollapsibleSection
+                    {territorialPacks.lombardy && <CollapsibleSection
                         id="siss"
                         kicker="SISS / FSE"
                         title="SISS e FSE"
@@ -742,7 +744,7 @@ export default function PatientDetailPage() {
                             onExportFhir={() => setIsExportModalOpen(true)}
                             onShareFhir={handleShareFhir}
                         />
-                    </CollapsibleSection>
+                    </CollapsibleSection>}
                 <CollapsibleSection
                     id="documenti"
                     keepMounted

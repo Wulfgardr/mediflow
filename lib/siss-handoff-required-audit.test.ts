@@ -35,6 +35,14 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web-session');
 openDbServer();
+const { commitTerritorialPackTransition, readTerritorialPacks } = load('./territorial-pack-store.ts') as typeof import('./territorial-pack-store.ts');
+const territorialManager = { actorType: 'system', actorRef: 'host-territorial-pack-manager', sourceSurface: 'job' } as const;
+function setTerritory(preset: 'core' | 'core+it+lom') {
+    commitTerritorialPackTransition(openDbServer(), { schemaVersion: 'mediflow.territorial-packs.v1',
+        expectedRevision: readTerritorialPacks(openDbServer()).revision, preset, confirmed: true }, territorialManager, () => undefined);
+}
+// Il diario dei passaggi SISS appartiene al pacchetto Lombardia (ADR 0158, 0177).
+setTerritory('core+it+lom');
 const { patients, sissHandoffEvents } = load('./schema.ts') as typeof import('./schema.ts');
 const createRoute = load('../app/api/siss-handoffs/route.ts') as typeof import('../app/api/siss-handoffs/route.ts');
 const itemRoute = load('../app/api/siss-handoffs/[id]/route.ts') as typeof import('../app/api/siss-handoffs/[id]/route.ts');
@@ -380,4 +388,21 @@ test('a new handoff is open without closure, or closed with one', async () => {
     const rows = Object.fromEntries((snapshot().handoffs as Array<{ id: string; completed_at: number | null }>).map((row) => [row.id, row.completed_at]));
     assert.equal(rows['synthetic-open'], null);
     assert.notEqual(rows['synthetic-closed'], null);
+});
+
+test('senza il pacchetto Lombardia i writer SISS non scrivono e lo storico resta; riattivato, scrivono di nuovo', async () => {
+    reset(); seed();
+    setTerritory('core');
+    try {
+        const before = snapshot();
+        for (const method of ['POST', 'PUT', 'DELETE'] as const) {
+            const response = await invoke(method, method === 'POST'
+                ? JSON.stringify({ id: 'synthetic-core', patientId: 'synthetic-patient', action: 'menu.open' })
+                : writeBody({ notes: 'ENC:synthetic:core' }));
+            assert.equal(response.status, 403);
+            assert.equal((await response.json()).code, 'TERRITORIAL_PACK_DISABLED');
+        }
+        assert.deepEqual(snapshot(), before);
+    } finally { setTerritory('core+it+lom'); }
+    assert.equal((await invoke('PUT', writeBody({ notes: 'ENC:synthetic:lom' }))).status, 200);
 });
