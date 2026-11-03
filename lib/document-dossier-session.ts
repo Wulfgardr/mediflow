@@ -28,7 +28,6 @@ import {
     type DossierSourceClassification, type DossierTaxCodeEvidence, type DossierWriteClaim,
 } from './domain/documents/dossier-import';
 import { preparedBulkDecisions, preparedDossierFacts, preparedPatientKey, preparedPatientLabel, type PreparedExtraction, type PreparedPatient } from './domain/documents/dossier-prepared';
-import { isValidItalianTaxCodeChecksum } from './domain/documents/document-identity-resolution';
 import { sameClinicalText, sameClinicalValue, sameDay, sameDosage, sameOptional, sameUnit } from './domain/documents/dossier-clinical-equality';
 
 // ---------------------------------------------------------------------------
@@ -187,18 +186,16 @@ export async function buildDossierInventory(
         const match = duplicateOf ? undefined : preparedSources.get(sha256);
         let facts = candidates.facts;
         let prepared: DossierDraftSource['prepared'];
+        let preparedDate: string | null = null;
         if (match) {
             const merged = preparedDossierFacts({ source: match, text, units: extraction.state === 'extracted' ? extraction.units : [],
                 documentDate: date?.date ?? null, parserFacts: candidates.facts, now: ports.now() });
             facts = merged.facts;
+            preparedDate = merged.documentDate;
             prepared = { patient: match.patient, patientLabel: preparedPatientLabel(match.patient), notes: merged.notes, facts: merged.facts.filter((fact) => fact.origin === 'prepared').length };
-            // Un CF dichiarato dall'estrazione partecipa al confronto solo se MediFlow non ne legge uno valido.
-            const preparedCode = match.patient?.taxCode;
-            if (preparedCode && isValidItalianTaxCodeChecksum(preparedCode) && !taxCodes.some((code) => code.checksumValid)) {
-                taxCodes.push({ value: preparedCode, role: 'patient_cf', checksumValid: true, origin: 'prepared' });
-            }
+            // Il CF dell'estrazione raggruppa soltanto: il controllo d'identità resta sui codici letti da MediFlow.
         }
-        const documentDate = date ? { value: date.date, source: date.source } : match?.documentDate ? { value: match.documentDate, source: 'text' as const } : null;
+        const documentDate = date ? { value: date.date, source: date.source } : preparedDate ? { value: preparedDate, source: 'text' as const } : null;
         const group = (match && preparedPatientKey(match.patient)) || groupKeyOf(file.relativePath);
         sources.push({ key, group, relativePath: file.relativePath, fileName: file.name, size: file.size, sha256,
             classification, extraction, text, taxCodes, documentDate,
@@ -329,7 +326,7 @@ async function acquireOne(
             // Senza leggere tutti gli artefatti non si può escludere un duplicato.
             if (seen.some((item) => item.artifactUnreadable)) return { key: source.key, status: 'failed', reason: 'artifact_conflict' };
             const existing = recordsBySha(seen).get(source.sha256);
-            if (existing) return await verifyReadback(ports, existing, bytes, source.key, 'reused', signal, guard, source.facts.filter((fact) => fact.origin === 'prepared'));
+            if (existing) return await verifyReadback(ports, existing, bytes, source.key, 'reused', signal, guard, preparedMergeFor(existing, source));
             // Un allegato già in app senza record dossier: stessa dimensione, poi confronto dei byte.
             for (const candidate of seen.filter((item) => item.size === bytes.byteLength && readDossierRecord(item.parseEvidenceArtifactSnapshot).status === 'absent')) {
                 const stored = await ports.readAttachmentBytes(candidate.id, patientId, signal);
@@ -389,6 +386,17 @@ async function acquireOne(
     } finally { bytes.fill(0); }
 }
 
+/**
+ * Proposte preparate da aggiungere a un dossier già acquisito: solo se il testo conservato è lo
+ * stesso su cui le citazioni sono state verificate, altrimenti gli offset non varrebbero.
+ */
+function preparedMergeFor(existing: DossierAttachmentMeta, source: DossierDraftSource): DossierFact[] {
+    const read = readDossierRecord(existing.parseEvidenceArtifactSnapshot);
+    if (read.status !== 'present' || read.record.extraction.state !== 'extracted' || source.extraction.state !== 'extracted') return [];
+    if (read.record.extraction.text.sha256 !== source.extraction.text.sha256) return [];
+    return source.facts.filter((fact) => fact.origin === 'prepared');
+}
+
 function withInlineText(record: DossierRecord, text: string | null): DossierRecord {
     if (record.extraction.state !== 'extracted' || text === null) return record;
     return { ...record, extraction: { ...record.extraction, text: { ...record.extraction.text, location: 'inline', inline: text } } };
@@ -411,7 +419,13 @@ async function verifyReadback(
     const now = ports.now().toISOString();
     // Un dossier già acquisito riceve le nuove proposte preparate da decidere; quelle note restano come sono.
     const known = new Set(read.record.facts.map((fact) => fact.factId));
-    const added = mergeFacts.filter((fact) => !known.has(fact.factId));
+    let added = same ? mergeFacts.filter((fact) => !known.has(fact.factId)) : [];
+    if (added.length) {
+        // Un'aggiunta che porterebbe l'artefatto oltre il limite non si fa: il dossier resta com'era.
+        const probe = writeDossierRecordIntoSnapshot(attachment.parseEvidenceArtifactSnapshot, { ...read.record, facts: [...read.record.facts, ...added] },
+            { attachmentId: attachment.id, fileName: read.record.source.fileName, text: null });
+        if (await ports.measureArtifact(probe) > ports.limits.updateRequestBytes) added = [];
+    }
     const record: DossierRecord = { ...read.record, updatedAt: now, ...(added.length ? { facts: [...read.record.facts, ...added] } : {}), preservation: same
         ? { reusedExisting: read.record.preservation.reusedExisting, state: 'verified', verifiedAt: now, ...(attachment.currentness ? { verifiedSourceRef: attachment.currentness.sourceRef } : {}) }
         : { reusedExisting: read.record.preservation.reusedExisting, state: 'mismatch' } };
@@ -972,9 +986,10 @@ export interface DossierBulkResult {
  * Conflitti, incertezze, negazioni e citazioni non trovate restano da decidere.
  */
 export async function acceptVerifiedAndApply(
-    ports: DossierPorts, input: { patientId: string; signal: AbortSignal; isCurrent: () => boolean },
+    ports: DossierPorts, input: { patientId: string; signal: AbortSignal; isCurrent: () => boolean; includeSummaries?: boolean },
 ): Promise<DossierBulkResult> {
     const { patientId, signal, isCurrent } = input;
+    const includeSummaries = input.includeSummaries === true;
     const guard = guardOf(signal, isCurrent);
     const result: DossierBulkResult = { documents: 0, accepted: 0, alreadyPresent: 0, superseded: 0, leftPending: 0, residualAcknowledged: 0, applied: [], skipped: 0 };
     const view = await loadPatientDossier(ports, patientId, signal);
@@ -985,7 +1000,7 @@ export async function acceptVerifiedAndApply(
     for (const document of view.documents) {
         if (document.coverage.gaps.includes('identity_conflict') || !document.preservationCurrent || !document.attachment.currentness) { result.skipped += 1; continue; }
         const decide = (record: DossierRecord) => preparedBulkDecisions({ record, documentKey: document.attachment.id,
-            assessment: (ref) => view.assessments.get(ref), exemptionCodes: view.exemptionCodes, acceptedElsewhere });
+            assessment: (ref) => view.assessments.get(ref), exemptionCodes: view.exemptionCodes, acceptedElsewhere, includeSummaries });
         const preview = decide(document.record);
         const acknowledge = preview.acknowledgeResidual && document.record.residualReview.state !== 'acknowledged';
         result.documents += 1;
@@ -994,13 +1009,19 @@ export async function acceptVerifiedAndApply(
             continue;
         }
         let decided = preview;
-        await saveDossierReview(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent,
-            change: (fresh) => {
-                decided = decide(fresh);
-                return { ...fresh, facts: decided.facts, residualReview: decided.acknowledgeResidual && fresh.residualReview.state !== 'acknowledged'
-                    ? { state: 'acknowledged', at: ports.now().toISOString(), note: 'Tutte le pagine coperte dall’estrazione preparata; testo completo conservato.' }
-                    : fresh.residualReview };
-            } });
+        try {
+            await saveDossierReview(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent,
+                change: (fresh) => {
+                    decided = decide(fresh);
+                    return { ...fresh, facts: decided.facts, residualReview: decided.acknowledgeResidual && fresh.residualReview.state !== 'acknowledged'
+                        ? { state: 'acknowledged', at: ports.now().toISOString(), note: 'Sintesi accettata; pagine dichiarate lette coerenti con il testo conservato.' }
+                        : fresh.residualReview };
+                } });
+        } catch (error) {
+            // Un documento cambiato o con scritture in volo si salta; gli altri proseguono.
+            if (error instanceof DossierStaleError || error instanceof DossierWriteInFlight) { result.skipped += 1; continue; }
+            throw error;
+        }
         guard();
         for (const ref of decided.accepted) acceptedElsewhere.add(ref);
         result.accepted += decided.counts.accepted; result.alreadyPresent += decided.counts.alreadyPresent;

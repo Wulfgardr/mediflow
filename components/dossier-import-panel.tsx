@@ -169,7 +169,8 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
     useEffect(() => () => { generation.current += 1; }, []);
     useEffect(() => {
         const signal = db.getSessionReadSignal();
-        const retire = () => { generation.current += 1; setGroups([]); setView(null); setBusy(null); };
+        // Al blocco della sessione si dimenticano anche estrazione e selezione: niente dati clinici in memoria.
+        const retire = () => { generation.current += 1; setGroups([]); setView(null); setBusy(null); setPrepared(null); lastSelection.current = null; };
         signal.addEventListener('abort', retire, { once: true });
         window.addEventListener('pagehide', retire);
         return () => { signal.removeEventListener('abort', retire); window.removeEventListener('pagehide', retire); };
@@ -209,7 +210,8 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
         const file = list?.[0];
         if (!file) return;
         if (file.size > DOSSIER_PREPARED_MAX_BYTES) { setNotice('Estrazione preparata oltre il limite di 20 MiB.'); return; }
-        const parsed = parsePreparedExtraction(await file.text());
+        let parsed: ReturnType<typeof parsePreparedExtraction>;
+        try { parsed = parsePreparedExtraction(await file.text()); } catch { setNotice('Estrazione preparata non leggibile.'); return; }
         if (!parsed.ok) { setNotice(parsed.error); return; }
         setPrepared({ extraction: parsed.value, warnings: parsed.warnings, fileName: file.name });
         // Una cartella già letta si rilegge con le nuove proposte: nessun dato salvato nel frattempo.
@@ -322,7 +324,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                             const outcome = outcomes[source.key];
                                             const taxCodes = source.taxCodes.map((code) => `${code.value} (${!code.checksumValid ? 'controllo formale non valido'
                                                 : code.role === 'professional_cf' && code.explicitProfessional && code.professionalLabelScope === 'same_line' ? 'professionista esplicito'
-                                                    : code.origin === 'prepared' ? 'dall’estrazione preparata' : code.role === 'patient_cf' ? 'paziente' : 'attribuzione da verificare'})`);
+                                                    : code.role === 'patient_cf' ? 'paziente' : 'attribuzione da verificare'})`);
                                             return <tr key={source.key} role="row" data-testid="dossier-source" data-source-status={source.status}>
                                                 <td role="cell" data-label="N.">{index + 1}</td>
                                                 <td role="cell" data-label="File"><PrivacyBlur>{source.relativePath}</PrivacyBlur>
@@ -390,7 +392,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                             {patients.map((patient) => <option key={patient.id} value={patient.id}>{patientLabel(patient)}</option>)}
                         </select>
                     </div>
-                    {view ? <DossierReview view={view} busy={Boolean(busy)} ports={ports} operation={operation} setBusy={setBusy} setNotice={setNotice}
+                    {view ? <DossierReview key={view.patient.id} view={view} busy={Boolean(busy)} ports={ports} operation={operation} setBusy={setBusy} setNotice={setNotice}
                         reload={() => loadDossier(view.patient.id)} /> : null}
                 </section>
             </div>
@@ -407,6 +409,7 @@ type ReviewProps = {
 function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reload }: ReviewProps) {
     const [results, setResults] = useState<Record<string, DossierApplyResult>>({});
     const [bulkResult, setBulkResult] = useState<DossierBulkResult | null>(null);
+    const [includeSummaries, setIncludeSummaries] = useState(false);
     const receipt = useMemo(() => {
         // Solo i documenti di questa scheda; le misure stanno nel record di ciascuna fonte.
         return buildDossierReceipt(view.documents.map((document) => ({ record: document.record, coverage: document.coverage,
@@ -457,7 +460,7 @@ function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reloa
         const op = operation();
         setBusy('Accettazione del verificato e scrittura nella scheda…');
         try {
-            const outcome = await acceptVerifiedAndApply(ports, { patientId: view.patient.id, ...op });
+            const outcome = await acceptVerifiedAndApply(ports, { patientId: view.patient.id, includeSummaries, ...op });
             if (!op.isCurrent()) return;
             setBulkResult(outcome);
             await reload();
@@ -467,11 +470,18 @@ function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reloa
         } finally { if (op.isCurrent()) setBusy(null); }
     };
     const complete = view.documents.filter((document) => document.coverage.complete).length;
+    const withPrepared = view.documents.some((document) => document.record.facts.some((fact) => fact.origin === 'prepared'));
     return <>
-        <div className={styles.actions}>
-            <button type="button" className={styles.primary} disabled={busy || complete === view.documents.length} data-testid="dossier-bulk" onClick={() => { void bulk(); }}>Accetta il verificato e applica</button>
-            <span className={styles.muted}>Accetta solo le proposte con citazione trovata nel documento, nuove rispetto alla scheda e complete; conflitti, negazioni e incertezze restano a te.</span>
-        </div>
+        {withPrepared ? <div className={styles.section} data-testid="dossier-bulk-panel">
+            <p className={styles.muted}>Per i documenti con estrazione preparata: accetta le proposte la cui citazione e i cui valori si ritrovano nel testo del documento, nuove rispetto alla scheda e complete, e le scrive. Rifiuta le proposte del parser dello stesso tipo che sostituiscono. Conflitti, negazioni, riformulazioni e citazioni non trovate restano a te.</p>
+            <label className={styles.consent}>
+                <input type="checkbox" checked={includeSummaries} disabled={busy} data-testid="dossier-bulk-summaries" onChange={(event) => setIncludeSummaries(event.currentTarget.checked)} />
+                <span>Ho letto le sintesi dei documenti e accetto anche quelle: sono testo riassunto, non verificabile parola per parola. Con la sintesi accettata, il residuo si considera rivisto solo se le pagine lette coincidono.</span>
+            </label>
+            <div className={styles.actions}>
+                <button type="button" className={styles.primary} disabled={busy || complete === view.documents.length} data-testid="dossier-bulk" onClick={() => { void bulk(); }}>Accetta il verificato e applica</button>
+            </div>
+        </div> : null}
         {bulkResult ? <p role="status" data-testid="dossier-bulk-result">
             {formatCountLabel(bulkResult.accepted, 'proposta accettata', 'proposte accettate')}, {formatCountLabel(bulkResult.alreadyPresent, 'già presente', 'già presenti')}, {formatCountLabel(bulkResult.superseded, 'proposta del parser sostituita', 'proposte del parser sostituite')}; {formatCountLabel(bulkResult.leftPending, 'resta da decidere', 'restano da decidere')}.
             {' '}{formatCountLabel(bulkResult.applied.reduce((sum, item) => sum + item.outcomes.filter((entry) => entry.outcome === 'applied' || entry.outcome === 'already_present').length, 0), 'scrittura confermata', 'scritture confermate')}
@@ -541,7 +551,7 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                     const blockers = dossierFactBlockers(fact, { exemptionCodes: view.exemptionCodes });
                     const applied = latestAppliedOutcome(record, fact.factId);
                     const locked = written(fact) || busy || Boolean(record.pendingWrites?.some((claim) => claim.factId === fact.factId));
-                    return <tr key={fact.factId} role="row" data-testid="dossier-fact" data-kind={fact.kind}>
+                    return <tr key={fact.factId} role="row" data-testid="dossier-fact" data-kind={fact.kind} data-origin={fact.origin} data-decision={fact.decision}>
                         <td role="cell" data-label="Tipo">{DOSSIER_FACT_KIND_LABELS[fact.kind]}<small className={styles.muted}>{ORIGIN_LABEL[fact.origin] ?? fact.origin}</small></td>
                         <td role="cell" data-label="Contenuto">
                             {fact.evidence ? <small>Evidenza, unità {fact.evidence.unit}: <PrivacyBlur>{fact.evidence.excerpt}</PrivacyBlur></small> : null}

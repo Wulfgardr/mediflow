@@ -686,12 +686,19 @@ test('accept verified and apply writes only what the source supports, with activ
     const [group] = await buildDossierInventory(ports, files, { ...live, prepared: preparedFor([{ text, cf: CF_A }]) });
     const source = group.sources[0];
     assert.equal(source.prepared?.facts, 4);
-    assert.ok(!source.facts.some((fact) => fact.origin === 'parser:section' || fact.origin === 'parser:document'));
+    assert.ok(source.facts.some((fact) => fact.origin === 'parser:document'), 'le proposte del parser restano visibili');
     await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
-    const result = await acceptVerifiedAndApply(ports, { patientId: 'pa', ...live });
-    assert.equal(result.accepted, 3, 'diagnosi, terapia e sintesi');
-    assert.equal(result.leftPending, 1, 'la terapia con citazione inventata resta al medico');
+    // Senza la scelta esplicita sulle sintesi: solo il verificato; sintesi e residuo restano al medico.
+    const cautious = await acceptVerifiedAndApply(ports, { patientId: 'pa', ...live });
+    assert.equal(cautious.accepted, 2, 'diagnosi e terapia');
+    assert.equal(cautious.residualAcknowledged, 0);
+    assert.equal([...records.keys()].filter((key) => key.startsWith('entries:')).length, 0);
+    const result = await acceptVerifiedAndApply(ports, { patientId: 'pa', includeSummaries: true, ...live });
+    assert.equal(result.accepted, 1, 'la sintesi');
+    assert.ok(result.superseded >= 1, 'la voce col testo intero lascia il posto alla sintesi');
     assert.equal(result.residualAcknowledged, 1);
+    const pending = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0].record.facts.filter((fact) => fact.decision === 'pending');
+    assert.deepEqual(pending.map((fact) => fact.values.drugName), ['Metformina'], 'la terapia con citazione inventata resta al medico');
     const therapies = [...records.entries()].filter(([key]) => key.startsWith('therapies:')).map(([, value]) => value);
     assert.equal(therapies.length, 1);
     assert.equal(therapies[0].drugName, 'Ramipril');
@@ -705,7 +712,7 @@ test('accept verified and apply writes only what the source supports, with activ
     assert.deepEqual(view.documents[0].coverage.gaps, ['facts_pending']);
     assert.ok((await ports.getPatient('pa', live.signal))!.diagnoses.some((item) => item.description === 'Ipertensione arteriosa essenziale'));
     // Ripetere non duplica nulla.
-    const again = await acceptVerifiedAndApply(ports, { patientId: 'pa', ...live });
+    const again = await acceptVerifiedAndApply(ports, { patientId: 'pa', includeSummaries: true, ...live });
     assert.equal(again.accepted, 0);
     assert.equal([...records.keys()].filter((key) => key.startsWith('therapies:')).length, 1);
 });
@@ -723,7 +730,7 @@ test('a document already in the dossier receives prepared proposals and section 
     const facts = view.documents[0].record.facts;
     assert.ok(facts.some((fact) => fact.origin === 'parser:section'));
     assert.equal(facts.filter((fact) => fact.origin === 'prepared').length, 4);
-    const result = await acceptVerifiedAndApply(ports, { patientId: 'pa', ...live });
+    const result = await acceptVerifiedAndApply(ports, { patientId: 'pa', includeSummaries: true, ...live });
     assert.ok(result.superseded >= 2);
     assert.equal(result.residualAcknowledged, 0, 'copertura dichiarata parziale: il residuo resta al medico');
     assert.equal([...records.keys()].filter((key) => key.startsWith('entries:')).length, 1, 'una sola voce di diario: la sintesi');

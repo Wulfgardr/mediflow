@@ -320,18 +320,23 @@ test('Dossier: estrazione preparata su una cartella mista di più pazienti, cita
         // Scheda A: la citazione inventata resta da decidere, il resto si accetta e si applica in un gesto.
         const document = panel.getByTestId('dossier-document');
         await expect(document).toHaveCount(1);
-        const invented = document.locator('[data-testid="dossier-fact"][data-kind="therapy"]').filter({ has: page.locator('input[value="Metformina"]') });
+        const invented = document.locator('[data-testid="dossier-fact"][data-kind="therapy"][data-origin="prepared"]').filter({ has: page.locator('input[value="Metformina"]') });
         await expect(invented).toContainText('Citazione non trovata nel testo del documento');
-        const ramipril = document.locator('[data-testid="dossier-fact"][data-kind="therapy"]').filter({ has: page.locator('input[value="Ramipril"]') });
-        await expect(ramipril).toContainText('Citazione trovata nel testo del documento');
+        const ramipril = document.locator('[data-testid="dossier-fact"][data-kind="therapy"][data-origin="prepared"]').filter({ has: page.locator('input[value="Ramipril"]') });
+        await expect(ramipril).toContainText('Citazione e valori trovati nel testo del documento');
         await expect(ramipril.getByLabel('Principio attivo')).toHaveValue('ramipril');
         await expect(ramipril.getByLabel('Stato')).toHaveValue('active');
-        await expect(document.locator('[data-testid="dossier-fact"][data-kind="diagnosis"]')).toHaveCount(1);
+        await expect(document.locator('[data-testid="dossier-fact"][data-kind="diagnosis"][data-origin="prepared"]')).toHaveCount(1);
+        // Le sintesi si accettano solo con la scelta esplicita di averle lette.
+        await panel.getByTestId('dossier-bulk-summaries').check();
         await panel.getByTestId('dossier-bulk').click();
         await expect(panel.getByTestId('dossier-bulk-result')).toContainText('3 proposte accettate', { timeout: 60_000 });
         await expect(panel.getByTestId('dossier-bulk-result')).toContainText('1 resta da decidere');
         await expect(panel.getByTestId('dossier-bulk-result')).toContainText('3 scritture confermate');
         await expect(panel.getByTestId('dossier-gaps')).toHaveText(/Fatti da decidere/u);
+        // Le proposte del parser dello stesso tipo restano visibili come sostituite, la voce col testo intero idem.
+        await expect(document.locator('[data-testid="dossier-fact"][data-origin="parser:section"][data-decision="pending"]')).toHaveCount(0);
+        await expect(document.locator('[data-testid="dossier-fact"][data-origin="parser:document"]')).toHaveAttribute('data-decision', 'rejected');
         expect(await countOf(page, 'therapies', patientA)).toBe(1);
         expect(await countOf(page, 'entries', patientA)).toBe(1);
         expect(await countOf(page, 'therapies', patientB)).toBe(0);
