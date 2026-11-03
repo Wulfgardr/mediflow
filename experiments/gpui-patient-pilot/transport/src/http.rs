@@ -461,6 +461,12 @@ impl RuntimeClient {
                 let status = response.status().as_u16();
                 let account_profile = path == crate::account_profile::ACCOUNT_PROFILE_PATH;
                 if !(200..300).contains(&status) && !(who_readiness && status == 503) {
+                    if status == 403 {
+                        return Err(read_response_body(response, 4096, mutation)
+                            .await
+                            .map(|raw| classify_forbidden(&raw.body))
+                            .unwrap_or(RuntimeError::Forbidden));
+                    }
                     if status == 409 {
                         let error_limit = if analytics_read { 1024 } else { limit };
                         let raw = match read_response_body(response, error_limit, mutation).await {
@@ -636,7 +642,7 @@ impl RuntimeClient {
                     }
                     return Err(match raw.status {
                         401 => RuntimeError::Rejected(401),
-                        403 => RuntimeError::Forbidden,
+                        403 => classify_forbidden(&raw.body),
                         404 => RuntimeError::Missing,
                         409 => RuntimeError::Conflict,
                         n => RuntimeError::Rejected(n),
@@ -686,6 +692,9 @@ impl RuntimeClient {
                 }
                 if raw.status == 409 || (200..300).contains(&raw.status) {
                     return Ok(raw);
+                }
+                if raw.status == 403 {
+                    return Err(classify_forbidden(&raw.body));
                 }
                 Err(classify_status(raw.status, mutation))
             },
@@ -2218,6 +2227,36 @@ mod tests {
         assert_eq!(
             url.query_pairs().collect::<Vec<_>>(),
             [("q".into(), query.into()), ("limit".into(), "30".into())]
+        );
+    }
+}
+
+fn classify_forbidden(body: &[u8]) -> RuntimeError {
+    if serde_json::from_slice::<Value>(body)
+        .ok()
+        .is_some_and(|value| value["code"] == "TERRITORIAL_PACK_DISABLED")
+    {
+        RuntimeError::TerritorialPackDisabled
+    } else {
+        RuntimeError::Forbidden
+    }
+}
+
+#[cfg(test)]
+mod territorial_error_tests {
+    use super::*;
+    #[test]
+    fn territorial_denial_is_distinct_from_permission_denial() {
+        let error =
+            classify_forbidden(br#"{"code":"TERRITORIAL_PACK_DISABLED","error":"private body"}"#);
+        assert_eq!(error, RuntimeError::TerritorialPackDisabled);
+        assert_eq!(error.status_code(), Some(403));
+        assert!(!error.retires_session());
+        assert!(error.to_string().contains("modulo lombardo"));
+        assert!(!error.to_string().contains("private body"));
+        assert_eq!(
+            classify_forbidden(br#"{"code":"FORBIDDEN"}"#),
+            RuntimeError::Forbidden
         );
     }
 }

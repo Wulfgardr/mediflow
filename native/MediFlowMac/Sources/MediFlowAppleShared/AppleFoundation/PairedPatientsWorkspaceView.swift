@@ -862,12 +862,14 @@ struct PairedPatientsWorkspaceView: View {
                         .accessibilityIdentifier("archive-patient-toolbar-button")
                     }
 
-                    Button {
-                        Task { await model.openPrregHandoff() }
-                    } label: {
-                        Label("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
+                    if model.showsLombardyFeatures {
+                        Button {
+                            Task { await model.openPrregHandoff() }
+                        } label: {
+                            Label("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
+                        }
+                        .accessibilityIdentifier("patient-prreg-handoff-toolbar-button")
                     }
-                    .accessibilityIdentifier("patient-prreg-handoff-toolbar-button")
 
                     Divider()
 

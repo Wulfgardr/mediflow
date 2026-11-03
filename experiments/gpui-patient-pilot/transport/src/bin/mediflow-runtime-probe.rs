@@ -93,6 +93,7 @@ fn runtime_error(phase: &'static str, error: RuntimeError) -> ProbeError {
         RuntimeError::UnsupportedProtocol => "unsupported-protocol",
         RuntimeError::Authentication => "authentication",
         RuntimeError::Forbidden => "forbidden",
+        RuntimeError::TerritorialPackDisabled => "territorial_pack_disabled",
         RuntimeError::Missing => "missing",
         RuntimeError::Conflict => "conflict",
         RuntimeError::ArchiveReplaced => "archive-replaced",

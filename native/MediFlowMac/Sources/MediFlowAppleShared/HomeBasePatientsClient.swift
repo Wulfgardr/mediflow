@@ -1667,6 +1667,11 @@ public actor HomeBasePatientsClient {
                    payload.code == "PIN_CHANGE_CONFLICT" {
                     throw HomeBaseClientError.pinChangeConflict(payload.message ?? payload.error)
                 }
+                if httpResponse.statusCode == 403,
+                   let payload = try? JSONDecoder().decode(APIErrorPayload.self, from: data),
+                   payload.code == "TERRITORIAL_PACK_DISABLED" {
+                    throw HomeBaseClientError.territorialPackDisabled
+                }
                 throw HomeBaseClientError.httpStatus(httpResponse.statusCode, Self.errorMessage(from: data))
             }
             return (data, httpResponse)
