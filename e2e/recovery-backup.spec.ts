@@ -27,8 +27,9 @@ test('complete backup is encrypted in the browser and verification never claims 
     await kit.getByRole('button', { name: 'Scarica kit di recupero', exact: true }).click(); await kitDownload;
     await kit.getByRole('checkbox').check();
     await kit.getByRole('button', { name: 'Attiva la nuova passphrase', exact: true }).click();
-    const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
-    await expect(renew).toBeEnabled(); await renew.click();
+    // The tab that has just created the archive closes its own session: no renewal step.
+    await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Rinnova accesso', exact: true })).toHaveCount(0);
     await page.getByLabel('Passphrase', { exact: true }).fill(phrase);
     await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
     const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
