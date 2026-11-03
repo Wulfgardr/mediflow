@@ -17,6 +17,8 @@ import {
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
 import { requireExpectedVersion, buildVersionConflictPayload } from '@/lib/version-concurrency';
+import { RetentionError } from '@/lib/retention-policy';
+import { assertNoRetentionHold } from '@/lib/retention-store';
 
 const PURGE_JSON_MAX_BYTES = 65_536;
 
@@ -98,6 +100,12 @@ export async function POST(request: Request) {
             if (!patient.deletedAt) return {
                 status: 409, value: { error: 'Patient is still active: soft-delete it before purging' },
             };
+
+            // ADR 0176: un blocco per contenzioso o richiesta sospende anche questa cancellazione.
+            try { assertNoRetentionHold(tx, patientId); } catch (error) {
+                if (error instanceof RetentionError) return { status: 409, value: { error: 'Legal hold active', code: 'legal_hold' } };
+                throw error;
+            }
 
             if (patient.version !== expectedVersion) return { status: 409,
                 value: buildVersionConflictPayload('patient', expectedVersion, patientId, {
