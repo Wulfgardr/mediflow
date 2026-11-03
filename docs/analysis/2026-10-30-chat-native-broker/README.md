@@ -100,7 +100,47 @@ Gli hash di report e log sono in `evidenze.csv`; i file completi restano nel
 | C-4 | PIN nativo collegato; test verifier, lockout e doppio biometrico | PIN interattivo finale, Touch ID reale con Leonardo e negativi Mac |
 | C-L | Corpus reale iniziale, protocollo in `carico.md` | Carichi completi e almeno 30 run caldo/freddo per scenario |
 | C-8 | Censimento iniziale in `catalogo.csv`; [matrice completa del 31 ottobre](../2026-10-31-chat-catalog-fabric/README.md) con 16 capability, 12 celle e 66 anchor | Raccordi mancanti e qualifica funzione/host |
-| C-10a | Matrice in `canali.csv`; incognito Claude osservato | Account/policy/retention e canali non osservabili; D2 per dati reali |
+| C-10a | Censimento in `canali.csv` per host, build e account, con fonte per ogni cella (vedi sotto) | Osservazioni sui due desktop con Leonardo (righe `da_osservare`); D2 per dati reali |
+
+## Canali, temporaneità e retention (C-10a)
+
+`canali.csv` ha una riga per host, build, account e aspetto. La colonna
+`tipo_prova` dice da dove viene il valore:
+
+- `codice` e `test`: punto del sorgente o test di MediFlow citato in `fonte`;
+- `documento`: limite dichiarato in un ADR, non una misura;
+- `fornitore`: pagina ufficiale di Anthropic o OpenAI, con data di
+  consultazione. Le pagine sono state lette tramite estratti di ricerca web
+  del 3 novembre 2026, non scaricate per intero: vanno rilette prima di
+  citarle in un testo pubblico;
+- `osservato`: osservazione registrata in precedenza sul Mac target;
+- `non_verificato`: nessuna fonte trovata, con il motivo in `limite`;
+- `da_osservare`: prova da fare sui due desktop reali con Leonardo.
+
+Provato dal codice: alla chat arrivano solo testo fisso e stati finiti; il
+payload sta in `_meta`; lo stderr dell'adapter, che Claude Desktop raccoglie
+nel log del server MCP, contiene solo due frasi fisse; il processo privato e
+il worker GLiNER non scrivono log; su disco restano solo riferimenti opachi
+ai comandi; le scritture lasciano comando, ricevuta e audit nell'archivio.
+Vale per l'adapter avviato dall'host per la vista. Un comando dell'agente
+dentro l'app host oggi supera la stessa attestazione e, dopo la conferma del
+medico, riceverebbe i byte approvati sul proprio output: limite aperto in
+WUL-803, da chiudere o dichiarare dopo l'osservazione sui due desktop.
+
+Dichiarato dai fornitori: Claude ha la chat incognito, esclusa da cronologia
+e memoria e conservata 30 giorni per impostazione predefinita; per Codex
+nell'app ChatGPT non è stata trovata una modalità temporanea; le chat
+cancellate sono eliminate entro 30 giorni salvo eccezioni; l'opzione di
+addestramento cambia la retention di Anthropic fino a 5 anni.
+
+Non verificato: se i risultati MCP Apps (`_meta` e risorsa) siano salvati
+nella conversazione lato fornitore, nella memoria o nelle cache locali
+dell'host. Vanno trattati come trasportati e conservabili secondo la policy
+della conversazione. Chiusura e revoca non cancellano byte già ricevuti.
+
+Da osservare con Leonardo: piano esatto e opzioni dei due account, incognito
+Claude con il server MCP attivo, assenza della temporanea in Codex, contenuto
+dei log dell'host dopo una sessione sintetica.
 
 Leonardo deve provare Touch ID vero, rifiuto, lockout biometrico, hardware
 assente e lock del Mac sul bundle congelato. D2 e D5 non sono stati usati
