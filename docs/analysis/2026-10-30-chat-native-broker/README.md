@@ -122,6 +122,10 @@ payload sta in `_meta`; lo stderr dell'adapter, che Claude Desktop raccoglie
 nel log del server MCP, contiene solo due frasi fisse; il processo privato e
 il worker GLiNER non scrivono log; su disco restano solo riferimenti opachi
 ai comandi; le scritture lasciano comando, ricevuta e audit nell'archivio.
+Vale per l'adapter avviato dall'host per la vista. Un comando dell'agente
+dentro l'app host oggi supera la stessa attestazione e, dopo la conferma del
+medico, riceverebbe i byte approvati sul proprio output: limite aperto in
+WUL-803, da chiudere o dichiarare dopo l'osservazione sui due desktop.
 
 Dichiarato dai fornitori: Claude ha la chat incognito, esclusa da cronologia
 e memoria e conservata 30 giorni per impostazione predefinita; per Codex
