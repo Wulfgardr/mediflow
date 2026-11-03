@@ -50,6 +50,16 @@ test('only requested page is opened; engine and scratch lifetime end even on suc
     assert.deepEqual(result, { page: 2, pages: 3, width: 900, height: 1200 });
     assert.equal(target.width, 900); assert.equal(bytes[0], 37);
 });
+test('a page with an unresolved glyph is refused unpainted and still reports the page count', async () => {
+    const f = fixture(), target = canvas();
+    const digit = { originalCharCode: 51, fontChar: '3', unicode: '3', accent: null, width: 556,
+        vmetric: undefined, operatorListId: undefined, isSpace: false, isInFont: false };
+    f.page.operators = async () => ({ fnArray: [44], argsArray: [[[digit]]] });
+    f.opened.resolve(f.document);
+    await assert.rejects(paintPdfPage(bytes, 2, target, new AbortController().signal, f.factory),
+        (error: unknown) => fails('unresolved_glyph')(error) && (error as PreviewError).pages === 3);
+    assert.equal(f.calls.paint, 0); assert.equal(target.width, 0); assert.equal(f.calls.dispose, 1);
+});
 test('pre-aborted input never creates a worker/session', async () => {
     const f = fixture(), target = canvas(), controller = new AbortController(); controller.abort();
     await assert.rejects(paintPdfPage(bytes, 1, target, controller.signal, f.factory), fails('cancelled'));
