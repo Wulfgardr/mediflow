@@ -12,9 +12,9 @@
 }
 
 @property --lume-filo-fill {
-  syntax: '<percentage>';
+  syntax: '<number>';
   inherits: false;
-  initial-value: 0%;
+  initial-value: 0;
 }
 
 @property --lume-overlay-shadow-opacity {
@@ -144,14 +144,22 @@
   to { --lume-overlay-shadow-opacity: 0; }
 }
 
+/* user units, not percentages: pathLength="100" scales user units to the real path, while a
+   percentage resolves against the viewport diagonal and leaves a dashed stroke. */
 .lume-filo-draw {
-  stroke-dasharray: 100%;
-  stroke-dashoffset: calc(100% - var(--lume-filo-fill));
+  stroke-dasharray: 100px;
+  stroke-dashoffset: calc((100 - var(--lume-filo-fill)) * 1px);
   transition: stroke-dashoffset var(--lume-dur-firma) var(--lume-ease);
 }
 
 .lume-filo-draw[data-lume-filo-static='true'] {
   transition: none;
+}
+
+/* with non-scaling-stroke the dashes are laid out in screen space, so a scaled connector would
+   still show gaps: once drawn in full, the stroke carries no dash at all. */
+.lume-filo-draw[data-lume-filo-complete='true'] {
+  stroke-dasharray: none;
 }
 
 .lume-filo-spina {

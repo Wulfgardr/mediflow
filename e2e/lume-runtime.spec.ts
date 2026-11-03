@@ -130,14 +130,19 @@ test('lume context tokens, focal light primitive and SVG filo retain their contr
     document.body.appendChild(path);
     const read = (fill: string) => {
       path.style.setProperty('--lume-filo-fill', fill);
-      return getComputedStyle(path).strokeDashoffset;
+      return Number.parseFloat(getComputedStyle(path).strokeDashoffset);
     };
-    const result = { quarter: read('25%'), threeQuarters: read('75%') };
+    // Numbers follow pathLength; a percentage would resolve against the viewport diagonal.
+    const result = { quarter: read('25'), threeQuarters: read('75'), drawing: getComputedStyle(path).strokeDasharray, complete: '' };
+    path.setAttribute('data-lume-filo-complete', 'true');
+    result.complete = getComputedStyle(path).strokeDasharray;
     path.remove();
     return result;
   });
-  expect(filoSamples.quarter).toBe('75%');
-  expect(filoSamples.threeQuarters).toBe('25%');
+  expect(filoSamples.quarter).toBe(75);
+  expect(filoSamples.threeQuarters).toBe(25);
+  expect(filoSamples.drawing).not.toContain('%');
+  expect(filoSamples.complete).toBe('none');
 });
 
 test('lume mobile theme and privacy controls retain 44px touch targets and state', async ({ page }) => {
