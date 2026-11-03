@@ -211,6 +211,12 @@ jobs:
         run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
       - name: Generate project + guards (structure + entitlements)
         run: scripts/generate-apple-xcodeproj.sh
+      - name: Committed Xcode project matches project.yml
+        # macOS packaging regenerates the project and refuses to seal a bundle
+        # from a changed checkout, so a hand-edited pbxproj blocks every build.
+        run: |
+          xcodegen --version
+          git diff --exit-code -- native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj
       - name: SwiftPM tests
         run: |
           set -o pipefail
