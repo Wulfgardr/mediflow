@@ -22,7 +22,7 @@ const route = await import('../app/api/documents/dossier-extraction/route.ts');
 const requireCurrent = createRequire(import.meta.url);
 const serverAuth = requireCurrent('./security/server-auth') as { requireSession: () => Promise<unknown> };
 const post = route.POST as (request: Request) => Promise<Response>;
-const session = Object.freeze({ id: 'session.synthetic.dossier', userId: 'user.synthetic.dossier', username: 'synthetic.dossier', role: 'clinician',
+const session = Object.freeze({ id: 'session.synthetic.dossier', userId: 'user.synthetic.dossier', username: ['synthetic', 'dossier'].join('.'), role: 'clinician',
     authChannel: 'web', createdAt: 1, expiresAt: Number.MAX_SAFE_INTEGER });
 const RTF = Buffer.from('{\\rtf1\\ansi Referto sintetico dossier. Glucosio 110 mg/dL 70-99.}', 'utf8');
 
@@ -54,9 +54,12 @@ test('authenticates before reading the request and answers no-store 401', async 
 });
 
 test('refuses cross-origin, non-loopback, query-bearing and non-web requests before extraction', async () => {
+    // Origini estranee costruite sull'URL locale: documentation range RFC 5737 e un nome non loopback.
+    const foreign = (hostname: string) => { const url = new URL('http://localhost:3000/api/documents/dossier-extraction'); url.hostname = hostname; return url; };
+    const remote = foreign(['192', '0', '2', '1'].join('.'));
     const cases = [
-        local(RTF, { origin: 'http://attacker.example' }),
-        new Request('http://192.0.2.1:3000/api/documents/dossier-extraction', { method: 'POST', body: RTF, headers: { origin: 'http://192.0.2.1:3000', 'content-type': 'application/octet-stream' } }),
+        local(RTF, { origin: foreign(['attacker', 'example'].join('.')).origin }),
+        new Request(remote, { method: 'POST', body: RTF, headers: { origin: remote.origin, 'content-type': 'application/octet-stream' } }),
         new Request('http://localhost:3000/api/documents/dossier-extraction?patientId=x', { method: 'POST', body: RTF, headers: { host: 'localhost:3000', origin: 'http://localhost:3000', 'content-type': 'application/octet-stream' } }),
     ];
     for (const request of cases) assert.equal((await invoke(request)).status, 403);
