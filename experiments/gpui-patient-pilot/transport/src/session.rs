@@ -214,6 +214,8 @@ struct ReadKey {
 struct ProfileSelection {
     target: Mutex<ProfileSelectionTarget>,
     host_epoch: AtomicU64,
+    /// Random per selection, so selecting the same patient again yields a new mark.
+    nonce: [u8; 32],
 }
 enum ProfileSelectionTarget {
     Patient { scope: String, patient: String },
@@ -507,6 +509,26 @@ impl RuntimeSession {
             patient: patient.into(),
             selection_epoch,
         })
+    }
+
+    /// Opaque mark of the patient selected now, for a private local card owner.
+    /// It changes with every selection and host epoch and carries no patient data.
+    pub fn chat_selection_mark(&self) -> Option<String> {
+        use sha2::{Digest, Sha256};
+        self.ensure_open().ok()?;
+        let current = self.inner.profile_selection.lock().ok()?;
+        let selected = current.as_ref()?;
+        if !matches!(
+            &*selected.target.lock().ok()?,
+            ProfileSelectionTarget::Patient { .. }
+        ) {
+            return None;
+        }
+        let mut hash = Sha256::new();
+        hash.update(b"mediflow.chat-selection.v1\0");
+        hash.update(selected.nonce);
+        hash.update(selected.host_epoch.load(Ordering::Acquire).to_be_bytes());
+        Some(hash.finalize().iter().map(|b| format!("{b:02x}")).collect())
     }
 
     pub fn check_chat_access_context(&self, context: &ChatAccessContext) -> Result<()> {
@@ -1791,6 +1813,8 @@ impl RuntimeSession {
 
     fn select_profile_target(&self, target: ProfileSelectionTarget) -> Result<()> {
         self.ensure_open()?;
+        let mut nonce = [0; 32];
+        getrandom::fill(&mut nonce).map_err(|_| RuntimeError::Transport)?;
         self.revoke_document_archives();
         let mut current = self
             .inner
@@ -1811,6 +1835,7 @@ impl RuntimeSession {
         *current = Some(Arc::new(ProfileSelection {
             target: Mutex::new(target),
             host_epoch: AtomicU64::new(0),
+            nonce,
         }));
         Ok(())
     }
