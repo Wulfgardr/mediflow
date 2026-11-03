@@ -97,11 +97,27 @@ L'importazione del prontuario è già generale: CSV `prosthetics-csv-v1` con le
 otto colonne del modello lombardo (sistema di codifica, codice, descrizione,
 versione, fonte, ambito, validità), associazione delle colonne, anteprima,
 conferma, fonte con ente e data, originali conservati; la ricerca filtra per
-fonte. Resta legata alla Lombardia la scrittura delle prescrizioni
-protesiche (ADR 0158). Renderla disponibile con un prontuario caricato senza
-il pacchetto lombardo, spostando su un writer SISS le prove di
-falsificazione oggi costruite sulla protesica, è la seconda consegna di
-questa decisione.
+fonte.
+
+#### Seconda consegna, 2026-11-03
+
+I cinque writer ordinari delle prescrizioni protesiche (creazione, modifica
+e cancellazione host; creazione e modifica paired) ammettono anche `core` e
+`core+it` quando il prontuario contiene almeno una voce collegata a una fonte
+con nome ed ente dichiarati. La verifica avviene nella stessa transazione
+IMMEDIATE della scrittura e dell'audit. Senza questo prontuario rispondono
+412 `PROSTHETICS_CATALOG_REQUIRED`, senza effetti, e chiedono di caricarlo nei
+Repertori. OpenAPI 1.54.0 documenta il nuovo codice 412 anche sui due writer
+paired, con deroga contrattuale tracciata: prima il rifiuto territoriale era
+403; i client precedenti ricevono ancora un errore esplicito.
+Restano invariati permessi, ambito, versioni concorrenti e snapshot
+delle voci selezionate.
+
+Con `core+it+lom` resta disponibile anche la registrazione manuale senza
+prontuario, come prima. Le codifiche del prontuario non attestano accesso o
+conformità ai servizi regionali: il passaggio SISS/PRREG, compresa l'azione
+`prosthetics.open`, richiede sempre `lom`. Le prove di mancata riattivazione
+di ADR 0158 usano ora i writer reali del diario SISS; lo storico resta leggibile.
 
 ## Conseguenze
 
