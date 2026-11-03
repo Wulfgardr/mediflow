@@ -1,3 +1,4 @@
+import { installTerritorialSissWriter } from './territorial-siss-writer-test-fixture';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
@@ -26,11 +27,14 @@ process.env.MEDIFLOW_DATA_DIR = directory;
 const { dbServer, openDbServer } = await import('./db-server.ts');
 const { bindSyntheticArchiveSessions } = await import('./security/web-auth-lifecycle-owner-test-fixture.ts');
 openDbServer(); bindSyntheticArchiveSessions('synthetic-production-territorial-web');
-const { createHostProstheticPrescription } = await import('./prosthetic-prescription-write.ts');
+const { readSqliteArchiveGeneration } = await import('./archive-generation.ts');
+const siss = installTerritorialSissWriter(directory, { id: 'synthetic-production-territorial-web', userId: 'synthetic-user',
+    username: ['synthetic', 'territorial'].join('-'), role: 'admin', authChannel: 'web', createdAt: Date.now(), expiresAt: Date.now() + 600000 }, readSqliteArchiveGeneration(db));
+db.prepare("INSERT INTO patients (id,first_name,last_name,tax_code) VALUES ('synthetic-patient','Synthetic','Patient','SYNTHETIC')").run();
 const originalFetch = globalThis.fetch;
 let external = 0;
 globalThis.fetch = async () => { external++; throw new Error('Unexpected parent egress'); };
-test.after(() => { globalThis.fetch = originalFetch; db.close(); dbServer.$client.close(); });
+test.after(() => { globalThis.fetch = originalFetch; siss.close(); db.close(); dbServer.$client.close(); });
 
 async function boundChild(kind: 'mini' | 'mcp' | 'aip') {
     const data = mkdtempSync(path.join(directory, `${kind}-`));
@@ -136,13 +140,10 @@ for (const kind of ['mini', 'aip', 'mcp', 'plugin'] as const) {
             }
             assert.deepEqual(readTerritorialPacks(db), before);
             assert.throws(() => db.transaction(() => requireTerritorialPack(db, 'lom')).immediate(), /pack_disabled/);
-            const deniedWriter = await createHostProstheticPrescription({ request: new Request('http://localhost/writer'),
-                session: { id: 'synthetic-production-territorial-web', userId: 'synthetic-user', username: ['synthetic', 'territorial'].join('-'), role: 'admin',
-                    authChannel: 'web', createdAt: Date.now(), expiresAt: Date.now() + 60000 } },
-                { patientId: 'synthetic-patient', prescribedAt: '2026-10-21', description: 'ENC:synthetic' });
+            const deniedWriter = await siss.write();
             assert.equal(deniedWriter.status, 403);
             assert.equal(external, 0);
-            assert.equal(db.prepare('SELECT count(*) FROM prosthetic_prescriptions').pluck().get(), 0);
+            assert.equal(db.prepare('SELECT count(*) FROM siss_handoff_events').pluck().get(), 0);
         } finally { await bound.close(); }
     });
 }

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.53.0
+  version: 1.54.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -2136,6 +2136,10 @@ paths:
         Lists prosthetic prescriptions for a patient in the paired client's
         effective ambulatory scope. This route requires
         `network.replica.readonly-prosthetic-prescriptions`.
+        Con `core` o `core+it` serve un prontuario caricato con fonte dichiarata;
+        in assenza risponde 412 `PROSTHETICS_CATALOG_REQUIRED` senza effetti.
+        Con `core+it+lom` resta ammessa la registrazione manuale senza prontuario.
+        Il passaggio SISS/PRREG resta separato e richiede `lom` (ADR 0177).
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2178,6 +2182,10 @@ paths:
         Creates a prosthetic prescription for a patient in the paired client's
         effective ambulatory scope. This route requires
         `network.replica.write-prosthetic-prescriptions`.
+        Con `core` o `core+it` serve un prontuario caricato con fonte dichiarata;
+        in assenza risponde 412 `PROSTHETICS_CATALOG_REQUIRED` senza effetti.
+        Con `core+it+lom` resta ammessa la registrazione manuale senza prontuario.
+        Il passaggio SISS/PRREG resta separato e richiede `lom` (ADR 0177).
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2215,7 +2223,7 @@ paths:
                     type: string
                     const: Prescription ID already exists
         '412':
-          description: La revisione del repertorio o gli originali della selezione non sono più validi; nessuna scrittura.
+          description: Manca un prontuario con fonte dichiarata fuori dalla Lombardia, oppure la revisione del repertorio o gli originali della selezione non sono più validi; nessuna scrittura.
           content:
             application/json:
               schema:
@@ -2246,6 +2254,10 @@ paths:
         moment of the change, and never writes an outcome; stepping back from
         `tested` clears collaudo date and outcome; removing the collaudo date
         of a tested prescription returns 409 `prosthetic_collaudo_date_required`.
+        Con `core` o `core+it` serve un prontuario caricato con fonte dichiarata;
+        in assenza risponde 412 `PROSTHETICS_CATALOG_REQUIRED` senza effetti.
+        Con `core+it+lom` resta ammessa la registrazione manuale senza prontuario.
+        Il passaggio SISS/PRREG resta separato e richiede `lom` (ADR 0177).
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2281,7 +2293,7 @@ paths:
         '409':
           $ref: '#/components/responses/ProstheticPrescriptionWriteConflict'
         '412':
-          description: La revisione del repertorio o gli originali della selezione non sono più validi; nessuna scrittura.
+          description: Manca un prontuario con fonte dichiarata fuori dalla Lombardia, oppure la revisione del repertorio o gli originali della selezione non sono più validi; nessuna scrittura.
           content:
             application/json:
               schema:
@@ -9342,7 +9354,7 @@ components:
           type: string
         code:
           type: string
-          enum: [CATALOG_REVISION_CONFLICT, ENTRY_NOT_FOUND, SOURCE_NOT_FOUND, DOCUMENT_NOT_FOUND, DOCUMENT_CHANGED, INVALID_DOCUMENT, ARCHIVE_PERMISSIONS]
+          enum: [CATALOG_REVISION_CONFLICT, ENTRY_NOT_FOUND, SOURCE_NOT_FOUND, DOCUMENT_NOT_FOUND, DOCUMENT_CHANGED, INVALID_DOCUMENT, ARCHIVE_PERMISSIONS, PROSTHETICS_CATALOG_REQUIRED]
     ProstheticsCatalogSelection:
       type: object
       additionalProperties: false

@@ -73,6 +73,62 @@ async function capture(op: Operation, fault?: 'FAIL' | 'IGNORE', domainIgnore = 
     return { ids, before, after, result, error };
 }
 
+const { readTerritorialPacks } = await import('./territorial-pack-store.ts');
+const setPack = (preset: 'core' | 'core+it' | 'core+it+lom') => commitTerritorialPackTransition(openDbServer(), {
+        schemaVersion: 'mediflow.territorial-packs.v1', expectedRevision: readTerritorialPacks(openDbServer()).revision,
+        preset, confirmed: true,
+    }, { actorType: 'system', actorRef: 'synthetic-supervisor', sourceSurface: 'job' }, () => {});
+test('without a catalog Lombardy keeps manual writes; core and Italy deny mutations without effects', async () => {
+    setPack('core+it+lom');
+    for (const op of operations) {
+        const x = await capture(op);
+        assert.equal(x.error, null);
+        assert.equal(x.result?.status, op.includes('create') ? 201 : 200);
+        assert.equal(x.after.audit.length - x.before.audit.length, 1);
+    }
+    for (const preset of ['core', 'core+it'] as const) {
+        setPack(preset);
+        for (const op of operations) {
+            const x = await capture(op);
+            assert.equal(x.error, null);
+            assert.equal(x.result?.status, 412, `${preset}/${op}: missing catalog`);
+            assert.equal((x.result?.value as Record<string, unknown>)?.code, 'PROSTHETICS_CATALOG_REQUIRED');
+            assert.deepEqual(x.after, x.before);
+        }
+    }
+});
+
+test('a declared catalog admits every ordinary prosthetic mutation in every preset with audit', async () => {
+    const { createProstheticsCatalog } = await import('./reference-data/prosthetics-catalog-service.ts');
+    const { PROSTHETICS_TEMPLATE } = await import('./reference-data/prosthetics-catalog-contract.ts');
+    const catalog = createProstheticsCatalog(openDbServer());
+    const bytes = Buffer.from(PROSTHETICS_TEMPLATE);
+    const preview = catalog.preview(bytes, 'synthetic-general.csv', session.userId);
+    catalog.commit({ bytes, sourceName: 'synthetic-general.csv', proof: preview.proof!, acceptSubset: true }, session.userId, () => {});
+    for (const preset of ['core', 'core+it', 'core+it+lom'] as const) {
+        setPack(preset);
+        for (const op of operations) {
+            const x = await capture(op);
+            assert.equal(x.error, null);
+            assert.equal(x.result?.status, op.includes('create') ? 201 : 200, `${preset}/${op}`);
+            assert.equal(x.after.audit.length - x.before.audit.length, 1);
+            assert.equal(x.after.row === null, op === 'host-delete');
+            const fault = await capture(op, 'FAIL');
+            assert.ok(fault.error, `${preset}/${op}: audit failure`);
+            assert.deepEqual(fault.after, fault.before);
+        }
+    }
+    setPack('core');
+    const declared = sql.prepare('SELECT id, authority FROM prosthetics_catalog_sources').all() as { id: string; authority: string }[];
+    sql.prepare("UPDATE prosthetics_catalog_sources SET authority = ''").run();
+    const absentSource = await capture('host-create');
+    assert.equal(absentSource.result?.status, 412);
+    assert.deepEqual(absentSource.after, absentSource.before);
+    for (const source of declared) sql.prepare('UPDATE prosthetics_catalog_sources SET authority=? WHERE id=?').run(source.authority, source.id);
+    setPack('core+it+lom');
+
+});
+
 test('audit FAIL and IGNORE roll back every ordinary mutation', async () => {
     for (const op of operations) for (const fault of ['FAIL', 'IGNORE'] as const) {
         const x = await capture(op, fault);

@@ -1,4 +1,4 @@
-import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
+import { installTerritorialSissWriter } from './territorial-siss-writer-test-fixture';
 import { clearAllSessions } from './security/server-session';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -34,25 +34,19 @@ function request(body: unknown, header = generation) {
 }
 const { dbServer, openDbServer } = await import('./db-server.ts');
 openDbServer(); bindSyntheticArchiveSessions('synthetic-territorial-web', 'synthetic-territorial-native');
-const authority = syntheticNetworkPatientAuthority(dbServer, 'synthetic-scope', { capabilities: ['network.replica.write-prosthetic-prescriptions'] });
-const cleanupCookies = installNetworkPatientCookieFixture(directory, { cookies: new Map([['ambulatory_id', 'synthetic-scope']]) });
-const writer = await import('./prosthetic-prescription-write.ts');
 const session = { id: 'synthetic-territorial-web', userId: web.userId, username: ['synthetic', 'territorial'].join('-'), role: 'admin', authChannel: 'web', createdAt: Date.now(), expiresAt: web.expiresAt } as ServerSession;
 db.prepare("INSERT INTO ambulatories (id,name,is_default) VALUES ('synthetic-scope','Sede inventata',1)").run();
 db.prepare("INSERT INTO patients (id,first_name,last_name,tax_code) VALUES ('synthetic-patient','Synthetic','Patient','SYNTHETIC')").run();
+const siss = installTerritorialSissWriter(directory, session, generation);
 let external = 0;
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async () => { external++; throw new Error('Unexpected external call'); };
-test.after(() => { globalThis.fetch = originalFetch; clearAllSessions(); cleanupCookies(); db.close(); dbServer.$client.close(); });
-let serial = 0;
-async function write(cached?: unknown) {
-    return writer.createHostProstheticPrescription({ request: new Request('http://localhost/writer', { headers: cached ? { 'x-mediflow-territorial-packs': JSON.stringify(cached) } : {} }), session },
-        { id: `synthetic-territorial-${serial++}`, patientId: 'synthetic-patient', prescribedAt: '2026-10-21', description: 'ENC:synthetic' });
-}
+test.after(() => { globalThis.fetch = originalFetch; clearAllSessions(); siss.close(); db.close(); dbServer.$client.close(); });
+const write = siss.write;
 async function assertDisabled(before: unknown) {
     assert.deepEqual(readTerritorialPacks(db), before);
     assert.equal((await write()).status, 403);
-    assert.equal(db.prepare('SELECT count(*) FROM prosthetic_prescriptions').pluck().get(), 0);
+    assert.equal(db.prepare('SELECT count(*) FROM siss_handoff_events').pluck().get(), 0);
     assert.equal(external, 0);
 }
 
@@ -68,20 +62,14 @@ test('core denies the real territorial writer; trusted Web requires a live sessi
     await assertDisabled(before);
 });
 
-test('all five protesica mutation entrypoints deny core, including paired operations', async () => {
-    const request = new Request('http://localhost/writer');
-    const paired = authority;
-    const host = { request, session, id: 'synthetic-prescription' };
-    const body = { patientId: 'synthetic-patient', prescribedAt: '2026-10-21', description: 'ENC:synthetic' };
-    const results = [
-        await writer.createHostProstheticPrescription(host, body),
-        await writer.updateHostProstheticPrescription(host, { version: 1, description: 'ENC:synthetic' }),
-        await writer.deleteHostProstheticPrescription(host, 1),
-        await writer.createNetworkScopedProstheticPrescription({ ...paired, patientId: 'synthetic-patient' }, body),
-        await writer.updateNetworkScopedProstheticPrescription({ ...paired, prescriptionId: 'synthetic-prescription' }, { version: 1, description: 'ENC:synthetic' }),
-    ];
-    assert.deepEqual(results.map(result => result.status), [403, 403, 403, 403, 403]);
-    assert.deepEqual(results.map(result => 'code' in result.value ? result.value.code : undefined), Array(5).fill('TERRITORIAL_PACK_DISABLED'));
+test('all SISS diary mutation entrypoints deny core without effects', async () => {
+    const before = db.prepare('SELECT * FROM audit_events ORDER BY rowid').all();
+    for (const method of ['POST', 'PUT', 'DELETE'] as const) {
+        const response = await siss.write(undefined, method);
+        assert.equal(response.status, 403);
+        assert.equal((await response.json()).code, 'TERRITORIAL_PACK_DISABLED');
+    }
+    assert.deepEqual(db.prepare('SELECT * FROM audit_events ORDER BY rowid').all(), before);
     await assertDisabled(readTerritorialPacks(db));
 });
 
@@ -148,7 +136,7 @@ test('both admitted channels transition and audit; cached pre-disable capabiliti
     const cached = await response.json();
     assert.equal(cached.preset, 'core+it+lom');
     assert.equal((await write()).status, 201);
-    db.prepare('DELETE FROM prosthetic_prescriptions').run();
+    db.prepare('DELETE FROM siss_handoff_events').run();
     response = await http(request(command('core', 1))); assert.equal(response.status, 200);
     await assertDisabled(readTerritorialPacks(db));
     assert.equal((await write(cached)).status, 403);
