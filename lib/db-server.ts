@@ -18,6 +18,7 @@ import { initSqlitePragmas } from '@/lib/sqlite-pragmas';
 import { openVersionedSqliteDatabase } from '@/lib/sqlite-schema-open';
 import { openAdmittedSqlite, runWithSqliteMaintenanceSync } from './sqlite-maintenance-admission.mjs';
 import { readSqliteArchiveGeneration, rotateSqliteArchiveGeneration } from './archive-generation';
+import { reconcileAccountResets } from './security/account-reset-journal';
 
 // Import is inert; only an explicit open or use of the lazy client acquires SQLite.
 let sqlite: Database.Database;
@@ -95,6 +96,12 @@ export function openDbServer(): Database.Database {
             catch { console.error('[MediFlow] SQLite lease release unverified; preserve the archive maintenance state.'); }
         });
         if (isNextProductionBuild) initSqlitePragmas(sqlite);
+        // SQLite already decided every interrupted reset atomically; record that decision before serving.
+        // A journal that cannot be read stays for inspection and never blocks the archive.
+        if (!isNextProductionBuild) {
+            try { reconcileAccountResets(sqlite); }
+            catch (error) { console.error('[MediFlow] Account reset journal not reconciled:', (error as Error).message); }
+        }
         initialSqlite = sqlite;
         openState = 'opened';
         return sqlite;
