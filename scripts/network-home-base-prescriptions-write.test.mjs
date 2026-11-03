@@ -189,6 +189,17 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         // the paired item PUT has its own CAS, mandatory event and rollback.
         const itemId = itemA.json.id;
         const itemDb = openTestDb();
+        // A status change without `items` (Apple 0.9.0) moves the items that were in the prescription's status.
+        const aligned = itemDb.prepare('SELECT id, status, version FROM service_prescription_items WHERE prescription_id=? ORDER BY ordinal').all(servicePrescriptionId);
+        assert.deepEqual(aligned.map((row) => [row.status, row.version]), [['performed', 2], ['performed', 2]]);
+        const alignedReason = itemDb.prepare("SELECT redacted_metadata FROM audit_events WHERE subject_ref=? AND event_type='service.prescription_item.updated'").get(itemB.json.id);
+        assert.equal(JSON.parse(alignedReason.redacted_metadata).reasonCode, 'status_cascade_without_items');
+        // The per-item call that follows in that client carries the old version and succeeds without writing.
+        const echo = await request('PUT', `/api/v1/network/service-prescription-items/${itemB.json.id}`, {
+            headers: { ...pairedHeaders(writerClient), ...sessionHeaders }, body: { version: 1, status: 'performed', performedAt: '2026-07-08T09:30:00.000Z' },
+        });
+        assert.equal(echo.response.status, 200);
+        assert.equal(itemDb.prepare('SELECT version FROM service_prescription_items WHERE id=?').get(itemB.json.id).version, 2);
         const itemState = () => ({
             row: itemDb.prepare('SELECT * FROM service_prescription_items WHERE id=?').get(itemId),
             events: itemDb.prepare('SELECT event_type, actor_ref, source_surface, redacted_metadata FROM audit_events WHERE subject_ref=? ORDER BY rowid').all(itemId),
@@ -197,34 +208,34 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
             // The route opens and admits the archive before the fault trigger exists:
             // admission refuses an archive that already carries a foreign audit trigger.
             await request('PUT', `/api/v1/network/service-prescription-items/${itemId}`, {
-                headers: { ...pairedHeaders(writerClient), ...sessionHeaders }, body: { version: 999, status: 'performed' },
+                headers: { ...pairedHeaders(writerClient), ...sessionHeaders }, body: { version: 999, status: 'report_received' },
             });
             const beforeItem = itemState();
             itemDb.exec("CREATE TRIGGER synthetic_paired_item_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='service.prescription_item.updated' BEGIN SELECT RAISE(FAIL, 'synthetic audit fault'); END");
             const failedUpdate = await request('PUT', `/api/v1/network/service-prescription-items/${itemId}`, {
-                headers: { ...pairedHeaders(writerClient), ...sessionHeaders }, body: { version: 1, status: 'performed' },
+                headers: { ...pairedHeaders(writerClient), ...sessionHeaders }, body: { version: 2, status: 'report_received' },
             });
             assert.equal(failedUpdate.response.status, 500); assert.deepEqual(itemState(), beforeItem);
             itemDb.exec('DROP TRIGGER synthetic_paired_item_audit');
             const itemUpdate = await request('PUT', `/api/v1/network/service-prescription-items/${itemId}`, {
-                headers: { ...pairedHeaders(writerClient), ...sessionHeaders }, body: { version: 1, status: 'performed' },
+                headers: { ...pairedHeaders(writerClient), ...sessionHeaders }, body: { version: 2, status: 'report_received' },
             });
             assert.equal(itemUpdate.response.status, 200);
             const afterItem = itemState();
-            assert.equal(afterItem.row.version, 2); assert.equal(afterItem.row.status, 'performed');
+            assert.equal(afterItem.row.version, 3); assert.equal(afterItem.row.status, 'report_received');
             assert.equal(afterItem.events.length, beforeItem.events.length + 1);
             assert.equal(afterItem.events.at(-1).event_type, 'service.prescription_item.updated');
             assert.equal(afterItem.events.at(-1).source_surface, 'native');
-            assert.equal(JSON.parse(afterItem.events.at(-1).redacted_metadata).resourceVersion, 2);
+            assert.equal(JSON.parse(afterItem.events.at(-1).redacted_metadata).resourceVersion, 3);
             const repeated = await request('PUT', `/api/v1/network/service-prescription-items/${itemId}`, {
-                headers: { ...pairedHeaders(writerClient), ...sessionHeaders }, body: { version: 1, status: 'performed' },
+                headers: { ...pairedHeaders(writerClient), ...sessionHeaders }, body: { version: 2, status: 'report_received' },
             });
             assert.equal(repeated.response.status, 409); assert.deepEqual(itemState(), afterItem);
             const reread = await request('GET', `/api/v1/network/service-prescription-items?prescriptionId=${encodeURIComponent(servicePrescriptionId)}`, {
                 headers: { ...pairedHeaders(writerClient), ...sessionHeaders },
             });
             assert.equal(reread.response.status, 200);
-            assert.equal(reread.json.find(item => item.id === itemId).version, 2);
+            assert.equal(reread.json.find(item => item.id === itemId).version, 3);
             const events = itemDb.prepare('SELECT event_type, redacted_metadata FROM audit_events WHERE subject_ref=? ORDER BY rowid').all(servicePrescriptionId);
             assert.deepEqual(events.map(event => event.event_type), ['service.prescription.created', 'service.prescription.updated']);
             assert.deepEqual(events.map(event => JSON.parse(event.redacted_metadata).resourceVersion), [1, 2]);

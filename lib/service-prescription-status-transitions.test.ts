@@ -250,3 +250,81 @@ test('the actions offered by the Web are forward steps inside the table', () => 
     assert.deepEqual(offered('report_received'), { book: false, perform: false, report: false });
     assert.deepEqual(offered('cancelled'), { book: false, perform: false, report: false });
 });
+
+/*
+ * Sequenza delle build Apple 0.9.0 già installate: prima la prescrizione senza
+ * elencare le voci, poi ogni voce a parte con la versione letta prima, e al
+ * primo rifiuto il client si ferma.
+ */
+async function legacyAppleSequence(ids: Seeded, status: string, scheduledAt: string) {
+    const cached = listed(ids);
+    const parent = await writer.updateNetworkScopedServicePrescription({ ...paired, prescriptionId: ids.prescriptionId },
+        { version: 3, status, scheduledAt });
+    const items: Array<{ status: number; value: Record<string, unknown> }> = [];
+    if (parent.status !== 200) return { parent, items };
+    for (const item of cached) {
+        const result = await writer.updateNetworkScopedServicePrescriptionItem({ ...paired, itemId: item.id },
+            { version: item.version, status, scheduledAt });
+        items.push(result);
+        if (result.status !== 200) break;
+    }
+    return { parent, items };
+}
+function itemAuditReasons(ids: Seeded) {
+    return ids.itemIds.map((id) => (sql.prepare('SELECT redacted_metadata FROM audit_events WHERE subject_ref=?').all(id) as Array<{ redacted_metadata: string }>)
+        .map((row) => (JSON.parse(row.redacted_metadata) as { reasonCode?: string }).reasonCode ?? null));
+}
+
+test('the 0.9.0 Apple sequence leaves prescription and items in agreement, whatever item it stops at', async () => {
+    for (const order of [['prescribed', 'cancelled', 'prescribed'], ['cancelled', 'prescribed', 'prescribed']]) {
+        const ids = seed('prescribed', order);
+        const { parent, items } = await legacyAppleSequence(ids, 'booked', '2026-06-01T10:00:00.000Z');
+        assert.equal(parent.status, 200);
+        assert.equal(parentRow(ids).status, 'booked');
+        const rows = itemRows(ids);
+        assert.deepEqual(rows.map((row) => row.status), order.map((status) => status === 'cancelled' ? 'cancelled' : 'booked'));
+        // L'eco sulle voci già spostate riesce senza scrivere; la voce annullata a parte resta e il client riceve un 409.
+        assert.deepEqual(rows.map((row) => row.version), order.map((status) => status === 'cancelled' ? 2 : 3));
+        const refused = items.at(-1)!;
+        assert.equal(refused.status, 409);
+        assert.equal(refused.value.code, 'status_transition_not_allowed');
+        assert.ok(items.slice(0, -1).every((result) => result.status === 200));
+        assert.deepEqual(itemAuditReasons(ids), order.map((status) => status === 'cancelled' ? [] : ['status_cascade_without_items']));
+    }
+});
+
+test('a 0.9.0 client cut off right after the prescription call leaves no item behind', async () => {
+    const ids = seed('booked', ['booked', 'booked']);
+    const result = await writer.updateNetworkScopedServicePrescription({ ...paired, prescriptionId: ids.prescriptionId },
+        { version: 3, status: 'performed', performedAt: '2026-06-10T09:30:00.000Z' });
+    assert.equal(result.status, 200);
+    assert.deepEqual(itemRows(ids).map((row) => [row.status, row.performed_at]),
+        [['performed', Date.parse('2026-06-10T09:30:00.000Z') / 1000], ['performed', Date.parse('2026-06-10T09:30:00.000Z') / 1000]]);
+});
+
+test('a failure while aligning the second item rolls back the prescription and the first item', async () => {
+    const ids = seed('prescribed', ['prescribed', 'prescribed']);
+    const before = { parent: parentRow(ids), items: itemRows(ids), audit: auditCount(ids) };
+    sql.exec(`CREATE TRIGGER synthetic_implicit_cascade_fault BEFORE UPDATE ON service_prescription_items
+        WHEN OLD.id = '${ids.itemIds[1]}' BEGIN SELECT RAISE(FAIL, 'synthetic item failure'); END`);
+    try {
+        await assert.rejects(writer.updateNetworkScopedServicePrescription({ ...paired, prescriptionId: ids.prescriptionId },
+            { version: 3, status: 'cancelled' }));
+    } finally {
+        sql.exec('DROP TRIGGER synthetic_implicit_cascade_fault');
+    }
+    assert.deepEqual({ parent: parentRow(ids), items: itemRows(ids), audit: auditCount(ids) }, before);
+});
+
+test('only a pure status echo of an applied change passes with an old version', async () => {
+    const ids = seed('prescribed', ['prescribed']);
+    await writer.updateNetworkScopedServicePrescription({ ...paired, prescriptionId: ids.prescriptionId }, { version: 3, status: 'booked' });
+    const [itemId] = ids.itemIds;
+    const withNotes = await writer.updateNetworkScopedServicePrescriptionItem({ ...paired, itemId }, { version: 2, status: 'booked', notes: 'ENC:synthetic:note' });
+    assert.equal(withNotes.status, 409);
+    assert.equal(withNotes.value.code, 'VERSION_CONFLICT');
+    const otherStatus = await writer.updateNetworkScopedServicePrescriptionItem({ ...paired, itemId }, { version: 2, status: 'performed' });
+    assert.equal(otherStatus.status, 409);
+    assert.equal(otherStatus.value.code, 'VERSION_CONFLICT');
+    assert.deepEqual(itemRows(ids).map((row) => [row.status, row.version]), [['booked', 3]]);
+});
