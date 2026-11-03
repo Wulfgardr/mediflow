@@ -913,3 +913,55 @@ test('v1 legacy replacement: local token, administrator, current snapshot and co
         current = null; owner.retire(admin, 'dispose'); owner.retire(clinician, 'dispose'); catalog.resetCatalog();
     }
 });
+
+test('un catalogo di un’altra agenzia passa da anteprima e conferma, dichiara la fonte e lascia AIFA come alternativa', async () => {
+    const catalog = await loadCatalogModules();
+    const { previewDrugCatalogFile, commitDrugCatalogFile } = await import('./drug-catalog-server.ts');
+    const { dbServer } = await import('./db-server.ts');
+    const { settings } = await import('./schema.ts');
+    const { eq } = await import('drizzle-orm');
+    catalog.resetCatalog();
+    const csv = new TextEncoder().encode('Product Code;Brand Name;Active Substance;ATC Code;Dosage Form;Package;Tier\n'
+        + 'SYN-001;Farmaco Uno;principio uno;n02be01;compressa;10 unità;T1\n'
+        + 'SYN-002;Farmaco Due;principio due;;soluzione;100 ml;T2\n'
+        + ';Senza codice;;;;;\n');
+    const suggestion = previewDrugCatalogFile(csv, undefined);
+    assert.equal(suggestion.suggested, true);
+    assert.equal(suggestion.counts, null);
+    assert.equal(suggestion.mapping.delimiter, ';');
+    assert.equal(suggestion.header[suggestion.mapping.columns.codice!], 'Product Code');
+    const preview = previewDrugCatalogFile(csv, suggestion.mapping);
+    assert.deepEqual(preview.counts, { total: 3, importable: 2, rejected: 1, duplicateCodes: 0 });
+    assert.equal(preview.sample[0].atc, 'N02BE01');
+    assert.equal((await catalog.searchAifaCatalog('farmaco', 10)).rows.length, 0, 'l’anteprima non scrive');
+
+    const audit = { eventType: 'reference_data.drug_catalog.updated' as const, outcome: 'success' as const, actorType: 'user' as const,
+        actorRef: 'synthetic-user', subjectType: 'reference_data' as const, subjectRef: 'drug-catalog', sourceSurface: 'web' as const,
+        archiveGeneration: (await import('./security/archive-session-generation.ts')).currentArchiveGeneration() };
+    const source = { agency: 'Agenzia sintetica del farmaco', codeSystem: 'SYN', version: 'v1', date: '2026-10-01', sourceUrl: null };
+    const base = { bytes: csv, fileName: 'catalogo-sintetico.csv', mapping: preview.mapping, source, previewSha256: preview.sha256,
+        expectedSnapshot: preview.current.snapshot, audit };
+    assert.throws(() => commitDrugCatalogFile({ ...base, confirmed: false }), /Conferma esplicita/u);
+    assert.throws(() => commitDrugCatalogFile({ ...base, previewSha256: '0'.repeat(64), confirmed: true }), /anteprima/u);
+    assert.equal((await catalog.getAifaCatalogStatus()).state, 'not-imported');
+
+    const result = commitDrugCatalogFile({ ...base, confirmed: true });
+    assert.equal(result.state, 'ready');
+    assert.equal(result.manifest, null);
+    assert.deepEqual({ kind: result.source?.kind, agency: result.source?.agency, codeSystem: result.source?.codeSystem, rowCount: result.source?.rowCount },
+        { kind: 'file', agency: source.agency, codeSystem: 'SYN', rowCount: 2 });
+    const [found] = (await catalog.searchAifaCatalog('farmaco uno', 10)).rows;
+    assert.deepEqual({ aic: found.aic, packaging: found.packaging, class: found.class }, { aic: 'SYN-001', packaging: 'compressa · 10 unità', class: 'T1' });
+    assert.throws(() => commitDrugCatalogFile({ ...base, confirmed: true }), /modificato/u, 'la conferma vale solo per lo stato visto in anteprima');
+
+    const aifa = fs.readFileSync(path.join(ROOT_DIR, 'scripts/fixtures/aifa-confezioni-synthetic.csv'));
+    const replaced = await catalog.replaceAifaCatalog(new File([aifa], 'aifa-synthetic.csv', { type: 'text/csv' }),
+        { sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL, downloadedAt: '2026-10-02', version: 'synthetic' }, undefined,
+        { confirmedReduction: undefined });
+    assert.equal(replaced.state, 'ready');
+    const status = await catalog.getAifaCatalogStatus();
+    assert.equal(status.source, undefined);
+    assert.equal(status.manifest?.version, 'synthetic');
+    assert.equal(dbServer.select().from(settings).where(eq(settings.key, 'drugCatalogSource')).get(), undefined);
+    catalog.resetCatalog();
+});
