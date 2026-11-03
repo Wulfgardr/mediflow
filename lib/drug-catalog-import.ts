@@ -84,9 +84,15 @@ function normalizeHeader(value: string): string {
     return normalizeAifaSearchText(value.replace(/^﻿/u, '')).replace(/ /gu, '_');
 }
 
+/** Conta i separatori fuori dalle virgolette: un'etichetta come "nome, descrizione" non deve decidere. */
 export function detectDrugCatalogDelimiter(firstLine: string): DrugCatalogDelimiter {
-    const counts = ([',', ';', '\t'] as const).map(d => [d, firstLine.split(d).length] as const);
-    return counts.reduce((best, item) => item[1] > best[1] ? item : best)[0];
+    const counts = new Map<DrugCatalogDelimiter, number>([[',', 0], [';', 0], ['\t', 0]]);
+    let quoted = false;
+    for (const char of firstLine) {
+        if (char === '"') quoted = !quoted;
+        else if (!quoted && counts.has(char as DrugCatalogDelimiter)) counts.set(char as DrugCatalogDelimiter, counts.get(char as DrugCatalogDelimiter)! + 1);
+    }
+    return [...counts].reduce((best, item) => item[1] > best[1] ? item : best)[0];
 }
 
 export function suggestDrugCatalogMapping(header: string[], delimiter: DrugCatalogDelimiter): DrugCatalogMapping {
@@ -129,7 +135,10 @@ function decode(bytes: Uint8Array): string {
 
 /** Legge l'intestazione e propone una mappatura; non convalida le righe. */
 export function readDrugCatalogHeader(bytes: Uint8Array): { header: string[]; suggestion: DrugCatalogMapping } {
-    const text = decode(bytes.subarray(0, Math.min(bytes.byteLength, 256 * 1024)));
+    // In streaming un carattere spezzato dal taglio resta in attesa invece di rendere invalido il file.
+    let text: string;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, Math.min(bytes.byteLength, 256 * 1024)), { stream: true }); }
+    catch { throw new DrugCatalogImportError('Il file deve essere un CSV UTF-8.'); }
     const firstLine = text.replace(/^﻿/u, '').split(/\r?\n/u, 1)[0] ?? '';
     const delimiter = detectDrugCatalogDelimiter(firstLine);
     const header = parseDelimitedRecords(`${firstLine}\n`, delimiter)[0] ?? [];
