@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { completeOnboardingIfNeeded, unlockIfNeeded, assertNoHorizontalOverflow } from './utils';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { trustedArchiveWebRequestHeaders, trustedWebRequestHeaders, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 const endpoint = '/api/onboarding/work-profile';
 
-test('onboarding: persisted preview, resume, changed recommendation, manual entry, conflict and rollback', async ({ page, context, request, browser }) => {
+test('onboarding: persisted preview, resume, changed recommendation, manual entry, conflict and rollback', async ({ page, context, request, browser, baseURL }) => {
     test.setTimeout(150_000);
     const pageErrors: string[] = [];
     const consoleErrors: { text: string; url: string }[] = [];
@@ -24,7 +24,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     };
 
     expect((await request.get(endpoint)).status()).toBe(401);
-    expect((await request.put(endpoint, { data: {} })).status()).toBe(401);
+    expect((await request.put(endpoint, { headers: trustedWebRequestHeaders(baseURL), data: {} })).status()).toBe(401);
     await page.setViewportSize({ width: 1440, height: 960 });
     await page.goto('/');
     await expect(page).toHaveTitle(/MediFlow/);
@@ -40,8 +40,8 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
         await panel.getByRole('button', { name: 'Scarta la bozza' }).click();
         await expect(panel.getByRole('group', { name: 'Quale attività vuoi organizzare?' })).toBeVisible();
     }
-    expect((await context.request.post('/api/settings', { data: { key: 'onboarding.workProfile', value: 'synthetic' } })).status()).toBe(403);
-    expect((await context.request.put('/api/settings/onboarding.workProfile', { data: { value: 'synthetic' } })).status()).toBe(403);
+    expect((await context.request.post('/api/settings', { headers: trustedWebRequestHeaders(page.url()), data: { key: 'onboarding.workProfile', value: 'synthetic' } })).status()).toBe(403);
+    expect((await context.request.put('/api/settings/onboarding.workProfile', { headers: trustedWebRequestHeaders(page.url()), data: { value: 'synthetic' } })).status()).toBe(403);
 
     await panel.getByRole('radio', { name: 'Consultare e compilare cartelle' }).check();
     await panel.getByRole('button', { name: 'Salva e continua' }).click();
@@ -133,7 +133,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     expectedLostResponse = true;
     await page.route(`**${endpoint}`, async (route) => {
         if (route.request().method() === 'PUT' && route.request().postDataJSON().action === 'confirm') {
-            await route.fetch(); // Commit reaches the real SQLite owner; only its response is lost.
+            await fetchInterceptedRequest(route); // Commit reaches the real SQLite owner; only its response is lost.
             await route.abort('failed');
         } else await route.continue();
     });

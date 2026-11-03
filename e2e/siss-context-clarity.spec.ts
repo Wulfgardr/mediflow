@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 test('SISS: comandi esterni, stati leggibili, diario e disclosure', async ({ page, baseURL }) => {
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || !['127.0.0.1', 'localhost'].includes(new URL(baseURL).hostname) || new URL(baseURL).port === '3000') throw new Error('Archivio e runtime sintetici isolati richiesti');
@@ -116,7 +117,7 @@ for (const first of ['validation', 'bundle'] as const) {
         await page.route(/\/api\/(entries(?:\?|$)|fse\/validate-patient\?)/, async route => {
             const validation = new URL(route.request().url()).pathname.includes('validate-patient');
             if ((first === 'validation') !== validation) await gate;
-            const response = await route.fetch();
+            const response = await fetchInterceptedRequest(route);
             await route.fulfill({ response });
             if ((first === 'validation') === validation) observed();
         });

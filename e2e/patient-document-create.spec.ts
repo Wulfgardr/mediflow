@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { expect, test } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession } from './utils';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 test.describe.configure({ retries: 0 });
 const PIN = process.env.E2E_PIN || '1234';
@@ -73,7 +74,7 @@ test('risposta persa dopo la conferma: l’esito si rilegge, nessuna seconda sch
     // The server executes; the browser never receives the answer.
     await page.route('**/api/patients/document-create', async (route) => {
         if ((route.request().postDataJSON() as { operation?: string }).operation !== 'execute') return route.continue();
-        await route.fetch();
+        await fetchInterceptedRequest(route);
         await route.abort('connectionreset');
     });
     const panel = await fillAndConfirm(page, lastName);

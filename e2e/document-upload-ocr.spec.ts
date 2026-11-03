@@ -3,7 +3,7 @@ import { createCanvas } from '@napi-rs/canvas';
 import { createHash, randomUUID } from 'node:crypto';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { openDocumentActions, bootstrapUnlockedSession, openPatientSection } from './utils';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { trustedArchiveWebRequestHeaders, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 import { observeAnyDocProjectResponse } from './anydoc-project-response';
 
 const NATIVE_TEXT = 'PRIMA PAGINA TESTUALE - DOCUMENTO SINTETICO';
@@ -178,7 +178,7 @@ test('Upload cifrato: annullamento, risposta tardiva, replay e nuovo tentativo',
       && route.request().headers()['x-mediflow-extraction-action'] === 'project') {
       held = false;
       token = route.request().headers()['x-mediflow-extraction-grant'];
-      const response = await route.fetch();
+      const response = await fetchInterceptedRequest(route);
       expect(response.status()).toBe(200); reached.resolve();
       await release.promise;
       try { await route.fulfill({ response }); } catch { /* Browser cancellation may close the request first. */ }

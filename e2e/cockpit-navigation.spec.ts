@@ -1,7 +1,7 @@
 /* delay real successful reads; no replacement patient or route payload. */
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { trustedArchiveWebRequestHeaders, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 function barrier() {
   let release = () => {};
@@ -36,14 +36,14 @@ test('a patient read completing during navigation cannot restore the previous ar
     const request = route.request();
     const url = new URL(request.url());
     if (request.method() === 'GET' && url.pathname === '/api/patients') {
-      const response = await route.fetch();
+      const response = await fetchInterceptedRequest(route);
       expect(response.status()).toBe(200);
       patientsReceived.release();
       await releasePatients.promise;
       return route.fulfill({ response });
     }
     if (delayNavigation && request.headers().rsc === '1' && url.pathname === '/' && url.searchParams.get('area') === 'incarico') {
-      const response = await route.fetch();
+      const response = await fetchInterceptedRequest(route);
       expect(response.status()).toBe(200);
       navigationReceived.release();
       await releaseNavigation.promise;
@@ -156,7 +156,7 @@ test('Apri quadro has one destination while folder navigation is pending', async
   await expect(row).toHaveCount(1);
   await page.route('**/*', async route => {
     if (route.request().headers().rsc === '1' && new URL(route.request().url()).pathname === folder) {
-      const actual = await route.fetch();
+      const actual = await fetchInterceptedRequest(route);
       expect(actual.status()).toBe(200);
       received.release();
       await released.promise;

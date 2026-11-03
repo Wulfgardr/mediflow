@@ -6,6 +6,7 @@ import {
   ensureAiRolloutReadinessArtifactDirectory,
   type RolloutReadinessArtifactLane,
 } from '../lib/ai-rollout-readiness-storage.ts';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 function requireRolloutDataDir() {
   const dataDir = process.env.MEDIFLOW_DATA_DIR;
@@ -105,7 +106,7 @@ for (const route of ['modelli', 'funzioni'] as const) {
     let readStarted!: () => void;
     const pendingRead = new Promise<void>((resolve) => { readStarted = resolve; });
     await page.route('**/api/settings/aiInsightManualConfig', async (request) => {
-      const response = await request.fetch();
+      const response = await fetchInterceptedRequest(request);
       readStarted();
       await readGate;
       await request.fulfill({ response });

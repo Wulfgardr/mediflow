@@ -6,6 +6,7 @@ import type { AttachmentExtractionProjectionGrant } from '../lib/domain/document
 import { openDocumentActions, bootstrapUnlockedSession, openPatientSection } from './utils';
 import { observeAnyDocProjectResponse } from './anydoc-project-response';
 import { createAnyDocConsumerDiagnostic } from './anydoc-consumer-diagnostic';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 const TEXT = 'DOCUMENTO SINTETICO PER RECUPERO';
 const RTF = Buffer.from(`{\\rtf1\\ansi ${TEXT}}`);
@@ -53,7 +54,7 @@ for (const failure of ['engine_absent', 'timeout', 'crash', 'transport_interrupt
     // response is simulated; a parser failure must not require a successful parse.
     await page.route(file.endpoint, async (route) => {
       if (route.request().headers()['x-mediflow-extraction-action'] === 'acquire') {
-        const response = await route.fetch();
+        const response = await fetchInterceptedRequest(route);
         expect(response.status()).toBe(200);
         grant = await response.json() as AttachmentExtractionProjectionGrant;
         return route.fulfill({ response });
@@ -136,7 +137,7 @@ test('OCR recovery UI: interrupt waiting, ignore late result and recover with a 
     calls += 1;
     const attempt = calls;
     if (attempt > 2) return route.continue();
-    const response = await route.fetch();
+    const response = await fetchInterceptedRequest(route);
     expect(response.status()).toBe(200);
     if (attempt === 1) { ready.resolve(); await release.promise; }
     else { retryReady.resolve(); await releaseRetry.promise; }
@@ -191,7 +192,7 @@ test('OCR recovery UI: deleting a pending attachment releases the other extracti
   const ready = Promise.withResolvers<void>(); const release = Promise.withResolvers<void>();
   await page.route(file.endpoint, async (route) => {
     if (route.request().headers()['x-mediflow-extraction-action'] !== 'project') return route.continue();
-    const response = await route.fetch();
+    const response = await fetchInterceptedRequest(route);
     ready.resolve(); await release.promise;
     await route.fulfill({ response }).catch(() => undefined);
   });
