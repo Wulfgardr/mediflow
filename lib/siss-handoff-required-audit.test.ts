@@ -41,7 +41,7 @@ function setTerritory(preset: 'core' | 'core+it+lom') {
     commitTerritorialPackTransition(openDbServer(), { schemaVersion: 'mediflow.territorial-packs.v1',
         expectedRevision: readTerritorialPacks(openDbServer()).revision, preset, confirmed: true }, territorialManager, () => undefined);
 }
-// Il diario dei passaggi SISS appartiene al pacchetto Lombardia (ADR 0158, 0176).
+// Il diario dei passaggi SISS appartiene al pacchetto Lombardia (ADR 0158, 0177).
 setTerritory('core+it+lom');
 const { patients, sissHandoffEvents } = load('./schema.ts') as typeof import('./schema.ts');
 const createRoute = load('../app/api/siss-handoffs/route.ts') as typeof import('../app/api/siss-handoffs/route.ts');

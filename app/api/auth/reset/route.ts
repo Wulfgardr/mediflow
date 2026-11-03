@@ -1,8 +1,9 @@
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
-import { dbServer } from '@/lib/db-server';
-import { users } from '@/lib/schema';
+import { openDbServer } from '@/lib/db-server';
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
+import { isWebAdminSession } from '@/lib/security/server-auth-policy';
+import { AccountResetError, listAccountResetReceipts, resetAccountsDurably, type AccountResetReceipt } from '@/lib/security/account-reset-journal';
 import {
     abortNativeSystemAdminReset,
     commitNativeSystemAdminReset,
@@ -16,8 +17,10 @@ import {
 } from '@/lib/security/web-auth-lifecycle-owner-adapter';
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 
-function resetFailure(status: 409 | 500, code: string, message: string) {
-    const response = NextResponse.json({ success: false, error: message, code }, { status });
+export const dynamic = 'force-dynamic';
+
+function resetFailure(status: 409 | 500, code: string, message: string, receipt: AccountResetReceipt | null = null) {
+    const response = NextResponse.json({ success: false, error: message, code, receipt }, { status });
     response.headers.set('Cache-Control', 'no-store');
     return response;
 }
@@ -55,13 +58,23 @@ export async function POST(request: Request) {
         return resetFailure(409, 'RESET_AUTHORITY_PREPARE_FAILED', 'Impossibile preparare il reset delle sessioni.');
     }
 
+    let receipt: AccountResetReceipt | null;
     try {
         // The two authority capabilities are already fenced before this destructive DB mutation.
-        await dbServer.delete(users);
+        // Journal, preserved copy and receipt make the outcome decidable after a crash.
+        receipt = resetAccountsDurably(openDbServer());
     } catch (error) {
-        abortPreparedReset(webCapability, nativeCapability);
-        console.error('Reset error:', error);
-        return resetFailure(500, 'RESET_DATABASE_FAILED', 'Reset non completato.');
+        const failure = error instanceof AccountResetError ? error : null;
+        if (failure?.code === 'RESET_RECEIPT_UNRECORDED') {
+            // The accounts are gone: the sessions must be retired; the next start records the outcome.
+            receipt = failure.receipt;
+        } else {
+            abortPreparedReset(webCapability, nativeCapability);
+            console.error('Reset error:', failure?.code ?? error);
+            return failure?.code === 'RESET_ARCHIVE_CHANGED'
+                ? resetFailure(409, failure.code, 'Archivio modificato durante il reset. Nessun account eliminato.', failure.receipt)
+                : resetFailure(500, 'RESET_DATABASE_FAILED', 'Reset non completato. Archivio precedente intatto.', failure?.receipt ?? null);
+        }
     }
 
     let webOutcome: 'completed' | 'failed' | 'denied' = 'failed';
@@ -71,12 +84,23 @@ export async function POST(request: Request) {
 
     const completed = webOutcome === 'completed' && nativeOutcome === 'completed';
     const response = completed
-        ? NextResponse.json({ success: true })
-        : resetFailure(500, 'RESET_AUTHORITY_COMMIT_FAILED', 'Reset eseguito, ma la chiusura delle sessioni non è stata confermata.');
+        ? NextResponse.json({ success: true, receipt })
+        : resetFailure(500, 'RESET_AUTHORITY_COMMIT_FAILED', 'Reset eseguito, ma la chiusura delle sessioni non è stata confermata.', receipt);
     response.headers.set('Cache-Control', 'no-store');
     response.cookies.set(SESSION_COOKIE_NAME, '', {
         ...sessionCookieOptionsForRequest(request),
         maxAge: 0,
     });
     return response;
+}
+
+/** Receipts of earlier resets, including those decided at a later start after an interruption. */
+export async function GET() {
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+    if (!isWebAdminSession(session)) return forbiddenResponse();
+    let receipts: AccountResetReceipt[];
+    try { receipts = listAccountResetReceipts(openDbServer()); }
+    catch { return resetFailure(500, 'RESET_JOURNAL_UNAVAILABLE', 'Ricevute del reset non leggibili.'); }
+    return NextResponse.json({ receipts }, { headers: { 'Cache-Control': 'no-store' } });
 }

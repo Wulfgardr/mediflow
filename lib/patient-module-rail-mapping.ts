@@ -131,7 +131,7 @@ export function buildPatientModuleRailGroups(
     return Object.freeze(groups) as Kree8WorkspaceNavGroups;
 }
 
-/* ADR 0158 e 0176: SISS e FSE appartiene al pacchetto Lombardia. La validazione resta sull'elenco
+/* ADR 0158 e 0177: SISS e FSE appartiene al pacchetto Lombardia. La validazione resta sull'elenco
    completo; il filtro toglie soltanto le voci dei pacchetti spenti, senza riordinare le altre. */
 const LOMBARDY_RAIL_HREFS = new Set(['#siss']);
 

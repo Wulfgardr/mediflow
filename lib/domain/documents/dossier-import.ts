@@ -299,7 +299,8 @@ export interface DossierEvidence { unit: number; start: number; end: number; exc
 export interface DossierFact {
     factId: string;
     kind: DossierFactKind;
-    origin: 'parser:lab' | 'parser:exemption' | 'parser:icd' | 'parser:section' | 'parser:scale' | 'parser:document' | 'manual';
+    /** `prepared`: dall'estrazione preparata fuori da MediFlow (ADR 0176), con citazione verificata sul testo conservato. */
+    origin: 'parser:lab' | 'parser:exemption' | 'parser:icd' | 'parser:section' | 'parser:scale' | 'parser:document' | 'prepared' | 'manual';
     evidence: DossierEvidence | null;
     /** Il testo nega l'informazione: non si applica senza correzione esplicita. */
     negated: boolean;

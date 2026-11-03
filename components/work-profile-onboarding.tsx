@@ -209,7 +209,7 @@ export function WorkProfileOnboarding({ controller }: { controller: WorkProfileC
                 <h1 id="work-profile-title" className="type-page-title">Il tuo modo di lavorare<span aria-hidden="true">.</span></h1>
                 <p>Scegli da dove iniziare. Puoi usare la cartella senza AI.</p>
                 <nav className={styles.links} aria-label="Percorsi sempre disponibili">
-                    <Link className={styles.textAction} href="/?area=turno">Apri la cartella manualmente</Link>
+                    <Link className={styles.textAction} href="/?area=incarico">Apri la cartella manualmente</Link>
                 </nav>
             </header>
             {error && <div role="alert" className={styles.alert}>
@@ -236,7 +236,7 @@ export function WorkProfileSettings({ showHeading = true }: { showHeading?: bool
         {busy && <p role="status">Lettura o salvataggio del profilo…</p>}
         {state && <ProfileEditor key={`${state.revision}:${controller.snapshotVersion}`} controller={controller} />}
         <nav className={styles.links} aria-label="Percorsi sempre disponibili">
-            <Link className={styles.textAction} href="/?area=turno">Apri la cartella manualmente</Link>
+            <Link className={styles.textAction} href="/?area=incarico">Apri la cartella manualmente</Link>
             <Link className={styles.textAction} href="/settings/ai/fabric">Configurazione AI facoltativa</Link>
             <Link className={styles.textAction} href="/settings/diagnostica">Diagnostica della postazione</Link>
         </nav>

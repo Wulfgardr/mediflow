@@ -176,7 +176,6 @@ function DocumentSynthesisFabricReviewCardSession({
                         <p><PrivacyBlur>Documento: {attachmentName}</PrivacyBlur></p>
                     </div>
                     <ChoiceField label="Ambulatorio per questa proposta" value={ambulatory?.ambulatoryId ?? ''} onChange={(event) => {
-                            picker.client.reset(picker.active);
                             setAmbulatory(proposal.ambulatories.find((choice) => choice.ambulatoryId === event.target.value) ?? null);
                             setConfirmed(false);
                         }}>

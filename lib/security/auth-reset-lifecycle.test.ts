@@ -7,7 +7,7 @@ const source = readFileSync(new URL('../../app/api/auth/reset/route.ts', import.
 test('admin reset fences Web and native/system owners before DB and commits both after DB', () => {
     const prepareWeb = source.indexOf('webCapability = prepareAdminReset(session)');
     const prepareNative = source.indexOf('nativeCapability = prepareNativeSystemAdminReset()');
-    const databaseMutation = source.indexOf('await dbServer.delete(users)');
+    const databaseMutation = source.indexOf('resetAccountsDurably(openDbServer())');
     const commitWeb = source.indexOf('commitAdminReset(webCapability)');
     const commitNative = source.indexOf('commitNativeSystemAdminReset(nativeCapability)');
     const cookieDeletion = source.indexOf("response.cookies.set(SESSION_COOKIE_NAME, '', {");
@@ -21,7 +21,8 @@ test('admin reset fences Web and native/system owners before DB and commits both
 });
 
 test('admin reset aborts both capabilities on DB failure and does not use mixed legacy APIs', () => {
-    assert.match(source, /catch \(error\) \{\s*abortPreparedReset\(webCapability, nativeCapability\);/u);
+    // Only a committed reset whose receipt file failed keeps the capabilities, to retire the sessions.
+    assert.match(source, /catch \(error\) \{[\s\S]*?'RESET_RECEIPT_UNRECORDED'[\s\S]*?\} else \{\s*abortPreparedReset\(webCapability, nativeCapability\);/u);
     assert.match(source, /function abortPreparedReset[\s\S]*abortAdminReset\(webCapability\)[\s\S]*abortNativeSystemAdminReset\(nativeCapability\)/u);
     assert.doesNotMatch(source, /\bclearAllSessions\b|\binvalidateSessionsForUser\b/u);
     assert.doesNotMatch(source, /cookieStore\.delete|cookies\(\)/u);
