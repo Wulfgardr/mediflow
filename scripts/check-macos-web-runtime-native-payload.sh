@@ -109,7 +109,7 @@ validate_resource_symlinks() {
     [[ "$(readlink "$link")" != /* ]] || fail "absolute symlink below Contents/Resources: $link"
     resolved="$(real_path "$link")"
     [[ "$resolved" == "$canonical_resources/"* ]] || fail "symlink escapes Contents/Resources: $link -> $resolved"
-    file -L "$link" | grep -q 'Mach-O' && fail "native symlink remains below Contents/Resources: $link"
+    file -L "$link" | grep -Eq 'Mach-O|PE32' && fail "native symlink remains below Contents/Resources: $link"
   done < <(find "$resources_root" -type l -print0)
   return 0
 }
@@ -120,6 +120,43 @@ validate_contained_file() {
   resolved="$(real_path "$candidate")"
   canonical_root="$(real_path "$root")"
   [[ "$resolved" == "$canonical_root/"* ]] || fail "$label escapes its owned root: $candidate -> $resolved"
+}
+
+# The Windows bootstrap ships two PE prebuilds (win32-x64, win32-arm64) that
+# check-standalone-runtime-bundle.mjs requires and that the loader refuses outside win32.
+# They are not Mach-O: they stay in place, byte for byte, and are never moved or signed.
+# Each present copy must pass the checkout's own verifier and match the checkout's pinned
+# manifest; the pair is all or nothing. Every other .node/.dylib stays a Mach-O to relocate.
+windows_bootstrap_prebuilds=()
+verify_windows_bootstrap_prebuilds() {
+  local bootstrap="$web_runtime/scripts/windows-launcher-bootstrap" trusted arch present=0 verified expected
+  windows_bootstrap_prebuilds=()
+  for arch in x64 arm64; do
+    if [[ -e "$bootstrap/prebuilds/win32-$arch/system-directory.node" || -L "$bootstrap/prebuilds/win32-$arch/system-directory.node" ]]; then
+      present=$((present + 1))
+    fi
+  done
+  [[ "$present" == "0" ]] && return 0
+  [[ "$present" == "2" ]] || fail "Windows bootstrap prebuilds must ship as the complete x64 and arm64 pair"
+  trusted="$(cd "$(dirname "$script_path")" && pwd -P)/windows-launcher-bootstrap"
+  for arch in x64 arm64; do
+    validate_contained_file "$bootstrap/prebuilds/win32-$arch/system-directory.node" "$web_runtime" "Windows bootstrap prebuild"
+    validate_contained_file "$bootstrap/prebuilds/win32-$arch/manifest.json" "$web_runtime" "Windows bootstrap manifest"
+    cmp -s "$trusted/prebuilds/win32-$arch/manifest.json" "$bootstrap/prebuilds/win32-$arch/manifest.json" || \
+      fail "Windows bootstrap $arch manifest differs from the checkout pin"
+  done
+  verified="$(node --input-type=module -e '
+    const { pathToFileURL } = await import("node:url");
+    const { verifySystemDirectoryArtifact } = await import(pathToFileURL(process.argv[1]).href);
+    process.stdout.write(["x64", "arm64"].map(arch => verifySystemDirectoryArtifact(process.argv[2], arch)).join("\n"));
+  ' "$trusted/index.mjs" "$bootstrap" 2>/dev/null)" || fail "Windows bootstrap prebuilds failed the checkout verifier"
+  expected="$bootstrap/prebuilds/win32-x64/system-directory.node"$'\n'"$bootstrap/prebuilds/win32-arm64/system-directory.node"
+  [[ "$verified" == "$expected" ]] || fail "Windows bootstrap verifier returned unexpected prebuild paths"
+  windows_bootstrap_prebuilds=( "$bootstrap/prebuilds/win32-x64/system-directory.node" "$bootstrap/prebuilds/win32-arm64/system-directory.node" )
+}
+
+is_windows_bootstrap_prebuild() {
+  [[ "${#windows_bootstrap_prebuilds[@]}" != "0" ]] && is_listed_path "$1" "${windows_bootstrap_prebuilds[@]}"
 }
 
 literal_count() {
@@ -212,6 +249,7 @@ package_web_runtime_machos() {
   # reject escaping or native symlinks before moving or rewriting any
   # file through the copied dependency tree.
   validate_resource_symlinks "$resources"
+  verify_windows_bootstrap_prebuilds
 
   for required_path in \
     "$web_runtime/scripts/anydoc-pdf-page-worker.mjs" "$web_runtime/node_modules/pdf-lib/package.json" \
@@ -232,8 +270,11 @@ package_web_runtime_machos() {
   )
   # a second normalization of a complete relocated tree is read-only.
   # A partial tree still fails the full validation below; do not delete its targets.
-  if [[ "$normalize" == "1" && -z "$(find "$web_runtime" -type f \( -name '*.node' -o -name '*.dylib' \) -print -quit)" ]]; then
+  if [[ "$normalize" == "1" ]]; then
     normalize=0
+    while IFS= read -r -d '' native; do
+      is_windows_bootstrap_prebuild "$native" || normalize=1
+    done < <(find "$web_runtime" \( -type f -o -type l \) \( -name '*.node' -o -name '*.dylib' \) -print0)
   fi
   loaders=(
     "$web_runtime/node_modules/@firecrawl/anydoc/index.js"
@@ -279,9 +320,10 @@ package_web_runtime_machos() {
       validate_contained_file "$loader" "$web_runtime" "package loader"
     done
     while IFS= read -r -d '' native; do
+      is_windows_bootstrap_prebuild "$native" && continue
       is_listed_path "$native" "${sources[@]}" || fail "unexpected native artifact in WebRuntime: $native"
       physical_count=$((physical_count + 1))
-    done < <(find "$web_runtime" -type f \( -name '*.node' -o -name '*.dylib' \) -print0)
+    done < <(find "$web_runtime" \( -type f -o -type l \) \( -name '*.node' -o -name '*.dylib' \) -print0)
     [[ "$physical_count" == "6" ]] || fail "expected exactly six physical WebRuntime Mach-O artifacts, found $physical_count"
     # preflight every package loader before moving any native payload.
     for index in 0 1 2 3 4 5; do
@@ -349,18 +391,24 @@ package_web_runtime_machos() {
   native="$(first_physical_macho "$resources")"
   [[ -z "$native" ]] || fail "physical Mach-O remains below Contents/Resources: $native"
   validate_resource_symlinks "$resources"
+  # re-verify after any relocation: only the untouched, verified PE pair may remain.
+  verify_windows_bootstrap_prebuilds
+  while IFS= read -r -d '' native; do
+    is_windows_bootstrap_prebuild "$native" || fail "native artifact remains below Contents/Resources: $native"
+  done < <(find "$resources" \( -type f -o -type l \) \( -name '*.node' -o -name '*.dylib' \) -print0)
   while IFS= read -r -d '' native; do
     is_listed_path "$native" "${targets[@]}" || fail "unexpected MediFlow Web native target: $native"
     framework_count=$((framework_count + 1))
   done < <(find "$frameworks" -maxdepth 1 \( -type f -o -type l \) -name 'mediflow-web-*' -print0)
   [[ "$framework_count" == "6" ]] || fail "expected exactly six MediFlow Web targets in Contents/Frameworks, found $framework_count"
-  echo "macOS WebRuntime native payload guard passed: six physical Frameworks targets and no native payload below Resources"
+  echo "macOS WebRuntime native payload guard passed: six physical Frameworks targets, ${#windows_bootstrap_prebuilds[@]} verified Windows PE prebuilds and no Mach-O below Resources"
 }
 
 run_self_test() {
   local temp_dir fake_bin fixture valid_web worker_path binding_path event_log state_file events
   local layout_bin layout_state layout_log layout_web layout_frameworks bad_app bad_web bad_frameworks path
   local bad_pattern_app bad_pattern_web extensionless_app extensionless_web real_node legacy_app legacy_web idempotent_events alias_root partial_app
+  local scripts_dir pe_case pe_app pe_web pe_dir arch
   temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/mediflow-macho-guard.XXXXXX")"
   temp_dir="$(real_path "$temp_dir")"
   real_node="$(command -v node)"
@@ -556,6 +604,16 @@ run_self_test() {
     "$layout_web/node_modules/fsevents/fsevents.js"
   : > "$layout_web/node_modules/sharp/node_modules/semver/bin/semver.js"
   ln -s ../semver/bin/semver.js "$layout_web/node_modules/sharp/node_modules/.bin/semver"
+  # The real, verified Windows PE pair ships next to the six Mach-O dependencies.
+  scripts_dir="$(cd "$(dirname "$script_path")" && pwd -P)"
+  mkdir -p "$layout_web/scripts/windows-launcher-bootstrap/prebuilds"
+  for path in index.mjs build.ps1 system-directory.c; do
+    cp "$scripts_dir/windows-launcher-bootstrap/$path" "$layout_web/scripts/windows-launcher-bootstrap/$path"
+  done
+  for arch in x64 arm64; do
+    cp -R "$scripts_dir/windows-launcher-bootstrap/prebuilds/win32-$arch" "$layout_web/scripts/windows-launcher-bootstrap/prebuilds/"
+  done
+  cp "$scripts_dir/prepare-windows-launcher-bootstrap.mjs" "$layout_web/scripts/prepare-windows-launcher-bootstrap.mjs"
   printf '%s\n' \
     '#!/bin/bash' \
     'artifact="${!#}"; base="$(basename "$artifact")"; state="${MEDIFLOW_LAYOUT_STATE_DIR:?}"' \
@@ -603,6 +661,37 @@ run_self_test() {
     "exec \"$real_node\" \"\$@\"" > "$layout_bin/node"
   chmod 755 "$layout_bin/otool" "$layout_bin/install_name_tool" "$layout_bin/codesign" "$layout_bin/file" "$layout_bin/node"
   : > "$layout_log"
+  # Every Windows PE deviation is refused before any Mach-O is moved, stripped or signed.
+  for pe_case in binary manifest coherent-tamper arch extra-node extra-pe-alias extra-dylib symlink half-pair; do
+    pe_app="$temp_dir/pe-$pe_case/MediFlow.app"
+    mkdir -p "$(dirname "$pe_app")"
+    cp -R "$temp_dir/layout/MediFlow.app" "$pe_app"
+    pe_web="$pe_app/Contents/Resources/WebRuntime"
+    pe_dir="$pe_web/scripts/windows-launcher-bootstrap/prebuilds"
+    case "$pe_case" in
+      binary) printf '\x01' | dd of="$pe_dir/win32-arm64/system-directory.node" bs=1 seek=4096 conv=notrunc 2>/dev/null ;;
+      manifest) perl -pi -e 's/"napiVersion": 1/"napiVersion": 2/' "$pe_dir/win32-x64/manifest.json" ;;
+      coherent-tamper)
+        printf '\x01' | dd of="$pe_dir/win32-arm64/system-directory.node" bs=1 seek=4096 conv=notrunc 2>/dev/null
+        perl -pi -e "s/\"sha256\": \"[0-9a-f]*\"/\"sha256\": \"$(shasum -a 256 "$pe_dir/win32-arm64/system-directory.node" | cut -d ' ' -f 1)\"/" \
+          "$pe_dir/win32-arm64/manifest.json" ;;
+      arch) cp "$pe_dir/win32-x64/system-directory.node" "$pe_dir/win32-arm64/system-directory.node" ;;
+      extra-node) cp "$pe_dir/win32-x64/system-directory.node" "$pe_web/node_modules/extra.node" ;;
+      extra-pe-alias) ln -s ../scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node "$pe_web/node_modules/pe-alias" ;;
+      extra-dylib) printf 'MZ' > "$pe_web/node_modules/extra.dylib" ;;
+      symlink)
+        rm "$pe_dir/win32-arm64/system-directory.node"
+        ln -s ../win32-x64/system-directory.node "$pe_dir/win32-arm64/system-directory.node" ;;
+      half-pair) rm -r "$pe_dir/win32-arm64" ;;
+    esac
+    if MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
+        PATH="$layout_bin:$PATH" "$script_path" --normalize --web-runtime "$pe_web" \
+        --frameworks "$pe_app/Contents/Frameworks" >/dev/null 2>&1; then
+      fail "self-test accepted a Windows bootstrap $pe_case deviation"
+    fi
+    rm -rf "$(dirname "$pe_app")"
+  done
+  [[ ! -s "$layout_log" ]] || fail "self-test changed native dependencies before rejecting a Windows PE deviation"
   bad_pattern_app="$temp_dir/bad-pattern/MediFlow.app"
   mkdir -p "$(dirname "$bad_pattern_app")"
   cp -R "$temp_dir/layout/MediFlow.app" "$bad_pattern_app"
@@ -671,8 +760,36 @@ run_self_test() {
     fail "self-test did not normalize Sharp to its Frameworks libvips target"
   [[ -L "$layout_web/node_modules/sharp/node_modules/.bin/semver" ]] || \
     fail "self-test removed the safe non-native semver symlink"
-  [[ -z "$(find "$(dirname "$layout_web")" -type f \( -name '*.node' -o -name '*.dylib' \) -print -quit)" ]] || \
-    fail "self-test left a native payload below Contents/Resources"
+  [[ "$(find "$(dirname "$layout_web")" \( -type f -o -type l \) \( -name '*.node' -o -name '*.dylib' \) | wc -l | tr -d ' ')" == "2" ]] || \
+    fail "self-test left a native payload other than the Windows PE pair below Contents/Resources"
+  for arch in x64 arm64; do
+    cmp -s "$scripts_dir/windows-launcher-bootstrap/prebuilds/win32-$arch/system-directory.node" \
+      "$layout_web/scripts/windows-launcher-bootstrap/prebuilds/win32-$arch/system-directory.node" || \
+      fail "self-test changed the $arch Windows PE prebuild during normalization"
+  done
+  # The same tamper is refused by the read-only check on an already normalized tree.
+  pe_app="$temp_dir/pe-after/MediFlow.app"
+  mkdir -p "$(dirname "$pe_app")"
+  cp -R "$temp_dir/layout/MediFlow.app" "$pe_app"
+  printf '\x01' | dd of="$pe_app/Contents/Resources/WebRuntime/scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node" \
+    bs=1 seek=4096 conv=notrunc 2>/dev/null
+  if MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
+      PATH="$layout_bin:$PATH" "$script_path" --web-runtime "$pe_app/Contents/Resources/WebRuntime" \
+      --frameworks "$pe_app/Contents/Frameworks" >/dev/null 2>&1; then
+    fail "self-test accepted a tampered Windows PE prebuild after normalization"
+  fi
+  cp "$scripts_dir/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node" \
+    "$pe_app/Contents/Resources/WebRuntime/scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node"
+  MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
+    PATH="$layout_bin:$PATH" "$script_path" --web-runtime "$pe_app/Contents/Resources/WebRuntime" \
+    --frameworks "$pe_app/Contents/Frameworks" >/dev/null
+  cp "$pe_app/Contents/Resources/WebRuntime/scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node" \
+    "$pe_app/Contents/Resources/extra.node"
+  if MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
+      PATH="$layout_bin:$PATH" "$script_path" --web-runtime "$pe_app/Contents/Resources/WebRuntime" \
+      --frameworks "$pe_app/Contents/Frameworks" >/dev/null 2>&1; then
+    fail "self-test accepted a non-Mach-O .node outside the WebRuntime after normalization"
+  fi
 
   bad_app="$temp_dir/bad-link/MediFlow.app"
   mkdir -p "$(dirname "$bad_app")"
