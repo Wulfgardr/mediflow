@@ -33,7 +33,7 @@
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
     "components/therapy-manager.tsx": "35ff8ae61fc0e21cf52a3c641b460c634601b879497dc2a0f53c81d23a727308",
-    "lib/db.ts": "0391853c24dd67cdf73402cac073e020728976215ab6c54a05615e367940701e",
+    "lib/db.ts": "95dcc4a1c8aeeaf196d01c36d7439a226c5cbbbef5c5e0a94d7165d23a5f3ba7",
     "lib/security/client-auth-api.ts": "754aebaedb77bc9629a32d90f754ecc3ee7e89ead880c6add9088dd6449ee5ce",
     "lib/therapy-write-operation.ts": "b89b775f2f3693bee64f00f1bec62e7d895f77955d32f7905d1c49f365739d72",
     "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",

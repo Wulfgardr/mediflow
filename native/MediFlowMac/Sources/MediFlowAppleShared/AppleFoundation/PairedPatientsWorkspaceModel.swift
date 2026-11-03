@@ -554,7 +554,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         selectedPatient: HomeBasePatientDetail? = nil,
         entries: [HomeBaseEntrySummary] = [],
         therapies: [HomeBaseTherapySummary] = [],
-        attachments: [HomeBaseAttachmentSummary] = []
+        attachments: [HomeBaseAttachmentSummary] = [],
+        attachmentListLoaded: Bool = false
     ) {
         self.pairedClientId = credentials.clientId
         self.pairedClientToken = credentials.clientToken
@@ -566,8 +567,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         self.entries = entries
         self.therapies = therapies
         self.attachments = attachments
-        self.attachmentsPatientId = attachments.isEmpty ? nil : selectedPatient?.id
-        self.attachmentsLoadState = attachments.isEmpty ? .idle : .loaded
+        let listRead = attachmentListLoaded || !attachments.isEmpty
+        self.attachmentsPatientId = listRead ? selectedPatient?.id : nil
+        self.attachmentsLoadState = listRead ? .loaded : .idle
         self.connectionState = .pairedOnline
     }
 
@@ -3914,11 +3916,22 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             errorMessage = precheck.message
             return .unconfirmed
         }
+        // The precondition is the list on screen for this patient, captured before sealing, never reread here.
+        guard attachmentsPatientId == patientId, attachmentsLoadState == .loaded else {
+            errorMessage = "Elenco documenti non ancora letto: aggiornalo prima di caricare un documento."
+            return .unconfirmed
+        }
+        let expectedCollection: [HomeBaseAttachmentCollectionEntry]?
+        do { expectedCollection = try HomeBaseAttachmentCollectionPrecondition.expected(from: attachments) } catch {
+            errorMessage = "Elenco documenti non verificabile: aggiornalo prima di caricare un documento."
+            return .unconfirmed
+        }
         let identity = clinicalWorkspaceConnection?.identity
         let capturedAmbulatoryId = ambulatoryId.trimmedOrNil
         var isCurrent: () -> Bool = { false }
         var acknowledged = false
         var refreshed = false
+        var collectionChanged = false
         await runTask({
             let generation = self.workspaceGeneration
             isCurrent = {
@@ -3934,7 +3947,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 type: mimeType,
                 size: rawData.count,
                 masterKey: masterKey
-            )
+            ).expecting(expectedCollection)
             let bodyPrecheck = try HomeBaseAttachmentWirePrecheck.check(
                 payload: payload,
                 rawByteCount: rawData.count
@@ -3947,13 +3960,27 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 self.errorMessage = "Il paziente selezionato e cambiato: scegli di nuovo il documento."
                 return
             }
-            let created = try await self.makeClient().createAttachment(
-                patientId: patientId,
-                payload: payload,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: capturedAmbulatoryId
-            )
+            let created: HomeBaseCreatedResource
+            do {
+                created = try await self.makeClient().createAttachment(
+                    patientId: patientId,
+                    payload: payload,
+                    credentials: credentials,
+                    sessionCookie: sessionCookie,
+                    ambulatoryId: capturedAmbulatoryId
+                )
+            } catch HomeBaseClientError.attachmentCollectionChanged {
+                collectionChanged = true
+                // A definite refusal: nothing was written. Reread so the next attempt reviews the current list.
+                if isCurrent(), let fetched = try? await self.fetchDecryptedAttachments(
+                    patientId: patientId, credentials: credentials,
+                    sessionCookie: sessionCookie, ambulatoryId: capturedAmbulatoryId), isCurrent() {
+                    self.attachments = fetched
+                    self.attachmentsPatientId = patientId
+                    self.attachmentsLoadState = .loaded
+                }
+                throw HomeBaseClientError.attachmentCollectionChanged
+            }
             guard !created.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw HomeBaseClientError.contract
             }
@@ -3973,6 +4000,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             refreshed = true
             self.statusMessage = "Documento caricato: in coda per elaborazione sull'home-base."
         }, canApplyFailure: { isCurrent() })
+        if collectionChanged { return .listChanged }
         return acknowledged ? (refreshed ? .uploaded : .uploadedNeedsRefresh) : .unconfirmed
     }
 

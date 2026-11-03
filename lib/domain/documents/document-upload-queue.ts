@@ -1,15 +1,21 @@
 /* UI-only sequencing. Persistence is the existing attachment writer. */
-export type DocumentUploadResult = Readonly<{
+type UploadSource = Readonly<{ name: string }>;
+
+export type DocumentUploadResult<T extends UploadSource = UploadSource> = Readonly<{
     saved: number;
     unconfirmed: readonly string[];
     notStarted: number;
     interrupted: boolean;
+    /** Present only when the host definitely refused a write that the user can repeat after reviewing:
+     * the refused file and every file not yet started, none of them written. */
+    held?: readonly T[];
 }>;
 
-type UploadSource = Readonly<{ name: string }>;
 type Dependencies<T extends UploadSource> = Readonly<{
     read(file: T, signal: AbortSignal): Promise<string>;
     persist(file: T, data: string): Promise<unknown>;
+    /** True for a definite refusal with no effect that invalidates the rest of the batch. */
+    holds?(error: unknown): boolean;
 }>;
 
 /** Cancel stops reads and the remaining queue, NOT an already submitted write.
@@ -19,7 +25,7 @@ export function createDocumentUploadQueue<T extends UploadSource>(dependencies: 
     let active: AbortController | null = null;
     return Object.freeze({
         cancel() { active?.abort(); },
-        start(files: readonly T[]): Promise<DocumentUploadResult> | null {
+        start(files: readonly T[]): Promise<DocumentUploadResult<T>> | null {
             if (active || files.length === 0) return null;
             const controller = new AbortController();
             active = controller;
@@ -28,8 +34,9 @@ export function createDocumentUploadQueue<T extends UploadSource>(dependencies: 
                 let saved = 0;
                 let started = 0;
                 const unconfirmed: string[] = [];
+                let held: readonly T[] | undefined;
                 try {
-                    for (const file of batch) {
+                    for (const [index, file] of batch.entries()) {
                         if (controller.signal.aborted) break;
                         let data: string;
                         try {
@@ -46,12 +53,17 @@ export function createDocumentUploadQueue<T extends UploadSource>(dependencies: 
                         try {
                             await dependencies.persist(file, data);
                             saved += 1;
-                        } catch {
+                        } catch (error) {
+                            if (dependencies.holds?.(error)) {
+                                started -= 1;
+                                held = Object.freeze(batch.slice(index));
+                                break;
+                            }
                             unconfirmed.push(file.name);
                         }
                     }
                     return Object.freeze({ saved, unconfirmed: Object.freeze(unconfirmed),
-                        notStarted: batch.length - started, interrupted: controller.signal.aborted });
+                        notStarted: batch.length - started, interrupted: controller.signal.aborted, ...(held ? { held } : {}) });
                 } finally {
                     if (active === controller) active = null;
                 }
