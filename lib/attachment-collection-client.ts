@@ -74,3 +74,27 @@ export class AttachmentCollectionView {
         this.#rows = null;
     }
 }
+
+/**
+ * Uploads each file once across attempts: a file already confirmed by the
+ * server keeps its id, so retrying after a refused file neither stores a
+ * duplicate document nor loses its link to the entry. Files removed from the
+ * form are forgotten; their documents stay in the patient's folder.
+ */
+export async function uploadFilesOnce<F extends object>(
+    files: readonly F[],
+    confirmed: Map<F, string>,
+    upload: (file: F) => Promise<string>,
+): Promise<string[]> {
+    for (const file of [...confirmed.keys()]) if (!files.includes(file)) confirmed.delete(file);
+    const ids: string[] = [];
+    for (const file of files) {
+        let id = confirmed.get(file);
+        if (id === undefined) {
+            id = await upload(file);
+            confirmed.set(file, id);
+        }
+        ids.push(id);
+    }
+    return ids;
+}

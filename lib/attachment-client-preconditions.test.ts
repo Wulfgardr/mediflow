@@ -124,3 +124,19 @@ test('delete sends the reviewed collection; a changed list is a typed refusal, a
     await assert.rejects(db.attachments.delete(shown.id, { attachmentPrecondition, attachmentCollection: view }), AttachmentCollectionChangedError);
     assert.equal(bodies.length, 2, 'a view retired by an unconfirmed write is never dispatched again');
 });
+
+test('a retry after a refused file reuses the files already saved instead of uploading duplicates', async () => {
+    const { uploadFilesOnce, AttachmentCollectionChangedError } = await import('./attachment-collection-client.ts');
+    const first = { name: 'a' }, second = { name: 'b' }, confirmed = new Map<{ name: string }, string>();
+    const uploads: string[] = [];
+    let refuse = true;
+    const upload = async (file: { name: string }) => {
+        if (file === second && refuse) { refuse = false; throw new AttachmentCollectionChangedError(); }
+        uploads.push(file.name); return `id-${file.name}-${uploads.length}`;
+    };
+    await assert.rejects(uploadFilesOnce([first, second], confirmed, upload), AttachmentCollectionChangedError);
+    assert.deepEqual(await uploadFilesOnce([first, second], confirmed, upload), ['id-a-1', 'id-b-2']);
+    assert.deepEqual(uploads, ['a', 'b'], 'the first file is stored once');
+    assert.deepEqual(await uploadFilesOnce([second], confirmed, upload), ['id-b-2']);
+    assert.equal(confirmed.has(first), false, 'a file removed from the form is forgotten');
+});
