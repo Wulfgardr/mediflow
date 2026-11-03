@@ -1,5 +1,6 @@
 /* WUL-804: dossier from a folder through the real local Web route, writers, extraction and OCR. Synthetic data only. */
 import { expect, test, type Page } from '@playwright/test';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -237,6 +238,110 @@ test('Dossier: cartella sintetica, aggiornamento di una scheda, nuova scheda da 
 
         const receipt = await panel.getByTestId('dossier-receipt').textContent();
         for (const forbidden of [CF_A, CF_B, CF_C, 'Rossi', 'Bianchi', 'esami.pdf', patientB]) expect(receipt).not.toContain(forbidden);
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
+
+async function countOf(page: Page, resource: 'therapies' | 'entries', patientId: string): Promise<number> {
+    return page.evaluate(async ([kind, id]) => {
+        const rows = await (await fetch(`/api/${kind}?patientId=${encodeURIComponent(id)}`, { cache: 'no-store' })).json() as Array<{ patientId: string; deletedAt?: unknown }>;
+        return rows.filter((row) => row.patientId === id && !row.deletedAt).length;
+    }, [resource, patientId] as const);
+}
+
+test('Dossier: estrazione preparata su una cartella mista di più pazienti, citazioni verificate e accettazione in blocco', async ({ page, baseURL }) => {
+    test.skip(process.env.E2E_DOCUMENTS_SYNTHETIC_ONLY !== '1', 'Requires explicit isolated synthetic data');
+    test.setTimeout(300_000);
+    expect(new URL(baseURL!).hostname).toMatch(/^(localhost|127\.0\.0\.1)$/);
+    const root = mkdtempSync(path.join(tmpdir(), 'mediflow-dossier-prepared-e2e-'));
+    // Codici propri di questo caso: il caso precedente ha già creato schede con CF_A e CF_B.
+    let CF_P = syntheticTaxCode();
+    while ([CF_A, CF_B, CF_C].includes(CF_P)) CF_P = syntheticTaxCode();
+    let CF_Q = syntheticTaxCode();
+    while ([CF_A, CF_B, CF_C, CF_P].includes(CF_Q)) CF_Q = syntheticTaxCode();
+    try {
+        await bootstrapUnlockedSession(page, PIN);
+        const inbox = path.join(root, 'Settimana');
+        mkdirSync(inbox, { recursive: true });
+        const today = new Date();
+        const day = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+        const iso = today.toISOString().slice(0, 10);
+        const letter = (code: string, drug: string) => textPdf(['Lettera di dimissione sintetica', `Codice fiscale paziente: ${code}`, `Data referto: ${day}`,
+            'Diagnosi: Ipertensione arteriosa essenziale', `Terapia: ${drug}`, 'Il paziente riferisce dispnea da sforzo da circa due mesi.']);
+        const a = await letter(CF_P, 'Ramipril 5 mg 1 cp al mattino');
+        const b = await letter(CF_Q, 'Bisoprololo 2,5 mg 1 cp');
+        writeFileSync(path.join(inbox, 'lettera-a.pdf'), a);
+        writeFileSync(path.join(inbox, 'lettera-b.pdf'), b);
+        writeFileSync(path.join(inbox, 'appunto.txt'), 'Appunto sintetico senza estrazione preparata.');
+        const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+        const entry = (bytes: Uint8Array, code: string, drug: string, dosage: string, quote: string) => ({
+            sha256: sha(bytes), fileName: 'lettera.pdf', documentDate: iso, documentType: 'lettera_dimissione',
+            patient: { taxCode: code, lastName: 'Rossi', firstName: 'Mario' },
+            summary: { title: 'Dimissione sintetica', text: 'Ricovero per ipertensione; dispnea da sforzo da circa due mesi.' },
+            coverage: { pages: 1, unreadablePages: [], complete: true },
+            facts: [
+                { kind: 'diagnosis', values: { description: 'Ipertensione arteriosa essenziale' }, quote: 'Diagnosi: Ipertensione arteriosa essenziale' },
+                { kind: 'therapy', values: { drugName: drug, activePrinciple: drug.toLowerCase(), dosage, status: 'active' }, quote },
+                { kind: 'therapy', values: { drugName: 'Metformina', dosage: '500 mg' }, quote: 'Metformina 500 mg due volte al giorno' },
+            ],
+        });
+        const preparedPath = path.join(root, 'estrazione.json');
+        writeFileSync(preparedPath, JSON.stringify({ schema: 'mediflow.dossier_prepared_extraction.v1', preparedAt: today.toISOString(), preparedBy: 'e2e', sources: [
+            entry(a, CF_P, 'Ramipril', '5 mg 1 cp al mattino', 'Terapia: Ramipril 5 mg 1 cp al mattino'),
+            entry(b, CF_Q, 'Bisoprololo', '2,5 mg 1 cp', 'Terapia: Bisoprololo 2,5 mg 1 cp'),
+        ] }));
+        const patientA = await createPatient(page, CF_P);
+        const patientB = await createPatient(page, CF_Q);
+
+        await page.goto('/patients/import/dossier');
+        const panel = page.getByTestId('dossier-import');
+        await panel.getByTestId('dossier-prepared').setInputFiles(preparedPath);
+        await expect(panel.getByTestId('dossier-prepared-status')).toContainText('2 documenti');
+        await panel.getByTestId('dossier-folder').setInputFiles(inbox);
+        // La cartella mista si divide per paziente; il file non coperto dall'estrazione lo dichiara.
+        await expect(panel.getByTestId('dossier-group')).toHaveCount(3, { timeout: 180_000 });
+        const groupA = panel.locator(`[data-testid="dossier-group"][data-group="cf:${CF_P}"]`);
+        const groupB = panel.locator(`[data-testid="dossier-group"][data-group="cf:${CF_Q}"]`);
+        // Il CF suggerisce la scheda, che viene preselezionata: il collegamento resta da confermare.
+        await expect(groupA).toHaveAttribute('data-identity', 'matched');
+        await expect(groupB).toHaveAttribute('data-identity', 'matched');
+        await expect(panel.getByTestId('dossier-source').filter({ hasText: 'appunto.txt' })).toContainText('Assente dall’estrazione preparata');
+        await expect(groupA.getByLabel('Scheda di destinazione')).toHaveValue(patientA);
+        await expect(groupB.getByLabel('Scheda di destinazione')).toHaveValue(patientB);
+
+        for (const [group, patientId] of [[groupB, patientB], [groupA, patientA]] as const) {
+            await group.getByLabel('Ho controllato le fonti e confermo che appartengono alla scheda scelta.').check();
+            await group.getByRole('button', { name: /^Salva 1 originale nella scheda$/u }).click();
+            await expect(group.getByTestId('dossier-acquire-outcome')).toHaveText('Originale salvato e riletto identico', { timeout: 60_000 });
+            expect(await attachmentCount(page, patientId)).toBe(1);
+        }
+
+        // Scheda A: la citazione inventata resta da decidere, il resto si accetta e si applica in un gesto.
+        const document = panel.getByTestId('dossier-document');
+        await expect(document).toHaveCount(1);
+        const invented = document.locator('[data-testid="dossier-fact"][data-kind="therapy"]').filter({ has: page.locator('input[value="Metformina"]') });
+        await expect(invented).toContainText('Citazione non trovata nel testo del documento');
+        const ramipril = document.locator('[data-testid="dossier-fact"][data-kind="therapy"]').filter({ has: page.locator('input[value="Ramipril"]') });
+        await expect(ramipril).toContainText('Citazione trovata nel testo del documento');
+        await expect(ramipril.getByLabel('Principio attivo')).toHaveValue('ramipril');
+        await expect(ramipril.getByLabel('Stato')).toHaveValue('active');
+        await expect(document.locator('[data-testid="dossier-fact"][data-kind="diagnosis"]')).toHaveCount(1);
+        await panel.getByTestId('dossier-bulk').click();
+        await expect(panel.getByTestId('dossier-bulk-result')).toContainText('3 proposte accettate', { timeout: 60_000 });
+        await expect(panel.getByTestId('dossier-bulk-result')).toContainText('1 resta da decidere');
+        await expect(panel.getByTestId('dossier-bulk-result')).toContainText('3 scritture confermate');
+        await expect(panel.getByTestId('dossier-gaps')).toHaveText(/Fatti da decidere/u);
+        expect(await countOf(page, 'therapies', patientA)).toBe(1);
+        expect(await countOf(page, 'entries', patientA)).toBe(1);
+        expect(await countOf(page, 'therapies', patientB)).toBe(0);
+
+        // Il medico rifiuta la proposta inventata: il documento è completo. Ripetere non duplica.
+        await invented.getByLabel('Decisione').selectOption('rejected');
+        await document.getByRole('button', { name: 'Salva revisione' }).click();
+        await expect(panel.getByTestId('dossier-document')).toHaveAttribute('data-complete', 'true', { timeout: 30_000 });
+        await panel.getByTestId('dossier-bulk').isDisabled();
+        expect(await countOf(page, 'therapies', patientA)).toBe(1);
     } finally {
         rmSync(root, { recursive: true, force: true });
     }
