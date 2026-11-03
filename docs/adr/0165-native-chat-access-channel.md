@@ -15,13 +15,48 @@ Il listener acquisisce dal kernel `LOCAL_PEERTOKEN` e `LOCAL_PEERPID`.
 Security.framework risolve il codice dinamico dal token, ne verifica la
 validità e confronta l'hash del codice con quello dell'eseguibile GPUI.
 Una firma ad hoc generica o un percorso uguale non bastano. La catena dei
-processi viene riletta con start time; un antenato vivo deve soddisfare il
-requisito Developer ID esatto dell'host. I requisiti osservati sul target sono
+processi viene riletta con start time; entro 24 antenati un processo vivo deve
+soddisfare il requisito Developer ID esatto dell'host. I requisiti osservati
+sul target sono
 `com.openai.codex` / team `2DC432GLL2` e
 `com.anthropic.claudefordesktop` / team `Q6L2SF6YDW`.
 La cattura viene confrontata di nuovo prima dell'uso; PID riutilizzati,
 eseguibili sostituiti, app assente o riavviata negano l'accesso.
 Anche l'hash del codice dell'antenato viene congelato nella cattura.
+
+### Restrizione della catena, WUL-803, 4 novembre 2026
+
+La sola presenza di un antenato firmato non distingue il lanciatore MCP da
+un comando dell'agente. Prima di poter creare una richiesta nativa, ogni
+processo fra adapter e host deve superare il requisito Developer ID dello
+stesso team dell'host. Shell e interpreti (`sh`, `bash`, `zsh`, `fish`, `dash`,
+`env`, `python`, `node`, `perl`, `ruby`, `osascript`, incluse varianti versionate)
+sono negati anche se firmati da quel team. Non esiste una lista aggiuntiva di
+helper ammessi: le fonti non documentano ancora la catena reale dei due desktop.
+Firma assente, ad hoc, non valida o di altro team, host assente, catena incompleta
+o oltre 24 antenati negano il canale prima di PIN, Touch ID e concessione.
+
+La cattura conserva identità, genitore, start time, hash e nome dell'eseguibile
+di ogni anello fino all'host. La rivalidazione confronta l'intera cattura. Il
+riepilogo nativo mostra il padre diretto dell'adapter e la catena; il log locale
+di attestazione registra gli stessi metadati tecnici e l'esito motivato.
+Non registra argomenti, ambiente, percorsi completi, richieste o dati clinici.
+Il diniego restituito sul socket è soltanto `withdrawn`; il motivo tecnico
+rimane nel log locale, senza arrivare al modello.
+
+Questa regola prudente può negare anche un lanciatore MCP legittimo che passi
+per un interprete o per un helper di altro team. Si può rivedere dopo la prova
+C-3a con Leonardo, registrando sul bundle candidato padre diretto e catena
+reale in Claude Desktop e nell'app Codex. I test di decisione su catene
+sintetiche non qualificano quelle catene né la consegna app-only di C-B/C-3b.
+Un percorso interamente firmato dallo stesso team può ancora servire più
+funzioni dell'host: la firma attesta l'origine del codice, non l'intento MCP.
+La verifica desktop deve distinguere vista e comandi dell'agente; WUL-803
+resta aperta fino a quella prova. I byte approvati presenti nell'adapter
+possono entrare nel modello se l'host ne instrada lo stdout a uno strumento.
+La restrizione non attesta il renderer, la destinazione finale dei byte o
+la cancellazione dei dati già acquisiti. I claim su cifratura e zero-knowledge
+rimangono invariati.
 
 L'adapter espone una vista statica e strumenti app-only. Il tool di apertura
 restituisce testo fisso. Il frame correla le richieste; non contiene endpoint

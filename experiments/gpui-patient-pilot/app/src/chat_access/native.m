@@ -8,6 +8,17 @@
 #import <stdatomic.h>
 #import <errno.h>
 
+#define MF_CHAT_MAX_ANCESTORS 24
+
+typedef struct {
+    int32_t pid, parent;
+    uint64_t start_sec, start_usec;
+    int32_t host_kind, team;
+    uint8_t hash[32];
+    uint32_t hash_length;
+    uint8_t executable[256];
+} MFChatProcess;
+
 typedef struct {
     uint32_t token[8];
     int32_t peer;
@@ -16,6 +27,8 @@ typedef struct {
     int32_t kind;
     uint8_t host_hash[32];
     uint32_t host_hash_length;
+    uint32_t chain_length;
+    MFChatProcess chain[MF_CHAT_MAX_ANCESTORS];
 } MFChatPeer;
 
 extern void MFAmbulatoryWindowScreenLockEvent(int locked);
@@ -109,9 +122,7 @@ static int sameExecutable(SecCodeRef code) {
     return same;
 }
 
-static int hostKind(pid_t pid, MFChatPeer *output) {
-    SecCodeRef code = codeFor(@{(__bridge NSString *)kSecGuestAttributePid: @(pid)});
-    if (!code) return 0;
+static int hostKind(SecCodeRef code) {
     NSArray<NSString *> *requirements = @[
         @"anchor apple generic and identifier \"com.openai.codex\" and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = \"2DC432GLL2\"",
         @"anchor apple generic and identifier \"com.anthropic.claudefordesktop\" and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = \"Q6L2SF6YDW\""
@@ -125,22 +136,52 @@ static int hostKind(pid_t pid, MFChatPeer *output) {
         }
         if (kind) break;
     }
-    if (kind) {
-        CFDictionaryRef info = NULL;
-        if (SecCodeCopySigningInformation(code, kSecCSSigningInformation, &info) != errSecSuccess) kind = 0;
-        else {
-            CFTypeRef hash = CFDictionaryGetValue(info, kSecCodeInfoUnique);
-            CFIndex length = hash && CFGetTypeID(hash) == CFDataGetTypeID() ? CFDataGetLength(hash) : 0;
-            if (length != 20 && length != 32) kind = 0;
-            else {
-                CFDataGetBytes(hash, CFRangeMake(0, length), output->host_hash);
-                output->host_hash_length = (uint32_t)length;
-            }
-            CFRelease(info);
+    return kind;
+}
+
+static int signingTeam(SecCodeRef code) {
+    NSArray<NSString *> *teams = @[@"2DC432GLL2", @"Q6L2SF6YDW"];
+    for (NSUInteger i = 0; i < teams.count; ++i) {
+        NSString *rule = [NSString stringWithFormat:@"anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = \"%@\"", teams[i]];
+        SecRequirementRef requirement = NULL;
+        if (SecRequirementCreateWithString((__bridge CFStringRef)rule, kSecCSDefaultFlags, &requirement) != errSecSuccess) continue;
+        BOOL valid = SecCodeCheckValidity(code, kSecCSStrictValidate, requirement) == errSecSuccess;
+        CFRelease(requirement);
+        if (valid) return (int)i + 1;
+    }
+    return 0;
+}
+
+static int processCode(pid_t pid, MFChatProcess *output) {
+    char path[PROC_PIDPATHINFO_MAXSIZE];
+    if (proc_pidpath(pid, path, sizeof(path)) <= 0) return 0;
+    const char *name = strrchr(path, '/');
+    name = name ? name + 1 : path;
+    size_t length = strlen(name);
+    if (!length || length >= sizeof(output->executable)) return 0;
+    memcpy(output->executable, name, length);
+    SecCodeRef code = codeFor(@{(__bridge NSString *)kSecGuestAttributePid: @(pid)});
+    if (!code) return 1;
+    output->team = signingTeam(code);
+    output->host_kind = hostKind(code);
+    CFDictionaryRef info = NULL;
+    if (SecCodeCopySigningInformation(code, kSecCSSigningInformation, &info) == errSecSuccess) {
+        CFTypeRef hash = CFDictionaryGetValue(info, kSecCodeInfoUnique);
+        CFIndex count = hash && CFGetTypeID(hash) == CFDataGetTypeID() ? CFDataGetLength(hash) : 0;
+        if (count == 20 || count == 32) {
+            CFDataGetBytes(hash, CFRangeMake(0, count), output->hash);
+            output->hash_length = (uint32_t)count;
+        } else {
+            output->team = 0;
+            output->host_kind = 0;
         }
+        CFRelease(info);
+    } else {
+        output->team = 0;
+        output->host_kind = 0;
     }
     CFRelease(code);
-    return kind;
+    return 1;
 }
 
 int MFChatCapturePeer(int fd, MFChatPeer *output, int requireHost) {
@@ -163,20 +204,26 @@ int MFChatCapturePeer(int fd, MFChatPeer *output, int requireHost) {
         output->peer = peer; output->peer_sec = info.pbi_start_tvsec; output->peer_usec = info.pbi_start_tvusec;
         if (!requireHost) return 1;
         pid_t current = info.pbi_ppid;
-        for (int depth = 0; depth < 24 && current > 1; ++depth) {
+        for (int depth = 0; depth < MF_CHAT_MAX_ANCESTORS && current > 1; ++depth) {
             struct proc_bsdinfo before, after;
             if (!bsd(current, &before)) return 0;
-            int kind = hostKind(current, output);
+            MFChatProcess *link = &output->chain[depth];
+            link->pid = current; link->parent = before.pbi_ppid;
+            link->start_sec = before.pbi_start_tvsec; link->start_usec = before.pbi_start_tvusec;
+            if (!processCode(current, link)) return 0;
             if (!bsd(current, &after) || before.pbi_start_tvsec != after.pbi_start_tvsec
                 || before.pbi_start_tvusec != after.pbi_start_tvusec || before.pbi_ppid != after.pbi_ppid) return 0;
-            if (kind) {
+            output->chain_length++;
+            if (link->host_kind) {
                 output->host = current; output->host_sec = before.pbi_start_tvsec;
-                output->host_usec = before.pbi_start_tvusec; output->kind = kind;
+                output->host_usec = before.pbi_start_tvusec; output->kind = link->host_kind;
+                memcpy(output->host_hash, link->hash, sizeof(link->hash));
+                output->host_hash_length = link->hash_length;
                 return 1;
             }
             current = before.pbi_ppid;
         }
-        return 0;
+        return 1;
     }
 }
 
