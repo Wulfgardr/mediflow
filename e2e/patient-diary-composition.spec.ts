@@ -2,6 +2,7 @@ import { expect, test, type Locator } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 const PROSE = 'Racconto clinico sintetico W15a: il testo originale resta leggibile, con enfasi e riferimenti conservati.';
 const ORIGINAL = 'Originale inventato W15a: fonte documentale del diario, senza dati reali.';
@@ -141,7 +142,7 @@ test('Diario paziente distingue metadata object/JSON, assenti, illeggibili e sta
     let metadata: unknown = fixture.metadata;
     await page.route('**/api/entries?*', async route => {
         if (new URL(route.request().url()).searchParams.get('patientId') !== fixture.patientId) return route.continue();
-        const response = await route.fetch(); const rows = await response.json();
+        const response = await fetchInterceptedRequest(route); const rows = await response.json();
         await route.fulfill({ response, json: rows.map((row: { id: string }) => row.id === fixture.entryId ? { ...row, metadata } : row) });
     });
     const row = page.locator('#diario article').filter({ hasText: 'Testo originale della stessa voce W15a.' });

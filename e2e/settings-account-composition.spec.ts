@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, unlockIfNeeded, assertNoHorizontalOverflow } from './utils';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 function requireSynthetic(baseURL?: string) {
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1'
@@ -194,7 +195,7 @@ test('passphrase account presentation consumes a declared auth-check mock withou
     let passphrasePosts = 0, mockChecks = 0;
     await page.route('**/api/auth/passphrase', route => { passphrasePosts++; return route.abort(); });
     await page.route('**/api/auth/check', async route => {
-        const response = await route.fetch(); mockChecks++;
+        const response = await fetchInterceptedRequest(route); mockChecks++;
         await route.fulfill({ response, json: { ...await response.json(),
             unlock: { credential: 'passphrase', kdfVersion: 3, salt: 'AAAAAAAAAAAAAAAAAAAAAA==' } } });
     });

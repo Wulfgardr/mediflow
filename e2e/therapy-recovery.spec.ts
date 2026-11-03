@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, unlockIfNeeded } from './utils';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 // Real authenticated routes and synthetic SQLite records. Only the named
 // transport failures are injected; writes forwarded by route.fetch still commit.
@@ -266,7 +267,7 @@ test('a lost create response is reconciled by stable identity without a duplicat
   await page.route('**/api/therapies', async route => {
     if (route.request().method() !== 'POST') return route.continue();
     writes++;
-    const response = await route.fetch();
+    const response = await fetchInterceptedRequest(route);
     expect(response.status()).toBe(201);
     await route.abort('failed');
   });
@@ -371,7 +372,7 @@ test('lost delete response keeps the reason and absence does not authorize anoth
   await page.route(`**/api/therapies/${data.therapyId}`, async route => {
     if (route.request().method() !== 'DELETE') return route.continue();
     writes++;
-    const response = await route.fetch();
+    const response = await fetchInterceptedRequest(route);
     expect(response.status()).toBe(200);
     await route.abort('failed');
   });
@@ -536,7 +537,7 @@ async function holdTherapyResponse(page: Page, patientId: string, therapyId: str
     taken = true;
     heldRequest = route.request();
     try {
-      const response = await route.fetch();
+      const response = await fetchInterceptedRequest(route);
       status = response.status();
       entered = true;
       await gate;

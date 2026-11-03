@@ -1,6 +1,7 @@
 /* ordinary shared-cookie tabs; no injected key/session or auth response. */
 import { expect, test, type Page, type Request } from '@playwright/test';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 const pin = process.env.E2E_PIN || '1234';
 const authPath = (request: Request) => new URL(request.url()).pathname;
@@ -57,7 +58,7 @@ test('an active session without the tab key needs explicit renewal and waits for
   let returnedFence: string | undefined;
   await sibling.route('**/api/auth/lock', async route => {
     // Forward the real operation, but keep its response pending at the browser boundary.
-    const response = await route.fetch();
+    const response = await fetchInterceptedRequest(route);
     expect(response.status()).toBe(200);
     expect(await response.json()).toEqual({
       schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_confirmed',
