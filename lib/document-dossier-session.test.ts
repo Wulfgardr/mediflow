@@ -4,12 +4,13 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import {
     DossierAbortedError, DossierCollectionChanged, DossierIdentityBlocked, DossierStaleError, DossierVersionConflict, DossierWriteRejected,
-    DossierWriteInFlight, acquireDossierGroup, applyDossierDocument, buildDossierInventory, evaluateDraftGroupIdentity, loadPatientDossier,
+    DossierWriteInFlight, acceptVerifiedAndApply, acquireDossierGroup, applyDossierDocument, buildDossierInventory, evaluateDraftGroupIdentity, loadPatientDossier,
     retryDossierExtraction, saveDossierReview,
-    type DossierAttachmentMeta, type DossierInputFile, type DossierPatient, type DossierPorts, type DossierRecordTable,
+    type DossierAcquireOutcome, type DossierAttachmentMeta, type DossierInputFile, type DossierPatient, type DossierPorts, type DossierRecordTable,
 } from './document-dossier-session';
 import { readDossierRecord, type DossierHostExtraction, type DossierRecord } from './domain/documents/dossier-import';
 import { parseDocumentParseEvidenceArtifactSnapshot } from './domain/documents/document-parse-evidence-artifact';
+import { DOSSIER_PREPARED_SCHEMA, parsePreparedExtraction, type PreparedExtraction } from './domain/documents/dossier-prepared';
 
 // Archivio sintetico: stessa semantica dei writer (CAS currentness, collezione osservata,
 // id duplicato 409, versione paziente). Nessun dato reale.
@@ -636,4 +637,101 @@ test('resume refuses the old multiline professional exemption before any clinica
     const result = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
     assert.equal(result.stopped, 'identity');
     assert.equal(counts().clinicalCreates, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Estrazione preparata (ADR 0176)
+// ---------------------------------------------------------------------------
+
+function letterText(cf: string, drug = 'Ramipril 5 mg 1 cp al mattino') {
+    return `%PDF-1.4 sintetico\nLettera di dimissione\nPaziente: Mario Rossi codice fiscale ${cf}\nData: 20/10/2026\nDiagnosi: Ipertensione arteriosa essenziale\nTerapia: ${drug}\nIl paziente riferisce dispnea da sforzo da circa due mesi.`;
+}
+
+function preparedFor(entries: Array<{ text: string; cf: string; facts?: unknown[]; complete?: boolean }>): PreparedExtraction {
+    const parsed = parsePreparedExtraction(JSON.stringify({ schema: DOSSIER_PREPARED_SCHEMA, preparedAt: '2026-11-03T09:00:00Z', preparedBy: 'test',
+        sources: entries.map((entry) => ({ sha256: sha(enc.encode(entry.text)), fileName: 'x.pdf', documentDate: '2026-10-20',
+            patient: { taxCode: entry.cf, lastName: 'Rossi', firstName: 'Mario' },
+            summary: { title: 'Dimissione', text: 'Ricovero per ipertensione; dispnea da sforzo da due mesi.' },
+            coverage: { pages: 1, unreadablePages: [], complete: entry.complete ?? true },
+            facts: entry.facts ?? [
+                { kind: 'diagnosis', values: { description: 'Ipertensione arteriosa essenziale' }, quote: 'Diagnosi: Ipertensione arteriosa essenziale' },
+                { kind: 'therapy', values: { drugName: 'Ramipril', activePrinciple: 'ramipril', dosage: '5 mg 1 cp al mattino', status: 'active' }, quote: 'Ramipril 5 mg 1 cp al mattino' },
+                { kind: 'therapy', values: { drugName: 'Metformina', dosage: '500 mg' }, quote: 'Metformina 500 mg due volte al giorno' },
+            ] })) }));
+    assert.ok(parsed.ok);
+    return (parsed as { ok: true; value: PreparedExtraction }).value;
+}
+
+test('a mixed inbox folder groups by the prepared patient, and identity is still checked on the text', async () => {
+    const a = letterText(CF_A); const b = letterText(CF_B, 'Bisoprololo 1,25 mg 1 cp');
+    const { ports, files } = setup([['settimana/a.pdf', a], ['settimana/b.pdf', b]]);
+    const plain = await buildDossierInventory(ports, files, live);
+    assert.equal(plain.length, 1);
+    assert.equal(evaluateDraftGroupIdentity(plain[0], patientsFixture(), null).status, 'mixed', 'senza estrazione la cartella mista è bloccata');
+    const groups = await buildDossierInventory(ports, files, { ...live, prepared: preparedFor([{ text: a, cf: CF_A }, { text: b, cf: CF_B }]) });
+    assert.deepEqual(groups.map((group) => group.key).sort(), [`cf:${CF_A}`, `cf:${CF_B}`]);
+    for (const group of groups) {
+        const identity = evaluateDraftGroupIdentity(group, patientsFixture(), null);
+        assert.equal(identity.status, 'suggested');
+        assert.deepEqual(identity.candidatePatientIds, [group.key.endsWith(CF_A) ? 'pa' : 'pb']);
+    }
+    // Un'estrazione che attribuisce il documento al paziente sbagliato non supera il CF letto da MediFlow.
+    const wrong = await buildDossierInventory(ports, [files[0]], { ...live, prepared: preparedFor([{ text: a, cf: CF_B }]) });
+    assert.equal(evaluateDraftGroupIdentity(wrong[0], patientsFixture(), 'pb').status, 'discordant');
+});
+
+test('accept verified and apply writes only what the source supports, with active principle and summary', async () => {
+    const text = letterText(CF_A);
+    const { ports, files, records } = setup([['settimana/a.pdf', text]]);
+    const [group] = await buildDossierInventory(ports, files, { ...live, prepared: preparedFor([{ text, cf: CF_A }]) });
+    const source = group.sources[0];
+    assert.equal(source.prepared?.facts, 4);
+    assert.ok(source.facts.some((fact) => fact.origin === 'parser:document'), 'le proposte del parser restano visibili');
+    await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    // Senza la scelta esplicita sulle sintesi: solo il verificato; sintesi e residuo restano al medico.
+    const cautious = await acceptVerifiedAndApply(ports, { patientId: 'pa', ...live });
+    assert.equal(cautious.accepted, 2, 'diagnosi e terapia');
+    assert.equal(cautious.residualAcknowledged, 0);
+    assert.equal([...records.keys()].filter((key) => key.startsWith('entries:')).length, 0);
+    const result = await acceptVerifiedAndApply(ports, { patientId: 'pa', includeSummaries: true, ...live });
+    assert.equal(result.accepted, 1, 'la sintesi');
+    assert.ok(result.superseded >= 1, 'la voce col testo intero lascia il posto alla sintesi');
+    assert.equal(result.residualAcknowledged, 1);
+    const pending = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0].record.facts.filter((fact) => fact.decision === 'pending');
+    assert.deepEqual(pending.map((fact) => fact.values.drugName), ['Metformina'], 'la terapia con citazione inventata resta al medico');
+    const therapies = [...records.entries()].filter(([key]) => key.startsWith('therapies:')).map(([, value]) => value);
+    assert.equal(therapies.length, 1);
+    assert.equal(therapies[0].drugName, 'Ramipril');
+    assert.equal(therapies[0].activePrinciple, 'ramipril');
+    assert.equal(therapies[0].status, 'active');
+    const entries = [...records.entries()].filter(([key]) => key.startsWith('entries:')).map(([, value]) => value);
+    assert.equal(entries.length, 1);
+    assert.match(String(entries[0].content), /dispnea da sforzo/u);
+    assert.match(String(entries[0].content), /testo completo resta nell’allegato/u);
+    const view = (await loadPatientDossier(ports, 'pa', live.signal))!;
+    assert.deepEqual(view.documents[0].coverage.gaps, ['facts_pending']);
+    assert.ok((await ports.getPatient('pa', live.signal))!.diagnoses.some((item) => item.description === 'Ipertensione arteriosa essenziale'));
+    // Ripetere non duplica nulla.
+    const again = await acceptVerifiedAndApply(ports, { patientId: 'pa', includeSummaries: true, ...live });
+    assert.equal(again.accepted, 0);
+    assert.equal([...records.keys()].filter((key) => key.startsWith('therapies:')).length, 1);
+});
+
+test('a document already in the dossier receives prepared proposals and section proposals are superseded', async () => {
+    const text = letterText(CF_A);
+    const { ports, files, records } = setup([['a.pdf', text]]);
+    const [plain] = await buildDossierInventory(ports, files, live);
+    await acquireDossierGroup(ports, { group: plain, patientId: 'pa', confirmed: true, ...live });
+    const [withPrepared] = await buildDossierInventory(ports, files, { ...live, prepared: preparedFor([{ text, cf: CF_A, complete: false }]) });
+    const outcomes: DossierAcquireOutcome[] = [];
+    await acquireDossierGroup(ports, { group: withPrepared, patientId: 'pa', confirmed: true, ...live, onProgress: (outcome) => outcomes.push(outcome) });
+    assert.equal(outcomes[0].status, 'reused');
+    const view = (await loadPatientDossier(ports, 'pa', live.signal))!;
+    const facts = view.documents[0].record.facts;
+    assert.ok(facts.some((fact) => fact.origin === 'parser:section'));
+    assert.equal(facts.filter((fact) => fact.origin === 'prepared').length, 4);
+    const result = await acceptVerifiedAndApply(ports, { patientId: 'pa', includeSummaries: true, ...live });
+    assert.ok(result.superseded >= 2);
+    assert.equal(result.residualAcknowledged, 0, 'copertura dichiarata parziale: il residuo resta al medico');
+    assert.equal([...records.keys()].filter((key) => key.startsWith('entries:')).length, 1, 'una sola voce di diario: la sintesi');
 });
