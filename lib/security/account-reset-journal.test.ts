@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { openVersionedSqliteDatabase } from '../sqlite-schema-open';
 import { readSqliteArchiveGeneration } from '../archive-generation';
-import { ACCOUNT_RESET_JOURNAL_SUFFIX, discardPreviousArchive, listAccountResetReceipts, resetAccountsDurably,
+import { ACCOUNT_RESET_JOURNAL_SUFFIX, discardPreviousArchive, listAccountResetReceipts, reconcileAccountResets, resetAccountsDurably,
     type AccountResetPhase, type AccountResetReceipt } from './account-reset-journal';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -133,4 +133,22 @@ test('a write by another connection after the copy aborts the reset with the arc
         assert.equal(users(archive.file), 2);
         assert.deepEqual(listAccountResetReceipts(db).map(entry => entry.outcome), ['aborted']);
     } finally { other.close(); db.close(); }
+});
+
+test('an interrupted reset whose PID now belongs to this process is reconciled, not left in progress', () => {
+    const { dir, file, generation } = syntheticArchive();
+    const id = '33333333-3333-4333-8333-333333333333';
+    const journal = path.join(file + ACCOUNT_RESET_JOURNAL_SUFFIX, id);
+    fs.mkdirSync(journal, { recursive: true, mode: 0o700 });
+    // Written before this process started, with the PID this process has now: the writer no longer exists.
+    fs.writeFileSync(path.join(journal, 'intent.json'), JSON.stringify({ version: 1, id, kind: 'account-reset', target: file,
+        pid: process.pid, startedAt: new Date(Date.now() - process.uptime() * 1000 - 60_000).toISOString(), originalGeneration: generation }), { mode: 0o600 });
+    const db = new Database(file);
+    try {
+        const receipt = reconcileAccountResets(db).find(entry => entry.id === id);
+        assert.equal(receipt?.outcome, 'aborted');
+        assert.equal(receipt?.reconciled, true);
+    } finally { db.close(); }
+    assert.equal(users(file), 2);
+    fs.rmSync(dir, { recursive: true, force: true });
 });

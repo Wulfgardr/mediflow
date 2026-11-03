@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { assertDurableDirectory } from '../sqlite-durability.mjs';
@@ -95,9 +96,20 @@ function sha256File(file: string): string {
     return hash.digest('hex');
 }
 
-function processAlive(pid: number): boolean {
-    if (pid === process.pid) return true;
-    try { process.kill(pid, 0); return true; }
+const PROCESS_STARTED_AT = Date.now() - process.uptime() * 1000;
+
+/*
+ * Whether the process that wrote the intent may still be running it. A PID alone is not enough: after a
+ * reboot or a restart the same number can belong to another process, this one included, and the
+ * operation would stay "in progress" forever. An intent older than the last boot, or written by this
+ * PID before this process started, belongs to a process that no longer exists.
+ */
+function intentProcessAlive(intent: Intent): boolean {
+    const startedAt = Date.parse(intent.startedAt);
+    if (!Number.isFinite(startedAt)) return false;
+    if (startedAt < Date.now() - os.uptime() * 1000) return false;
+    if (intent.pid === process.pid) return startedAt >= PROCESS_STARTED_AT;
+    try { process.kill(intent.pid, 0); return true; }
     catch (error) { return (error as NodeJS.ErrnoException).code !== 'ESRCH'; }
 }
 
@@ -132,7 +144,7 @@ function describe(db: Database.Database, dir: string, id: string): AccountResetR
         const discarded = readRecord<{ version: 1; discardedAt: string }>(path.join(dir, 'discarded.json'));
         const previousArchive = { retained: regularFile(path.join(dir, 'previous.db')), sha256: preserved?.sha256 ?? null,
             discardedAt: discarded?.discardedAt ?? null };
-        if (!outcome) return { ...undetermined, outcome: processAlive(intent.pid) ? 'in_progress' : 'undetermined',
+        if (!outcome) return { ...undetermined, outcome: intentProcessAlive(intent) ? 'in_progress' : 'undetermined',
             startedAt: intent.startedAt, previousArchive };
         if (outcome.version !== 1 || !['completed', 'aborted'].includes(outcome.outcome)) return { ...undetermined, startedAt: intent.startedAt, previousArchive };
         return { id, outcome: outcome.outcome, startedAt: intent.startedAt, finishedAt: outcome.finishedAt, reconciled: outcome.reconciled === true,
@@ -165,7 +177,7 @@ export function reconcileAccountResets(db: Database.Database): AccountResetRecei
         try {
             if (regularFile(path.join(dir, 'outcome.json'))) continue;
             const intent = readRecord<Intent>(path.join(dir, 'intent.json'));
-            if (!validIntent(intent, id, db.name) || processAlive(intent.pid)) continue;
+            if (!validIntent(intent, id, db.name) || intentProcessAlive(intent)) continue;
             const row = readReceiptRow(db, id);
             // Without a receipt row the transaction never committed: the archive is the one before the reset.
             // The incomplete copy is only a partial duplicate of that intact archive.
