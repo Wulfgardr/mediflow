@@ -491,12 +491,14 @@ struct PairedPatientDetailSection: View {
                 }
                 .accessibilityIdentifier("patient-share-fhir-button")
             }
-            Button {
-                Task { await model.openPrregHandoff() }
-            } label: {
-                Label("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
+            if model.showsLombardyFeatures {
+                Button {
+                    Task { await model.openPrregHandoff() }
+                } label: {
+                    Label("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
+                }
+                .accessibilityIdentifier("patient-prreg-handoff-button")
             }
-            .accessibilityIdentifier("patient-prreg-handoff-button")
             Divider()
             Button(role: .destructive) {
                 patientLifecycleSheet = .delete
@@ -580,13 +582,15 @@ struct PairedPatientDetailSection: View {
             }
             .accessibilityIdentifier("patient-share-fhir-button")
         }
-        Button {
-            Task { await model.openPrregHandoff() }
-        } label: {
-            patientHeaderActionLabel("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
+        if model.showsLombardyFeatures {
+            Button {
+                Task { await model.openPrregHandoff() }
+            } label: {
+                patientHeaderActionLabel("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
+            }
+            .font(.caption)
+            .accessibilityIdentifier("patient-prreg-handoff-button")
         }
-        .font(.caption)
-        .accessibilityIdentifier("patient-prreg-handoff-button")
     }
 
     private func patientHeaderActionLabel(_ title: String, systemImage: String) -> some View {

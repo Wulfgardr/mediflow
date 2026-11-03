@@ -264,12 +264,14 @@ public struct AppleFoundationMobileRootView: View {
             #endif
         }
         .task(id: workspaceModel.clinicalWorkspaceConnection?.identity) {
+            workspaceModel.updateTerritorialPacks(nil)
             await capabilitiesStore.loadIfNeeded(using: workspaceModel.clinicalWorkspaceConnection)
             // Hand the answer to the workspace model, which is the object every
             // clinical section observes. Only some of them receive the store, so
             // a gate hanging off the store alone would not redraw their buttons
             // when the answer arrived.
             workspaceModel.updateAvailableCapabilities(capabilitiesStore.settledCapabilityKeys)
+            workspaceModel.updateTerritorialPacks(capabilitiesStore.territorialPacks)
         }
         .sheet(isPresented: $showsProjectSurfaces) { projectSurfaceSheet }
         .modifier(ClinicalNavigationReception(
