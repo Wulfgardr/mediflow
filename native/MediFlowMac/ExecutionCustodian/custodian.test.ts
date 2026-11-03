@@ -12,6 +12,7 @@ import { Duplex } from 'node:stream';
 const { buildMacCustodian, launchMacCustodian, MacNativeBuildError } = await import('../../../lib/chatgpt-execution/execution-mac-native.ts');
 const { executionSandboxProfile, EXECUTION_CONFIG } = await import('../../../lib/chatgpt-execution/execution-sandbox.ts');
 const { MacOwnerSequence, parseMacOwnerFrame } = await import('../../../lib/chatgpt-execution/execution-mac-state.ts');
+const { macBoundaryProbePassed, parseMacBoundaryProbeLine } = await import('../../../lib/chatgpt-execution/execution-mac-probe.ts');
 const nonce = '0123456789abcdef0123456789abcdef';
 const syntheticStub = `#define _DARWIN_C_SOURCE 1
 #include <stdio.h>
@@ -50,7 +51,8 @@ async function fixture() {
         for (const server of servers) await bounded(new Promise<void>(resolve => server.close(() => resolve())));
         if (unsafe) throw new Error(`unconfirmed-owned-drain; retain only this synthetic root: ${root}`);
         rmSync(root, { recursive: true, force: false });
-        for (const suffix of ['.sock', '.sentinel']) { try { rmSync(root + suffix); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; } }
+        for (const suffix of ['.sock', '.sentinel', '.escape']) { try { rmSync(root + suffix); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; } }
+        rmSync(root + '.targets', { recursive: true, force: true });
     }
     try {
         const source = join(dirname(fileURLToPath(import.meta.url)), 'mac-owner.c');
@@ -70,6 +72,11 @@ async function fixture() {
         const proxyPort = await listener(), deniedPort = await listener(); await listener(root + '.sock');
         writeFileSync(root + '.sentinel', 'native-test-sentinel', { mode: 0o600, flag: 'wx' });
         writeFileSync(join(root, 'runtime', 'probe-ports'), `${proxyPort} ${deniedPort}\n`, { mode: 0o400, flag: 'wx' });
+        // Synthetic personal home and archive outside the owned root.
+        const targets = root + '.targets';
+        for (const name of ['home', 'data']) mkdirSync(join(targets, name), { recursive: true, mode: 0o700 });
+        writeFileSync(join(targets, 'data', 'medical.db'), 'native-test-archive', { mode: 0o600, flag: 'wx' });
+        writeFileSync(join(root, 'runtime', 'probe-paths'), `${join(targets, 'home')}\n${join(targets, 'data')}\n${join(targets, 'data', 'medical.db')}\n-\n`, { mode: 0o400, flag: 'wx' });
         writeFileSync(join(root, 'codex', 'config.toml'), EXECUTION_CONFIG, { mode: 0o400, flag: 'wx' });
         writeFileSync(join(root, 'runtime', 'public-ca.pem'), 'PUBLIC_CA_SYNTHETIC_TEST_ONLY', { mode: 0o400, flag: 'wx' });
         writeFileSync(join(root, 'runtime', 'profile.sb'), executionSandboxProfile(root, binary, proxyPort), { mode: 0o400, flag: 'wx' });
@@ -94,7 +101,8 @@ test('native: fast exec readiness, setsid/no descendants, protected files, IPC, 
         await t.test('same native profile: no fork/posix_spawn, changed session, config/CA, TCP/Unix/Mach', async () => {
             const owner = f.owner('probe'), output = owner.collect(); void output.catch(() => undefined);
             await bounded(owner.started);
-            assert.equal(await bounded(output), 'MAC_PROBE_OK_V1\n');
+            const checks = parseMacBoundaryProbeLine(await bounded(output));
+            assert.ok(checks); assert.equal(macBoundaryProbePassed(checks), true);
             assert.equal(owner.drained(), true); assert.equal(owner.live(), false);
             assert.equal(readFileSync(f.root + '.sentinel', 'utf8'), 'native-test-sentinel');
             assert.equal(readFileSync(join(f.root, 'codex', 'config.toml'), 'utf8'), EXECUTION_CONFIG);
