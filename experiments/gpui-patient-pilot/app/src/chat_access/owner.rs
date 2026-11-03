@@ -1343,6 +1343,22 @@ pub(crate) mod tests {
         assert!(p.clinical.is_some());
     }
 
+    #[test]
+    fn approved_clinical_card_is_withheld_when_the_profile_cannot_be_reread() {
+        // The synthetic host never answers the profile query: the revision seen
+        // at review can no longer be confirmed, so approved bytes must not leave.
+        let (pending, _remote, _session, _host) = clinical_request();
+        let mut p = pending.lock().unwrap();
+        p.state = State::Preparing;
+        p.install_card(Some(super::super::card::Card::synthetic()));
+        assert_eq!(p.status(), State::Challenge);
+        let (_, _, attempt) = p.begin().unwrap();
+        p.finish(attempt, true);
+        assert_eq!(p.status(), State::Approved);
+        drop(p);
+        assert_eq!(consume_card(&pending), (State::Withdrawn, None));
+    }
+
     pub(crate) fn clinical_request() -> (Pending, UnixStream, RuntimeSession, Host) {
         let (session, host) = native_session();
         let context = session.chat_access_context("scope-a", "patient-a").unwrap();
