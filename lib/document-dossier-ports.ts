@@ -168,12 +168,12 @@ export function createDossierPorts(): DossierPorts {
             return {
                 diagnoses: view?.diagnoses.map((item) => ({ ...item, date: item.date.slice(0, 10) })) ?? [],
                 exemptions: view?.exemptions ?? [],
-                therapies: own(therapies).map((item) => ({ id: item.id, drugName: item.drugName, dosage: item.dosage, status: item.status, startDate: day(item.startDate) })),
+                therapies: own(therapies).map((item) => ({ id: item.id, drugName: item.drugName, dosage: item.dosage, status: item.status, startDate: day(item.startDate), endDate: day(item.endDate) })),
                 observations: own(observations).map((item) => ({ id: item.id, code: item.code, display: item.display, value: String(item.value), unitCode: item.unitCode, observedAt: day(item.observedAt) })),
                 entries: own(entries).map((item) => ({ id: item.id, dossierFactRef: entryFactRef(item.metadata) })),
                 servicePrescriptions: servicePrescriptions.filter((item) => item.patientId === patientId).map((item) => ({ id: item.id, serviceName: item.serviceName,
-                    prescribedAt: day(item.prescribedAt), requestReference: item.requestReference })),
-                prostheticPrescriptions: prosthetic.filter((item) => item.patientId === patientId).map((item) => ({ id: item.id, description: item.description, prescribedAt: day(item.prescribedAt) })),
+                    prescribedAt: day(item.prescribedAt), requestReference: item.requestReference, priority: item.priority })),
+                prostheticPrescriptions: prosthetic.filter((item) => item.patientId === patientId).map((item) => ({ id: item.id, description: item.description, prescribedAt: day(item.prescribedAt), status: item.status, isoCode: item.isoCode })),
             };
         },
         async exemptionCodes(signal) {

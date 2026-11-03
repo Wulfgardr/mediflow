@@ -515,7 +515,7 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
             <div className={styles.actions}>
                 <button type="button" className={styles.secondary} disabled={!dirty || busy}
                     onClick={() => { void onSave((fresh) => ({ ...fresh, facts: draft.facts, residualReview: draft.residualReview, documentDate: draft.documentDate })); }}>Salva revisione</button>
-                <button type="button" className={styles.primary} disabled={dirty || busy || acceptedReady === 0} onClick={() => { void onApply(); }}>
+                <button type="button" className={styles.primary} disabled={dirty || busy || acceptedReady === 0 || document.coverage.gaps.includes('identity_conflict')} onClick={() => { void onApply(); }}>
                     Applica {formatCountLabel(acceptedReady, 'fatto accettato', 'fatti accettati')}
                 </button>
             </div>

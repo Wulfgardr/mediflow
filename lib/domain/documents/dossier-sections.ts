@@ -134,7 +134,7 @@ export function prostheticStatusOf(text: string): string {
     return '';
 }
 
-const SCALE = /\b(Barthel|MMSE|Mini[- ]?Mental(?:\s+State)?|IADL|ADL|Tinetti|Braden|Norton|NRS|VAS|GDS|CIRS|MNA|CDR|Karnofsky|ECOG)\b[^\d\n]{0,20}?(\d{1,3}(?:[.,]\d)?)(?:\s*(?:\/|su)\s*(\d{1,3}))?/giu;
+const SCALE = /\b(Barthel|MMSE|Mini[- ]?Mental(?:\s+State)?|IADL|ADL|Tinetti|Braden|Norton|NRS|VAS|GDS|CIRS|MNA|CDR|Karnofsky|ECOG)\b\s*(?:(?:punteggio|totale|score)(?:\s+di)?\s*)?[:=]?\s*(\d{1,3}(?:[.,]\d+)?)(?![\d.,])(?:\s*(?:\/|su)\s*(\d{1,3})(?!\d))?/giu;
 
 export interface DossierScaleMention { scaleName: string; total: string; max: string; start: number; end: number }
 

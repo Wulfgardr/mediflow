@@ -67,7 +67,7 @@ le funzioni AI spente.
      priorità e quesito, ausili con codice ISO solo se scritto e stato documentato,
      invalidità con percentuale e indennità se scritte, valutazione, indicazioni,
      contesto assistenziale;
-   - totali di scale nominate (Barthel, MMSE e altre) con il numero vicino.
+   - totali di scale nominate (Barthel, MMSE e altre) con valore direttamente associato al nome o a un’etichetta di punteggio; anni e intervalli futuri restano residui.
    Ogni proposta conserva negazione, soggetto (paziente o familiare: una diagnosi di un
    familiare diventa anamnesi familiare), riferimento temporale e incertezza. Date e
    codici non si inventano; una terapia da documento è storica salvo scelta esplicita;
@@ -86,12 +86,16 @@ le funzioni AI spente.
    ogni voce di prestazione), scrive con i writer ordinari (P-01 con versione, T-03,
    O-03, E-03, SP-06/SP-03, PR-03), rilegge e confronta tutti i campi clinici del
    payload, poi registra l'esito con l'impronta e rilascia il claim. Un esito incerto
-   tiene il claim e la ripresa rilegge prima di qualunque nuovo invio. Un 409 non vale
+   tiene il claim e la ripresa rilegge prima di qualunque nuovo invio. Un timeout o un
+   errore di trasporto resta incerto anche se la prima rilettura è vuota: il commit
+   potrebbe essere ancora in corso. Un 409 non vale
    come successo. Sessione e contesto si ricontrollano prima e dopo ogni confine di
    scrittura; una revoca resta revoca, non un errore di rete.
 9. **Riprova dell'estrazione.** Un documento con estrazione non riuscita si può
    rileggere dall'originale conservato (sha256 verificato) e rielaborare in locale. Il
-   tentativo è registrato; il nuovo testo entra inline; i fatti già presenti e le loro
+   tentativo è registrato; i codici fiscali riletti vengono confrontati con la scheda e
+   una discordanza blocca l’applicazione. Il controllo viene ripetuto sulla scheda
+   corrente prima delle scritture. Il nuovo testo entra inline; i fatti già presenti e le loro
    decisioni restano; le nuove proposte arrivano da decidere e il residuo torna da
    rivedere.
 10. **Copertura, misure e ricevuta.** Un documento è completo solo con originale riletto

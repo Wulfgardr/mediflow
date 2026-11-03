@@ -419,9 +419,18 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
             const start = match.index ?? 0;
             const boundary = previousEnd;
             previousEnd = start + match[0].length;
+            const section = segmentDossierSections(text).find((item) => item.start <= start && item.end >= start);
+            const context = lineAround(text, start, start + match[0].length).line.trim();
+            const qualifiers = qualifiersOf(context, section?.kind ?? 'diagnosis', section?.label ?? '');
+            if (qualifiers.subject === 'familiare') {
+                facts.push({ factId: dossierFactId('anamnesis', unit.index, start, { text: context }), kind: 'anamnesis', origin: 'parser:icd',
+                    evidence: { unit: unit.index, start, end: start + match[0].length, excerpt: context }, negated: false,
+                    values: { title: 'Anamnesi familiare', text: context, subject: 'familiare', date, certainty: qualifiers.certainty }, decision: 'pending' });
+                continue;
+            }
             const values: DossierFactValues = {
                 code: match[2].toUpperCase(), system: match[1] === '9' ? 'ICD-9' : 'ICD-10',
-                description: match[3].trim(), date,
+                description: match[3].trim(), date, certainty: qualifiers.certainty, temporality: qualifiers.temporality,
             };
             facts.push({ factId: dossierFactId('diagnosis', unit.index, start, values), kind: 'diagnosis', origin: 'parser:icd',
                 evidence: { unit: unit.index, start, end: start + match[0].length, excerpt: lineAround(text, start, start + match[0].length).line.trim() },
@@ -943,7 +952,7 @@ export class DossierArtifactConflictError extends Error {
 
 export type DossierGap =
     | 'not_preserved' | 'readback_mismatch' | 'not_extracted' | 'extraction_failed' | 'text_unverified'
-    | 'facts_pending' | 'residual_pending' | 'apply_pending' | 'apply_uncertain' | 'apply_conflict' | 'apply_failed';
+    | 'facts_pending' | 'residual_pending' | 'apply_pending' | 'apply_uncertain' | 'apply_conflict' | 'apply_failed' | 'identity_conflict';
 
 export const DOSSIER_GAP_LABELS: Record<DossierGap, string> = {
     not_preserved: 'Originale non ancora riletto', readback_mismatch: 'Originale riletto diverso dalla fonte',
@@ -951,12 +960,14 @@ export const DOSSIER_GAP_LABELS: Record<DossierGap, string> = {
     text_unverified: 'Testo conservato non verificabile', facts_pending: 'Fatti da decidere',
     residual_pending: 'Testo residuo da rivedere', apply_pending: 'Scritture da eseguire',
     apply_uncertain: 'Esito di scrittura incerto', apply_conflict: 'Conflitto in scrittura', apply_failed: 'Scrittura non riuscita',
+    identity_conflict: 'Il codice fiscale letto non corrisponde alla scheda o identifica più pazienti: applicazione bloccata.',
 };
 
 export interface DossierCoverage { complete: boolean; gaps: DossierGap[] }
 
 export function evaluateDossierCoverage(record: DossierRecord, textVerified: boolean, sourceRef?: string): DossierCoverage {
     const gaps: DossierGap[] = [];
+    if (['mixed', 'discordant'].includes(record.identity.status)) gaps.push('identity_conflict');
     if (record.preservation.state === 'pending_readback') gaps.push('not_preserved');
     // Un'attestazione fatta su un'altra sorgente host non vale più.
     if (record.preservation.state === 'verified' && sourceRef !== undefined && !preservationIsCurrent(record, sourceRef)) gaps.push('not_preserved');

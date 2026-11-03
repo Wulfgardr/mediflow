@@ -568,3 +568,33 @@ test('measured original ciphertext stays with its source; a reused original is r
     const reused = (await loadPatientDossier(fixture.ports, 'pa', live.signal))!.documents[0];
     assert.equal(reused.record.storage, undefined);
 });
+
+
+test('parent delta: retry OCR revealing another patient must block subsequent apply', async () => {
+    const { files, ports } = setup([['D/R/a.pdf', labText(CF_B)]], () => ({ status: 'failed', detail: 'unavailable' }));
+    const [group] = await buildDossierInventory(ports, files, live);
+    const [stored] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    const attachmentId = (stored as { attachmentId: string }).attachmentId;
+    let document = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    ports.extract = async () => ({ status: 'extracted', markdown: labText(CF_B), ocr: null });
+    await retryDossierExtraction(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+    document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record,
+        facts: record.facts.filter((fact) => fact.kind === 'exemption') }));
+    const result = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+    assert.equal(result.stopped, 'identity');
+    assert.deepEqual((await ports.getPatient('pa', live.signal))!.exemptions, []);
+});
+
+test('parent delta: unknown dispatch error with no record yet must keep an uncertain claim', async () => {
+    const { files, ports } = setup([['D/R/a.pdf', labText(CF_A)]]);
+    const [group] = await buildDossierInventory(ports, files, live);
+    const [stored] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    const attachmentId = (stored as { attachmentId: string }).attachmentId;
+    const document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record,
+        facts: record.facts.filter((fact) => fact.kind === 'document_entry') }));
+    ports.createRecord = async () => { throw new DossierWriteRejected(null); };
+    const result = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+    assert.equal(result.outcomes[0].outcome, 'uncertain');
+    const fresh = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.equal(fresh.record.pendingWrites!.length, 1);
+});
