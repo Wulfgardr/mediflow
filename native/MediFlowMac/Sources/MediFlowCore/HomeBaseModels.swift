@@ -245,6 +245,8 @@ public struct HomeBaseAttachmentSummary: Identifiable, Codable, Hashable, Sendab
     public let ocrQueueUpdatedAt: Date?
     public let ocrReplayArtifactSnapshot: String?
     public let createdAt: Date?
+    /// Host currentness of the row; absent from home-bases older than the reviewed-collection precondition.
+    public let currentness: HomeBaseAttachmentCurrentness?
 
     public init(
         id: String,
@@ -259,8 +261,10 @@ public struct HomeBaseAttachmentSummary: Identifiable, Codable, Hashable, Sendab
         ocrQueueReason: HomeBaseDocumentOcrQueueReason?,
         ocrQueueUpdatedAt: Date?,
         ocrReplayArtifactSnapshot: String?,
-        createdAt: Date?
+        createdAt: Date?,
+        currentness: HomeBaseAttachmentCurrentness? = nil
     ) {
+        self.currentness = currentness
         self.id = id
         self.patientId = patientId
         self.name = name
@@ -326,19 +330,61 @@ public struct HomeBaseAttachmentDetail: Identifiable, Codable, Hashable, Sendabl
     }
 }
 
+public struct HomeBaseAttachmentCurrentness: Codable, Hashable, Sendable {
+    public let sourceRef: String
+    public let revision: Int
+    public let freshnessEpoch: Int
+
+    public init(sourceRef: String, revision: Int, freshnessEpoch: Int) {
+        self.sourceRef = sourceRef
+        self.revision = revision
+        self.freshnessEpoch = freshnessEpoch
+    }
+}
+
+public struct HomeBaseAttachmentCollectionEntry: Encodable, Hashable, Sendable {
+    public let id: String
+    public let currentness: HomeBaseAttachmentCurrentness
+}
+
+/// The patient's documents as the user saw them, sent with a create so the
+/// home-base refuses it if the list changed in the meantime (#758).
+public enum HomeBaseAttachmentCollectionPrecondition {
+    /// `nil` only for a home-base that predates the precondition: its list
+    /// carries no currentness and it would reject the field. A list that mixes
+    /// both shapes is not a reading the client can vouch for.
+    public static func expected(from rows: [HomeBaseAttachmentSummary]) throws -> [HomeBaseAttachmentCollectionEntry]? {
+        let entries = rows.compactMap { row in
+            row.currentness.map { HomeBaseAttachmentCollectionEntry(id: row.id, currentness: $0) }
+        }
+        if entries.count == rows.count { return entries }
+        if entries.isEmpty { return nil }
+        throw HomeBaseClientError.contract
+    }
+}
+
 public struct HomeBaseAttachmentCreatePayload: Encodable, Sendable {
     public let name: String
     public let path: String
     public let data: String
     public let type: String
     public let size: Int
+    /// Omitted from the wire when nil.
+    public let expectedCollection: [HomeBaseAttachmentCollectionEntry]?
 
-    init(name: String, path: String, data: String, type: String, size: Int) {
+    init(name: String, path: String, data: String, type: String, size: Int,
+         expectedCollection: [HomeBaseAttachmentCollectionEntry]? = nil) {
         self.name = name
         self.path = path
         self.data = data
         self.type = type
         self.size = size
+        self.expectedCollection = expectedCollection
+    }
+
+    public func expecting(_ collection: [HomeBaseAttachmentCollectionEntry]?) -> HomeBaseAttachmentCreatePayload {
+        HomeBaseAttachmentCreatePayload(name: name, path: path, data: data, type: type, size: size,
+                                        expectedCollection: collection)
     }
 }
 
@@ -1954,6 +2000,8 @@ public enum HomeBaseClientError: LocalizedError, Equatable {
     case versionConflict(VersionConflictPayload)
     case localAuthorityUnsupported(String)
     case contract
+    /// The home-base refused a document write because the list changed after it was read. Nothing was written.
+    case attachmentCollectionChanged
 
     public var errorDescription: String? {
         switch self {
@@ -1982,6 +2030,8 @@ public enum HomeBaseClientError: LocalizedError, Equatable {
             return "\(operation) non supportata in modalita autorita locale."
         case .contract:
             return "La risposta dell'home-base non rispetta il contratto atteso."
+        case .attachmentCollectionChanged:
+            return "L'elenco dei documenti è cambiato dopo l'ultima lettura: il documento non è stato caricato. Controlla l'elenco aggiornato, poi riprova."
         }
     }
 }

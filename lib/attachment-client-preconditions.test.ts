@@ -67,10 +67,76 @@ test('document delete wiring captures before confirmation and provides explicit 
     const source = fs.readFileSync('components/document-upload.tsx', 'utf8');
     const handler = sourceVariableDeclaration(source, 'handleDelete');
     assert.ok(handler.indexOf('captureAttachmentWritePrecondition(file)') < handler.indexOf('await confirm('));
-    assert.match(handler, /db\.attachments\.delete\(file\.id, \{ attachmentPrecondition \}\)/);
+    assert.ok(handler.indexOf('AttachmentCollectionView.capture(patientId, currentAttachments)') < handler.indexOf('await confirm('));
+    assert.match(handler, /db\.attachments\.delete\(file\.id, \{ attachmentPrecondition, attachmentCollection \}\)/);
     assert.doesNotMatch(handler, /db\.attachments\.get|fetch\(/);
     assert.match(source, /onClick=\{refreshAttachments\}[^>]*>Rileggi elenco/);
     const seeder = fs.readFileSync('components/data-seeder.tsx', 'utf8');
     assert.match(seeder, /Eliminazione non completata/);
     assert.match(seeder, /Alcuni dati potrebbero essere già stati eliminati/);
+});
+
+test('a batch sends the reviewed collection, extends it with its own confirmed rows and stops on a changed list', async t => {
+    const { AttachmentCollectionView, AttachmentCollectionChangedError } = await import('./attachment-collection-client');
+    const shown = record();
+    const created = { sourceRef: 'b'.repeat(64), revision: 1, freshnessEpoch: 1 };
+    const bodies: Array<Record<string, unknown>> = [];
+    const answers = [
+        () => Response.json({ id: 'synthetic-new', currentness: created }, { status: 201 }),
+        () => Response.json({ error: 'Attachment collection changed. Review the documents again.', code: 'ATTACHMENT_COLLECTION_CHANGED' }, { status: 409 }),
+    ];
+    t.mock.method(globalThis, 'fetch', async (_url: unknown, options: RequestInit) => {
+        bodies.push(JSON.parse(options.body as string));
+        return answers.shift()!();
+    });
+    db.setKey(await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
+    t.after(() => db.setKey(null));
+    const view = AttachmentCollectionView.capture(shown.patientId, [shown]);
+    const file = (id: string) => ({ id, patientId: shown.patientId, name: 'synthetic', path: 'synthetic', type: 'text/plain', size: 1, createdAt: new Date(0) }) as Attachment;
+    assert.equal(await db.attachments.add(file('synthetic-new'), { attachmentCollection: view }), 'synthetic-new');
+    await assert.rejects(db.attachments.add(file('synthetic-next'), { attachmentCollection: view }), AttachmentCollectionChangedError);
+    assert.deepEqual(bodies.map(body => body.expectedCollection), [
+        [{ id: shown.id, currentness: shown.currentness }],
+        [{ id: shown.id, currentness: shown.currentness }, { id: 'synthetic-new', currentness: created }],
+    ]);
+    await assert.rejects(db.attachments.add({ ...file('other'), patientId: 'other-patient' }, { attachmentCollection: view }), /collection unavailable/);
+    assert.equal(bodies.length, 2);
+    assert.throws(() => AttachmentCollectionView.capture(shown.patientId, undefined), /collection unavailable/);
+    assert.throws(() => AttachmentCollectionView.capture(shown.patientId, [{ ...shown, currentness: undefined }]), /collection unavailable/);
+});
+
+test('delete sends the reviewed collection; a changed list is a typed refusal, an unanswered write retires the view', async t => {
+    const { AttachmentCollectionView, AttachmentCollectionChangedError } = await import('./attachment-collection-client');
+    const shown = record();
+    const bodies: Array<Record<string, unknown>> = [];
+    let answer = () => Response.json({ error: 'Attachment collection changed. Review the documents again.', code: 'ATTACHMENT_COLLECTION_CHANGED' }, { status: 409 });
+    t.mock.method(globalThis, 'fetch', async (_url: unknown, options: RequestInit) => {
+        bodies.push(JSON.parse(options.body as string));
+        return answer();
+    });
+    const view = AttachmentCollectionView.capture(shown.patientId, [shown]);
+    const attachmentPrecondition = captureAttachmentWritePrecondition(shown);
+    await assert.rejects(db.attachments.delete(shown.id, { attachmentPrecondition, attachmentCollection: view }), AttachmentCollectionChangedError);
+    assert.deepEqual(bodies[0], { patientId: shown.patientId, expected: shown.currentness,
+        expectedCollection: [{ id: shown.id, currentness: shown.currentness }] });
+    answer = () => new Response('unavailable', { status: 503 });
+    await assert.rejects(db.attachments.delete(shown.id, { attachmentPrecondition, attachmentCollection: view }), (error: unknown) => !(error instanceof AttachmentCollectionChangedError));
+    await assert.rejects(db.attachments.delete(shown.id, { attachmentPrecondition, attachmentCollection: view }), AttachmentCollectionChangedError);
+    assert.equal(bodies.length, 2, 'a view retired by an unconfirmed write is never dispatched again');
+});
+
+test('a retry after a refused file reuses the files already saved instead of uploading duplicates', async () => {
+    const { uploadFilesOnce, AttachmentCollectionChangedError } = await import('./attachment-collection-client.ts');
+    const first = { name: 'a' }, second = { name: 'b' }, confirmed = new Map<{ name: string }, string>();
+    const uploads: string[] = [];
+    let refuse = true;
+    const upload = async (file: { name: string }) => {
+        if (file === second && refuse) { refuse = false; throw new AttachmentCollectionChangedError(); }
+        uploads.push(file.name); return `id-${file.name}-${uploads.length}`;
+    };
+    await assert.rejects(uploadFilesOnce([first, second], confirmed, upload), AttachmentCollectionChangedError);
+    assert.deepEqual(await uploadFilesOnce([first, second], confirmed, upload), ['id-a-1', 'id-b-2']);
+    assert.deepEqual(uploads, ['a', 'b'], 'the first file is stored once');
+    assert.deepEqual(await uploadFilesOnce([second], confirmed, upload), ['id-b-2']);
+    assert.equal(confirmed.has(first), false, 'a file removed from the form is forgotten');
 });

@@ -19,7 +19,7 @@ type Options = Readonly<{
         expectedSyntheticPatientName: string;
     }>;
 }>;
-type ObservedRequest = Readonly<{ method: string; path: string; metadataOnly?: boolean; patientId?: string | null; bodyKeys?: readonly string[] }>;
+type ObservedRequest = Readonly<{ method: string; path: string; metadataOnly?: boolean; patientId?: string | null; bodyKeys?: readonly string[]; collectionRows?: number | null }>;
 const PREFIX = '/api/ai/document-synthesis/';
 
 export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, options: Options): Promise<void> {
@@ -41,9 +41,14 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         const method = request.method(); const path = requestUrl.pathname;
         if (!path.startsWith('/api/')) return;
         const keys = path.startsWith(PREFIX) && method === 'POST' ? Object.keys(request.postDataJSON() ?? {}).sort() : undefined;
+        // Only the size of the reviewed-collection precondition is kept: no identifiers or currentness.
+        const collection = (method === 'POST' && path === '/api/attachments') || (method === 'DELETE' && /^\/api\/attachments\/[^/]+$/u.test(path))
+            ? (request.postDataJSON() as { expectedCollection?: unknown } | null)?.expectedCollection : undefined;
+        const collectionRows = collection === undefined ? undefined : Array.isArray(collection) ? collection.length : null;
         requests.push({ method, path, ...(method === 'GET' && ['/api/attachments', '/api/observations'].includes(path)
             ? { patientId: requestUrl.searchParams.get('patientId') } : {}), ...(method === 'GET' && path === '/api/attachments'
-            ? { metadataOnly: requestUrl.searchParams.get('metadata') === 'true' } : {}), ...(keys ? { bodyKeys: keys } : {}) });
+            ? { metadataOnly: requestUrl.searchParams.get('metadata') === 'true' } : {}), ...(keys ? { bodyKeys: keys } : {}),
+            ...(collectionRows !== undefined ? { collectionRows } : {}) });
         if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return;
         if (scopedNotesOpenInput(request, url.pathname.split('/')[2], url.origin)) return;
         const attachmentWrite = (method === 'POST' && path === '/api/attachments')
@@ -111,6 +116,8 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         });
         await expect(rows).toHaveCount(2);
         expect(writes('POST')).toHaveLength(2);
+        // Each file carries the list that was on screen, extended only by the batch's own first write.
+        expect(writes('POST').map((item) => item.collectionRows)).toEqual([0, 1]);
         expect(synthesisCalls()).toEqual([]);
         await expect(docs.getByLabel('Documento da sintetizzare')).toHaveValue('');
         for (const name of names) {
@@ -215,7 +222,7 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         await verifyHealth();
         await page.screenshot({ path: info.outputPath('document-flow-populated-mobile.png'), fullPage: false });
 
-        const deleteRow = async (name: string, cancelFirst: boolean) => {
+        const deleteRow = async (name: string, cancelFirst: boolean, expectedRows: number) => {
             const row = rows.filter({ has: page.getByRole('heading', { name, exact: true }) });
             const before = writes('DELETE').length;
             await openDocumentActions(page, name);
@@ -229,11 +236,12 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
             }
             await dialog.getByRole('button', { name: 'Elimina', exact: true }).click();
             await expect(row).toHaveCount(0); expect(writes('DELETE')).toHaveLength(before + 1);
+            expect(writes('DELETE').at(-1)?.collectionRows, 'Delete carries the reviewed collection').toBe(expectedRows);
         };
-        await deleteRow(names[0], true);
+        await deleteRow(names[0], true, 2);
         await page.reload(); await openDocuments(); await expect(rows).toHaveCount(1);
         await expect(rows.getByRole('heading', { name: names[1], exact: true })).toBeVisible();
-        await deleteRow(names[1], false);
+        await deleteRow(names[1], false, 1);
         await expect(docs.getByText('Nessun documento caricato.', { exact: false })).toBeVisible();
         await verifyHealth();
     } finally {

@@ -88,8 +88,10 @@ test('web creation persists a production lower-hex initial host tuple', async ()
     const response = await invoke(request(payload({ id: ' attachment.synthetic.currentness ' })));
 
     assert.equal(response.status, 201);
-    assert.deepEqual(await response.json(), { id: ' attachment.synthetic.currentness ' });
+    const body = await response.json() as { id: string; currentness: unknown };
     const [created] = rows();
+    assert.deepEqual(body, { id: ' attachment.synthetic.currentness ', currentness: { sourceRef: created?.document_source_ref,
+        revision: created?.document_revision, freshnessEpoch: created?.document_freshness_epoch } });
     assert.equal(created?.id, ' attachment.synthetic.currentness ');
     assert.equal(created?.patient_id, patientId);
     assert.match(created?.document_source_ref as string, /^[0-9a-f]{64}$/u);
@@ -426,4 +428,48 @@ test('web reviewed creation validates collection revisions and preserves ciphert
     const sql = new Database(dbPath);
     try { assert.equal((sql.prepare('SELECT count(*) AS n FROM attachments WHERE path = ?').get(sealedPath) as { n: number }).n, 2); }
     finally { sql.close(); }
+});
+
+function collectionView(): Array<{ id: unknown; currentness: { sourceRef: unknown; revision: unknown; freshnessEpoch: unknown } }> {
+    return rows().map(row => ({ id: row.id, currentness: { sourceRef: row.document_source_ref,
+        revision: row.document_revision, freshnessEpoch: row.document_freshness_epoch } }));
+}
+
+async function removeWithView(id: string, expectedCollection: unknown): Promise<Response> {
+    const original = serverAuth.requireSession;
+    try {
+        serverAuth.requireSession = async () => session;
+        const row = rows().find(candidate => candidate.id === id);
+        return await detailRoute.DELETE(syntheticArchiveRequest(archiveGeneration, `http://localhost/api/attachments/${id}`, {
+            method: 'DELETE', headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json' },
+            body: JSON.stringify({ patientId, expected: { sourceRef: row?.document_source_ref,
+                revision: row?.document_revision, freshnessEpoch: row?.document_freshness_epoch }, expectedCollection }),
+        }), { params: Promise.resolve({ id }) });
+    } finally { serverAuth.requireSession = original; }
+}
+
+test('two windows: B uploads, A deletes with the old list and nothing changes', async () => {
+    reset();
+    assert.equal((await invoke(request(payload({ id: 'attachment.synthetic.window.x', expectedCollection: [] })))).status, 201);
+    const viewA = collectionView();
+    const createdByB = await invoke(request(payload({ id: 'attachment.synthetic.window.y', expectedCollection: viewA })));
+    assert.equal(createdByB.status, 201);
+    const createdBody = await createdByB.json() as { id: string; currentness?: unknown };
+    assert.deepEqual(createdBody.currentness, collectionView().find(row => row.id === createdBody.id)?.currentness,
+        'the create response carries the committed currentness so a client can chain its own next write');
+
+    const before = snapshot();
+    const staleDelete = await removeWithView('attachment.synthetic.window.x', viewA);
+    assert.equal(staleDelete.status, 409);
+    assert.equal((await staleDelete.json() as { code?: string }).code, 'ATTACHMENT_COLLECTION_CHANGED');
+    assert.deepEqual(snapshot(), before, 'a stale collection view deletes nothing and writes no audit');
+
+    const staleCreate = await invoke(request(payload({ id: 'attachment.synthetic.window.z', expectedCollection: viewA })));
+    assert.equal(staleCreate.status, 409);
+    assert.equal((await staleCreate.json() as { code?: string }).code, 'ATTACHMENT_COLLECTION_CHANGED');
+    assert.deepEqual(snapshot(), before);
+
+    const reread = await removeWithView('attachment.synthetic.window.x', collectionView());
+    assert.equal(reread.status, 200);
+    assert.deepEqual(rows().map(row => row.id), ['attachment.synthetic.window.y']);
 });

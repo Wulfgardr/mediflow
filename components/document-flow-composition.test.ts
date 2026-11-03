@@ -35,7 +35,8 @@ test('initial list errors, refresh errors and empty state are distinct; retry is
 test('the persisted attachment writer is behind the single-flight queue, not an extraction or synthesis event', async () => {
     const source = await upload();
     assert.match(source, /createDocumentUploadQueue<File>/u);
-    assert.match(source, /persist: \(file, data\) => db\.attachments\.add/u);
+    assert.match(source, /persist: \(file, data\) => \{[\s\S]*?return db\.attachments\.add\([\s\S]*?\{ attachmentCollection \}\)/u);
+    assert.match(source, /holds: \(error\) => error instanceof AttachmentCollectionChangedError/u);
     assert.match(source, /onDrop, disabled: isProcessing, maxFiles: 10, maxSize: 25 \* 1024 \* 1024/u);
     assert.match(source, /const task = uploadQueue.start\(acceptedFiles\)/u);
     const onDrop = source.slice(source.indexOf('const onDrop ='), source.indexOf('const { getRootProps'));
@@ -64,15 +65,18 @@ test('delete confirmation is fenced and failures remain visible; only successful
         'if (activeDelete.current) return;',
         'activeDelete.current = operation;',
         'const attachmentPrecondition = captureAttachmentWritePrecondition(file);',
+        'const attachmentCollection = AttachmentCollectionView.capture(patientId, currentAttachments);',
         'await confirm(',
         'if (!confirmed || activeDelete.current !== operation) return;',
-        'await db.attachments.delete(file.id, { attachmentPrecondition });',
+        'await db.attachments.delete(file.id, { attachmentPrecondition, attachmentCollection });',
         'if (activeDelete.current !== operation) return;',
         'setLocalExtraction((value)',
         'setViewingId((value)',
         'setSelectedId((value)',
-        '} catch {',
-        'if (activeDelete.current === operation) setDeleteErrorId(file.id);',
+        '} catch (error) {',
+        'error instanceof AttachmentCollectionChangedError',
+        'setDeleteChangedId(file.id); refreshAttachments();',
+        '} else if (activeDelete.current === operation) setDeleteErrorId(file.id);',
         '} finally {',
     ];
     let previous = -1;
@@ -84,7 +88,7 @@ test('delete confirmation is fenced and failures remain visible; only successful
     assert.equal((body.match(/captureAttachmentWritePrecondition\(file\)/gu) ?? []).length, 1);
     assert.equal((body.match(/db\.attachments\.delete\(/gu) ?? []).length, 1);
     assert.doesNotMatch(body, /db\.attachments\.(get|query)|fetch\(/u);
-    const failureAndCleanup = body.slice(body.indexOf('} catch {'));
+    const failureAndCleanup = body.slice(body.indexOf('} catch (error) {'));
     assert.doesNotMatch(failureAndCleanup, /setLocalExtraction|setViewingId|setSelectedId/u);
     assert.match(failureAndCleanup, /if \(activeDelete.current === operation\) \{ activeDelete.current = null; setDeletingId\(null\); \}/u);
     assert.match(source, /Eliminazione non confermata/u);

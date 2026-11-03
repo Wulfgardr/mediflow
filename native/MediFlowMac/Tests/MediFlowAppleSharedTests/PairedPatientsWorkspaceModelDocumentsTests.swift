@@ -92,7 +92,7 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         let patient = detail(id: "p1")
         let source = DocumentsMockDataSource(details: ["p1": patient])
         let model = await makeModel(source: source)
-        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient, attachmentListLoaded: true)
 
         let rawBytes = Data("hello referto".utf8)
         let outcome = await model.uploadAttachmentForSelectedPatient(patientId: patient.id, fileName: "referto.pdf", mimeType: "application/pdf", rawData: rawBytes)
@@ -104,7 +104,9 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         // must carry ONLY the projection fields, all three sealed ENC.
         let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(unwrapped)) as? [String: Any]
         let keys = Set(try XCTUnwrap(encoded).keys)
-        XCTAssertEqual(keys, ["name", "path", "data", "type", "size"])
+        // The empty list on screen travels as the reviewed-collection precondition.
+        XCTAssertEqual(keys, ["name", "path", "data", "type", "size", "expectedCollection"])
+        XCTAssertEqual(unwrapped.expectedCollection, [])
         XCTAssertTrue(unwrapped.name.hasPrefix(CryptoService.encPrefix))
         XCTAssertTrue(unwrapped.path.hasPrefix(CryptoService.encPrefix))
         XCTAssertTrue(unwrapped.data.hasPrefix(CryptoService.encPrefix))
@@ -122,6 +124,81 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         XCTAssertEqual(createdPatientId, patient.id)
         let status = await model.statusMessage
         XCTAssertEqual(status, "Documento caricato: in coda per elaborazione sull'home-base.")
+    }
+
+    func testUploadSendsTheListOnScreenAsTheCollectionPrecondition() async throws {
+        let patient = detail(id: "p1")
+        let shown = HomeBaseAttachmentCurrentness(sourceRef: String(repeating: "a", count: 64), revision: 2, freshnessEpoch: 1)
+        let source = DocumentsMockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient,
+            attachments: [attachmentSummary(id: "a1", name: "referto.pdf", currentness: shown)])
+
+        _ = await model.uploadAttachmentForSelectedPatient(patientId: patient.id, fileName: "nuovo.pdf", mimeType: "application/pdf", rawData: Data("sintetico".utf8))
+
+        let lastPayload = await source.lastCreatePayload
+        let payload = try XCTUnwrap(lastPayload)
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(payload)) as? [String: Any])
+        let wire = try XCTUnwrap(encoded["expectedCollection"] as? [[String: Any]])
+        XCTAssertEqual(wire.count, 1)
+        XCTAssertEqual(wire.first?["id"] as? String, "a1")
+        let currentness = try XCTUnwrap(wire.first?["currentness"] as? [String: Any])
+        XCTAssertEqual(currentness["sourceRef"] as? String, shown.sourceRef)
+        XCTAssertEqual(currentness["revision"] as? Int, 2)
+        XCTAssertEqual(currentness["freshnessEpoch"] as? Int, 1)
+    }
+
+    func testUploadWithoutAListReadForThePatientNeverCallsCreate() async {
+        let patient = detail(id: "p1")
+        let source = DocumentsMockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+
+        let outcome = await model.uploadAttachmentForSelectedPatient(patientId: patient.id, fileName: "nuovo.pdf", mimeType: "application/pdf", rawData: Data("sintetico".utf8))
+
+        if case .unconfirmed = outcome {} else { XCTFail("No reviewed list, no write") }
+        let calls = await source.createAttachmentCalls
+        XCTAssertEqual(calls, 0)
+        let error = await model.errorMessage
+        XCTAssertEqual(error, "Elenco documenti non ancora letto: aggiornalo prima di caricare un documento.")
+    }
+
+    func testLegacyHomeBaseListWithoutCurrentnessOmitsThePrecondition() async throws {
+        let patient = detail(id: "p1")
+        let source = DocumentsMockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient,
+            attachments: [attachmentSummary(id: "a1", name: "referto.pdf")])
+
+        _ = await model.uploadAttachmentForSelectedPatient(patientId: patient.id, fileName: "nuovo.pdf", mimeType: "application/pdf", rawData: Data("sintetico".utf8))
+
+        let lastPayload = await source.lastCreatePayload
+        let payload = try XCTUnwrap(lastPayload)
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(payload)) as? [String: Any])
+        XCTAssertNil(encoded["expectedCollection"])
+    }
+
+    func testChangedCollectionIsReportedHonestlyAndRereadsTheList() async {
+        let patient = detail(id: "p1")
+        let current = HomeBaseAttachmentCurrentness(sourceRef: String(repeating: "b", count: 64), revision: 1, freshnessEpoch: 1)
+        let reread = [attachmentSummary(id: "a1", name: sealedField("referto.pdf"), currentness: current),
+                      attachmentSummary(id: "a2", name: sealedField("altro.pdf"), currentness: current)]
+        let source = DocumentsMockDataSource(details: ["p1": patient], attachments: reread, collectionChangedOnCreate: true)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient,
+            attachments: [attachmentSummary(id: "a1", name: "referto.pdf", currentness: current)])
+
+        let outcome = await model.uploadAttachmentForSelectedPatient(patientId: patient.id, fileName: "nuovo.pdf", mimeType: "application/pdf", rawData: Data("sintetico".utf8))
+
+        if case .listChanged = outcome {} else { XCTFail("A changed collection is a definite refusal, not an uncertain outcome") }
+        let error = await model.errorMessage
+        XCTAssertEqual(error, HomeBaseClientError.attachmentCollectionChanged.errorDescription)
+        let rereads = await source.fetchAttachmentListCount
+        XCTAssertEqual(rereads, 1)
+        let listed = await model.attachments.map(\.id)
+        XCTAssertEqual(listed, ["a1", "a2"])
+        let createCalls = await source.createAttachmentCalls
+        XCTAssertEqual(createCalls, 1, "no silent retry against the reread list")
     }
 
     func testUploadAttachmentRefusesOversizedFileAndNeverCallsCreate() async {
@@ -241,7 +318,7 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         let patient = detail(id: "p1")
         let source = DocumentsMockDataSource(details: ["p1": patient])
         let model = makeModel(source: source)
-        model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient, attachmentListLoaded: true)
         model.newEntryTitle = "Bozza sintetica"
         model.newEntryEditorDocument = ClinicalRichTextEditorDocument(blocks: [
             ClinicalRichTextEditorBlock(kind: .paragraph, span: ClinicalRichTextTextRun(text: "Testo da mantenere"))
@@ -263,7 +340,7 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         let source = DocumentsMockDataSource(details: ["p1": patient],
             attachments: [attachmentSummary(id: "attachment", name: sealedField("nuovo.txt"))])
         let model = makeModel(source: source)
-        model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient, attachmentListLoaded: true)
         model.newEntryTitle = "Bozza sintetica"
         model.newEntryEditorDocument = ClinicalRichTextEditorDocument(blocks: [
             ClinicalRichTextEditorBlock(kind: .paragraph, span: ClinicalRichTextTextRun(text: "Testo da mantenere"))
@@ -285,7 +362,7 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         let patient = detail(id: "p1")
         let source = DocumentsMockDataSource(details: ["p1": patient], failAttachmentList: true)
         let model = makeModel(source: source)
-        model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient, attachmentListLoaded: true)
         let outcome = await model.uploadAttachmentForNewEntryDraft(patientId: "p1", fileName: "nuovo.txt",
             mimeType: "text/plain", rawData: Data("sintetico".utf8), isCurrent: { true })
         if case .uploadedNeedsRefresh = outcome {} else { XCTFail("Creation was acknowledged") }
@@ -300,7 +377,7 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
             let patient = detail(id: "p1")
             let source = DocumentsMockDataSource(details: ["p1": patient], failCreate: true, denyCreate: denied)
             let model = makeModel(source: source)
-            model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient, attachmentListLoaded: true)
             model.newEntryAttachmentIds = ["existing"]
             let outcome = await model.uploadAttachmentForNewEntryDraft(patientId: "p1", fileName: "nuovo.txt",
                 mimeType: "text/plain", rawData: Data("sintetico".utf8), isCurrent: { true })
@@ -317,7 +394,7 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
             let patient = detail(id: "p1")
             let source = DocumentsMockDataSource(details: ["p1": patient], suspendCreate: true)
             let model = makeModel(source: source)
-            model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient, attachmentListLoaded: true)
             let uploading = Task { await model.uploadAttachmentForNewEntryDraft(patientId: "p1", fileName: "nuovo.txt",
                 mimeType: "text/plain", rawData: Data("sintetico".utf8), isCurrent: { true }) }
             for _ in 0..<1000 { if await source.createAttachmentCalls > 0 { break }; await Task.yield() }
@@ -338,7 +415,7 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
             let patient = detail(id: "p1")
             let source = DocumentsMockDataSource(details: ["p1": patient], suspendCreate: true)
             let model = makeModel(source: source)
-            model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient, attachmentListLoaded: true)
             var current = true
             let uploading = Task { await model.uploadAttachmentForNewEntryDraft(patientId: "p1", fileName: "nuovo.txt",
                 mimeType: "text/plain", rawData: Data("sintetico".utf8), isCurrent: { current }) }
@@ -441,12 +518,14 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
     }
 
     private func attachmentSummary(
-        id: String, name: String, ocrState: HomeBaseDocumentOcrQueueState? = nil, ocrReason: HomeBaseDocumentOcrQueueReason? = nil
+        id: String, name: String, ocrState: HomeBaseDocumentOcrQueueState? = nil, ocrReason: HomeBaseDocumentOcrQueueReason? = nil,
+        currentness: HomeBaseAttachmentCurrentness? = nil
     ) -> HomeBaseAttachmentSummary {
         HomeBaseAttachmentSummary(
             id: id, patientId: "p1", name: name, type: "application/pdf", size: 1024, path: sealedField("uploads/\(id)"),
             summarySnapshot: nil, parseEvidenceArtifactSnapshot: nil, ocrQueueState: ocrState, ocrQueueReason: ocrReason,
-            ocrQueueUpdatedAt: nil, ocrReplayArtifactSnapshot: nil, createdAt: Date(timeIntervalSince1970: 1_750_000_000)
+            ocrQueueUpdatedAt: nil, ocrReplayArtifactSnapshot: nil, createdAt: Date(timeIntervalSince1970: 1_750_000_000),
+            currentness: currentness
         )
     }
 
@@ -469,6 +548,8 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
     private let fetchAttachmentDelayNanoseconds: UInt64
     private let fetchCapabilitiesDelayNanoseconds: UInt64
     private let failAttachmentList: Bool
+    private let collectionChangedOnCreate: Bool
+    private(set) var fetchAttachmentListCount = 0
     private let failCreate: Bool
     private let denyCreate: Bool
     private let suspendCreate: Bool
@@ -488,8 +569,9 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
         fetchAttachmentDelayNanoseconds: UInt64 = 0,
         fetchCapabilitiesDelayNanoseconds: UInt64 = 0,
         failAttachmentList: Bool = false, failCreate: Bool = false, denyCreate: Bool = false,
-        suspendCreate: Bool = false
+        suspendCreate: Bool = false, collectionChangedOnCreate: Bool = false
     ) {
+        self.collectionChangedOnCreate = collectionChangedOnCreate
         self.failAttachmentList = failAttachmentList
         self.failCreate = failCreate
         self.denyCreate = denyCreate
@@ -614,6 +696,7 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
     }
 
     func fetchAttachments(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseAttachmentSummary] {
+        fetchAttachmentListCount += 1
         if failAttachmentList { throw URLError(.networkConnectionLost) }
         return attachments
     }
@@ -632,6 +715,7 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
         lastCreatePatientId = patientId
         lastCreatePayload = payload
         if suspendCreate { await withCheckedContinuation { createContinuation = $0 } }
+        if collectionChangedOnCreate { throw HomeBaseClientError.attachmentCollectionChanged }
         if failCreate {
             if denyCreate { throw HomeBaseClientError.httpStatus(403, "Forbidden") }
             throw URLError(.networkConnectionLost)
@@ -798,6 +882,14 @@ final class PairedAttachmentImportBatchTests: XCTestCase {
         XCTAssertEqual(calls, 2)
         XCTAssertEqual(batch.results[0].message, "Caricato")
         XCTAssertTrue(batch.results[1].message.contains("non confermato"))
+        XCTAssertEqual(batch.results[2].message, "Non avviato")
+    }
+    func testChangedListStopsBatchAndSaysTheFileWasNotSaved() async {
+        let batch = PairedAttachmentImportBatch(); var calls = 0
+        batch.start(urls, isCurrent: { true }) { _ in calls += 1; return calls == 1 ? .uploaded : .listChanged }
+        await settle(batch)
+        XCTAssertEqual(calls, 2)
+        XCTAssertEqual(batch.results[1].message, "Non caricato: l’elenco dei documenti è cambiato. Controlla l’elenco aggiornato, poi scegli di nuovo i file.")
         XCTAssertEqual(batch.results[2].message, "Non avviato")
     }
     func testAcknowledgedUploadWithRefreshFailureIsNotReportedAsUnconfirmedOrRetried() async {

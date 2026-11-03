@@ -621,7 +621,8 @@ struct PairedPatientDocumentsSection: View {
 
 }
 
-enum PairedAttachmentUploadOutcome { case uploaded, uploadedNeedsRefresh, unconfirmed }
+/// `listChanged`: the home-base definitely refused the file because the documents changed after the list was read.
+enum PairedAttachmentUploadOutcome { case uploaded, uploadedNeedsRefresh, unconfirmed, listChanged }
 
 @MainActor
 final class PairedAttachmentImportBatch: ObservableObject {
@@ -673,6 +674,9 @@ final class PairedAttachmentImportBatch: ObservableObject {
                         return
                     case .unconfirmed:
                         results[index].message = "Esito non confermato: verifica l’archivio prima di riprovare."
+                        return
+                    case .listChanged:
+                        results[index].message = "Non caricato: l’elenco dei documenti è cambiato. Controlla l’elenco aggiornato, poi scegli di nuovo i file."
                         return
                     }
                 } catch {

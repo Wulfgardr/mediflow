@@ -13,6 +13,7 @@ import {
 } from '@/lib/domain/documents/document-ocr-queue';
 import { attachmentDeleteSchema, attachmentUpdateSchema, type AttachmentExpectedCurrentness } from '@/lib/api-schemas/attachments';
 import { parseApiBody } from '@/lib/api-schemas/parse';
+import { ATTACHMENT_COLLECTION_CHANGED, ATTACHMENT_COLLECTION_CHANGED_ERROR, attachmentCollectionMatches } from '@/lib/attachment-collection-currentness';
 import { isAttachmentCurrentnessHostError, isAttachmentMetadataCurrentnessHostError, transitionAttachmentMetadataCurrentness } from '@/lib/attachment-currentness-host';
 
 const ATTACHMENT_DETAIL_RESPONSE_COLUMNS = {
@@ -169,15 +170,18 @@ export async function DELETE(
         if (!body.ok) return NextResponse.json({ error: body.status === 413 ? 'JSON payload too large' : 'Invalid payload' }, { status: body.status });
         const parsed = parseApiBody(attachmentDeleteSchema, body.value);
         if (!parsed.ok) return parsed.response;
-        const { patientId, expected } = parsed.data;
-        dbServer.transaction((tx) => {
+        const { patientId, expected, expectedCollection } = parsed.data;
+        const deleted = dbServer.transaction((tx): 'deleted' | 'stale' => {
             assertAttachmentExpected(tx, id, patientId, expected);
+            if (!attachmentCollectionMatches(tx, patientId, expectedCollection)) return 'stale';
             const result = tx.delete(attachments).where(and(eq(attachments.id, id),
                 eq(attachments.patientId, patientId), eq(attachments.documentSourceRef, expected.sourceRef),
                 eq(attachments.documentRevision, expected.revision), eq(attachments.documentFreshnessEpoch, expected.freshnessEpoch))).run();
             if (result.changes !== 1) throw new Error('Attachment delete did not affect exactly one row');
             writeAttachmentWebAudit(tx, request, session, 'attachment.deleted', id);
+            return 'deleted';
         }, { behavior: 'immediate' });
+        if (deleted === 'stale') return NextResponse.json({ error: ATTACHMENT_COLLECTION_CHANGED_ERROR, code: ATTACHMENT_COLLECTION_CHANGED }, { status: 409 });
         return NextResponse.json({ success: true });
     } catch (error) {
         const replacement = archiveReplacementResponse(error);

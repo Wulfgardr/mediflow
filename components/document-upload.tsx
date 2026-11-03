@@ -23,6 +23,7 @@ import {
     isAiDocumentSynthesisEnabledValue,
 } from '@/lib/ai-document-synthesis-kill-switch';
 import { db, captureAttachmentWritePrecondition, type Attachment } from '@/lib/db';
+import { AttachmentCollectionChangedError, AttachmentCollectionView } from '@/lib/attachment-collection-client';
 import { requestAnyDocDecryptedLocalExtractionPreview, type AnyDocLocalExtractionPreview } from '@/lib/domain/documents/anydoc-local-extraction-client';
 import { createDocumentUploadQueue, readDocumentDataUrl, type DocumentUploadResult } from '@/lib/domain/documents/document-upload-queue';
 import { useLiveQueryState } from '@/lib/live-query';
@@ -128,14 +129,23 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     const activeUploadSelection = useRef<object | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [deleteErrorId, setDeleteErrorId] = useState<string | null>(null);
+    const [deleteChangedId, setDeleteChangedId] = useState<string | null>(null);
     const [fileRejections, setFileRejections] = useState<string[]>([]);
+    // Files the host definitely did not save, kept until the user resumes against a reread list.
+    const [heldUpload, setHeldUpload] = useState<Readonly<{ files: readonly File[]; seenList: unknown; listChanged: boolean }> | null>(null);
+    const uploadCollection = useRef<AttachmentCollectionView | null>(null);
     const generation = useRef(0);
     const [uploadQueue] = useState(() => createDocumentUploadQueue<File>({
         read: readDocumentDataUrl,
-        persist: (file, data) => db.attachments.add({
-            id: uuidv4(), patientId, name: file.name, type: file.type, size: file.size,
-            path: `uploads/${file.name}`, data, createdAt: new Date(),
-        }).then((id) => { uploadedId.current = id; return id; }),
+        persist: (file, data) => {
+            const attachmentCollection = uploadCollection.current;
+            if (!attachmentCollection) return Promise.reject(new AttachmentCollectionChangedError());
+            return db.attachments.add({
+                id: uuidv4(), patientId, name: file.name, type: file.type, size: file.size,
+                path: `uploads/${file.name}`, data, createdAt: new Date(),
+            }, { attachmentCollection }).then((id) => { uploadedId.current = id; return id; });
+        },
+        holds: (error) => error instanceof AttachmentCollectionChangedError,
     }));
 
     useEffect(() => {
@@ -150,7 +160,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             setIsProcessing(false);
             setStopRequested(true);
             setExtractingId(null); setDeletingId(null);
-            setSelectedId(''); setViewingId(null); setLocalExtraction(null);
+            setSelectedId(''); setViewingId(null); setLocalExtraction(null); setHeldUpload(null);
         };
         window.addEventListener('pagehide', retireDocument);
         return () => {
@@ -176,6 +186,8 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     // A failed refresh does not turn the previous list into a new empty result.
     // Old source actions/publications are withheld until a successful reread.
     const currentAttachments = listError ? undefined : attachments;
+    const latestList = useRef<unknown>(attachments);
+    latestList.current = attachments;
     const selectedAttachment = currentAttachments?.find((file) => file.id === selectedId);
     const viewingFile = currentAttachments?.find((file) => file.id === viewingId);
     const selectSource = (id: string) => { setSelectedId(id); setViewingId(id || null); };
@@ -193,6 +205,16 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
         activeUploadSelection.current = operation;
         setFileRejections(rejectionMessages(rejectedFiles));
         if (!acceptedFiles.length) { activeUploadSelection.current = null; return; }
+        setHeldUpload(null);
+        // The precondition is the list on screen when the files were chosen, never a reread during the batch.
+        let attachmentCollection: AttachmentCollectionView;
+        try {
+            attachmentCollection = AttachmentCollectionView.capture(patientId, listLoading ? undefined : currentAttachments);
+        } catch {
+            setHeldUpload({ files: acceptedFiles, seenList: latestList.current, listChanged: false });
+            activeUploadSelection.current = null;
+            return;
+        }
         setIsProcessing(true); setStopRequested(false); setUploadResult(null);
         try {
             const possibleDuplicates = acceptedFiles.filter((file, index) =>
@@ -205,19 +227,26 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                 cancelLabel: 'Torna all’elenco',
             })).confirmed) return;
             if (activeUploadSelection.current !== operation) return;
+            uploadCollection.current = attachmentCollection;
             const task = uploadQueue.start(acceptedFiles);
             if (!task) return;
             uploadedId.current = null;
             if (uploadArea.current?.contains(document.activeElement)) listStatus.current?.focus();
             const result = await task;
-            if (activeUploadSelection.current === operation) setUploadResult(result);
+            if (activeUploadSelection.current !== operation) return;
+            setUploadResult(result);
+            if (result.held) {
+                setHeldUpload({ files: result.held, seenList: latestList.current, listChanged: true });
+                refreshAttachments();
+            }
         } finally {
+            if (uploadCollection.current === attachmentCollection) uploadCollection.current = null;
             if (activeUploadSelection.current === operation) {
                 activeUploadSelection.current = null;
                 setIsProcessing(false);
             }
         }
-    }, [uploadQueue, currentAttachments, confirm]);
+    }, [uploadQueue, currentAttachments, confirm, patientId, listLoading, refreshAttachments]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop, disabled: isProcessing, maxFiles: 10, maxSize: 25 * 1024 * 1024,
@@ -227,16 +256,17 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
         if (activeDelete.current) return;
         const operation = {};
         activeDelete.current = operation;
-        setDeletingId(file.id); setDeleteErrorId(null);
+        setDeletingId(file.id); setDeleteErrorId(null); setDeleteChangedId(null);
         try {
             const attachmentPrecondition = captureAttachmentWritePrecondition(file);
+            const attachmentCollection = AttachmentCollectionView.capture(patientId, currentAttachments);
             const { confirmed } = await confirm({
                 title: `Eliminare il documento «${file.name}»?`,
                 message: 'Il documento verrà rimosso dagli allegati del paziente.',
                 confirmLabel: 'Elimina', tone: 'danger',
             });
             if (!confirmed || activeDelete.current !== operation) return;
-            await db.attachments.delete(file.id, { attachmentPrecondition });
+            await db.attachments.delete(file.id, { attachmentPrecondition, attachmentCollection });
             if (activeDelete.current !== operation) return;
             if (activeExtraction.current?.attachmentId === file.id) {
                 activeExtraction.current.controller.abort(); activeExtraction.current = null; setExtractingId(null);
@@ -244,9 +274,11 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             setLocalExtraction((value) => value?.attachmentId === file.id ? null : value);
             setViewingId((value) => value === file.id ? null : value);
             setSelectedId((value) => value === file.id ? '' : value);
-        } catch {
+        } catch (error) {
             // Do not log source names, file bytes or backend error bodies.
-            if (activeDelete.current === operation) setDeleteErrorId(file.id);
+            if (activeDelete.current === operation && error instanceof AttachmentCollectionChangedError) {
+                setDeleteChangedId(file.id); refreshAttachments();
+            } else if (activeDelete.current === operation) setDeleteErrorId(file.id);
         } finally {
             if (activeDelete.current === operation) { activeDelete.current = null; setDeletingId(null); }
         }
@@ -339,6 +371,22 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                         </>}
                     </div>
                 )}
+                {heldUpload && (
+                    <div className="mt-3" role="alert" data-testid="document-upload-held">
+                        <p>{heldUpload.listChanged
+                            ? 'L’elenco dei documenti è cambiato dopo l’ultima lettura, quindi il caricamento si è fermato.'
+                            : 'Elenco documenti non ancora disponibile: il caricamento non è partito.'}
+                            {` ${formatCountLabel(heldUpload.files.length, 'file non salvato resta', 'file non salvati restano')} in attesa.`}</p>
+                        <p>Controlla l’elenco aggiornato, poi riprendi il caricamento.</p>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <button type="button" className={disclosure.documentAction} data-lume-action="quiet"
+                                disabled={isProcessing || listLoading || Boolean(listError) || attachments === heldUpload.seenList}
+                                onClick={() => { void onDrop([...heldUpload.files], []); }}>Riprendi caricamento</button>
+                            <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshAttachments} disabled={listLoading}>Rileggi elenco</button>
+                            <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={() => setHeldUpload(null)}>Scarta i file in attesa</button>
+                        </div>
+                    </div>
+                )}
                 {fileRejections.length > 0 && (
                     <div className="mt-3" role="alert"><ul>{fileRejections.map((message) => <li key={message}><PrivacyBlur>{message}</PrivacyBlur></li>)}</ul></div>
                 )}
@@ -393,9 +441,13 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             </PatientSheetMenu>
 
                     </td></tr>
-                    {(deleteErrorId === file.id || extractingId === file.id || localExtraction?.attachmentId === file.id) && <tr><td colSpan={2}>
+                    {(deleteErrorId === file.id || deleteChangedId === file.id || extractingId === file.id || localExtraction?.attachmentId === file.id) && <tr><td colSpan={2}>
                         {deleteErrorId === file.id && <div className="mt-3" role="alert">
                             <p>Eliminazione non confermata. Rileggi l’elenco prima di riprovare.</p>
+                            <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshAttachments} disabled={listLoading}>Rileggi elenco</button>
+                        </div>}
+                        {deleteChangedId === file.id && <div className="mt-3" role="alert">
+                            <p>L’elenco dei documenti è cambiato dopo l’ultima lettura: il documento non è stato eliminato. Controlla l’elenco aggiornato prima di riprovare.</p>
                             <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshAttachments} disabled={listLoading}>Rileggi elenco</button>
                         </div>}
                         {extractingId === file.id && <div className="mt-3 flex flex-wrap items-center gap-3" role="status">

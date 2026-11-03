@@ -173,7 +173,8 @@ public enum ClinicalFieldCrypto {
             parseEvidenceArtifactSnapshot: string(a.parseEvidenceArtifactSnapshot, masterKey),
             ocrQueueState: a.ocrQueueState, ocrQueueReason: a.ocrQueueReason, ocrQueueUpdatedAt: a.ocrQueueUpdatedAt,
             ocrReplayArtifactSnapshot: a.ocrReplayArtifactSnapshot,
-            createdAt: a.createdAt
+            createdAt: a.createdAt,
+            currentness: a.currentness
         )
     }
 

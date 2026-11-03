@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { attachmentCollectionMatches } from './attachment-collection-currentness';
+import { ATTACHMENT_COLLECTION_CHANGED, ATTACHMENT_COLLECTION_CHANGED_ERROR, attachmentCollectionMatches } from './attachment-collection-currentness';
 
 import { NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
@@ -53,6 +53,7 @@ export async function createWebAttachment(
         }
 
         const id = body.id ?? uuidv4();
+        let committed: ReturnType<typeof mintHostAttachmentCurrentness> | null = null;
         const created = dbServer.transaction((tx): 'created' | 'missing' | 'duplicate' | 'stale' => {
             const patient = tx.select({ id: patients.id }).from(patients)
                 .where(and(eq(patients.id, body.patientId), activePatients())).get();
@@ -80,12 +81,14 @@ export async function createWebAttachment(
             }).run();
             if (inserted.changes !== 1) throw new Error('Attachment insert did not affect exactly one row');
             writeAttachmentWebAudit(tx, request, session, 'attachment.created', id);
+            committed = currentness;
             return 'created';
         }, { behavior: 'immediate' });
-        if (created === 'stale') return NextResponse.json({ error: 'Attachment collection changed. Review the documents again.' }, { status: 409 });
+        if (created === 'stale') return NextResponse.json({ error: ATTACHMENT_COLLECTION_CHANGED_ERROR, code: ATTACHMENT_COLLECTION_CHANGED }, { status: 409 });
         if (created === 'duplicate') return NextResponse.json({ error: 'Attachment already exists' }, { status: 409 });
         if (created === 'missing') return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        return NextResponse.json({ id }, { status: 201 });
+        // The committed currentness lets the browser extend its reviewed view for the next file of the same batch.
+        return NextResponse.json({ id, currentness: committed }, { status: 201 });
     } catch {
         return NextResponse.json({ error: 'Create Failed' }, { status: 500 });
     }
