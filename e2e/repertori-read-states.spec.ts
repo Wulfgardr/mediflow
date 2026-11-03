@@ -52,7 +52,7 @@ async function installCatalogFixture(page: Page, baseURL: string) {
       return method === 'GET' ? route.fulfill({ json: [] }) : deny();
     }
     const ownedAuth = ['/api/auth/check', '/api/auth/setup', '/api/auth/login', '/api/auth/lock', '/api/auth/rewrap-master-key'].includes(path);
-    const ownedRead = method === 'GET' && (path === '/api/onboarding/work-profile' || path === '/api/system/revision');
+    const ownedRead = method === 'GET' && (path === '/api/onboarding/work-profile' || path === '/api/system/revision' || path === '/api/system/territorial-packs');
     if (path.startsWith('/api/') && !ownedAuth && !ownedRead) return deny();
     return route.continue();
   };
