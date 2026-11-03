@@ -225,8 +225,10 @@ export function resetAccountsDurably(db: Database.Database, options: { onPhaseFo
 
         // Consistent copy through SQLite, owner-only from its first byte, published only once complete and synced.
         fs.closeSync(fs.openSync(partial, 'wx', 0o600));
-        db.prepare('VACUUM INTO ?').run(partial);
+        // Read before the copy: in WAL mode a commit by another connection during VACUUM INTO is absent
+        // from the copy but already visible to a later read, which would hide it from the check below.
         const copiedAt = Number(db.pragma('data_version', { simple: true }));
+        db.prepare('VACUUM INTO ?').run(partial);
         syncFile(partial);
         fs.renameSync(partial, previous);
         syncDirectory(dir);
