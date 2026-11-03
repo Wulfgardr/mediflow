@@ -5,6 +5,7 @@ import type { Page } from '@playwright/test';
 import { LOCKED_DATA_PLACEHOLDER } from '../lib/locked-field-guard';
 import { assertDocumentFlowRealRoutes } from './document-flow-real-route.acceptance';
 import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY } from '../lib/ai-document-synthesis-kill-switch';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 test('Documenti: upload, persistenza, consultazione e cancellazione senza generazione implicita', async ({ page, baseURL }, info) => {
     test.skip(process.env.E2E_DOCUMENTS_SYNTHETIC_ONLY !== '1', 'Requires explicit isolated synthetic data');
@@ -83,7 +84,7 @@ async function delayOriginal(page: Page, id: string) {
     });
     await page.route('**/api/attachments/' + id, async (route) => {
         if (route.request().method() !== 'GET') return route.continue();
-        const response = await route.fetch();
+        const response = await fetchInterceptedRequest(route);
         expect(response.status()).toBe(200);
         ready.resolve(); await release.promise;
         // Cancellation makes delivery impossible; its observed requestfailed is
@@ -120,7 +121,7 @@ test('Originale: errore e riprova, identità o revisione diversa e dati illeggib
     let responseMode: 'unavailable' | 'valid' | 'patient' | 'id' | 'revision' | 'epoch' | 'source' | 'locked' | 'ciphertext' = 'unavailable';
     await page.route('**/api/attachments/' + a.id, async (route) => {
         if (route.request().method() !== 'GET') return route.continue();
-        const response = await route.fetch();
+        const response = await fetchInterceptedRequest(route);
         expect(response.status()).toBe(200);
         if (responseMode === 'unavailable') return route.fulfill({ status: 503, json: { error: 'Synthetic read unavailable' } });
         const body = await response.json() as { id: string; patientId: string; data: string;

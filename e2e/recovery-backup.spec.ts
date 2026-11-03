@@ -1,15 +1,16 @@
 import fs from 'node:fs';
 import { test, expect } from './fixtures/isolated-runtime';
+import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
 test.describe.configure({ retries: 0 });
 const phrase = 'Passphrase recupero soltanto sintetica';
 
-test('complete backup is encrypted in the browser and verification never claims a proven restore', async ({ page }, testInfo) => {
+test('complete backup is encrypted in the browser and verification never claims a proven restore', async ({ page, baseURL }, testInfo) => {
     await page.route('**/api/siss/session-status', route => route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } }));
     const pageErrors: string[] = []; const sent: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
     page.on('request', request => { if (request.method() === 'POST') sent.push(request.postData() ?? ''); });
-    expect((await page.request.post('/api/system/recovery-backup', { data: {} })).status()).toBe(401);
+    expect((await page.request.post('/api/system/recovery-backup', { data: {}, headers: trustedWebRequestHeaders(baseURL) })).status()).toBe(401);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
     await page.getByLabel('Nome e cognome', { exact: true }).fill('Medico Sintetico Recupero');

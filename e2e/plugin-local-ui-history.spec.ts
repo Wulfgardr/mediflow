@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession } from './utils';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { trustedArchiveWebRequestHeaders, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
@@ -109,7 +109,7 @@ test('an epoch response arriving after the UI timeout cannot resurrect a confirm
   let observed!: () => void;
   const started = new Promise<void>(resolve => { observed = resolve; });
   await page.route('**/api/patient-profile/selection-epoch', async route => {
-    const response = await route.fetch(); observed(); await gate;
+    const response = await fetchInterceptedRequest(route); observed(); await gate;
     await route.fulfill({ response }).catch(() => {});
   });
   expect(await isolatedRuntime.usePairing(grant.nonce, grant.host, { intent: 'history' })).toBe('accepted');

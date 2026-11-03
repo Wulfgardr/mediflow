@@ -5,6 +5,7 @@ import { createCipheriv, createDecipheriv, hkdfSync, pbkdf2Sync, randomBytes } f
 import type { Page, Request } from '@playwright/test';
 import { expect, test } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession } from './utils';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 const PIN = 'demo086086';
 const PASSPHRASE = 'cavallo batteria graffetta corretta';
@@ -107,7 +108,7 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await kitPanel.getByRole('checkbox').check();
   // The server can commit credentials while cleanup remains pending; the UI must keep that distinction.
   await page.route('**/api/auth/passphrase', async route => {
-    const result = await route.fetch();
+    const result = await fetchInterceptedRequest(route);
     await route.fulfill({ response: result, json: { ...await result.json(), earlierCopiesCleared: false } });
   });
   const adoption = page.waitForResponse(response => isPost(response.request(), '/api/auth/passphrase'));
@@ -171,7 +172,7 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toHaveCount(0);
 
   await page.route('**/api/auth/login', async route => {
-    const result = await route.fetch();
+    const result = await fetchInterceptedRequest(route);
     await route.fulfill({ response: result, json: { ...await result.json(), earlierCopiesCleared: false } });
   });
   await field.fill(PASSPHRASE);

@@ -94,6 +94,7 @@ function broker(config = installation()): Broker {
     const value = createClinicalCardBroker(config); brokers.push(value); return value;
 }
 const fixtureKnown = { names: corpus.flatMap(entry => entry.gold.entities.filter(e => e.type !== 'date').map(e => e.text)), birthDates: corpus.flatMap(entry => entry.gold.entities.filter(e => e.type === 'date').map(e => e.text)) };
+const selectionA = 'a'.repeat(64), selectionB = 'b'.repeat(64);
 const all = { diagnoses: ['diabete mellito tipo 2'], noteExcerpts: ['HbA1c 7,2. Pressione 130/80 mmHg. Peso 72 kg. Metformina 500 mg due volte al giorno.'] };
 async function ready(b = broker(), patient = 'basic', selection = all) {
     await b.owner.selectPatient(patient);
@@ -171,17 +172,37 @@ test('private native owner only consumes after preparation, with no caller conse
     const { createNativeClinicalOwner } = await import('../../scripts/chat-card-clinical-owner.mjs');
     const owner = createNativeClinicalOwner(installation());
     try {
-        const review = await owner.command({ command: 'prepare', knownIdentifiers: fixtureKnown, selection: all });
-        const output = await owner.command({ command: 'consume' });
+        const review = await owner.command({ command: 'prepare', knownIdentifiers: fixtureKnown, patient: selectionA, selection: all });
+        const output = await owner.command({ command: 'consume', patient: selectionA });
         assert.equal(output.payload, review.payload);
-        await assert.rejects(owner.command({ command: 'consume' }));
+        await assert.rejects(owner.command({ command: 'consume', patient: selectionA }));
     } finally { await owner.close(); }
-    for (const command of [{ command: 'consume' }, { command: 'prepare', knownIdentifiers: fixtureKnown, selection: all, approved: true }, { command: 'prepare', knownIdentifiers: { names: [], birthDates: [] }, selection: { ...all, filename: 'hidden' } }]) {
+    for (const command of [{ command: 'consume', patient: selectionA }, { command: 'prepare', knownIdentifiers: fixtureKnown, patient: selectionA, selection: all, approved: true }, { command: 'prepare', knownIdentifiers: { names: [], birthDates: [] }, patient: selectionA, selection: { ...all, filename: 'hidden' } }]) {
         const owner = createNativeClinicalOwner(installation());
         try { await assert.rejects(owner.command(command)); } finally { await owner.close(); }
     }
 });
 
+
+test('private native owner hands the declared selection to the broker, so a patient change before consumption denies every byte', async () => {
+    const { createNativeClinicalOwner } = await import('../../scripts/chat-card-clinical-owner.mjs');
+    const same = createNativeClinicalOwner(installation());
+    try {
+        const review = await same.command({ command: 'prepare', knownIdentifiers: fixtureKnown, patient: selectionA, selection: all });
+        assert.equal((await same.command({ command: 'consume', patient: selectionA })).payload, review.payload);
+    } finally { await same.close(); }
+    const changed = createNativeClinicalOwner(installation());
+    try {
+        const review = await changed.command({ command: 'prepare', knownIdentifiers: fixtureKnown, patient: selectionA, selection: all });
+        assert.ok(review.payload);
+        await assert.rejects(changed.command({ command: 'consume', patient: selectionB }), denied);
+        await assert.rejects(changed.command({ command: 'consume', patient: selectionA }), denied);
+    } finally { await changed.close(); }
+    for (const patient of [undefined, '', 'native-selection', 'A'.repeat(64), 7]) {
+        const owner = createNativeClinicalOwner(installation());
+        try { await assert.rejects(owner.command({ command: 'prepare', knownIdentifiers: fixtureKnown, patient, selection: all }), denied); } finally { await owner.close(); }
+    }
+});
 
 test('clinical neural false positives preserve exact diagnosis and excerpt bytes', async () => {
     redactDiagnosis = true;
@@ -208,12 +229,12 @@ test('known identifiers are local, normalized, and passed to preparation, includ
 test('private owner requires local identifiers and returns only an indexed denial for token-only content', async () => {
     const { createNativeClinicalOwner } = await import('../../scripts/chat-card-clinical-owner.mjs');
     const owner = createNativeClinicalOwner(installation());
-    try { await assert.rejects(owner.command({ command: 'prepare', selection: all })); } finally { await owner.close(); }
+    try { await assert.rejects(owner.command({ command: 'prepare', patient: selectionA, selection: all })); } finally { await owner.close(); }
     redactDiagnosis = true;
     const deniedOwner = createNativeClinicalOwner(installation());
     try {
-        assert.deepEqual(await deniedOwner.command({ command: 'prepare', selection: { diagnoses: ['Diabete mellito'], noteExcerpts: [] }, knownIdentifiers: { names: ['Diabete'], birthDates: [] } }), { status: 'denied', section: 'diagnoses', row: 1 });
-        await assert.rejects(deniedOwner.command({ command: 'consume' }));
+        assert.deepEqual(await deniedOwner.command({ command: 'prepare', patient: selectionA, selection: { diagnoses: ['Diabete mellito'], noteExcerpts: [] }, knownIdentifiers: { names: ['Diabete'], birthDates: [] } }), { status: 'denied', section: 'diagnoses', row: 1 });
+        await assert.rejects(deniedOwner.command({ command: 'consume', patient: selectionA }));
     } finally { await deniedOwner.close(); }
 });
 

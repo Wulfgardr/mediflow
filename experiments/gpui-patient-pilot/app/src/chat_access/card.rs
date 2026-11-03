@@ -20,6 +20,8 @@ pub(super) struct Card {
     pub(super) denial: Option<String>,
     pub(super) digest: String,
     pub(super) native_source: String,
+    /// Opaque selection mark the clinical owner prepared for; none for a catalog card.
+    selection: Option<String>,
 }
 impl Card {
     pub(super) fn prepare(
@@ -65,7 +67,8 @@ impl Card {
         command.arg(supervisor).arg(script).arg(installation);
         let mut card = Self::spawn(&mut command, cancelled)?;
         let request = if let Some(selection) = selection {
-            json!({"command":"prepare", "selection":selection["selection"], "knownIdentifiers":selection["knownIdentifiers"]})
+            card.selection = Some(selection["patient"].as_str()?.to_owned());
+            json!({"command":"prepare", "patient":selection["patient"], "selection":selection["selection"], "knownIdentifiers":selection["knownIdentifiers"]})
         } else {
             json!({"command":"prepare"})
         };
@@ -133,6 +136,7 @@ impl Card {
             denial: None,
             digest: String::new(),
             native_source: String::new(),
+            selection: None,
         })
     }
     fn stop(&mut self) -> std::io::Result<()> {
@@ -145,19 +149,21 @@ impl Card {
             ))
         }
     }
+    #[cfg(test)]
     fn call(&mut self, command: &str) -> Option<Value> {
         let timeout = Duration::from_secs(if command == "prepare" { 90 } else { 2 });
         self.call_with_timeout(command, timeout)
     }
+    #[cfg(test)]
     fn call_with_timeout(&mut self, command: &str, timeout: Duration) -> Option<Value> {
-        let result = self.exchange(command, timeout);
+        self.send_with_timeout(&json!({"command":command}), timeout)
+    }
+    fn send_with_timeout(&mut self, command: &Value, timeout: Duration) -> Option<Value> {
+        let result = self.exchange_value(command, timeout);
         if result.is_none() && self.stop().is_err() {
             eprintln!("Arresto del gruppo posseduto non verificato");
         }
         result
-    }
-    fn exchange(&mut self, command: &str, timeout: Duration) -> Option<Value> {
-        self.exchange_value(&json!({"command":command}), timeout)
     }
     fn exchange_value(&mut self, command: &Value, timeout: Duration) -> Option<Value> {
         let input = self.input.as_mut()?;
@@ -177,6 +183,11 @@ impl Card {
     }
     #[cfg(test)]
     pub(super) fn synthetic() -> Self {
+        Self::synthetic_for(None)
+    }
+    /// Synthetic owner tree prepared for `selection`, as the clinical owner is.
+    #[cfg(test)]
+    pub(super) fn synthetic_for(selection: Option<&str>) -> Self {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
         let module = root.join("scripts/chat-card-process-owner.mjs");
         let fixture = root.join("scripts/fixtures/chat-card-owned-tree.mjs");
@@ -192,18 +203,39 @@ impl Card {
         let mut command = Command::new(node);
         command.args(["--input-type=module", "-e", &source]);
         let mut card = Self::spawn(&mut command, Arc::new(AtomicBool::new(false))).unwrap();
-        let review = card.call("prepare").unwrap();
+        let review = match selection {
+            Some(mark) => {
+                card.selection = Some(mark.into());
+                card.exchange_value(
+                    &json!({"command":"prepare", "patient":mark}),
+                    Duration::from_secs(90),
+                )
+            }
+            None => card.call("prepare"),
+        }
+        .unwrap();
         card.payload = review["payload"].as_str().unwrap().into();
         card.digest = review["payloadSha256"].as_str().unwrap().into();
         card.native_source = review["nativeSource"].to_string();
         card
     }
-    pub(super) fn consume(&mut self) -> Option<String> {
-        let result = self.call("consume")?;
+    /// `current` is the selection mark read at consumption: the clinical owner
+    /// hands it to its broker, which denies the bytes if the patient changed.
+    pub(super) fn consume(&mut self, current: Option<&str>) -> Option<String> {
+        let result = self.send_with_timeout(
+            &consume_command(self.selection.as_deref(), current)?,
+            Duration::from_secs(2),
+        )?;
         if result.as_object()?.len() != 1 || result["payload"].as_str()? != self.payload {
             return None;
         }
         Some(self.payload.clone())
+    }
+}
+fn consume_command(prepared: Option<&str>, current: Option<&str>) -> Option<Value> {
+    match prepared {
+        Some(_) => Some(json!({"command":"consume", "patient":current?})),
+        None => Some(json!({"command":"consume"})),
     }
 }
 impl Drop for Card {
@@ -240,6 +272,25 @@ mod tests {
             .filter_map(|p| p.parse::<u64>().ok())
             .filter(|p| pids.contains(p))
             .count()
+    }
+    #[test]
+    fn clinical_consumption_sends_the_current_selection_and_the_owner_refuses_another() {
+        let (a, b) = ("a".repeat(64), "b".repeat(64));
+        assert_eq!(
+            Card::synthetic_for(Some(&a)).consume(Some(&b)),
+            None,
+            "selection changed after preparation"
+        );
+        assert_eq!(Card::synthetic_for(Some(&a)).consume(None), None);
+        assert_eq!(
+            Card::synthetic_for(Some(&a)).consume(Some(&a)).as_deref(),
+            Some("synthetic-redacted-payload")
+        );
+        // A catalog card has no patient selection and keeps the plain command.
+        assert_eq!(
+            Card::synthetic().consume(Some(&b)).as_deref(),
+            Some("synthetic-redacted-payload")
+        );
     }
     #[test]
     fn revoke_timeout_and_drop_stop_every_owned_descendant_only() {
