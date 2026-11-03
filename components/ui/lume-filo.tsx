@@ -31,7 +31,7 @@ type LumeFiloNodoProps = SVGProps<SVGSVGElement> & {
 };
 
 type LumeFiloStyle = CSSProperties & {
-    '--lume-filo-fill'?: string;
+    '--lume-filo-fill'?: number;
     '--lume-spina-scale'?: number;
 };
 
@@ -297,13 +297,14 @@ function LumeConnettore({
         setDraws(true);
         const frame = requestAnimationFrame(() => setVisibleFill(targetFill));
         const release = () => releaseFiloMotion(drawId);
-        const fallback = window.setTimeout(release, CONNECTOR_DRAW_FALLBACK_MS);
-        pathElement.addEventListener('transitionend', release, { once: true });
+        const settle = () => { release(); setDraws(false); };
+        const fallback = window.setTimeout(settle, CONNECTOR_DRAW_FALLBACK_MS);
+        pathElement.addEventListener('transitionend', settle, { once: true });
 
         return () => {
             cancelAnimationFrame(frame);
             window.clearTimeout(fallback);
-            pathElement.removeEventListener('transitionend', release);
+            pathElement.removeEventListener('transitionend', settle);
             release();
         };
     }, [drawId, targetFill]);
@@ -322,6 +323,7 @@ function LumeConnettore({
                 ref={pathRef}
                 className="lume-filo-draw"
                 data-lume-filo-static={draws ? undefined : 'true'}
+                data-lume-filo-complete={!draws && visibleFill >= 100 ? 'true' : undefined}
                 d={path}
                 fill="none"
                 pathLength="100"
@@ -329,7 +331,7 @@ function LumeConnettore({
                 strokeLinecap="round"
                 strokeWidth="1"
                 style={{
-                    '--lume-filo-fill': `${visibleFill}%`,
+                    '--lume-filo-fill': visibleFill,
                 } as LumeFiloStyle}
                 vectorEffect="non-scaling-stroke"
             />
