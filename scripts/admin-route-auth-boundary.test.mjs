@@ -21,6 +21,7 @@ const WEB_ADMIN_ROUTES = [
     { file: 'app/api/system/purge-patient/route.ts', handlers: ['GET', 'POST'] },
     { file: 'app/api/system/repair-db/route.ts', handlers: ['POST'] },
     { file: 'app/api/system/restore-patient/route.ts', handlers: ['GET', 'POST'] },
+    { file: 'app/api/system/retention/route.ts', handlers: ['GET', 'PUT', 'POST'] },
 ];
 
 const SESSION_REQUIRED_SYSTEM_ROUTES = [

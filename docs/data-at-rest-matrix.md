@@ -7,8 +7,8 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 12.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
-criterio 1. Aggiornata il 21 ottobre 2026 per il marker Web di cambio stato
+**Versione 13.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+criterio 1. Aggiornata il 3 novembre 2026 per finestre e blocchi della conservazione (ADR 0178); il 21 ottobre 2026 per il marker Web di cambio stato
 terapia (ADR 0156); il 13 ottobre 2026 per i permessi del database adottato dalla cartella
 dell’applicazione; l’11 ottobre per credenziali v3 e generazione dell’archivio, recupero cifrato completo e permessi delle copie di riparazione; la prima classificazione era su `main` `bcb7af46a`.
 
@@ -287,7 +287,7 @@ dati nel restore. Conservare i backup come gli altri dati sensibili.
 ### `settings`: configurazione locale
 
 - In chiaro: `key`, `value`
-- Leggibile senza chiave: nome del medico e dello studio, indirizzi dei servizi AI locali, percorso dei backup, stato dell'abbinamento dei client (dei token conserva l'hash SHA-256).
+- Leggibile senza chiave: nome del medico e dello studio, indirizzi dei servizi AI locali, percorso dei backup, stato dell'abbinamento dei client (dei token conserva l'hash SHA-256), finestre di conservazione e blocchi per contenzioso o richiesta (identificativi di paziente e documento, motivo, data e utente; nessun nome).
 
 ### `siss_handoff_events`: passaggi verso SISS
 
