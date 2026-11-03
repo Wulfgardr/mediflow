@@ -685,7 +685,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
     };
 
-    const finishAccessMutation = async (generation: number, result: { response: Response; payload: { success?: boolean; error?: string; message?: string; earlierCopiesCleared?: boolean } | null }): Promise<AccessResult> => {
+    const finishAccessMutation = async (generation: number, result: { response: Response; payload: { success?: boolean; error?: string; message?: string; earlierCopiesCleared?: boolean } | null }, kind: 'setup' | 'credential' = 'credential'): Promise<AccessResult> => {
         if (generation !== authorityAttemptGenerationRef.current) return { ok: false, message: 'Operazione scaduta. Rinnova l’accesso.' };
         if (!result.response.ok || result.payload?.success !== true) return { ok: false, message: result.payload?.message || result.payload?.error || 'Aggiornamento non confermato. Riprova.' };
         if (typeof result.payload.earlierCopiesCleared === 'boolean') setPinResiduesPending(!result.payload.earlierCopiesCleared);
@@ -694,6 +694,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setRequiresSetup(false);
         setUnlockCredential('passphrase');
         shownCredentialRef.current = 'passphrase';
+        /* the session cookie of a first setup was created by this very tab and no other tab can hold
+           its key: close it at once, as the renewal gesture would, and open the passphrase field. */
+        if (kind === 'setup') { lock(); return { ok: true }; }
         setAuthErrorMessage('Passphrase aggiornata. Rinnova l’accesso e sblocca con la nuova passphrase.');
         updateAuthRecoveryState('required');
         return { ok: true };
@@ -775,7 +778,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 return { ok: false, message: 'Configurazione già completata. Rinnova l’accesso.' };
             }
             if (result.response.ok && result.controlState !== 'accepted') { lock(); return { ok: false, message: 'Risposta di configurazione non verificabile. Rinnova l’accesso.' }; }
-            return finishAccessMutation(generation, result);
+            return finishAccessMutation(generation, result, 'setup');
         }, generation);
         if (!result.ok) throw new Error(result.message);
     };
