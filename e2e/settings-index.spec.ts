@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 function requireSynthetic(baseURL?: string) {
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw new Error('Runtime e archivio sintetici isolati richiesti');
@@ -70,7 +71,7 @@ test('Indice Impostazioni: gerarchia, stati e risposta persa dopo PUT reale', as
         gate = deferred(); hold = true; overviewReads = 0;
         let committed: unknown;
         await page.route('**/api/settings/network.mode', async route => {
-            const response = await route.fetch(); expect(response.ok()).toBe(true);
+            const response = await fetchInterceptedRequest(route); expect(response.ok()).toBe(true);
             committed = await response.json();
             await route.abort('connectionreset');
         });
@@ -132,11 +133,11 @@ test('Indice Impostazioni: diniego reale, ricevuta positiva e riconciliazione no
         const denials: unknown[] = [];
         await page.route('**/api/settings/network.mode', async route => {
             if (scenario === 'denied') {
-                const response = await route.fetch({ postData: '{}' });
+                const response = await fetchInterceptedRequest(route, { postData: '{}' });
                 expect(response.status()).toBe(400); denials.push(await response.json());
                 return route.fulfill({ response });
             }
-            const response = await route.fetch(); expect(response.ok()).toBe(true);
+            const response = await fetchInterceptedRequest(route); expect(response.ok()).toBe(true);
             putArrived.release(); await responseGate.promise;
             return scenario === 'unknown' ? route.abort('connectionreset') : route.fulfill({ response });
         });

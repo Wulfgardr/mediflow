@@ -3,6 +3,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 const providerSettings = Object.freeze({ aiProvider: 'ollama', aiUrl: 'http://127.0.0.1:11434', ollamaUrl: 'http://127.0.0.1:11434' });
 async function installSettingsEvidenceMocks(page: Page, baseURL: string) {
@@ -180,7 +181,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
             }
             for (const [id, endpoint] of [['db', '**/api/auth/check'], ['api', '**/api/settings/aiProvider']]) {
                 const fail = async (route: import('@playwright/test').Route) => {
-                    const response = await route.fetch();
+                    const response = await fetchInterceptedRequest(route);
                     await route.fulfill({ response, status: 503, json: { error: 'Indisponibile' } });
                 };
                 await page.route(endpoint, fail);

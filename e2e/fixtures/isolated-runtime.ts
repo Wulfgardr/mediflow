@@ -6,7 +6,6 @@ import { createServer } from 'node:net';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { trustedWebRequestHeaders } from './trusted-web-request';
 
 const repositoryRoot = path.resolve(__dirname, '../..');
 
@@ -180,7 +179,6 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
     }
   },
   baseURL: async ({ isolatedRuntime }, provide) => provide(isolatedRuntime.url),
-  extraHTTPHeaders: async ({ baseURL }, provide) => provide(trustedWebRequestHeaders(baseURL)),
 });
 
 export { expect };

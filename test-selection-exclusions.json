@@ -36,7 +36,7 @@
   },
   {
     "path": "e2e/fixtures/secure-browser.ts",
-    "reason": "Opzioni di avvio di Chromium (sandbox e rete solo loopback) usate da playwright.config.ts, e2e/native-chat-access-frame.config.ts e dagli spec che avviano il browser da soli; nessun test autonomo.",
+    "reason": "Opzioni di avvio di Chromium (sandbox, rete solo loopback e canale opzionale E2E_BROWSER_CHANNEL) usate da playwright.config.ts, e2e/native-chat-access-frame.config.ts e dagli spec che avviano il browser da soli; nessun test autonomo.",
     "owner": "@Wulfgardr"
   },
   {
