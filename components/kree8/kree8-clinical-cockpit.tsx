@@ -66,6 +66,7 @@ import type {
   StatusFilter,
 } from './cockpit-shared';
 import styles from './kree8-clinical-cockpit-shell.module.css';
+import { useTerritorialPacks } from '@/lib/territorial-pack-client';
 
 export { AREA_ID_VALUES };
 export type { AreaId };
@@ -119,6 +120,7 @@ function AreaContent({
   onRetryAgenda,
   onRetryDiary,
   onRetryTodos,
+  territorialHandoff,
 }: {
   area: AreaId;
   filter: StatusFilter;
@@ -140,6 +142,8 @@ function AreaContent({
   onRetryAgenda: () => void;
   onRetryDiary: () => void;
   onRetryTodos: () => void;
+  /** Pacchetto Lombardia attivo (o superficie di review): abilita SISS e portali. */
+  territorialHandoff: boolean;
 }) {
   switch (area) {
     case 'turno':
@@ -168,6 +172,7 @@ function AreaContent({
           onSelectPatient={onSelectPatient}
           onAlignPatient={onAlignPatient}
           onOpenArea={onOpenArea}
+          territorialHandoff={territorialHandoff}
           onRetryPatients={onRetryPatients}
           isReview={isReview}
         />
@@ -202,9 +207,10 @@ function AreaContent({
     case 'repertori':
       return <RepertoriArea isReview={isReview} />;
     case 'handoff':
-      return isReview
-        ? <HandoffArea />
-        : <LiveHandoffArea patient={selectedPatient} onOpenArea={onOpenArea} />;
+      if (isReview) return <HandoffArea />;
+      return territorialHandoff
+        ? <LiveHandoffArea patient={selectedPatient} onOpenArea={onOpenArea} />
+        : <SchedaArea patient={selectedPatient} isReview={false} onOpenArea={onOpenArea} />;
     case 'governance':
       return isReview
         ? <GovernanceArea />
@@ -228,6 +234,8 @@ export function Kree8ClinicalCockpit({
   const { proposal } = useRuntimeTwinDesign();
   const router = useRouter();
   const isReview = surface === 'review';
+  const territorialPacks = useTerritorialPacks();
+  const territorialHandoff = isReview || territorialPacks.lombardy;
   const operatorName = operatorNameProp || (isReview ? 'Review design' : 'Sessione locale');
   const [area, setArea] = useState<AreaId>(() => (isReview ? 'turno' : initialArea));
   useRuntimeWorkspaceArea(isReview ? null : area);
@@ -675,7 +683,7 @@ export function Kree8ClinicalCockpit({
                   { id: 'scheda' as AreaId, label: 'Quadro' },
                   { id: 'revisione' as AreaId, label: 'Documenti' },
                   { id: 'handoff' as AreaId, label: 'SISS' },
-                ]).map((tab) => (
+                ]).filter((tab) => tab.id !== 'handoff' || territorialHandoff).map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
@@ -699,6 +707,7 @@ export function Kree8ClinicalCockpit({
                 diaryState={diaryState}
                 worklistTodos={worklistTodos}
                 onRetryTodos={refreshCheckups}
+                territorialHandoff={territorialHandoff}
                 selectedPatient={selectedPatient}
                 selectedPatientId={selectedPatientId}
                 patientWorkspace={patientWorkspace}

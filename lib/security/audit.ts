@@ -70,6 +70,7 @@ export const AUDIT_EVENT_TYPES = [
     'territorial.packs.migrated',
     'territorial.packs.changed',
     'reference_data.aifa.updated',
+    'reference_data.drug_catalog.updated',
     'ambulatory.created',
     'ambulatory.updated',
     'ambulatory.deleted',

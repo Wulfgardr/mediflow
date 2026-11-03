@@ -8,7 +8,14 @@ export type DrugAutocompleteCatalogState = 'ready' | 'unverified' | 'not-importe
 export type DrugAutocompleteResult = {
     items: AifaDrug[];
     catalogState: DrugAutocompleteCatalogState;
+    /** Codifica dichiarata del catalogo attivo; `AIC` per AIFA, assente se non dichiarata. */
+    codeSystem?: string;
 };
+
+/** Il campo `aic` delle terapie riceve solo codici AIC; le altre codifiche restano nel catalogo. */
+export function isAicCodeSystem(codeSystem: string | null | undefined): boolean {
+    return !codeSystem || codeSystem === 'AIC';
+}
 
 /* WUL-488 */
 export async function fetchDrugAutocomplete(
@@ -32,7 +39,10 @@ export async function fetchDrugAutocomplete(
     const catalogState: DrugAutocompleteCatalogState = header === 'ready' || header === 'unverified'
         ? header
         : 'not-imported';
-    return { items: (payload as AifaDrug[]).slice(0, RESULT_LIMIT), catalogState };
+    let codeSystem: string | undefined;
+    const encoded = response.headers.get('x-mediflow-drug-code-system');
+    if (encoded) { try { codeSystem = decodeURIComponent(encoded); } catch { codeSystem = undefined; } }
+    return { items: (payload as AifaDrug[]).slice(0, RESULT_LIMIT), catalogState, ...(codeSystem ? { codeSystem } : {}) };
 }
 
 /* WUL-488 */
