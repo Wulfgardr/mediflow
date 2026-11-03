@@ -5,6 +5,7 @@ import type { AifaDrug } from '@/lib/db';
 import {
     commitDrugAutocompleteQueryChange,
     createDrugAutocompleteSearch,
+    isAicCodeSystem,
     type DrugAutocompleteCatalogState,
 } from '@/lib/drug-autocomplete-search';
 import { Search, X, Pill, Database, Activity } from 'lucide-react';
@@ -12,6 +13,7 @@ import Link from 'next/link';
 import styles from './drug-autocomplete.module.css';
 
 interface DrugAutocompleteProps {
+    /** Con un catalogo non AIFA il codice non è un AIC: `aic` arriva vuoto e il codice resta nel catalogo. */
     onSelect: (drug: AifaDrug) => void;
     id?: string;
     placeholder?: string;
@@ -29,6 +31,7 @@ export default function DrugAutocomplete({ onSelect, id, placeholder = "Cerca pe
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [catalogState, setCatalogState] = useState<DrugAutocompleteCatalogState>('ready');
+    const [codeSystem, setCodeSystem] = useState<string | undefined>(undefined);
     const [searchFailed, setSearchFailed] = useState(false);
     /* WUL-UIUX (Fase 5): pattern combobox ARIA + navigazione da tastiera. */
     const [activeIndex, setActiveIndex] = useState(-1);
@@ -55,6 +58,7 @@ export default function DrugAutocomplete({ onSelect, id, placeholder = "Cerca pe
                     if (result === null) return;
                     setResults(result.items);
                     setCatalogState(result.catalogState);
+                    setCodeSystem(result.codeSystem);
                     setSearchFailed(false);
                     setActiveIndex(-1);
                     setIsOpen(true);
@@ -98,7 +102,7 @@ export default function DrugAutocomplete({ onSelect, id, placeholder = "Cerca pe
         commitDrugAutocompleteQueryChange(drugSearch, setQuery, drug.name, () => setIsLoading(false)); // WUL-488
         setIsOpen(false);
         setActiveIndex(-1);
-        onSelect(drug);
+        onSelect(isAicCodeSystem(codeSystem) ? drug : { ...drug, aic: '' });
     };
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -176,7 +180,7 @@ export default function DrugAutocomplete({ onSelect, id, placeholder = "Cerca pe
                         <span>Risultati catalogo ({results.length})</span>
                         <span className="flex items-center gap-1">
                             <Database className="w-3 h-3" />
-                            {catalogState === 'ready' ? 'AIFA locale' : 'Catalogo locale'}
+                            {catalogState === 'ready' && isAicCodeSystem(codeSystem) ? 'AIFA locale' : 'Catalogo locale'}
                         </span>
                     </div>
 
@@ -203,11 +207,11 @@ export default function DrugAutocomplete({ onSelect, id, placeholder = "Cerca pe
                                         {drug.activePrinciple}
                                     </div>
                                     <div className="mt-1 truncate text-xs text-[color:var(--lume-ink-muted)]">
-                                        {drug.company} {drug.class ? `• Fascia ${drug.class}` : ''} {drug.atc ? `• ATC: ${drug.atc}` : ''}
+                                        {drug.company} {drug.class ? `• ${isAicCodeSystem(codeSystem) ? 'Fascia' : 'Classe'} ${drug.class}` : ''} {drug.atc ? `• ATC: ${drug.atc}` : ''}
                                     </div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <span className="apple-chip lume-registro text-xs">AIC {drug.aic}</span>
+                                    <span className="apple-chip lume-registro text-xs">{isAicCodeSystem(codeSystem) ? 'AIC' : codeSystem} {drug.aic}</span>
                                     {drug.price !== undefined && drug.price > 0 && (
                                         <div className="mt-1 text-xs font-medium text-[color:var(--lume-ink-muted)]">€ {drug.price.toFixed(2)}</div>
                                     )}
@@ -225,7 +229,7 @@ export default function DrugAutocomplete({ onSelect, id, placeholder = "Cerca pe
                         <>
                             <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Catalogo farmaci non importato.</p>
                             <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
-                                Importa il file AIFA in{' '}
+                                Importa il catalogo AIFA o quello di un’altra agenzia in{' '}
                                 <Link href="/settings/repertori" className="font-semibold text-[color:var(--lume-accent)] underline-offset-2 hover:underline">
                                     Impostazioni, Repertori
                                 </Link>

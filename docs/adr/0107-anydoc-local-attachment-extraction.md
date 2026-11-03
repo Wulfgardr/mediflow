@@ -207,3 +207,33 @@ pre-decodifica delle maschere resta aperto. La soglia non viene alzata e non
 vengono generate derivate. Il visualizzatore condiviso offre il salvataggio
 dell’originale solo dopo un gesto esplicito e l’avviso sulla copia decifrata,
 anche quando la scansione non è visualizzabile.
+
+### Glifi senza contorno nell’anteprima e nella rasterizzazione OCR
+
+Quando un font, incorporato o standard, non ha il contorno di un codice usato
+(per esempio `/Differences [51 /nomeInesistente]` sulla cifra 3), PDF.js 4.10.38
+avanza comunque la penna e disegna un vuoto: «Hb 13.4» diventa «Hb 1 .4» nel
+raster, mentre il codice e lo strato di testo conservano il carattere. Il difetto
+riguardava sia l’anteprima Web sia il raster passato all’OCR.
+
+Dal 3 novembre 2026 entrambi i percorsi leggono i record dei glifi della lista
+di operatori, già normalizzati da PDF.js, prima di disegnare. Una pagina con un
+glifo `isInFont=false` il cui carattere non è uno spazio non viene disegnata:
+l’anteprima mostra il rifiuto di quella pagina, lascia raggiungibili le altre e
+indica «Salva originale»; il worker AnyDoc non produce il raster e la pagina non
+arriva all’OCR. La regola è in `hasUnresolvedPdfGlyph` di
+`lib/pdf-raster-preflight.mjs`, condivisa dai due percorsi.
+
+Gli spazi restano ammessi. PDF.js registra con lo stesso record uno spazio valido
+e un nome di glifo irrisolvibile usato sul codice dello spazio, ma entrambi
+disegnano un avanzamento vuoto e lo strato di testo dice spazio: il raster non
+differisce. Sul corpus sintetico di 30 PDF legittimi (esportazioni DOCX e PDF/A,
+referti con font non incorporati, strati OCR, codifiche Differences valide) la
+regola non rifiuta nessun file; rifiuta i quattro casi con la cifra o la lettera
+mancante, compresi i due della suite GPUI.
+
+Non provato: un font Type3 con un nome di glifo codificato ma senza la
+procedura `CharProcs` corrispondente, che PDF.js potrebbe segnare come presente. Lo strato di testo
+nativo estratto da AnyDoc segue la codifica di base del codice (nel caso sopra
+riporta «13.4»), come fanno gli estrattori PDF comuni; non è un raster di PDF.js
+e non passa da questa regola.

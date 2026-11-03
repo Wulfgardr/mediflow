@@ -53,6 +53,14 @@ const ALLOWLIST = [
             + 'il guasto imprevisto restituisce un messaggio fisso.',
     },
     {
+        file: 'app/api/drugs/catalog-import/route.ts',
+        motivo:
+            "I rami segnalati sono `AifaReductionError`, `DrugCatalogImportError` e `AifaUpdateError`: "
+            + 'messaggi autoriali su file, mappatura, fonte dichiarata e conferma del catalogo farmaci, '
+            + 'senza input del file o eccezioni di sistema. Il guasto imprevisto restituisce un messaggio fisso '
+            + 'e conserva il catalogo.',
+    },
+    {
         file: 'app/api/siss/context/route.ts',
         motivo:
             "Il ramo segnalato e' `error instanceof SissPatientContextError`: una classe di dominio "

@@ -1,4 +1,4 @@
-// ADR 0176: conservazione dei dati sanitari. Lettura della revisione, finestre del
+// ADR 0178: conservazione dei dati sanitari. Lettura della revisione, finestre del
 // titolare, blocchi e scarto confermato; sessione Web admin soltanto.
 import { NextResponse } from 'next/server';
 import { archiveReplacementResponse } from '@/lib/api-error-response';

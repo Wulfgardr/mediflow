@@ -49,7 +49,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
                 href: '/settings/profilo',
                 label: 'Profilo',
                 description: 'Nome medico e ambulatorio',
-                keywords: ['nome medico', 'nome ambulatorio', 'intestazione ricette', 'profilo', 'account'],
+                keywords: ['nome medico', 'nome ambulatorio', 'intestazione ricette', 'profilo', 'account', 'personalizzazione territoriale', 'lombardia', 'siss'],
             },
             {
                 id: 'aspetto',

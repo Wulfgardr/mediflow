@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.52.0
+  version: 1.53.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -1974,7 +1974,11 @@ paths:
         scope. `version` is required and stale versions return
         `VERSION_CONFLICT`. A `status` change must follow the allowed
         transition table, otherwise the request returns 409
-        `status_transition_not_allowed` before any write. This route requires
+        `status_transition_not_allowed` before any write. A stale version is
+        accepted with no write only when the item and its prescription are
+        already in the requested `status` and the body carries nothing but
+        `version`, `status` and dates: the change was already applied by the
+        prescription update. This route requires
         `network.replica.write-service-prescriptions`.
       security:
         - pairedClientId: []
@@ -9011,6 +9015,10 @@ components:
             items that were in its previous status move to `status` in one
             transaction. Items in any other status stay as they are. An item
             added, removed or changed meanwhile makes the whole request a 409.
+            Without `items`, a `status` change moves the same items in the same
+            transaction without the version check, for clients that still
+            update each item on its own; each moved item is audited with reason
+            `status_cascade_without_items`.
           items:
             type: object
             additionalProperties: false

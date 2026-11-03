@@ -101,7 +101,7 @@ export async function POST(request: Request) {
                 status: 409, value: { error: 'Patient is still active: soft-delete it before purging' },
             };
 
-            // ADR 0176: un blocco per contenzioso o richiesta sospende anche questa cancellazione.
+            // ADR 0178: un blocco per contenzioso o richiesta sospende anche questa cancellazione.
             try { assertNoRetentionHold(tx, patientId); } catch (error) {
                 if (error instanceof RetentionError) return { status: 409, value: { error: 'Legal hold active', code: 'legal_hold' } };
                 throw error;
