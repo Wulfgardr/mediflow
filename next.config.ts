@@ -144,6 +144,7 @@ const nextConfig: NextConfig = {
       "./node_modules/@pdf-lib/**/*",
       "./node_modules/pdfjs-dist/package.json",
       "./node_modules/pdfjs-dist/legacy/build/**/*",
+      "./node_modules/pdfjs-dist/standard_fonts/*",
       "./node_modules/sharp/**/*",
       "./node_modules/detect-libc/**/*",
       "./node_modules/.pnpm/node_modules/semver/**/*",

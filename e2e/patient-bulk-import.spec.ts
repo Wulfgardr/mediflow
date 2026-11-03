@@ -68,7 +68,11 @@ async function unlockPassphrase(page: Page): Promise<void> {
     const input = page.getByLabel('Passphrase', { exact: true });
     await expect(input).toBeVisible();
     const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
-    if (await renew.isVisible() && await renew.isEnabled()) await renew.click();
+    // After first setup the tab closes its own session: the renew button can
+    // appear for a moment and leave. Its disappearance means no renewal is due.
+    if (await renew.isVisible() && await renew.isEnabled({ timeout: 1_000 }).catch(() => false)) {
+        await renew.click({ timeout: 1_000 }).catch(() => undefined);
+    }
     await expect(input).toBeEnabled();
     await input.fill(PASSPHRASE);
     const response = page.waitForResponse(item => item.request().method() === 'POST' && new URL(item.url()).pathname === '/api/auth/login');

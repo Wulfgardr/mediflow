@@ -80,7 +80,12 @@ class PdfPageWorkerSmokeError extends Error {}
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
-const ANYDOC_PDF_PAGE_WORKER_SHA256 = 'a199010e58679ba5cc0a84866b01dc4faf4f4137e740c43e6377a198b55cb3f4';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = 'a7830f7afeb3946d907af1c01121fb030be9dcb62f7defb7833bedfc8af565f9';
+const PDFJS_STANDARD_FONT_FILES = Object.freeze([
+  'FoxitDingbats.pfb', 'FoxitFixed.pfb', 'FoxitFixedBold.pfb', 'FoxitFixedBoldItalic.pfb', 'FoxitFixedItalic.pfb',
+  'FoxitSerif.pfb', 'FoxitSerifBold.pfb', 'FoxitSerifBoldItalic.pfb', 'FoxitSerifItalic.pfb', 'FoxitSymbol.pfb',
+  'LiberationSans-Bold.ttf', 'LiberationSans-BoldItalic.ttf', 'LiberationSans-Italic.ttf', 'LiberationSans-Regular.ttf',
+]);
 const ANYDOC_PDF_CHILD_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1';
 const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
 const ANYDOC_LOCAL_EXTRACTION_ROUTE_DIRECTORY = path.join(
@@ -589,6 +594,8 @@ function standalonePdfChildDependenciesFailure(standaloneDir, requireFromStandal
       requireFromPdfLib.resolve('tslib'),
       createRequire(standardFontsEntry).resolve('pako'),
       createRequire(upngEntry).resolve('pako'),
+      // The page worker draws non-embedded standard fonts only from these package assets.
+      ...PDFJS_STANDARD_FONT_FILES.map((file) => path.join(path.dirname(pdfJsManifest), 'standard_fonts', file)),
     ];
     const root = fs.realpathSync(standaloneDir);
     for (const entry of runtimeEntries) {
