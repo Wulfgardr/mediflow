@@ -62,3 +62,16 @@ test('direct Node startup registers its own loader before resolving the broker a
   assert.deepEqual(JSON.parse(result.stdout), { status: 'denied' });
   assert.doesNotMatch(result.stderr, /ERR_MODULE_NOT_FOUND/);
 });
+
+test('supervisor and both card owners admit the same exact Node, so the clinical card is not denied by construction', async () => {
+  // chat-card-process-owner.mjs starts the owner with its own process.execPath:
+  // two different exact pins would deny every clinical card on the real path.
+  const { readFileSync } = await import('node:fs');
+  const pins = ['chat-card-process-owner.mjs', 'chat-card-native-owner.mjs', 'chat-card-clinical-owner.mjs'].map(name => {
+    const source = readFileSync(new URL(`./${name}`, import.meta.url), 'utf8');
+    const found = [...source.matchAll(/process\.versions\.node !== '(\d+\.\d+\.\d+)'/gu)].map(match => match[1]);
+    assert.equal(found.length, 1, name);
+    return found[0];
+  });
+  assert.deepEqual(new Set(pins).size, 1, pins.join(' / '));
+});
