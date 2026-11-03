@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession } from './utils';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 test('two profile editors retain a conflicting draft, reread explicitly and save canonical values', async ({ browser, baseURL }, testInfo) => {
     const contextA = await browser.newContext({ baseURL });
@@ -65,7 +66,7 @@ test('a lost save response preserves draft and requires reread without a second 
     });
     await page.route('**/api/auth/profile', async route => {
         if (route.request().method() !== 'PUT') return route.continue();
-        const committed = await route.fetch();
+        const committed = await fetchInterceptedRequest(route);
         expect(committed.status()).toBe(200);
         expect((await committed.json()).changed).toBe(true);
         await route.abort('failed');

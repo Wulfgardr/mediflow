@@ -926,7 +926,7 @@ pub(crate) fn prepare_clinical(pending: &Pending) {
             b.context.clone(),
             profile.version,
             p.cancelled.clone(),
-            serde_json::json!({"selection":{"diagnoses":diagnoses, "noteExcerpts":excerpts}, "knownIdentifiers":super::clinical::known_identifiers(profile)}),
+            serde_json::json!({"patient":b.session.chat_selection_mark()?, "selection":{"diagnoses":diagnoses, "noteExcerpts":excerpts}, "knownIdentifiers":super::clinical::known_identifiers(profile)}),
         );
         p.state = State::Preparing;
         Some(result)
@@ -970,7 +970,11 @@ pub(crate) fn consume_card(pending: &Pending) -> (State, Option<String>) {
         payload = if let Some((bytes, _, _)) = p.catalog.take() {
             Some(bytes)
         } else {
-            p.card.as_mut().and_then(|c| c.consume())
+            // Read now, not at binding: the clinical owner must see the selection of this moment.
+            let selection = binding.as_ref().and_then(|(s, _)| s.chat_selection_mark());
+            p.card
+                .as_mut()
+                .and_then(|c| c.consume(selection.as_deref()))
         };
     }
     let valid = payload.is_some()
@@ -1357,6 +1361,35 @@ pub(crate) mod tests {
         assert_eq!(p.status(), State::Approved);
         drop(p);
         assert_eq!(consume_card(&pending), (State::Withdrawn, None));
+    }
+
+    #[test]
+    fn clinical_owner_selection_mark_changes_with_every_patient_selection() {
+        let (pending, _remote, session, _host) = clinical_request();
+        let first = session.chat_selection_mark().unwrap();
+        assert_eq!(first.len(), 64);
+        assert!(
+            first
+                .bytes()
+                .all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'))
+        );
+        assert!(!first.contains("patient-a") && !first.contains("Amina"));
+        assert_eq!(
+            session.chat_selection_mark().as_deref(),
+            Some(first.as_str())
+        );
+        session
+            .select_profile_patient("scope-a", "patient-b")
+            .unwrap();
+        let other = session.chat_selection_mark().unwrap();
+        session
+            .select_profile_patient("scope-a", "patient-a")
+            .unwrap();
+        let again = session.chat_selection_mark().unwrap();
+        assert!(other != first && again != first && again != other);
+        session.begin_profile_creation("scope-a").unwrap();
+        assert_eq!(session.chat_selection_mark(), None);
+        drop(pending);
     }
 
     pub(crate) fn clinical_request() -> (Pending, UnixStream, RuntimeSession, Host) {
