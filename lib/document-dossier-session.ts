@@ -27,6 +27,7 @@ import {
     type DossierFactAssessment, type DossierHostExtraction, type DossierIdentityEvaluation, type DossierRecord, type DossierResidualSegment,
     type DossierSourceClassification, type DossierTaxCodeEvidence, type DossierWriteClaim,
 } from './domain/documents/dossier-import';
+import { preparedBulkDecisions, preparedDossierFacts, preparedPatientKey, preparedPatientLabel, type PreparedExtraction, type PreparedPatient } from './domain/documents/dossier-prepared';
 import { sameClinicalText, sameClinicalValue, sameDay, sameDosage, sameOptional, sameUnit } from './domain/documents/dossier-clinical-equality';
 
 // ---------------------------------------------------------------------------
@@ -109,6 +110,8 @@ export interface DossierDraftSource {
     status: DossierSourceStatus;
     duplicateOf?: string;
     file: DossierInputFile;
+    /** Corrispondenza nell'estrazione preparata, per sha256 (ADR 0176). */
+    prepared?: { patient: PreparedPatient | null; patientLabel: string; notes: string[]; facts: number };
 }
 
 export interface DossierDraftGroup { key: string; sources: DossierDraftSource[] }
@@ -134,9 +137,11 @@ async function extractWithRetry(ports: DossierPorts, bytes: Uint8Array, signal: 
 }
 
 export async function buildDossierInventory(
-    ports: DossierPorts, files: readonly DossierInputFile[], options: { signal: AbortSignal; isCurrent: () => boolean; onProgress?: (done: number, total: number) => void },
+    ports: DossierPorts, files: readonly DossierInputFile[],
+    options: { signal: AbortSignal; isCurrent: () => boolean; onProgress?: (done: number, total: number) => void; prepared?: PreparedExtraction | null },
 ): Promise<DossierDraftGroup[]> {
     const { signal, isCurrent } = options;
+    const preparedSources = new Map((options.prepared?.sources ?? []).map((source) => [source.sha256, source]));
     const exemptionCodes = await ports.exemptionCodes(signal);
     assertLive(signal, isCurrent);
     const sources: DossierDraftSource[] = [];
@@ -177,11 +182,25 @@ export async function buildDossierInventory(
         const candidates = text && extraction.state === 'extracted'
             ? extractDossierCandidates({ fileName: file.name, text, units: extraction.units, documentDate: date?.date ?? null, exemptionCodes })
             : { facts: [], classification: 'unknown' as const };
-        sources.push({ key, group: groupKeyOf(file.relativePath), relativePath: file.relativePath, fileName: file.name, size: file.size, sha256,
-            classification, extraction, text, taxCodes: text ? collectDossierTaxCodes(text) : [],
-            documentDate: date ? { value: date.date, source: date.source } : null,
-            facts: candidates.facts, classificationResult: candidates.classification,
-            status: duplicateOf ? 'duplicate_in_selection' : 'ready', ...(duplicateOf ? { duplicateOf } : {}), file });
+        const taxCodes = text ? collectDossierTaxCodes(text) : [];
+        const match = duplicateOf ? undefined : preparedSources.get(sha256);
+        let facts = candidates.facts;
+        let prepared: DossierDraftSource['prepared'];
+        let preparedDate: string | null = null;
+        if (match) {
+            const merged = preparedDossierFacts({ source: match, text, units: extraction.state === 'extracted' ? extraction.units : [],
+                documentDate: date?.date ?? null, parserFacts: candidates.facts, now: ports.now() });
+            facts = merged.facts;
+            preparedDate = merged.documentDate;
+            prepared = { patient: match.patient, patientLabel: preparedPatientLabel(match.patient), notes: merged.notes, facts: merged.facts.filter((fact) => fact.origin === 'prepared').length };
+            // Il CF dell'estrazione raggruppa soltanto: il controllo d'identità resta sui codici letti da MediFlow.
+        }
+        const documentDate = date ? { value: date.date, source: date.source } : preparedDate ? { value: preparedDate, source: 'text' as const } : null;
+        const group = (match && preparedPatientKey(match.patient)) || groupKeyOf(file.relativePath);
+        sources.push({ key, group, relativePath: file.relativePath, fileName: file.name, size: file.size, sha256,
+            classification, extraction, text, taxCodes, documentDate,
+            facts, classificationResult: candidates.classification,
+            status: duplicateOf ? 'duplicate_in_selection' : 'ready', ...(duplicateOf ? { duplicateOf } : {}), ...(prepared ? { prepared } : {}), file });
         options.onProgress?.(index + 1, files.length);
     }
     const groups = new Map<string, DossierDraftSource[]>();
@@ -307,7 +326,7 @@ async function acquireOne(
             // Senza leggere tutti gli artefatti non si può escludere un duplicato.
             if (seen.some((item) => item.artifactUnreadable)) return { key: source.key, status: 'failed', reason: 'artifact_conflict' };
             const existing = recordsBySha(seen).get(source.sha256);
-            if (existing) return await verifyReadback(ports, existing, bytes, source.key, 'reused', signal, guard);
+            if (existing) return await verifyReadback(ports, existing, bytes, source.key, 'reused', signal, guard, preparedMergeFor(existing, source));
             // Un allegato già in app senza record dossier: stessa dimensione, poi confronto dei byte.
             for (const candidate of seen.filter((item) => item.size === bytes.byteLength && readDossierRecord(item.parseEvidenceArtifactSnapshot).status === 'absent')) {
                 const stored = await ports.readAttachmentBytes(candidate.id, patientId, signal);
@@ -367,6 +386,17 @@ async function acquireOne(
     } finally { bytes.fill(0); }
 }
 
+/**
+ * Proposte preparate da aggiungere a un dossier già acquisito: solo se il testo conservato è lo
+ * stesso su cui le citazioni sono state verificate, altrimenti gli offset non varrebbero.
+ */
+function preparedMergeFor(existing: DossierAttachmentMeta, source: DossierDraftSource): DossierFact[] {
+    const read = readDossierRecord(existing.parseEvidenceArtifactSnapshot);
+    if (read.status !== 'present' || read.record.extraction.state !== 'extracted' || source.extraction.state !== 'extracted') return [];
+    if (read.record.extraction.text.sha256 !== source.extraction.text.sha256) return [];
+    return source.facts.filter((fact) => fact.origin === 'prepared');
+}
+
 function withInlineText(record: DossierRecord, text: string | null): DossierRecord {
     if (record.extraction.state !== 'extracted' || text === null) return record;
     return { ...record, extraction: { ...record.extraction, text: { ...record.extraction.text, location: 'inline', inline: text } } };
@@ -378,7 +408,7 @@ function withInlineText(record: DossierRecord, text: string | null): DossierReco
  */
 async function verifyReadback(
     ports: DossierPorts, attachment: DossierAttachmentMeta, bytes: Uint8Array, key: string, status: 'stored' | 'reused',
-    signal: AbortSignal, guard: Guard,
+    signal: AbortSignal, guard: Guard, mergeFacts: readonly DossierFact[] = [],
 ): Promise<DossierAcquireOutcome> {
     const read = readDossierRecord(attachment.parseEvidenceArtifactSnapshot);
     if (read.status !== 'present') return { key, status: 'failed', reason: 'artifact_conflict', attachmentId: attachment.id };
@@ -387,7 +417,16 @@ async function verifyReadback(
     const same = Boolean(stored && dataEqual(stored, bytes));
     stored?.fill(0);
     const now = ports.now().toISOString();
-    const record: DossierRecord = { ...read.record, updatedAt: now, preservation: same
+    // Un dossier già acquisito riceve le nuove proposte preparate da decidere; quelle note restano come sono.
+    const known = new Set(read.record.facts.map((fact) => fact.factId));
+    let added = same ? mergeFacts.filter((fact) => !known.has(fact.factId)) : [];
+    if (added.length) {
+        // Un'aggiunta che porterebbe l'artefatto oltre il limite non si fa: il dossier resta com'era.
+        const probe = writeDossierRecordIntoSnapshot(attachment.parseEvidenceArtifactSnapshot, { ...read.record, facts: [...read.record.facts, ...added] },
+            { attachmentId: attachment.id, fileName: read.record.source.fileName, text: null });
+        if (await ports.measureArtifact(probe) > ports.limits.updateRequestBytes) added = [];
+    }
+    const record: DossierRecord = { ...read.record, updatedAt: now, ...(added.length ? { facts: [...read.record.facts, ...added] } : {}), preservation: same
         ? { reusedExisting: read.record.preservation.reusedExisting, state: 'verified', verifiedAt: now, ...(attachment.currentness ? { verifiedSourceRef: attachment.currentness.sourceRef } : {}) }
         : { reusedExisting: read.record.preservation.reusedExisting, state: 'mismatch' } };
     try {
@@ -639,9 +678,9 @@ function recordFor(fact: DossierFact, patientId: string, attachmentId: string, n
     const base = { id, patientId };
     switch (fact.kind) {
         case 'therapy': {
-            const record = { ...base, drugName: v.drugName.trim(), dosage: v.dosage.trim(), status: v.status, startDate: dateIso(v.startDate),
+            const record = { ...base, drugName: v.drugName.trim(), activePrinciple: v.activePrinciple?.trim() || null, dosage: v.dosage.trim(), status: v.status, startDate: dateIso(v.startDate),
                 endDate: v.endDate ? dateIso(v.endDate) : null, motivation: `Da documento ${fact.evidence ? `(unità ${fact.evidence.unit})` : ''}`.trim(), createdAt: now };
-            return { table: 'therapies', record, matches: payloadMatcher({ patientId: 'exact', drugName: 'text', dosage: 'dosage', status: 'exact', startDate: 'day', endDate: 'day', motivation: 'text' }, record) };
+            return { table: 'therapies', record, matches: payloadMatcher({ patientId: 'exact', drugName: 'text', activePrinciple: 'text', dosage: 'dosage', status: 'exact', startDate: 'day', endDate: 'day', motivation: 'text' }, record) };
         }
         case 'observation': {
             const record = { ...base, codeSystem: 'LOINC', code: v.code.trim(), display: v.display.trim(), unitSystem: 'UCUM', unitCode: v.unitCode.trim(),
@@ -669,7 +708,8 @@ function recordFor(fact: DossierFact, patientId: string, attachmentId: string, n
                 v.certainty ? `Certezza: ${v.certainty}.` : ''].filter(Boolean).join(' ');
             const body = fact.kind === 'reported_scale'
                 ? `Totale trascritto dal documento, non una somministrazione: ${v.scaleName} ${v.scaleTotal}${v.scaleMax ? `/${v.scaleMax}` : ''}.${v.text ? `\n\n${v.text}` : ''}`
-                : v.textSource === 'document' ? documentText ?? '' : v.text;
+                : v.textSource === 'document' ? documentText ?? ''
+                    : v.textSource === 'prepared' ? [v.text, v.preparedNotes, 'Sintesi da estrazione preparata; il testo completo resta nell’allegato.'].filter(Boolean).join('\n\n') : v.text;
             const content = qualifiers ? `${qualifiers}\n\n${body}` : body;
             const record = { ...base, type: entryType(fact.kind), date: dateIso(v.date), title, content,
                 attachments: [attachmentId], metadata: { dossier: { factRef: dossierFactRef(attachmentId, fact.factId), kind: fact.kind } },
@@ -921,4 +961,110 @@ async function releaseClaim(
         }
     }
     return false;
+}
+
+// ---------------------------------------------------------------------------
+// Accettazione in blocco del verificato (ADR 0176)
+// ---------------------------------------------------------------------------
+
+export interface DossierBulkResult {
+    documents: number;
+    accepted: number;
+    alreadyPresent: number;
+    superseded: number;
+    leftPending: number;
+    residualAcknowledged: number;
+    applied: DossierApplyResult[];
+    skipped: number;
+}
+
+/**
+ * Un solo gesto del medico per scheda: accetta le proposte verificate sulla fonte, nuove e
+ * senza blocchi, segna come già presenti quelle in scheda o accettate in un'altra fonte,
+ * rifiuta le proposte per sezione sostituite dall'estrazione preparata, conferma il residuo
+ * solo dove l'estrazione dichiara coperte tutte le pagine; poi applica con i writer ordinari.
+ * Conflitti, incertezze, negazioni e citazioni non trovate restano da decidere.
+ */
+export async function acceptVerifiedAndApply(
+    ports: DossierPorts, input: { patientId: string; signal: AbortSignal; isCurrent: () => boolean; includeSummaries?: boolean },
+): Promise<DossierBulkResult> {
+    const { patientId, signal, isCurrent } = input;
+    const includeSummaries = input.includeSummaries === true;
+    const guard = guardOf(signal, isCurrent);
+    const result: DossierBulkResult = { documents: 0, accepted: 0, alreadyPresent: 0, superseded: 0, leftPending: 0, residualAcknowledged: 0, applied: [], skipped: 0 };
+    const view = await loadPatientDossier(ports, patientId, signal);
+    guard();
+    if (!view) return result;
+    const acceptedElsewhere = new Set(view.documents.flatMap((document) => document.record.facts
+        .filter((fact) => fact.decision === 'accepted' || fact.decision === 'already_present').map((fact) => dossierFactRef(document.attachment.id, fact.factId))));
+    for (const document of view.documents) {
+        if (document.coverage.gaps.includes('identity_conflict') || !document.preservationCurrent || !document.attachment.currentness) { result.skipped += 1; continue; }
+        const decide = (record: DossierRecord) => preparedBulkDecisions({ record, documentKey: document.attachment.id,
+            assessment: (ref) => view.assessments.get(ref), exemptionCodes: view.exemptionCodes, acceptedElsewhere, includeSummaries });
+        const preview = decide(document.record);
+        const acknowledge = preview.acknowledgeResidual && document.record.residualReview.state !== 'acknowledged';
+        result.documents += 1;
+        if (!preview.counts.accepted && !preview.counts.alreadyPresent && !preview.counts.superseded && !acknowledge) {
+            result.leftPending += preview.counts.leftPending;
+            continue;
+        }
+        let decided = preview;
+        try {
+            await saveDossierReview(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent,
+                change: (fresh) => {
+                    decided = decide(fresh);
+                    return { ...fresh, facts: decided.facts, residualReview: decided.acknowledgeResidual && fresh.residualReview.state !== 'acknowledged'
+                        ? { state: 'acknowledged', at: ports.now().toISOString(), note: 'Sintesi accettata; pagine dichiarate lette coerenti con il testo conservato.' }
+                        : fresh.residualReview };
+                } });
+        } catch (error) {
+            // Un documento cambiato o con scritture in volo si salta; gli altri proseguono.
+            if (error instanceof DossierStaleError || error instanceof DossierWriteInFlight) { result.skipped += 1; continue; }
+            throw error;
+        }
+        guard();
+        for (const ref of decided.accepted) acceptedElsewhere.add(ref);
+        result.accepted += decided.counts.accepted; result.alreadyPresent += decided.counts.alreadyPresent;
+        result.superseded += decided.counts.superseded; result.leftPending += decided.counts.leftPending;
+    }
+    const hasPrepared = (record: DossierRecord) => record.facts.some((fact) => fact.origin === 'prepared');
+    const fresh = await loadPatientDossier(ports, patientId, signal);
+    guard();
+    for (const document of fresh?.documents ?? []) {
+        // Solo i documenti con estrazione preparata: gli altri restano al pulsante «Applica» del documento.
+        if (!hasPrepared(document.record) || !document.attachment.currentness || document.coverage.gaps.includes('identity_conflict')) continue;
+        const ready = document.record.facts.some((fact) => eligible(document.record, fact, fresh!.exemptionCodes));
+        if (!ready) continue;
+        result.applied.push(await applyDossierDocument(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent }));
+        guard();
+    }
+    // Dopo la scrittura: dove la sintesi è scritta e riletta, la voce col testo intero lascia il posto e il residuo si conferma.
+    const after = await loadPatientDossier(ports, patientId, signal);
+    guard();
+    for (const document of after?.documents ?? []) {
+        if (!hasPrepared(document.record) || !document.attachment.currentness) continue;
+        const final = preparedBulkDecisions({ record: document.record, documentKey: document.attachment.id, assessment: (ref) => after!.assessments.get(ref),
+            exemptionCodes: after!.exemptionCodes, acceptedElsewhere, includeSummaries: false });
+        const acknowledge = final.acknowledgeResidual && document.record.residualReview.state !== 'acknowledged';
+        if (!final.counts.superseded && !acknowledge) continue;
+        try {
+            await saveDossierReview(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent,
+                change: (record) => {
+                    const decided = preparedBulkDecisions({ record, documentKey: document.attachment.id, assessment: (ref) => after!.assessments.get(ref),
+                        exemptionCodes: after!.exemptionCodes, acceptedElsewhere, includeSummaries: false });
+                    return { ...record, facts: decided.facts, residualReview: decided.acknowledgeResidual && record.residualReview.state !== 'acknowledged'
+                        ? { state: 'acknowledged', at: ports.now().toISOString(), note: 'Sintesi scritta e riletta; pagine dichiarate lette coerenti con il testo conservato.' }
+                        : record.residualReview };
+                } });
+        } catch (error) {
+            if (error instanceof DossierStaleError || error instanceof DossierWriteInFlight) { result.skipped += 1; continue; }
+            throw error;
+        }
+        guard();
+        // Ciò che la seconda fase sostituisce era «da decidere» nella prima.
+        result.superseded += final.counts.superseded;
+        result.leftPending = Math.max(0, result.leftPending - final.counts.superseded);
+        if (acknowledge) result.residualAcknowledged += 1;
+    }
+    return result;
 }

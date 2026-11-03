@@ -127,6 +127,12 @@ export default function AifaCatalogManager({ expanded, onExpandedChange }: { exp
                             <p className="mt-1">Il manifest identifica il file importato; non certifica autenticità o licenza dello specifico dataset.</p>
                         </Disclosure>
                     </div>
+                ) : drugCatalog?.source?.kind === 'file' ? (
+                    <div className={styles.provenance}>
+                        <p className="font-semibold">Catalogo attivo da un’altra agenzia</p>
+                        <p className="mt-1 break-words">{drugCatalog.source.agency} · {drugCatalog.source.codeSystem} {drugCatalog.source.version} del {drugCatalog.source.date} · {formatCountLabel(drugCatalog.source.rowCount, 'voce', 'voci')}</p>
+                        <p className="mt-1">Un aggiornamento o un caricamento AIFA lo sostituisce.</p>
+                    </div>
                 ) : drugCatalog?.state === 'unverified' ? (
                     <div className={`rounded-[var(--lume-radius-control)] border p-4 text-sm leading-6 ${semanticSignalSurfaceClass('warning')}`}>
                         Il catalogo esistente non ha un manifest. Reimporta il CSV con i dati di provenienza.

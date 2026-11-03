@@ -1,4 +1,5 @@
 /* application-level allocation/complexity budgets, not a PDF parser heap quota. */
+import { hasUnresolvedPdfGlyph } from '../lib/pdf-raster-preflight.mjs';
 import { assertImageSize, clearPreviewCanvas, PREVIEW_LIMITS, PreviewError } from './document-viewer-policy.ts';
 
 export type PreviewOperatorList = { fnArray: number[]; argsArray: unknown[] };
@@ -7,7 +8,7 @@ export type PreviewImageOps = { image: number; inline: number; mask: number; rep
 // Pinned PDF.js 4.10.38 shared/util.js OPS and core/evaluator.js protocol.
 // Keep the guard dependency-free; the adapter supplies image opcodes and the
 // delivery parser regression checks these representations against the real build.
-const STROKE_RGB = 58, FILL_RGB = 59, CONSTRUCT_PATH = 91;
+const SHOW_TEXT = 44, STROKE_RGB = 58, FILL_RGB = 59, CONSTRUCT_PATH = 91;
 const argumentFree = new Set([
     10, 11, 18, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 43,
     71, 72, 73, 75, 77, 81, 90, 92, 93,
@@ -159,6 +160,8 @@ export function checkPdfOperators(list: PreviewOperatorList, codes: PreviewImage
             else walk(args[2], 1);
         } else walk(args, 0);
     }
+    // A glyph without an outline would be painted as a gap inside a value.
+    if (hasUnresolvedPdfGlyph(list.fnArray, list.argsArray, SHOW_TEXT)) throw new PreviewError('unresolved_glyph');
 }
 
 type Surface = { canvas: HTMLCanvasElement | null; context: CanvasRenderingContext2D | null };

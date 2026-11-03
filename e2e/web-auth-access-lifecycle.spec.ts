@@ -100,7 +100,8 @@ test('Web access recovers across application lock, logout, and synthetic admin r
     headers: { ...trustedWebRequestHeaders(baseURL), 'x-mediflow-archive-generation': archiveGeneration },
   });
   expect(reset.status()).toBe(200);
-  await expect(reset.json()).resolves.toEqual({ success: true });
+  await expect(reset.json()).resolves.toMatchObject({ success: true,
+    receipt: { outcome: 'completed', reconciled: false, previousArchive: { retained: true } } });
 
   const afterReset = await request.get('/api/patients');
   expect(afterReset.status()).toBe(401);

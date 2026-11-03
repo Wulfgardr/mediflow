@@ -1,4 +1,4 @@
-// ADR 0176: conservazione dei dati sanitari per giurisdizione.
+// ADR 0178: conservazione dei dati sanitari per giurisdizione.
 // Modulo puro: profili, categorie, fonti, classificazione e valutazione del
 // fascicolo. Nessun accesso al database, nessuna cancellazione.
 import { z } from 'zod';

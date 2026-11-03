@@ -39,7 +39,7 @@ async function installAgendaDiaryFixture(page: Page, baseURL: string) {
     if (path === '/api/plugin-local-ui/pairing' && method === 'GET') return route.fulfill({ json: { available: false, pending: [], active: [] } });
     if (path === '/api/siss/session-status') return route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } });
     if (path === '/api/clinical-agenda/candidates') { calls.push({ path, search: url.search, method, mocked: true }); return route.fulfill({ json: { enabled: false, stats: { candidates: 0, parsed: 0, ignored: 0, invalid: 0 }, candidates: [], sources: [] } }); }
-    if (/^\/api\/(ai|icd|system|drugs|exemptions|prosthetics)(?:\/|$)/.test(path) && path !== '/api/system/revision') return deny();
+    if (/^\/api\/(ai|icd|system|drugs|exemptions|prosthetics)(?:\/|$)/.test(path) && path !== '/api/system/revision' && path !== '/api/system/territorial-packs') return deny();
     if (/^\/api\/(patients|checkups|entries)(?:\/|$)/.test(path)) {
       calls.push({ path, search: url.search, method, mocked: true });
       if (method !== 'GET') return deny();
@@ -57,7 +57,7 @@ async function installAgendaDiaryFixture(page: Page, baseURL: string) {
       return route.fulfill({ json: [] });
     }
     const ownedAuth = ['/api/auth/check', '/api/auth/setup', '/api/auth/login', '/api/auth/lock', '/api/auth/rewrap-master-key'].includes(path);
-    const ownedRead = method === 'GET' && (path === '/api/onboarding/work-profile' || path === '/api/settings' || path.startsWith('/api/settings/') || path === '/api/system/revision');
+    const ownedRead = method === 'GET' && (path === '/api/onboarding/work-profile' || path === '/api/settings' || path.startsWith('/api/settings/') || path === '/api/system/revision' || path === '/api/system/territorial-packs');
     if (path.startsWith('/api/') && !ownedAuth && !ownedRead) return deny();
     return route.continue();
   };

@@ -239,6 +239,16 @@ test('synthesis requires explicit context, leaves summary readable and disclosur
     await expect(page.getByText('not_established', { exact: true })).toBeVisible();
 });
 
+test('choosing the ambulatory keeps the model chosen for this proposal', async t => {
+    const page = await pageFor(t, '/synthesis');
+    const picker = page.getByText(/^Selettore sostituito solo nel test/);
+    await harness.expect(picker).toContainText('Modello: synthetic-model-choice');
+    await page.getByRole('button', { name: 'Genera proposta', exact: true }).click();
+    await page.getByRole('combobox').selectOption('ui06-ambulatory');
+    await harness.expect(page.getByRole('checkbox')).toBeEnabled();
+    await harness.expect(picker).toContainText('Modello: synthetic-model-choice');
+});
+
 test('unavailable context exposes a readable status and retains the full technical outcome in disclosure', async t => {
     const page = await pageFor(t, '/synthesis?mode=unavailable');
     await page.getByRole('button', { name: 'Genera proposta', exact: true }).click();

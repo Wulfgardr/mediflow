@@ -1,4 +1,4 @@
-// ADR 0176: stato della conservazione nell'host. Tutte le funzioni lavorano sulla
+// ADR 0178: stato della conservazione nell'host. Tutte le funzioni lavorano sulla
 // transazione del chiamante; lo scarto passa soltanto dalla cascata canonica.
 import { randomUUID } from 'node:crypto';
 import { getTableName, sql } from 'drizzle-orm';

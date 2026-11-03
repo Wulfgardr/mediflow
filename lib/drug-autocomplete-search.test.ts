@@ -6,6 +6,7 @@ import {
     commitDrugAutocompleteQueryChange,
     createDrugAutocompleteSearch,
     fetchDrugAutocomplete,
+    isAicCodeSystem,
 } from './drug-autocomplete-search';
 
 const { webDrug: parityDrug } = JSON.parse(readFileSync(
@@ -116,4 +117,13 @@ test('coordinator aborts the prior request and suppresses its stale response', a
     assert.equal(pending[2].signal.aborted, true);
     pending[2].resolve(jsonResponse([{ aic: '2', name: 'Secondo farmaco' }]));
     assert.equal(await selected, null);
+});
+
+test('con un catalogo di un’altra agenzia la codifica dichiarata arriva al chiamante e non passa per AIC', async () => {
+    const fetchImpl: typeof fetch = async () => new Response(JSON.stringify([{ aic: 'SYN-001', name: 'Farmaco sintetico' }]), {
+        status: 200, headers: { 'X-MediFlow-Aifa-Catalog': 'ready', 'X-MediFlow-Drug-Code-System': encodeURIComponent('Codifica sintetica è') } });
+    const result = await fetchDrugAutocomplete('farmaco', new AbortController().signal, fetchImpl);
+    assert.equal(result.codeSystem, 'Codifica sintetica è');
+    assert.equal(isAicCodeSystem(result.codeSystem), false);
+    assert.equal(isAicCodeSystem('AIC'), true);
 });

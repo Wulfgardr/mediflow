@@ -1,4 +1,4 @@
-# ADR 0176: conservazione dei dati sanitari per giurisdizione
+# ADR 0178: conservazione dei dati sanitari per giurisdizione
 
 Data: 2026-11-03. Stato: Proposed.
 Decisione di Leonardo del 3/11/2026: la conservazione entra nella 0.9.1 con

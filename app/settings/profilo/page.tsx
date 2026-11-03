@@ -11,6 +11,7 @@ import { AccountProfileDraftMemory } from '@/lib/security/account-profile-draft'
 import { AccountProfileEditor, type ProfileEditorState } from '@/lib/security/account-profile-editor';
 import { captureClientAccountAuthority, observeArchiveGeneration, subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
 import { WorkProfileSettings } from '@/components/work-profile-onboarding';
+import { TerritorialPackSettings } from '@/components/settings/territorial-pack-settings';
 import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 import {
     SETTINGS_INPUT_CLASS,
@@ -130,6 +131,9 @@ export default function SettingsProfilePage() {
             <Disclosure title="Il tuo modo di lavorare" headingLevel={3} className={styles.section}
                 open={workProfileOpen} onOpenChange={setWorkProfileOpen}>
                 <WorkProfileSettings showHeading={false} />
+            </Disclosure>
+            <Disclosure title="Personalizzazione territoriale" headingLevel={3} className={styles.section}>
+                <TerritorialPackSettings />
             </Disclosure>
         </section>
     );
