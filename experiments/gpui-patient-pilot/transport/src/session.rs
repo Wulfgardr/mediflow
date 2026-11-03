@@ -8150,6 +8150,8 @@ mod tests {
                     crate::RetirementNotice::new(Some(path)).pending(),
                     status == 503
                 );
+                // On Windows the live instance holds its marker open.
+                drop((notice, session));
                 std::fs::remove_dir_all(directory).unwrap();
             }
         }
@@ -8212,6 +8214,8 @@ mod tests {
                 crate::RetirementNotice::new(Some(path)).pending(),
                 status != 204
             );
+            // On Windows the live instance holds its marker open.
+            drop((notice, session));
             std::fs::remove_dir_all(directory).unwrap();
         }
     }

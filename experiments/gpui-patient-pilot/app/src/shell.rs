@@ -1113,6 +1113,7 @@ impl ClinicalApp {
                         this.chat_access.detach(cx);
                         #[cfg(unix)]
                         this.patient_document.detach(cx);
+                        this.local_host.resolve_passphrase_outcome(&session);
                         this.session = Some(session);
                         this.focus_after_render = true;
                         this.message = None;
@@ -3174,6 +3175,17 @@ impl ClinicalApp {
                         cx,
                     ))
                 });
+        }
+        if self.local_host.passphrase_outcome_pending() {
+            panel = panel.child(
+                notice(
+                    "clinical-workspace-passphrase-outcome",
+                    local_host::PASSPHRASE_OUTCOME_GUIDANCE,
+                    theme,
+                    true,
+                )
+                .debug_selector(|| "clinical-workspace-passphrase-outcome".into()),
+            );
         }
         if let Some((message, error)) = &self.message {
             panel = panel.child(notice(
@@ -5767,6 +5779,52 @@ impl Render for ClinicalApp {
                                     )
                                     .debug_selector(|| "local-session-retirement-warning".into())
                                     .flex_shrink_0(),
+                                )
+                                .when(
+                                    self.local_host.retirement.orphaned(),
+                                    |el| {
+                                        // One row under the warning: the guidance reads
+                                        // first, the action keeps its own width and wraps
+                                        // below the text in a narrow window.
+                                        el.child(
+                                            div()
+                                                .flex()
+                                                .flex_wrap()
+                                                .items_center()
+                                                .gap(px(12.))
+                                                .px(px(16.))
+                                                .py(px(8.))
+                                                .flex_shrink_0()
+                                                .child(
+                                                    notice(
+                                                        "local-session-retirement-orphan",
+                                                        local_host::RETIREMENT_ORPHAN_GUIDANCE,
+                                                        theme,
+                                                        false,
+                                                    )
+                                                    .flex_1()
+                                                    .min_w(px(280.))
+                                                    .p_0()
+                                                    .border_0()
+                                                    .bg(gpui::transparent_black()),
+                                                )
+                                                .child(
+                                                    button(
+                                                        "local-session-retirement-dismiss",
+                                                        "Ho verificato le sessioni dell’host",
+                                                        theme,
+                                                        false,
+                                                        true,
+                                                    )
+                                                    .debug_selector(|| {
+                                                        "local-session-retirement-dismiss".into()
+                                                    })
+                                                    .on_click(cx.listener(|this, _, _, cx| {
+                                                        this.dismiss_orphaned_retirement(cx)
+                                                    })),
+                                                ),
+                                        )
+                                    },
                                 )
                             })
                             .child(content),

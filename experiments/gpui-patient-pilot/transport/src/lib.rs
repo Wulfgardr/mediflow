@@ -48,7 +48,7 @@ pub use http::{FirstAmbulatoryDraft, HostBootstrapSession};
 pub use http::{PairingCredentials, RuntimeClient, RuntimeConfig};
 pub use local_host::*;
 pub use profile_query::{ProfileCurrentness, ProfileProjection};
-pub use retirement_notice::{RETIREMENT_WARNING, RetirementNotice};
+pub use retirement_notice::{RETIREMENT_ORPHAN_GUIDANCE, RETIREMENT_WARNING, RetirementNotice};
 pub use scales::*;
 pub use session::patient_document::*;
 pub use session::{
