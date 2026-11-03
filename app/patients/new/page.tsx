@@ -12,7 +12,7 @@ import {
     type ServicePrescriptionPriority,
 } from '@/lib/db';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, FileSearch, FileSpreadsheet } from 'lucide-react'; // manual CSV entrypoint
+import { AlertTriangle, CheckCircle2, FileSearch, FileSpreadsheet, FolderOpen } from 'lucide-react'; // manual CSV and folder entrypoints
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
 import PatientDocumentCreate from '@/components/patient-document-create';
@@ -232,7 +232,10 @@ export default function NewPatientPage() {
             statusLabel={statusLabel}
             navItems={navItems}
             navigationClassName={styles.navigation}
-            headerActions={<Link href="/patients/import" className="mf-button-secondary"><FileSpreadsheet size={16} aria-hidden="true" />Importa elenco CSV</Link>}
+            headerActions={<>
+                <Link href="/patients/import" className="mf-button-secondary"><FileSpreadsheet size={16} aria-hidden="true" />Importa elenco CSV</Link>
+                <Link href="/patients/import/dossier" className="mf-button-secondary"><FolderOpen size={16} aria-hidden="true" />Importa documenti da cartella</Link>
+            </>}
         >
             <div className={`${ink.surface} ${ink.form} ${ink.stack}`}>
             <section id="documento" className={`${styles.documentSection} space-y-5 scroll-mt-40`}>

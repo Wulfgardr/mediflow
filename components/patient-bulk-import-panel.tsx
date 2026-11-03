@@ -2,6 +2,7 @@
 
 import { formatCountLabel } from '@/lib/format-count';
 /* only preview metadata fetch; patient writes use the existing encrypted client. */
+import Link from 'next/link';
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { db, type Patient } from '@/lib/db';
 import { useSecurity } from '@/components/security-provider';
@@ -174,7 +175,8 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
         <Kree8WorkspaceShell eyebrow="Pazienti" title="Importa elenco"
             subtitle="Aggiungi più schede da un CSV, dopo averle controllate."
             backHref="/?area=incarico" backLabel="Torna alla lista"
-            statusLabel="Le schede esistenti non vengono modificate.">
+            statusLabel="Le schede esistenti non vengono modificate."
+            headerActions={<Link href="/patients/import/dossier" className="mf-button-secondary">Importa documenti da cartella</Link>}>
             <div className={styles.panel} data-testid="patient-bulk-import" data-phase={snapshot.phase}>
                 <section className={styles.section} aria-labelledby="bulk-file-title">
                     <h2 id="bulk-file-title">1. Scegli l’elenco</h2>

@@ -109,6 +109,19 @@ function normalizeDocumentDate(value: string | Date): string {
     return Number.isFinite(date.getTime()) ? date.toISOString() : new Date(0).toISOString();
 }
 
+function hasDossierRecord(value: string | null | undefined): boolean {
+    const snapshot = compactText(value);
+    if (!snapshot || !snapshot.includes('"dossier"')) return false;
+    try {
+        const parsed = JSON.parse(snapshot) as unknown;
+        return Boolean(parsed) && typeof parsed === 'object' && !Array.isArray(parsed)
+            && Object.prototype.hasOwnProperty.call(parsed, 'dossier');
+    } catch {
+        // Un testo non JSON che nomina un dossier non si sostituisce: meglio saltare che perdere dati.
+        return true;
+    }
+}
+
 function readExistingArtifact(value: string | null | undefined): DocumentParseEvidenceArtifact | undefined {
     const snapshot = compactText(value);
     if (!snapshot) return undefined;
@@ -163,6 +176,17 @@ function planAttachment(
         existingArtifactSnapshotPresent: hasExistingSnapshot,
         existingArtifactValid: Boolean(existingArtifact),
     };
+
+    // Un artefatto con chiave `dossier` (ADR 0175) porta provenienza, decisioni e registro delle
+    // scritture del medico: non si ricostruisce mai, neppure con rebuildExisting e neppure se il
+    // record è malformato o di una versione futura che questo planner non conosce.
+    if (hasDossierRecord(input.parseEvidenceArtifactSnapshot)) {
+        return {
+            ...base,
+            decision: 'skip_existing_artifact',
+            reason: 'Artifact carries a dossier record (ADR 0175); it is never rebuilt by backfill.',
+        };
+    }
 
     if (existingArtifact && !options.rebuildExisting) {
         return {
