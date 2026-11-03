@@ -7,6 +7,31 @@ import XCTest
 // pasteboard/browser reali del runner grazie allo spy iniettato al posto di
 // SystemActions.
 final class PairedPatientsWorkspaceModelPrregTests: XCTestCase {
+    @MainActor
+    func testTerritorialDiscoveryControlsRegionalSurfacesAndHandoff() async throws {
+        let spy = SystemActionsSpy()
+        let model = makeModel(systemActions: spy)
+        model.configurePairedOnlineForTests(selectedPatient: detail(taxCode: "RSSMRA80A01H501U"))
+        for (preset, visible) in [("core", false), ("core+it", false), ("core+it+lom", true)] {
+            let payload = Data("{\"nodeId\":\"n\",\"operatingMode\":\"network-home-base\",\"protocolVersion\":\"1.14.0\",\"capabilities\":[],\"territorialPacks\":{\"schemaVersion\":\"mediflow.territorial-packs.v1\",\"revision\":1,\"status\":\"ready\",\"preset\":\"\(preset)\"}}".utf8)
+            let response = try JSONDecoder().decode(NetworkCapabilitiesResponse.self, from: payload)
+            model.updateTerritorialPacks(response.territorialPacks)
+            XCTAssertEqual(model.showsLombardyFeatures, visible)
+            if !visible { await model.openPrregHandoff() }
+        }
+        let actions = await spy.recordedActions()
+        XCTAssertTrue(actions.openedURLs.isEmpty)
+        XCTAssertTrue(actions.copiedTexts.isEmpty)
+        for invalid in ["null", "{\"preset\":\"core\"}", "{\"schemaVersion\":\"mediflow.territorial-packs.v1\",\"revision\":null,\"status\":\"configuration_error\",\"preset\":\"core\"}"] {
+            let payload = Data("{\"nodeId\":\"n\",\"operatingMode\":\"network-home-base\",\"protocolVersion\":\"1.14.0\",\"capabilities\":[],\"territorialPacks\":\(invalid)}".utf8)
+            let response = try JSONDecoder().decode(NetworkCapabilitiesResponse.self, from: payload)
+            model.updateTerritorialPacks(response.territorialPacks)
+            XCTAssertTrue(model.showsLombardyFeatures)
+        }
+        model.updateTerritorialPacks(nil)
+        XCTAssertTrue(model.showsLombardyFeatures)
+    }
+
     private actor SystemActionsSpy: SystemActionsPerforming {
         private(set) var openedURLs: [URL] = []
         private(set) var copiedTexts: [String] = []
