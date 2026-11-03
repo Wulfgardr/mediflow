@@ -281,7 +281,7 @@ test('pins the isolated local engine graph and excludes direct engine imports fr
     assert.equal(ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID, `mediflow.pdfjs_png.node24.${process.platform}_${process.arch}.v1`);
     assert.equal(sha256(ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR), ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256);
     if (process.platform === 'darwin' && process.arch === 'arm64')
-        assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, '7c3f340dcd41e1684e82829c5a9f80664e9de761c6ad59885ebb3f25358929e4');
+        assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, 'db5bc68dc3822cd647f2b02fa8f7dc2878b72d84479c3ed7f9e6f4b878017462');
     assert.match(source, /1011b38553532d7078c59f26b15a471f8dae00f101b60e2add9b8511737a1ce0/u);
     assert.match(source, /ec7dc504d4ade7fd36846d16643e50eed5c914335f3a86b6a2a8d632391e5bfa/u);
     assert.equal(profiles.find((entry) => entry.platform === 'darwin')?.tarballSha256,
@@ -302,4 +302,28 @@ test('real child refuses oversized soft and explicit masks before rendering', { 
         if (result.status !== 'failed') throw new Error('expected resource rejection');
         assert.equal(result.reason, 'resource_limit');
     }
+});
+
+test('real child draws non-embedded standard-font overlays on scanned pages', { skip: !SUPPORTS_REAL_RENDERER }, async () => {
+    const { runAnyDocPdfRenderingChild } = await import('./anydoc-pdf-child-process-owner');
+    const { loadImage } = await import('@napi-rs/canvas');
+    const scan = createCanvas(8, 8); const scanContext = scan.getContext('2d');
+    scanContext.fillStyle = '#e0e0e0'; scanContext.fillRect(0, 0, 8, 8);
+    const pdf = await PDFDocument.create({ updateMetadata: false });
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const image = await pdf.embedPng(scan.toBuffer('image/png'));
+    const page = pdf.addPage([200, 100]);
+    page.drawImage(image, { x: 0, y: 0, width: 200, height: 100 });
+    page.drawText('Referto 12345', { x: 10, y: 40, font, size: 18 });
+    const pdfBytes = Buffer.from(await pdf.save({ useObjectStreams: false, addDefaultPage: false, updateFieldAppearances: false }));
+    const result = await runAnyDocPdfRenderingChild([{ page: 1, pdfBytes }]);
+    assert.equal(result.status, 'rendered', JSON.stringify(result));
+    if (result.status !== 'rendered') return;
+    const raster = await loadImage(result.pages[0]!.pngBytes);
+    const canvas = createCanvas(raster.width, raster.height); const context = canvas.getContext('2d');
+    context.drawImage(raster, 0, 0);
+    const { data } = context.getImageData(0, 0, raster.width, raster.height);
+    let dark = 0;
+    for (let index = 0; index < data.length; index += 4) if (data[index]! < 96) dark += 1;
+    assert.ok(dark > 200, `overlay text not drawn: ${dark} dark pixels`);
 });
