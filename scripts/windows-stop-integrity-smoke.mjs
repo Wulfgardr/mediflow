@@ -105,7 +105,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === script) {
   assert.equal(process.env.MEDIFLOW_DATA_DIR, directory);
   assert.equal(process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY, '1');
   if (mode === '--transaction-writer') {
+    // Readiness normally arrives 0.4-0.9 s after the leader starts; once it took more than 8 s
+    // (PR #808, 2 Nov 2026) with no trace of where. Each stage is recorded for the next case.
+    record({ type: 'writer-started', pid: process.pid, generation });
     const lease = openAdmittedSqlite(path.join(directory, 'synthetic.db'), { role: 'synthetic-stop-writer' });
+    record({ type: 'writer-sqlite-open', pid: process.pid, generation });
     const db = lease.database;
     db.pragma('journal_mode = WAL'); db.pragma('synchronous = FULL'); db.pragma('cache_size = 8');
     db.exec('CREATE TABLE synthetic_stop_rows (id TEXT PRIMARY KEY, value TEXT NOT NULL)');
@@ -114,6 +118,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === script) {
     const insert = db.prepare('INSERT INTO synthetic_stop_rows VALUES (?,?)');
     for (let index = 0; index < 128; index++) insert.run('incomplete-' + index, 'synthetic-'.repeat(1024));
     assert.equal(db.inTransaction, true);
+    record({ type: 'writer-rows-pending', pid: process.pid, generation, rows: 128 });
     const server = http.createServer((_request, response) => {
       assert.equal(db.inTransaction, true);
       response.end(generation);
