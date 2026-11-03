@@ -91,6 +91,7 @@ locali salvano ciò che ricevono.
 - Cifrate: `name`, `path`, `data`, `summary_snapshot`, `parse_evidence_artifact_snapshot`
 - In chiaro: `id`, `patient_id`, `type`, `size`, `created_at`, `ocr_queue_state`, `ocr_queue_reason`, `ocr_queue_updated_at`, `ocr_replay_artifact_snapshot`, `document_source_ref`, `document_revision`, `document_freshness_epoch`
 - Leggibile senza chiave: tipo MIME, dimensione, stato della coda OCR e identificativo del paziente. `ocr_replay_artifact_snapshot` non ha oggi un writer e non è nel contratto.
+- Il record dossier di ADR 0175 (provenienza, testo completo, proposte, decisioni e registro delle scritture) è una chiave interna di `parse_evidence_artifact_snapshot`: resta cifrato con lo stesso campo e non aggiunge colonne.
 
 ### `audit_events`: registro di audit
 
