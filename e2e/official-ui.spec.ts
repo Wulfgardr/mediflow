@@ -105,10 +105,9 @@ test('ordinary PIN and manual onboarding preserve default B without comparison c
   const profile = page.getByTestId('work-profile-onboarding');
   await expect(profile).toBeVisible();
   await profile.getByRole('link', { name: 'Apri la cartella manualmente' }).click();
-  // The unconfigured work profile keeps its existing Agenda entry. Layout B
-  // changes the patient record entry, not the onboarding/start-area contract.
-  await expect(page).toHaveURL(/[?&]area=turno/);
-  await expect(nav().getByRole('link', { name: 'Agenda', exact: true })).toHaveAttribute('aria-current', 'page');
+  // The manual entry opens the patient records, not the Agenda.
+  await expect(page).toHaveURL(/[?&]area=incarico/);
+  await expect(nav().getByRole('link', { name: 'Pazienti', exact: true })).toHaveAttribute('aria-current', 'page');
 });
 
 test('patient preview opens the correct record and all thirteen progressive sections remain reachable', async () => {
