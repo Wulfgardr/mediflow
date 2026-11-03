@@ -163,8 +163,6 @@ export interface DossierTaxCodeEvidence {
     explicitProfessional?: boolean;
     /** Distingue la regola sulla stessa riga dalle vecchie attribuzioni multilinea. */
     professionalLabelScope?: 'same_line';
-    /** Letto dall'estrazione preparata perché il testo di MediFlow non ne contiene uno valido: partecipa al confronto. */
-    origin?: 'prepared';
 }
 
 const CF_LABEL = String.raw`(?:codice[ \t\u00a0]+fiscale|c\.?[ \t\u00a0]*f\.?)`;

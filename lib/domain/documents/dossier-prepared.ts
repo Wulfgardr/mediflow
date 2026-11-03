@@ -3,18 +3,20 @@
  *
  * Una estrazione preparata è un file JSON prodotto fuori da MediFlow (la skill
  * `mediflow-dossier-import`) che, per ogni fonte riconosciuta dallo sha256 dei byte,
- * propone identità del paziente, fatti clinici con una citazione testuale e una sintesi.
- * MediFlow la tratta come dato non fidato:
+ * propone paziente, fatti clinici con una citazione testuale e una sintesi. MediFlow la
+ * tratta come dato non fidato:
  *
  * - la fonte si abbina solo per sha256, mai per nome;
- * - ogni citazione si cerca nel testo che MediFlow stessa ha estratto dall'originale;
- *   se manca, il fatto resta da decidere e non entra nell'accettazione in blocco;
- * - i valori chiave (farmaco, codice, valore, totale) devono comparire nella citazione;
- * - codici LOINC/UCUM solo dal catalogo locale; date solo ISO valide;
- * - una terapia «in corso» di un documento non recente torna storica.
- *
- * L'accettazione in blocco (`preparedBulkDecisions`) decide solo ciò che è verificato,
- * nuovo rispetto alla scheda e senza blocchi; conflitti e incertezze restano al medico.
+ * - la citazione (almeno tre parole) si cerca nel testo che MediFlow stessa ha estratto;
+ *   in lettura approssimata ogni parola può differire al più di una lettera, i numeri mai;
+ * - i campi clinici del fatto (farmaco e dose, esame, valore e unità, descrizione, codici)
+ *   si controllano sul passo del documento trovato, non sulla citazione proposta;
+ * - i testi descrittivi passano solo se sono passi del documento; una riformulazione e la
+ *   sintesi restano a una decisione esplicita del medico;
+ * - LOINC/UCUM solo dal catalogo locale; date solo ISO, mai future; una terapia «in corso»
+ *   di un documento non recente torna storica;
+ * - il codice fiscale dell'estrazione serve solo a raggruppare: non entra nel controllo
+ *   d'identità, che resta sui codici letti da MediFlow.
  */
 
 import { isValidItalianTaxCodeChecksum } from './document-identity-resolution';
@@ -62,20 +64,35 @@ const FIELDS: Record<DossierFactKind, readonly string[]> = {
 };
 const QUALIFIERS = ['subject', 'temporality', 'certainty'] as const;
 const DATE_FIELDS = new Set(['date', 'startDate', 'endDate', 'observedAt', 'prescribedAt', 'birthDate']);
-/** Valori che devono comparire nella citazione, se presenti. */
-const ANCHORS: Partial<Record<DossierFactKind, readonly string[]>> = {
-    therapy: ['drugName'], diagnosis: ['code'], exemption: ['code'], observation: ['value'], prosthetic: ['isoCode'],
-    reported_scale: ['scaleTotal'], invalidity: ['percentage'], service_prescription: ['requestReference'],
+/** Testi descrittivi: verificabili solo se il testo proposto è un passo del documento. */
+const NARRATIVE = new Set<DossierFactKind>(['anamnesis', 'assessment', 'imaging_report', 'care_context', 'document_entry', 'invalidity']);
+/**
+ * Campi da ritrovare nel passo del documento. `all`: ogni parola; `long`: le parole di almeno
+ * quattro lettere; `numbers`: i soli numeri (una posologia si scrive in tanti modi, le dosi no).
+ */
+const FIELD_CHECKS: Partial<Record<DossierFactKind, ReadonlyArray<readonly [string, 'all' | 'long' | 'numbers']>>> = {
+    therapy: [['drugName', 'all'], ['dosage', 'numbers']],
+    observation: [['display', 'long'], ['value', 'all'], ['unit', 'all']],
+    diagnosis: [['code', 'all'], ['description', 'long']],
+    exemption: [['code', 'all']],
+    service_prescription: [['serviceName', 'long'], ['requestReference', 'all']],
+    prosthetic: [['description', 'long'], ['isoCode', 'all']],
+    reported_scale: [['scaleName', 'long'], ['scaleTotal', 'all'], ['scaleMax', 'all']],
+    invalidity: [['percentage', 'numbers']],
 };
+export const PREPARED_MIN_QUOTE_WORDS = 3;
+export const PREPARED_MIN_QUOTE_CHARS = 12;
 
 export const PREPARED_CHECK_LABELS = {
-    verified: 'Citazione trovata nel testo del documento',
-    approximate: 'Citazione trovata con piccole differenze di lettura',
+    verified: 'Citazione e valori trovati nel testo del documento',
+    approximate: 'Citazione e valori trovati, con una lettera diversa in qualche parola (lettura OCR)',
     not_found: 'Citazione non trovata nel testo del documento: verifica prima di accettare',
-    value_missing: 'Un valore proposto non compare nella citazione: verifica prima di accettare',
+    value_missing: 'Un valore proposto non compare nel passo del documento: verifica prima di accettare',
+    short_quote: 'Citazione troppo breve per essere verificata: verifica sull’originale',
+    paraphrase: 'Testo riformulato, non un passo del documento: leggilo prima di accettare',
     no_text: 'Testo del documento non disponibile in MediFlow: verifica sull’originale',
     no_quote: 'Proposta senza citazione: verifica sull’originale',
-    summary: 'Sintesi dell’estrazione preparata',
+    summary: 'Sintesi dell’estrazione preparata: testo non verificabile, si accetta solo leggendola',
 } as const;
 export type PreparedCheck = keyof typeof PREPARED_CHECK_LABELS;
 
@@ -123,7 +140,7 @@ export function parsePreparedExtraction(json: string): PreparedParseResult {
             date: validIso(str(summaryRaw!.date, 10)) ? str(summaryRaw!.date, 10) : documentDate ?? '' } : null;
         const facts: PreparedFactInput[] = [];
         (Array.isArray(raw.facts) ? raw.facts : []).forEach((item, factIndex) => {
-            if (!isRecord(item) || typeof item.kind !== 'string' || !(item.kind in DOSSIER_FACT_TARGET) || !isRecord(item.values)) {
+            if (!isRecord(item) || typeof item.kind !== 'string' || !Object.hasOwn(DOSSIER_FACT_TARGET, item.kind) || !isRecord(item.values)) {
                 warnings.push(`Fonte ${index + 1}, fatto ${factIndex + 1}: tipo o valori non validi, ignorato.`); return;
             }
             const kind = item.kind as DossierFactKind;
@@ -164,17 +181,24 @@ export function preparedPatientLabel(patient: PreparedPatient | null): string {
     return [[patient.lastName, patient.firstName].filter(Boolean).join(' '), patient.taxCode, patient.birthDate].filter(Boolean).join(' · ');
 }
 
+
 // ---------------------------------------------------------------------------
 // Citazioni: confronto per parole, sugli offset del testo conservato
 // ---------------------------------------------------------------------------
 
-interface Token { text: string; start: number; end: number }
+interface Token { text: string; start: number; end: number; numeric: boolean }
+
+/**
+ * Parole: sequenze di lettere (con diacritici), oppure numeri con i loro separatori («1,25»,
+ * «12.06.06»). Cifre e lettere attaccate si separano: «5mg» vale «5» e «mg».
+ */
+const WORD = /[0-9]+(?:[.,][0-9]+)*|[\p{L}\p{M}]+/gu;
 
 export function preparedTokens(text: string): Token[] {
     const tokens: Token[] = [];
-    for (const match of text.matchAll(/[\p{L}\p{N}]+/gu)) {
+    for (const match of text.matchAll(WORD)) {
         const normalized = match[0].normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('it-IT');
-        tokens.push({ text: normalized, start: match.index!, end: match.index! + match[0].length });
+        tokens.push({ text: normalized, start: match.index!, end: match.index! + match[0].length, numeric: /[0-9]/u.test(normalized) });
     }
     return tokens;
 }
@@ -192,50 +216,58 @@ function withinOneEdit(a: string, b: string): boolean {
     return edits + (a.length - i) + (b.length - j) <= 1;
 }
 
-/** Due parole coincidono; con lettura OCR imperfetta, una sola differenza per parole lunghe non numeriche. */
-function tokenMatches(doc: string, quote: string, approximate: boolean): boolean {
-    if (doc === quote) return true;
-    if (!approximate || /\d/u.test(doc) || /\d/u.test(quote) || quote.length < 5) return false;
-    return withinOneEdit(doc, quote);
+/** Esatta, oppure (lettura approssimata) una lettera di differenza in una parola di almeno cinque lettere senza cifre. */
+function sameWord(doc: string, wanted: string, approximate: boolean): boolean {
+    if (doc === wanted) return true;
+    if (!approximate || /[0-9]/u.test(doc) || /[0-9]/u.test(wanted) || wanted.length < 5 || doc.length < 5) return false;
+    return withinOneEdit(doc, wanted);
 }
 
-export interface PreparedAnchor { evidence: DossierEvidence; match: 'exact' | 'approximate' }
+export interface PreparedAnchor { evidence: DossierEvidence; match: 'exact' | 'approximate'; words: string[] }
 
-/** Trova la citazione nel testo per unità. Esatta per parole, altrimenti approssimata (≥ 85% delle parole). */
+export function quoteLongEnough(quote: string): boolean {
+    return preparedTokens(quote).length >= PREPARED_MIN_QUOTE_WORDS && quote.replace(/[^\p{L}\p{N}]/gu, '').length >= PREPARED_MIN_QUOTE_CHARS;
+}
+
+/**
+ * Trova la citazione nel testo, unità per unità. Esatta per parole; altrimenti ogni parola
+ * deve coincidere o differire al più di una lettera (parole lunghe, mai numeri), con non
+ * più di una parola diversa ogni sei. Una citazione troppo breve non si cerca.
+ */
 export function anchorPreparedQuote(text: string, units: readonly DossierUnit[], quote: string): PreparedAnchor | null {
+    if (!quoteLongEnough(quote)) return null;
     const wanted = preparedTokens(quote).map((token) => token.text);
-    if (!wanted.length) return null;
-    let best: { unit: DossierUnit; from: Token; to: Token; score: number } | null = null;
-    for (const approximate of [false, true]) {
-        for (const unit of units) {
-            const body = unitText(text, unit);
-            const tokens = preparedTokens(body);
-            for (let start = 0; start + wanted.length <= tokens.length; start += 1) {
-                let hits = 0; let numericMiss = false;
-                for (let k = 0; k < wanted.length; k += 1) {
-                    if (tokenMatches(tokens[start + k].text, wanted[k], approximate)) hits += 1;
-                    // Dosi, valori, date: una cifra diversa esclude la finestra, anche in lettura approssimata.
-                    else if (/\d/u.test(wanted[k]) || /\d/u.test(tokens[start + k].text)) { numericMiss = true; break; }
-                }
-                if (numericMiss) continue;
-                const score = hits / wanted.length;
-                if (!approximate && score === 1) {
-                    return { match: 'exact', evidence: { unit: unit.index, start: tokens[start].start, end: tokens[start + wanted.length - 1].end,
-                        excerpt: body.slice(tokens[start].start, tokens[start + wanted.length - 1].end).replace(/\s+/gu, ' ').trim() } };
-                }
-                if (approximate && wanted.length >= 3 && score >= 0.85 && (!best || score > best.score)) {
-                    best = { unit, from: tokens[start], to: tokens[start + wanted.length - 1], score };
-                }
+    const allowed = Math.max(1, Math.floor(wanted.length / 6));
+    let best: { unit: DossierUnit; from: number; tokens: Token[]; differences: number } | null = null;
+    for (const unit of units) {
+        const tokens = preparedTokens(unitText(text, unit));
+        for (let start = 0; start + wanted.length <= tokens.length; start += 1) {
+            let differences = 0; let ok = true;
+            for (let k = 0; k < wanted.length && ok; k += 1) {
+                const doc = tokens[start + k].text;
+                if (doc === wanted[k]) continue;
+                if (sameWord(doc, wanted[k], true)) differences += 1; else ok = false;
             }
+            if (!ok || differences > allowed) continue;
+            if (!best || differences < best.differences) best = { unit, from: start, tokens, differences };
+            if (differences === 0) break;
         }
+        if (best?.differences === 0) break;
     }
     if (!best) return null;
     const body = unitText(text, best.unit);
-    return { match: 'approximate', evidence: { unit: best.unit.index, start: best.from.start, end: best.to.end,
-        excerpt: body.slice(best.from.start, best.to.end).replace(/\s+/gu, ' ').trim() } };
+    const first = best.tokens[best.from]; const last = best.tokens[best.from + wanted.length - 1];
+    return { match: best.differences === 0 ? 'exact' : 'approximate', words: best.tokens.slice(best.from, best.from + wanted.length).map((token) => token.text),
+        evidence: { unit: best.unit.index, start: first.start, end: last.end, excerpt: body.slice(first.start, last.end).replace(/\s+/gu, ' ').trim() } };
 }
 
-/** Le parole del valore compaiono, in ordine e contigue, nella citazione. */
+/** Il valore si ritrova nelle parole del passo del documento, secondo la regola del campo. */
+export function valueInWords(value: string, words: readonly string[], rule: 'all' | 'long' | 'numbers', approximate = false): boolean {
+    const wanted = preparedTokens(value).filter((token) => rule === 'all' ? true : rule === 'numbers' ? token.numeric : token.numeric || token.text.length >= 4);
+    return wanted.every((token) => words.some((word) => sameWord(word, token.text, approximate && !token.numeric)));
+}
+
+/** Compatibilità: il valore compare, in ordine e contiguo, nel testo dato. */
 export function valueInQuote(value: string, quote: string): boolean {
     const v = preparedTokens(value).map((token) => token.text);
     const q = preparedTokens(quote).map((token) => token.text);
@@ -256,53 +288,77 @@ export interface PreparedFactsInput {
     /** Testo estratto da MediFlow; null se l'estrazione non è riuscita. */
     text: string | null;
     units: readonly DossierUnit[];
+    /** Data letta da MediFlow nel testo o nel nome: prevale su quella dell'estrazione. */
     documentDate: string | null;
-    /** Proposte dei parser locali per la stessa fonte. */
+    /** Proposte dei parser locali per la stessa fonte: restano tutte. */
     parserFacts: readonly DossierFact[];
     now: Date;
 }
 
-export interface PreparedFactsResult { facts: DossierFact[]; notes: string[] }
+export interface PreparedFactsResult { facts: DossierFact[]; notes: string[]; documentDate: string | null }
 
 function daysBetween(fromIso: string, to: Date): number {
     return Math.floor((to.getTime() - new Date(`${fromIso}T00:00:00Z`).getTime()) / 86_400_000);
 }
 
+/** Una data dell'estrazione vale solo se valida e non futura. */
+function notFuture(value: string | null | undefined, now: Date): string | null {
+    return value && validIso(value) && daysBetween(value, now) >= 0 ? value : null;
+}
+
+/** Data del documento: quella letta da MediFlow, altrimenti quella dell'estrazione se non futura. */
+export function preparedDocumentDate(source: PreparedSource, appDate: string | null, now: Date): string | null {
+    return appDate ?? notFuture(source.documentDate, now);
+}
+
+/** Identità stabile del fatto: fonte, tipo, valori e citazione così come proposti, non i valori derivati. */
+function stableFactId(sha: string, item: PreparedFactInput): string {
+    const raw: Record<string, string> = { ...item.values, quote: item.quote ?? '', source: sha };
+    return `p-${dossierFactId(item.kind, 0, 0, raw)}`;
+}
+
 /**
- * Converte le proposte preparate in fatti del dossier. Le proposte deterministiche con
- * codice (ICD etichettati, esenzioni del catalogo, laboratorio codificato) restano; le
- * proposte per sezione e la voce di diario col testo intero lasciano il posto alla
- * sintesi preparata, perché descrivono lo stesso contenuto con meno precisione.
+ * Converte le proposte preparate in fatti del dossier. Le proposte dei parser restano
+ * tutte: l'accettazione in blocco rifiuta solo quelle che un fatto preparato accettato
+ * sostituisce. Le proposte preparate uguali a una proposta codificata del parser non si ripetono.
  */
 export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsResult {
     const { source, text, units, now } = input;
-    const date = source.documentDate ?? input.documentDate ?? '';
+    const documentDate = preparedDocumentDate(source, input.documentDate, now);
+    const date = documentDate ?? '';
     const notes: string[] = [];
-    const keptParser = input.parserFacts.filter((fact) => fact.origin === 'parser:icd' || fact.origin === 'parser:exemption'
+    if (!input.documentDate && source.documentDate && !documentDate) notes.push('La data del documento proposta dall’estrazione è futura o non valida: ignorata.');
+    const codedParser = input.parserFacts.filter((fact) => fact.origin === 'parser:icd' || fact.origin === 'parser:exemption'
         || (fact.origin === 'parser:lab' && Boolean(fact.values.code)));
     const facts: DossierFact[] = [];
+    const ids = new Set<string>();
     let uncoded = 0;
-    source.facts.forEach((item, index) => {
+    for (const item of source.facts) {
+        const factId = stableFactId(source.sha256, item);
+        if (ids.has(factId)) continue;
+        ids.add(factId);
         const values: Record<string, string> = { ...item.values };
-        for (const field of Object.keys(values)) if (DATE_FIELDS.has(field) && !validIso(values[field])) delete values[field];
-        // Date e stati di default, mai la data di oggi.
+        const factNotes: string[] = [];
+        for (const field of Object.keys(values)) if (DATE_FIELDS.has(field) && !notFuture(values[field], now)) delete values[field];
         switch (item.kind) {
             case 'therapy': {
                 values.startDate ||= date;
+                // Un farmaco citato senza dose resta un farmaco: la posologia lo dichiara, non la inventa.
+                values.dosage ||= 'non indicata nel documento';
                 if (!['active', 'suspended', 'completed'].includes(values.status ?? '')) values.status = 'completed';
                 if (values.status === 'active' && (!date || daysBetween(date, now) > PREPARED_ACTIVE_THERAPY_MAX_AGE_DAYS)) {
                     values.status = 'completed';
-                    values.temporality = [values.temporality, `in corso alla data del documento, non oltre ${PREPARED_ACTIVE_THERAPY_MAX_AGE_DAYS} giorni fa`].filter(Boolean).join('; ');
+                    values.temporality = [values.temporality, `indicata in corso dal documento, non recente`].filter(Boolean).join('; ');
                 }
                 break;
             }
             case 'observation': {
                 values.observedAt ||= date;
-                if (!values.code || !values.unitCode) {
-                    const coded = catalogObservationCode(values.display ?? '', values.unit ?? '');
-                    if (!coded) { uncoded += 1; return; }
-                    values.code = coded.code; values.unitCode = coded.unitCode; values.codeSource = 'catalogo locale: nome e unità coincidenti';
-                }
+                // Codice e unità solo dal catalogo locale, qualunque cosa proponga il file.
+                delete values.code; delete values.unitCode;
+                const coded = catalogObservationCode(values.display ?? '', values.unit ?? '');
+                if (!coded) { uncoded += 1; continue; }
+                values.code = coded.code; values.unitCode = coded.unitCode; values.codeSource = 'catalogo locale: nome e unità coincidenti';
                 break;
             }
             case 'diagnosis': values.date ||= date; if (values.code && !values.system) values.system = 'ICD-10'; break;
@@ -313,43 +369,62 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
         }
         let evidence: DossierEvidence | null = null;
         let check: PreparedCheck;
-        if (!item.quote) check = 'no_quote';
-        else if (text === null || !units.length) check = 'no_text';
+        if (text === null || !units.length) check = 'no_text';
+        else if (NARRATIVE.has(item.kind)) {
+            // Un testo descrittivo è verificato solo se è esso stesso un passo del documento.
+            const passage = values.text ? anchorPreparedQuote(text, units, values.text) : null;
+            const quoted = item.quote ? anchorPreparedQuote(text, units, item.quote) : null;
+            evidence = passage?.evidence ?? quoted?.evidence ?? null;
+            check = passage ? (passage.match === 'exact' ? 'verified' : 'approximate') : 'paraphrase';
+            if (passage && item.kind === 'invalidity' && values.percentage && !valueInWords(values.percentage, passage.words, 'numbers')) check = 'value_missing';
+        } else if (!item.quote) check = 'no_quote';
+        else if (!quoteLongEnough(item.quote)) check = 'short_quote';
         else {
             const anchor = anchorPreparedQuote(text, units, item.quote);
             if (!anchor) check = 'not_found';
             else {
                 evidence = anchor.evidence;
-                const anchors = (ANCHORS[item.kind] ?? []).filter((field) => values[field]);
-                check = anchors.every((field) => valueInQuote(values[field], item.quote!)) ? (anchor.match === 'exact' ? 'verified' : 'approximate') : 'value_missing';
+                const approximate = anchor.match === 'approximate';
+                const checks = (FIELD_CHECKS[item.kind] ?? []).filter(([field]) => values[field]);
+                check = checks.every(([field, rule]) => valueInWords(values[field], anchor.words, rule, approximate)) ? (approximate ? 'approximate' : 'verified') : 'value_missing';
+                // Un principio attivo non scritto nel passo resta una nota per il medico, non un dato.
+                if (item.kind === 'therapy' && values.activePrinciple && !valueInWords(values.activePrinciple, anchor.words, 'all', approximate)
+                    && !valueInWords(values.activePrinciple, preparedTokens(values.drugName ?? '').map((token) => token.text), 'all')) {
+                    factNotes.push(`Principio attivo proposto, non scritto nel documento: ${values.activePrinciple}.`);
+                    delete values.activePrinciple;
+                }
             }
         }
+        if (item.kind === 'therapy' && values.activePrinciple && check !== 'verified' && check !== 'approximate') {
+            factNotes.push(`Principio attivo proposto: ${values.activePrinciple}.`);
+            delete values.activePrinciple;
+        }
         values.preparedCheck = check;
-        const factId = `p-${dossierFactId(item.kind, evidence?.unit ?? 0, evidence?.start ?? index, values)}`;
-        // Una proposta preparata uguale a una del parser codificato non si ripete.
-        if (keptParser.some((fact) => fact.kind === item.kind && sameIdentity(fact, values))) return;
+        if (factNotes.length) values.preparedNotes = factNotes.join(' ');
+        if (codedParser.some((fact) => fact.kind === item.kind && sameIdentity(fact, values))) continue;
         facts.push({ factId, kind: item.kind, origin: 'prepared', evidence, negated: false, values, decision: 'pending' });
-    });
+    }
     if (uncoded) notes.push(`${uncoded} ${uncoded === 1 ? 'valore di laboratorio senza codice LOINC verificato resta' : 'valori di laboratorio senza codice LOINC verificato restano'} nella sintesi e nel testo conservato.`);
     if (source.summary) {
-        const values: Record<string, string> = { title: source.summary.title, date: source.summary.date || date, text: source.summary.text,
+        const values: Record<string, string> = { title: source.summary.title, date: notFuture(source.summary.date, now) ?? date, text: source.summary.text,
             textSource: 'prepared', preparedCheck: 'summary', preparedCoverage: source.coverage.complete ? 'complete' : 'partial',
+            ...(source.coverage.pages ? { preparedPages: String(source.coverage.pages) } : {}),
             ...(notes.length ? { preparedNotes: notes.join(' ') } : {}) };
-        facts.push({ factId: `p-${dossierFactId('document_entry', 0, 0, { title: values.title, text: values.text })}`, kind: 'document_entry', origin: 'prepared',
-            evidence: null, negated: false, values, decision: 'pending' });
+        facts.push({ factId: `p-${dossierFactId('document_entry', 0, 0, { title: values.title, text: values.text, source: source.sha256 })}`, kind: 'document_entry',
+            origin: 'prepared', evidence: null, negated: false, values, decision: 'pending' });
     } else {
         notes.push('L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo.');
     }
-    const parserKept = source.summary ? keptParser : [...keptParser, ...input.parserFacts.filter((fact) => fact.origin === 'parser:document')];
-    return { facts: [...parserKept, ...facts], notes };
+    return { facts: [...input.parserFacts, ...facts], notes, documentDate };
 }
 
 function sameIdentity(fact: DossierFact, values: Record<string, string>): boolean {
     const v = fact.values;
+    const words = (value: string | undefined) => preparedTokens(value ?? '').map((token) => token.text).join(' ');
     switch (fact.kind) {
         case 'diagnosis': return Boolean(v.code && values.code) && v.code.toUpperCase() === values.code.toUpperCase();
         case 'exemption': return v.code?.toUpperCase() === values.code?.toUpperCase();
-        case 'observation': return v.code === values.code && v.observedAt === values.observedAt && preparedTokens(v.value ?? '').map((t) => t.text).join(' ') === preparedTokens(values.value ?? '').map((t) => t.text).join(' ');
+        case 'observation': return v.code === values.code && v.observedAt === values.observedAt && words(v.value) === words(values.value);
         default: return false;
     }
 }
@@ -365,6 +440,8 @@ export interface PreparedBulkInput {
     exemptionCodes: ReadonlySet<string>;
     /** Riferimenti di fatti che la stessa operazione accetta in altri documenti. */
     acceptedElsewhere: ReadonlySet<string>;
+    /** Il medico ha letto le sintesi e chiede di accettarle: testo non verificabile. */
+    includeSummaries: boolean;
 }
 
 export interface PreparedBulkResult {
@@ -374,48 +451,81 @@ export interface PreparedBulkResult {
     counts: { accepted: number; alreadyPresent: number; superseded: number; leftPending: number };
 }
 
-const SUPERSEDED_ORIGINS = new Set<DossierFact['origin']>(['parser:section', 'parser:scale', 'parser:document']);
+const PARSER_ELIGIBLE = new Set<DossierFact['origin']>(['parser:lab', 'parser:icd', 'parser:exemption']);
+const PARSER_ELIGIBLE_KINDS = new Set<DossierFactKind>(['diagnosis', 'exemption', 'observation']);
+const SUPERSEDABLE = new Set<DossierFact['origin']>(['parser:section', 'parser:scale']);
 
-/** Una proposta entra nel blocco solo se verificabile sulla fonte. */
-export function preparedFactEligible(fact: DossierFact, exemptionCodes: ReadonlySet<string>): boolean {
+export function isPreparedSummary(fact: DossierFact): boolean {
+    return fact.origin === 'prepared' && fact.values.preparedCheck === 'summary';
+}
+
+/** Una proposta entra nel blocco solo se verificabile sulla fonte (la sintesi solo su richiesta esplicita). */
+export function preparedFactEligible(fact: DossierFact, exemptionCodes: ReadonlySet<string>, includeSummaries = false): boolean {
     if (fact.negated || dossierFactBlockers(fact, { exemptionCodes }).length) return false;
-    if (fact.origin === 'manual') return false;
     if (fact.origin === 'prepared') {
-        if (fact.values.preparedCheck === 'summary') return true;
+        if (isPreparedSummary(fact)) return includeSummaries;
         return Boolean(fact.evidence) && (fact.values.preparedCheck === 'verified' || fact.values.preparedCheck === 'approximate');
     }
-    return Boolean(fact.evidence) && !SUPERSEDED_ORIGINS.has(fact.origin);
+    return PARSER_ELIGIBLE.has(fact.origin) && PARSER_ELIGIBLE_KINDS.has(fact.kind) && Boolean(fact.evidence);
+}
+
+/** Unità di testo di MediFlow, se contate per pagina: servono a confrontare la copertura dichiarata. */
+function appPageCount(record: DossierRecord): number | null {
+    return record.extraction.state === 'extracted' && record.extraction.unitBasis === 'pages' ? record.extraction.units.length : null;
 }
 
 export function preparedBulkDecisions(input: PreparedBulkInput): PreparedBulkResult {
     const { record, documentKey } = input;
-    const hasPrepared = record.facts.some((fact) => fact.origin === 'prepared');
     const counts = { accepted: 0, alreadyPresent: 0, superseded: 0, leftPending: 0 };
     const accepted: string[] = [];
-    // Anche un fatto accettato poco prima nello stesso documento rende «già presente» il suo duplicato.
+    // Solo i documenti con un'estrazione preparata: senza, nulla cambia rispetto ad ADR 0175.
+    if (!record.facts.some((fact) => fact.origin === 'prepared')) {
+        return { facts: record.facts, acknowledgeResidual: false, accepted, counts: { ...counts, leftPending: record.facts.filter((fact) => fact.decision === 'pending').length } };
+    }
     const acceptedNow = new Set(input.acceptedElsewhere);
-    const facts = record.facts.map((fact) => {
-        if (fact.decision !== 'pending') return fact;
+    const supersedableHere = new Set(record.facts.filter((fact) => SUPERSEDABLE.has(fact.origin) && fact.decision === 'pending').map((fact) => `${documentKey}#${fact.factId}`));
+    // 1. Proposte preparate e proposte codificate del parser.
+    const first = record.facts.map((fact) => {
+        if (fact.decision !== 'pending' || SUPERSEDABLE.has(fact.origin) || fact.origin === 'parser:document') return fact;
         const ref = `${documentKey}#${fact.factId}`;
-        if (hasPrepared && SUPERSEDED_ORIGINS.has(fact.origin)) {
-            counts.superseded += 1;
-            return { ...fact, decision: 'rejected' as const, note: 'Sostituita dall’estrazione preparata verificata.' };
+        let assessment = input.assessment(ref);
+        // Un fatto preparato «doppio» di una proposta per sezione dello stesso documento non è un doppione:
+        // è la stessa informazione, verificata; la proposta per sezione verrà sostituita.
+        if (fact.origin === 'prepared' && assessment?.status === 'duplicate_in_dossier') {
+            const others = assessment.relatedFactRefs.filter((related) => !supersedableHere.has(related));
+            if (!others.length) assessment = { status: 'new', detail: assessment.detail, relatedFactRefs: [] };
+            else assessment = { ...assessment, relatedFactRefs: others };
         }
-        const assessment = input.assessment(ref);
         if (assessment?.status === 'already_present') { counts.alreadyPresent += 1; return { ...fact, decision: 'already_present' as const }; }
         if (assessment?.status === 'duplicate_in_dossier' && assessment.relatedFactRefs.length
             && assessment.relatedFactRefs.every((related) => acceptedNow.has(related))) {
             counts.alreadyPresent += 1;
             return { ...fact, decision: 'already_present' as const, note: 'Stesso contenuto di un’altra fonte accettata.' };
         }
-        if ((!assessment || assessment.status === 'new') && preparedFactEligible(fact, input.exemptionCodes)) {
+        if ((!assessment || assessment.status === 'new') && preparedFactEligible(fact, input.exemptionCodes, input.includeSummaries)) {
             counts.accepted += 1; accepted.push(ref); acceptedNow.add(ref);
             return { ...fact, decision: 'accepted' as const };
+        }
+        return fact;
+    });
+    // 2. Sostituzioni: la voce col testo intero solo se la sintesi è accettata; le proposte per sezione
+    //    solo se un fatto preparato dello stesso tipo è accettato in questo documento.
+    const summaryAccepted = first.some((fact) => isPreparedSummary(fact) && fact.decision === 'accepted');
+    const acceptedKinds = new Set(first.filter((fact) => fact.origin === 'prepared' && fact.decision === 'accepted' && !isPreparedSummary(fact)).map((fact) => fact.kind));
+    const facts = first.map((fact) => {
+        if (fact.decision !== 'pending') return fact;
+        if ((fact.origin === 'parser:document' && summaryAccepted) || (SUPERSEDABLE.has(fact.origin) && acceptedKinds.has(fact.kind))) {
+            counts.superseded += 1;
+            return { ...fact, decision: 'rejected' as const, note: fact.origin === 'parser:document' ? 'Sostituita dalla sintesi accettata; il testo completo resta nell’allegato.'
+                : 'Sostituita dall’estrazione preparata verificata dello stesso tipo.' };
         }
         counts.leftPending += 1;
         return fact;
     });
-    const summary = facts.find((fact) => fact.origin === 'prepared' && fact.values.preparedCheck === 'summary');
-    const acknowledgeResidual = Boolean(summary && summary.values.preparedCoverage === 'complete');
+    // 3. Il residuo si conferma solo con la sintesi accettata e la copertura dichiarata coerente con MediFlow.
+    const summary = facts.find(isPreparedSummary);
+    const pages = appPageCount(record);
+    const acknowledgeResidual = Boolean(summary && summary.decision === 'accepted' && summary.values.preparedCoverage === 'complete'
+        && (pages === null || summary.values.preparedPages === String(pages)));
     return { facts, acknowledgeResidual, accepted, counts };
 }
