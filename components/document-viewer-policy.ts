@@ -39,6 +39,7 @@ const MESSAGES = {
     page_limit: 'Il PDF supera il limite di 500 pagine per l’anteprima locale.',
     page_dimensions: 'Le dimensioni della pagina PDF superano i limiti dell’anteprima locale.',
     page_unavailable: 'La pagina richiesta non è disponibile.',
+    unresolved_glyph: 'Pagina non mostrata: contiene caratteri che il visualizzatore locale non sa disegnare, e un valore apparirebbe alterato. Per leggerla usa Salva originale.',
     operation_limit: 'La pagina è troppo complessa per l’anteprima locale. L’allegato non è stato modificato.',
     memory_limit: 'La pagina supera il budget grafico dell’anteprima locale. L’allegato non è stato modificato.',
     missing_resource: 'Il PDF richiede risorse grafiche non disponibili localmente. Nessuna risorsa è stata scaricata.',
@@ -48,19 +49,24 @@ const MESSAGES = {
     cancelled: 'Anteprima interrotta. L’allegato non è stato modificato.',
 } as const;
 export type PreviewErrorCode = keyof typeof MESSAGES;
-export type PreviewFailure = Readonly<{ code: PreviewErrorCode; message: string }>;
+export type PreviewFailure = Readonly<{ code: PreviewErrorCode; message: string; pages?: number }>;
 
 export class PreviewError extends Error {
     readonly code: PreviewErrorCode;
-    constructor(code: PreviewErrorCode) {
+    // Page count of a document whose refusal concerns one page only, so the
+    // other pages stay reachable.
+    readonly pages?: number;
+    constructor(code: PreviewErrorCode, pages?: number) {
         super(MESSAGES[code]);
         this.name = 'PreviewError';
         this.code = code;
+        if (pages !== undefined) this.pages = pages;
     }
 }
 export function previewFailure(error: unknown, fallback: PreviewErrorCode = 'invalid_source'): PreviewFailure {
-    const code = error instanceof PreviewError ? error.code : fallback;
-    return { code, message: MESSAGES[code] };
+    if (!(error instanceof PreviewError)) return { code: fallback, message: MESSAGES[fallback] };
+    return error.pages === undefined ? { code: error.code, message: MESSAGES[error.code] }
+        : { code: error.code, message: MESSAGES[error.code], pages: error.pages };
 }
 export function assertSourceSize(size: number): void {
     if (!Number.isSafeInteger(size) || size < 0) throw new PreviewError('invalid_source');

@@ -12,7 +12,7 @@ const PRESET_LABELS: Record<TerritorialPackPreset, { label: string; detail: stri
     'core+it+lom': { label: 'Italia e Lombardia', detail: 'Aggiunge SISS e portali regionali, PRREG e protesica con le codifiche lombarde.' },
 };
 
-/** Assetto territoriale dell'installazione (ADR 0158, 0176): un'operazione dell'host con conferma esplicita. */
+/** Assetto territoriale dell'installazione (ADR 0158, 0177): un'operazione dell'host con conferma esplicita. */
 export function TerritorialPackSettings() {
     const confirm = useConfirm();
     const packs = useTerritorialPacks();

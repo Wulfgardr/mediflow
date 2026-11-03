@@ -36,17 +36,27 @@ const proposal: DocumentSynthesisContextProposal = {
     ambulatories: [{ ambulatoryId: 'ui06-ambulatory', name: 'Ambulatorio inventato UI06', address: '', version: 1 }],
 };
 const blockedFetch: typeof fetch = async () => { throw new Error('UI06: unexpected network access'); };
+// The doubled picker keeps the doctor's model choice until reset() discards it,
+// so a test can observe whether the card throws that choice away.
+const pickerListeners = new Set<() => void>();
+let pickerChoice: string | null = 'synthetic-model-choice';
 const client = {
     fetch: blockedFetch,
     async begin() { boundaryState.begins += 1; return 'synthetic-model-token'; },
     isCurrent() { return boundaryState.current; },
-    reset() {},
+    reset() { pickerChoice = null; for (const notify of pickerListeners) notify(); },
 };
+function usePickerChoice() {
+    return useSyncExternalStore(callback => { pickerListeners.add(callback); return () => { pickerListeners.delete(callback); }; }, () => pickerChoice, () => pickerChoice);
+}
 const view = { blocked: false, choice: 'synthetic-model-choice' };
 export function useFunctionModelPicker(_function: string, _patientId: string, _attachmentId: string, enabled: boolean) {
     return { active: enabled, canGenerate: enabled, client, view };
 }
-export function FunctionModelPicker() { return <p>Selettore sostituito solo nel test; nessun provider attivo.</p>; }
+export function FunctionModelPicker() {
+    const choice = usePickerChoice();
+    return <p>Selettore sostituito solo nel test; nessun provider attivo. Modello: {choice ?? 'predefinito'}</p>;
+}
 export function createDocumentSynthesisReviewBrowserController() {
     return {
         reset() { boundaryState.resets += 1; },

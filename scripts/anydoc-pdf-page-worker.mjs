@@ -265,8 +265,9 @@ async function loadRenderer() {
             import('@napi-rs/canvas'),
         ]);
         if (pdfjs.version !== PDFJS_VERSION || typeof pdfjs.getDocument !== 'function'
+            || !Number.isInteger(pdfjs.OPS?.showText)
             || typeof canvas.createCanvas !== 'function') throw new EngineUnavailable();
-        return { getDocument: pdfjs.getDocument, createCanvas: canvas.createCanvas };
+        return { getDocument: pdfjs.getDocument, showText: pdfjs.OPS?.showText, createCanvas: canvas.createCanvas };
     } catch (error) {
         if (error instanceof EngineUnavailable) throw error;
         throw new EngineUnavailable();
@@ -312,7 +313,7 @@ async function renderPage(engine, bytes) {
     let task = null;
     let canvas = null;
     try {
-        const { preparePdfRasterInput, PdfRasterLimit } = await import('../lib/pdf-raster-preflight.mjs');
+        const { preparePdfRasterInput, PdfRasterLimit, hasUnresolvedPdfGlyph } = await import('../lib/pdf-raster-preflight.mjs');
         let checkedBytes;
         try {
             checkedBytes = await boundedUntil(preparePdfRasterInput(bytes, {
@@ -347,6 +348,10 @@ async function renderPage(engine, bytes) {
         if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1
             || width > MAX_DIMENSION_PIXELS || height > MAX_DIMENSION_PIXELS
             || !Number.isSafeInteger(pixels) || pixels > MAX_PIXELS) throw new ResourceLimit();
+        // A glyph without an outline would reach OCR as a gap inside a value.
+        // render() reuses this display operator list instead of rebuilding it.
+        const operators = await boundedUntil(page.getOperatorList(), deadline, () => loading?.destroy());
+        if (hasUnresolvedPdfGlyph(operators.fnArray, operators.argsArray, engine.showText)) throw new Error('unresolved_glyph');
         canvas = engine.createCanvas(width, height);
         task = page.render({ canvasContext: canvas.getContext('2d'), viewport, background: '#ffffff' });
         await boundedUntil(task.promise, deadline, () => task?.cancel());

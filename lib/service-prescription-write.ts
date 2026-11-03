@@ -468,6 +468,26 @@ function planServicePrescriptionItemCascade(
     return { ok: true, moves: children.filter((child) => child.status === parent.status) };
 }
 
+/*
+ * Le build Apple 0.9.0 cambiano lo stato della prescrizione senza elencare le
+ * voci e poi chiamano ogni voce a parte, e possono fermarsi a metà. Perché
+ * prescrizione e voci non restino in disaccordo, un cambio di stato senza
+ * `items` sposta nella stessa transazione le voci che erano nello stato della
+ * prescrizione, con la regola della cascata esplicita. L'audit di ogni voce
+ * spostata così porta un motivo proprio.
+ */
+const IMPLICIT_CASCADE_REASON = 'status_cascade_without_items';
+
+function planImplicitServicePrescriptionItemCascade(
+    tx: ServicePrescriptionWriteTx,
+    parent: { id: string; status: string },
+    nextStatus: string | undefined,
+): ServicePrescriptionItemRow[] {
+    if (nextStatus === undefined || nextStatus === parent.status) return [];
+    return tx.select().from(servicePrescriptionItems)
+        .where(and(eq(servicePrescriptionItems.prescriptionId, parent.id), eq(servicePrescriptionItems.status, parent.status))).all();
+}
+
 /* Scrive le voci pianificate, ciascuna con il suo audit, nella transazione della prescrizione. */
 function applyServicePrescriptionItemCascade(
     tx: ServicePrescriptionWriteTx,
@@ -475,6 +495,7 @@ function applyServicePrescriptionItemCascade(
     surface: 'host' | 'network',
     moves: ServicePrescriptionItemRow[],
     parentValues: Partial<typeof servicePrescriptions.$inferInsert>,
+    reasonCode?: string,
 ): void {
     for (const child of moves) {
         const values: Partial<typeof servicePrescriptionItems.$inferInsert> = { status: parentValues.status, updatedAt: parentValues.updatedAt };
@@ -489,7 +510,7 @@ function applyServicePrescriptionItemCascade(
             .where(and(eq(servicePrescriptionItems.id, child.id), eq(servicePrescriptionItems.version, child.version))).run();
         if (moved.changes !== 1) throw new Error('Service prescription item cascade did not write exactly one row');
         writeAuditEventInTransaction(tx, serviceAuditInput(context, surface, 'service.prescription_item.updated', 'service_prescription_item', child.id, {
-            changedFields, resourceVersion: child.version + 1,
+            changedFields, resourceVersion: child.version + 1, ...(reasonCode ? { reasonCode } : {}),
         }));
     }
 }
@@ -521,6 +542,8 @@ async function updateServicePrescription(
             .where(and(eq(servicePrescriptions.id, context.id), eq(servicePrescriptions.version, expectedVersion))).run();
         if (updated.changes !== 1) throw new Error('Service prescription update did not write exactly one row');
         if (cascade) applyServicePrescriptionItemCascade(tx, context, surface, cascade.moves, normalized.values);
+        else applyServicePrescriptionItemCascade(tx, context, surface,
+            planImplicitServicePrescriptionItemCascade(tx, existing, nextStatus), normalized.values, IMPLICIT_CASCADE_REASON);
         writeAuditEventInTransaction(tx, serviceAuditInput(context, surface, 'service.prescription.updated', 'service_prescription', context.id, {
             changedFields: listChangedFields(body as Record<string, unknown>, ['version', 'items']), resourceVersion: expectedVersion + 1,
         }));
@@ -584,6 +607,27 @@ export async function updateHostServicePrescriptionItem(context: HostContext & {
     return updateServicePrescriptionItem(context, parsed.data, 'host');
 }
 
+const ITEM_ECHO_FIELDS = new Set(['version', 'status', ...CASCADE_DATE_FIELDS]);
+
+/*
+ * Dopo la cascata dal server, la build Apple 0.9.0 manda a ogni voce lo stesso
+ * stato con la versione letta prima. Se la voce è già in quello stato, che è
+ * anche quello della prescrizione, e la richiesta porta solo stato e date, la
+ * chiamata riesce senza effetti: il passaggio è già avvenuto e la data salvata
+ * resta. Ogni altra versione superata resta un conflitto.
+ */
+function isAlreadyAppliedItemEcho(
+    body: ServicePrescriptionItemUpdatePayload,
+    expectedVersion: number,
+    existing: { status: string; version: number },
+    parentStatus: string,
+): boolean {
+    return expectedVersion < existing.version
+        && body.status === existing.status
+        && existing.status === parentStatus
+        && Object.keys(body).every((key) => ITEM_ECHO_FIELDS.has(key));
+}
+
 async function updateServicePrescriptionItem(context: (HostContext | NetworkWriteContext) & { id: string }, body: ServicePrescriptionItemUpdatePayload, surface: 'host' | 'network'): Promise<MutationResponse> {
     const expectedVersion = parsePrescriptionExpectedVersion(body.version);
     if (expectedVersion === null) return badRequest('Version is required');
@@ -595,10 +639,13 @@ async function updateServicePrescriptionItem(context: (HostContext | NetworkWrit
         if (denial) return denial;
         const existing = tx.select().from(servicePrescriptionItems).where(eq(servicePrescriptionItems.id, context.id)).get();
         if (!existing) return { status: 404, value: { error: surface === 'host' ? 'Service prescription item not found' : 'Not found' } };
-        const parent = tx.select({ patientId: servicePrescriptions.patientId }).from(servicePrescriptions).where(eq(servicePrescriptions.id, existing.prescriptionId)).get();
+        const parent = tx.select({ patientId: servicePrescriptions.patientId, status: servicePrescriptions.status }).from(servicePrescriptions).where(eq(servicePrescriptions.id, existing.prescriptionId)).get();
         if (!parent || parent.patientId !== existing.patientId || !activeParentExists(tx, existing.patientId) || (surface === 'network' && !patientIsInScope(tx, existing.patientId, (context as NetworkWriteContext).scopeAmbulatoryId))) return { status: 404, value: { error: 'Not found' } };
-        if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription_item', expectedVersion, context.id, selectServicePrescriptionItemConflictSnapshot(tx, context.id)) };
         const nextStatus = normalized.values.status;
+        if (existing.version !== expectedVersion) {
+            if (isAlreadyAppliedItemEcho(body, expectedVersion, existing, parent.status)) return { status: 200, value: { success: true } };
+            return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription_item', expectedVersion, context.id, selectServicePrescriptionItemConflictSnapshot(tx, context.id)) };
+        }
         if (nextStatus !== undefined && !isServicePrescriptionTransitionAllowed(existing.status, nextStatus)) {
             return statusTransitionDenial('service_prescription_item', existing.status, nextStatus);
         }
