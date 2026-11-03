@@ -193,7 +193,9 @@ proprietario gestito descritto sopra e non aggiungerebbe garanzie. L'ordine è:
 All'apertura `openDbServer` riconcilia ogni intento senza esito il cui processo
 non è più vivo, decidendo solo dalla ricevuta dentro l'archivio: presente vuol
 dire completato, assente vuol dire annullato con archivio intatto, e la copia
-parziale viene rimossa. Un giornale illeggibile resta per l'ispezione e non
+parziale regolare viene rimossa dopo la registrazione dell'esito. Un elemento
+inatteso nel percorso della copia parziale resta per l'ispezione senza impedire
+la registrazione del rifiuto. Un giornale illeggibile resta per l'ispezione e non
 blocca l'archivio, già coerente. La copia `previous.db` non viene mai rimossa
 in automatico: solo una conferma dell'amministratore, che ne verifica
 l'impronta e registra `discarded.json`.
@@ -207,3 +209,31 @@ rinomina l'archivio aperto: rinomina solo la copia chiusa; resta da provare
 sul campo. Il recupero completo dal file `.mediflow-recovery` resta la CLI
 offline descritta sopra.
 
+## Prove HTTP e recupero offline del 4 novembre 2026
+
+`lib/security/account-reset-http.test.ts` esercita le route Next con login HTTP
+reale, su archivio sintetico. Una copia isolata dei sorgenti collega il callback
+di fase già esistente a una barriera: il processo che serve la richiesta viene
+ucciso con SIGKILL dopo intento, copia, mutazione non commessa, commit e ricevuta.
+Il riavvio verifica riconciliazione, login, generazione, righe cliniche e integrità
+della copia conservata. Prima del commit gli account restano quelli originali;
+dopo il commit gli account sono assenti e occorre una nuova configurazione.
+All'intento la copia non è ancora stata creata.
+
+Il caso negativo occupa con una directory il percorso della copia parziale:
+l'apertura esclusiva fallisce realmente, il reset risponde con errore e ricevuta
+`aborted`, le credenziali restano valide anche dopo il riavvio. Questo prova una
+copia fallita, non l'esaurimento fisico dello spazio o una quota del filesystem.
+
+`lib/recovery-backup.test.ts` invoca anche la CLI in uno pseudoterminale POSIX,
+con kit e chiave sintetici, verificando decifratura, involucri, ricevute, tabelle
+e storico. I blocchi e le finestre di conservazione tornano allo stato del
+backup; i blocchi recuperati impediscono la cancellazione. I moduli territoriali
+restano quelli dell'host di destinazione, come per gli altri scambi SQLite:
+un backup con Lombardia non abilita Lombardia su un host Core. Il log CLI
+dichiara queste due politiche. La ricevuta di reset in `settings` è parte del
+backup; i file esterni di `medical.db.reset-journal` non lo sono.
+
+Queste prove HTTP usano Next in sviluppo su Mac. Non qualificano il reset GPUI,
+una build standalone di produzione, altri sistemi o hardware, né la perdita di
+alimentazione. Il restore completo resta esclusivamente offline.
