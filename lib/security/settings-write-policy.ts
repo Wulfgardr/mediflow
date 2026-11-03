@@ -30,6 +30,8 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     'localOperationJournal.v1': { write: [], note: 'ADR 0162 local operation service only; encrypted durable journal' },
     'territorial.packs': { write: [], note: 'ADR 0158 host territorial pack manager only' },
     'territorial.packs.initialization': { write: [], note: 'ADR 0158 one-time host admission only' },
+    'retention.windows': { write: [], note: 'ADR 0178 retention route with revision CAS only' },
+    'retention.holds': { write: [], note: 'ADR 0178 retention route with revision CAS only' },
     aifaNetworkAccess: { write: ['web-session'], note: 'opt-in AIFA public catalog HEAD and explicit download' },
     aifaCatalogRemoteState: { write: [], note: 'server-managed AIFA HTTP metadata and persistent debounce' },
     aifaCatalogManifest: { write: [], note: 'atomic AIFA catalog writer only' },
