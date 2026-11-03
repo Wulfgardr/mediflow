@@ -19,6 +19,7 @@ import {
     type RetentionWindow, type RetentionWindows, type EffectiveTerm, type FascicoloEvaluation, type ProfileTerm,
 } from '@/lib/retention-policy';
 import type { RetentionOverview } from '@/lib/retention-store';
+import type { RetentionProfileId } from '@/lib/retention-policy';
 
 const ENDPOINT = '/api/system/retention';
 const HOLD_REASON_LABELS: Record<RetentionHoldReason, string> = {
@@ -79,6 +80,19 @@ function windowsFromDraft(draft: Draft): RetentionWindows | null {
         windows[category] = { kind: 'years', years } satisfies RetentionWindow;
     }
     return windows;
+}
+
+/*
+ * A window saved under another profile can sit at or below the minimum of the active one, also on a
+ * category that the profile now keeps without limit and the page no longer lets you edit. Such a window
+ * changes nothing: it is left out, so it cannot block saving the other categories.
+ */
+function windowsAboveMinimum(profileId: RetentionProfileId, windows: RetentionWindows): RetentionWindows {
+    return Object.fromEntries(Object.entries(windows).filter(([category, window]) => {
+        const minimum = RETENTION_PROFILES[profileId].terms[category as RetentionCategory].term;
+        if (minimum.kind === 'unlimited') return false;
+        return !(minimum.kind === 'years' && window.kind === 'years' && window.years <= minimum.years);
+    })) as RetentionWindows;
 }
 
 export function RetentionPanel() {
@@ -143,7 +157,7 @@ export function RetentionPanel() {
             message: 'Le finestre si applicano a tutti i fascicoli chiusi. Possono solo allungare il minimo del profilo.', confirmLabel: 'Salva finestre' });
         if (!confirmed) return;
         setBusy(true);
-        const result = await send('PUT', { expectedRevision: overview.windowsRevision, windows: parsedDraft });
+        const result = await send('PUT', { expectedRevision: overview.windowsRevision, windows: windowsAboveMinimum(overview.profileId, parsedDraft) });
         setBusy(false);
         if (!result.ok) return fail(result.code);
         showToast({ tone: 'success', title: 'Finestre salvate' });
@@ -175,7 +189,7 @@ export function RetentionPanel() {
     };
 
     const discard = async (item: FascicoloEvaluation) => {
-        if (busy || !item.governing || item.expiresAt === null) return;
+        if (busy || !item.governing || item.expiresAt === null || !patients.has(item.patientId)) return;
         const { confirmed } = await confirm({
             title: `Scartare il fascicolo di ${patientName(item.patientId)}?`,
             message: `Termine applicato: ${termCopy(item.governing.term)} dalla chiusura, ${RETENTION_CATEGORY_LABELS[item.governing.category].toLowerCase()}. `
@@ -264,8 +278,10 @@ export function RetentionPanel() {
                         <div className={styles.siteActions}>
                             {item.status === 'expired' ? <>
                                 <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => void placeHold(item.patientId, null)}>Blocca</button>
-                                <button type="button" className="mf-button-destructive" disabled={busy} onClick={() => void discard(item)} data-testid="retention-discard">Scarta</button>
+                                <button type="button" className="mf-button-destructive" disabled={busy || !patients.has(item.patientId)} onClick={() => void discard(item)} data-testid="retention-discard">Scarta</button>
                             </> : null}
+                            {item.status === 'expired' && !patients.has(item.patientId)
+                                ? <p className={styles.meta}>Per scartarla, apri l’ambulatorio di questa scheda.</p> : null}
                         </div>
                     </li>)}
                 </ul>}
