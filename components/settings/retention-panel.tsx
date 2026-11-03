@@ -82,17 +82,11 @@ function windowsFromDraft(draft: Draft): RetentionWindows | null {
     return windows;
 }
 
-/*
- * A window saved under another profile can sit at or below the minimum of the active one, also on a
- * category that the profile now keeps without limit and the page no longer lets you edit. Such a window
- * changes nothing: it is left out, so it cannot block saving the other categories.
- */
-function windowsAboveMinimum(profileId: RetentionProfileId, windows: RetentionWindows): RetentionWindows {
-    return Object.fromEntries(Object.entries(windows).filter(([category, window]) => {
-        const minimum = RETENTION_PROFILES[profileId].terms[category as RetentionCategory].term;
-        if (minimum.kind === 'unlimited') return false;
-        return !(minimum.kind === 'years' && window.kind === 'years' && window.years <= minimum.years);
-    })) as RetentionWindows;
+// Le categorie illimitate del profilo non sono modificabili. Le altre finestre
+// arrivano alla validazione server, che rifiuta quelle inferiori al minimo.
+function editableWindows(profileId: RetentionProfileId, windows: RetentionWindows): RetentionWindows {
+    return Object.fromEntries(Object.entries(windows).filter(([category]) =>
+        RETENTION_PROFILES[profileId].terms[category as RetentionCategory].term.kind !== 'unlimited')) as RetentionWindows;
 }
 
 export function RetentionPanel() {
@@ -157,7 +151,7 @@ export function RetentionPanel() {
             message: 'Le finestre si applicano a tutti i fascicoli chiusi. Possono solo allungare il minimo del profilo.', confirmLabel: 'Salva finestre' });
         if (!confirmed) return;
         setBusy(true);
-        const result = await send('PUT', { expectedRevision: overview.windowsRevision, windows: windowsAboveMinimum(overview.profileId, parsedDraft) });
+        const result = await send('PUT', { expectedRevision: overview.windowsRevision, windows: editableWindows(overview.profileId, parsedDraft) });
         setBusy(false);
         if (!result.ok) return fail(result.code);
         showToast({ tone: 'success', title: 'Finestre salvate' });
