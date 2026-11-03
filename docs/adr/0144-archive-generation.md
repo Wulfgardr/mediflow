@@ -90,7 +90,7 @@ Le regole di ammissione e recovery restano quelle dell’[ADR 0142](0142-sqlite-
 | SOAP headless e transizioni checkup | Rivalidazione dell’owner di sessione/selezione dentro il commit; la sessione è vincolata alla generazione. |
 | Backfill documentale CLI | Dry-run con lease read-only; apply esclusivo offline sotto intent per l’intero backup, letture asincrone e scritture. Un lease attivo impedisce anche il backup. |
 | Store envelope/replay di review e link paziente | Primitive sincrone senza composizione Web esposta; non costituiscono un’API autonoma. |
-| Bootstrap, reset, cataloghi e impostazioni | Confini operativi, non riprese cliniche da uno snapshot paziente; bootstrap ammesso, richieste Web protette dal documento corrente. |
+| Bootstrap, reset, cataloghi e impostazioni | Confini operativi, non riprese cliniche da uno snapshot paziente; bootstrap ammesso, richieste Web protette dal documento corrente. Il reset degli account ruota la generazione nella propria transazione (sezione sotto). |
 
 ## Alternative scartate e limiti
 
@@ -164,3 +164,46 @@ riaccensione di una copia su un altro computer. L’operatore deve ritirare
 l’installazione sorgente prima di lavorare su quella recuperata; la CLI richiede
 questa conferma. Non è una prevenzione tecnica dei cloni remoti. La UI distingue
 backup creato, autenticità della cifratura verificata e ripristino provato.
+
+## Reset degli account con giornale e ricevuta
+
+Aggiornamento del 3 novembre 2026. Fino a qui il reset della Zona pericolo
+eliminava gli account con una sola `DELETE` e non lasciava traccia: dopo un
+crash nessuno poteva dire se il reset fosse avvenuto, e gli involucri della
+chiave degli account eliminati andavano persi senza copia.
+
+Il reset resta nel processo Web e non sostituisce il file: modifica righe,
+quindi il punto di non ritorno è una transazione SQLite IMMEDIATE, che SQLite
+rende atomica anche dopo `kill -9`. Uno scambio di file richiederebbe il
+proprietario gestito descritto sopra e non aggiungerebbe garanzie. L'ordine è:
+
+1. `medical.db.reset-journal/<id>/intent.json`, scritto in esclusiva e
+   sincronizzato con la directory prima di toccare l'archivio: identificativo,
+   PID, data, generazione di partenza.
+2. Copia `VACUUM INTO` della connessione stessa in `previous.db.partial`
+   (`0600` dal primo byte), sincronizzata e pubblicata come `previous.db`;
+   l'impronta va in `preserved.json`.
+3. Transazione con `synchronous = FULL`: rifiuta se un'altra connessione ha
+   scritto dopo la copia (`data_version`), elimina `users` e i legami di
+   sessione, ruota la generazione e inserisce la ricevuta in `settings` con il
+   prefisso delle ricevute di ripristino, già escluso dagli scrittori generici.
+4. `outcome.json` dopo il commit. Le capability delle sessioni Web e native
+   seguono l'ordine precedente.
+
+All'apertura `openDbServer` riconcilia ogni intento senza esito il cui processo
+non è più vivo, decidendo solo dalla ricevuta dentro l'archivio: presente vuol
+dire completato, assente vuol dire annullato con archivio intatto, e la copia
+parziale viene rimossa. Un giornale illeggibile resta per l'ispezione e non
+blocca l'archivio, già coerente. La copia `previous.db` non viene mai rimossa
+in automatico: solo una conferma dell'amministratore, che ne verifica
+l'impronta e registra `discarded.json`.
+
+Le prove in `lib/security/account-reset-journal.test.ts` uccidono con SIGKILL
+un processo reale su SQLite sintetico in cinque punti (dopo l'intento, dopo la
+copia, dentro la transazione, dopo il commit, dopo la ricevuta) e riaprono con
+`openDbServer` in un nuovo processo. Non provati: perdita di alimentazione,
+Windows e Linux, dischi pieni durante la copia. Su Windows il percorso non
+rinomina l'archivio aperto: rinomina solo la copia chiusa; resta da provare
+sul campo. Il recupero completo dal file `.mediflow-recovery` resta la CLI
+offline descritta sopra.
+
