@@ -37,7 +37,7 @@ async function labPdf(taxCode: string): Promise<Uint8Array> {
     const document = await PDFDocument.create();
     const font = await document.embedFont(StandardFonts.Helvetica);
     const page = document.addPage([595, 842]);
-    ['Referto di laboratorio sintetico', `Paziente: Mario Rossi codice fiscale ${taxCode}`, 'Data prelievo: 10/01/2025']
+    ['Referto di laboratorio sintetico', `Sig. Mario Rossi C.F.: ${taxCode}`, 'Data prelievo: 10/01/2025']
         .forEach((line, index) => page.drawText(line, { x: 40, y: 800 - index * 18, size: 11, font }));
     [['Creatinina', '0,9', 'mg/dL', '0,6-1,2'], ['Sodio', '140', 'mmol/L', '135-145']]
         .forEach((row, index) => row.forEach((cell, column) => page.drawText(cell, { x: 40 + column * 130, y: 700 - index * 18, size: 11, font })));
@@ -100,7 +100,7 @@ test('Dossier: cartella sintetica, aggiornamento di una scheda, nuova scheda da 
         const lab = await labPdf(CF_B);
         writeFileSync(path.join(folder, '2025-01-10__laboratorio__esami.pdf'), lab);
         writeFileSync(path.join(folder, 'copia-esami.pdf'), lab);
-        writeFileSync(path.join(folder, 'lettera.pdf'), await textPdf(['Lettera specialistica sintetica', `Assistito: Mario Rossi codice fiscale ${CF_B}`,
+        writeFileSync(path.join(folder, 'lettera.pdf'), await textPdf(['ASST sintetica - Medicina', `Sig. Mario Rossi C.F.: ${CF_B}`,
             'Data referto: 02/02/2025', 'Diagnosi: ICD-10 I10 Ipertensione essenziale', 'Nega diabete ICD-10 E11.9 diabete mellito',
             'Terapia domiciliare: Ramipril 5 mg 1 cp al mattino; Bisoprololo 2,5 mg 1 cp', 'Ausili prescritti: deambulatore ISO 12.06.06']));
         writeFileSync(path.join(folder, 'scansione-leggibile.pdf'), await scannedPdf(page, ['Valutazione geriatrica sintetica', 'Data referto: 03/03/2025', 'Indice di Barthel 60/100']));
@@ -124,6 +124,8 @@ test('Dossier: cartella sintetica, aggiornamento di una scheda, nuova scheda da 
         const nuovo = panel.locator('[data-testid="dossier-group"][data-group="Nuovo"]');
         await expect(rossi.getByTestId('dossier-source')).toHaveCount(6);
         await expect(rossi.locator('[data-source-status="duplicate_in_selection"]')).toHaveCount(1);
+        await expect(rossi.getByTestId('dossier-source').filter({ hasText: 'lettera.pdf' })).toContainText('attribuzione da verificare');
+        await expect(rossi.getByTestId('dossier-source').filter({ hasText: 'lettera.pdf' })).not.toContainText('Nessun CF');
 
         // Omonimi: il codice del documento preseleziona B; A è discordante e non si può salvare.
         const destination = rossi.getByLabel('Scheda di destinazione');

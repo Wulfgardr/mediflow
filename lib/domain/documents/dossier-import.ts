@@ -157,18 +157,32 @@ export function unitText(text: string, unit: DossierUnit): string { return text.
 // Identità: un codice fiscale valido non prova l'identità
 // ---------------------------------------------------------------------------
 
-export interface DossierTaxCodeEvidence { value: string; role: 'patient_cf' | 'professional_cf' | 'unknown_cf'; checksumValid: boolean }
+export interface DossierTaxCodeEvidence {
+    value: string; role: 'patient_cf' | 'professional_cf' | 'unknown_cf'; checksumValid: boolean;
+    /** Ogni occorrenza ha un'etichetta professionale direttamente prima del codice. I vecchi artefatti non lo attestano. */
+    explicitProfessional?: boolean;
+}
+
+const CF_LABEL = String.raw`(?:codice\s+fiscale|c\.?\s*f\.?)`;
+const PROFESSIONAL_LABEL = String.raw`(?:medico(?:\s+prescrittore)?|prescrittore|operatore|operatrice|compilatore|compilatrice)`;
+const EXPLICIT_PROFESSIONAL_CF = new RegExp(String.raw`\b(?:${CF_LABEL}\s+(?:del(?:la)?\s+)?${PROFESSIONAL_LABEL}|${PROFESSIONAL_LABEL}\s+${CF_LABEL})\s*[:=]?\s*$`, 'iu');
 
 export function collectDossierTaxCodes(text: string): DossierTaxCodeEvidence[] {
     const resolved = resolveDocumentTaxCodeRoles({ text });
     const seen = new Set<string>();
     const result: DossierTaxCodeEvidence[] = [];
     for (const code of resolved.taxCodes) {
-        const role = code.role === 'patient_cf' ? 'patient_cf' : code.role === 'unknown_cf' ? 'unknown_cf' : 'professional_cf';
+        // La vicinanza ad ASST/medico non basta: può essere l'intestazione sopra i dati del paziente.
+        // Verifica tutte le occorrenze: una ripetizione non attribuita deve restare nel confronto.
+        const occurrences = [...text.matchAll(new RegExp(`\\b${code.value}\\b`, 'giu'))];
+        const explicitProfessional = occurrences.length > 0 && occurrences.every((match) =>
+            EXPLICIT_PROFESSIONAL_CF.test(text.slice(Math.max(0, match.index! - 100), match.index!)));
+        const role = explicitProfessional ? 'professional_cf' : code.role === 'patient_cf' ? 'patient_cf' : 'unknown_cf';
         const key = `${code.value}:${role}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        result.push({ value: code.value, role, checksumValid: isValidItalianTaxCodeChecksum(code.value) });
+        result.push({ value: code.value, role, checksumValid: isValidItalianTaxCodeChecksum(code.value),
+            ...(explicitProfessional ? { explicitProfessional: true } : {}) });
     }
     return result;
 }
@@ -193,8 +207,9 @@ function normalizedCode(value: string): string { return value.trim().toUpperCase
 
 /**
  * Valuta un gruppo di documenti. Il nome della cartella non partecipa mai.
- * - più CF paziente validi distinti nel gruppo (anche nello stesso documento): blocco;
- * - CF paziente diverso da quello della scheda collegata: blocco;
+ * - tutti i CF validi, anche non attribuiti, partecipano al confronto;
+ * - solo un CF esplicitamente del professionista viene escluso;
+ * - più CF distinti o CF diverso dalla scheda collegata: blocco;
  * - nessun CF: collegamento solo con conferma esplicita.
  */
 export function evaluateDossierGroupIdentity(
@@ -203,12 +218,15 @@ export function evaluateDossierGroupIdentity(
     linkedPatientId?: string | null,
 ): DossierIdentityEvaluation {
     const patientCodes = [...new Set(documents.flatMap((document) => document.taxCodes
-        .filter((code) => code.role === 'patient_cf' && code.checksumValid).map((code) => normalizedCode(code.value))))].sort();
+        .filter((code) => code.checksumValid && !(code.role === 'professional_cf' && code.explicitProfessional === true))
+        .map((code) => normalizedCode(code.value))))].sort();
+    const unattributed = documents.some((document) => document.taxCodes.some((code) => code.checksumValid
+        && code.role !== 'patient_cf' && !(code.role === 'professional_cf' && code.explicitProfessional === true)));
     const linked = linkedPatientId ? patients.find((patient) => patient.id === linkedPatientId) : undefined;
     const holders = (code: string) => patients.filter((patient) => normalizedCode(patient.taxCode) === code).map((patient) => patient.id);
     if (patientCodes.length > 1) {
         return { status: 'mixed', blocking: true, confirmationRequired: true, documentPatientCodes: patientCodes, candidatePatientIds: [],
-            message: 'I documenti contengono codici fiscali di pazienti diversi. Escludi le fonti di un altro paziente prima di procedere.' };
+            message: 'I documenti contengono più codici fiscali distinti, inclusi quelli di attribuzione incerta. Controlla a chi si riferiscono ed escludi le fonti discordanti prima di procedere.' };
     }
     const [code] = patientCodes;
     if (linked) {
@@ -218,7 +236,8 @@ export function evaluateDossierGroupIdentity(
         }
         if (code) {
             return { status: 'matched', blocking: false, confirmationRequired: true, documentPatientCodes: patientCodes, candidatePatientIds: [linked.id],
-                message: 'Il codice fiscale nei documenti coincide con la scheda scelta. Conferma comunque il collegamento.' };
+                message: unattributed ? 'Il codice fiscale letto coincide con la scheda scelta, ma la sua attribuzione nel documento è incerta. Verifica a chi si riferisce prima di confermare.'
+                    : 'Il codice fiscale nei documenti coincide con la scheda scelta. Conferma comunque il collegamento.' };
         }
         return { status: 'no_document_cf', blocking: false, confirmationRequired: true, documentPatientCodes: [], candidatePatientIds: [linked.id],
             message: 'Nessun codice fiscale paziente leggibile: verifica i documenti e conferma il collegamento.' };
@@ -420,11 +439,17 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
             const boundary = previousEnd;
             previousEnd = start + match[0].length;
             const section = segmentDossierSections(text).find((item) => item.start <= start && item.end >= start);
-            const context = lineAround(text, start, start + match[0].length).line.trim();
+            const line = lineAround(text, start, start + match[0].length);
+            const lower = Math.max(line.lineStart, section?.start ?? 0, boundary);
+            const prefix = text.slice(lower, start);
+            const sentenceBreak = [...prefix.matchAll(/[.!?;](?=\s|$)/gu)].at(-1);
+            const contextStart = lower + (sentenceBreak ? sentenceBreak.index! + 1 : 0);
+            const contextEnd = Math.min(start + match[0].length, section?.end ?? text.length);
+            const context = text.slice(contextStart, contextEnd).trim();
             const qualifiers = qualifiersOf(context, section?.kind ?? 'diagnosis', section?.label ?? '');
             if (qualifiers.subject === 'familiare') {
                 facts.push({ factId: dossierFactId('anamnesis', unit.index, start, { text: context }), kind: 'anamnesis', origin: 'parser:icd',
-                    evidence: { unit: unit.index, start, end: start + match[0].length, excerpt: context }, negated: false,
+                    evidence: { unit: unit.index, start: contextStart, end: contextEnd, excerpt: context }, negated: false,
                     values: { title: 'Anamnesi familiare', text: context, subject: 'familiare', date, certainty: qualifiers.certainty }, decision: 'pending' });
                 continue;
             }
@@ -1037,7 +1062,8 @@ export function buildDossierReceipt(
         generatedAt: now.toISOString(),
         sources: entries.length,
         byKind,
-        preservedVerified: entries.filter(({ record }) => record.preservation.state === 'verified').length,
+        preservedVerified: entries.filter(({ record, coverage }) => record.preservation.state === 'verified'
+            && !coverage.gaps.includes('not_preserved') && !coverage.gaps.includes('readback_mismatch')).length,
         extracted: entries.filter(({ record }) => record.extraction.state === 'extracted').length,
         extractionFailed: entries.filter(({ record }) => record.extraction.state === 'failed').length,
         notExtracted: entries.filter(({ record }) => record.extraction.state === 'not_extracted').length,

@@ -272,14 +272,16 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                         <thead><tr><th scope="col">N.</th><th scope="col">File</th><th scope="col">Lettura</th><th scope="col">Esito</th></tr></thead>
                                         <tbody>{group.sources.map((source, index) => {
                                             const outcome = outcomes[source.key];
-                                            const patientCodes = source.taxCodes.filter((code) => code.role === 'patient_cf' && code.checksumValid).map((code) => code.value);
+                                            const taxCodes = source.taxCodes.map((code) => `${code.value} (${!code.checksumValid ? 'controllo formale non valido'
+                                                : code.role === 'professional_cf' && code.explicitProfessional ? 'professionista esplicito'
+                                                    : code.role === 'patient_cf' ? 'paziente' : 'attribuzione da verificare'})`);
                                             return <tr key={source.key} role="row" data-testid="dossier-source" data-source-status={source.status}>
                                                 <td role="cell" data-label="N.">{index + 1}</td>
                                                 <td role="cell" data-label="File"><PrivacyBlur>{source.relativePath}</PrivacyBlur>
                                                     <small className={styles.muted}>{source.classification.reason}</small></td>
                                                 <td role="cell" data-label="Lettura">{describeExtraction(source)}
                                                     <small>{source.documentDate ? `Data: ${source.documentDate.value}` : 'Nessuna data esplicita'}</small>
-                                                    <small>{patientCodes.length ? <>CF paziente: <PrivacyBlur>{patientCodes.join(', ')}</PrivacyBlur></> : 'Nessun CF paziente leggibile'}</small>
+                                                    <small>{taxCodes.length ? <>CF letti: <PrivacyBlur>{taxCodes.join(', ')}</PrivacyBlur></> : 'Nessun CF leggibile'}</small>
                                                     <small>{formatCountLabel(source.facts.length, 'proposta', 'proposte')}</small></td>
                                                 <td role="cell" data-label="Esito">
                                                     {outcome ? <strong data-testid="dossier-acquire-outcome">{ACQUIRE_LABEL[outcome.status === 'failed' || outcome.status === 'skipped' ? outcome.reason : outcome.status]}</strong>
