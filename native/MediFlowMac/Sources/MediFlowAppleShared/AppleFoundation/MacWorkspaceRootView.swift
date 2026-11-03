@@ -224,8 +224,10 @@ public struct MediFlowMacRootView: View {
             scene.prepareWorkspaceIfNeeded()
         }
         .task(id: scene.workspaceModel?.clinicalWorkspaceConnection?.identity) {
+            scene.workspaceModel?.updateTerritorialPacks(nil)
             await scene.capabilities.loadIfNeeded(using: scene.workspaceModel?.clinicalWorkspaceConnection)
             scene.workspaceModel?.updateAvailableCapabilities(scene.capabilities.settledCapabilityKeys)
+            scene.workspaceModel?.updateTerritorialPacks(scene.capabilities.territorialPacks)
         }
         .environment(\.appleReduceMotionOverride, appearance.reduceMotionOverride)
         .environment(\.dynamicTypeSize, scene.launchDynamicTypeSizeOverride ?? inheritedDynamicTypeSize)

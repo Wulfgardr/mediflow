@@ -12,6 +12,7 @@ pub enum RuntimeError {
     UnsupportedProtocol,
     Authentication,
     Forbidden,
+    TerritorialPackDisabled,
     Missing,
     Conflict,
     ArchiveReplaced,
@@ -45,7 +46,7 @@ impl RuntimeError {
     pub fn status_code(&self) -> Option<u16> {
         match self {
             Self::Authentication => Some(401),
-            Self::Forbidden => Some(403),
+            Self::Forbidden | Self::TerritorialPackDisabled => Some(403),
             Self::Missing => Some(404),
             Self::Conflict | Self::ArchiveReplaced => Some(409),
             Self::AnalyticsCancelled => Some(409),
@@ -65,6 +66,7 @@ impl fmt::Display for RuntimeError {
             Self::LegacyAccessNeedsWeb => "Per gestire questo metodo di accesso, apri MediFlow nel browser sul computer dell’ambulatorio, accedi con il PIN e scegli Impostazioni, Accesso, Passa dal PIN alla passphrase. Salva il kit e la chiave di recupero, conferma e torna qui usando la nuova frase di accesso.",
             Self::UnsupportedProtocol => "Aggiorna Mediflow sul computer che ospita l’archivio per usare questa versione.",
             Self::Authentication => "Accesso non valido o sessione scaduta. Accedi di nuovo.",
+            Self::TerritorialPackDisabled => "Funzione del modulo lombardo, non attiva su questa installazione.",
             Self::Forbidden => "L'operatore o il dispositivo non è autorizzato a questa operazione.",
             Self::Missing => "La risorsa non è disponibile in questo ambulatorio.",
             Self::Conflict => "La versione è cambiata. Rileggi i dati prima di confermare una nuova modifica.",

@@ -81,16 +81,18 @@ struct PairedPatientDocumentsSection: View {
 
             followupSuggestionsSection
 
-            Divider()
-            DisclosureGroup {
-                fseDocumentValidationSection
-                    .padding(.top, 12)
-            } label: {
-                Text("Verifica FSE")
-                    .font(.headline)
+            if model.showsLombardyFeatures {
+                Divider()
+                DisclosureGroup {
+                    fseDocumentValidationSection
+                        .padding(.top, 12)
+                } label: {
+                    Text("Verifica FSE")
+                        .font(.headline)
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("documents-fse-disclosure")
             }
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("documents-fse-disclosure")
         }
 
     }

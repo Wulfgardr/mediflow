@@ -198,6 +198,7 @@ struct SessionInner {
     scopes: Mutex<HashSet<String>>,
     ambulatory_reads: Mutex<HashMap<String, u64>>,
     capabilities: Mutex<HashSet<String>>,
+    lombardy_features: Mutex<bool>,
 }
 struct SessionSecrets {
     pairing: Option<PairingCredentials>,
@@ -958,6 +959,7 @@ impl RuntimeSession {
                 scopes: Mutex::new(HashSet::new()),
                 ambulatory_reads: Mutex::new(HashMap::new()),
                 capabilities: Mutex::new(HashSet::new()),
+                lombardy_features: Mutex::new(true),
             }),
             context,
         }
@@ -1127,7 +1129,20 @@ impl RuntimeSession {
         self.can_write("network.replica.write-clinical-diary")
             && self.can_write("network.replica.readonly-clinical-diary")
     }
+    pub fn shows_lombardy_features(&self) -> bool {
+        self.inner
+            .lombardy_features
+            .lock()
+            .map(|value| *value)
+            .unwrap_or(true)
+    }
+
     pub fn refresh_capabilities(&self) -> Result<()> {
+        *self
+            .inner
+            .lombardy_features
+            .lock()
+            .map_err(|_| RuntimeError::Locked)? = true;
         let response =
             self.read_json(None, &["api", "v1", "network", "capabilities"], JSON_LIMIT)?;
         crate::ports::negotiate_host_ports(&response.value["hostPorts"])?;
@@ -1164,6 +1179,12 @@ impl RuntimeSession {
             }
         }
         self.check_read_epoch(response.epoch)?;
+        *self
+            .inner
+            .lombardy_features
+            .lock()
+            .map_err(|_| RuntimeError::Locked)? =
+            shows_lombardy_features(&response.value["territorialPacks"]);
         *self
             .inner
             .capabilities
@@ -4055,6 +4076,70 @@ mod tests {
             Err(RuntimeError::Locked)
         ));
         assert!(!session_at("https://example.invalid").can_bootstrap_first_ambulatory());
+    }
+
+    #[test]
+    fn territorial_http_denial_explains_module_without_retiring_session() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let server = thread::spawn(move || {
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+            read_request(&mut stream);
+            send_status_reply(
+                &mut stream,
+                403,
+                r#"{"code":"TERRITORIAL_PACK_DISABLED","error":"private body"}"#,
+            );
+        });
+        let error = session.refresh_capabilities().unwrap_err();
+        assert_eq!(error, RuntimeError::TerritorialPackDisabled);
+        assert!(error.to_string().contains("modulo lombardo"));
+        assert!(session.retirement_error().is_none());
+        assert!(session.shows_lombardy_features());
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn territorial_discovery_controls_regional_visibility_and_unknown_fallback() {
+        for (packs, visible) in [
+            (
+                json!({"schemaVersion":"mediflow.territorial-packs.v1","revision":1,"status":"ready","preset":"core"}),
+                false,
+            ),
+            (
+                json!({"schemaVersion":"mediflow.territorial-packs.v1","revision":2,"status":"ready","preset":"core+it"}),
+                false,
+            ),
+            (
+                json!({"schemaVersion":"mediflow.territorial-packs.v1","revision":3,"status":"ready","preset":"core+it+lom"}),
+                true,
+            ),
+            (Value::Null, true),
+            (json!({"preset":"core"}), true),
+            (
+                json!({"schemaVersion":"mediflow.territorial-packs.v1","revision":null,"status":"configuration_error","preset":"core"}),
+                true,
+            ),
+        ] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            assert!(session.shows_lombardy_features());
+            let server = thread::spawn(move || {
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/v1/network/capabilities "));
+                send_reply(
+                    &mut stream,
+                    &json!({"protocolVersion":"1.14.0", "operatingMode":"network-home-base",
+                    "capabilities":[], "territorialPacks":packs,
+                    "hostPorts":serde_json::from_str::<Value>(include_str!("../tests/fixtures/host-ports.json")).unwrap()}).to_string(),
+                );
+            });
+            session.refresh_capabilities().unwrap();
+            assert_eq!(session.shows_lombardy_features(), visible);
+            server.join().unwrap();
+            assert!(session.refresh_capabilities().is_err());
+            assert!(session.shows_lombardy_features());
+        }
     }
 
     #[test]
@@ -11297,4 +11382,14 @@ mod document_archive_tests {
         );
         worker.join().unwrap();
     }
+}
+
+fn shows_lombardy_features(value: &Value) -> bool {
+    if value["schemaVersion"] != "mediflow.territorial-packs.v1"
+        || value["status"] != "ready"
+        || value["revision"].as_u64().is_none()
+    {
+        return true;
+    }
+    !matches!(value["preset"].as_str(), Some("core" | "core+it"))
 }

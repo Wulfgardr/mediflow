@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AB7040000000000000000001 /* UIReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB7040000000000000000002 /* UIReadiness.swift */; };
 		033BF77802FE8AAAEA132414 /* MediFlowAppleShared in Frameworks */ = {isa = PBXBuildFile; productRef = 72EEC18E3E55264AEE14AA58 /* MediFlowAppleShared */; };
 		106073ECD36704940DA42B6D /* MobileVisitProductUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 282D49CA4FB326E39DB5CC71 /* MobileVisitProductUITests.swift */; };
 		18CDE82377A243F4B41B0C9B /* MediFlowMacShellApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4691B9860CA77FA5871DC2A8 /* MediFlowMacShellApp.swift */; };
@@ -15,6 +14,7 @@
 		45E4F741A3B8FBFFA75DD465 /* MediFlowMobileAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22294E85FD406F50AFBC48A9 /* MediFlowMobileAppUITests.swift */; };
 		4D5A03A67EC34FC88CAF655C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8724FDBA2290730AC0ED1F7E /* Assets.xcassets */; };
 		72DB344A36DDDCFFBD637E1F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8724FDBA2290730AC0ED1F7E /* Assets.xcassets */; };
+		7C127F78052B32DE6BBA3C29 /* UIReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = C65F32C323B31999F216FA14 /* UIReadiness.swift */; };
 		8758DDAC87384F01D87446FD /* MediFlowMobileShellApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121D53CD238781DE1F4D7312 /* MediFlowMobileShellApp.swift */; };
 		F4EE94988286DF1B0F39BFCA /* MediFlowAppleShared in Frameworks */ = {isa = PBXBuildFile; productRef = 5B9F44783C8363DE73DF6AB1 /* MediFlowAppleShared */; };
 /* End PBXBuildFile section */
@@ -30,7 +30,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		AB7040000000000000000002 /* UIReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIReadiness.swift; sourceTree = "<group>"; };
 		121D53CD238781DE1F4D7312 /* MediFlowMobileShellApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediFlowMobileShellApp.swift; sourceTree = "<group>"; };
 		22294E85FD406F50AFBC48A9 /* MediFlowMobileAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediFlowMobileAppUITests.swift; sourceTree = "<group>"; };
 		282D49CA4FB326E39DB5CC71 /* MobileVisitProductUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileVisitProductUITests.swift; sourceTree = "<group>"; };
@@ -40,6 +39,7 @@
 		4D79840B7DA781EA15CC8B29 /* MediFlowMobileApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MediFlowMobileApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8724FDBA2290730AC0ED1F7E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AFEA3F590AD845053A0F0558 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		C65F32C323B31999F216FA14 /* UIReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIReadiness.swift; sourceTree = "<group>"; };
 		CC5F0A7BD278D6125B67FD3A /* MobilePairedStatusOverrideUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobilePairedStatusOverrideUITests.swift; sourceTree = "<group>"; };
 		E91940CED10687F6D9D7CF0F /* MediFlowMacApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediFlowMacApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FFE1A092411BBD96AD35DDFF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -113,9 +113,9 @@
 			isa = PBXGroup;
 			children = (
 				22294E85FD406F50AFBC48A9 /* MediFlowMobileAppUITests.swift */,
-				AB7040000000000000000002 /* UIReadiness.swift */,
 				CC5F0A7BD278D6125B67FD3A /* MobilePairedStatusOverrideUITests.swift */,
 				282D49CA4FB326E39DB5CC71 /* MobileVisitProductUITests.swift */,
+				C65F32C323B31999F216FA14 /* UIReadiness.swift */,
 			);
 			path = MediFlowMobileAppUITests;
 			sourceTree = "<group>";
@@ -264,9 +264,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				45E4F741A3B8FBFFA75DD465 /* MediFlowMobileAppUITests.swift in Sources */,
-				AB7040000000000000000001 /* UIReadiness.swift in Sources */,
 				1D1D34F7A87FD455B29493B7 /* MobilePairedStatusOverrideUITests.swift in Sources */,
 				106073ECD36704940DA42B6D /* MobileVisitProductUITests.swift in Sources */,
+				7C127F78052B32DE6BBA3C29 /* UIReadiness.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -9,10 +9,11 @@ import { macDigest, readPinnedMacFile } from './execution-mac-config';
 import { MacOwnerSequence, parseMacOwnerFrame } from './execution-mac-state';
 
 // Updated only with the complete reviewed native source, never from caller JSON.
-export const MAC_NATIVE_SOURCE = Object.freeze({ bytes: 20411, sha256: 'c26edcc883e311f279507fc5a80c792242a252d66e99ee97c5f67693bcb14fac' });
+export const MAC_NATIVE_SOURCE = Object.freeze({ bytes: 24627, sha256: 'fe57d4589aded9f5439873d43361def44fbaa42908ba648831c8d48c29a7adb1' });
 export class MacNativeBuildError extends ExecutionError {
     constructor(readonly drainUnconfirmed: boolean) { super('unqualified_boundary'); }
 }
+const PROBE_LINE = /^MAC_PROBE_V2 [a-z_=012 ]+\n$/u;
 const fail = (): never => { throw new ExecutionError('unqualified_boundary'); };
 function trustedCommand(binary: string, args: readonly string[], root: string): string {
     const result = spawnSync(binary, [...args], { cwd: root, shell: false,
@@ -122,11 +123,12 @@ export function launchMacCustodian(root: string, nonce: string, mode: 'probe' | 
                 child.stdout.on('data', (chunk: Buffer) => {
                     text += chunk.toString('utf8');
                     if (Buffer.byteLength(text) > 4096) { failure(); clearTimeout(timer); reject(new ExecutionError('protocol_error')); }
-                    if (mode === 'probe' && text === 'MAC_PROBE_OK_V1\n') close();
+                    // One complete result line, passed or not: the host judges it after drain.
+                    if (mode === 'probe' && PROBE_LINE.test(text)) close();
                 });
                 void finished.then(() => {
                     clearTimeout(timer);
-                    if (!(!sequence.failed && sequence.drained && (mode === 'probe' ? text === 'MAC_PROBE_OK_V1\n' && sequence.reason === 1 : sequence.exitCode === 0))) reject(new ExecutionError('unqualified_boundary'));
+                    if (!(!sequence.failed && sequence.drained && (mode === 'probe' ? PROBE_LINE.test(text) && sequence.reason === 1 : sequence.exitCode === 0))) reject(new ExecutionError('unqualified_boundary'));
                     else resolve(text);
                 });
             });
