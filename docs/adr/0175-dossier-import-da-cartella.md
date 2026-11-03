@@ -75,7 +75,7 @@ le funzioni AI spente.
      contesto assistenziale;
    - totali di scale nominate (Barthel, MMSE e altre) con valore direttamente associato al nome o a un’etichetta di punteggio; anni e intervalli futuri restano residui. Mese/anno o giorno/mese/anno prima del punteggio non diventano un totale; un valore successivo si propone solo dopo un separatore o un’etichetta esplicita.
    Ogni proposta conserva negazione, soggetto (paziente o familiare: una diagnosi di un
-   familiare diventa anamnesi familiare, valutando la frase e la sezione del codice anche nei paragrafi uniti, senza separare le abbreviazioni cliniche dal soggetto), riferimento temporale e incertezza. Date e
+   familiare diventa anamnesi familiare, usando la sezione esplicita del codice anche nei paragrafi uniti; un punto o un codice ICD precedente non bastano a cambiare soggetto), riferimento temporale e incertezza. Date e
    codici non si inventano; una terapia da documento è storica salvo scelta esplicita;
    un totale di scala trascritto è una nota, non una scala somministrata; una richiesta
    non è mai un farmaco. Il documento intero è proposto come voce di diario e il testo

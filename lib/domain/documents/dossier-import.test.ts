@@ -349,17 +349,17 @@ test('identity: unlabeled and facility-adjacent codes remain visible and block t
     assert.equal(evaluateDossierGroupIdentity([repeated], patients, 'pa').blocking, true);
 });
 
-test('ICD subject comes from its own sentence and section in a merged paragraph', () => {
+test('ICD subject follows explicit sections; punctuation alone does not establish a new subject', () => {
     for (const text of [
         'Anamnesi familiare: madre diabetica. Diagnosi: ICD-10 E11 diabete mellito tipo 2',
-        'Madre diabetica. ICD-10 E11 diabete mellito tipo 2',
-        'Diagnosi: madre diabetica. ICD-10 E11 diabete mellito tipo 2',
+        'Madre diabetica. Diagnosi: ICD-10 E11 diabete mellito tipo 2',
     ]) {
         const facts = candidates(text);
         assert.deepEqual(facts.filter((f) => f.kind === 'diagnosis').map((f) => f.values.code), ['E11'], text);
         assert.equal(facts.some((f) => f.kind === 'anamnesis' && f.values.text?.includes('ICD-10 E11')), false);
     }
-    for (const text of ['Anamnesi familiare:\n- padre ICD-10 I21 infarto miocardico', 'Anamnesi familiare:\nICD-10 I21 infarto miocardico acuto']) {
+    for (const text of ['Anamnesi familiare:\n- padre ICD-10 I21 infarto miocardico', 'Anamnesi familiare:\nICD-10 I21 infarto miocardico acuto',
+        'Madre diabetica. ICD-10 E11 diabete mellito tipo 2', 'Diagnosi: madre diabetica. ICD-10 E11 diabete mellito tipo 2']) {
         const facts = candidates(text);
         assert.equal(facts.some((f) => f.kind === 'diagnosis'), false);
         assert.ok(facts.some((f) => f.kind === 'anamnesis' && f.values.subject === 'familiare'));
@@ -412,6 +412,8 @@ test('clinical abbreviations do not detach an ICD diagnosis from its family subj
         'Padre: dec. IMA ICD-10 I21 infarto',
         'Anamnesi: madre con diab. mell. ICD-10 E11',
         'Anamnesi: madre con diab. mell. tipo 2 ICD-10 E11',
+        'Madre con npl. Mammella ICD-10 C50',
+        'Madre ICD-10 E11 diabete; ICD-10 I10 ipertensione',
         'Madre deceduta per carcinoma mammella ICD-10 C50',
     ]) {
         const facts = candidates(text);

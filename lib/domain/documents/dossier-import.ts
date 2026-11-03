@@ -369,20 +369,6 @@ const LAB_ROW_BREAK = /-?\d+(?:[.,]\d+)?\s*[-–]\s*-?\d+(?:[.,]\d+)?(?:\s+(?:H|
 const ICD_EXPLICIT = /\bICD[-\s]?(9|10)(?:[-\s]?CM)?\s*[:.]?\s*([A-Z]?\d{2,3}(?:\.\d{1,2})?)\b\s*[-–:]?\s*((?:(?!\bICD\b|\bICD[-\s]?\d|\b(?:nega|non|esclus)\w*\b)[^\n.;]){0,160})/giu;
 const EXEMPTION_LINE = /\besen(?:zione|zioni|te)\b/iu;
 const CODE_TOKEN = /\b[A-Z0-9]{1,6}(?:\.[A-Z0-9]{1,4})?\b/giu;
-// Punti abbreviativi, frequenti nelle anamnesi: non separano il soggetto dal codice.
-const CLINICAL_ABBREVIATION = /\b(?:ca|dec|diab|mell|fam|anam|pat|preg|ipert|insuff|cron|sig|sigg|dott|dr|prof|ecc|es|dx|sx)\.$/iu;
-
-function icdSentenceStart(prefix: string): number {
-    const boundaries = [...prefix.matchAll(/[.!?;](?=\s|$)/gu)].filter((match) => {
-        if (match[0] !== '.') return true;
-        const before = prefix.slice(0, match.index! + 1);
-        if (CLINICAL_ABBREVIATION.test(before) || /(?:^|[^\p{L}])\p{L}\.$/u.test(before)) return false;
-        // Una continuazione in minuscolo può essere un'abbreviazione non in elenco.
-        return !/^\s*\p{Ll}/u.test(prefix.slice(match.index! + 1));
-    });
-    const last = boundaries.at(-1);
-    return last ? last.index! + 1 : 0;
-}
 
 function entryKindForClass(classification: DocumentDecisionClassification): { kind: DossierFactKind; title: string } {
     switch (classification) {
@@ -463,9 +449,10 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
             previousEnd = start + match[0].length;
             const section = segmentDossierSections(text).find((item) => item.start <= start && item.end >= start);
             const line = lineAround(text, start, start + match[0].length);
-            const lower = Math.max(line.lineStart, section?.start ?? 0, boundary);
-            const prefix = text.slice(lower, start);
-            const contextStart = lower + icdSentenceStart(prefix);
+            // Un punto (abbreviativo o meno) o un altro ICD non provano un cambio
+            // di soggetto. Nella stessa riga il familiare resta nel contesto fino
+            // a una nuova sezione esplicita, ad esempio «Diagnosi:».
+            const contextStart = Math.max(line.lineStart, section?.start ?? 0);
             const contextEnd = Math.min(start + match[0].length, section?.end ?? text.length);
             const context = text.slice(contextStart, contextEnd).trim();
             const qualifiers = qualifiersOf(context, section?.kind ?? 'diagnosis', section?.label ?? '');
