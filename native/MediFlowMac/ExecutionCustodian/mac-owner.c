@@ -189,53 +189,126 @@ static int tcp_connect_port(unsigned port) {
     int result = connect(fd, (struct sockaddr *)&address, sizeof(address)), error = errno;
     close(fd); errno = error; return result;
 }
+/* Fixed order and names: the host accepts exactly this line and decides.
+ * 1 passed, 0 failed, 2 target absent on this station (database only). */
+static const char *const probe_names[] = { "nproc", "fork", "spawn", "thread", "descriptors", "owned_read",
+    "owned_write", "protected_write", "protected_rename", "outside_read", "outside_write", "home_read", "data_read",
+    "database_read", "proxy_connect", "loopback_other", "unix_socket", "mach_lookup", "external_network" };
+enum { PROBE_CHECKS = sizeof(probe_names) / sizeof(probe_names[0]) };
+/* Services that exist outside the sandbox; the supervisor proves presence first. */
+static const char *const probe_services[] = { "com.apple.SystemConfiguration.configd",
+    "com.apple.system.opendirectoryd.libinfo", "com.apple.dnssd.service" };
+static bool directory_denied(const char *path) {
+    int fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (fd >= 0) { close(fd); return false; }
+    return denied_errno();
+}
+static bool unix_denied(const char *path) {
+    struct sockaddr_un address; memset(&address, 0, sizeof(address)); address.sun_family = AF_UNIX;
+    int n = snprintf(address.sun_path, sizeof(address.sun_path), "%s", path);
+    if (n < 1 || (size_t)n >= sizeof(address.sun_path)) return false;
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0); if (fd < 0) return denied_errno();
+    int result = connect(fd, (struct sockaddr *)&address, sizeof(address)), error = errno; close(fd); errno = error;
+    return result != 0 && denied_errno();
+}
+/* 192.0.2.1 is TEST-NET-1: no real service. Non-blocking, so a permissive
+ * profile shows EINPROGRESS/ENETUNREACH at once instead of hanging. */
+static bool external_denied(void) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0); if (fd < 0) return denied_errno();
+    if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0) { close(fd); return false; }
+    struct sockaddr_in address; memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET; address.sin_port = htons(443); address.sin_addr.s_addr = htonl(0xC0000201u);
+    int result = connect(fd, (struct sockaddr *)&address, sizeof(address)), error = errno; close(fd); errno = error;
+    return result != 0 && denied_errno();
+}
+/* One absolute path or "-" per line, written read-only by the host. */
+static bool target_line(FILE *file, char out[PATH_MAX], bool optional) {
+    if (!fgets(out, PATH_MAX, file)) return false;
+    size_t length = strlen(out);
+    if (length < 2 || out[length - 1] != '\n') return false;
+    out[--length] = '\0';
+    if (optional && !strcmp(out, "-")) return true;
+    if (out[0] != '/') return false;
+    for (const unsigned char *p = (const unsigned char *)out; *p; ++p) if (*p < 32 || *p == 127) return false;
+    return true;
+}
 static int probe(const char *root) {
-    struct rlimit limit;
-    if (getrlimit(RLIMIT_NPROC, &limit) || limit.rlim_cur != 0 || limit.rlim_max != 0) return 80;
-    limit.rlim_cur = 1; limit.rlim_max = 1;
-    if (!setrlimit(RLIMIT_NPROC, &limit) || errno != EPERM) return 81;
-    /* The original child escapes its group. Ownership must survive this. */
-    if (setsid() < 0) return 82;
-    pid_t p = fork();
-    if (p == 0) _exit(99);
-    if (p > 0) { (void)kill(p, SIGKILL); (void)waitpid(p, NULL, 0); return 83; }
-    if (errno != EAGAIN && !denied_errno()) return 84;
-    char helper[PATH_MAX]; if (!path_join(helper, root, "runtime/mac-owner")) return 85;
-    char *args[] = { helper, "--invalid-probe-child", NULL };
-    int spawn_error = posix_spawn(&p, helper, NULL, NULL, args, environ);
-    if (!spawn_error) { (void)kill(p, SIGKILL); (void)waitpid(p, NULL, 0); return 86; }
-    if (spawn_error != EAGAIN && spawn_error != EPERM && spawn_error != EACCES) return 87;
-    pthread_t thread;
-    if (pthread_create(&thread, NULL, thread_noop, NULL) || pthread_join(thread, NULL)) return 88;
-    if (fcntl(3, F_GETFD) != -1 || errno != EBADF || fcntl(4, F_GETFD) != -1 || errno != EBADF) return 89;
-    char config[PATH_MAX], ca[PATH_MAX], moved[PATH_MAX], sentinel[PATH_MAX], ports[PATH_MAX], owned[PATH_MAX];
-    if (!path_join(config, root, "codex/config.toml") || !path_join(ca, root, "runtime/public-ca.pem")
-        || !path_join(moved, root, "work/moved-config") || !path_join(ports, root, "runtime/probe-ports")
+    int ok[PROBE_CHECKS]; for (size_t i = 0; i < PROBE_CHECKS; ++i) ok[i] = 0;
+    char helper[PATH_MAX], config[PATH_MAX], ca[PATH_MAX], moved[PATH_MAX], sentinel[PATH_MAX], escape[PATH_MAX];
+    char ports[PATH_MAX], paths[PATH_MAX], owned[PATH_MAX], unix_path[PATH_MAX];
+    char home[PATH_MAX], data[PATH_MAX], database[PATH_MAX], dns[PATH_MAX];
+    if (!path_join(helper, root, "runtime/mac-owner") || !path_join(config, root, "codex/config.toml")
+        || !path_join(ca, root, "runtime/public-ca.pem") || !path_join(moved, root, "work/moved-config")
+        || !path_join(ports, root, "runtime/probe-ports") || !path_join(paths, root, "runtime/probe-paths")
         || !path_join(owned, root, "work/probe-owned")) return 90;
     int n = snprintf(sentinel, sizeof(sentinel), "%s.sentinel", root); if (n < 1 || n >= PATH_MAX) return 90;
-    if (!file_denied(config, O_WRONLY) || !file_denied(ca, O_WRONLY) || !file_denied(helper, O_WRONLY)
-        || !file_denied(sentinel, O_RDONLY) || !file_denied(sentinel, O_WRONLY)) return 91;
-    if (!rename(config, moved) || !denied_errno() || !chmod(config, 0600) || !denied_errno()) return 92;
-    int fd = open(owned, O_WRONLY | O_CREAT | O_EXCL, 0600);
-    if (fd < 0 || write_all(fd, "synthetic", 9)) { if (fd >= 0) close(fd); return 93; }
-    close(fd);
+    n = snprintf(escape, sizeof(escape), "%s.escape", root); if (n < 1 || n >= PATH_MAX) return 90;
+    n = snprintf(unix_path, sizeof(unix_path), "%s.sock", root); if (n < 1 || n >= PATH_MAX) return 90;
     FILE *file = fopen(ports, "r"); unsigned proxy_port = 0, blocked_port = 0; char extra;
     if (!file) return 94;
     int count = fscanf(file, "%u %u %c", &proxy_port, &blocked_port, &extra); fclose(file);
     if (count != 2 || !proxy_port || proxy_port > 65535 || !blocked_port || blocked_port > 65535 || proxy_port == blocked_port) return 94;
-    if (tcp_connect_port(proxy_port) || !tcp_connect_port(blocked_port) || !denied_errno()) return 95;
-    struct sockaddr_un address; memset(&address, 0, sizeof(address)); address.sun_family = AF_UNIX;
-    n = snprintf(address.sun_path, sizeof(address.sun_path), "%s.sock", root);
-    if (n < 1 || (size_t)n >= sizeof(address.sun_path)) return 96;
-    fd = socket(AF_UNIX, SOCK_STREAM, 0); if (fd < 0) return 96;
-    int result = connect(fd, (struct sockaddr *)&address, sizeof(address)), error = errno; close(fd); errno = error;
-    if (result == 0 || !denied_errno()) return 96;
-    mach_port_t service = MACH_PORT_NULL;
-    if (bootstrap_look_up(bootstrap_port, "com.apple.SystemConfiguration.configd", &service) == KERN_SUCCESS) {
-        mach_port_deallocate(mach_task_self(), service); return 97;
+    file = fopen(paths, "r"); if (!file) return 94;
+    bool targets = target_line(file, home, false) && target_line(file, data, false)
+        && target_line(file, database, true) && target_line(file, dns, true) && fgetc(file) == EOF;
+    fclose(file); if (!targets) return 94;
+
+    struct rlimit limit;
+    ok[0] = !getrlimit(RLIMIT_NPROC, &limit) && limit.rlim_cur == 0 && limit.rlim_max == 0;
+    limit.rlim_cur = 1; limit.rlim_max = 1;
+    if (!setrlimit(RLIMIT_NPROC, &limit) || errno != EPERM) ok[0] = 0;
+    /* The original child escapes its group. Ownership must survive this. */
+    if (setsid() < 0) return 82;
+    pid_t p = fork();
+    if (p == 0) _exit(99);
+    if (p > 0) { (void)kill(p, SIGKILL); (void)waitpid(p, NULL, 0); }
+    ok[1] = p < 0 && (errno == EAGAIN || denied_errno());
+    char *args[] = { helper, "--invalid-probe-child", NULL };
+    int spawn_error = posix_spawn(&p, helper, NULL, NULL, args, environ);
+    if (!spawn_error) { (void)kill(p, SIGKILL); (void)waitpid(p, NULL, 0); }
+    ok[2] = spawn_error == EAGAIN || spawn_error == EPERM || spawn_error == EACCES;
+    pthread_t thread;
+    ok[3] = !pthread_create(&thread, NULL, thread_noop, NULL) && !pthread_join(thread, NULL);
+    ok[4] = fcntl(3, F_GETFD) == -1 && errno == EBADF && fcntl(4, F_GETFD) == -1 && errno == EBADF;
+    int fd = open(config, O_RDONLY | O_CLOEXEC); char byte;
+    ok[5] = fd >= 0 && read(fd, &byte, 1) == 1; if (fd >= 0) close(fd);
+    fd = open(owned, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    ok[6] = fd >= 0 && !write_all(fd, "synthetic", 9); if (fd >= 0) close(fd);
+    ok[7] = file_denied(config, O_WRONLY) && file_denied(ca, O_WRONLY) && file_denied(helper, O_WRONLY);
+    ok[8] = rename(config, moved) && denied_errno();
+    if (ok[8]) ok[8] = chmod(config, 0600) && denied_errno();
+    ok[9] = file_denied(sentinel, O_RDONLY);
+    ok[10] = file_denied(sentinel, O_WRONLY);
+    fd = open(escape, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    if (fd >= 0) { close(fd); (void)unlink(escape); ok[10] = 0; }
+    else if (!denied_errno()) ok[10] = 0;
+    ok[11] = directory_denied(home);
+    ok[12] = directory_denied(data);
+    ok[13] = !strcmp(database, "-") ? 2 : file_denied(database, O_RDONLY);
+    ok[14] = tcp_connect_port(proxy_port) == 0;
+    ok[15] = tcp_connect_port(blocked_port) != 0 && denied_errno();
+    ok[16] = unix_denied(unix_path) && (!strcmp(dns, "-") || unix_denied(dns));
+    ok[17] = 1;
+    for (size_t i = 0; i < sizeof(probe_services) / sizeof(probe_services[0]); ++i) {
+        mach_port_t service = MACH_PORT_NULL;
+        if (bootstrap_look_up(bootstrap_port, probe_services[i], &service) == KERN_SUCCESS) {
+            mach_port_deallocate(mach_task_self(), service); ok[17] = 0;
+        }
     }
-    if (write_all(STDOUT_FILENO, "MAC_PROBE_OK_V1\n", 16)) return 98;
-    /* Only the still-owning supervisor ends this process, proving escaped-leader drain. */
+    ok[18] = external_denied();
+
+    char line[1024]; size_t used = 0;
+    n = snprintf(line, sizeof(line), "MAC_PROBE_V2"); if (n < 1) return 98; used = (size_t)n;
+    for (size_t i = 0; i < PROBE_CHECKS; ++i) {
+        n = snprintf(line + used, sizeof(line) - used, " %s=%d", probe_names[i], ok[i]);
+        if (n < 1 || (size_t)n >= sizeof(line) - used) return 98;
+        used += (size_t)n;
+    }
+    if (used + 1 >= sizeof(line)) return 98;
+    line[used++] = '\n';
+    if (write_all(STDOUT_FILENO, line, used)) return 98;
+    /* Only the still-owning supervisor ends this process, proving escaped-leader drain,
+     * whatever the result: the host alone judges the line. */
     for (;;) pause();
 }
 static int event(const char *nonce, unsigned *sequence, const char *kind, long value, long detail) {
@@ -249,11 +322,13 @@ static int supervise(const char *mode, const char *root, const char *nonce) {
     if (admin_absent()) { (void)event(nonce, &sequence, "ERROR", 1, 0); return 78; }
     if (!strcmp(mode, "probe")) {
         /* A nonexistent Mach service is not a successful deny probe. */
-        mach_port_t service = MACH_PORT_NULL;
-        if (bootstrap_look_up(bootstrap_port, "com.apple.SystemConfiguration.configd", &service) != KERN_SUCCESS) {
-            (void)event(nonce, &sequence, "ERROR", 2, 0); return 78;
+        for (size_t i = 0; i < sizeof(probe_services) / sizeof(probe_services[0]); ++i) {
+            mach_port_t service = MACH_PORT_NULL;
+            if (bootstrap_look_up(bootstrap_port, probe_services[i], &service) != KERN_SUCCESS) {
+                (void)event(nonce, &sequence, "ERROR", 2, 0); return 78;
+            }
+            mach_port_deallocate(mach_task_self(), service);
         }
-        mach_port_deallocate(mach_task_self(), service);
     }
     char helper[PATH_MAX]; if (!path_join(helper, root, "runtime/mac-owner")) return 78;
     int ready[2]; if (pipe(ready)) return 78;

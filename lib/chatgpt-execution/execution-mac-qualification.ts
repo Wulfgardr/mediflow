@@ -13,6 +13,7 @@ import { createStdioExecutionTransport, reportExecutionDiagnostic, type Executio
 import { EXECUTION_CONFIG, EXECUTION_SUBSTRATE, executionPublicCaBundle, executionSandboxProfile, verifyExecutionSubstrate } from './execution-sandbox';
 import { MAC_CONFIG_SOURCE, MAC_CONTEXT_SHA256, MAC_POLICY_REVISION, MAC_READBACK_SOURCE, assertMacConfigReadback, macDigest, verifyMacSourceSet } from './execution-mac-config';
 import { buildMacCustodian, launchMacCustodian, MacNativeBuildError, type MacNativeOwner } from './execution-mac-native';
+import { macBoundaryProbePassed, macBoundaryProbeTargets, parseMacBoundaryProbeLine, readMacOsSubstrate, type MacBoundaryProbeRecord, type MacOsSubstrate } from './execution-mac-probe';
 import type { MacProductQualificationAuthority } from './execution-platform';
 
 type Phase = 'preparing' | 'ready' | 'borrowed' | 'draining' | 'sealed' | 'revoked';
@@ -25,7 +26,7 @@ export type MacQualificationAudit = Readonly<{ schema: 'mediflow.mac-custody-aud
     consumedProjectionBinding: 'not_observed' | 'layered_source_projection_observed';
     omittedToolBinding: 'not_observed' | 'source_resolver_and_immutable_input_not_direct_tool_observation'; protocolRegeneration: 'not_observed' | '24_digests_matched';
     initializeSha256: string | null; readbackSha256: string | null; nativeHelperSha256: string | null;
-    compilerSha256: string | null; binarySha256: string; osBuild: string; cleanupComplete: boolean;
+    compilerSha256: string | null; binarySha256: string; osBuild: string | null; boundaryProbe: MacBoundaryProbeRecord | null; cleanupComplete: boolean;
     ownedTreeCeased: boolean; administrativePolicy: 'absent_only_no_overrides'; resourcesRetained: boolean }>;
 export class MacQualificationFailure extends ExecutionError {
     constructor(readonly stage: MacQualificationStage, readonly audit: MacQualificationAudit,
@@ -132,6 +133,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
     let initialization: unknown, initSha: string | null = null, configSha: string | null = null;
     let native: ReturnType<typeof buildMacCustodian> | undefined;
     let protocolMatched = false;
+    let substrate: MacOsSubstrate | null = null, boundaryProbe: MacBoundaryProbeRecord | null = null;
     let proxy: Awaited<ReturnType<typeof createOpenAIConnectProxy>> | undefined;
     let raw: ExecutionTransport | undefined, host: QualifiedExecutionHost | undefined, serverOwner: MacNativeOwner | undefined;
     const owners: MacNativeOwner[] = [], listeners: Server[] = [], immutable = new Map<string, string>();
@@ -150,7 +152,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
             protocolRegeneration: protocolMatched ? '24_digests_matched' : 'not_observed',
             initializeSha256: initSha, readbackSha256: configSha, nativeHelperSha256: native?.helperSha256 ?? null,
             compilerSha256: native?.compilerSha256 ?? null, binarySha256: EXECUTION_SUBSTRATE.codexSha256,
-            osBuild: EXECUTION_SUBSTRATE.osBuild, cleanupComplete: cleaned, ownedTreeCeased: treeCeased,
+            osBuild: substrate?.osBuild ?? null, boundaryProbe, cleanupComplete: cleaned, ownedTreeCeased: treeCeased,
             administrativePolicy: 'absent_only_no_overrides', resourcesRetained: root !== null && !cleaned });
     }
     function withdraw() {
@@ -184,7 +186,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
                     const s = lstatSync(root);
                     if (JSON.stringify([s.dev, s.ino, s.uid]) !== rootIdentity || !s.isDirectory() || s.isSymbolicLink()) return false;
                     rmSync(root, { recursive: true, force: false });
-                    for (const suffix of ['.sentinel', '.sock']) {
+                    for (const suffix of ['.sentinel', '.sock', '.escape']) {
                         try { rmSync(root + suffix); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
                     }
                 }
@@ -213,7 +215,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
     function assertReadbackCurrent(): void {
         check();
         if (!root || intentionalDrain || !serverOwner?.live() || !administrativeFilesAbsent()
-            || directories.size !== 8 || immutable.size !== 8) throw new ExecutionError('unqualified_boundary');
+            || directories.size !== 8 || immutable.size !== 9) throw new ExecutionError('unqualified_boundary');
         for (const [path, expected] of directories) if (directoryIdentity(path) !== expected) throw new ExecutionError('unqualified_boundary');
         for (const [path, expected] of immutable) if (identity(path) !== expected) throw new ExecutionError('unqualified_boundary');
         const path = join(root, 'codex', 'config.toml');
@@ -238,6 +240,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         stage = 'sources';
         const pins = verifyMacSourceSet(options.schemaDirectory, options.c1ReceiptPath, executionConfigFromToml(EXECUTION_CONFIG));
         binaryPath = verifyExecutionSubstrate(options.binaryPath);
+        substrate = readMacOsSubstrate();
         const ca = executionPublicCaBundle();
         check();
         root = realpathSync(mkdtempSync('/private/tmp/mfmac-')); chmodSync(root, 0o700);
@@ -268,6 +271,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         await new Promise<void>((resolve, reject) => { unix.once('error', reject); unix.listen(root + '.sock', resolve); });
         writeFileSync(root + '.sentinel', 'MediFlow synthetic boundary sentinel', { mode: 0o600, flag: 'wx' });
         writeFileSync(join(root, 'runtime', 'probe-ports'), `${proxy.port} ${address.port}\n`, { mode: 0o400, flag: 'wx' });
+        writeFileSync(join(root, 'runtime', 'probe-paths'), macBoundaryProbeTargets(), { mode: 0o400, flag: 'wx' });
         async function run(mode: 'probe' | 'version' | 'schemas'): Promise<string> {
             check(); const owner = launchMacCustodian(root!, nonce, mode, env, withdraw); owners.push(owner);
             const output = owner.collect(); // Attach before the first await, including fast --version.
@@ -277,8 +281,23 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
             if (!owner.drained()) throw new ExecutionError('unqualified_boundary');
             return text;
         }
-        stage = 'probe'; await run('probe');
-        if (readFileSync(root + '.sentinel', 'utf8') !== 'MediFlow synthetic boundary sentinel') throw new ExecutionError('unqualified_boundary');
+        stage = 'probe';
+        // Every preparation probes the container on the build it runs on, so
+        // the first send after a macOS update is always preceded by a probe.
+        const record = (outcome: MacBoundaryProbeRecord['outcome'], checks: MacBoundaryProbeRecord['checks']) => Object.freeze({
+            schema: 'mediflow.mac-boundary-probe.v1', osBuild: substrate!.osBuild, osVersion: substrate!.osVersion,
+            observedAt: new Date().toISOString(), codexSha256: EXECUTION_SUBSTRATE.codexSha256,
+            dyldSupportSha256: EXECUTION_SUBSTRATE.dyldSupportSha256,
+            profileSha256: macDigest(readFileSync(join(root!, 'runtime', 'profile.sb'))),
+            probeProfileSha256: macDigest(readFileSync(join(root!, 'runtime', 'profile-probe.sb'))),
+            nativeHelperSha256: native?.helperSha256 ?? null, outcome, checks: Object.freeze({ ...checks }) }) as MacBoundaryProbeRecord;
+        boundaryProbe = record('not_run', {});
+        const checks = parseMacBoundaryProbeLine(await run('probe'));
+        if (!checks) throw new ExecutionError('unqualified_boundary');
+        const passed = macBoundaryProbePassed(checks)
+            && readFileSync(root + '.sentinel', 'utf8') === 'MediFlow synthetic boundary sentinel';
+        boundaryProbe = record(passed ? 'passed' : 'failed', checks);
+        if (!passed) throw new ExecutionError('unqualified_boundary');
         stage = 'version'; if ((await run('version')).trim() !== `codex-cli ${EXECUTION_SUBSTRATE.codexVersion}`) throw new ExecutionError('unqualified_boundary');
         stage = 'protocol'; await run('schemas');
         for (const pin of pins) {
@@ -288,7 +307,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         // Capture BEFORE server startup. Never reset the config identity captured
         // immediately after exclusive creation, or adopt a replacement on readback.
         for (const path of [binary, native.helper, join(root, 'runtime', 'mac-owner.c'), join(root, 'runtime', 'profile.sb'),
-            join(root, 'runtime', 'profile-probe.sb'), join(root, 'runtime', 'public-ca.pem'), join(root, 'runtime', 'probe-ports'), join(root, 'codex', 'config.toml')]) {
+            join(root, 'runtime', 'profile-probe.sb'), join(root, 'runtime', 'public-ca.pem'), join(root, 'runtime', 'probe-ports'), join(root, 'runtime', 'probe-paths'), join(root, 'codex', 'config.toml')]) {
             const stamp = identity(path), previous = immutable.get(path);
             if (previous !== undefined && previous !== stamp) throw new ExecutionError('unqualified_boundary');
             immutable.set(path, stamp);
@@ -320,6 +339,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         if (macDigest(readFileSync(native.helper)) !== native.helperSha256 || readFileSync(join(root, 'codex', 'config.toml'), 'utf8') !== EXECUTION_CONFIG
             || readFileSync(join(root, 'runtime', 'public-ca.pem'), 'utf8') !== ca) throw new ExecutionError('unqualified_boundary');
         revision = macDigest(JSON.stringify({ base: MAC_CONTEXT_SHA256, policy: MAC_POLICY_REVISION, nonce, binary: EXECUTION_SUBSTRATE,
+            osBuild: substrate.osBuild, boundaryProbe: boundaryProbe.checks,
             native, source: MAC_CONFIG_SOURCE, readbackSource: MAC_READBACK_SOURCE, protocol: pins, initSha, configSha,
             profile: macDigest(readFileSync(join(root, 'runtime', 'profile.sb'))), config: macDigest(EXECUTION_CONFIG) }));
         phase = 'ready';
