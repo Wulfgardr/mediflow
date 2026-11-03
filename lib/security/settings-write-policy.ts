@@ -33,6 +33,7 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     aifaNetworkAccess: { write: ['web-session'], note: 'opt-in AIFA public catalog HEAD and explicit download' },
     aifaCatalogRemoteState: { write: [], note: 'server-managed AIFA HTTP metadata and persistent debounce' },
     aifaCatalogManifest: { write: [], note: 'atomic AIFA catalog writer only' },
+    drugCatalogSource: { write: [], note: 'atomic drug catalog file import writer only (lib/drug-catalog-server.ts)' },
     /* only the named preferences service owns revision CAS. */
     'ai.fabric.chatgptOrdinary': { write: [], note: 'ADR 0077 named authenticated ordinary controller with revision CAS only' },
     'ai.fabric.configurationGeneration': { write: [], note: 'host-managed monotonic configuration revocation; settings owner transaction only' },

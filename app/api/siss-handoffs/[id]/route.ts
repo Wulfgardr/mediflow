@@ -10,6 +10,7 @@ import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth
 import { sissHandoffUpdateSchema, sissHandoffWritePreconditionSchema } from '@/lib/api-schemas/siss-handoffs';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
+import { lombardyPackDenied, TERRITORIAL_PACK_DISABLED } from '@/lib/territorial-pack-production';
 import { planSissHandoffOutcomeChange } from '@/lib/clinical-status-transitions';
 
 // Local handoff notes and metadata; no documents or attachment payloads.
@@ -85,6 +86,7 @@ export async function PUT(request: Request, context: RouteContext) {
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
         const result = dbServer.transaction((tx) => {
+            if (lombardyPackDenied()) return { status: 403, value: TERRITORIAL_PACK_DISABLED } as const;
             const target = and(eq(sissHandoffEvents.id, id), eq(sissHandoffEvents.patientId, body.patientId));
             const existing = tx.select({ version: sissHandoffEvents.version, outcome: sissHandoffEvents.outcome,
                 completedAt: sissHandoffEvents.completedAt }).from(sissHandoffEvents).where(target).get();
@@ -149,6 +151,7 @@ export async function DELETE(request: Request, context: RouteContext) {
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
         const result = dbServer.transaction((tx) => {
+            if (lombardyPackDenied()) return { status: 403, value: TERRITORIAL_PACK_DISABLED } as const;
             const target = and(eq(sissHandoffEvents.id, id), eq(sissHandoffEvents.patientId, body.patientId));
             const existing = tx.select({ version: sissHandoffEvents.version }).from(sissHandoffEvents)
                 .where(target).get();

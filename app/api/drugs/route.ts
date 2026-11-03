@@ -17,6 +17,8 @@ import { parseDrugSearchLimit } from '@/lib/drug-search-query';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 const CATALOG_STATUS_HEADER = 'X-MediFlow-Aifa-Catalog';
+/** Codifica del catalogo attivo (AIC per AIFA), codificata per l'header. */
+const CATALOG_CODE_SYSTEM_HEADER = 'X-MediFlow-Drug-Code-System';
 
 function toDrugPayload(
     row: Awaited<ReturnType<typeof searchAifaCatalog>>['rows'][number],
@@ -68,7 +70,9 @@ export async function GET(request: Request) {
         const limit = parseDrugSearchLimit(searchParams.get('limit'));
         const { rows, status } = await searchAifaCatalog(query, limit);
         return NextResponse.json(rows.map((row) => toDrugPayload(row, status.state === 'ready')), {
-            headers: { [CATALOG_STATUS_HEADER]: status.state },
+            headers: { [CATALOG_STATUS_HEADER]: status.state,
+                ...(status.source ? { [CATALOG_CODE_SYSTEM_HEADER]: encodeURIComponent(status.source.codeSystem) }
+                    : status.manifest ? { [CATALOG_CODE_SYSTEM_HEADER]: 'AIC' } : {}) },
         });
     } catch (error) {
         const replacement = archiveReplacementResponse(error);

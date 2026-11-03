@@ -28,6 +28,7 @@ import {
     normalizeDrugSearchQuery,
 } from './drug-search-query';
 import { drugs, settings, users } from './schema';
+import { DRUG_CATALOG_SOURCE_SETTING_KEY, parseStoredDrugCatalogManifest, type DrugCatalogActiveSource } from './drug-catalog-import';
 
 const INSERT_BATCH_SIZE = 400;
 const MAX_AIFA_CSV_BYTES = 100 * 1024 * 1024;
@@ -36,6 +37,8 @@ export type AifaCatalogStatus = {
     count: number;
     manifest: AifaCatalogManifest | null;
     state: 'ready' | 'unverified' | 'not-imported';
+    /** Fonte dichiarata del catalogo caricato da file; assente per AIFA, descritto dal manifest. */
+    source?: DrugCatalogActiveSource;
 };
 
 export type AifaCatalogImportResult = AifaCatalogStatus & {
@@ -49,7 +52,13 @@ function readCatalogStatus(connection: Pick<typeof dbServer, 'select'>): AifaCat
         .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY)).get();
     const count = Number(countRow?.total || 0);
     const manifest = parseStoredAifaCatalogManifest(manifestRow?.value);
-    return { count, manifest, state: count === 0 ? 'not-imported' : manifest ? 'ready' : 'unverified' };
+    const external = manifest ? null : parseStoredDrugCatalogManifest(connection.select({ value: settings.value }).from(settings)
+        .where(eq(settings.key, DRUG_CATALOG_SOURCE_SETTING_KEY)).get()?.value);
+    // `source` compare solo per i cataloghi caricati da file; per AIFA la fonte è il manifest.
+    const source: DrugCatalogActiveSource | null = external
+        ? { kind: 'file', agency: external.agency, codeSystem: external.codeSystem, version: external.version, date: external.date, rowCount: external.rowCount, sha256: external.sha256 }
+        : null;
+    return { count, manifest, state: count === 0 ? 'not-imported' : manifest || source ? 'ready' : 'unverified', ...(source ? { source } : {}) };
 }
 
 export async function getAifaCatalogStatus(): Promise<AifaCatalogStatus> {
@@ -61,14 +70,24 @@ export function getAifaCatalogVersionedStatus(): AifaCatalogStatus & { snapshot:
 }
 
 /* Snapshot includes every stored drug field and the raw manifest, including legacy catalogs. */
-function catalogSnapshot(connection: Pick<typeof dbServer, 'select'>): string {
+export function catalogSnapshot(connection: Pick<typeof dbServer, 'select'>): string {
     const hash = createHash('sha256');
     for (const row of connection.select().from(drugs).orderBy(asc(drugs.aic)).all()) {
         hash.update(JSON.stringify(row)).update('\n');
     }
     const manifest = connection.select({ value: settings.value }).from(settings)
         .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY)).get();
-    return hash.update(JSON.stringify(manifest ?? null)).digest('hex');
+    hash.update(JSON.stringify(manifest ?? null));
+    // Assente sugli archivi con solo AIFA: lo snapshot già osservato resta identico.
+    const external = connection.select({ value: settings.value }).from(settings)
+        .where(eq(settings.key, DRUG_CATALOG_SOURCE_SETTING_KEY)).get();
+    if (external) hash.update('\n').update(JSON.stringify(external));
+    return hash.digest('hex');
+}
+
+/** Transazione IMMEDIATE del catalogo farmaci, per i writer di altre fonti nello stesso confine. */
+export function runDrugCatalogTransaction(apply: (transaction: Parameters<Parameters<typeof dbServer.transaction>[0]>[0]) => void): void {
+    dbServer.transaction(apply, { behavior: 'immediate' });
 }
 
 export function getAifaCatalogSnapshot(): string {
@@ -184,6 +203,7 @@ export async function replaceAifaCatalog(
             for (let offset = 0; offset < parsed.drugs.length; offset += INSERT_BATCH_SIZE) {
                 transaction.insert(drugs).values(parsed.drugs.slice(offset, offset + INSERT_BATCH_SIZE)).run();
             }
+            transaction.delete(settings).where(eq(settings.key, DRUG_CATALOG_SOURCE_SETTING_KEY)).run();
             transaction.insert(settings)
                 .values({ key: AIFA_CATALOG_MANIFEST_SETTING_KEY, value: JSON.stringify(manifest) })
                 .onConflictDoUpdate({
@@ -324,7 +344,7 @@ export function clearAifaCatalogWithAuthority(input: AifaAdminCommandInput): Aif
     return runAifaAdminCommand(input, AIFA_CLEAR_CONFIRMATION, () => new AifaClearDeniedError(), ({ transaction, previous, expectedSnapshot }) => {
         transaction.delete(drugs).run();
         transaction.delete(settings)
-            .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
+            .where(or(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY), eq(settings.key, DRUG_CATALOG_SOURCE_SETTING_KEY)))
             .run();
         const auditEventId = writeAuditEventInTransaction(transaction, { ...input.audit, outcome: 'success',
             redactedMetadata: { ...input.audit.redactedMetadata, counts: previous.count,
@@ -359,7 +379,7 @@ export function replaceLegacyDrugCatalogWithAuthority(
                 transaction.insert(drugs).values(normalizedItems.slice(offset, offset + INSERT_BATCH_SIZE)).run();
             }
             transaction.delete(settings)
-                .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
+                .where(or(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY), eq(settings.key, DRUG_CATALOG_SOURCE_SETTING_KEY)))
                 .run();
             const auditEventId = writeAuditEventInTransaction(transaction, { ...input.audit, outcome: 'success',
                 redactedMetadata: { ...input.audit.redactedMetadata, counts: normalizedItems.length,

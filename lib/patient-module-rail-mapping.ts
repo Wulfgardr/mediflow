@@ -130,3 +130,18 @@ export function buildPatientModuleRailGroups(
     validatePatientModuleRailGroups(groups, items);
     return Object.freeze(groups) as Kree8WorkspaceNavGroups;
 }
+
+/* ADR 0158 e 0176: SISS e FSE appartiene al pacchetto Lombardia. La validazione resta sull'elenco
+   completo; il filtro toglie soltanto le voci dei pacchetti spenti, senza riordinare le altre. */
+const LOMBARDY_RAIL_HREFS = new Set(['#siss']);
+
+export function filterTerritorialRailGroups(
+    groups: Kree8WorkspaceNavGroups,
+    packs: { readonly lombardy: boolean },
+): Kree8WorkspaceNavGroups {
+    if (packs.lombardy) return groups;
+    return Object.freeze(groups.map((group) => Object.freeze({
+        ...group,
+        items: Object.freeze(group.items.filter((item) => !LOMBARDY_RAIL_HREFS.has(item.href))),
+    }))) as Kree8WorkspaceNavGroups;
+}
