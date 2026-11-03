@@ -15,7 +15,7 @@ import { InkState } from '@/components/ui/ink-state';
 import { ClinicalRichTextEditor } from '@/components/clinical-rich-text-editor';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
-import { AttachmentCollectionChangedError, AttachmentCollectionView } from '@/lib/attachment-collection-client';
+import { AttachmentCollectionChangedError, AttachmentCollectionView, uploadFilesOnce } from '@/lib/attachment-collection-client';
 import { db, type Attachment, type ClinicalEntry, type Therapy, type Observation, type Checkup } from '@/lib/db';
 import { clinicalRichTextToPlainText, isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
 import { useLiveQueryState } from '@/lib/live-query';
@@ -86,6 +86,8 @@ export default function NewEntryPage() {
     const [editState, setEditState] = useState<EntryLocalDraft['editState']>('pristine');
     const [dateSource, setDateSource] = useState<EntryLocalDraft['dateSource']>('default');
     const [files, setFiles] = useState<File[]>([]);
+    // Files the server already stored in an earlier attempt of this entry: a retry reuses their ids.
+    const confirmedUploads = useRef(new Map<File, string>());
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [uploadProgress, setUploadProgress] = useState('');
     /* WUL-420 */
@@ -307,10 +309,8 @@ export default function NewEntryPage() {
         setIsSubmitting(true);
         setUploadProgress('Salvataggio allegati...');
 
-        const attachmentIds: string[] = [];
         try {
-
-            for (const file of files) {
+            const attachmentIds = await uploadFilesOnce(files, confirmedUploads.current, async (file) => {
                 const summary = 'Allegato alla voce clinica · revisione documentale richiesta';
                 const attachmentId = uuidv4();
 
@@ -332,8 +332,8 @@ export default function NewEntryPage() {
                     summarySnapshot: summary,
                     createdAt: new Date(),
                 }, { attachmentCollection });
-                attachmentIds.push(attachmentId);
-            }
+                return attachmentId;
+            });
 
             setUploadProgress('Salvataggio voce diario...');
 
@@ -363,8 +363,8 @@ export default function NewEntryPage() {
         } catch (error) {
             if (error instanceof AttachmentCollectionChangedError) {
                 attachmentsRead.refresh();
-                showToast({ tone: 'warning', title: 'Documenti in cartella cambiati', description: attachmentIds.length
-                    ? 'L’elenco dei documenti è cambiato durante il salvataggio. La voce non è stata registrata e alcuni allegati sono già in cartella: controllali prima di registrare di nuovo.'
+                showToast({ tone: 'warning', title: 'Documenti in cartella cambiati', description: confirmedUploads.current.size
+                    ? 'L’elenco dei documenti è cambiato durante il salvataggio. La voce non è stata registrata; gli allegati già salvati restano in cartella e non verranno caricati di nuovo. Controlla i documenti e registra di nuovo.'
                     : 'L’elenco dei documenti è cambiato dopo l’ultima lettura. La voce e gli allegati non sono stati salvati: i file restano nel modulo, controlla i documenti in cartella e registra di nuovo.' });
                 setIsSubmitting(false);
                 setUploadProgress('');
