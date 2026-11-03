@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { formatCountLabel } from '@/lib/format-count';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { Disclosure } from '@/components/disclosure';
@@ -390,6 +391,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                 {fileRejections.length > 0 && (
                     <div className="mt-3" role="alert"><ul>{fileRejections.map((message) => <li key={message}><PrivacyBlur>{message}</PrivacyBlur></li>)}</ul></div>
                 )}
+                <p className="mt-3"><Link href={`/patients/import/dossier?patientId=${encodeURIComponent(patientId)}`} className={disclosure.documentAction} data-lume-action="quiet">Dossier: importa da cartella o riprendi la revisione</Link></p>
             </section>
 
             <p ref={listStatus} role="status" aria-label="Stato elenco documenti" aria-live="polite" aria-atomic="true" tabIndex={isProcessing || listLoading ? 0 : -1}>
