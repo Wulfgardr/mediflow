@@ -16,7 +16,7 @@
       "Read"
     ],
     "defaultPrompt": [
-      "Apri la ricerca locale di MediFlow."
+      "$mediflow-local-ui:local-ui Apri la ricerca locale di MediFlow."
     ]
   }
 }

@@ -7,10 +7,15 @@ alle capacità cliniche o inline previste dall'ADR 0160.
 ## Risultato della diagnosi
 
 Il plugin installato e abilitato compare in `codex mcp list` e fra le skill.
-Un messaggio generico di collaudo che non nomina MediFlow non ne espone i tool;
-il prompt originale del pacchetto che nomina MediFlow e il richiamo esplicito
-`$mediflow-local-ui:local-ui` funzionano entrambi. La prova non dimostra un
-difetto del caricamento e non richiede di cambiare il prompt iniziale.
+Un messaggio generico di collaudo che non nomina MediFlow non ne espone i tool.
+Il prompt originale che nomina MediFlow funziona nella fixture con parent
+sintetico, ma nella prova con pacchetto completo e runtime standalone ha
+lasciato `ALL_TOOLS` senza MediFlow. Il richiamo esplicito
+`$mediflow-local-ui:local-ui` ha esposto il tool e ricevuto la risposta positiva
+sullo stesso runtime. Il prompt iniziale ora include questo richiamo.
+La selezione del plugin deve quindi essere distinta dalla validità del
+catalogo. Queste osservazioni non individuano il meccanismo interno con cui
+Codex seleziona implicitamente i plugin.
 
 Il server pubblica `mediflow.local_ui.navigate.v1`. Codex lo accetta e nel
 code mode lo espone come
