@@ -113,7 +113,7 @@ async function unlockPassphrase(page: Page, passphrase = PASSPHRASE) {
     await expect(lock.or(page.getByTestId('work-profile-onboarding')).or(page.getByTestId('settings-access-section')).first()).toBeVisible();
     if (!await lock.isVisible()) return;
     const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
-    if (await renew.isVisible()) await renew.click();
+    if (await renew.isVisible() && await renew.isEnabled()) await renew.click();
     const field = page.getByLabel('Passphrase', { exact: true });
     await expect(field).toBeEnabled(); await field.fill(passphrase);
     await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
@@ -203,6 +203,11 @@ async function setup(page: Page, info?: TestInfo) {
     expect(setupBodies).toHaveLength(1);
     expect(JSON.parse(setupBodies[0])).toMatchObject({ password: PIN, encryptedMasterKey: expect.stringMatching(/^v3:/u) });
     for (const secret of [PASSPHRASE, key]) expect(setupBodies[0]).not.toContain(secret);
+    /* the tab that has just created the archive closes its own session: no renewal step, no
+       claim of another session or of a changed passphrase. */
+    await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Rinnova accesso', exact: true })).toHaveCount(0);
+    await expect(page.getByText(/Una sessione è già attiva|Passphrase aggiornata/u)).toHaveCount(0);
     await unlockPassphrase(page);
     const panel = page.getByTestId('work-profile-onboarding');
     await expect(panel).toBeVisible();
