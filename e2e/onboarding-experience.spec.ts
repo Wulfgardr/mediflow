@@ -260,7 +260,7 @@ for (const width of [390, 1440]) for (const theme of ['light', 'dark'] as const)
         await setup(page, info);
         const panel = page.getByTestId('work-profile-onboarding');
         const manual = panel.getByRole('link', { name: 'Apri la cartella manualmente', exact: true });
-        await expect(manual).toHaveAttribute('href', '/?area=turno');
+        await expect(manual).toHaveAttribute('href', '/?area=incarico');
         await expect(manual).toBeVisible();
         await expect(panel.getByLabel('Avanzamento guida', { exact: true })).toHaveCount(1);
         await expect(panel.getByRole('radio', { checked: true })).toHaveCount(0);
@@ -306,7 +306,7 @@ test('first use: manual entry creates the first synthetic patient without saving
     const panel = page.getByTestId('work-profile-onboarding');
     const before = await readProfile(page);
     await panel.getByRole('link', { name: 'Apri la cartella manualmente', exact: true }).click();
-    await expect(page).toHaveURL(/[?&]area=turno/u);
+    await expect(page).toHaveURL(/[?&]area=incarico/u);
     expect(await readProfile(page)).toEqual(before);
     const initial = await page.request.get('/api/patients');
     expect(initial.status()).toBe(200);
@@ -424,7 +424,7 @@ for (const width of [320, 768]) {
         await focusVisible(page, manual);
         await assertKeyboardFocusProgresses(page, manual, 'always available manual entry');
         await manual.press('Enter');
-        await expect(page).toHaveURL(/[?&]area=turno/u);
+        await expect(page).toHaveURL(/[?&]area=incarico/u);
         expect((await readProfile(page)).active).toBeNull();
         await check(info);
     });

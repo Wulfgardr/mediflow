@@ -150,7 +150,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     const replay = await context.request.put(endpoint, { headers: archiveHeaders, data: current.lastCommand });
     expect(await replay.json()).toEqual(current);
     await panel.getByRole('link', { name: 'Apri la cartella manualmente' }).click();
-    await expect(page).toHaveURL(/[?&]area=turno/);
+    await expect(page).toHaveURL(/[?&]area=incarico/);
     await page.goto('/');
     await expect(page.getByRole('heading', { name: /Stato operativo/, level: 1 })).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true })).toHaveAttribute('aria-current', 'page');
