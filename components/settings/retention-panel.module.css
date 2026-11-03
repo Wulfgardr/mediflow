@@ -1,0 +1,14 @@
+.sources { margin: 0; padding-left: 1.25rem; display: grid; gap: 8px; max-width: 64ch; line-height: 1.6; }
+.sources a { color: var(--lume-ink); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.terms { display: grid; min-width: 0; }
+.termRow { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 0.8fr); gap: 16px; align-items: center;
+    padding-block: 16px; border-top: 1px solid var(--lume-rule); }
+.termIdentity { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.termField { display: grid; gap: 8px; min-width: 0; }
+.termInputs { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.termInputs input[type='number'] { width: 7rem; }
+.check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+.check input { width: 18px; height: 18px; accent-color: var(--lume-accent); }
+.termApplied { font: var(--type-strong); }
+.review { margin: 0; padding: 0; list-style: none; display: grid; min-width: 0; }
+@media (max-width: 767px) { .termRow { grid-template-columns: minmax(0, 1fr); } }

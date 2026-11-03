@@ -86,6 +86,13 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
                 keywords: ['backup', 'ripristino', 'restore', 'schedulazione backup', 'export dati', 'archivio cifrato'],
             },
             {
+                id: 'conservazione',
+                href: '/settings/conservazione',
+                label: 'Conservazione',
+                description: 'Termini, scadenze e blocchi dei fascicoli',
+                keywords: ['conservazione', 'retention', 'scarto', 'massimario', 'legal hold', 'blocco', 'contenzioso', 'fascicoli chiusi'],
+            },
+            {
                 id: 'compliance-evidence',
                 href: '/settings/compliance',
                 label: 'Evidenze e conformità',

@@ -451,6 +451,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'The two consolidated EUR-Lex versions and the Commission overview consulted on 2026-09-06 are read-only legal provenance for explicit user review; the inventory performs no fetch or background egress.',
         },
         {
+            path: 'lib/retention-policy.ts',
+            pattern: '(?:https://www\\.garanteprivacy\\.it/web/guest/home/docweb/-/docweb-display/docweb/9091942|https://siusa-archivi\\.cultura\\.gov\\.it/cgi-bin/siusa/pagina\\.pl\\?Chiave=3&RicProgetto=carte&TipoPag=profdocgen|https://sa-fvg\\.cultura\\.gov\\.it/fileadmin/normativa/d\\.m\\._Sanita_14_feb\\._1997\\.pdf|https://www\\.regione\\.lombardia\\.it/sanita/monitoraggio-dei-servizi-sanitari/gestione-della-documentazione-sanitaria)(?=[\'\"]|$)',
+            reason: 'ADR 0176: official sources of the retention profiles, shown as links for the data controller to review; the retention domain performs no fetch or background egress.',
+        },
+        {
             path: 'lib/compliance-evidence-inventory.test.ts',
             pattern: '(?:https://eur-lex\\.europa\\.eu/legal-content/EN/TXT/\\?uri=CELEX:(?:02016R0679-20160504|02024R1689-20260727)|https://digital-strategy\\.ec\\.europa\\.eu/en/policies/regulatory-framework-ai)(?=[\'\"]|$)',
             reason: 'Compliance inventory tests assert these exact official provenance strings and the bounded URL exceptions without issuing network requests.',
