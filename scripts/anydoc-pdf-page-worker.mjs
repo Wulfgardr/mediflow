@@ -193,6 +193,31 @@ async function materialize(request) {
     return { pages };
 }
 
+const STANDARD_FONT_MAX_BYTES = 256 * 1024;
+const STANDARD_FONT_FILES = new Set([
+    'FoxitDingbats.pfb', 'FoxitFixed.pfb', 'FoxitFixedBold.pfb', 'FoxitFixedBoldItalic.pfb', 'FoxitFixedItalic.pfb',
+    'FoxitSerif.pfb', 'FoxitSerifBold.pfb', 'FoxitSerifBoldItalic.pfb', 'FoxitSerifItalic.pfb', 'FoxitSymbol.pfb',
+    'LiberationSans-Bold.ttf', 'LiberationSans-BoldItalic.ttf', 'LiberationSans-Italic.ttf', 'LiberationSans-Regular.ttf',
+]);
+
+/* Non-embedded standard fonts (Helvetica, Times, Courier...) are drawn only from
+   the pinned pdfjs-dist package assets; document-supplied URLs are ignored. Without
+   them PDF.js silently skips the glyphs and OCR never sees overlay text. */
+class PackageStandardFontDataFactory {
+    constructor() {}
+
+    async fetch({ filename }) {
+        if (typeof filename !== 'string' || !STANDARD_FONT_FILES.has(filename)) throw new EngineUnavailable();
+        const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
+        const file = path.join(path.dirname(require.resolve('pdfjs-dist/package.json')), 'standard_fonts', filename);
+        const relative = path.relative(root, realpathSync(file));
+        const stat = lstatSync(file);
+        if (!stat.isFile() || stat.size < 1 || stat.size > STANDARD_FONT_MAX_BYTES
+            || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
+        return new Uint8Array(readFileSync(file));
+    }
+}
+
 async function loadRenderer() {
     if (process.versions.node.split('.')[0] !== '24') throw new EngineUnavailable();
     const profiles = JSON.parse(readFileSync(new URL('./anydoc-pdf-renderer-profiles.json', import.meta.url), 'utf8'));
@@ -302,6 +327,7 @@ async function renderPage(engine, bytes) {
             disableWorker: true,
             isEvalSupported: false,
             useSystemFonts: false,
+            StandardFontDataFactory: PackageStandardFontDataFactory,
             useWorkerFetch: false,
             stopAtErrors: true,
             disableRange: true,

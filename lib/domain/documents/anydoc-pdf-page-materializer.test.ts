@@ -12,7 +12,7 @@ import {
 } from './anydoc-pdf-page-materializer';
 import { ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
 
-const ENGINE_SHA256 = '19b2061750dbb696679c820471739177693bc9da8051f1c017e5d541e494341d';
+const ENGINE_SHA256 = '15aa0ef5b79bbe69ff8f3720efe19e171baba7290d340533d73c6d2dd1a0321a';
 const sha256 = (bytes: Uint8Array | string) => createHash('sha256').update(bytes).digest('hex');
 const routing = (pageCount: number, pages: readonly number[] = [1]) => ({
     schemaVersion: 'mediflow.anydoc_page_routing.v1' as const, pages, pageCount,
