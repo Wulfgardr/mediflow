@@ -168,6 +168,7 @@ enum NetworkCapabilityKey {
 @MainActor
 final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
     @Published private(set) var state: ClinicalWorkspaceLoadState = .idle
+    @Published private(set) var territorialPacks: TerritorialPackCapability?
     private var availableKeys = Set<String>()
     private var loadedConnectionIdentity: ClinicalWorkspaceConnection.Identity?
     private var requestGeneration: UInt64 = 0
@@ -187,6 +188,7 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
         #endif
         guard let connection else {
             requestGeneration &+= 1
+            territorialPacks = nil
             availableKeys.removeAll()
             loadedConnectionIdentity = nil
             state = .unavailable("Collega l'home-base per verificare le capability disponibili.")
@@ -198,6 +200,7 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
         let generation = requestGeneration
         availableKeys.removeAll()
         loadedConnectionIdentity = nil
+        territorialPacks = nil
         state = .loading
         do {
             let response = try await connection.dataSource.fetchNetworkCapabilities(
@@ -209,6 +212,7 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
             availableKeys = Set(response.capabilities.compactMap { capability in
                 capability.status == "available" ? capability.key : nil
             })
+            territorialPacks = response.territorialPacks
             loadedConnectionIdentity = connectionIdentity
             state = .loaded
         } catch {
