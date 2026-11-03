@@ -704,6 +704,80 @@ Produzione resta `HELD` nella prova C2, senza modifica alle condizioni di
 HOLD, consenso, annullamento, proposta o ammissione clinica. Il percorso I-4
 con account e generazioni rimane una verifica distinta.
 
+## Qualifica dinamica della build macOS: probe a ogni preparazione
+
+Data: 3 novembre 2026. Decisione D1 di Leonardo (30 ottobre): MediFlow deve
+funzionare sui Mac da M1 in su con le versioni di macOS supportate. Il pin fisso
+`26B118` spegneva le tre funzioni ChatGPT a ogni aggiornamento minore: il Mac
+di riferimento è passato a `26B123` il 2 novembre e le funzioni rispondevano
+`unqualified_boundary` prima di qualunque invio. Il pin della build viene tolto;
+il confine resta verificato.
+
+Restano fissati per digest il binario Codex `0.153.4`, `dyld-support.sb`, il
+bundle delle sole CA pubbliche e il sorgente del custode nativo. Una differenza
+su uno di questi ferma la preparazione allo stadio `sources` o `build`, come
+prima. La build macOS è letta da `SystemVersion.plist` e registrata, non
+confrontata con un valore atteso.
+
+Il probe richiesto dalla sezione sulla riqualifica `26B118` è ora nel
+repository (`mac-owner.c`, modalità `probe`; `execution-mac-probe.ts`). Gira in
+ogni preparazione, dentro il processo confinato reale, con lo stesso custode e
+lo stesso profilo Seatbelt della produzione più l'esecuzione del solo custode,
+dopo la verifica dei digest e prima dell'avvio del server Codex. Non usa account,
+rete verso OpenAI o quota. Riporta una riga con l'esito di ciascuno dei 19
+controlli; l'host accetta solo la riga completa, nell'ordine fissato, e soltanto
+se ogni controllo è superato. Il controllo sull'archivio può risultare `absent`
+quando su una postazione nuova `medical.db` non esiste ancora.
+
+| Controllo | Cosa verifica dentro il contenitore |
+| --- | --- |
+| `nproc`, `fork`, `spawn` | Limite processi a zero non alzabile; fork e spawn negati |
+| `thread`, `descriptors` | Un thread si crea; nessun descrittore ereditato oltre stdio |
+| `owned_read`, `owned_write` | La cartella posseduta si legge e si scrive |
+| `protected_write`, `protected_rename` | Configurazione, CA e custode non si scrivono, rinominano o cambiano permessi |
+| `outside_read`, `outside_write` | Un file sentinella fuori dalla cartella non si legge né scrive; nessun file nuovo nella cartella superiore |
+| `home_read` | La cartella personale reale (dal database account, non da `HOME`) non si apre |
+| `data_read`, `database_read` | La cartella dati MediFlow e `medical.db` non si aprono |
+| `proxy_connect` | Il proxy locale di uscita è raggiungibile |
+| `loopback_other`, `unix_socket` | Un altro servizio TCP locale, un socket Unix locale e il socket DNS di sistema sono negati |
+| `mach_lookup` | `configd`, `opendirectoryd` e `dnssd` non si raggiungono; il supervisore prova prima che esistano |
+| `external_network` | Una connessione diretta a un indirizzo pubblico (TEST-NET-1) è negata |
+
+Il probe dimostra il comportamento del contenitore su questa build per questi
+bersagli. Non è un'analisi del profilo né una prova esaustiva: una regola che
+aprisse un solo file diverso da quelli provati non verrebbe vista. La limitazione
+delle destinazioni a `auth.openai.com` e `chatgpt.com` resta compito del proxy,
+coperto dai suoi test, non del probe. Il controllo dei processi dipende anche
+dal limite `RLIMIT_NPROC` e la protezione dei file anche dai permessi; per questo
+la prova di falsificazione usa profili permissivi e mirati.
+
+Ammissione: se il probe passa, l'esito è registrato per build in
+`chatgpt-execution/boundary-probe.json` nella cartella dati (build, versione,
+data, digest di binario, `dyld-support.sb`, profili e custode, esito per
+controllo) e la revisione della qualifica include build ed esito. Se la
+registrazione non riesce, la preparazione è rifiutata. La registrazione è
+un'osservazione e non viene mai letta come autorità: ogni preparazione rifà il
+probe, quindi il primo invio dopo un cambio di build è sempre preceduto da un
+probe su quella build. Probe fallito o non concluso significa rifiuto: il server
+Codex non parte, nessun dato è inviato, l'interfaccia dice quale controllo
+manca.
+
+Prove del 3 novembre su macOS 27.2 `26B123`, Node `24.22.0`, Apple clang delle
+Command Line Tools: C2 senza account con il binario installato e i 19 controlli
+superati, `24_digests_matched`, initialize e readback osservati,
+`cleanupComplete: true`, `resourcesRetained: false`, login e turno non eseguiti.
+Con la cartella dati puntata su `/usr/lib`, che il profilo lascia leggere, la C2
+si ferma allo stadio `probe` con `data_read` fallito, prima di initialize. Sul
+custode reale un profilo `allow default` fa fallire tutti i controlli di
+confine; un profilo di produzione con la sola lettura della home aggiunta fa
+fallire solo `home_read`; con l'uscita di rete aperta falliscono
+`loopback_other`, `unix_socket` e `external_network`. Le prove usano cartelle
+dati sintetiche e non aprono l'archivio reale.
+
+Resta fisso `dyld-support.sb`: se un aggiornamento di macOS lo cambia, le
+funzioni si fermano con il messaggio dedicato finché il digest non viene
+riqualificato. Accesso, catalogo e generazioni restano verifiche distinte.
+
 ## Emendamento: quota inclusa, crediti e dinieghi osservati
 
 La quota inclusa esaurita non equivale sempre a impossibilità di eseguire una
