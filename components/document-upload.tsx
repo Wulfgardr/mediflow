@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { formatCountLabel } from '@/lib/format-count';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { Disclosure } from '@/components/disclosure';
@@ -336,6 +337,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     return (
         <div className={`${styles.register} ${styles.documentLayout}`} data-testid="patient-documents">
             <div className={styles.documentRail}>
+            <p className="mb-3"><Link href={`/patients/import/dossier?patientId=${encodeURIComponent(patientId)}`} className={disclosure.documentAction} data-lume-action="quiet">Dossier: importa da cartella o riprendi la revisione</Link></p>
             <section ref={uploadArea} aria-label="Caricamento documenti" data-document-area="upload">
                 {currentAttachments?.length === 0 && !listLoading ? (
                     <p className={disclosure.empty}>Nessun documento caricato. Aggiungi un file per consultarlo e, separatamente, richiedere una sintesi.</p>

@@ -34,7 +34,8 @@ for (const name of [panelName, 'app/patients/import/page.tsx', 'app/patients/new
 }
 test('Nuova scheda keeps CSV import secondary to the form submit', () => {
     const source = read('app/patients/new/page.tsx');
-    assert.match(source, /headerActions=\{<Link href="\/patients\/import" className="mf-button-secondary"/u);
+    assert.match(source, /headerActions=\{<>\s*<Link href="\/patients\/import" className="mf-button-secondary"/u);
+    assert.match(source, /<Link href="\/patients\/import\/dossier" className="mf-button-secondary"/u);
     assert.doesNotMatch(source, /primaryAction=/u);
     assert.match(source, /import .*FileSpreadsheet.* from 'lucide-react'/u);
 });
