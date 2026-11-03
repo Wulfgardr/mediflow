@@ -47,7 +47,7 @@ export function createNativeClinicalOwner(installation) {
 async function main() {
   let owner;
   try {
-    if (process.versions.node !== '24.22.0' || process.argv.length !== 3) return denied();
+    if (process.versions.node !== '24.18.0' || process.argv.length !== 3) return denied();
     owner = createNativeClinicalOwner(JSON.parse(readFileSync(process.argv[2], 'utf8')));
     process.once('SIGTERM', () => { owner.close().then(() => process.exit(0), () => process.exit(1)); });
     const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
