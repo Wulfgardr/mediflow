@@ -60,6 +60,41 @@ jobs:
       # npm ci rebuilds better-sqlite3 for the Node 24 ABI so the server can boot.
       - run: npm ci && npm run prepare:dependencies
 
+      # The dossier scan uses real local OCR on Linux. These optional artifacts
+      # are not npm dependencies; provision them explicitly before tracing the
+      # standalone bundle. The runtime never downloads an engine or language.
+      - name: Provision pinned local OCR artifacts
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { createHash } from 'node:crypto';
+          const manifest = JSON.parse(fs.readFileSync('scripts/anydoc-tesseract-artifacts.json', 'utf8'));
+          const core = 'https://cdn.jsdelivr.net/npm/tesseract.js-core@6.0.0/';
+          const data = 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/87416418657359cb625c412a48b6e1d6d41c29bd/';
+          const sources = {
+            'tesseract-core-lstm.js': core + 'tesseract-core-lstm.js',
+            'tesseract-core-lstm.wasm': core + 'tesseract-core-lstm.wasm',
+            'LICENSE': core + 'LICENSE',
+            'ita.traineddata': data + 'ita.traineddata',
+            'tessdata-LICENSE': data + 'LICENSE',
+          };
+          const verified = [];
+          for (const file of manifest.files) {
+            if (!Object.hasOwn(sources, file.name)) throw new Error('Unknown OCR artifact');
+            const response = await fetch(sources[file.name], { signal: AbortSignal.timeout(60000) });
+            if (!response.ok) throw new Error(`OCR artifact ${file.name}: HTTP ${response.status}`);
+            const bytes = Buffer.from(await response.arrayBuffer());
+            if (bytes.length !== file.byteLength || createHash('sha256').update(bytes).digest('hex') !== file.sha256)
+              throw new Error(`OCR artifact ${file.name}: size or SHA-256 mismatch`);
+            verified.push([file.name, bytes]);
+          }
+          fs.mkdirSync(manifest.directory);
+          for (const [name, bytes] of verified) fs.writeFileSync(path.join(manifest.directory, name), bytes, { flag: 'wx' });
+          console.log(`Local OCR: ${verified.length} pinned artifacts verified.`);
+          NODE
+          npm run check:anydoc-desktop-ocr
+
       - name: Test AnyDoc diagnostic artifact boundary
         run: npm run test:anydoc-diagnostics
 
