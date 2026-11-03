@@ -136,12 +136,23 @@
       "classification": "legacy-node-http"
     },
     {
+      "file": "app/api/auth/reset/previous/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
       "file": "app/api/auth/reset/route.ts",
       "target": "lib/db-server.ts",
       "capability": "server:lib/db-server.ts",
       "form": "import",
       "symbols": [
-        "dbServer"
+        "openDbServer"
       ],
       "count": 1,
       "classification": "legacy-node-http"
@@ -1358,6 +1369,17 @@
       ],
       "count": 1,
       "classification": "ambulatory-destructive-command"
+    },
+    {
+      "file": "lib/security/account-reset-journal-crash-fixture.ts",
+      "target": "lib/sqlite-schema-open.ts",
+      "capability": "server:lib/sqlite-schema-open.ts",
+      "form": "import",
+      "symbols": [
+        "openVersionedSqliteDatabase"
+      ],
+      "count": 1,
+      "classification": "synthetic-support"
     },
     {
       "file": "lib/security/archive-generation-test-support.cjs",
