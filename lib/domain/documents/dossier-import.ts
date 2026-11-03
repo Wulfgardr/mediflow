@@ -161,11 +161,17 @@ export interface DossierTaxCodeEvidence {
     value: string; role: 'patient_cf' | 'professional_cf' | 'unknown_cf'; checksumValid: boolean;
     /** Ogni occorrenza ha un'etichetta professionale direttamente prima del codice. I vecchi artefatti non lo attestano. */
     explicitProfessional?: boolean;
+    /** Distingue la regola sulla stessa riga dalle vecchie attribuzioni multilinea. */
+    professionalLabelScope?: 'same_line';
 }
 
-const CF_LABEL = String.raw`(?:codice\s+fiscale|c\.?\s*f\.?)`;
-const PROFESSIONAL_LABEL = String.raw`(?:medico(?:\s+prescrittore)?|prescrittore|operatore|operatrice|compilatore|compilatrice)`;
-const EXPLICIT_PROFESSIONAL_CF = new RegExp(String.raw`\b(?:${CF_LABEL}\s+(?:del(?:la)?\s+)?${PROFESSIONAL_LABEL}|${PROFESSIONAL_LABEL}\s+${CF_LABEL})\s*[:=]?\s*$`, 'iu');
+const CF_LABEL = String.raw`(?:codice[ \t\u00a0]+fiscale|c\.?[ \t\u00a0]*f\.?)`;
+const PROFESSIONAL_LABEL = String.raw`(?:medico(?:[ \t\u00a0]+prescrittore)?|prescrittore|operatore|operatrice|compilatore|compilatrice)`;
+const EXPLICIT_PROFESSIONAL_CF = new RegExp(String.raw`^[ \t\u00a0]*(?:${CF_LABEL}[ \t\u00a0]+(?:del(?:la)?[ \t\u00a0]+)?${PROFESSIONAL_LABEL}|${PROFESSIONAL_LABEL}[ \t\u00a0]+${CF_LABEL})[ \t\u00a0]*[:=]?[ \t\u00a0]*$`, 'iu');
+
+function professionalCodeOnSameLine(code: DossierTaxCodeEvidence): boolean {
+    return code.role === 'professional_cf' && code.explicitProfessional === true && code.professionalLabelScope === 'same_line';
+}
 
 export function collectDossierTaxCodes(text: string): DossierTaxCodeEvidence[] {
     const resolved = resolveDocumentTaxCodeRoles({ text });
@@ -175,14 +181,17 @@ export function collectDossierTaxCodes(text: string): DossierTaxCodeEvidence[] {
         // La vicinanza ad ASST/medico non basta: può essere l'intestazione sopra i dati del paziente.
         // Verifica tutte le occorrenze: una ripetizione non attribuita deve restare nel confronto.
         const occurrences = [...text.matchAll(new RegExp(`\\b${code.value}\\b`, 'giu'))];
-        const explicitProfessional = occurrences.length > 0 && occurrences.every((match) =>
-            EXPLICIT_PROFESSIONAL_CF.test(text.slice(Math.max(0, match.index! - 100), match.index!)));
+        const explicitProfessional = occurrences.length > 0 && occurrences.every((match) => {
+            const prefix = text.slice(0, match.index!);
+            const line = /[^\r\n\v\f\u0085\u2028\u2029]*$/u.exec(prefix)![0];
+            return EXPLICIT_PROFESSIONAL_CF.test(line);
+        });
         const role = explicitProfessional ? 'professional_cf' : code.role === 'patient_cf' ? 'patient_cf' : 'unknown_cf';
         const key = `${code.value}:${role}`;
         if (seen.has(key)) continue;
         seen.add(key);
         result.push({ value: code.value, role, checksumValid: isValidItalianTaxCodeChecksum(code.value),
-            ...(explicitProfessional ? { explicitProfessional: true } : {}) });
+            ...(explicitProfessional ? { explicitProfessional: true, professionalLabelScope: 'same_line' as const } : {}) });
     }
     return result;
 }
@@ -218,10 +227,10 @@ export function evaluateDossierGroupIdentity(
     linkedPatientId?: string | null,
 ): DossierIdentityEvaluation {
     const patientCodes = [...new Set(documents.flatMap((document) => document.taxCodes
-        .filter((code) => code.checksumValid && !(code.role === 'professional_cf' && code.explicitProfessional === true))
+        .filter((code) => code.checksumValid && !professionalCodeOnSameLine(code))
         .map((code) => normalizedCode(code.value))))].sort();
     const unattributed = documents.some((document) => document.taxCodes.some((code) => code.checksumValid
-        && code.role !== 'patient_cf' && !(code.role === 'professional_cf' && code.explicitProfessional === true)));
+        && code.role !== 'patient_cf' && !professionalCodeOnSameLine(code)));
     const linked = linkedPatientId ? patients.find((patient) => patient.id === linkedPatientId) : undefined;
     const holders = (code: string) => patients.filter((patient) => normalizedCode(patient.taxCode) === code).map((patient) => patient.id);
     if (patientCodes.length > 1) {
@@ -360,6 +369,20 @@ const LAB_ROW_BREAK = /-?\d+(?:[.,]\d+)?\s*[-–]\s*-?\d+(?:[.,]\d+)?(?:\s+(?:H|
 const ICD_EXPLICIT = /\bICD[-\s]?(9|10)(?:[-\s]?CM)?\s*[:.]?\s*([A-Z]?\d{2,3}(?:\.\d{1,2})?)\b\s*[-–:]?\s*((?:(?!\bICD\b|\bICD[-\s]?\d|\b(?:nega|non|esclus)\w*\b)[^\n.;]){0,160})/giu;
 const EXEMPTION_LINE = /\besen(?:zione|zioni|te)\b/iu;
 const CODE_TOKEN = /\b[A-Z0-9]{1,6}(?:\.[A-Z0-9]{1,4})?\b/giu;
+// Punti abbreviativi, frequenti nelle anamnesi: non separano il soggetto dal codice.
+const CLINICAL_ABBREVIATION = /\b(?:ca|dec|diab|mell|fam|anam|pat|preg|ipert|insuff|cron|sig|sigg|dott|dr|prof|ecc|es|dx|sx)\.$/iu;
+
+function icdSentenceStart(prefix: string): number {
+    const boundaries = [...prefix.matchAll(/[.!?;](?=\s|$)/gu)].filter((match) => {
+        if (match[0] !== '.') return true;
+        const before = prefix.slice(0, match.index! + 1);
+        if (CLINICAL_ABBREVIATION.test(before) || /(?:^|[^\p{L}])\p{L}\.$/u.test(before)) return false;
+        // Una continuazione in minuscolo può essere un'abbreviazione non in elenco.
+        return !/^\s*\p{Ll}/u.test(prefix.slice(match.index! + 1));
+    });
+    const last = boundaries.at(-1);
+    return last ? last.index! + 1 : 0;
+}
 
 function entryKindForClass(classification: DocumentDecisionClassification): { kind: DossierFactKind; title: string } {
     switch (classification) {
@@ -442,8 +465,7 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
             const line = lineAround(text, start, start + match[0].length);
             const lower = Math.max(line.lineStart, section?.start ?? 0, boundary);
             const prefix = text.slice(lower, start);
-            const sentenceBreak = [...prefix.matchAll(/[.!?;](?=\s|$)/gu)].at(-1);
-            const contextStart = lower + (sentenceBreak ? sentenceBreak.index! + 1 : 0);
+            const contextStart = lower + icdSentenceStart(prefix);
             const contextEnd = Math.min(start + match[0].length, section?.end ?? text.length);
             const context = text.slice(contextStart, contextEnd).trim();
             const qualifiers = qualifiersOf(context, section?.kind ?? 'diagnosis', section?.label ?? '');

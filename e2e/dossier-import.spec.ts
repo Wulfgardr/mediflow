@@ -100,8 +100,9 @@ test('Dossier: cartella sintetica, aggiornamento di una scheda, nuova scheda da 
         const lab = await labPdf(CF_B);
         writeFileSync(path.join(folder, '2025-01-10__laboratorio__esami.pdf'), lab);
         writeFileSync(path.join(folder, 'copia-esami.pdf'), lab);
-        writeFileSync(path.join(folder, 'lettera.pdf'), await textPdf(['ASST sintetica - Medicina', `Sig. Mario Rossi C.F.: ${CF_B}`,
-            'Data referto: 02/02/2025', 'Diagnosi: ICD-10 I10 Ipertensione essenziale', 'Nega diabete ICD-10 E11.9 diabete mellito',
+        writeFileSync(path.join(folder, 'lettera.pdf'), await textPdf(['ASST sintetica - Medicina', 'Sig. Mario Rossi, inviato dal medico', `C.F.: ${CF_B}`,
+            'Data referto: 02/02/2025', 'Anamnesi: madre deceduta per ca. mammella ICD-10 C50',
+            'Diagnosi: ICD-10 I10 Ipertensione essenziale', 'Nega diabete ICD-10 E11.9 diabete mellito',
             'Terapia domiciliare: Ramipril 5 mg 1 cp al mattino; Bisoprololo 2,5 mg 1 cp', 'Ausili prescritti: deambulatore ISO 12.06.06']));
         writeFileSync(path.join(folder, 'scansione-leggibile.pdf'), await scannedPdf(page, ['Valutazione geriatrica sintetica', 'Data referto: 03/03/2025', 'Indice di Barthel 60/100']));
         writeFileSync(path.join(folder, 'scansione.pdf'), await blankPdf());
@@ -162,6 +163,8 @@ test('Dossier: cartella sintetica, aggiornamento di una scheda, nuova scheda da 
         const diagnosis = (code: string) => letter.locator('[data-testid="dossier-fact"][data-kind="diagnosis"]').filter({ has: page.locator(`input[value="${code}"]`) });
         await expect(diagnosis('E11.9').getByLabel('Il testo nega questa informazione')).toBeChecked();
         await expect(diagnosis('I10').getByLabel('Il testo nega questa informazione')).not.toBeChecked();
+        await expect(diagnosis('C50')).toHaveCount(0);
+        await expect(letter.locator('[data-testid="dossier-fact"][data-kind="anamnesis"]').filter({ hasText: 'ICD-10 C50' })).not.toHaveCount(0);
         const ramipril = letter.locator('[data-testid="dossier-fact"][data-kind="therapy"]').filter({ has: page.locator('input[value="Ramipril"]') });
         await expect(ramipril.getByLabel('Posologia')).toHaveValue('5 mg 1 cp al mattino');
         await expect(ramipril.getByLabel('Stato')).toHaveValue('completed');

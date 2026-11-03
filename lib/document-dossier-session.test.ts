@@ -599,9 +599,10 @@ test('parent delta: unknown dispatch error with no record yet must keep an uncer
     assert.equal(fresh.record.pendingWrites!.length, 1);
 });
 
-for (const heading of ['Lettera sintetica', 'ASST sintetica - Medicina']) {
-    test(`ambiguous identity (${heading}): acquire and OCR retry cannot write on the wrong patient`, async () => {
-        const text = `%PDF-1.4 sintetico\n${heading}\nSig. Bianchi Luca C.F.: ${CF_B}\nEsenzione 031\nData referto: 01/02/2025`;
+for (const prefix of ['Lettera sintetica\nSig. Bianchi Luca C.F.:', 'ASST sintetica - Medicina\nSig. Bianchi Luca C.F.:',
+    'Sig. Bianchi Luca, inviato dal medico\nC.F.:', 'Assistito Medico\nC.F.:']) {
+    test(`ambiguous identity (${prefix.replace(/\n/gu, ' / ')}): acquire and OCR retry cannot write on the wrong patient`, async () => {
+        const text = `%PDF-1.4 sintetico\n${prefix} ${CF_B}\nEsenzione 031\nData referto: 01/02/2025`;
         const first = setup([['D/R/a.pdf', text]]);
         const [draft] = await buildDossierInventory(first.ports, first.files, live);
         await assert.rejects(acquireDossierGroup(first.ports, { group: draft, patientId: 'pa', confirmed: true, ...live }), DossierIdentityBlocked);
@@ -621,3 +622,18 @@ for (const heading of ['Lettera sintetica', 'ASST sintetica - Medicina']) {
         assert.equal(counts().clinicalCreates, 0);
     });
 }
+
+test('resume refuses the old multiline professional exemption before any clinical write', async () => {
+    const { ports, attachments, attachmentId, counts } = await storedDocument(labText(CF_A));
+    const document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record, facts: record.facts.filter((fact) => fact.kind === 'document_entry') }));
+    const meta = attachments.get(attachmentId)!.meta;
+    const snapshot = JSON.parse(meta.parseEvidenceArtifactSnapshot!);
+    snapshot.dossier.identity.taxCodes = [{ value: CF_B, role: 'professional_cf', checksumValid: true, explicitProfessional: true }];
+    snapshot.dossier.identity.status = 'no_document_cf';
+    meta.parseEvidenceArtifactSnapshot = JSON.stringify(snapshot);
+    const loaded = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.ok(loaded.coverage.gaps.includes('identity_conflict'));
+    const result = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+    assert.equal(result.stopped, 'identity');
+    assert.equal(counts().clinicalCreates, 0);
+});

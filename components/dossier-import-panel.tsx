@@ -273,7 +273,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                         <tbody>{group.sources.map((source, index) => {
                                             const outcome = outcomes[source.key];
                                             const taxCodes = source.taxCodes.map((code) => `${code.value} (${!code.checksumValid ? 'controllo formale non valido'
-                                                : code.role === 'professional_cf' && code.explicitProfessional ? 'professionista esplicito'
+                                                : code.role === 'professional_cf' && code.explicitProfessional && code.professionalLabelScope === 'same_line' ? 'professionista esplicito'
                                                     : code.role === 'patient_cf' ? 'paziente' : 'attribuzione da verificare'})`);
                                             return <tr key={source.key} role="row" data-testid="dossier-source" data-source-status={source.status}>
                                                 <td role="cell" data-label="N.">{index + 1}</td>
