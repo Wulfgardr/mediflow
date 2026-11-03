@@ -36,6 +36,8 @@ function OwnedDocumentPreviewCanvas({ source, signal }: CanvasProps) {
     const status = current?.state ?? 'loading';
     const count = pageCount?.source === source ? pageCount.count : undefined;
     const isPdf = source.kind === 'pdf';
+    // A page refused on its own still lets the reader move to the others.
+    const navigable = status === 'ready' || (current?.state === 'error' && current.error.pages !== undefined);
 
     useEffect(() => {
         const target = canvas.current;
@@ -54,7 +56,10 @@ function OwnedDocumentPreviewCanvas({ source, signal }: CanvasProps) {
             setPageCount({ source, count: result.pages });
             setSnapshot({ job, state: 'ready' });
         }).catch((error: unknown) => {
-            if (!controller.signal.aborted) setSnapshot({ job, state: 'error', error: previewFailure(error, isPdf ? 'invalid_pdf' : 'invalid_image') });
+            if (controller.signal.aborted) return;
+            const failure = previewFailure(error, isPdf ? 'invalid_pdf' : 'invalid_image');
+            if (failure.pages !== undefined) setPageCount({ source, count: failure.pages });
+            setSnapshot({ job, state: 'error', error: failure });
         });
         return () => {
             controller.abort();
@@ -73,10 +78,10 @@ function OwnedDocumentPreviewCanvas({ source, signal }: CanvasProps) {
         <section data-testid={isPdf ? 'document-preview-pdf' : 'document-preview-image'} data-state={status}
             className="absolute inset-0 flex min-h-0 flex-col" aria-busy={status === 'loading'}>
             {isPdf && <nav aria-label="Pagine PDF" className="flex flex-wrap items-center justify-center gap-3 p-3">
-                <button type="button" className="mf-btn-secondary" disabled={status !== 'ready' || page <= 1}
+                <button type="button" className="mf-btn-secondary" disabled={!navigable || page <= 1}
                     onClick={() => setPage((value) => value - 1)}>Pagina precedente</button>
                 <span aria-live="polite" data-testid="document-preview-page-number">Pagina {page} di {count ?? '…'}</span>
-                <button type="button" className="mf-btn-secondary" disabled={status !== 'ready' || !count || page >= count}
+                <button type="button" className="mf-btn-secondary" disabled={!navigable || !count || page >= count}
                     onClick={() => setPage((value) => value + 1)}>Pagina successiva</button>
             </nav>}
             {status === 'loading' && <div className="p-3 text-center">
@@ -93,7 +98,7 @@ function OwnedDocumentPreviewCanvas({ source, signal }: CanvasProps) {
                     style={{ display: status === 'ready' ? 'block' : 'none', maxWidth: '100%', height: 'auto', margin: 'auto' }} />
             </div>
             {isPdf && <p className="px-3 py-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                Anteprima grafica locale, senza moduli o collegamenti attivi. Alcuni caratteri possono mancare o differire: per un valore clinico controlla il documento originale.
+                Anteprima grafica locale, senza moduli o collegamenti attivi. Il tipo di carattere può differire dall’originale.
             </p>}
         </section>
     );

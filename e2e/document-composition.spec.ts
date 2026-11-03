@@ -221,6 +221,28 @@ test('Documenti: PDF con immagine oltre soglia rifiuta tutta la pagina; PDF norm
     }
 });
 
+test('Documenti: una pagina con una cifra senza glifo non viene disegnata, le altre restano raggiungibili', async ({ page }) => {
+    const { readFileSync } = await import('node:fs');
+    const { PDFDocument } = await import('pdf-lib');
+    const { docs } = await documents(page);
+    const combined = await PDFDocument.create();
+    for (const file of ['lab-missing-digit.pdf', 'laboratory-1.pdf']) {
+        const source = await PDFDocument.load(readFileSync(`components/test-support/pdf-glyphs/${file}`));
+        const [copied] = await combined.copyPages(source, [0]);
+        combined.addPage(copied);
+    }
+    const name = 'Referto sintetico con glifo mancante.pdf';
+    await docs.locator('input[type="file"]').setInputFiles({ name, mimeType: 'application/pdf', buffer: Buffer.from(await combined.save()) });
+    await docs.getByRole('button', { name: `Visualizza ${name}`, exact: true }).click();
+    const viewer = page.getByTestId('document-viewer');
+    await expect(viewer.getByTestId('document-preview-error')).toHaveAttribute('data-error-code', 'unresolved_glyph');
+    await expect(viewer.getByTestId('document-preview-pdf-page')).toHaveAttribute('width', '0');
+    await expect(viewer.getByTestId('document-preview-page-number')).toHaveText('Pagina 1 di 2');
+    await viewer.getByRole('button', { name: 'Pagina successiva' }).click();
+    await expect(viewer.getByTestId('document-preview-pdf')).toHaveAttribute('data-state', 'ready');
+    await expect(viewer.getByTestId('document-preview-error')).toHaveCount(0);
+});
+
 test('Documenti: un duplicato richiede una scelta e le copie restano distinguibili', async ({ page }) => {
     const { docs, names } = await documents(page);
     const source = { name: names[0], mimeType: 'text/plain', buffer: Buffer.from('Originale sintetico A. Nessun dato reale.') };

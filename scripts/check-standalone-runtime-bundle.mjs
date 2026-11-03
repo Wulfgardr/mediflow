@@ -80,7 +80,7 @@ class PdfPageWorkerSmokeError extends Error {}
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
-const ANYDOC_PDF_PAGE_WORKER_SHA256 = 'a7830f7afeb3946d907af1c01121fb030be9dcb62f7defb7833bedfc8af565f9';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = '5facb4803373cd1a15c7548813f9a3662107dd0efd5e9cf3739643921e49cedc';
 const PDFJS_STANDARD_FONT_FILES = Object.freeze([
   'FoxitDingbats.pfb', 'FoxitFixed.pfb', 'FoxitFixedBold.pfb', 'FoxitFixedBoldItalic.pfb', 'FoxitFixedItalic.pfb',
   'FoxitSerif.pfb', 'FoxitSerifBold.pfb', 'FoxitSerifBoldItalic.pfb', 'FoxitSerifItalic.pfb', 'FoxitSymbol.pfb',
