@@ -3,7 +3,8 @@
 /*
  * Dossier da cartella (WUL-804, ADR 0175). Superficie Web locale, con la chiave nel
  * client. Ogni scrittura parte da un'azione esplicita del medico e passa da
- * lib/document-dossier-session.ts sui writer ordinari. Nessun modello coinvolto.
+ * lib/document-dossier-session.ts sui writer ordinari. L'app non chiama modelli:
+ * un'estrazione preparata (ADR 0176) è un file scelto dal medico, verificato sul testo locale.
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -16,9 +17,9 @@ import { proposeIdentityFields } from '@/lib/domain/documents/dossier-sections';
 import { db } from '@/lib/db';
 import { createDossierPorts } from '@/lib/document-dossier-ports';
 import {
-    DossierAbortedError, DossierIdentityBlocked, DossierStaleError, DossierWriteInFlight, acquireDossierGroup, applyDossierDocument, buildDossierInventory,
+    DossierAbortedError, DossierIdentityBlocked, DossierStaleError, DossierWriteInFlight, acceptVerifiedAndApply, acquireDossierGroup, applyDossierDocument, buildDossierInventory,
     evaluateDraftGroupIdentity, loadPatientDossier, retryDossierExtraction, saveDossierReview,
-    type DossierAcquireOutcome, type DossierApplyResult, type DossierDocumentView, type DossierDraftGroup, type DossierInputFile,
+    type DossierAcquireOutcome, type DossierApplyResult, type DossierBulkResult, type DossierDocumentView, type DossierDraftGroup, type DossierInputFile,
     type DossierPatient, type DossierPatientView,
 } from '@/lib/document-dossier-session';
 import {
@@ -26,6 +27,9 @@ import {
     latestAppliedOutcome, unitText,
     type DossierFact, type DossierFactKind, type DossierRecord,
 } from '@/lib/domain/documents/dossier-import';
+import {
+    DOSSIER_PREPARED_MAX_BYTES, PREPARED_CHECK_LABELS, parsePreparedExtraction, type PreparedCheck, type PreparedExtraction,
+} from '@/lib/domain/documents/dossier-prepared';
 import { formatCountLabel } from '@/lib/format-count';
 import styles from './patient-bulk-import-panel.module.css';
 
@@ -36,7 +40,7 @@ const FIELDS: Record<DossierFactKind, FieldSpec[]> = {
         { name: 'system', label: 'Sistema', type: 'select', options: [['', 'Nessun codice'], ['ICD-9', 'ICD-9'], ['ICD-10', 'ICD-10'], ['ICD-11', 'ICD-11']] },
         { name: 'date', label: 'Data', type: 'date' }],
     exemption: [{ name: 'code', label: 'Codice di esenzione' }],
-    therapy: [{ name: 'drugName', label: 'Farmaco' }, { name: 'dosage', label: 'Posologia' },
+    therapy: [{ name: 'drugName', label: 'Farmaco' }, { name: 'activePrinciple', label: 'Principio attivo' }, { name: 'dosage', label: 'Posologia (dose, frequenza, via, durata)' },
         { name: 'status', label: 'Stato', type: 'select', options: [['completed', 'Storica, non in corso'], ['suspended', 'Sospesa'], ['active', 'In corso']] },
         { name: 'startDate', label: 'Inizio', type: 'date' }, { name: 'endDate', label: 'Fine', type: 'date' }],
     observation: [{ name: 'display', label: 'Esame' }, { name: 'value', label: 'Valore' }, { name: 'unit', label: 'Unità nel documento' },
@@ -73,6 +77,9 @@ function qualifierNotes(fact: DossierFact): string[] {
         v.rowSource ? v.rowSource : '',
         fact.kind === 'reported_scale' ? 'Totale trascritto: non diventa una scala somministrata' : '',
         fact.kind === 'therapy' && v.status !== 'active' ? 'Resta storica finché non scegli «In corso»' : '',
+        v.preparedCheck ? PREPARED_CHECK_LABELS[v.preparedCheck as PreparedCheck] ?? '' : '',
+        v.preparedCoverage === 'partial' ? 'L’estrazione preparata non dichiara coperte tutte le pagine: il residuo resta da rivedere' : '',
+        v.preparedNotes ?? '',
     ].filter(Boolean);
 }
 
@@ -97,6 +104,16 @@ function inputFiles(list: FileList): DossierInputFile[] {
         relativePath: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name,
         read: async () => new Uint8Array(await file.arrayBuffer()),
     }));
+}
+
+const ORIGIN_LABEL: Record<DossierFact['origin'], string> = {
+    manual: 'Aggiunta dal medico', prepared: 'Estrazione preparata', 'parser:lab': 'Parser locale: laboratorio', 'parser:exemption': 'Parser locale: esenzione',
+    'parser:icd': 'Parser locale: codice ICD', 'parser:section': 'Parser locale: sezione', 'parser:scale': 'Parser locale: scala', 'parser:document': 'Parser locale: documento intero',
+};
+
+function groupTitle(key: string, sources: DossierDraftGroup['sources']): string {
+    if (key.startsWith('cf:') || key.startsWith('nome:')) return `Paziente secondo l’estrazione preparata: ${sources.find((source) => source.prepared?.patientLabel)?.prepared?.patientLabel ?? key}`;
+    return `Cartella ${key === '.' ? 'principale' : key}`;
 }
 
 function patientLabel(patient: DossierPatient): string {
@@ -144,11 +161,16 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
     const [creating, setCreating] = useState<{ groupKey: string; sourceKey: string } | null>(null);
     const [dossierPatientId, setDossierPatientId] = useState(initialPatientId ?? '');
     const [view, setView] = useState<DossierPatientView | null>(null);
+    // Estrazione preparata (ADR 0176): solo in memoria, mai nello storage del browser.
+    const preparedInput = useRef<HTMLInputElement>(null);
+    const [prepared, setPrepared] = useState<{ extraction: PreparedExtraction; warnings: string[]; fileName: string } | null>(null);
+    const lastSelection = useRef<DossierInputFile[] | null>(null);
 
     useEffect(() => () => { generation.current += 1; }, []);
     useEffect(() => {
         const signal = db.getSessionReadSignal();
-        const retire = () => { generation.current += 1; setGroups([]); setView(null); setBusy(null); };
+        // Al blocco della sessione si dimenticano anche estrazione e selezione: niente dati clinici in memoria.
+        const retire = () => { generation.current += 1; setGroups([]); setView(null); setBusy(null); setPrepared(null); lastSelection.current = null; };
         signal.addEventListener('abort', retire, { once: true });
         window.addEventListener('pagehide', retire);
         return () => { signal.removeEventListener('abort', retire); window.removeEventListener('pagehide', retire); };
@@ -181,12 +203,28 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
 
     const readSelection = async (list: FileList | null) => {
         if (!list?.length) return;
-        const files = inputFiles(list);
+        await readFiles(inputFiles(list), prepared?.extraction ?? null);
+    };
+
+    const loadPrepared = async (list: FileList | null) => {
+        const file = list?.[0];
+        if (!file) return;
+        if (file.size > DOSSIER_PREPARED_MAX_BYTES) { setNotice('Estrazione preparata oltre il limite di 20 MiB.'); return; }
+        let parsed: ReturnType<typeof parsePreparedExtraction>;
+        try { parsed = parsePreparedExtraction(await file.text()); } catch { setNotice('Estrazione preparata non leggibile.'); return; }
+        if (!parsed.ok) { setNotice(parsed.error); return; }
+        setPrepared({ extraction: parsed.value, warnings: parsed.warnings, fileName: file.name });
+        // Una cartella già letta si rilegge con le nuove proposte: nessun dato salvato nel frattempo.
+        if (lastSelection.current) await readFiles(lastSelection.current, parsed.value);
+    };
+
+    const readFiles = async (files: DossierInputFile[], extraction: PreparedExtraction | null) => {
+        lastSelection.current = files;
         const op = operation();
         setGroups([]); setOutcomes({}); setMeasured({}); setNotice(null); setConfirmations({});
         setBusy(`Lettura locale di ${formatCountLabel(files.length, 'file', 'file')}…`);
         try {
-            const next = await buildDossierInventory(ports, files, { ...op, onProgress: (done, total) => {
+            const next = await buildDossierInventory(ports, files, { ...op, prepared: extraction, onProgress: (done, total) => {
                 if (op.isCurrent()) setBusy(`Lettura locale: ${done} di ${total}. Nessun file viene ancora salvato.`);
             } });
             if (!op.isCurrent()) return;
@@ -250,6 +288,18 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                         <input ref={filesInput} type="file" hidden multiple data-testid="dossier-files"
                             onChange={(event) => { const list = event.currentTarget.files; void readSelection(list); event.currentTarget.value = ''; }} />
                     </div>
+                    <p className={styles.muted}>Facoltativo: un’estrazione preparata (file .json della skill di importazione) propone per ogni documento identità, fatti clinici e una sintesi. MediFlow abbina i documenti per impronta dei byte e cerca ogni citazione nel proprio testo: ciò che non trova resta da decidere.</p>
+                    <div className={styles.actions}>
+                        <button type="button" className="mf-button-secondary" disabled={Boolean(busy)} onClick={() => preparedInput.current?.click()}>
+                            {prepared ? 'Sostituisci estrazione preparata' : 'Carica estrazione preparata'}</button>
+                        {prepared ? <button type="button" className="mf-button-secondary" disabled={Boolean(busy)}
+                            onClick={() => { setPrepared(null); if (lastSelection.current) void readFiles(lastSelection.current, null); }}>Rimuovi estrazione</button> : null}
+                        <input ref={preparedInput} type="file" hidden accept="application/json,.json" data-testid="dossier-prepared"
+                            onChange={(event) => { const list = event.currentTarget.files; void loadPrepared(list); event.currentTarget.value = ''; }} />
+                    </div>
+                    {prepared ? <p role="status" data-testid="dossier-prepared-status">Estrazione preparata: {formatCountLabel(prepared.extraction.sources.length, 'documento', 'documenti')}
+                        {prepared.extraction.preparedAt ? `, preparata il ${prepared.extraction.preparedAt.slice(0, 10)}` : ''}
+                        {prepared.warnings.length ? `; ${formatCountLabel(prepared.warnings.length, 'voce ignorata', 'voci ignorate')}: ${prepared.warnings.slice(0, 3).join(' ')}` : '.'}</p> : null}
                 </section>
                 {busy ? <p role="status" aria-live="polite">{busy}</p> : null}
                 {notice ? <p className={styles.notice} role="alert">{notice}</p> : null}
@@ -266,7 +316,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                             const ready = group.sources.filter((source) => source.status === 'ready').length;
                             return (
                                 <article key={group.key} className={styles.section} data-testid="dossier-group" data-group={group.key} data-identity={identity.status}>
-                                    <h3>Cartella <PrivacyBlur>{group.key === '.' ? 'principale' : group.key}</PrivacyBlur> · {formatCountLabel(group.sources.length, 'fonte', 'fonti')}</h3>
+                                    <h3><PrivacyBlur>{groupTitle(group.key, group.sources)}</PrivacyBlur> · {formatCountLabel(group.sources.length, 'fonte', 'fonti')}</h3>
                                     <table className={styles.table} role="table">
                                         <caption>Inventario: ogni file selezionato ha uno stato.</caption>
                                         <thead><tr><th scope="col">N.</th><th scope="col">File</th><th scope="col">Lettura</th><th scope="col">Esito</th></tr></thead>
@@ -282,7 +332,9 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                                 <td role="cell" data-label="Lettura">{describeExtraction(source)}
                                                     <small>{source.documentDate ? `Data: ${source.documentDate.value}` : 'Nessuna data esplicita'}</small>
                                                     <small>{taxCodes.length ? <>CF letti: <PrivacyBlur>{taxCodes.join(', ')}</PrivacyBlur></> : 'Nessun CF leggibile'}</small>
-                                                    <small>{formatCountLabel(source.facts.length, 'proposta', 'proposte')}</small></td>
+                                                    <small>{formatCountLabel(source.facts.length, 'proposta', 'proposte')}</small>
+                                                    {source.prepared ? <small data-testid="dossier-source-prepared">Estrazione preparata: {formatCountLabel(source.prepared.facts, 'proposta', 'proposte')}{source.prepared.patientLabel ? <>, paziente <PrivacyBlur>{source.prepared.patientLabel}</PrivacyBlur></> : ''}{source.prepared.notes.length ? `. ${source.prepared.notes.join(' ')}` : ''}</small>
+                                                        : prepared && source.status === 'ready' ? <small className={styles.notice} data-testid="dossier-source-prepared">Assente dall’estrazione preparata: solo proposte del parser locale.</small> : null}</td>
                                                 <td role="cell" data-label="Esito">
                                                     {outcome ? <strong data-testid="dossier-acquire-outcome">{ACQUIRE_LABEL[outcome.status === 'failed' || outcome.status === 'skipped' ? outcome.reason : outcome.status]}</strong>
                                                         : source.status === 'duplicate_in_selection' ? ACQUIRE_LABEL.duplicate_in_selection
@@ -340,7 +392,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                             {patients.map((patient) => <option key={patient.id} value={patient.id}>{patientLabel(patient)}</option>)}
                         </select>
                     </div>
-                    {view ? <DossierReview view={view} busy={Boolean(busy)} ports={ports} operation={operation} setBusy={setBusy} setNotice={setNotice}
+                    {view ? <DossierReview key={view.patient.id} view={view} busy={Boolean(busy)} ports={ports} operation={operation} setBusy={setBusy} setNotice={setNotice}
                         reload={() => loadDossier(view.patient.id)} /> : null}
                 </section>
             </div>
@@ -356,6 +408,8 @@ type ReviewProps = {
 
 function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reload }: ReviewProps) {
     const [results, setResults] = useState<Record<string, DossierApplyResult>>({});
+    const [bulkResult, setBulkResult] = useState<DossierBulkResult | null>(null);
+    const [includeSummaries, setIncludeSummaries] = useState(false);
     const receipt = useMemo(() => {
         // Solo i documenti di questa scheda; le misure stanno nel record di ciascuna fonte.
         return buildDossierReceipt(view.documents.map((document) => ({ record: document.record, coverage: document.coverage,
@@ -402,8 +456,36 @@ function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reloa
             if (op.isCurrent()) setNotice(error instanceof DossierAbortedError ? error.message : 'Nuova estrazione interrotta.');
         } finally { if (op.isCurrent()) setBusy(null); }
     };
+    const bulk = async () => {
+        const op = operation();
+        setBusy('Accettazione del verificato e scrittura nella scheda…');
+        try {
+            const outcome = await acceptVerifiedAndApply(ports, { patientId: view.patient.id, includeSummaries, ...op });
+            if (!op.isCurrent()) return;
+            setBulkResult(outcome);
+            await reload();
+        } catch (error) {
+            if (op.isCurrent()) setNotice(error instanceof DossierStaleError || error instanceof DossierAbortedError ? `${error.message} Rileggi il dossier: le scritture confermate restano registrate.`
+                : 'Accettazione interrotta. Rileggi il dossier prima di riprovare: nulla viene ripetuto.');
+        } finally { if (op.isCurrent()) setBusy(null); }
+    };
     const complete = view.documents.filter((document) => document.coverage.complete).length;
+    const withPrepared = view.documents.some((document) => document.record.facts.some((fact) => fact.origin === 'prepared'));
     return <>
+        {withPrepared ? <div className={styles.section} data-testid="dossier-bulk-panel">
+            <p className={styles.muted}>Per i documenti con estrazione preparata: accetta le proposte la cui citazione e i cui valori si ritrovano nel testo del documento, nuove rispetto alla scheda e complete, e le scrive. Rifiuta le proposte del parser dello stesso tipo che sostituiscono. Conflitti, negazioni, riformulazioni e citazioni non trovate restano a te.</p>
+            <label className={styles.consent}>
+                <input type="checkbox" checked={includeSummaries} disabled={busy} data-testid="dossier-bulk-summaries" onChange={(event) => setIncludeSummaries(event.currentTarget.checked)} />
+                <span>Ho letto le sintesi dei documenti e accetto anche quelle: sono testo riassunto, non verificabile parola per parola. Con la sintesi accettata, il residuo si considera rivisto solo se le pagine lette coincidono.</span>
+            </label>
+            <div className={styles.actions}>
+                <button type="button" className={styles.primary} disabled={busy || complete === view.documents.length} data-testid="dossier-bulk" onClick={() => { void bulk(); }}>Accetta il verificato e applica</button>
+            </div>
+        </div> : null}
+        {bulkResult ? <p role="status" data-testid="dossier-bulk-result">
+            {formatCountLabel(bulkResult.accepted, 'proposta accettata', 'proposte accettate')}, {formatCountLabel(bulkResult.alreadyPresent, 'già presente', 'già presenti')}, {formatCountLabel(bulkResult.superseded, 'proposta del parser sostituita', 'proposte del parser sostituite')}; {formatCountLabel(bulkResult.leftPending, 'resta da decidere', 'restano da decidere')}.
+            {' '}{formatCountLabel(bulkResult.applied.reduce((sum, item) => sum + item.outcomes.filter((entry) => entry.outcome === 'applied' || entry.outcome === 'already_present').length, 0), 'scrittura confermata', 'scritture confermate')}
+            {bulkResult.applied.some((item) => item.partial) ? '; alcune applicazioni sono parziali: controlla i documenti segnati.' : '.'}</p> : null}
         <p data-testid="dossier-summary"><strong>{complete} di {formatCountLabel(view.documents.length, 'documento', 'documenti')} completi.</strong> Un documento è completo solo con originale riletto, testo verificato, ogni proposta decisa, il residuo rivisto e le scritture confermate.</p>
         {view.invalidDocuments ? <p className={styles.notice}>{formatCountLabel(view.invalidDocuments, 'documento ha', 'documenti hanno')} un record dossier non leggibile e non {view.invalidDocuments === 1 ? 'viene' : 'vengono'} modificati.</p> : null}
         {view.documents.map((document) => <DossierDocument key={`${document.attachment.id}:${document.attachment.currentness?.revision ?? 0}:${document.attachment.currentness?.freshnessEpoch ?? 0}`} document={document} view={view} busy={busy}
@@ -469,8 +551,8 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                     const blockers = dossierFactBlockers(fact, { exemptionCodes: view.exemptionCodes });
                     const applied = latestAppliedOutcome(record, fact.factId);
                     const locked = written(fact) || busy || Boolean(record.pendingWrites?.some((claim) => claim.factId === fact.factId));
-                    return <tr key={fact.factId} role="row" data-testid="dossier-fact" data-kind={fact.kind}>
-                        <td role="cell" data-label="Tipo">{DOSSIER_FACT_KIND_LABELS[fact.kind]}<small className={styles.muted}>{fact.origin === 'manual' ? 'Aggiunta dal medico' : 'Proposta del parser locale'}</small></td>
+                    return <tr key={fact.factId} role="row" data-testid="dossier-fact" data-kind={fact.kind} data-origin={fact.origin} data-decision={fact.decision}>
+                        <td role="cell" data-label="Tipo">{DOSSIER_FACT_KIND_LABELS[fact.kind]}<small className={styles.muted}>{ORIGIN_LABEL[fact.origin] ?? fact.origin}</small></td>
                         <td role="cell" data-label="Contenuto">
                             {fact.evidence ? <small>Evidenza, unità {fact.evidence.unit}: <PrivacyBlur>{fact.evidence.excerpt}</PrivacyBlur></small> : null}
                             {fact.values.textSource === 'document' ? <small>Testo: il testo completo del documento, conservato sopra.</small> : null}
@@ -563,10 +645,21 @@ function NewPatientFromDocument({ group, identityBlocking, busy, creating, onSta
         </div>;
     }
     return <div className={styles.section} data-testid="dossier-new-patient">
-        {file && source ? <PatientDocumentCreate dossier={{ file, proposals: proposeIdentityFields(source.text ?? '', patientCode),
+        {file && source ? <PatientDocumentCreate dossier={{ file, proposals: withPreparedIdentity(proposeIdentityFields(source.text ?? '', patientCode), source),
             onCreated: ({ patientId }) => { void onCreated(patientId); } }} /> : <p role="status">Preparazione del documento…</p>}
         <div className={styles.actions}><button type="button" className={styles.secondary} onClick={onCancel}>Chiudi la creazione</button></div>
     </div>;
+}
+
+/** Campi d'anagrafica dell'estrazione preparata dove il testo non ne propone: restano proposte, inserite solo con un gesto. */
+function withPreparedIdentity(proposals: ReturnType<typeof proposeIdentityFields>, source: DossierDraftGroup['sources'][number]): ReturnType<typeof proposeIdentityFields> {
+    const patient = source.prepared?.patient;
+    if (!patient) return proposals;
+    const have = new Set(proposals.map((proposal) => proposal.field));
+    const extra = (['taxCode', 'lastName', 'firstName', 'birthDate'] as const)
+        .filter((field) => !have.has(field) && patient[field])
+        .map((field) => ({ field, value: patient[field]!, excerpt: `Dall’estrazione preparata: ${patient[field]}` }));
+    return [...proposals, ...extra];
 }
 
 function FactField({ spec, value, disabled, id, onChange }: { spec: FieldSpec; value: string; disabled: boolean; id: string; onChange: (value: string) => void }) {

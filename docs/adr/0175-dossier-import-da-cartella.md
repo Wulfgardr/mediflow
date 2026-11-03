@@ -5,6 +5,8 @@ Integra [ADR 0084](./0084-document-diagnoses-review-only.md) e
 [ADR 0087](./0087-registro-proposte-diagnostiche-documentali.md): è la lane
 contrattuale separata che ADR 0084 richiede per un apply. Riusa il comando
 documento→anagrafica di [ADR 0042](./0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
+Aggiornamento 2026-11-03: [ADR 0176](./0176-estrazione-preparata-per-il-dossier.md) aggiunge l'estrazione preparata,
+un file esterno di proposte con citazioni verificate sul testo conservato.
 
 ## Problema
 
