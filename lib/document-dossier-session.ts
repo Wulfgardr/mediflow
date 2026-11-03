@@ -1026,16 +1026,45 @@ export async function acceptVerifiedAndApply(
         for (const ref of decided.accepted) acceptedElsewhere.add(ref);
         result.accepted += decided.counts.accepted; result.alreadyPresent += decided.counts.alreadyPresent;
         result.superseded += decided.counts.superseded; result.leftPending += decided.counts.leftPending;
-        if (acknowledge) result.residualAcknowledged += 1;
     }
+    const hasPrepared = (record: DossierRecord) => record.facts.some((fact) => fact.origin === 'prepared');
     const fresh = await loadPatientDossier(ports, patientId, signal);
     guard();
     for (const document of fresh?.documents ?? []) {
-        if (!document.attachment.currentness || document.coverage.gaps.includes('identity_conflict')) continue;
+        // Solo i documenti con estrazione preparata: gli altri restano al pulsante «Applica» del documento.
+        if (!hasPrepared(document.record) || !document.attachment.currentness || document.coverage.gaps.includes('identity_conflict')) continue;
         const ready = document.record.facts.some((fact) => eligible(document.record, fact, fresh!.exemptionCodes));
         if (!ready) continue;
         result.applied.push(await applyDossierDocument(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent }));
         guard();
+    }
+    // Dopo la scrittura: dove la sintesi è scritta e riletta, la voce col testo intero lascia il posto e il residuo si conferma.
+    const after = await loadPatientDossier(ports, patientId, signal);
+    guard();
+    for (const document of after?.documents ?? []) {
+        if (!hasPrepared(document.record) || !document.attachment.currentness) continue;
+        const final = preparedBulkDecisions({ record: document.record, documentKey: document.attachment.id, assessment: (ref) => after!.assessments.get(ref),
+            exemptionCodes: after!.exemptionCodes, acceptedElsewhere, includeSummaries: false });
+        const acknowledge = final.acknowledgeResidual && document.record.residualReview.state !== 'acknowledged';
+        if (!final.counts.superseded && !acknowledge) continue;
+        try {
+            await saveDossierReview(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent,
+                change: (record) => {
+                    const decided = preparedBulkDecisions({ record, documentKey: document.attachment.id, assessment: (ref) => after!.assessments.get(ref),
+                        exemptionCodes: after!.exemptionCodes, acceptedElsewhere, includeSummaries: false });
+                    return { ...record, facts: decided.facts, residualReview: decided.acknowledgeResidual && record.residualReview.state !== 'acknowledged'
+                        ? { state: 'acknowledged', at: ports.now().toISOString(), note: 'Sintesi scritta e riletta; pagine dichiarate lette coerenti con il testo conservato.' }
+                        : record.residualReview };
+                } });
+        } catch (error) {
+            if (error instanceof DossierStaleError || error instanceof DossierWriteInFlight) { result.skipped += 1; continue; }
+            throw error;
+        }
+        guard();
+        // Ciò che la seconda fase sostituisce era «da decidere» nella prima.
+        result.superseded += final.counts.superseded;
+        result.leftPending = Math.max(0, result.leftPending - final.counts.superseded);
+        if (acknowledge) result.residualAcknowledged += 1;
     }
     return result;
 }

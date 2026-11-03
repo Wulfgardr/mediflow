@@ -22,7 +22,7 @@
 import { isValidItalianTaxCodeChecksum } from './document-identity-resolution';
 import { catalogObservationCode } from './dossier-sections';
 import {
-    DOSSIER_FACT_TARGET, dossierFactBlockers, dossierFactId, unitText,
+    DOSSIER_FACT_TARGET, dossierFactBlockers, dossierFactId, latestAppliedOutcome, unitText,
     type DossierEvidence, type DossierFact, type DossierFactAssessment, type DossierFactKind, type DossierRecord, type DossierUnit,
 } from './dossier-import';
 
@@ -66,19 +66,9 @@ const QUALIFIERS = ['subject', 'temporality', 'certainty'] as const;
 const DATE_FIELDS = new Set(['date', 'startDate', 'endDate', 'observedAt', 'prescribedAt', 'birthDate']);
 /** Testi descrittivi: verificabili solo se il testo proposto è un passo del documento. */
 const NARRATIVE = new Set<DossierFactKind>(['anamnesis', 'assessment', 'imaging_report', 'care_context', 'document_entry', 'invalidity']);
-/**
- * Campi da ritrovare nel passo del documento. `all`: ogni parola; `long`: le parole di almeno
- * quattro lettere; `numbers`: i soli numeri (una posologia si scrive in tanti modi, le dosi no).
- */
-const FIELD_CHECKS: Partial<Record<DossierFactKind, ReadonlyArray<readonly [string, 'all' | 'long' | 'numbers']>>> = {
-    therapy: [['drugName', 'all'], ['dosage', 'numbers']],
-    observation: [['display', 'long'], ['value', 'all'], ['unit', 'all']],
-    diagnosis: [['code', 'all'], ['description', 'long']],
-    exemption: [['code', 'all']],
-    service_prescription: [['serviceName', 'long'], ['requestReference', 'all']],
-    prosthetic: [['description', 'long'], ['isoCode', 'all']],
-    reported_scale: [['scaleName', 'long'], ['scaleTotal', 'all'], ['scaleMax', 'all']],
-    invalidity: [['percentage', 'numbers']],
+const NARRATIVE_TITLES: Partial<Record<DossierFactKind, string>> = {
+    anamnesis: 'Anamnesi da documento', assessment: 'Valutazione da documento', imaging_report: 'Referto di imaging',
+    care_context: 'Contesto assistenziale da documento', invalidity: 'Invalidità da documento', document_entry: 'Passo del documento',
 };
 export const PREPARED_MIN_QUOTE_WORDS = 3;
 export const PREPARED_MIN_QUOTE_CHARS = 12;
@@ -87,7 +77,9 @@ export const PREPARED_CHECK_LABELS = {
     verified: 'Citazione e valori trovati nel testo del documento',
     approximate: 'Citazione e valori trovati, con una lettera diversa in qualche parola (lettura OCR)',
     not_found: 'Citazione non trovata nel testo del documento: verifica prima di accettare',
-    value_missing: 'Un valore proposto non compare nel passo del documento: verifica prima di accettare',
+    value_missing: 'Un valore proposto non è scritto nel passo del documento accanto al suo esame o farmaco: verifica prima di accettare',
+    status_conflict: 'Il passo parla di sospensione o interruzione ma la proposta è «in corso»: verifica prima di accettare',
+    subject_conflict: 'Il passo si riferisce a un familiare: verifica a chi appartiene prima di accettare',
     short_quote: 'Citazione troppo breve per essere verificata: verifica sull’originale',
     paraphrase: 'Testo riformulato, non un passo del documento: leggilo prima di accettare',
     no_text: 'Testo del documento non disponibile in MediFlow: verifica sull’originale',
@@ -261,10 +253,137 @@ export function anchorPreparedQuote(text: string, units: readonly DossierUnit[],
         evidence: { unit: best.unit.index, start: first.start, end: last.end, excerpt: body.slice(first.start, last.end).replace(/\s+/gu, ' ').trim() } };
 }
 
-/** Il valore si ritrova nelle parole del passo del documento, secondo la regola del campo. */
-export function valueInWords(value: string, words: readonly string[], rule: 'all' | 'long' | 'numbers', approximate = false): boolean {
-    const wanted = preparedTokens(value).filter((token) => rule === 'all' ? true : rule === 'numbers' ? token.numeric : token.numeric || token.text.length >= 4);
-    return wanted.every((token) => words.some((word) => sameWord(word, token.text, approximate && !token.numeric)));
+const words = (value: string | undefined) => preparedTokens(value ?? '').map((token) => token.text);
+const isNumber = (word: string) => /^[0-9]/u.test(word);
+/** Cifre non ASCII (frazioni, apici, numeri romani Unicode): nel testo di MediFlow non diventano numeri. */
+const FOREIGN_DIGITS = /[^\P{N}0-9]/u;
+
+/** Prima posizione da `from` in cui `wanted` compare contiguo; restituisce l'indice dopo l'ultima parola, -1 se assente. */
+function contiguous(passage: readonly string[], wanted: readonly string[], from = 0): number {
+    if (!wanted.length) return from;
+    for (let start = from; start + wanted.length <= passage.length; start += 1) {
+        if (wanted.every((word, k) => passage[start + k] === word)) return start + wanted.length;
+    }
+    return -1;
+}
+
+/** Le parole lunghe di `wanted`, in ordine, entro una finestra stretta; restituisce l'indice dopo l'ultima, -1 se assenti. */
+function inOrder(passage: readonly string[], wanted: readonly string[]): number {
+    const long = wanted.filter((word) => isNumber(word) || word.length >= 4);
+    if (!long.length) return contiguous(passage, wanted);
+    for (let start = 0; start < passage.length; start += 1) {
+        if (passage[start] !== long[0]) continue;
+        let at = start + 1; let k = 1;
+        const limit = start + long.length * 3 + 2;
+        while (k < long.length && at < passage.length && at < limit) { if (passage[at] === long[k]) k += 1; at += 1; }
+        if (k === long.length) return at;
+    }
+    return -1;
+}
+
+/** Ogni parola lunga (non numerica) di `wanted` compare nel passo, in qualsiasi ordine: per nomi di ausili e prestazioni. */
+function allNameWords(passage: readonly string[], wanted: readonly string[]): boolean {
+    const long = wanted.filter((word) => !isNumber(word) && word.length >= 4);
+    return long.length > 0 ? long.every((word) => passage.includes(word)) : wanted.every((word) => passage.includes(word));
+}
+
+/** I numeri `wanted` sono, nell'ordine, i primi numeri del passo dopo la posizione `from`. */
+function firstNumbersAfter(passage: readonly string[], from: number, wanted: readonly string[]): number {
+    let at = from;
+    for (const number of wanted) {
+        while (at < passage.length && !isNumber(passage[at])) at += 1;
+        if (passage[at] !== number) return -1;
+        at += 1;
+    }
+    return at;
+}
+
+const NEGATION_WORDS = new Set(['non', 'nega', 'negano', 'negato', 'negata', 'assenza', 'assente', 'esclusa', 'escluso', 'escluse', 'esclusi', 'no', 'senza']);
+const SUSPENSION = /^(?:sospes|sospend|interrott|interromp|sospensione|stop)/u;
+const FAMILY_WORDS = /^(?:padre|madre|fratell|sorell|figli|nonn|zi[oaie]$|familiar|genitor|mamma|papa$)/u;
+
+export interface PreparedFieldCheck { check: 'ok' | 'value_missing' | 'status_conflict' | 'subject_conflict'; negated: boolean; notes: string[]; drop: string[] }
+
+/**
+ * Controllo posizionale dei campi sul passo del documento (parole del testo di MediFlow):
+ * il soggetto del fatto (farmaco, esame, scala, diagnosi) e poi i suoi valori, nell'ordine
+ * in cui il documento li scrive. Un valore preso da una riga vicina non passa.
+ */
+export function verifyPreparedFields(kind: DossierFactKind, values: Readonly<Record<string, string>>, passage: readonly string[]): PreparedFieldCheck {
+    const out: PreparedFieldCheck = { check: 'ok', negated: false, notes: [], drop: [] };
+    const fail = (check: PreparedFieldCheck['check']) => ({ ...out, check });
+    const foreign = Object.entries(values).some(([field, value]) => ['dosage', 'value', 'scaleTotal', 'scaleMax', 'percentage'].includes(field) && FOREIGN_DIGITS.test(value));
+    if (foreign) return fail('value_missing');
+    let subjectAt = -1;
+    switch (kind) {
+        case 'therapy': {
+            const drug = words(values.drugName);
+            const end = contiguous(passage, drug);
+            if (!drug.length || end < 0) return fail('value_missing');
+            subjectAt = end - drug.length;
+            if (firstNumbersAfter(passage, end, words(values.dosage).filter(isNumber)) < 0) return fail('value_missing');
+            if (values.status === 'active' && passage.some((word) => SUSPENSION.test(word))) return fail('status_conflict');
+            const principle = words(values.activePrinciple);
+            if (principle.length && contiguous(drug, principle) < 0) {
+                const near = contiguous(passage.slice(Math.max(0, subjectAt - 6), end + 6), principle) >= 0;
+                if (!near) { out.notes.push(`Principio attivo proposto, non scritto nel documento accanto al farmaco: ${values.activePrinciple}.`); out.drop.push('activePrinciple'); }
+            }
+            break;
+        }
+        case 'observation': {
+            const display = words(values.display);
+            const end = contiguous(passage, display);
+            if (!display.length || end < 0) return fail('value_missing');
+            subjectAt = end - display.length;
+            const value = words(values.value);
+            const valueEnd = value.some(isNumber) ? firstNumbersAfter(passage, end, value.filter(isNumber)) : contiguous(passage.slice(0, end + 4), value, end);
+            if (valueEnd < 0 || (value.some(isNumber) && passage.slice(end, valueEnd).filter(isNumber).length !== value.filter(isNumber).length)) return fail('value_missing');
+            const unit = words(values.unit);
+            if (unit.length && contiguous(passage.slice(0, valueEnd + unit.length + 2), unit, valueEnd) < 0) return fail('value_missing');
+            break;
+        }
+        case 'reported_scale': {
+            const end = inOrder(passage, words(values.scaleName));
+            if (end < 0) return fail('value_missing');
+            const numbers = [...words(values.scaleTotal).filter(isNumber), ...words(values.scaleMax).filter(isNumber)];
+            if (firstNumbersAfter(passage, end, numbers) < 0) return fail('value_missing');
+            subjectAt = 0;
+            break;
+        }
+        case 'diagnosis': {
+            if (values.code && contiguous(passage, words(values.code)) < 0) return fail('value_missing');
+            const end = inOrder(passage, words(values.description));
+            if (end < 0) return fail('value_missing');
+            subjectAt = Math.max(0, end - words(values.description).length * 3);
+            if (values.subject !== 'familiare' && passage.some((word) => FAMILY_WORDS.test(word))) return fail('subject_conflict');
+            break;
+        }
+        case 'exemption':
+            if (contiguous(passage, words(values.code)) < 0) return fail('value_missing');
+            subjectAt = contiguous(passage, words(values.code)) - words(values.code).length;
+            break;
+        case 'service_prescription':
+            // Nomi di prestazioni e ausili: si controllano le parole; quantità e frequenze non sono valori verificati.
+            if (!allNameWords(passage, words(values.serviceName))) return fail('value_missing');
+            if (values.requestReference && contiguous(passage, words(values.requestReference)) < 0) return fail('value_missing');
+            break;
+        case 'prosthetic':
+            if (!allNameWords(passage, words(values.description))) return fail('value_missing');
+            if (values.isoCode && contiguous(passage, words(values.isoCode)) < 0) return fail('value_missing');
+            break;
+        default:
+            break;
+    }
+    // Una negazione scritta prima del soggetto, nello stesso passo, nega il fatto.
+    if (subjectAt > 0 && passage.slice(0, subjectAt).some((word) => NEGATION_WORDS.has(word))) out.negated = true;
+    return out;
+}
+
+/** Percentuale d'invalidità: scritta come «N%» o «N per cento» nel testo del passo. */
+function percentageWritten(percentage: string, excerpt: string): boolean {
+    const number = words(percentage).find(isNumber);
+    if (!number) return false;
+    return new RegExp(`(?:^|[^0-9.,])${number.replace(/[.,]/gu, '[.,]')}\\s*(?:%|per\\s*cento)`, 'iu').test(excerpt);
 }
 
 /** Compatibilità: il valore compare, in ordine e contiguo, nel testo dato. */
@@ -369,14 +488,17 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
         }
         let evidence: DossierEvidence | null = null;
         let check: PreparedCheck;
+        let negated = false;
         if (text === null || !units.length) check = 'no_text';
         else if (NARRATIVE.has(item.kind)) {
-            // Un testo descrittivo è verificato solo se è esso stesso un passo del documento.
+            // Un testo descrittivo è verificato solo se è esso stesso un passo del documento; il titolo è quello del tipo.
+            values.title = NARRATIVE_TITLES[item.kind] ?? values.title ?? '';
             const passage = values.text ? anchorPreparedQuote(text, units, values.text) : null;
             const quoted = item.quote ? anchorPreparedQuote(text, units, item.quote) : null;
             evidence = passage?.evidence ?? quoted?.evidence ?? null;
             check = passage ? (passage.match === 'exact' ? 'verified' : 'approximate') : 'paraphrase';
-            if (passage && item.kind === 'invalidity' && values.percentage && !valueInWords(values.percentage, passage.words, 'numbers')) check = 'value_missing';
+            if (passage && item.kind === 'invalidity' && values.percentage && !percentageWritten(values.percentage, passage.evidence.excerpt)) check = 'value_missing';
+            if (passage && item.kind === 'anamnesis' && values.subject !== 'familiare' && passage.words.some((word) => FAMILY_WORDS.test(word))) check = 'subject_conflict';
         } else if (!item.quote) check = 'no_quote';
         else if (!quoteLongEnough(item.quote)) check = 'short_quote';
         else {
@@ -384,15 +506,12 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
             if (!anchor) check = 'not_found';
             else {
                 evidence = anchor.evidence;
-                const approximate = anchor.match === 'approximate';
-                const checks = (FIELD_CHECKS[item.kind] ?? []).filter(([field]) => values[field]);
-                check = checks.every(([field, rule]) => valueInWords(values[field], anchor.words, rule, approximate)) ? (approximate ? 'approximate' : 'verified') : 'value_missing';
-                // Un principio attivo non scritto nel passo resta una nota per il medico, non un dato.
-                if (item.kind === 'therapy' && values.activePrinciple && !valueInWords(values.activePrinciple, anchor.words, 'all', approximate)
-                    && !valueInWords(values.activePrinciple, preparedTokens(values.drugName ?? '').map((token) => token.text), 'all')) {
-                    factNotes.push(`Principio attivo proposto, non scritto nel documento: ${values.activePrinciple}.`);
-                    delete values.activePrinciple;
-                }
+                // I valori si confrontano con le parole del documento senza tolleranza, anche in lettura approssimata.
+                const fields = verifyPreparedFields(item.kind, values, anchor.words);
+                negated = fields.negated;
+                for (const field of fields.drop) delete values[field];
+                factNotes.push(...fields.notes);
+                check = fields.check === 'ok' ? (anchor.match === 'exact' ? 'verified' : 'approximate') : fields.check;
             }
         }
         if (item.kind === 'therapy' && values.activePrinciple && check !== 'verified' && check !== 'approximate') {
@@ -402,7 +521,7 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
         values.preparedCheck = check;
         if (factNotes.length) values.preparedNotes = factNotes.join(' ');
         if (codedParser.some((fact) => fact.kind === item.kind && sameIdentity(fact, values))) continue;
-        facts.push({ factId, kind: item.kind, origin: 'prepared', evidence, negated: false, values, decision: 'pending' });
+        facts.push({ factId, kind: item.kind, origin: 'prepared', evidence, negated, values, decision: 'pending' });
     }
     if (uncoded) notes.push(`${uncoded} ${uncoded === 1 ? 'valore di laboratorio senza codice LOINC verificato resta' : 'valori di laboratorio senza codice LOINC verificato restano'} nella sintesi e nel testo conservato.`);
     if (source.summary) {
@@ -416,6 +535,19 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
         notes.push('L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo.');
     }
     return { facts: [...input.parserFacts, ...facts], notes, documentDate };
+}
+
+const SUBJECT_FIELD: Partial<Record<DossierFactKind, string>> = {
+    therapy: 'drugName', diagnosis: 'description', observation: 'display', service_prescription: 'serviceName', prosthetic: 'description', reported_scale: 'scaleName',
+};
+
+/** Stesso soggetto clinico: le parole lunghe di uno contengono quelle dell'altro. */
+function sameSubject(left: DossierFact, right: DossierFact): boolean {
+    const field = SUBJECT_FIELD[left.kind];
+    if (!field) return false;
+    const a = words(left.values[field]).filter((word) => word.length >= 4); const b = words(right.values[field]).filter((word) => word.length >= 4);
+    if (!a.length || !b.length) return false;
+    return a.every((word) => b.includes(word)) || b.every((word) => a.includes(word));
 }
 
 function sameIdentity(fact: DossierFact, values: Record<string, string>): boolean {
@@ -508,13 +640,15 @@ export function preparedBulkDecisions(input: PreparedBulkInput): PreparedBulkRes
         }
         return fact;
     });
-    // 2. Sostituzioni: la voce col testo intero solo se la sintesi è accettata; le proposte per sezione
-    //    solo se un fatto preparato dello stesso tipo è accettato in questo documento.
-    const summaryAccepted = first.some((fact) => isPreparedSummary(fact) && fact.decision === 'accepted');
-    const acceptedKinds = new Set(first.filter((fact) => fact.origin === 'prepared' && fact.decision === 'accepted' && !isPreparedSummary(fact)).map((fact) => fact.kind));
+    // 2. Sostituzioni: la voce col testo intero solo quando la sintesi è già scritta e riletta;
+    //    una proposta per sezione solo se un fatto preparato accettato riguarda lo stesso soggetto.
+    const written = (fact: DossierFact) => { const outcome = latestAppliedOutcome(record, fact.factId)?.outcome; return outcome === 'applied' || outcome === 'already_present'; };
+    const summaryWritten = first.some((fact) => isPreparedSummary(fact) && fact.decision === 'accepted' && written(fact));
+    const acceptedPrepared = first.filter((fact) => fact.origin === 'prepared' && fact.decision === 'accepted' && !isPreparedSummary(fact));
     const facts = first.map((fact) => {
         if (fact.decision !== 'pending') return fact;
-        if ((fact.origin === 'parser:document' && summaryAccepted) || (SUPERSEDABLE.has(fact.origin) && acceptedKinds.has(fact.kind))) {
+        if ((fact.origin === 'parser:document' && summaryWritten)
+            || (SUPERSEDABLE.has(fact.origin) && acceptedPrepared.some((other) => other.kind === fact.kind && sameSubject(other, fact)))) {
             counts.superseded += 1;
             return { ...fact, decision: 'rejected' as const, note: fact.origin === 'parser:document' ? 'Sostituita dalla sintesi accettata; il testo completo resta nell’allegato.'
                 : 'Sostituita dall’estrazione preparata verificata dello stesso tipo.' };
@@ -525,7 +659,7 @@ export function preparedBulkDecisions(input: PreparedBulkInput): PreparedBulkRes
     // 3. Il residuo si conferma solo con la sintesi accettata e la copertura dichiarata coerente con MediFlow.
     const summary = facts.find(isPreparedSummary);
     const pages = appPageCount(record);
-    const acknowledgeResidual = Boolean(summary && summary.decision === 'accepted' && summary.values.preparedCoverage === 'complete'
+    const acknowledgeResidual = Boolean(summary && summary.decision === 'accepted' && written(summary) && summary.values.preparedCoverage === 'complete'
         && (pages === null || summary.values.preparedPages === String(pages)));
     return { facts, acknowledgeResidual, accepted, counts };
 }

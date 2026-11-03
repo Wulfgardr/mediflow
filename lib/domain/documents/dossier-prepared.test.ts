@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-    DOSSIER_PREPARED_SCHEMA, anchorPreparedQuote, parsePreparedExtraction, preparedBulkDecisions, preparedDossierFacts, preparedPatientKey, valueInWords,
+    DOSSIER_PREPARED_SCHEMA, anchorPreparedQuote, parsePreparedExtraction, preparedBulkDecisions, preparedDossierFacts, preparedPatientKey, verifyPreparedFields,
     preparedTokens, type PreparedFactInput, type PreparedSource,
 } from './dossier-prepared';
 import { extractDossierCandidates, splitDossierUnits, type DossierFact, type DossierRecord } from './dossier-import';
@@ -75,8 +75,9 @@ test('quotes anchor by words across markdown, case and accents; short quotes and
 
 test('numbers keep their separators and accents in either normal form match', () => {
     assert.deepEqual(preparedTokens('piastrine 1.500 e 1,25 mg; ISO 12.06.06').map((token) => token.text), ['piastrine', '1.500', 'e', '1,25', 'mg', 'iso', '12.06.06']);
-    assert.equal(valueInWords('1.500', preparedTokens('piastrine 1,500').map((token) => token.text), 'all'), false, 'caso J');
+    assert.equal(verifyPreparedFields('observation', { display: 'piastrine', value: '1.500' }, preparedTokens('piastrine 1,500').map((token) => token.text)).check, 'value_missing', 'caso J');
     assert.deepEqual(preparedTokens('117,2mg /75mmHg E11.9').map((token) => token.text), ['117,2', 'mg', '75', 'mmhg', 'e', '11.9']);
+    assert.deepEqual(preparedTokens('kg/m\u00b2 Ca\u00b2\u207a \u2163 \u00bd x\u0323\u0301yz').map((token) => token.text), ['kg', 'm', 'ca', 'xyz'], 'stessi valori del validatore Python');
     assert.deepEqual(preparedTokens('caffé città').map((token) => token.text), preparedTokens('caffé città').map((token) => token.text));
 });
 
@@ -150,7 +151,7 @@ test('parser proposals all stay; coded duplicates are not repeated', () => {
 });
 
 function record(facts: DossierFact[], pages: number | null = null): DossierRecord {
-    return { facts, residualReview: { state: 'pending' },
+    return { facts, residualReview: { state: 'pending' }, applied: [],
         extraction: pages === null ? { state: 'extracted', unitBasis: 'document', units: [{ index: 0 }] } : { state: 'extracted', unitBasis: 'pages', units: Array.from({ length: pages }, (_, index) => ({ index: index + 1 })) },
     } as unknown as DossierRecord;
 }
@@ -193,10 +194,16 @@ test('bulk decisions accept only verified, new, complete proposals', () => {
     assert.equal(without.acknowledgeResidual, false, 'senza sintesi accettata il residuo resta al medico');
     const withSummaries = run(true);
     assert.equal(withSummaries.facts.find((item) => item.factId === 'sum')!.decision, 'accepted');
-    assert.equal(withSummaries.facts.find((item) => item.factId === 'doc')!.decision, 'rejected', 'la voce col testo intero si sostituisce solo con la sintesi accettata');
-    assert.equal(withSummaries.acknowledgeResidual, true);
-    assert.equal(run(true, 3).acknowledgeResidual, false, 'pagine dichiarate diverse da quelle di MediFlow');
-    assert.equal(run(true, 1).acknowledgeResidual, true);
+    assert.equal(withSummaries.facts.find((item) => item.factId === 'doc')!.decision, 'pending', 'prima della scrittura della sintesi la voce col testo intero resta');
+    assert.equal(withSummaries.acknowledgeResidual, false);
+    // Sintesi scritta e riletta: ora sostituisce e il residuo si conferma, se le pagine coincidono.
+    const written = (pages: number | null) => preparedBulkDecisions({ record: { ...record(facts.map((item) => item.factId === 'sum' ? { ...item, decision: 'accepted' as const } : item), pages),
+        applied: [{ factId: 'sum', target: 'entries', recordId: 'r', outcome: 'applied', at: 'x' }] } as unknown as DossierRecord, documentKey: 'doc', assessment: (ref) => assessments[ref],
+        exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries: true });
+    assert.equal(written(null).facts.find((item) => item.factId === 'doc')!.decision, 'rejected');
+    assert.equal(written(null).acknowledgeResidual, true);
+    assert.equal(written(3).acknowledgeResidual, false, 'pagine dichiarate diverse da quelle di MediFlow');
+    assert.equal(written(1).acknowledgeResidual, true);
 });
 
 test('bulk leaves the residual pending when the summary cannot be applied, and ignores documents without prepared facts', () => {
@@ -219,4 +226,131 @@ test('patients group by valid tax code, otherwise by name and birth date', () =>
     assert.equal(preparedPatientKey({ taxCode: 'RSSMRA80A01F205Z', lastName: 'Rossi', firstName: 'Mario', birthDate: '1980-01-01' }), 'nome:rossi|mario|1980-01-01');
     assert.equal(preparedPatientKey({ lastName: 'Rossi' }), null);
     assert.equal(preparedPatientKey(null), null);
+});
+
+// ---------------------------------------------------------------------------
+// Valori legati al proprio soggetto (difetti riprodotti il 3/11/2026, restano come regressioni)
+// ---------------------------------------------------------------------------
+
+function onLine(line: string, item: PreparedFactInput) {
+    const text = `Referto sintetico\n${line}\nFine referto.`;
+    const { units: lineUnits } = splitDossierUnits(text, null);
+    return preparedDossierFacts({ source: source([item], { summary: null }), text, units: lineUnits, documentDate: '2026-10-20', parserFacts: [], now })
+        .facts.filter((fact) => fact.origin === 'prepared');
+}
+const verdict = (line: string, item: PreparedFactInput) => {
+    const [first] = onLine(line, item);
+    return first ? { check: first.values.preparedCheck, negated: first.negated, values: first.values } : null;
+};
+
+test('a lab value belongs to the analyte written right before it, short names included', () => {
+    const line = 'Sodio 140 mmol/L, Potassio 4,1 mmol/L';
+    assert.equal(verdict(line, { kind: 'observation', values: { display: 'Potassio', value: '140', unit: 'mmol/L' }, quote: line })?.check, 'value_missing');
+    assert.equal(verdict(line, { kind: 'observation', values: { display: 'Potassio', value: '4,1', unit: 'mmol/L' }, quote: line })?.check, 'verified');
+    // Abbreviazioni brevi: «K» non passa più senza controllo.
+    const short = 'Na 140 mmol/L K 4,1 mmol/L Cl 102 mmol/L';
+    assert.equal(verifyPreparedFields('observation', { display: 'K', value: '140', unit: 'mmol/L' }, preparedTokens(short).map((t) => t.text)).check, 'value_missing');
+    assert.equal(verifyPreparedFields('observation', { display: 'Na', value: '102', unit: 'mmol/L' }, preparedTokens(short).map((t) => t.text)).check, 'value_missing');
+    assert.equal(verifyPreparedFields('observation', { display: 'K', value: '4,1', unit: 'mmol/L' }, preparedTokens(short).map((t) => t.text)).check, 'ok');
+    const lipids = 'Colesterolo totale 210 mg/dL, Colesterolo HDL 45 mg/dL';
+    assert.equal(verifyPreparedFields('observation', { display: 'Colesterolo HDL', value: '210', unit: 'mg/dL' }, preparedTokens(lipids).map((t) => t.text)).check, 'value_missing');
+    assert.equal(verifyPreparedFields('observation', { display: 'Colesterolo HDL', value: '45', unit: 'mg/dL' }, preparedTokens(lipids).map((t) => t.text)).check, 'ok');
+    assert.equal(verifyPreparedFields('observation', { display: 'Creatinina', value: '0,9', unit: 'mmol/L' }, preparedTokens('Creatinina 0,9 mg/dL').map((t) => t.text)).check, 'value_missing', 'unità diversa');
+});
+
+test('generated: on a line with two analytes or two drugs, every swapped value is refused and every right one accepted', () => {
+    const analytes = [['Glucosio', 'mg/dL'], ['Creatinina', 'mg/dL'], ['Sodio', 'mmol/L'], ['Potassio', 'mmol/L'], ['Emoglobina', 'g/dL'], ['ALT', 'U/L'], ['AST', 'U/L'], ['TSH', 'mUI/L']];
+    const values = ['95', '0,9', '140', '4,1', '13,2', '32', '28', '2,15'];
+    let pairs = 0;
+    for (let a = 0; a < analytes.length; a += 1) for (let b = 0; b < analytes.length; b += 1) {
+        if (a === b || values[a] === values[b]) continue;
+        const line = `${analytes[a][0]} ${values[a]} ${analytes[a][1]}; ${analytes[b][0]} ${values[b]} ${analytes[b][1]}`;
+        const passage = preparedTokens(line).map((t) => t.text);
+        assert.equal(verifyPreparedFields('observation', { display: analytes[b][0], value: values[a], unit: analytes[b][1] }, passage).check, 'value_missing', line);
+        assert.equal(verifyPreparedFields('observation', { display: analytes[b][0], value: values[b], unit: analytes[b][1] }, passage).check, 'ok', line);
+        pairs += 1;
+    }
+    const drugs = [['Ramipril', '5 mg'], ['Metformina', '500 mg'], ['Bisoprololo', '2,5 mg'], ['Atorvastatina', '20 mg'], ['Furosemide', '25 mg'], ['Pantoprazolo', '40 mg']];
+    for (let a = 0; a < drugs.length; a += 1) for (let b = 0; b < drugs.length; b += 1) {
+        if (a === b) continue;
+        const line = `Terapia: ${drugs[a][0]} ${drugs[a][1]} 1 cp, ${drugs[b][0]} ${drugs[b][1]} 1 cp`;
+        const passage = preparedTokens(line).map((t) => t.text);
+        assert.equal(verifyPreparedFields('therapy', { drugName: drugs[b][0], dosage: drugs[a][1] }, passage).check, 'value_missing', line);
+        assert.equal(verifyPreparedFields('therapy', { drugName: drugs[b][0], dosage: `${drugs[b][1]} 1 cp` }, passage).check, 'ok', line);
+        pairs += 1;
+    }
+    assert.ok(pairs >= 80, `coppie provate: ${pairs}`);
+});
+
+test('a dose is not taken from the neighbouring drug, and a nearby active principle is not kept on the wrong drug', () => {
+    const line = 'Terapia: Ramipril 5 mg 1 cp al mattino, Metformina 500 mg 2 volte al giorno';
+    assert.equal(verdict(line, { kind: 'therapy', values: { drugName: 'Metformina', dosage: '5 mg' }, quote: line })?.check, 'value_missing');
+    const ok = verdict(line, { kind: 'therapy', values: { drugName: 'Metformina', activePrinciple: 'ramipril', dosage: '500 mg 2 volte al giorno' }, quote: line });
+    assert.equal(ok?.check, 'verified');
+    assert.equal(ok?.values.activePrinciple, undefined, 'il principio attivo di un altro farmaco non resta');
+});
+
+test('negation, suspension and family history stop the bulk path', () => {
+    const negated = verdict('Il paziente non assume warfarin 5 mg da anni', { kind: 'therapy', values: { drugName: 'warfarin', dosage: '5 mg', status: 'active' }, quote: 'Il paziente non assume warfarin 5 mg da anni' });
+    assert.equal(negated?.negated, true);
+    const suspended = verdict('Bisoprololo 2,5 mg sospeso per bradicardia', { kind: 'therapy', values: { drugName: 'Bisoprololo', dosage: '2,5 mg', status: 'active' }, quote: 'Bisoprololo 2,5 mg sospeso per bradicardia' });
+    assert.equal(suspended?.check, 'status_conflict');
+    const asSuspended = verdict('Bisoprololo 2,5 mg sospeso per bradicardia', { kind: 'therapy', values: { drugName: 'Bisoprololo', dosage: '2,5 mg', status: 'suspended' }, quote: 'Bisoprololo 2,5 mg sospeso per bradicardia' });
+    assert.equal(asSuspended?.check, 'verified');
+    const family = verdict('Anamnesi: madre affetta da carcinoma mammario', { kind: 'diagnosis', values: { description: 'carcinoma mammario' }, quote: 'Anamnesi: madre affetta da carcinoma mammario' });
+    assert.equal(family?.check, 'subject_conflict');
+    const narrative = verdict('Anamnesi: madre affetta da carcinoma mammario', { kind: 'anamnesis', values: { title: 'Carcinoma mammario della paziente', text: 'madre affetta da carcinoma mammario' } });
+    assert.equal(narrative?.check, 'subject_conflict');
+    assert.equal(narrative?.values.title, 'Anamnesi da documento', 'il titolo proposto non entra');
+    const facts = onLine('Il paziente non assume warfarin 5 mg da anni', { kind: 'therapy', values: { drugName: 'warfarin', dosage: '5 mg', status: 'active' }, quote: 'Il paziente non assume warfarin 5 mg da anni' });
+    const bulk = preparedBulkDecisions({ record: { facts, residualReview: { state: 'pending' }, applied: [], extraction: { state: 'extracted', unitBasis: 'document', units: [] } } as unknown as DossierRecord,
+        documentKey: 'doc', assessment: () => undefined, exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries: false });
+    assert.equal(bulk.facts[0].decision, 'pending', 'negato: mai in blocco');
+});
+
+test('ICD codes match as a whole, never assembled from pieces of other codes', () => {
+    const line = 'Diabete mellito tipo 2 (E11) e ipertensione arteriosa (I10)';
+    assert.equal(verdict(line, { kind: 'diagnosis', values: { description: 'ipertensione arteriosa', code: 'I11', system: 'ICD-10' }, quote: line })?.check, 'value_missing');
+    assert.equal(verdict(line, { kind: 'diagnosis', values: { description: 'ipertensione arteriosa', code: 'I10', system: 'ICD-10' }, quote: line })?.check, 'verified');
+    assert.equal(verdict('Diagnosi: E11.9 diabete mellito', { kind: 'diagnosis', values: { description: 'diabete mellito', code: 'E11.9' }, quote: 'Diagnosi: E11.9 diabete mellito' })?.check, 'verified');
+});
+
+test('scales and invalidity: the total follows the scale name, the percentage is written as such', () => {
+    const line = 'MMSE 24/30, Barthel 60/100';
+    assert.equal(verifyPreparedFields('reported_scale', { scaleName: 'Barthel', scaleTotal: '24', scaleMax: '30' }, preparedTokens(line).map((t) => t.text)).check, 'value_missing');
+    assert.equal(verifyPreparedFields('reported_scale', { scaleName: 'Barthel', scaleTotal: '60', scaleMax: '100' }, preparedTokens(line).map((t) => t.text)).check, 'ok');
+    const text = 'Riconosciuta invalidità civile 75% con revisione nel 2028.';
+    const { units: u } = splitDossierUnits(text, null);
+    const pass = (percentage: string) => preparedDossierFacts({ source: source([{ kind: 'invalidity', values: { text: 'Riconosciuta invalidità civile 75% con revisione nel 2028', percentage } }], { summary: null }),
+        text, units: u, documentDate: '2026-10-20', parserFacts: [], now }).facts[0].values.preparedCheck;
+    assert.equal(pass('75'), 'verified');
+    assert.equal(pass('20'), 'value_missing', '2028 non è una percentuale');
+});
+
+test('one accepted drug supersedes only the section proposal of the same drug', () => {
+    const prepared: DossierFact = fact('prep', { values: { drugName: 'Ramipril', dosage: '5 mg', status: 'completed', startDate: '2026-10-20', preparedCheck: 'verified' } });
+    const sectionSame: DossierFact = fact('secR', { origin: 'parser:section', evidence: { unit: 0, start: 0, end: 1, excerpt: 'x' }, values: { drugName: 'Ramipril', dosage: '5 mg', status: 'completed', startDate: '' } });
+    const sectionOther: DossierFact = fact('secW', { origin: 'parser:section', evidence: { unit: 0, start: 0, end: 1, excerpt: 'x' }, values: { drugName: 'Warfarin', dosage: '5 mg', status: 'completed', startDate: '' } });
+    const result = preparedBulkDecisions({ record: record([prepared, sectionSame, sectionOther]), documentKey: 'doc', assessment: () => undefined, exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries: false });
+    assert.deepEqual(result.facts.map((item) => item.decision), ['accepted', 'rejected', 'pending']);
+});
+
+test('the full-text entry is replaced and the residual acknowledged only once the summary is written', () => {
+    const accepted = { ...summary(), decision: 'accepted' as const };
+    const base = { facts: [accepted, parserDocument], residualReview: { state: 'pending' }, extraction: { state: 'extracted', unitBasis: 'document', units: [] } };
+    const run = (applied: unknown[]) => preparedBulkDecisions({ record: { ...base, applied } as unknown as DossierRecord, documentKey: 'doc', assessment: () => undefined,
+        exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries: true });
+    const before = run([]);
+    assert.equal(before.facts[1].decision, 'pending');
+    assert.equal(before.acknowledgeResidual, false);
+    const after = run([{ factId: 'sum', target: 'entries', recordId: 'r', outcome: 'applied', at: 'x' }]);
+    assert.equal(after.facts[1].decision, 'rejected');
+    assert.equal(after.acknowledgeResidual, true);
+});
+
+test('aid and service names are checked on their words; quantities written around them do not block', () => {
+    const line = '3 siringhe tipo schizzettoni die 90 pz mese';
+    assert.equal(verifyPreparedFields('prosthetic', { description: 'Siringhe tipo schizzettoni, 3/die, 90 pz/mese' }, preparedTokens(line).map((t) => t.text)).check, 'ok');
+    assert.equal(verifyPreparedFields('prosthetic', { description: 'Soluzione fisiologica 100ml, 6 confezioni/die' }, preparedTokens('6 confezioni di soluzione fisiologica 100 ml die').map((t) => t.text)).check, 'ok');
+    assert.equal(verifyPreparedFields('prosthetic', { description: 'Deambulatore' }, preparedTokens(line).map((t) => t.text)).check, 'value_missing');
 });
