@@ -3,6 +3,7 @@ import { registerHooks } from 'node:module';
 import { evidenceHash, redactionIdentityDigest } from '../../../lib/ai-redaction-evidence.ts';
 import * as constants from '../../../lib/redaction-runtime-identity.ts';
 import corpus from '../../../scripts/fixtures/chat-card-corpus.json' with { type: 'json' };
+import { corpusEntitySpans } from '../../../lib/chat-card/corpus-entity-spans.test-support.ts';
 export const SENTINEL = 'IDENTIFYING_SENTINEL_Serena_Falsa_17_04_1972';
 const identity = { schema: constants.REDACTION_RUNTIME_SCHEMA, adapter: constants.REDACTION_RUNTIME_ADAPTER,
   model: constants.REDACTION_RUNTIME_MODEL, revision: constants.REDACTION_RUNTIME_REVISION,
@@ -13,15 +14,7 @@ globalThis.__cardTestRunner = {
   createGlinerRedactionRunner: () => ({
     async extract(text) {
       if (process.argv.includes('--slow')) await new Promise(resolve => setTimeout(resolve, 300));
-      const spans = [];
-      for (const entity of new Map(corpus.flatMap(entry => entry.gold.entities).map(entity => [entity.text, entity])).values()) {
-        let start = text.indexOf(entity.text);
-        while (start >= 0) {
-          spans.push({ type: entity.type, start, end: start + entity.text.length, text: entity.text, confidence: 1 });
-          start = text.indexOf(entity.text, start + entity.text.length);
-        }
-      }
-      return spans;
+      return corpusEntitySpans(text, new Map(corpus.flatMap(entry => entry.gold.entities).map(entity => [entity.text, entity])).values());
     }, async close() {},
   }),
 };

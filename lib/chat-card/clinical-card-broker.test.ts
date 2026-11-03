@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import crypto from 'node:crypto';
+import { syncBuiltinESMExports } from 'node:module';
 import { mockOrdinaryModule } from '../chatgpt-execution/ordinary-module.test-support.ts';
+import { corpusEntitySpans } from './corpus-entity-spans.test-support.ts';
 import corpus from '../../scripts/fixtures/clinical-chat-corpus.json' with { type: 'json' };
 import reviewCorpus from '../../scripts/fixtures/clinical-chat-review-corpus.json' with { type: 'json' };
 import { evidenceHash, redactionIdentityDigest } from '../ai-redaction-evidence';
@@ -28,15 +31,7 @@ mockOrdinaryModule(import.meta.url, '../gliner-redaction-runner', { namedExports
             if (finalOnlyUnknown && text.startsWith('{')) { const start = text.indexOf('Nives Beldoni'); return [{ type: 'person', start, end: start + 13, text: 'Nives Beldoni', confidence: 1 }]; }
             if (redactDiagnosis && text.includes('Diabete mellito')) { const start = text.indexOf('Diabete mellito'); return [{ type: 'person', start, end: start + 15, text: 'Diabete mellito', confidence: 1 }]; }
             const entities = new Map([...corpus, ...reviewCorpus].flatMap(entry => entry.gold.entities).map(entity => [entity.text, entity]));
-            const spans: NeuralRedactionSpan[] = [];
-            for (const entity of entities.values()) {
-                if (omitted.has(entity.text)) continue;
-                let start = text.indexOf(entity.text);
-                while (start >= 0) {
-                    spans.push({ type: entity.type as NeuralRedactionSpan['type'], start, end: start + entity.text.length, text: entity.text, confidence: 1 });
-                    start = text.indexOf(entity.text, start + entity.text.length);
-                }
-            }
+            const spans = corpusEntitySpans(text, entities.values(), omitted) as NeuralRedactionSpan[];
             if (overRedact) {
                 const start = text.indexOf('Testometformina');
                 if (start >= 0) spans.push({ type: 'person', start, end: start + 14, text: 'Testometformina', confidence: 1 });
@@ -280,4 +275,16 @@ test('clinical exemptions are closed terms, never generated dosage patterns', as
     assert.equal(isClosedClinicalTerm('Vitamina D3 1000 UI in Marta Valli'), false);
     const b = broker(); await b.owner.selectPatient('homonym');
     await assert.rejects(b.owner.prepare({ diagnoses: ['Vitamina D3 1000 UI'], noteExcerpts: [] }, { names: ['Vitamina'], birthDates: [] }));
+});
+
+test('random identifiers that happen to contain a corpus date still prepare a clean card', async () => {
+    // Payload identifiers are random hex; about one in a thousand carries "1972", a corpus date.
+    const bytes = Buffer.from('1972' + 'ab'.repeat(14), 'hex');
+    mock.method(crypto, 'randomBytes', (size: number) => Buffer.concat([bytes, Buffer.alloc(size)]).subarray(0, size));
+    syncBuiltinESMExports();
+    try {
+        const { b, token, consent, review } = await ready();
+        assert.match(review.payload, /1972abab/u);
+        assert.equal(b.reader.takeApprovedBytes(token, consent), review.payload);
+    } finally { mock.restoreAll(); syncBuiltinESMExports(); }
 });
