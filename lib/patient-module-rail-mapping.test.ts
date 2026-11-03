@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import {
     buildPatientModuleRailGroups,
+    filterTerritorialRailGroups,
     validatePatientModuleRailGroups,
 } from './patient-module-rail-mapping.ts';
 
@@ -92,4 +93,15 @@ test('rejects group identity, order and caller-object drift', () => {
         ),
         /patient_module_rail_mapping_invalid:item_identity_drift/,
     );
+});
+
+test('senza il pacchetto Lombardia la rail perde solo SISS e FSE; con la Lombardia resta identica', () => {
+    const items = canonicalItems();
+    const groups = buildPatientModuleRailGroups(items);
+    assert.equal(filterTerritorialRailGroups(groups, { lombardy: true }), groups);
+    const core = filterTerritorialRailGroups(groups, { lombardy: false });
+    const hrefs = core.flatMap((group) => group.items.map((item) => item.href));
+    assert.equal(hrefs.includes('#siss'), false);
+    assert.deepEqual(hrefs, items.map((item) => item.href).filter((href) => href !== '#siss'));
+    assert.equal(core[0].items[0], items[0], 'le voci restano quelle del chiamante');
 });

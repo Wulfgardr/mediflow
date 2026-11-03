@@ -11,6 +11,7 @@ import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth
 import { sissHandoffCreateSchema } from '@/lib/api-schemas/siss-handoffs';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
+import { lombardyPackDenied, TERRITORIAL_PACK_DISABLED } from '@/lib/territorial-pack-production';
 
 // Local handoff notes and metadata; no documents or attachment payloads.
 const SISS_HANDOFF_JSON_MAX_BYTES = 262_144;
@@ -95,6 +96,7 @@ export async function POST(request: Request) {
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
         const result = dbServer.transaction((tx) => {
+            if (lombardyPackDenied()) return { status: 403, value: TERRITORIAL_PACK_DISABLED } as const;
             const patient = tx.select({ deletedAt: patients.deletedAt }).from(patients)
                 .where(eq(patients.id, patientId)).get();
             if (!patient || patient.deletedAt) {

@@ -97,7 +97,8 @@ function normalizeHeader(value: string): string {
     return normalizeAifaSearchText(value.replace(/^\uFEFF/, '')).replace(/ /g, '_');
 }
 
-function parseCsvRecords(text: string, delimiter: string): string[][] {
+/** Lettore CSV condiviso con i cataloghi farmaci di altre agenzie. */
+export function parseDelimitedRecords(text: string, delimiter: string): string[][] {
     const records: string[][] = [];
     let record: string[] = [];
     let field = '';
@@ -160,7 +161,7 @@ function parsePrice(value: string | null): number | null {
 export function parseAifaCsv(text: string, requirePromisedColumns = false): AifaCsvParseResult {
     const firstLine = text.split(/\r?\n/, 1)[0] || '';
     const delimiter = firstLine.includes(';') ? ';' : ',';
-    const records = parseCsvRecords(text, delimiter);
+    const records = parseDelimitedRecords(text, delimiter);
     if (records.length < 2) throw new Error('CSV AIFA non valido: nessun record');
 
     const headers = records[0].map(normalizeHeader);

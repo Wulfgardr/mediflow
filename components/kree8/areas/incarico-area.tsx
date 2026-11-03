@@ -57,6 +57,7 @@ function IncaricoArea({
   onSelectPatient,
   onAlignPatient,
   onOpenArea,
+  territorialHandoff = true,
   onRetryPatients,
   isReview,
 }: {
@@ -69,6 +70,8 @@ function IncaricoArea({
   onSelectPatient: (patientId: string) => void;
   onAlignPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
+  /** SISS e portali: solo col pacchetto Lombardia attivo. */
+  territorialHandoff?: boolean;
   onRetryPatients?: () => void;
   isReview: boolean;
 }) {
@@ -195,7 +198,7 @@ function IncaricoArea({
     { label: 'Quadro', icon: <FileSearch size={14} aria-hidden="true" />, run: () => onOpenArea('scheda') },
     { label: 'Nuova voce', icon: <Plus size={14} aria-hidden="true" />, href: `${selected.href}/entries/new` },
     { label: 'Documenti', icon: <FileText size={14} aria-hidden="true" />, href: `${selected.modulesHref}#documenti` },
-    { label: 'Prepara SISS', icon: <Workflow size={14} aria-hidden="true" />, run: () => onOpenArea('handoff') },
+    ...(territorialHandoff ? [{ label: 'Prepara SISS', icon: <Workflow size={14} aria-hidden="true" />, run: () => onOpenArea('handoff') }] : []),
   ] : [];
 
   const patientListParentRef = useRef<HTMLDivElement>(null);
