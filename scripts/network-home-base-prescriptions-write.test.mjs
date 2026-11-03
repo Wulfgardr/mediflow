@@ -655,7 +655,7 @@ async function assertTerritorialChannelBoundaries(client, webHeaders, patientId)
     const db = openTestDb();
     const snapshot = () => ({
         settings: db.prepare("SELECT * FROM settings WHERE key IN ('territorial.packs','territorial.packs.initialization') ORDER BY key").all(),
-        writer: db.prepare('SELECT * FROM prosthetic_prescriptions ORDER BY id').all(),
+        writer: db.prepare('SELECT * FROM siss_handoff_events ORDER BY id').all(),
         audit: db.prepare('SELECT * FROM audit_events ORDER BY rowid').all(),
     });
     const initial = snapshot();
@@ -668,8 +668,8 @@ async function assertTerritorialChannelBoundaries(client, webHeaders, patientId)
     const unchangedAndDenied = async () => {
         const capability = await request('GET', route, { headers: webHeaders });
         assert.deepEqual(capability.json, before);
-        const denied = await request('POST', '/api/v1/network/prosthetic-prescriptions', {
-            headers: { ...pairedHeaders(client), ...webHeaders }, body: prostheticPrescriptionPayload(patientId),
+        const denied = await request('POST', '/api/siss-handoffs', {
+            headers: webHeaders, body: { patientId, action: 'prosthetics.open' },
         });
         assert.equal(denied.response.status, 403, denied.text);
         assert.equal(denied.json.code, 'TERRITORIAL_PACK_DISABLED');

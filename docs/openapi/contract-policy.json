@@ -598,6 +598,16 @@
       "change": "PUT /api/v1/network/prosthetic-prescriptions/{id} response 409.recordId was removed",
       "trackingIssue": "WUL-800",
       "reason": "WUL-800 coorte 4, OpenAPI 1.51.0: the original PrescriptionVersionConflictResponse remains unchanged in the first oneOf branch of ProstheticPrescriptionWriteConflict. The added branches carry status_transition_not_allowed (server-side prosthetic transition table) and prosthetic_collaudo_date_required (a tested prescription cannot lose its collaudo date). The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary CAS conflicts keep every original field. The Apple client in the same release offers collaudo only where the table allows it; an older build shows a refused choice as an HTTP 409 error."
+    },
+    {
+      "change": "POST /api/v1/network/prosthetic-prescriptions response 412.code changed",
+      "trackingIssue": "ADR-0177",
+      "reason": "ADR 0177, seconda consegna del 3/11/2026, OpenAPI 1.54.0: fuori dalla Lombardia il prerequisito diventa un prontuario caricato con fonte dichiarata. Senza prontuario ritorna 412 PROSTHETICS_CATALOG_REQUIRED al posto del precedente 403 territoriale; nessuna scrittura o audit. Con Lombardia resta invariata la registrazione manuale. I client precedenti continuano a ricevere un errore con code ed error; payload e codici di conflitto della selezione restano invariati."
+    },
+    {
+      "change": "PUT /api/v1/network/prosthetic-prescriptions/{id} response 412.code changed",
+      "trackingIssue": "ADR-0177",
+      "reason": "ADR 0177, seconda consegna del 3/11/2026, OpenAPI 1.54.0: fuori dalla Lombardia il prerequisito diventa un prontuario caricato con fonte dichiarata. Senza prontuario ritorna 412 PROSTHETICS_CATALOG_REQUIRED al posto del precedente 403 territoriale; nessuna scrittura o audit. Con Lombardia resta invariata la registrazione manuale. I client precedenti continuano a ricevere un errore con code ed error; payload e codici di conflitto della selezione restano invariati."
     }
   ]
 }
