@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
     DOSSIER_SCHEMA_VERSION, DossierArtifactConflictError, buildDossierReceipt, classifyDossierSource, collectDossierTaxCodes,
-    dossierFactBlockers, evaluateDossierCoverage, evaluateDossierGroupIdentity, extractDossierCandidates, findExplicitDocumentDate,
+    dossierFactBlockers, dossierResidualSegments, evaluateDossierCoverage, evaluateDossierGroupIdentity, extractDossierCandidates, findExplicitDocumentDate,
     readDossierRecord, reconcileDossierFacts, resolveDossierText, splitDossierUnits, writeDossierRecordIntoSnapshot,
     type DossierFact, type DossierRecord,
 } from './dossier-import';
@@ -259,12 +259,14 @@ test('merged paragraph: sections still separate; family history is not a patient
     assert.equal(facts.find((fact) => fact.kind === 'care_context')!.values.text, 'figlia convivente');
 });
 
-test('reported scales and invalidity are transcribed values, never administered scales; negated scale flagged', () => {
+test('reported scales and invalidity are transcribed values; unperformed scales stay residual', () => {
     const text = 'Valutazione multidimensionale sintetica. Indice di Barthel 60/100. MMSE non eseguito 0. Invalidità civile riconosciuta al 100% con indennità di accompagnamento.';
     const facts = candidates(text);
     const scales = facts.filter((fact) => fact.kind === 'reported_scale');
     assert.deepEqual(scales.map((fact) => [fact.values.scaleName, fact.values.scaleTotal, fact.values.scaleMax, fact.negated]),
-        [['Barthel', '60', '100', false], ['MMSE', '0', '', true]]);
+        [['Barthel', '60', '100', false]]);
+    assert.ok(dossierResidualSegments(text, splitDossierUnits(text, null).units, facts).some((part) => part.excerpt.includes('MMSE non eseguito 0')));
+    assert.equal(candidates('Non somministrato MMSE: 0').find((fact) => fact.kind === 'reported_scale')?.negated, true);
     const invalidity = facts.find((fact) => fact.kind === 'invalidity')!;
     assert.deepEqual([invalidity.values.percentage, invalidity.values.allowance], ['100', 'riconosciuta']);
 });
@@ -304,4 +306,17 @@ test('lab table rows merged into one paragraph are rebuilt conservatively and ma
     assert.equal(text.slice(observations[1].evidence!.start, observations[1].evidence!.end), 'Sodio 150 mmol/L 135-145 H');
     assert.ok(observations[1].values.rowSource, 'a rebuilt row is labelled for the physician');
     assert.equal(observations[0].values.rowSource, undefined);
+});
+
+
+test('scale years and future intervals are not transcribed scores', async () => {
+    const { findScaleMentions } = await import('./dossier-sections');
+    for (const source of ['MMSE nel 2025', 'Ripetere MMSE fra 6 mesi', 'Barthel 2025']) assert.deepEqual(findScaleMentions(source), [], source);
+    assert.deepEqual(findScaleMentions('MMSE: 24/30; Barthel 60; NRS punteggio 4').map((m) => m.total), ['24', '60', '4']);
+});
+
+test('explicit ICD in family history does not become the patient diagnosis', () => {
+    const facts = candidates('Anamnesi familiare: madre con ICD-10 E11.9 diabete mellito');
+    assert.equal(facts.filter((f) => f.kind === 'diagnosis').length, 0);
+    assert.ok(facts.some((f) => f.kind === 'anamnesis' && f.values.subject === 'familiare'));
 });

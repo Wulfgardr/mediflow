@@ -443,9 +443,11 @@ export async function loadPatientDossier(ports: DossierPorts, patientId: string,
             && await ports.sha256(new TextEncoder().encode(text)) === read.record.extraction.text.sha256;
         let artifactCiphertextChars: number | null = null;
         try { artifactCiphertextChars = await ports.measureArtifact(attachment.parseEvidenceArtifactSnapshot!); } catch { artifactCiphertextChars = null; }
+        const identity = evaluateDossierGroupIdentity([read.record.identity], [patient], patientId);
+        const coverageRecord = { ...read.record, identity: { ...read.record.identity, status: identity.status } };
         documents.push({ attachment, record: read.record, text, textVerified,
             preservationCurrent: preservationIsCurrent(read.record, attachment.currentness?.sourceRef),
-            coverage: evaluateDossierCoverage(read.record, textVerified, attachment.currentness?.sourceRef ?? ''),
+            coverage: evaluateDossierCoverage(coverageRecord, textVerified, attachment.currentness?.sourceRef ?? ''),
             residual: textVerified && text !== null && read.record.extraction.state === 'extracted' ? dossierResidualSegments(text, read.record.extraction.units, read.record.facts) : [],
             artifactCiphertextChars });
     }
@@ -558,9 +560,14 @@ export async function retryDossierExtraction(
         guard();
         const date = record.documentDate ?? (() => { const found = findExplicitDocumentDate(text, record.source.fileName); return found ? { value: found.date, source: found.source } : null; })();
         const proposed = extractDossierCandidates({ fileName: record.source.fileName, text, units, documentDate: date?.value ?? null, exemptionCodes });
+        const patient = await ports.getPatient(input.patientId, input.signal);
+        guard();
+        if (!patient) return 'stale';
+        const taxCodes = collectDossierTaxCodes(text);
+        const identity = evaluateDossierGroupIdentity([{ taxCodes }], [patient], input.patientId);
         const known = new Set(record.facts.map((fact) => fact.factId));
         next = { ...record, updatedAt: at, extraction, documentDate: date,
-            identity: { ...record.identity, taxCodes: collectDossierTaxCodes(text) },
+            identity: { ...record.identity, taxCodes, status: identity.status },
             classification: proposed.classification,
             facts: [...record.facts, ...proposed.facts.filter((fact) => !known.has(fact.factId))],
             residualReview: { state: 'pending' },
@@ -699,6 +706,8 @@ async function writeIdempotent(
         guard();
         if (after) return spec.matches(after) ? { outcome: 'applied' } : { outcome: 'conflict', detail: 'Il record riletto non corrisponde a quanto inviato.' };
         const status = error instanceof DossierWriteRejected ? error.status : null;
+        // Una rilettura vuota non esclude un commit ancora in volo dopo un timeout.
+        if (status === null || status >= 500 || status === 408) return { outcome: 'uncertain', detail: 'Esito dell’invio non noto: riprendi la verifica prima di modificare il fatto.' };
         return { outcome: 'failed', detail: status ? `Scrittura rifiutata (${status}).` : 'Scrittura non riuscita.' };
     }
     const after = await ports.getRecord(spec.table, id, patientId, signal);
@@ -737,7 +746,10 @@ async function applyPatientCode(
                 : { outcome: 'conflict', detail: 'La scheda è cambiata: rileggi e riprova.' };
         }
         if (reread && present(reread)) return { outcome: 'applied' };
-        return reread ? { outcome: 'failed', detail: 'Scrittura non riuscita.' } : { outcome: 'uncertain', detail: 'Esito non verificabile.' };
+        const status = error instanceof DossierWriteRejected ? error.status : null;
+        return status !== null && status >= 400 && status < 500 && status !== 408
+            ? { outcome: 'failed', detail: `Scrittura rifiutata (${status}).` }
+            : { outcome: 'uncertain', detail: 'Esito dell’invio non noto: riprendi la verifica prima di modificare il fatto.' };
     }
     const after = await ports.getPatient(patientId, signal);
     guard();
@@ -778,7 +790,7 @@ export async function applyDossierDocument(
     const patient = await ports.getPatient(patientId, signal);
     guard();
     if (!patient || first.attachment.patientId !== patientId || !preservationIsCurrent(first.record, first.attachment.currentness?.sourceRef)
-        || ['mixed', 'discordant'].includes(first.record.identity.status)) return finish('identity');
+        || evaluateDossierGroupIdentity([first.record.identity], [patient], patientId).blocking) return finish('identity');
     const exemptionCodes = await ports.exemptionCodes(signal);
     guard();
     const planned = first.record.facts.filter((fact) => eligible(first.record, fact, exemptionCodes)).map((fact) => fact.factId);
@@ -836,8 +848,11 @@ export async function applyDossierDocument(
         const authorize = async (): Promise<boolean> => {
             const fresh = await rereadDocument(ports, patientId, attachmentId, signal);
             guard();
+            const linked = await ports.getPatient(patientId, signal);
+            guard();
             const freshFact = fresh?.record.facts.find((item) => item.factId === factId);
-            return Boolean(fresh && freshFact && fresh.record.pendingWrites?.some((item) => item.factId === factId && item.factFingerprint === activeClaim.factFingerprint)
+            return Boolean(fresh && linked && !evaluateDossierGroupIdentity([fresh.record.identity], [linked], patientId).blocking
+                && freshFact && fresh.record.pendingWrites?.some((item) => item.factId === factId && item.factFingerprint === activeClaim.factFingerprint)
                 && dossierFactFingerprint(freshFact) === activeClaim.factFingerprint && freshFact.decision === 'accepted'
                 && preservationIsCurrent(fresh.record, fresh.attachment.currentness?.sourceRef));
         };
