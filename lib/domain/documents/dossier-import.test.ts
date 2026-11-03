@@ -381,3 +381,43 @@ test('scale dates do not become scores and explicit scores after dates retain th
     }
     for (const text of ['MMSE 03/2021', 'MMSE 01/03/2021', 'MMSE 2019: 24/30']) assert.deepEqual(findScaleMentions(text), [], text);
 });
+
+test('professional identity labels cannot cross lines or be taken from narrative prose', () => {
+    const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
+    for (const prefix of [
+        'Assistito Medico\nC.F.', 'Sig. Bianchi Luca, inviato dal medico\nC.F.:',
+        "Paziente Bianchi Luca, preso in carico dall'operatore\nCF",
+        'CF medico:\n', 'CF\nmedico:', 'Codice fiscale del\nmedico:',
+        'Medico\r\nCF:', 'Medico\u2028CF:',
+        'Sig. Bianchi Luca, inviato dal medico C.F.:', 'Assistito Medico C.F.:',
+    ]) {
+        const taxCodes = collectDossierTaxCodes(`${prefix} ${CF_B}`);
+        assert.equal(evaluateDossierGroupIdentity([{ taxCodes }], patients, 'pa').blocking, true, prefix);
+        assert.equal(taxCodes.some((code) => code.explicitProfessional), false, prefix);
+    }
+    // A stored attribution from the old, multiline rule must not survive as an exemption.
+    const old = { taxCodes: [{ value: CF_B, role: 'professional_cf' as const, checksumValid: true, explicitProfessional: true }] };
+    assert.equal(evaluateDossierGroupIdentity([old], patients, 'pa').blocking, true);
+    for (const prefix of ['CF medico:', 'Codice fiscale del medico prescrittore:', 'Medico CF:', '  CF\toperatore:']) {
+        const taxCodes = collectDossierTaxCodes(`Paziente CF ${CF_A}\n${prefix} ${CF_B}`);
+        assert.equal(evaluateDossierGroupIdentity([{ taxCodes }], patients, 'pa').blocking, false, prefix);
+    }
+});
+
+test('clinical abbreviations do not detach an ICD diagnosis from its family subject', () => {
+    for (const text of [
+        'Madre deceduta per ca. mammella ICD-10 C50',
+        'Madre deceduta per ca. Mammella ICD-10 C50',
+        'Padre: dec. per IMA ICD-10 I21 infarto',
+        'Padre: dec. IMA ICD-10 I21 infarto',
+        'Anamnesi: madre con diab. mell. ICD-10 E11',
+        'Anamnesi: madre con diab. mell. tipo 2 ICD-10 E11',
+        'Madre deceduta per carcinoma mammella ICD-10 C50',
+    ]) {
+        const facts = candidates(text);
+        assert.equal(facts.some((f) => f.kind === 'diagnosis'), false, text);
+        assert.ok(facts.some((f) => f.kind === 'anamnesis' && f.values.subject === 'familiare' && f.values.text?.includes('ICD-10')), text);
+    }
+    const own = candidates('Madre deceduta per ca. mammella. Diagnosi: ICD-10 E11 diabete');
+    assert.deepEqual(own.filter((f) => f.kind === 'diagnosis').map((f) => f.values.code), ['E11']);
+});
