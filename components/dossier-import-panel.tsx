@@ -6,17 +6,18 @@
  * lib/document-dossier-session.ts sui writer ordinari. Nessun modello coinvolto.
  */
 
-import Link from 'next/link';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useSecurity } from '@/components/security-provider';
+import PatientDocumentCreate from '@/components/patient-document-create';
+import { proposeIdentityFields } from '@/lib/domain/documents/dossier-sections';
 import { db } from '@/lib/db';
 import { createDossierPorts } from '@/lib/document-dossier-ports';
 import {
-    DossierAbortedError, DossierIdentityBlocked, DossierStaleError, acquireDossierGroup, applyDossierDocument, buildDossierInventory,
-    evaluateDraftGroupIdentity, loadPatientDossier, saveDossierReview,
+    DossierAbortedError, DossierIdentityBlocked, DossierStaleError, DossierWriteInFlight, acquireDossierGroup, applyDossierDocument, buildDossierInventory,
+    evaluateDraftGroupIdentity, loadPatientDossier, retryDossierExtraction, saveDossierReview,
     type DossierAcquireOutcome, type DossierApplyResult, type DossierDocumentView, type DossierDraftGroup, type DossierInputFile,
     type DossierPatient, type DossierPatientView,
 } from '@/lib/document-dossier-session';
@@ -48,16 +49,33 @@ const FIELDS: Record<DossierFactKind, FieldSpec[]> = {
         { name: 'clinicalQuestion', label: 'Quesito' }, { name: 'items', label: 'Voci, una per riga', type: 'textarea' }],
     prosthetic: [{ name: 'description', label: 'Ausilio' },
         { name: 'category', label: 'Categoria', type: 'select', options: [['', 'Scegli'], ['standard', 'Standard'], ['oxygen', 'Ossigeno'], ['repair', 'Riparazione'], ['replacement', 'Sostituzione'], ['trial', 'Prova'], ['other', 'Altro']] },
-        { name: 'status', label: 'Stato documentato', type: 'select', options: [['prescribed', 'Prescritto'], ['submitted', 'Presentato'], ['authorized', 'Autorizzato'], ['delivered', 'Consegnato'], ['tested', 'Collaudato']] },
+        { name: 'status', label: 'Stato documentato', type: 'select', options: [['', 'Non indicato'], ['prescribed', 'Prescritto'], ['submitted', 'Presentato'], ['authorized', 'Autorizzato'], ['delivered', 'Consegnato'], ['tested', 'Collaudato']] },
         { name: 'isoCode', label: 'Codice ISO (solo se scritto)' }, { name: 'prescribedAt', label: 'Data', type: 'date' }],
-    reported_scale: [{ name: 'scaleName', label: 'Scala' }, { name: 'scaleTotal', label: 'Totale trascritto' }, { name: 'date', label: 'Data', type: 'date' }, { name: 'text', label: 'Contesto', type: 'textarea' }],
-    anamnesis: TEXT_FIELDS, assessment: TEXT_FIELDS, imaging_report: TEXT_FIELDS, invalidity: TEXT_FIELDS, care_context: TEXT_FIELDS, document_entry: TEXT_FIELDS,
+    reported_scale: [{ name: 'scaleName', label: 'Scala' }, { name: 'scaleTotal', label: 'Totale trascritto' }, { name: 'scaleMax', label: 'Massimo (se scritto)' },
+        { name: 'date', label: 'Data', type: 'date' }, { name: 'text', label: 'Contesto', type: 'textarea' }],
+    invalidity: [...TEXT_FIELDS, { name: 'percentage', label: 'Percentuale (se scritta)' }, { name: 'allowance', label: 'Indennità di accompagnamento (se scritta)' }],
+    anamnesis: TEXT_FIELDS, assessment: TEXT_FIELDS, imaging_report: TEXT_FIELDS, care_context: TEXT_FIELDS, document_entry: TEXT_FIELDS,
 };
 const DEFAULT_VALUES: Partial<Record<DossierFactKind, Record<string, string>>> = {
     therapy: { status: 'completed' }, prosthetic: { status: 'prescribed' },
     anamnesis: { title: 'Anamnesi da documento' }, assessment: { title: 'Valutazione da documento' }, imaging_report: { title: 'Referto di imaging' },
     invalidity: { title: 'Invalidità da documento' }, care_context: { title: 'Contesto assistenziale da documento' },
 };
+/** Qualificatori letti nel testo: si mostrano accanto alla proposta e finiscono nella voce scritta. */
+function qualifierNotes(fact: DossierFact): string[] {
+    const v = fact.values;
+    return [
+        v.subject && v.subject !== 'paziente' ? `Riferito a: ${v.subject}` : '',
+        v.temporality ? `Tempo: ${v.temporality}` : '',
+        v.certainty ? 'Formulazione incerta nel documento' : '',
+        v.sectionLabel ? `Sezione: ${v.sectionLabel}` : '',
+        v.codeSource ? `Codice: ${v.codeSource}` : '',
+        v.rowSource ? v.rowSource : '',
+        fact.kind === 'reported_scale' ? 'Totale trascritto: non diventa una scala somministrata' : '',
+        fact.kind === 'therapy' && v.status !== 'active' ? 'Resta storica finché non scegli «In corso»' : '',
+    ].filter(Boolean);
+}
+
 const EXTRACTION_LABEL: Record<string, string> = {
     unsupported_format: 'formato non leggibile', image_or_scan: 'OCR non riuscito su almeno una pagina', malformed_document: 'file danneggiato',
     encrypted_document: 'file protetto da password', resource_limit: 'oltre i limiti di estrazione', incomplete_document: 'documento incompleto',
@@ -122,6 +140,8 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
     const [confirmations, setConfirmations] = useState<Record<string, boolean>>({});
     const [outcomes, setOutcomes] = useState<Record<string, DossierAcquireOutcome>>({});
     const [measured, setMeasured] = useState<Record<string, { original: number; artifact: number }>>({});
+    // Creazione di una scheda da un documento del gruppo: una sola alla volta, nessun dato nell'URL o nello storage.
+    const [creating, setCreating] = useState<{ groupKey: string; sourceKey: string } | null>(null);
     const [dossierPatientId, setDossierPatientId] = useState(initialPatientId ?? '');
     const [view, setView] = useState<DossierPatientView | null>(null);
 
@@ -238,7 +258,6 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                         <h2 id={`${ids}-groups`}>2. Collega le fonti alle schede</h2>
                         <p className={styles.muted}>Il nome della cartella non sceglie il paziente. Un codice fiscale valido è un indizio, non una prova: conferma tu ogni collegamento.</p>
                         <div className={styles.actions}>
-                            <Link className="mf-button-secondary" href="/patients/new" target="_blank" rel="noopener">Crea una nuova scheda</Link>
                             <button type="button" className="mf-button-secondary" onClick={() => { void refreshPatients(); }}>Aggiorna elenco schede</button>
                         </div>
                         {groups.map((group) => {
@@ -246,7 +265,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                             const identity = evaluateDraftGroupIdentity(group, patients, linked || null);
                             const ready = group.sources.filter((source) => source.status === 'ready').length;
                             return (
-                                <article key={group.key} className={styles.section} data-testid="dossier-group" data-identity={identity.status}>
+                                <article key={group.key} className={styles.section} data-testid="dossier-group" data-group={group.key} data-identity={identity.status}>
                                     <h3>Cartella <PrivacyBlur>{group.key === '.' ? 'principale' : group.key}</PrivacyBlur> · {formatCountLabel(group.sources.length, 'fonte', 'fonti')}</h3>
                                     <table className={styles.table} role="table">
                                         <caption>Inventario: ogni file selezionato ha uno stato.</caption>
@@ -293,6 +312,16 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                         <button type="button" className={styles.primary} disabled={!linked || identity.blocking || !confirmations[group.key] || !ready || Boolean(busy)}
                                             onClick={() => { void acquire(group); }}>Salva {formatCountLabel(ready, 'originale', 'originali')} nella scheda</button>
                                     </div>
+                                    <NewPatientFromDocument group={group} identityBlocking={identity.blocking} busy={Boolean(busy)}
+                                        creating={creating?.groupKey === group.key ? creating.sourceKey : null}
+                                        onStart={(sourceKey) => setCreating({ groupKey: group.key, sourceKey })}
+                                        onCancel={() => setCreating(null)}
+                                        onCreated={async (patientId) => {
+                                            await refreshPatients();
+                                            setLinks((current) => ({ ...current, [group.key]: patientId }));
+                                            setConfirmations((current) => ({ ...current, [group.key]: false }));
+                                            setNotice('Scheda creata dal documento. Conferma il collegamento e salva gli originali: il documento già allegato viene riusato, non duplicato.');
+                                        }} />
                                 </article>
                             );
                         })}
@@ -310,7 +339,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                         </select>
                     </div>
                     {view ? <DossierReview view={view} busy={Boolean(busy)} ports={ports} operation={operation} setBusy={setBusy} setNotice={setNotice}
-                        reload={() => loadDossier(view.patient.id)} measured={Object.values(measured)} /> : null}
+                        reload={() => loadDossier(view.patient.id)} /> : null}
                 </section>
             </div>
         </Kree8WorkspaceShell>
@@ -321,15 +350,15 @@ type ReviewProps = {
     view: DossierPatientView; busy: boolean; ports: ReturnType<typeof createDossierPorts>;
     operation: () => { signal: AbortSignal; isCurrent: () => boolean };
     setBusy: (value: string | null) => void; setNotice: (value: string | null) => void; reload: () => Promise<void>;
-    measured: Array<{ original: number; artifact: number }>;
 };
 
-function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reload, measured }: ReviewProps) {
+function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reload }: ReviewProps) {
     const [results, setResults] = useState<Record<string, DossierApplyResult>>({});
     const receipt = useMemo(() => {
-        const value = buildDossierReceipt(view.documents.map((document) => ({ record: document.record, coverage: document.coverage })), new Date());
-        return { ...value, measuredStoredBytes: { originals: measured.reduce((sum, item) => sum + item.original, 0), artifacts: measured.reduce((sum, item) => sum + item.artifact, 0) } };
-    }, [view, measured]);
+        // Solo i documenti di questa scheda; le misure stanno nel record di ciascuna fonte.
+        return buildDossierReceipt(view.documents.map((document) => ({ record: document.record, coverage: document.coverage,
+            artifactCiphertextChars: document.artifactCiphertextChars })), new Date());
+    }, [view]);
     const receiptUrl = `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(receipt, null, 2))}`;
     if (!view.documents.length) {
         return <p role="status" data-testid="dossier-empty">Nessun documento acquisito come dossier per questa scheda{view.invalidDocuments ? `; ${view.invalidDocuments} con record non leggibile` : ''}.</p>;
@@ -341,7 +370,7 @@ function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reloa
             await saveDossierReview(ports, { patientId: view.patient.id, attachmentId: document.attachment.id, expected: document.attachment.currentness!, ...op, change });
             if (op.isCurrent()) await reload();
         } catch (error) {
-            if (op.isCurrent()) setNotice(error instanceof DossierStaleError ? error.message : error instanceof Error ? error.message : 'Revisione non salvata.');
+            if (op.isCurrent()) setNotice(error instanceof DossierStaleError || error instanceof DossierWriteInFlight ? error.message : error instanceof Error ? error.message : 'Revisione non salvata.');
         } finally { if (op.isCurrent()) setBusy(null); }
     };
     const apply = async (document: DossierDocumentView) => {
@@ -356,12 +385,27 @@ function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reloa
             if (op.isCurrent()) setNotice(error instanceof DossierAbortedError ? `${error.message} Rileggi il dossier: le scritture già confermate restano registrate.` : 'Applicazione interrotta. Rileggi il dossier prima di riprovare.');
         } finally { if (op.isCurrent()) setBusy(null); }
     };
+    const retry = async (document: DossierDocumentView) => {
+        const op = operation();
+        setBusy('Nuova estrazione locale dall’originale conservato…');
+        try {
+            const outcome = await retryDossierExtraction(ports, { patientId: view.patient.id, attachmentId: document.attachment.id, expected: document.attachment.currentness!, ...op });
+            if (!op.isCurrent()) return;
+            setNotice(outcome === 'extracted' ? 'Testo letto: le nuove proposte sono da decidere; le decisioni precedenti restano.'
+                : outcome === 'failed' ? 'Estrazione ancora non riuscita: il tentativo è registrato, l’originale resta conservato.'
+                    : outcome === 'source_changed' ? 'L’originale riletto non coincide con la fonte registrata: nessuna estrazione.'
+                        : outcome === 'stale' ? 'Il documento è cambiato: rileggi il dossier.' : 'Questo documento non si può estrarre di nuovo.');
+            await reload();
+        } catch (error) {
+            if (op.isCurrent()) setNotice(error instanceof DossierAbortedError ? error.message : 'Nuova estrazione interrotta.');
+        } finally { if (op.isCurrent()) setBusy(null); }
+    };
     const complete = view.documents.filter((document) => document.coverage.complete).length;
     return <>
         <p data-testid="dossier-summary"><strong>{complete} di {formatCountLabel(view.documents.length, 'documento', 'documenti')} completi.</strong> Un documento è completo solo con originale riletto, testo verificato, ogni proposta decisa, il residuo rivisto e le scritture confermate.</p>
         {view.invalidDocuments ? <p className={styles.notice}>{formatCountLabel(view.invalidDocuments, 'documento ha', 'documenti hanno')} un record dossier non leggibile e non {view.invalidDocuments === 1 ? 'viene' : 'vengono'} modificati.</p> : null}
-        {view.documents.map((document) => <DossierDocument key={document.attachment.id} document={document} view={view} busy={busy}
-            result={results[document.attachment.id]} onSave={(change) => save(document, change)} onApply={() => apply(document)} />)}
+        {view.documents.map((document) => <DossierDocument key={`${document.attachment.id}:${document.attachment.currentness?.revision ?? 0}:${document.attachment.currentness?.freshnessEpoch ?? 0}`} document={document} view={view} busy={busy}
+            result={results[document.attachment.id]} onSave={(change) => save(document, change)} onApply={() => apply(document)} onRetry={() => retry(document)} />)}
         <details className={styles.disclosure}>
             <summary>Ricevuta aggregata del dossier</summary>
             <p className={styles.muted}>Solo conteggi: nessun nome, testo, codice o identificativo. Gli spazi misurati riguardano gli originali salvati in questa sessione.</p>
@@ -370,20 +414,24 @@ function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reloa
                 <dt>Testo estratto</dt><dd>{receipt.extracted}</dd><dt>Estrazione non riuscita</dt><dd>{receipt.extractionFailed}</dd>
                 <dt>Conservati senza estrazione</dt><dd>{receipt.notExtracted}</dd><dt>Completi</dt><dd>{receipt.complete}</dd>
                 <dt>Fatti accettati / scritti</dt><dd>{receipt.factsAccepted} / {receipt.factsApplied}</dd>
+                <dt>Originali cifrati misurati</dt><dd>{receipt.measuredStoredBytes.originals} caratteri{receipt.measuredStoredBytes.originalsUnmeasured
+                    ? `; ${formatCountLabel(receipt.measuredStoredBytes.originalsUnmeasured, 'originale non misurato', 'originali non misurati')} (già presenti in MediFlow)` : ''}</dd>
+                <dt>Artefatti cifrati (testo, proposte, registro)</dt><dd>{receipt.measuredStoredBytes.artifacts} caratteri{receipt.measuredStoredBytes.artifactsUnmeasured
+                    ? `; ${formatCountLabel(receipt.measuredStoredBytes.artifactsUnmeasured, 'non misurato', 'non misurati')}` : ''}</dd>
             </dl>
+            <p className={styles.muted}>Misure della serializzazione cifrata del client: non includono l’ingombro di SQLite, indici o backup.</p>
             <a className="mf-button-secondary" href={receiptUrl} download="mediflow-ricevuta-dossier.json">Scarica ricevuta</a>
         </details>
     </>;
 }
 
-function DossierDocument({ document, view, busy, result, onSave, onApply }: {
+function DossierDocument({ document, view, busy, result, onSave, onApply, onRetry }: {
     document: DossierDocumentView; view: DossierPatientView; busy: boolean; result?: DossierApplyResult;
-    onSave: (change: (record: DossierRecord) => DossierRecord) => Promise<void>; onApply: () => Promise<void>;
+    onSave: (change: (record: DossierRecord) => DossierRecord) => Promise<void>; onApply: () => Promise<void>; onRetry: () => Promise<void>;
 }) {
     const ids = useId();
     const [draft, setDraft] = useState<DossierRecord>(document.record);
     const [newKind, setNewKind] = useState<DossierFactKind>('diagnosis');
-    useEffect(() => { setDraft(document.record); }, [document.record]);
     const dirty = JSON.stringify(draft) !== JSON.stringify(document.record);
     const record = document.record;
     const written = (fact: DossierFact) => { const outcome = latestAppliedOutcome(record, fact.factId)?.outcome; return outcome === 'applied' || outcome === 'already_present'; };
@@ -398,6 +446,14 @@ function DossierDocument({ document, view, busy, result, onSave, onApply }: {
                 {record.preservation.reusedExisting ? ' · già presente in MediFlow' : ''}</p>
             {document.coverage.gaps.length ? <ul data-testid="dossier-gaps">{document.coverage.gaps.map((gap) => <li key={gap}>{DOSSIER_GAP_LABELS[gap]}</li>)}</ul>
                 : <p data-testid="dossier-gaps"><strong>Completo.</strong></p>}
+            <p className={styles.muted} data-testid="dossier-storage">{record.storage
+                ? `Originale cifrato: ${record.storage.originalCiphertextChars} caratteri, misurati all’acquisizione.` : 'Originale già presente in MediFlow: spazio non misurato da questo flusso.'}
+                {document.artifactCiphertextChars !== null ? ` Artefatto cifrato: ${document.artifactCiphertextChars} caratteri.` : ' Artefatto non misurato.'}</p>
+            {record.pendingWrites?.length ? <p className={styles.notice} role="status">{formatCountLabel(record.pendingWrites.length, 'scrittura ha', 'scritture hanno')} esito da verificare: applica di nuovo per rileggerle, senza duplicare.</p> : null}
+            {record.extraction.state === 'failed' ? <div className={styles.actions}>
+                <span>{record.extractionAttempts?.length ? formatCountLabel(record.extractionAttempts.length, 'tentativo registrato', 'tentativi registrati') : ''}</span>
+                <button type="button" className={styles.secondary} disabled={busy || dirty} onClick={() => { void onRetry(); }}>Riprova l’estrazione dall’originale</button>
+            </div> : null}
             {document.text !== null ? <details className={styles.disclosure}>
                 <summary>Testo completo{document.textVerified ? '' : ' (non verificato)'}</summary>
                 <dl>{units.map((unit) => <div key={unit.index}><dt>{unit.kind === 'page' ? `Pagina ${unit.index}` : 'Documento'}</dt>
@@ -410,12 +466,13 @@ function DossierDocument({ document, view, busy, result, onSave, onApply }: {
                     const assessment = view.assessments.get(dossierFactRef(document.attachment.id, fact.factId));
                     const blockers = dossierFactBlockers(fact, { exemptionCodes: view.exemptionCodes });
                     const applied = latestAppliedOutcome(record, fact.factId);
-                    const locked = written(fact) || busy;
+                    const locked = written(fact) || busy || Boolean(record.pendingWrites?.some((claim) => claim.factId === fact.factId));
                     return <tr key={fact.factId} role="row" data-testid="dossier-fact" data-kind={fact.kind}>
                         <td role="cell" data-label="Tipo">{DOSSIER_FACT_KIND_LABELS[fact.kind]}<small className={styles.muted}>{fact.origin === 'manual' ? 'Aggiunta dal medico' : 'Proposta del parser locale'}</small></td>
                         <td role="cell" data-label="Contenuto">
                             {fact.evidence ? <small>Evidenza, unità {fact.evidence.unit}: <PrivacyBlur>{fact.evidence.excerpt}</PrivacyBlur></small> : null}
                             {fact.values.textSource === 'document' ? <small>Testo: il testo completo del documento, conservato sopra.</small> : null}
+                            {qualifierNotes(fact).map((note) => <small key={note} data-testid="dossier-qualifier">{note}</small>)}
                             {FIELDS[fact.kind].filter((field) => !(field.name === 'text' && fact.values.textSource === 'document')).map((field) => <FactField key={field.name} spec={field} value={fact.values[field.name] ?? ''} disabled={locked}
                                 id={`${ids}-${fact.factId}-${field.name}`} onChange={(value) => updateFact(fact.factId, (item) => ({ ...item, values: { ...item.values, [field.name]: value } }))} />)}
                             {fact.negated || fact.origin !== 'manual' ? <label className={styles.consent}>
@@ -436,6 +493,12 @@ function DossierDocument({ document, view, busy, result, onSave, onApply }: {
                     </tr>;
                 })}</tbody>
             </table>
+            {document.residual.length ? <details className={styles.disclosure} data-testid="dossier-residual">
+                <summary>Testo non strutturato: {formatCountLabel(document.residual.length, 'segmento', 'segmenti')} senza proposta</summary>
+                <p className={styles.muted}>Questi passaggi restano nel testo conservato. Aggiungi un’informazione se contengono dati utili, poi conferma il residuo.</p>
+                <dl>{document.residual.map((segment) => <div key={`${segment.unit}-${segment.start}`}><dt>Unità {segment.unit}</dt>
+                    <dd><PrivacyBlur>{segment.excerpt}</PrivacyBlur></dd></div>)}</dl>
+            </details> : null}
             <div className={styles.actions}>
                 <label htmlFor={`${ids}-new-kind`}>Aggiungi un’informazione omessa</label>
                 <select id={`${ids}-new-kind`} value={newKind} disabled={busy} onChange={(event) => setNewKind(event.currentTarget.value as DossierFactKind)}>
@@ -464,6 +527,44 @@ function DossierDocument({ document, view, busy, result, onSave, onApply }: {
             </p> : null}
         </article>
     );
+}
+
+/** Nuova scheda da un documento PDF del gruppo, con il comando documentale esistente (stage, revisione, PIN). */
+function NewPatientFromDocument({ group, identityBlocking, busy, creating, onStart, onCancel, onCreated }: {
+    group: DossierDraftGroup; identityBlocking: boolean; busy: boolean; creating: string | null;
+    onStart: (sourceKey: string) => void; onCancel: () => void; onCreated: (patientId: string) => Promise<void>;
+}) {
+    const ids = useId();
+    const candidates = group.sources.filter((source) => source.status === 'ready' && source.classification.kind === 'pdf' && source.size <= 10 * 1024 * 1024);
+    const [choice, setChoice] = useState(candidates[0]?.key ?? '');
+    const [prepared, setPrepared] = useState<{ key: string; file: File } | null>(null);
+    const source = group.sources.find((item) => item.key === creating);
+    const file = prepared && prepared.key === creating ? prepared.file : null;
+    useEffect(() => {
+        let live = true;
+        if (!source) return;
+        void source.file.read().then((bytes) => {
+            // Il comando riceve gli stessi byte già inventariati: l'allegato creato verrà riconosciuto e riusato.
+            if (live) setPrepared({ key: source.key, file: new File([new Uint8Array(bytes)], source.fileName, { type: 'application/pdf' }) });
+        }).catch(() => undefined);
+        return () => { live = false; };
+    }, [source]);
+    if (identityBlocking || !candidates.length) return null;
+    const patientCode = source?.taxCodes.find((code) => code.role === 'patient_cf' && code.checksumValid)?.value ?? null;
+    if (!creating) {
+        return <div className={styles.actions} data-testid="dossier-new-patient">
+            <label htmlFor={`${ids}-source`}>Nessuna scheda adatta? Crea la scheda da</label>
+            <select id={`${ids}-source`} value={choice} disabled={busy} onChange={(event) => setChoice(event.currentTarget.value)}>
+                {candidates.map((item) => <option key={item.key} value={item.key}>{item.fileName}</option>)}
+            </select>
+            <button type="button" className={styles.secondary} disabled={busy || !choice} onClick={() => onStart(choice)}>Crea la scheda da questo documento</button>
+        </div>;
+    }
+    return <div className={styles.section} data-testid="dossier-new-patient">
+        {file && source ? <PatientDocumentCreate dossier={{ file, proposals: proposeIdentityFields(source.text ?? '', patientCode),
+            onCreated: ({ patientId }) => { void onCreated(patientId); } }} /> : <p role="status">Preparazione del documento…</p>}
+        <div className={styles.actions}><button type="button" className={styles.secondary} onClick={onCancel}>Chiudi la creazione</button></div>
+    </div>;
 }
 
 function FactField({ spec, value, disabled, id, onChange }: { spec: FieldSpec; value: string; disabled: boolean; id: string; onChange: (value: string) => void }) {

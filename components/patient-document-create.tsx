@@ -18,6 +18,14 @@ import {
     type PatientDocumentView,
 } from '@/lib/patient-document-create-client';
 import { OCR_MIN_SHORT_SIDE_PIXELS } from '@/lib/patient-document-image-geometry';
+import type { DossierIdentityProposal } from '@/lib/domain/documents/dossier-sections';
+
+/** Dossier (ADR 0175): documento già scelto nel lotto e proposte d'identità con evidenza. */
+export type PatientDocumentDossierSource = Readonly<{
+    file: File;
+    proposals: readonly DossierIdentityProposal[];
+    onCreated: (created: { patientId: string; attachmentId: string }) => void;
+}>;
 
 type Fields = { firstName: string; lastName: string; taxCode: string; birthDate: string };
 type Source = { fileName: string; size: number; converted: boolean; reduction: number };
@@ -60,7 +68,7 @@ function fieldError(fields: Fields): string | null {
 
 /** Creates a patient from one document through the shared command: local extraction, field-by-field
  * entry by the physician, explicit PIN confirmation, CAS and audit on the server, attachment readback here. */
-export default function PatientDocumentCreate({ onActiveChange }: { onActiveChange?: (active: boolean) => void } = {}) {
+export default function PatientDocumentCreate({ onActiveChange, dossier }: { onActiveChange?: (active: boolean) => void; dossier?: PatientDocumentDossierSource } = {}) {
     const { showToast } = useToast();
     const confirm = useConfirm();
     const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
@@ -79,6 +87,8 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
     const work = useRef<{ epoch: number; controller: AbortController; original: Uint8Array | null }>({ epoch: 0, controller: new AbortController(), original: null });
     const heading = useRef<HTMLHeadingElement>(null);
     const fileInput = useRef<HTMLInputElement>(null);
+    const dossierCreated = useRef(dossier?.onCreated);
+    dossierCreated.current = dossier?.onCreated;
 
     const restart = useCallback(() => {
         work.current.controller.abort();
@@ -107,6 +117,8 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
         if (verified !== 'failed') {
             patientDocumentMarker.clear(scope.current, commandId);
             work.current.original?.fill(0); work.current.original = null;
+            // Il lotto dossier riprende con la scheda creata; l'allegato del comando viene riusato, non duplicato.
+            dossierCreated.current?.({ patientId: receipt.patientId, attachmentId: receipt.attachmentId });
         }
         setPin('');
         setPhase({ kind: 'applied', patientId: receipt.patientId, verified, commandId });
@@ -252,6 +264,12 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
             {phase.kind === 'idle' && (
                 <>
                     {phase.notice && <div className={`mf-alert ${phase.notice.tone === 'critical' ? 'mf-alert-critical' : 'mf-alert-info'}`} role="alert">{phase.notice.text}</div>}
+                    {dossier && (
+                        <div className="mf-alert mf-alert-info">
+                            <p className="text-sm">Documento del lotto: {dossier.file.name}. La lettura locale avvia una lavorazione revisionabile; nessuna scheda viene creata senza PIN.</p>
+                            <button type="button" className="mf-button-primary mt-3" onClick={() => { void choose(dossier.file); }}>Avvia la revisione del documento</button>
+                        </div>
+                    )}
                     <section
                         aria-labelledby="patient-document-create-title"
                         onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
@@ -287,7 +305,9 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
                 }}>
                     <div className="mf-alert mf-alert-warning">
                         <h3 ref={heading} tabIndex={-1} className="font-semibold">{phase.kind === 'review' ? 'Revisione dei dati' : 'Conferma della creazione'}</h3>
-                        <p className="text-sm">MediFlow non compila i dati dal documento: leggi il testo estratto e scrivi tu ogni campo.</p>
+                        <p className="text-sm">{dossier
+                            ? 'Le proposte del dossier entrano nei campi solo con il tuo gesto: confronta ogni campo con il testo estratto.'
+                            : 'MediFlow non compila i dati dal documento: leggi il testo estratto e scrivi tu ogni campo.'}</p>
                         <p className="mt-1 text-xs">Fonte: {sourceLine(phase.source)}</p>
                     </div>
                     {!phase.markerKept && (
@@ -309,6 +329,18 @@ export default function PatientDocumentCreate({ onActiveChange }: { onActiveChan
                         </section>
                         <fieldset className="space-y-4 min-w-0" disabled={phase.kind === 'confirm'}>
                             <legend className="mf-eyebrow mb-2">Dati della nuova scheda</legend>
+                            {dossier?.proposals.length ? (
+                                <div className="space-y-2" data-testid="patient-document-dossier-proposals">
+                                    <p className="mf-field-helper">Proposte dal documento, con l’evidenza letta:</p>
+                                    <ul className="space-y-2">{dossier.proposals.map((proposal) => (
+                                        <li key={`${proposal.field}-${proposal.value}`} className="flex flex-wrap items-center gap-2 text-sm">
+                                            <span>{proposal.excerpt}</span>
+                                            <button type="button" className="mf-button-secondary"
+                                                onClick={() => setFields((value) => ({ ...value, [proposal.field]: proposal.value }))}>
+                                                Usa per {proposal.field === 'taxCode' ? 'codice fiscale' : proposal.field === 'firstName' ? 'nome' : proposal.field === 'lastName' ? 'cognome' : 'data di nascita'}
+                                            </button>
+                                        </li>))}</ul>
+                                </div>) : null}
                             {([
                                 ['firstName', 'Nome', 'given-name'],
                                 ['lastName', 'Cognome', 'family-name'],

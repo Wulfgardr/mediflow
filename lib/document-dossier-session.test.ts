@@ -4,7 +4,8 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import {
     DossierAbortedError, DossierCollectionChanged, DossierIdentityBlocked, DossierStaleError, DossierVersionConflict, DossierWriteRejected,
-    acquireDossierGroup, applyDossierDocument, buildDossierInventory, evaluateDraftGroupIdentity, loadPatientDossier, saveDossierReview,
+    DossierWriteInFlight, acquireDossierGroup, applyDossierDocument, buildDossierInventory, evaluateDraftGroupIdentity, loadPatientDossier,
+    retryDossierExtraction, saveDossierReview,
     type DossierAttachmentMeta, type DossierInputFile, type DossierPatient, type DossierPorts, type DossierRecordTable,
 } from './document-dossier-session';
 import { readDossierRecord, type DossierHostExtraction, type DossierRecord } from './domain/documents/dossier-import';
@@ -131,8 +132,14 @@ async function acceptAll(ports: DossierPorts, patientId: string, attachmentId: s
     const view = (await loadPatientDossier(ports, patientId, live.signal))!;
     const document = view.documents.find((item) => item.attachment.id === attachmentId)!;
     await saveDossierReview(ports, { patientId, attachmentId, expected: document.attachment.currentness!, ...live,
-        change: (record) => (edit ?? ((value) => value))({ ...record, residualReview: { state: 'acknowledged', at: 'x' },
-            facts: record.facts.map((fact) => ({ ...fact, decision: 'accepted' })) }) });
+        change: (record) => {
+            const accepted: DossierRecord = { ...record, residualReview: { state: 'acknowledged', at: 'x' },
+                facts: record.facts.map((fact) => ({ ...fact, decision: 'accepted' })) };
+            const edited = (edit ?? ((value) => value))(accepted);
+            // Una proposta esclusa dal caso di prova resta nel dossier come rifiutata: la revisione non elimina fatti.
+            const kept = new Set(edited.facts.map((fact) => fact.factId));
+            return { ...edited, facts: [...edited.facts, ...accepted.facts.filter((fact) => !kept.has(fact.factId)).map((fact) => ({ ...fact, decision: 'rejected' as const }))] };
+        } });
     return (await loadPatientDossier(ports, patientId, live.signal))!.documents.find((item) => item.attachment.id === attachmentId)!;
 }
 
@@ -349,4 +356,215 @@ test('missing date and negation block application; historical therapy stays non-
     assert.match(String(scale.content), /non una somministrazione/u);
     const after = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
     assert.equal(after.coverage.complete, false, 'undated observation and negated diagnosis keep the document incomplete');
+});
+
+test('reimport checks the current original bytes even after an earlier verified receipt', async () => {
+    const { files, ports, attachments } = setup([['D/R/a.pdf', labText(CF_A)]]);
+    const [group] = await buildDossierInventory(ports, files, live);
+    const [stored] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    const attachmentId = (stored as { attachmentId: string }).attachmentId;
+    attachments.get(attachmentId)!.bytes = enc.encode('different original after a later edit');
+    const [again] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    assert.equal(again.status, 'failed');
+    assert.equal(again.status === 'failed' && again.reason, 'readback_mismatch');
+});
+
+test('context retiring during the lookup before create prevents the clinical write', async () => {
+    const { files, ports, counts } = setup([['D/R/a.pdf', labText(CF_A)]]);
+    const [group] = await buildDossierInventory(ports, files, live);
+    const [stored] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    const attachmentId = (stored as { attachmentId: string }).attachmentId;
+    const document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record,
+        facts: record.facts.filter((fact) => fact.kind === 'document_entry') }));
+    let current = true;
+    const get = ports.getRecord;
+    ports.getRecord = async (...args) => { const value = await get(...args); current = false; return value; };
+    try {
+        await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!,
+            signal: live.signal, isCurrent: () => current });
+    } catch (error) { assert.ok(error instanceof DossierAbortedError); }
+    assert.equal(counts().clinicalCreates, 0);
+});
+
+test('review rejected in another client during lookup does not get applied or logged as applied', async () => {
+    const { files, ports, attachments, counts } = setup([['D/R/a.pdf', labText(CF_A)]]);
+    const [group] = await buildDossierInventory(ports, files, live);
+    const [stored] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    const attachmentId = (stored as { attachmentId: string }).attachmentId;
+    const document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record,
+        facts: record.facts.filter((fact) => fact.kind === 'document_entry') }));
+    const get = ports.getRecord;
+    let changed = false;
+    ports.getRecord = async (...args) => {
+        const value = await get(...args);
+        if (!changed) {
+            changed = true;
+            const meta = attachments.get(attachmentId)!.meta;
+            const snapshot = JSON.parse(meta.parseEvidenceArtifactSnapshot!);
+            snapshot.dossier.facts[0].decision = 'rejected';
+            meta.parseEvidenceArtifactSnapshot = JSON.stringify(snapshot);
+            meta.currentness = { ...meta.currentness!, revision: meta.currentness!.revision + 1 };
+        }
+        return value;
+    };
+    await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+    assert.equal(counts().clinicalCreates, 0);
+    const final = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.equal(final.record.applied.some((entry) => entry.outcome === 'applied'), false);
+});
+
+test('readback with a changed measurement unit is a conflict, not a verified write', async () => {
+    const { files, ports, records } = setup([['D/R/a.pdf', labText(CF_A)]]);
+    const [group] = await buildDossierInventory(ports, files, live);
+    const [stored] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    const attachmentId = (stored as { attachmentId: string }).attachmentId;
+    const document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record,
+        facts: record.facts.filter((fact) => fact.kind === 'observation').map((fact) => ({ ...fact,
+            values: { ...fact.values, code: '2345-7', unitCode: 'mg/dL' } })) }));
+    const create = ports.createRecord;
+    ports.createRecord = async (table, record) => {
+        await create(table, record);
+        if (table === 'observations') records.get(`${table}:${record.id}`)!.unitCode = 'mmol/L';
+    };
+    const result = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+    assert.equal(result.outcomes[0].outcome, 'conflict');
+    assert.equal(result.partial, true);
+});
+
+// ---------------------------------------------------------------------------
+// Ripresa WUL-804: riprova OCR, attestazione, autorizzazione per fatto e voce, rilettura completa
+// ---------------------------------------------------------------------------
+
+async function storedDocument(text: string, extraction?: (text: string) => DossierHostExtraction) {
+    const fixture = setup([['D/R/a.pdf', text]], extraction);
+    const [group] = await buildDossierInventory(fixture.ports, fixture.files, live);
+    const [stored] = await acquireDossierGroup(fixture.ports, { group, patientId: 'pa', confirmed: true, ...live });
+    return { ...fixture, attachmentId: (stored as { attachmentId: string }).attachmentId };
+}
+
+test('OCR retry from the preserved original: transient failure, then readable text; reviewed facts and history kept', async () => {
+    const text = labText(CF_A);
+    let available = false;
+    const fixture = await storedDocument(text, () => ({ status: 'failed', detail: 'resource_limit' }));
+    const { ports, attachmentId } = fixture;
+    const original = ports.extract;
+    ports.extract = async (bytes, signal) => available ? { status: 'extracted', markdown: text.replace('%PDF-1.4 sintetico\n', ''), ocr: { pageCount: 1, ocrPageCount: 1 } } : original(bytes, signal);
+    let view = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.ok(view.coverage.gaps.includes('extraction_failed'));
+    // Una decisione presa a mano prima del recupero deve sopravvivere.
+    await saveDossierReview(ports, { patientId: 'pa', attachmentId, expected: view.attachment.currentness!, ...live,
+        change: (record) => ({ ...record, facts: [...record.facts, { factId: 'm-note', kind: 'care_context', origin: 'manual', evidence: null, negated: false,
+            decision: 'accepted', values: { title: 'Contesto', date: '2025-01-10', text: 'Vive con la figlia (sintetico).' } }] }) });
+    view = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.equal(await retryDossierExtraction(ports, { patientId: 'pa', attachmentId, expected: view.attachment.currentness!, ...live }), 'failed');
+    view = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.deepEqual(view.record.extractionAttempts!.map((attempt) => attempt.outcome), ['failed', 'failed']);
+    available = true;
+    assert.equal(await retryDossierExtraction(ports, { patientId: 'pa', attachmentId, expected: view.attachment.currentness!, ...live }), 'extracted');
+    view = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.equal(view.record.extraction.state, 'extracted');
+    assert.equal(view.textVerified, true);
+    assert.equal(view.record.extraction.state === 'extracted' && view.record.extraction.engine, 'anydoc_ocr');
+    assert.deepEqual(view.record.extractionAttempts!.map((attempt) => attempt.outcome), ['failed', 'failed', 'extracted']);
+    assert.equal(view.record.facts.find((fact) => fact.factId === 'm-note')!.decision, 'accepted');
+    assert.ok(view.record.facts.some((fact) => fact.kind === 'observation' && fact.decision === 'pending'), 'new proposals arrive undecided');
+    assert.equal(view.record.residualReview.state, 'pending');
+    assert.equal(await retryDossierExtraction(ports, { patientId: 'pa', attachmentId, expected: view.attachment.currentness!, ...live }), 'not_retryable');
+});
+
+test('a verified receipt is bound to the host source: another sourceRef is not preserved and blocks apply', async () => {
+    const { ports, attachments, attachmentId, counts } = await storedDocument(labText(CF_A));
+    const document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record, facts: record.facts.filter((fact) => fact.kind === 'document_entry') }));
+    assert.equal(document.preservationCurrent, true);
+    const meta = attachments.get(attachmentId)!.meta;
+    meta.currentness = { ...meta.currentness!, sourceRef: 'e'.repeat(64) };
+    const view = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.equal(view.preservationCurrent, false);
+    assert.ok(view.coverage.gaps.includes('not_preserved'));
+    const result = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: view.attachment.currentness!, ...live });
+    assert.equal(result.stopped, 'identity');
+    assert.equal(counts().clinicalCreates, 0);
+});
+
+test('a fact with a write in flight cannot be changed by another review; resume resolves it without a second record', async () => {
+    const { ports, attachmentId, records } = await storedDocument(labText(CF_A));
+    const document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record, facts: record.facts.filter((fact) => fact.kind === 'document_entry') }));
+    const create = ports.createRecord;
+    ports.createRecord = async (table, record) => { await create(table, record); throw new Error('connection lost after commit'); };
+    const get = ports.getRecord;
+    let lookups = 0;
+    ports.getRecord = async (...args) => { lookups += 1; if (lookups === 2) throw new Error('reread unavailable'); return get(...args); };
+    const first = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+    assert.deepEqual(first.outcomes.map((entry) => entry.outcome), ['uncertain']);
+    ports.createRecord = create; ports.getRecord = get;
+    let view = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.equal(view.record.pendingWrites!.length, 1, 'uncertain outcome keeps the authorization');
+    assert.ok(view.coverage.gaps.includes('apply_uncertain'));
+    await assert.rejects(saveDossierReview(ports, { patientId: 'pa', attachmentId, expected: view.attachment.currentness!, ...live,
+        change: (record) => ({ ...record, facts: record.facts.map((fact) => fact.kind === 'document_entry' ? { ...fact, decision: 'rejected' } : fact) }) }), DossierWriteInFlight);
+    const second = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: view.attachment.currentness!, ...live });
+    assert.deepEqual(second.outcomes.map((entry) => entry.outcome), ['applied']);
+    assert.equal([...records.keys()].filter((key) => key.startsWith('entries:')).length, 1);
+    view = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.equal(view.record.pendingWrites!.length, 0);
+});
+
+test('service items are authorized one by one: a fact changed between prescription and item stops the next item', async () => {
+    const text = '%PDF-1.4 sintetico\nRicetta sintetica\nData prescrizione: 01/02/2025\nPrestazioni richieste:\n- Ecografia addome\n- Visita chirurgica\n';
+    const { ports, attachments, attachmentId, records } = await storedDocument(text);
+    const document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record,
+        facts: record.facts.filter((fact) => fact.kind === 'service_prescription').map((fact) => ({ ...fact, values: { ...fact.values, category: 'imaging' } })) }));
+    const create = ports.createRecord;
+    ports.createRecord = async (table, record) => {
+        await create(table, record);
+        if (table === 'service_prescriptions') {
+            const meta = attachments.get(attachmentId)!.meta;
+            const snapshot = JSON.parse(meta.parseEvidenceArtifactSnapshot!);
+            const fact = snapshot.dossier.facts.find((item: { kind: string }) => item.kind === 'service_prescription');
+            fact.values.items = 'Ecografia addome';
+            meta.parseEvidenceArtifactSnapshot = JSON.stringify(snapshot);
+            meta.currentness = { ...meta.currentness!, revision: meta.currentness!.revision + 1 };
+        }
+    };
+    const result = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+    assert.equal([...records.keys()].filter((key) => key.startsWith('service_prescription_items:')).length, 0);
+    assert.notEqual(result.outcomes[0]?.outcome, 'applied');
+    assert.equal(result.partial, true);
+});
+
+test('readback compares every clinical field: therapy status, end date and diary content', async () => {
+    for (const tamper of [
+        (record: Record<string, unknown>) => { record.status = 'active'; },
+        (record: Record<string, unknown>) => { record.endDate = '2024-01-01T00:00:00.000Z'; },
+    ]) {
+        const { ports, attachmentId, records } = await storedDocument(labText(CF_A));
+        const document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record, facts: [{ factId: 'm-rx', kind: 'therapy', origin: 'manual', evidence: null,
+            negated: false, decision: 'accepted', values: { drugName: 'Metformina', dosage: '500 mg', status: 'completed', startDate: '2019-03-01', endDate: '' } }] }));
+        const create = ports.createRecord;
+        ports.createRecord = async (table, record) => { await create(table, record); tamper(records.get(`${table}:${record.id}`)!); };
+        const result = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+        assert.deepEqual(result.outcomes.map((entry) => entry.outcome), ['conflict']);
+    }
+    const { ports, attachmentId, records } = await storedDocument(labText(CF_A));
+    const document = await acceptAll(ports, 'pa', attachmentId, (record) => ({ ...record, facts: record.facts.filter((fact) => fact.kind === 'document_entry') }));
+    const create = ports.createRecord;
+    ports.createRecord = async (table, record) => { await create(table, record); records.get(`${table}:${record.id}`)!.content = 'testo diverso'; };
+    const result = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+    assert.deepEqual(result.outcomes.map((entry) => entry.outcome), ['conflict']);
+});
+
+test('measured original ciphertext stays with its source; a reused original is reported as not measured', async () => {
+    const { ports, attachmentId } = await storedDocument(labText(CF_A));
+    const view = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.ok(view.record.storage && view.record.storage.originalCiphertextChars > 0);
+    assert.equal(view.attachment.id, attachmentId);
+    assert.ok((view.artifactCiphertextChars ?? 0) > 0);
+    const text = labText(CF_A);
+    const fixture = setup([['D/R/a.pdf', text]]);
+    fixture.attachments.set('legacy', { bytes: enc.encode(text), meta: { id: 'legacy', patientId: 'pa', name: 'vecchio.pdf', size: enc.encode(text).byteLength, type: 'application/pdf',
+        currentness: { sourceRef: 'd'.repeat(64), revision: 1, freshnessEpoch: 99 } } });
+    const [group] = await buildDossierInventory(fixture.ports, fixture.files, live);
+    await acquireDossierGroup(fixture.ports, { group, patientId: 'pa', confirmed: true, ...live });
+    const reused = (await loadPatientDossier(fixture.ports, 'pa', live.signal))!.documents[0];
+    assert.equal(reused.record.storage, undefined);
 });

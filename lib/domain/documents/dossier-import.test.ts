@@ -173,9 +173,135 @@ test('coverage: failed extraction, unverified text, pending decisions and uncert
 test('receipt is aggregate: no names, paths, codes, text or identifiers', () => {
     const accepted = { ...fact('exemption', { code: '031' }), decision: 'accepted' as const };
     const r = record({ facts: [accepted], identity: { taxCodes: [{ value: CF_A, role: 'patient_cf', checksumValid: true }], status: 'matched', confirmedAt: 'x' } });
-    const receipt = buildDossierReceipt([{ record: r, coverage: evaluateDossierCoverage(r, true), storedBytes: { original: 100, artifact: 50 } }], new Date('2026-11-03T00:00:00Z'));
+    const measured = { ...r, storage: { originalCiphertextChars: 100, measuredAt: 'x' } };
+    const receipt = buildDossierReceipt([{ record: measured, coverage: evaluateDossierCoverage(measured, true), artifactCiphertextChars: 50 },
+        { record: r, coverage: evaluateDossierCoverage(r, true), artifactCiphertextChars: null }], new Date('2026-11-03T00:00:00Z'));
     const serialized = JSON.stringify(receipt);
     for (const forbidden of [CF_A, 'x.pdf', 'Cartella', 'imp-1', 'a'.repeat(64), '031']) assert.equal(serialized.includes(forbidden), false, forbidden);
-    assert.equal(receipt.sources, 1);
-    assert.deepEqual(receipt.measuredStoredBytes, { originals: 100, artifacts: 50 });
+    assert.equal(receipt.sources, 2);
+    assert.deepEqual(receipt.measuredStoredBytes, { originals: 100, originalsUnmeasured: 1, artifacts: 50, artifactsUnmeasured: 1 }, 'unmeasured is counted, never shown as zero');
+});
+
+test('backfill rebuild cannot propose replacing an artifact that carries dossier decisions and provenance', () => {
+    const text = 'Testo completo di un documento sintetico con informazioni da conservare.';
+    const snapshot = writeDossierRecordIntoSnapshot(undefined, record(), { attachmentId: 'att-1', fileName: 'x.pdf', text });
+    const plan = buildDocumentEvidenceBackfillPlan([{ id: 'att-1', patientId: 'p', fileName: 'x.pdf', createdAt: '2026-11-03',
+        rawMarkdown: text, parseEvidenceArtifactSnapshot: snapshot }], { rebuildExisting: true });
+    assert.equal(plan.items[0].decision, 'skip_existing_artifact');
+    assert.equal(plan.items[0].candidateArtifact, undefined);
+});
+
+test('observations with opposite numeric sign or a different unit are not already present', () => {
+    for (const changed of [{ value: '-5', unitCode: 'mmol/L' }, { value: '5', unitCode: 'mg/dL' }]) {
+        const candidate = fact('observation', { code: 'base-excess', display: 'Base excess', value: '5', unitCode: 'mmol/L', observedAt: '2025-01-10' }, 'measurement');
+        const current = { diagnoses: [], exemptions: [], therapies: [], entries: [], servicePrescriptions: [], prostheticPrescriptions: [],
+            observations: [{ id: 'o1', code: 'base-excess', display: 'Base excess', observedAt: '2025-01-10', ...changed }] };
+        const result = reconcileDossierFacts([{ documentKey: 'd1', documentDate: '2025-01-10', facts: [candidate] }], current);
+        assert.equal(result.get('d1#measurement')!.status, 'conflict', JSON.stringify(changed));
+    }
+});
+
+test('same drug and date with a different dosage across documents is a conflict, not a duplicate', () => {
+    const candidate = (dosage: string) => fact('therapy', { drugName: 'Ramipril', dosage, status: 'completed', startDate: '2025-01-10' }, 'therapy');
+    const current = { diagnoses: [], exemptions: [], therapies: [], observations: [], entries: [], servicePrescriptions: [], prostheticPrescriptions: [] };
+    const result = reconcileDossierFacts([
+        { documentKey: 'd1', documentDate: '2025-01-10', facts: [candidate('5 mg')] },
+        { documentKey: 'd2', documentDate: '2025-01-11', facts: [candidate('10 mg')] },
+    ], current);
+    assert.equal(result.get('d2#therapy')!.status, 'conflict');
+});
+
+// ---------------------------------------------------------------------------
+// Proposte strutturate da sezioni esplicite (WUL-804, ripresa)
+// ---------------------------------------------------------------------------
+
+function candidates(text: string, documentDate: string | null = '2025-03-01') {
+    return extractDossierCandidates({ fileName: 'x.pdf', text, units: splitDossierUnits(text, null).units, documentDate, exemptionCodes: empty }).facts;
+}
+
+test('medications from an explicit therapy section: dose only if written, historical by default, negation kept', () => {
+    const text = 'Lettera sintetica\nTerapia domiciliare:\n- Ramipril 5 mg 1 cp al mattino\n- Bisoprololo 2,5 mg 1 cp\n- Paracetamolo al bisogno\n- non assume anticoagulanti\n\nAltro testo.';
+    const therapies = candidates(text).filter((fact) => fact.kind === 'therapy');
+    assert.deepEqual(therapies.map((fact) => [fact.values.drugName, fact.values.dosage, fact.values.status, fact.values.startDate, fact.negated]), [
+        ['Ramipril', '5 mg 1 cp al mattino', 'completed', '', false],
+        ['Bisoprololo', '2,5 mg 1 cp', 'completed', '', false],
+        ['Paracetamolo al bisogno', '', 'completed', '', false],
+        ['non assume anticoagulanti', '', 'completed', '', true],
+    ]);
+    assert.equal(therapies[0].values.temporality, 'in atto secondo il documento');
+    assert.equal(text.slice(therapies[0].evidence!.start, therapies[0].evidence!.end), 'Ramipril 5 mg 1 cp al mattino');
+    assert.ok(dossierFactBlockers(therapies[0]).some((item) => item.includes('Data mancante')), 'start date is never invented');
+    assert.ok(dossierFactBlockers(therapies[2]).some((item) => item.includes('dosage')));
+});
+
+test('service request with items, NRE, priority and question; prosthetics with explicit ISO code and status', () => {
+    const text = 'Ricetta sintetica NRE: 0301A1234567890 Priorità: B\nQuesito diagnostico: dispnea da sforzo\nPrestazioni richieste:\n1) Ecocardiogramma\n2) Visita cardiologica\n\nAusili prescritti: deambulatore ISO 12.06.06; materasso antidecubito';
+    const facts = candidates(text);
+    const service = facts.find((fact) => fact.kind === 'service_prescription')!;
+    assert.deepEqual([service.values.serviceName, service.values.items, service.values.requestReference, service.values.priority, service.values.clinicalQuestion, service.values.prescribedAt],
+        ['Ecocardiogramma', 'Ecocardiogramma\nVisita cardiologica', '0301A1234567890', 'B', 'dispnea da sforzo', '2025-03-01']);
+    assert.ok(dossierFactBlockers(service).some((item) => item.includes('category')), 'category is not invented');
+    const aids = facts.filter((fact) => fact.kind === 'prosthetic');
+    assert.deepEqual(aids.map((fact) => [fact.values.description, fact.values.isoCode, fact.values.status]),
+        [['deambulatore', '12.06.06', 'prescribed'], ['materasso antidecubito', '', 'prescribed']]);
+    assert.equal(facts.some((fact) => fact.kind === 'therapy'), false, 'requests are never medications');
+});
+
+test('merged paragraph: sections still separate; family history is not a patient diagnosis; uncertainty kept', () => {
+    const text = 'Visita sintetica Anamnesi familiare: padre con infarto. Diagnosi: sospetta BPCO; ipertensione arteriosa Valutazione: paziente orientato, deambula con bastone Caregiver: figlia convivente';
+    const facts = candidates(text);
+    const family = facts.find((fact) => fact.kind === 'anamnesis')!;
+    assert.equal(family.values.subject, 'familiare');
+    const diagnoses = facts.filter((fact) => fact.kind === 'diagnosis');
+    assert.deepEqual(diagnoses.map((fact) => [fact.values.description, fact.values.certainty, fact.values.code]),
+        [['sospetta BPCO', 'incerta', ''], ['ipertensione arteriosa', '', '']]);
+    assert.equal(facts.find((fact) => fact.kind === 'assessment')!.values.text, 'paziente orientato, deambula con bastone');
+    assert.equal(facts.find((fact) => fact.kind === 'care_context')!.values.text, 'figlia convivente');
+});
+
+test('reported scales and invalidity are transcribed values, never administered scales; negated scale flagged', () => {
+    const text = 'Valutazione multidimensionale sintetica. Indice di Barthel 60/100. MMSE non eseguito 0. Invalidità civile riconosciuta al 100% con indennità di accompagnamento.';
+    const facts = candidates(text);
+    const scales = facts.filter((fact) => fact.kind === 'reported_scale');
+    assert.deepEqual(scales.map((fact) => [fact.values.scaleName, fact.values.scaleTotal, fact.values.scaleMax, fact.negated]),
+        [['Barthel', '60', '100', false], ['MMSE', '0', '', true]]);
+    const invalidity = facts.find((fact) => fact.kind === 'invalidity')!;
+    assert.deepEqual([invalidity.values.percentage, invalidity.values.allowance], ['100', 'riconosciuta']);
+});
+
+test('lab LOINC/UCUM only from an exact local catalog match; ambiguous or unknown analytes stay uncoded', () => {
+    const text = 'Creatinina 0,9 mg/dL 0,6-1,2\nGlicemia 110 mg/dL 70-99\nCreatinina 80 umol/L 50-110\nFerritina 30 ng/mL 15-150';
+    const observations = candidates(text).filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(observations.map((fact) => [fact.values.display, fact.values.code, fact.values.unitCode]), [
+        ['Creatinina', '2160-0', 'mg/dL'],
+        ['Glicemia', '', ''],
+        ['Creatinina', '', ''],
+        ['Ferritina', '', ''],
+    ]);
+});
+
+test('residual text is everything no proposal covers, per unit', async () => {
+    const { dossierResidualSegments } = await import('./dossier-import');
+    const text = 'Terapia: Ramipril 5 mg\n\nNota libera senza struttura.';
+    const { units } = splitDossierUnits(text, null);
+    const facts = candidates(text);
+    const residual = dossierResidualSegments(text, units, facts);
+    assert.deepEqual(residual.map((segment) => segment.excerpt), ['Nota libera senza struttura.']);
+});
+
+test('identity proposals only from explicit labels; birth date validated', async () => {
+    const { proposeIdentityFields } = await import('./dossier-sections');
+    const proposals = proposeIdentityFields('Cognome: Rossi Nome: Mario Data di nascita: 31/02/1950 nato il 01/01/1950', CF_A);
+    assert.deepEqual(proposals.map((item) => [item.field, item.value]), [['taxCode', CF_A], ['lastName', 'Rossi'], ['firstName', 'Mario']]);
+    assert.deepEqual(proposeIdentityFields('Assistito: Mario Rossi, nato il 01/01/1950', null).map((item) => [item.field, item.value]), [['birthDate', '1950-01-01']]);
+});
+
+test('lab table rows merged into one paragraph are rebuilt conservatively and marked; evidence offsets stay exact', () => {
+    const text = 'Referto sintetico\n\nCreatinina 0,9 mg/dL 0,6-1,2 Sodio 150 mmol/L 135-145 H Potassio 4,1 mmol/L 3,5-5,1';
+    const observations = candidates(text, '2025-01-10').filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(observations.map((fact) => [fact.values.display, fact.values.value, fact.values.unit, fact.values.code]),
+        [['Creatinina', '0.9', 'mg/dL', '2160-0'], ['Sodio', '150', 'mmol/L', '2951-2'], ['Potassio', '4.1', 'mmol/L', '2823-3']]);
+    assert.equal(text.slice(observations[1].evidence!.start, observations[1].evidence!.end), 'Sodio 150 mmol/L 135-145 H');
+    assert.ok(observations[1].values.rowSource, 'a rebuilt row is labelled for the physician');
+    assert.equal(observations[0].values.rowSource, undefined);
 });

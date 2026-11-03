@@ -17,6 +17,11 @@ import type { DocumentDecisionClassification } from './document-decision';
 import { isValidItalianTaxCodeChecksum, resolveDocumentTaxCodeRoles } from './document-identity-resolution';
 import { parseItalianLabReport } from './lab-report-parser';
 import {
+    catalogObservationCode, findInvalidityMentions, findIsoCode, findPrescriptionReference, findPriority, findScaleMentions, invalidityDetails,
+    parseMedicationItem, prostheticStatusOf, qualifiersOf, segmentDossierSections, splitSectionItems, type DossierSection,
+} from './dossier-sections';
+import { clinicalDay, identityName, sameClinicalText, sameClinicalValue, sameDay, sameDosage, sameOptional, sameUnit } from './dossier-clinical-equality';
+import {
     DOCUMENT_PARSE_EVIDENCE_ARTIFACT_SCHEMA_VERSION,
     buildDocumentParseEvidenceArtifact,
     parseDocumentParseEvidenceArtifactSnapshot,
@@ -266,7 +271,7 @@ export interface DossierEvidence { unit: number; start: number; end: number; exc
 export interface DossierFact {
     factId: string;
     kind: DossierFactKind;
-    origin: 'parser:lab' | 'parser:exemption' | 'parser:icd' | 'parser:document' | 'manual';
+    origin: 'parser:lab' | 'parser:exemption' | 'parser:icd' | 'parser:section' | 'parser:scale' | 'parser:document' | 'manual';
     evidence: DossierEvidence | null;
     /** Il testo nega l'informazione: non si applica senza correzione esplicita. */
     negated: boolean;
@@ -330,6 +335,9 @@ export function findExplicitDocumentDate(text: string, fileName: string): { date
 }
 
 // La descrizione si ferma al codice successivo o a fine frase: AnyDoc può unire righe.
+const LAB_RANGE = /-?\d+(?:[.,]\d+)?\s*[-–]\s*-?\d+(?:[.,]\d+)?/gu;
+const LAB_ROW_BREAK = /-?\d+(?:[.,]\d+)?\s*[-–]\s*-?\d+(?:[.,]\d+)?(?:\s+(?:H|L|ALTO|BASSO|\*{1,2}|↑|↓))?\s(?=\p{Lu})/gu;
+
 const ICD_EXPLICIT = /\bICD[-\s]?(9|10)(?:[-\s]?CM)?\s*[:.]?\s*([A-Z]?\d{2,3}(?:\.\d{1,2})?)\b\s*[-–:]?\s*((?:(?!\bICD\b|\bICD[-\s]?\d|\b(?:nega|non|esclus)\w*\b)[^\n.;]){0,160})/giu;
 const EXEMPTION_LINE = /\besen(?:zione|zioni|te)\b/iu;
 const CODE_TOKEN = /\b[A-Z0-9]{1,6}(?:\.[A-Z0-9]{1,4})?\b/giu;
@@ -371,7 +379,19 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
         const text = unitText(input.text, unit);
         // Marcatura markdown di AnyDoc (titoli, elenchi, citazioni) sostituita da spazi
         // della stessa lunghezza: gli offset delle evidenze restano quelli del testo conservato.
-        const plain = text.replace(/^([ \t]*)(#{1,6}|[-*+>])(?=[ \t])/gmu, (_match, lead: string, mark: string) => lead + ' '.repeat(mark.length));
+        const unmarked = text.replace(/^([ \t]*)(#{1,6}|[-*+>])(?=[ \t])/gmu, (_match, lead: string, mark: string) => lead + ' '.repeat(mark.length));
+        // Righe di una tabella unite in un paragrafo dall'estrattore: solo se la riga contiene almeno due
+        // intervalli di riferimento, lo spazio dopo ciascun intervallo (ed eventuale segno H/L) diventa un a capo.
+        const rebuilt = new Set<number>();
+        const plain = unmarked.split('\n').map((line, index, all) => {
+            if ((line.match(LAB_RANGE) ?? []).length < 2) return line;
+            const offset = all.slice(0, index).reduce((sum, item) => sum + item.length + 1, 0);
+            return line.replace(LAB_ROW_BREAK, (match, ...rest) => {
+                const at = rest[rest.length - 2] as number;
+                rebuilt.add(offset + at + match.length);
+                return `${match.slice(0, -1)}\n`;
+            });
+        }).join('\n');
         // Laboratorio: parser esistente, riga per riga.
         const lines = plain.replace(/\r/gu, '').split('\n');
         const offsets: number[] = [];
@@ -379,8 +399,13 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
         for (const line of lines) { offsets.push(cursor); cursor += line.length + 1; }
         for (const result of parseItalianLabReport(plain)) {
             const start = offsets[result.lineNumber - 1] ?? 0;
+            // Codice e unità solo da corrispondenza esatta col catalogo locale; altrimenti restano da inserire.
+            const coded = catalogObservationCode(result.analyte, result.unit);
+            const fromParagraph = rebuilt.has(start);
             const values: DossierFactValues = {
-                display: result.analyte, value: result.value, unit: result.unit, code: '', unitCode: '',
+                display: result.analyte, value: result.value, unit: result.unit, code: coded?.code ?? '', unitCode: coded?.unitCode ?? '',
+                ...(coded ? { codeSource: 'catalogo locale: nome e unità coincidenti' } : {}),
+                ...(fromParagraph ? { rowSource: 'riga ricostruita da un paragrafo dell’estrattore: verifica esame e valore' } : {}),
                 refText: result.referenceRange.text, refLow: result.referenceRange.low ?? '', refHigh: result.referenceRange.high ?? '',
                 observedAt: date,
             };
@@ -417,6 +442,7 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
             }
             lineStart += line.length + 1;
         }
+        facts.push(...sectionCandidates(text, unit.index, date, routed.classification));
     }
     // Il documento intero come voce di diario: conserva tutto ciò che non è strutturabile.
     const entry = entryKindForClass(routed.classification);
@@ -428,6 +454,140 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
             evidence: null, negated: false, values, decision: 'pending' });
     }
     return { facts: dedupeFactIds(facts), classification: routed.classification };
+}
+
+function serviceCategory(classification: DocumentDecisionClassification): string {
+    return classification === 'lab_prescription' ? 'lab' : classification === 'imaging_prescription' ? 'imaging' : '';
+}
+
+const capitalized = (value: string) => value ? value[0].toLocaleUpperCase('it-IT') + value.slice(1) : value;
+
+/** Proposte dalle sezioni esplicite e dalle menzioni puntuali (scale, invalidità) di un'unità. */
+function sectionCandidates(text: string, unit: number, date: string, classification: DocumentDecisionClassification): DossierFact[] {
+    const facts: DossierFact[] = [];
+    const sections = segmentDossierSections(text);
+    const add = (kind: DossierFactKind, origin: DossierFact['origin'], span: { start: number; end: number }, values: DossierFactValues, negated: boolean) => {
+        facts.push({ factId: dossierFactId(kind, unit, span.start, values), kind, origin,
+            evidence: { unit, start: span.start, end: span.end, excerpt: text.slice(span.start, span.end).replace(/\s+/gu, ' ').trim() },
+            negated, values, decision: 'pending' });
+    };
+    const content = (section: DossierSection) => text.slice(section.start, section.end).trim();
+    const whole = (section: DossierSection) => ({ start: section.labelStart, end: section.end });
+    const question = sections.find((section) => section.kind === 'clinical_question');
+    const reference = findPrescriptionReference(text);
+    const priority = findPriority(text);
+    for (const section of sections) {
+        const label = section.label.toLocaleLowerCase('it-IT');
+        switch (section.kind) {
+            case 'diagnosis':
+                for (const item of splitSectionItems(text, section.start, section.end)) {
+                    if (/\bICD[-\s]?\d/iu.test(item.text)) continue; // coperto dal parser ICD esplicito
+                    const q = qualifiersOf(item.text, section.kind, section.label);
+                    if (q.subject === 'familiare') {
+                        add('anamnesis', 'parser:section', item, { title: 'Anamnesi familiare', date, text: item.text, subject: q.subject, temporality: q.temporality, certainty: q.certainty }, q.negated);
+                    } else {
+                        add('diagnosis', 'parser:section', item, { description: item.text, code: '', system: '', date, certainty: q.certainty, temporality: q.temporality, sectionLabel: section.label }, q.negated);
+                    }
+                }
+                break;
+            case 'anamnesis': case 'anamnesis_family': {
+                const q = qualifiersOf(content(section), section.kind, section.label);
+                add('anamnesis', 'parser:section', whole(section), { title: capitalized(section.label), date, text: content(section), subject: q.subject,
+                    temporality: q.temporality || (section.kind === 'anamnesis' ? 'storica' : ''), certainty: q.certainty }, false);
+                break;
+            }
+            case 'medication':
+                for (const item of splitSectionItems(text, section.start, section.end)) {
+                    const q = qualifiersOf(item.text, section.kind, section.label);
+                    const parsed = parseMedicationItem(item.text);
+                    // Una terapia letta da documento resta storica finché il medico non sceglie altrimenti.
+                    const status = /\bsospes|sospend|interrott/iu.test(`${label} ${item.text}`) ? 'suspended' : 'completed';
+                    add('therapy', 'parser:section', item, { drugName: parsed.drugName, dosage: parsed.dosage, status, startDate: '', endDate: '',
+                        temporality: q.temporality, sectionLabel: section.label, certainty: q.certainty }, q.negated);
+                }
+                break;
+            case 'services': {
+                const items = splitSectionItems(text, section.start, section.end);
+                if (!items.length) break;
+                add('service_prescription', 'parser:section', whole(section), { serviceName: items[0].text, items: items.map((item) => item.text).join('\n'),
+                    category: serviceCategory(classification), priority: priority?.value ?? '', requestReference: reference?.value ?? '',
+                    clinicalQuestion: question ? content(question) : '', prescribedAt: date }, false);
+                break;
+            }
+            case 'prosthetic':
+                for (const item of splitSectionItems(text, section.start, section.end)) {
+                    const isoCode = findIsoCode(item.text);
+                    add('prosthetic', 'parser:section', item, { description: item.text.replace(/\b(?:cod(?:ice)?\.?\s*)?ISO\s*[:.]?\s*[\d.\s]+/iu, '').trim() || item.text,
+                        isoCode, category: '', status: prostheticStatusOf(`${section.label} ${item.text}`), prescribedAt: date }, qualifiersOf(item.text, section.kind, section.label).negated);
+                }
+                break;
+            case 'invalidity': {
+                const details = invalidityDetails(content(section));
+                add('invalidity', 'parser:section', whole(section), { title: capitalized(section.label), date, text: content(section), ...details }, false);
+                break;
+            }
+            case 'assessment': case 'followup': {
+                const q = qualifiersOf(content(section), section.kind, section.label);
+                add(classification === 'imaging_report' && /conclusion/u.test(label) ? 'imaging_report' : 'assessment', 'parser:section', whole(section),
+                    { title: capitalized(section.label), date, text: content(section), temporality: q.temporality, certainty: q.certainty }, false);
+                break;
+            }
+            case 'care_context':
+                add('care_context', 'parser:section', whole(section), { title: capitalized(section.label), date, text: content(section) }, false);
+                break;
+            default:
+                break;
+        }
+    }
+    if (!sections.some((section) => section.kind === 'services') && reference && /prescription/u.test(classification)) {
+        // Ricetta riconosciuta senza elenco esplicito: la prestazione va completata dal medico.
+        add('service_prescription', 'parser:section', reference, { serviceName: '', items: '', category: serviceCategory(classification), priority: priority?.value ?? '',
+            requestReference: reference.value, clinicalQuestion: question ? content(question) : '', prescribedAt: date }, false);
+    }
+    for (const mention of findScaleMentions(text)) {
+        // La frase della menzione, non la riga: un paragrafo unito non estende la negazione ad altre scale.
+        const from = Math.max(text.lastIndexOf('.', mention.start - 1), text.lastIndexOf(';', mention.start - 1), text.lastIndexOf('\n', mention.start - 1)) + 1;
+        const stops = ['.', ';', '\n'].map((mark) => text.indexOf(mark, mention.end)).filter((index) => index >= 0);
+        const sentence = text.slice(from, stops.length ? Math.min(...stops) : text.length);
+        add('reported_scale', 'parser:scale', mention, { scaleName: mention.scaleName, scaleTotal: mention.total, scaleMax: mention.max, date, text: sentence.trim() },
+            NEGATION.test(sentence.slice(0, mention.start - from)) || /non\s+(?:eseguit|somministrat|valutabil)/iu.test(sentence));
+    }
+    if (!sections.some((section) => section.kind === 'invalidity')) {
+        for (const mention of findInvalidityMentions(text)) {
+            add('invalidity', 'parser:section', mention, { title: 'Invalidità', date, text: mention.text, ...invalidityDetails(mention.text) }, false);
+        }
+    }
+    return facts;
+}
+
+export interface DossierResidualSegment { unit: number; start: number; end: number; excerpt: string }
+
+/**
+ * Testo che nessuna proposta con evidenza copre: resta visibile come residuo da rivedere.
+ * Offset relativi all'unità, come le evidenze. Marcatori di pagina e separatori esclusi.
+ */
+export function dossierResidualSegments(text: string, units: readonly DossierUnit[], facts: readonly DossierFact[]): DossierResidualSegment[] {
+    const residual: DossierResidualSegment[] = [];
+    for (const unit of units) {
+        const body = unitText(text, unit);
+        // Coperti: le evidenze delle proposte e le etichette di sezione già interpretate.
+        const covered = [...facts.filter((fact) => fact.evidence?.unit === unit.index).map((fact) => [fact.evidence!.start, fact.evidence!.end] as const),
+            ...segmentDossierSections(body).map((section) => [section.labelStart, section.start] as const)].sort((a, b) => a[0] - b[0]);
+        let cursor = 0;
+        const push = (from: number, to: number) => {
+            const raw = body.slice(from, to).replace(/^## Pagina \d+$/gmu, '').replace(/^-{3,}$/gmu, '');
+            if (raw.replace(/[^\p{L}\p{N}]/gu, '').length >= 3) {
+                const lead = body.slice(from, to).length - body.slice(from, to).trimStart().length;
+                residual.push({ unit: unit.index, start: from + lead, end: to, excerpt: raw.replace(/\s+/gu, ' ').trim() });
+            }
+        };
+        for (const [start, end] of covered) {
+            if (start > cursor) push(cursor, start);
+            cursor = Math.max(cursor, end);
+        }
+        if (cursor < body.length) push(cursor, body.length);
+    }
+    return residual;
 }
 
 function dedupeFactIds(facts: DossierFact[]): DossierFact[] {
@@ -454,7 +614,7 @@ function validIsoDate(value: string | undefined): boolean {
 export const DOSSIER_REQUIRED_FIELDS: Record<DossierFactKind, readonly string[]> = {
     diagnosis: ['description', 'date'], exemption: ['code'], therapy: ['drugName', 'dosage', 'status', 'startDate'],
     observation: ['display', 'value', 'code', 'unitCode', 'observedAt'], service_prescription: ['serviceName', 'category', 'prescribedAt'],
-    prosthetic: ['description', 'category', 'prescribedAt'], anamnesis: ['text', 'date'], reported_scale: ['scaleName', 'scaleTotal', 'date'],
+    prosthetic: ['description', 'category', 'status', 'prescribedAt'], anamnesis: ['text', 'date'], reported_scale: ['scaleName', 'scaleTotal', 'date'],
     assessment: ['text', 'date'], imaging_report: ['text', 'date'], invalidity: ['text', 'date'], care_context: ['text', 'date'],
     document_entry: ['text', 'date'],
 };
@@ -496,37 +656,71 @@ export function dossierFactBlockers(fact: DossierFact, context: { exemptionCodes
 export interface DossierCurrentRecords {
     diagnoses: ReadonlyArray<{ code?: string; system?: string; description?: string; date?: string }>;
     exemptions: readonly string[];
-    therapies: ReadonlyArray<{ id: string; drugName: string; dosage: string; status: string; startDate?: string }>;
+    therapies: ReadonlyArray<{ id: string; drugName: string; dosage: string; status: string; startDate?: string; endDate?: string }>;
     observations: ReadonlyArray<{ id: string; code?: string; display: string; value: string; unitCode?: string; observedAt?: string }>;
     entries: ReadonlyArray<{ id: string; dossierFactRef?: string }>;
-    servicePrescriptions: ReadonlyArray<{ id: string; serviceName: string; prescribedAt?: string; requestReference?: string }>;
-    prostheticPrescriptions: ReadonlyArray<{ id: string; description: string; prescribedAt?: string }>;
+    servicePrescriptions: ReadonlyArray<{ id: string; serviceName: string; prescribedAt?: string; requestReference?: string; priority?: string; clinicalQuestion?: string }>;
+    prostheticPrescriptions: ReadonlyArray<{ id: string; description: string; prescribedAt?: string; status?: string; isoCode?: string }>;
 }
 
 export type DossierAssessmentStatus = 'new' | 'already_present' | 'duplicate_in_dossier' | 'conflict';
 export interface DossierFactAssessment { status: DossierAssessmentStatus; detail: string; relatedFactRefs: string[] }
 
-const squash = (value: string | undefined) => (value ?? '').toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-const day = (value: string | undefined) => (value ?? '').slice(0, 10);
-
 export function dossierFactRef(documentKey: string, factId: string): string { return `${documentKey}#${factId}`; }
 
-function comparableKey(fact: DossierFact): string | null {
+/** Stesso soggetto clinico (non stesso contenuto): farmaco e data, esame e data, codice. */
+function identityKey(fact: DossierFact): string | null {
     const v = fact.values;
     switch (fact.kind) {
-        case 'diagnosis': return v.code ? `dx:${(v.system ?? '').toUpperCase()}:${v.code.toUpperCase()}` : `dx-text:${squash(v.description)}`;
-        case 'exemption': return `ex:${(v.code ?? '').toUpperCase()}`;
-        case 'therapy': return `rx:${squash(v.drugName)}:${day(v.startDate)}`;
-        case 'observation': return `obs:${squash(v.code || v.display)}:${day(v.observedAt)}`;
-        case 'service_prescription': return v.requestReference ? `sp-ref:${squash(v.requestReference)}` : `sp:${squash(v.serviceName)}:${day(v.prescribedAt)}`;
-        case 'prosthetic': return `pr:${squash(v.description)}:${day(v.prescribedAt)}`;
+        case 'diagnosis': return v.code ? `dx:${(v.system ?? '').toUpperCase()}:${v.code.toUpperCase()}` : v.description ? `dx-text:${identityName(v.description)}` : null;
+        case 'exemption': return v.code ? `ex:${v.code.toUpperCase()}` : null;
+        case 'therapy': return v.drugName ? `rx:${identityName(v.drugName)}:${clinicalDay(v.startDate)}` : null;
+        case 'observation': return (v.code || v.display) ? `obs:${identityName(v.code || v.display)}:${clinicalDay(v.observedAt)}` : null;
+        case 'service_prescription': return v.requestReference ? `sp-ref:${identityName(v.requestReference)}` : v.serviceName ? `sp:${identityName(v.serviceName)}:${clinicalDay(v.prescribedAt)}` : null;
+        case 'prosthetic': return v.description ? `pr:${identityName(v.description)}:${clinicalDay(v.prescribedAt)}` : null;
+        case 'reported_scale': return v.scaleName ? `scale:${identityName(v.scaleName)}:${clinicalDay(v.date)}` : null;
         default: return null;
     }
+}
+
+const observationUnit = (values: DossierFactValues) => values.unitCode || values.unit || '';
+const itemList = (value: string | undefined) => (value ?? '').split('\n').map((item) => identityName(item)).filter(Boolean).sort().join('|');
+
+/** Campi clinicamente diversi fra due fatti dello stesso soggetto. Vuoto = stesso contenuto. */
+export function dossierFactDifferences(left: DossierFact, right: DossierFact): string[] {
+    const a = left.values; const b = right.values;
+    const differences: string[] = [];
+    const check = (label: string, same: boolean) => { if (!same) differences.push(label); };
+    switch (left.kind) {
+        case 'therapy':
+            check('posologia', sameDosage(a.dosage, b.dosage)); check('stato', sameOptional(a.status, b.status)); check('fine', sameDay(a.endDate, b.endDate));
+            break;
+        case 'observation':
+            check('valore', sameClinicalValue(a.value, b.value)); check('unità', sameUnit(observationUnit(a), observationUnit(b)));
+            break;
+        case 'diagnosis':
+            if (!a.code) check('descrizione', sameClinicalText(a.description, b.description));
+            break;
+        case 'service_prescription':
+            check('voci', itemList(a.items) === itemList(b.items)); check('priorità', sameOptional(a.priority, b.priority));
+            check('quesito', sameClinicalText(a.clinicalQuestion, b.clinicalQuestion)); check('data', sameDay(a.prescribedAt, b.prescribedAt));
+            break;
+        case 'prosthetic':
+            check('stato', sameOptional(a.status, b.status)); check('codice ISO', sameOptional(a.isoCode, b.isoCode));
+            break;
+        case 'reported_scale':
+            check('totale', sameClinicalValue(a.scaleTotal, b.scaleTotal)); check('massimo', sameOptional(a.scaleMax, b.scaleMax));
+            break;
+        default:
+            break;
+    }
+    return differences;
 }
 
 /**
  * Classifica ogni fatto rispetto alla scheda corrente e alle fonti precedenti del dossier
  * (ordinate per data del documento; senza data restano dopo). Non decide nulla: segnala.
+ * Stesso soggetto con contenuto diverso è sempre un conflitto, mai un duplicato.
  */
 export function reconcileDossierFacts(
     documents: ReadonlyArray<{ documentKey: string; documentDate: string | null; facts: readonly DossierFact[] }>,
@@ -534,39 +728,25 @@ export function reconcileDossierFacts(
 ): Map<string, DossierFactAssessment> {
     const result = new Map<string, DossierFactAssessment>();
     const ordered = [...documents].sort((a, b) => (a.documentDate ?? '9999').localeCompare(b.documentDate ?? '9999') || a.documentKey.localeCompare(b.documentKey));
-    const firstByKey = new Map<string, { ref: string; fact: DossierFact }>();
+    const seenByKey = new Map<string, Array<{ ref: string; fact: DossierFact }>>();
     for (const document of ordered) {
         for (const fact of document.facts) {
             const ref = dossierFactRef(document.documentKey, fact.factId);
             if (fact.decision === 'rejected') { result.set(ref, { status: 'new', detail: 'Rifiutato', relatedFactRefs: [] }); continue; }
             const presence = currentPresence(fact, ref, current);
             if (presence) { result.set(ref, presence); continue; }
-            const key = comparableKey(fact);
+            const key = identityKey(fact);
             if (key) {
-                const first = firstByKey.get(key);
-                if (first) {
-                    const differs = fact.kind === 'observation' && (squash(first.fact.values.value) !== squash(fact.values.value)
-                        || squash(first.fact.values.unit) !== squash(fact.values.unit));
-                    result.set(ref, differs
-                        ? { status: 'conflict', detail: 'Stesso esame alla stessa data con valore diverso in un’altra fonte.', relatedFactRefs: [first.ref] }
-                        : { status: 'duplicate_in_dossier', detail: 'Già presente in un’altra fonte del dossier.', relatedFactRefs: [first.ref] });
+                const earlier = seenByKey.get(key) ?? [];
+                seenByKey.set(key, [...earlier, { ref, fact }]);
+                const different = earlier.map((item) => ({ item, differences: dossierFactDifferences(item.fact, fact) })).filter((entry) => entry.differences.length);
+                if (different.length) {
+                    result.set(ref, { status: 'conflict', detail: `Stesso soggetto in un’altra fonte con ${[...new Set(different.flatMap((entry) => entry.differences))].join(', ')} diversi.`,
+                        relatedFactRefs: different.map((entry) => entry.item.ref) });
                     continue;
                 }
-                firstByKey.set(key, { ref, fact });
-            }
-            if (fact.kind === 'therapy') {
-                const sameDrug = current.therapies.filter((therapy) => squash(therapy.drugName) === squash(fact.values.drugName));
-                const variation = sameDrug.find((therapy) => squash(therapy.dosage) !== squash(fact.values.dosage));
-                if (variation) {
-                    result.set(ref, { status: 'conflict', detail: `Farmaco già in scheda con posologia diversa (stato ${variation.status}). Valuta se è una terapia storica.`, relatedFactRefs: [] });
-                    continue;
-                }
-            }
-            if (fact.kind === 'observation') {
-                const sameDay = current.observations.find((observation) => squash(observation.code || observation.display) === squash(fact.values.code || fact.values.display)
-                    && day(observation.observedAt) === day(fact.values.observedAt) && day(fact.values.observedAt) !== '');
-                if (sameDay && squash(sameDay.value) !== squash(fact.values.value)) {
-                    result.set(ref, { status: 'conflict', detail: 'In scheda c’è lo stesso esame alla stessa data con un valore diverso.', relatedFactRefs: [] });
+                if (earlier.length) {
+                    result.set(ref, { status: 'duplicate_in_dossier', detail: 'Stesso contenuto in un’altra fonte del dossier.', relatedFactRefs: earlier.map((item) => item.ref) });
                     continue;
                 }
             }
@@ -579,27 +759,46 @@ export function reconcileDossierFacts(
 function currentPresence(fact: DossierFact, ref: string, current: DossierCurrentRecords): DossierFactAssessment | null {
     const v = fact.values;
     const present = (detail: string): DossierFactAssessment => ({ status: 'already_present', detail, relatedFactRefs: [] });
+    const conflict = (detail: string): DossierFactAssessment => ({ status: 'conflict', detail, relatedFactRefs: [] });
     switch (fact.kind) {
-        case 'diagnosis':
-            return current.diagnoses.some((diagnosis) => v.code
+        case 'diagnosis': {
+            const match = current.diagnoses.find((diagnosis) => v.code
                 ? (diagnosis.code ?? '').toUpperCase() === v.code.toUpperCase() && (diagnosis.system ?? '').toUpperCase() === (v.system ?? '').toUpperCase()
-                : squash(diagnosis.description) === squash(v.description) && squash(v.description) !== '') ? present('Diagnosi già in scheda.') : null;
+                : Boolean(v.description) && sameClinicalText(diagnosis.description, v.description));
+            return match ? present('Diagnosi già in scheda.') : null;
+        }
         case 'exemption':
             return current.exemptions.some((code) => code.toUpperCase() === (v.code ?? '').toUpperCase()) ? present('Esenzione già in scheda.') : null;
-        case 'therapy':
-            return current.therapies.some((therapy) => squash(therapy.drugName) === squash(v.drugName) && squash(therapy.dosage) === squash(v.dosage)
-                && (!v.startDate || day(therapy.startDate) === day(v.startDate))) ? present('Terapia già in scheda.') : null;
-        case 'observation':
-            return current.observations.some((observation) => squash(observation.code || observation.display) === squash(v.code || v.display)
-                && squash(observation.value) === squash(v.value) && day(observation.observedAt) === day(v.observedAt) && day(v.observedAt) !== '')
-                ? present('Osservazione già in scheda.') : null;
-        case 'service_prescription':
-            return current.servicePrescriptions.some((item) => (v.requestReference && squash(item.requestReference) === squash(v.requestReference))
-                || (squash(item.serviceName) === squash(v.serviceName) && day(item.prescribedAt) === day(v.prescribedAt) && day(v.prescribedAt) !== ''))
-                ? present('Prescrizione già in scheda.') : null;
-        case 'prosthetic':
-            return current.prostheticPrescriptions.some((item) => squash(item.description) === squash(v.description) && day(item.prescribedAt) === day(v.prescribedAt))
-                ? present('Ausilio già in scheda.') : null;
+        case 'therapy': {
+            const sameDrug = current.therapies.filter((therapy) => identityName(therapy.drugName) === identityName(v.drugName));
+            if (!sameDrug.length) return null;
+            const identical = sameDrug.find((therapy) => sameDosage(therapy.dosage, v.dosage) && sameOptional(therapy.status, v.status)
+                && sameDay(therapy.startDate, v.startDate) && sameDay(therapy.endDate, v.endDate));
+            if (identical) return present('Terapia già in scheda con stessa posologia, stato e date.');
+            const other = sameDrug[0];
+            return conflict(`Farmaco già in scheda (stato ${other.status}, posologia ${other.dosage}) con posologia, stato o date diversi. Valuta se è una terapia storica.`);
+        }
+        case 'observation': {
+            if (!clinicalDay(v.observedAt)) return null;
+            const sameExam = current.observations.filter((observation) => identityName(observation.code || observation.display) === identityName(v.code || v.display)
+                && sameDay(observation.observedAt, v.observedAt));
+            if (!sameExam.length) return null;
+            if (sameExam.some((observation) => sameClinicalValue(observation.value, v.value) && sameUnit(observation.unitCode, observationUnit(v)))) return present('Osservazione già in scheda.');
+            return conflict('In scheda c’è lo stesso esame alla stessa data con valore o unità diversi.');
+        }
+        case 'service_prescription': {
+            const match = current.servicePrescriptions.find((item) => (v.requestReference && sameOptional(item.requestReference, v.requestReference))
+                || (identityName(item.serviceName) === identityName(v.serviceName) && clinicalDay(v.prescribedAt) !== '' && sameDay(item.prescribedAt, v.prescribedAt)));
+            if (!match) return null;
+            return identityName(match.serviceName) === identityName(v.serviceName) && sameOptional(match.priority, v.priority)
+                ? present('Prescrizione già in scheda.') : conflict('In scheda c’è una prescrizione con lo stesso riferimento e contenuto diverso.');
+        }
+        case 'prosthetic': {
+            const match = current.prostheticPrescriptions.find((item) => identityName(item.description) === identityName(v.description) && sameDay(item.prescribedAt, v.prescribedAt));
+            if (!match) return null;
+            return sameOptional(match.status, v.status) && sameOptional(match.isoCode, v.isoCode) ? present('Ausilio già in scheda.')
+                : conflict('In scheda c’è lo stesso ausilio alla stessa data con stato o codice diversi.');
+        }
         default:
             return current.entries.some((entry) => entry.dossierFactRef === ref) ? present('Voce già nel diario.') : null;
     }
@@ -618,14 +817,26 @@ export interface DossierAppliedEntry {
     outcome: DossierAppliedOutcome;
     at: string;
     detail?: string;
+    /** Impronta del fatto (decisione e valori) per cui è avvenuta la scrittura. */
+    factFingerprint?: string;
 }
+
+/** Autorizzazione a scrivere un fatto, persistita con CAS prima di ogni invio. */
+export interface DossierWriteClaim { factId: string; recordId: string | null; factFingerprint: string; at: string }
+
+export interface DossierExtractionAttempt { at: string; outcome: 'extracted' | 'failed'; detail?: DossierExtractionFailureDetail }
 
 export interface DossierRecord {
     schemaVersion: typeof DOSSIER_SCHEMA_VERSION;
     /** Identità opaca stabile della fonte, creata prima del primo invio. */
     importId: string;
     source: { sha256: string; byteLength: number; mediaType: string; kind: DossierSourceKind; relativePath: string; fileName: string };
-    preservation: { state: 'pending_readback' | 'verified' | 'mismatch'; verifiedAt?: string; reusedExisting: boolean };
+    /** `verifiedSourceRef`: la currentness host dell'allegato confrontato; una sorgente diversa annulla l'attestazione. */
+    preservation: { state: 'pending_readback' | 'verified' | 'mismatch'; verifiedAt?: string; verifiedSourceRef?: string; reusedExisting: boolean };
+    /** Byte cifrati dell'originale misurati prima dell'invio; assente se l'originale era già in MediFlow. */
+    storage?: { originalCiphertextChars: number; measuredAt: string };
+    extractionAttempts?: DossierExtractionAttempt[];
+    pendingWrites?: DossierWriteClaim[];
     extraction: DossierExtraction;
     identity: { taxCodes: DossierTaxCodeEvidence[]; status: DossierIdentityStatus; confirmedAt: string };
     documentDate: { value: string; source: 'text' | 'file_name' | 'physician' } | null;
@@ -638,6 +849,28 @@ export interface DossierRecord {
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+/** Impronta sincrona del contenuto deciso di un fatto (non è una firma: rileva cambiamenti). */
+export function dossierFactFingerprint(fact: DossierFact): string {
+    const canonical = JSON.stringify([fact.factId, fact.kind, fact.decision, fact.negated, fact.recordId ?? null,
+        Object.keys(fact.values).sort().map((key) => [key, fact.values[key]])]);
+    const hash = (seed: number) => {
+        let h1 = 0xdeadbeef ^ seed; let h2 = 0x41c6ce57 ^ seed;
+        for (let index = 0; index < canonical.length; index += 1) {
+            const code = canonical.charCodeAt(index);
+            h1 = Math.imul(h1 ^ code, 2654435761); h2 = Math.imul(h2 ^ code, 1597334677);
+        }
+        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
+    };
+    return `${hash(1)}${hash(2)}${canonical.length.toString(16)}`;
+}
+
+/** L'attestazione di conservazione vale solo per la sorgente host con cui è stata fatta. */
+export function preservationIsCurrent(record: DossierRecord, sourceRef: string | undefined): boolean {
+    return record.preservation.state === 'verified' && Boolean(sourceRef) && record.preservation.verifiedSourceRef === sourceRef;
+}
 
 function validFact(value: unknown): value is DossierFact {
     if (!isRecord(value) || typeof value.factId !== 'string' || typeof value.kind !== 'string' || !(value.kind in DOSSIER_FACT_TARGET)
@@ -722,18 +955,25 @@ export const DOSSIER_GAP_LABELS: Record<DossierGap, string> = {
 
 export interface DossierCoverage { complete: boolean; gaps: DossierGap[] }
 
-export function evaluateDossierCoverage(record: DossierRecord, textVerified: boolean): DossierCoverage {
+export function evaluateDossierCoverage(record: DossierRecord, textVerified: boolean, sourceRef?: string): DossierCoverage {
     const gaps: DossierGap[] = [];
     if (record.preservation.state === 'pending_readback') gaps.push('not_preserved');
+    // Un'attestazione fatta su un'altra sorgente host non vale più.
+    if (record.preservation.state === 'verified' && sourceRef !== undefined && !preservationIsCurrent(record, sourceRef)) gaps.push('not_preserved');
     if (record.preservation.state === 'mismatch') gaps.push('readback_mismatch');
     if (record.extraction.state === 'not_extracted') gaps.push('not_extracted');
     if (record.extraction.state === 'failed') gaps.push('extraction_failed');
     if (record.extraction.state === 'extracted' && !textVerified) gaps.push('text_unverified');
     if (record.facts.some((fact) => fact.decision === 'pending')) gaps.push('facts_pending');
     if (record.residualReview.state !== 'acknowledged') gaps.push('residual_pending');
-    const lastOutcome = new Map(record.applied.map((entry) => [entry.factId, entry.outcome] as const));
     for (const fact of record.facts.filter((item) => item.decision === 'accepted')) {
-        const outcome = lastOutcome.get(fact.factId);
+        if (record.pendingWrites?.some((claim) => claim.factId === fact.factId)) { gaps.push('apply_uncertain'); continue; }
+        const last = latestAppliedOutcome(record, fact.factId);
+        const outcome = last?.outcome;
+        // Una scrittura vale per la revisione con cui è avvenuta, non per contenuti decisi dopo.
+        if ((outcome === 'applied' || outcome === 'already_present') && last?.factFingerprint && last.factFingerprint !== dossierFactFingerprint(fact)) {
+            gaps.push('apply_conflict'); continue;
+        }
         if (outcome === 'applied' || outcome === 'already_present') continue;
         gaps.push(outcome === 'uncertain' ? 'apply_uncertain' : outcome === 'conflict' ? 'apply_conflict' : outcome === 'failed' ? 'apply_failed' : 'apply_pending');
     }
@@ -763,20 +1003,22 @@ export interface DossierReceipt {
     factsAccepted: number;
     factsApplied: number;
     gaps: Partial<Record<DossierGap, number>>;
-    measuredStoredBytes: { originals: number; artifacts: number };
+    /** Caratteri cifrati misurati sulla serializzazione effettiva; non sono byte SQLite né backup. */
+    measuredStoredBytes: { originals: number; originalsUnmeasured: number; artifacts: number; artifactsUnmeasured: number };
 }
 
 export function buildDossierReceipt(
-    entries: ReadonlyArray<{ record: DossierRecord; coverage: DossierCoverage; storedBytes?: { original: number; artifact: number } }>,
+    entries: ReadonlyArray<{ record: DossierRecord; coverage: DossierCoverage; artifactCiphertextChars?: number | null }>,
     now: Date,
 ): DossierReceipt {
     const byKind: Partial<Record<DossierSourceKind, number>> = {};
     const gaps: Partial<Record<DossierGap, number>> = {};
-    let originals = 0; let artifacts = 0;
-    for (const { record, coverage, storedBytes } of entries) {
+    let originals = 0; let artifacts = 0; let originalsUnmeasured = 0; let artifactsUnmeasured = 0;
+    for (const { record, coverage, artifactCiphertextChars } of entries) {
         byKind[record.source.kind] = (byKind[record.source.kind] ?? 0) + 1;
         for (const gap of coverage.gaps) gaps[gap] = (gaps[gap] ?? 0) + 1;
-        originals += storedBytes?.original ?? 0; artifacts += storedBytes?.artifact ?? 0;
+        if (record.storage) originals += record.storage.originalCiphertextChars; else originalsUnmeasured += 1;
+        if (typeof artifactCiphertextChars === 'number') artifacts += artifactCiphertextChars; else artifactsUnmeasured += 1;
     }
     const accepted = entries.flatMap(({ record }) => record.facts.filter((fact) => fact.decision === 'accepted').map((fact) => ({ record, fact })));
     return {
@@ -795,6 +1037,6 @@ export function buildDossierReceipt(
             return outcome === 'applied' || outcome === 'already_present';
         }).length,
         gaps,
-        measuredStoredBytes: { originals, artifacts },
+        measuredStoredBytes: { originals, originalsUnmeasured, artifacts, artifactsUnmeasured },
     };
 }
