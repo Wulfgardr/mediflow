@@ -4,6 +4,7 @@ import {
     type AifaCatalogManifest,
     type AifaCatalogManifestInput,
 } from './aifa-catalog';
+import type { DrugCatalogActiveSource } from './drug-catalog-import';
 
 export type AifaCatalogClientStatus = {
     count: number;
@@ -11,6 +12,8 @@ export type AifaCatalogClientStatus = {
     state: 'ready' | 'unverified' | 'not-imported';
     /** Present on the versioned status read; required to clear. */
     snapshot?: string;
+    /** Fonte dichiarata del catalogo caricato da file di un'altra agenzia. */
+    source?: DrugCatalogActiveSource;
 };
 
 export type AifaImportClientResult = AifaCatalogClientStatus & {
