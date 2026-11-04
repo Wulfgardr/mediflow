@@ -148,6 +148,13 @@ function generatedMetadata(sources: Sources): Readonly<{ timestamp: string; revi
 /** Executes Patient Insight through the fixed host-resolved Fabric route; it has no apply or persistence seam. */
 export function createPatientInsightHostCapability(dependencies: Dependencies) {
     const sources = dependencies.sources ?? productionSources;
+    async function permissionDenial() {
+        try {
+            const state = await dependencies.killSwitch.read();
+            if (state.status !== 'enabled') return deny(state.code === 'disabled' ? 'kill_switch_disabled' : 'kill_switch_unavailable');
+        } catch { return deny('kill_switch_unavailable'); }
+        return null;
+    }
     return Object.freeze({
         async preview(value: unknown): Promise<PatientInsightHostCapabilityResult> {
             const request = previewInput(value); if (!request) return deny('input_invalid');
@@ -159,6 +166,7 @@ export function createPatientInsightHostCapability(dependencies: Dependencies) {
             catch { return deny('source_stale'); }
             if (isOrdinaryFunctionSelected('patient_insight')) {
                 const result = await executeOwnedOrdinaryProfile('patient_insight', createPatientInsightOrdinaryTaskProfile(request.projection), () => dependencies.currentness.verify());
+                const denied = await permissionDenial(); if (denied) return denied;
                 const metadata = generatedMetadata(sources); if (!metadata || !dependencies.currentness.verify()) return deny('source_stale');
                 const extraction = result.output as import('../../ai-task-contracts').PatientInsightExtraction;
                 const proposal: PatientInsightReviewProposal = Object.freeze({ schemaVersion: 'mediflow.patient-insight.review-proposal.v2', reviewOnly: true,
@@ -220,6 +228,7 @@ export function createPatientInsightHostCapability(dependencies: Dependencies) {
                     gaps: Object.freeze([...parsed.value.data.gaps]), generatedAt: metadata.timestamp,
                     currentness: Object.freeze({ ...request.currentness, verifiedAt: metadata.timestamp }) });
             } catch { return failed('proposal_invalid', receipt, provenance); }
+            const denied = await permissionDenial(); if (denied) return denied;
             try { if (dependencies.currentness.verify() !== true) return failed('source_stale', receipt, provenance); }
             catch { return failed('source_stale', receipt, provenance); }
             return Object.freeze({ ...common, status: 'available', code: null, proposal, receipt, provenance, reviewRef: metadata.reviewRef });

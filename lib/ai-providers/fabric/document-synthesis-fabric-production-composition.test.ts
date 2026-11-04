@@ -164,3 +164,25 @@ for (const transition of ['selection change', 'lock'] as const) {
         } finally { provider.complete(); await execution?.catch(() => undefined); value.restore(); }
     });
 }
+
+for (const negative of ['malformed', 'unavailable', 'permission_missing'] as const) {
+    test(`document_synthesis/ollama: ${negative} denies publication without a writer`, { concurrency: false }, async () => {
+        let calls = 0;
+        const value = await fixture(async () => {
+            calls++;
+            return { content: '{malformed', stats: { latency: 0, tokensIn: 0, tokensOut: 0 } };
+        });
+        try {
+            const configuration = negative === 'permission_missing'
+                ? Object.freeze({ ...value.configuration, session: Object.freeze({}) }) : value.configuration;
+            const composition = createDocumentSynthesisFabricProductionCompositionForTest(configuration, Object.freeze({
+                bind: () => negative === 'unavailable'
+                    ? Promise.resolve({ status: 'denied' as const, code: 'provider_unready' as const, receipt: null, readiness: null, token: null })
+                    : value.binding.bind(),
+            }));
+            if (negative === 'permission_missing') assert.equal(composition, null);
+            else { assert.ok(composition); assert.equal(await composition.execute(), null); }
+            assert.equal(calls, negative === 'malformed' ? 1 : 0);
+        } finally { value.restore(); }
+    });
+}

@@ -91,7 +91,7 @@ test('returns one frozen review-only proposal after the fixed host pipeline', as
     assert.equal(result.status, 'available');
     assert.equal(result.proposal?.summary, 'Proposta sintetica');
     assert.match(result.reviewRef ?? '', /^review_[0-9a-f]{32}$/u);
-    assert.deepEqual(calls, { kill: 1, broker: 1, lifecycle: 1, binding: 1, readiness: 1, router: 1, chat: 1, clock: 1, entropy: 1 });
+    assert.deepEqual(calls, { kill: 2, broker: 1, lifecycle: 1, binding: 1, readiness: 1, router: 1, chat: 1, clock: 1, entropy: 1 });
     assert.equal(result.writesPerformed, 0);
     assert.equal(result.apply, 'denied');
     assert.equal(Object.isFrozen(result), true);

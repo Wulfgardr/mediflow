@@ -301,3 +301,22 @@ test('production registration completes Web retirement and disposes capture and 
         assert.equal(await factory.acquire(), null);
     }
 });
+
+test('document_synthesis/ollama: revoking the lane while execution is pending suppresses publication', async () => {
+    const selected = context(); let enabled = true, entropy = 0;
+    const entered = Promise.withResolvers<void>(), pending = Promise.withResolvers<object>();
+    const factory = createDocumentSynthesisProductionOperationForTest({
+        acquireContext: async () => selected, readCurrentness: () => CURRENT,
+        readLaneEnabled: () => enabled,
+        extract: async (_session: unknown, id: string) => extracted(id),
+        execute: async () => { entered.resolve(); return pending.promise; },
+        entropy: () => Uint8Array.from({ length: 16 }, () => ++entropy),
+        registerResource: () => () => undefined,
+    });
+    const operation = await factory.acquire(); assert.ok(operation);
+    const capture = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
+    const ingest = await operation.ingest({ captureHandle: capture.captureHandle });
+    const work = operation.preview({ previewHandle: ingest.previewHandle });
+    await entered.promise; enabled = false; pending.resolve(Object.freeze({ forbidden: 'late proposal' }));
+    assert.deepEqual(await work, { status: 'denied', code: 'lane_disabled', publication: null });
+});

@@ -8,7 +8,34 @@ prima delle modifiche di questa tranche. Fonti: registro I-0, `catalog.ts`,
 C-7 e C-8 restano aperti. La presenza di un servizio o di un descriptor non
 abilita la funzione nella chat. Il catalogo Fabric mantiene anche il descriptor
 storico Treatment Reasoning: prevale il diniego di `ai-function-availability.ts`.
-Non si modifica il contratto, il registro o la sua impronta.
+La prima tranche non modificava il contratto, il registro o la sua impronta.
+
+## Raccordo operativo del 4 novembre 2026
+
+Il [catalogo operativo generato](catalogo-operativo.md) deriva dai descriptor,
+dai servizi, dai controlli di accesso, dai chiamanti e dai test del codice.
+`npm run check:fabric-operational-catalog` verifica che sia aggiornato e nega
+capacità senza controllo di permesso o senza test. Per rigenerarlo:
+`npm run check:fabric-operational-catalog -- --write`. Il controllo e le sue
+prove negative fanno parte di Repository Guards.
+
+Il gate I-0 comprende sei celle: Patient Insight, Smart Import e Document
+Synthesis su Ollama e ChatGPT. Le sei API OpenAI/Anthropic sono ora in
+`optionalCells`, non qualificate e con `countsAsReleaseEvidence: false`.
+Treatment Reasoning resta rinviato. Il contratto non cambia.
+
+I negativi sintetici coprono ogni funzione e venue del gate: output
+malformato, revoca durante l'esecuzione, indisponibilità e permesso mancante.
+Il controllo del kill switch viene ripetuto dopo la risposta del provider:
+una funzione disattivata durante il calcolo non pubblica la proposta. Le prove
+ChatGPT sostituiscono solo il trasporto e, nei casi positivi, il confine egress
+con doppioni dichiarati dal test esistente; non attestano account, contenimento
+del processo o generazioni reali. Nessun account e nessuna inferenza a pagamento.
+
+Restano non provati le generazioni ChatGPT reali con Leonardo, la parità dei
+desktop installati e i raccordi clinici chat dichiarati non collegati sotto.
+La tabella generata è una mappa dei riferimenti sorgente, non un grant né una
+qualifica runtime. Le sezioni successive conservano le evidenze delle tranche.
 
 ## Funzioni e azioni effettive
 
@@ -65,9 +92,10 @@ raccordo nei due host.
 | `search` | `lib/headless/application-operation-registry.ts` | Non collegato; raccordo e prova nei due host mancanti |
 | `navigation` | `lib/headless/canonical-capability-catalog.ts` | Non collegato; raccordo e prova nei due host mancanti |
 
-## Dodici celle generative rimaste
+## Dodici celle censite nella prima tranche
 
-Ogni cella è **non qualificata nella chat**. I-5 e I-6 restano fermi;
+Ogni cella era **non qualificata nella chat**. Con l’emendamento del 4/11,
+I-5 e I-6 sono opzionali e fuori gate;
 ChatGPT richiede la decisione D-I1 su account e quota. Nessuna chiamata API,
 generazione ChatGPT o inferenza locale è eseguita da questa tranche.
 

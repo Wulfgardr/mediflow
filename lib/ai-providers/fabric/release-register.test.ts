@@ -7,9 +7,10 @@ import { FABRIC_CAPABILITY_DESCRIPTORS, getFabricCapabilityDescriptor } from './
 const root = new URL('../../../', import.meta.url);
 const register = JSON.parse(readFileSync(new URL('docs/quality/intelligence/registro-0.9.1.json', root), 'utf8'));
 const functions = ['patient_insight', 'smart_import', 'document_synthesis'];
-const providers = ['ollama', 'openai.responses.v1', 'anthropic.messages.v1', 'chatgpt'];
+const providers = ['ollama', 'chatgpt'];
+const apiProviders = ['openai.responses.v1', 'anthropic.messages.v1'];
 
-test('I-0 copre esattamente le 12 celle del contratto e separa le quattro rinviate', () => {
+test('I-0 copre esattamente le sei celle del gate e separa API opzionali e Treatment Reasoning', () => {
     const contract = readFileSync(new URL(register.contract, root));
     assert.equal(register.contractSha256, createHash('sha256').update(contract).digest('hex'));
     for (const label of ['Patient Insight', 'Smart Import', 'Document Synthesis', 'Treatment Reasoning', 'AnyDoc', 'Apple Vision', 'ricerca', 'navigazione']) {
@@ -18,8 +19,18 @@ test('I-0 copre esattamente le 12 celle del contratto e separa le quattro rinvia
     const expected = functions.flatMap(id => providers.map(provider => `${id}/${provider}`));
     assert.deepEqual(register.cells.map((cell: { id: string }) => cell.id).sort(), expected.sort());
     assert.deepEqual(register.conditionalCells, []);
+    assert.deepEqual(register.optionalCells?.map((cell: { id: string }) => cell.id).sort(),
+        functions.flatMap(id => apiProviders.map(provider => `${id}/${provider}`)).sort());
+    for (const cell of register.optionalCells) {
+        assert.equal(cell.releaseDisposition, 'optional_outside_0.9.1_gate');
+        assert.equal(cell.countsAsReleaseEvidence, false);
+        assert.equal(cell.qualification, 'not_qualified');
+        assert.equal(cell.proof, null);
+        assert.equal(cell.modelIdentity, null);
+        assert.ok(cell.blockedBy.includes('API_not_qualified_for_0.9.1'));
+    }
     assert.deepEqual(register.deferredCells.map((cell: { id: string }) => cell.id).sort(),
-        ['athena_mlx', ...providers.slice(1)].map(provider => `treatment_reasoning/${provider}`).sort());
+        ['athena_mlx', ...apiProviders, 'chatgpt'].map(provider => `treatment_reasoning/${provider}`).sort());
     for (const cell of register.deferredCells) {
         assert.equal(cell.releaseDisposition, 'deferred_beyond_0.9.1');
         assert.equal(cell.qualification, 'not_qualified');
