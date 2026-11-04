@@ -79,3 +79,25 @@ test('follows an imported guard wrapper invoked through an alias', () => {
     const result = buildOperationalCatalog(sources, descriptors);
     assert.ok(result.text.includes('lib/auth.ts: requireSession'));
 });
+test('keeps a route whose service is reached through a guard-named callback', () => {
+    // Come app/api/ai/patient-insight/preview: la callback ha un nome da controllo e la sua
+    // implementazione è l'unico ponte fra la route e il servizio.
+    const sources = fixture();
+    sources.set('lib/synthetic-preview.ts', `
+        export function createSyntheticPreviewService(options) { return { acquire: () => options.createCapability() }; }
+        export function createSyntheticPreviewHttpHandler(options) { return () => options.acquirePreview(); }
+    `);
+    sources.set('lib/synthetic-preview-production.ts', `
+        import { lookup } from './synthetic-service';
+        import { createSyntheticPreviewService } from './synthetic-preview';
+        export const acquireAuthenticatedSyntheticPreview = createSyntheticPreviewService({ createCapability: () => lookup() }).acquire;
+    `);
+    sources.set('app/api/synthetic/route.ts', `
+        import { acquireAuthenticatedSyntheticPreview } from '@/lib/synthetic-preview-production';
+        import { createSyntheticPreviewHttpHandler } from '@/lib/synthetic-preview';
+        export const POST = withArchiveRequestContext(createSyntheticPreviewHttpHandler({ acquirePreview: acquireAuthenticatedSyntheticPreview }));
+    `);
+    const result = buildOperationalCatalog(sources, descriptors);
+    assert.ok(result.text.includes('app/api/synthetic/route.ts: acquireAuthenticatedSyntheticPreview, withArchiveRequestContext')
+        || result.text.includes('app/api/synthetic/route.ts: withArchiveRequestContext'), 'la route resta fra gli ingressi con la sua prova');
+});
