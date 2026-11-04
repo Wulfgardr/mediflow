@@ -238,5 +238,15 @@
     "path": "scripts/verify-windows-bootstrap-rebuild.mjs",
     "reason": "Verificatore CI eseguito dai job Windows x64 e arm64; non registra test. Il confronto PE ha prove unit in lib/windows-bootstrap-provenance.test.ts.",
     "owner": "@Wulfgardr"
+  },
+  {
+    "path": "visual-qualification/flows.spec.ts",
+    "reason": "Qualifica visiva 0.9.1 solo locale tramite npm run qualify:visual-091; esclusa dagli shard e2e CI.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "visual-qualification/playwright.config.ts",
+    "reason": "Qualifica visiva 0.9.1 solo locale tramite npm run qualify:visual-091; esclusa dagli shard e2e CI.",
+    "owner": "@Wulfgardr"
   }
 ]
