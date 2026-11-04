@@ -53,6 +53,7 @@ async function main() {
     let recoveryKey = await hiddenRecoveryKey();
     try {
         await restoreRecoveryBackup({ artifact, kit, recoveryKey, destination: path.join(data, 'medical.db') });
+        console.log('Moduli territoriali dell’host conservati; fascicoli, finestre e blocchi di conservazione riportati allo stato del backup.');
         console.log('Archivio ripristinato. Avvia MediFlow con questa cartella dati e scegli «Recupera con kit e chiave» per impostare la nuova passphrase. Non riutilizzare l’installazione sorgente.');
     } finally { recoveryKey = ''; }
 }

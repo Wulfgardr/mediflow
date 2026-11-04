@@ -180,8 +180,7 @@ export function reconcileAccountResets(db: Database.Database): AccountResetRecei
             if (!validIntent(intent, id, db.name) || intentProcessAlive(intent)) continue;
             const row = readReceiptRow(db, id);
             // Without a receipt row the transaction never committed: the archive is the one before the reset.
-            // The incomplete copy is only a partial duplicate of that intact archive.
-            if (!row && regularFile(path.join(dir, 'previous.db.partial'))) fs.unlinkSync(path.join(dir, 'previous.db.partial'));
+            // Record the decision before cleanup: an unexpected partial entry must not hide the abort.
             // previous.db is published only after its sync; a crash may have preceded its digest record.
             if (regularFile(path.join(dir, 'previous.db')) && !regularFile(path.join(dir, 'preserved.json'))) {
                 const previous = path.join(dir, 'previous.db');
@@ -189,6 +188,7 @@ export function reconcileAccountResets(db: Database.Database): AccountResetRecei
             }
             writeDurable(path.join(dir, 'outcome.json'), { version: 1, outcome: row ? 'completed' : 'aborted',
                 finishedAt: new Date().toISOString(), reconciled: true, archiveGeneration: row?.archiveGeneration ?? null } satisfies Outcome);
+            if (!row && regularFile(path.join(dir, 'previous.db.partial'))) fs.unlinkSync(path.join(dir, 'previous.db.partial'));
         } catch (error) {
             console.error('[MediFlow] Account reset journal entry left for inspection:', id, (error as Error).message);
         }
@@ -266,11 +266,11 @@ export function resetAccountsDurably(db: Database.Database, options: { onPhaseFo
         if (intentWritten) {
             // The transaction rolled back or never started: record the abort, drop only the incomplete copy.
             try {
-                if (regularFile(partial)) fs.unlinkSync(partial);
                 writeDurable(path.join(dir, 'outcome.json'), { version: 1, outcome: 'aborted', finishedAt: new Date().toISOString(),
                     reconciled: false, archiveGeneration: null } satisfies Outcome);
                 receipt = describe(db, dir, id);
-            } catch { /* the next start reconciles this operation */ }
+                if (regularFile(partial)) fs.unlinkSync(partial);
+            } catch { /* preserve an unrecognized partial entry; reconcile an unwritten outcome at next start */ }
         }
         if (error instanceof AccountResetError) throw new AccountResetError(error.code, receipt);
         throw new AccountResetError(intentWritten ? 'RESET_DATABASE_FAILED' : 'RESET_JOURNAL_UNAVAILABLE', receipt);

@@ -18,7 +18,7 @@ const loader = ['--experimental-strip-types', '--import', pathToFileURL(path.joi
 const child = path.join(here, 'account-reset-journal-crash-fixture.ts');
 
 function syntheticArchive(): { dir: string; file: string; generation: string } {
-    const dir = fs.mkdtempSync(path.join(process.env.MEDIFLOW_DATA_DIR!, 'account-reset-'));
+    const dir = fs.realpathSync(fs.mkdtempSync(path.join(process.env.MEDIFLOW_DATA_DIR!, 'account-reset-')));
     const file = path.join(dir, 'medical.db');
     const db = openVersionedSqliteDatabase(file);
     try {
@@ -143,6 +143,7 @@ test('an interrupted reset whose PID now belongs to this process is reconciled, 
     // Written before this process started, with the PID this process has now: the writer no longer exists.
     fs.writeFileSync(path.join(journal, 'intent.json'), JSON.stringify({ version: 1, id, kind: 'account-reset', target: file,
         pid: process.pid, startedAt: new Date(Date.now() - process.uptime() * 1000 - 60_000).toISOString(), originalGeneration: generation }), { mode: 0o600 });
+    fs.mkdirSync(path.join(journal, 'previous.db.partial'));
     const db = new Database(file);
     try {
         const receipt = reconcileAccountResets(db).find(entry => entry.id === id);
@@ -151,4 +152,24 @@ test('an interrupted reset whose PID now belongs to this process is reconciled, 
     } finally { db.close(); }
     assert.equal(users(file), 2);
     fs.rmSync(dir, { recursive: true, force: true });
+});
+
+
+test('a failed copy records its refusal even when its partial path cannot be cleaned up', () => {
+    const archive = syntheticArchive();
+    const db = openVersionedSqliteDatabase(archive.file);
+    try {
+        assert.throws(() => resetAccountsDurably(db, { onPhaseForTest: phase => {
+            if (phase !== 'intent') return;
+            const root = archive.file + ACCOUNT_RESET_JOURNAL_SUFFIX;
+            fs.mkdirSync(path.join(root, fs.readdirSync(root)[0], 'previous.db.partial'));
+        } }), { code: 'RESET_DATABASE_FAILED' });
+        const [receipt] = listAccountResetReceipts(db);
+        assert.equal(receipt.outcome, 'aborted');
+        assert.equal(users(archive.file), 2);
+        assert.equal(readSqliteArchiveGeneration(db), archive.generation);
+        const partial = path.join(archive.file + ACCOUNT_RESET_JOURNAL_SUFFIX, receipt.id, 'previous.db.partial');
+        assert.ok(fs.statSync(partial).isDirectory(), 'an unexpected entry is preserved for inspection');
+        assert.deepEqual(restart(archive.dir), [receipt]);
+    } finally { db.close(); }
 });

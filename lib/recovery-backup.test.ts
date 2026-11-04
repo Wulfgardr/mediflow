@@ -11,6 +11,7 @@ import { openVersionedSqliteDatabase, CURRENT_SQLITE_SCHEMA_VERSION } from './sq
 import { readTerritorialPacks, requireTerritorialPack, commitTerritorialPackTransition } from './territorial-pack-store';
 import { TERRITORIAL_PACK_SCHEMA } from './territorial-packs';
 import { readSqliteArchiveGeneration } from './archive-generation';
+import { ACCOUNT_RESET_RECEIPT_PREFIX } from './backup-restore-receipt-contract';
 import { openAdmittedSqlite } from './sqlite-maintenance-admission.mjs';
 import { createRecoverySnapshot, restoreRecoveryBackup } from './recovery-backup-server';
 import { encryptRecoveryBackup, decryptRecoveryBackup, parseRecoveryKit, type RecoveryKit } from './recovery-backup';
@@ -373,4 +374,58 @@ for (const alteration of ['none', 'column', 'index', 'view', 'authority-table'])
         }
         assert.deepEqual(fs.readFileSync(file), bytes);
     } finally { f.cleanup(); }
+});
+
+test('offline CLI restores keys, receipts and legal holds, and declares the host territorial policy', { skip: process.platform === 'win32' }, async () => {
+    const f = await fixture();
+    try {
+        commitTerritorialPackTransition(f.db, { schemaVersion: TERRITORIAL_PACK_SCHEMA, preset: 'core+it+lom',
+            expectedRevision: 0, confirmed: true }, { actorType: 'system', actorRef: 'synthetic-source', sourceSurface: 'job' }, () => {});
+        const { drizzle } = await import('drizzle-orm/better-sqlite3');
+        const { placeRetentionHold, assertNoRetentionHold } = await import('./retention-store');
+        const db = drizzle(f.db);
+        const holds = db.transaction(tx => placeRetentionHold(tx, { patientId: 'synthetic-patient', reason: 'litigation',
+            expectedRevision: 0, confirmed: true }, actor, 1783000000, () => {}));
+        const resetId = '91111111-1111-4111-8111-111111111111';
+        f.db.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run(ACCOUNT_RESET_RECEIPT_PREFIX + resetId,
+            JSON.stringify({ id: resetId, archiveGeneration: readSqliteArchiveGeneration(f.db), previousSha256: 'a'.repeat(64), completedAt: '2026-11-01T00:00:00.000Z' }));
+        const original = contents(f.db);
+        const artifact = await encryptRecoveryBackup(createRecoverySnapshot(f.db, actor), f.key);
+        const backup = path.join(f.root, 'complete.mediflow-recovery'); const kit = path.join(f.root, 'kit.json');
+        fs.writeFileSync(backup, artifact); fs.writeFileSync(kit, JSON.stringify(f.kit));
+        // The source no longer has the hold or the territorial module. Recovery must use backup-time values.
+        f.db.prepare("DELETE FROM settings WHERE key IN ('retention.holds', 'territorial.packs')").run();
+        f.db.close();
+        const output = execFileSync('python3', ['scripts/fixtures/recovery-cli-pty.py'], { encoding: 'utf8', timeout: 70000,
+            input: JSON.stringify({ command: [process.execPath, 'scripts/run-strip-types.mjs', 'scripts/restore-recovery-backup.ts',
+                '--backup', backup, '--kit', kit, '--data-dir', f.targetDir, '--source-retired'], key: f.recoveryKey }) });
+        assert.ok(!output.includes(f.recoveryKey), 'TTY does not echo the recovery key');
+        const installed = openVersionedSqliteDatabase(f.destination);
+        try {
+            const actual = contents(installed);
+            for (const table of Object.keys(original).filter(name => !['settings', 'audit_events'].includes(name))) {
+                assert.deepEqual(actual[table], original[table], table);
+            }
+            const portableSettings = (rows: unknown) => (rows as { key: string; value: string }[]).filter(row => !row.key.startsWith('territorial.packs'));
+            assert.deepEqual(portableSettings(actual.settings), portableSettings(original.settings));
+            const historicalEvents = original.audit_events as Record<string, unknown>[];
+            assert.deepEqual((actual.audit_events as Record<string, unknown>[]).filter(row => historicalEvents.some(old => old.event_id === row.event_id)), historicalEvents);
+            const recovered = await openRecoveryWrapping(f.kit.wrappedMasterKey, f.kit.salt, f.recoveryKey);
+            const [, iv, ciphertext] = (installed.prepare('SELECT notes FROM patients').pluck().get() as string).split(':');
+            assert.equal(await decryptData(ciphertext, iv, recovered.masterKey), 'nota clinica sintetica recuperabile');
+            assert.equal(installed.prepare("SELECT value FROM settings WHERE key='retention.holds'").pluck().get(), JSON.stringify(holds));
+            assert.throws(() => drizzle(installed).transaction(tx => assertNoRetentionHold(tx, 'synthetic-patient')), { code: 'legal_hold' });
+            assert.equal(readTerritorialPacks(installed).preset, 'core');
+            assert.throws(() => installed.transaction(() => requireTerritorialPack(installed, 'lom')).immediate(), /pack_disabled/);
+            assert.match(output, /Moduli territoriali dell.host conservati/u);
+            assert.match(output, /blocchi di conservazione.*backup/u);
+        } finally { installed.close(); }
+    } finally { f.cleanup(); }
+});
+
+test('the CLI terminal fixture waits for a child that closes the terminal before exiting', { skip: process.platform === 'win32' }, () => {
+    // Su Linux la lettura dal terminale dà EIO appena il figlio lo chiude, prima che il processo sia raccolto.
+    const child = 'import os, time\nfor fd in (0, 1, 2): os.close(fd)\ntime.sleep(0.5)';
+    execFileSync('python3', ['scripts/fixtures/recovery-cli-pty.py'], { encoding: 'utf8', timeout: 20000,
+        input: JSON.stringify({ command: ['python3', '-c', child], key: 'synthetic' }) });
 });
