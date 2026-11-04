@@ -2850,11 +2850,31 @@ test('IPC rejects replay, expiry, revoked IDs and extra fields without new navig
 test('the inherited peer must retain the expected archive and source generation', async t => {
     const f = await ordinaryLauncherFixture(t, 'web');
     await f.until(() => f.output().includes('Pronto:'));
-    for (const expected of [{ dataDir: '/different-archive', sourceFingerprint: 'synthetic@aaaaaaaaaaaa:clean' },
-        { dataDir: f.data, sourceFingerprint: 'different-generation' }]) {
-        await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'history', AbortSignal.timeout(2000), Date.now() + 5000, expected));
+    const results = [];
+    const receive = frame => { if (frame?.type === 'mediflow-local-ui-result') results.push(frame); };
+    f.child.on('message', receive);
+    t.after(() => f.child.off('message', receive));
+    for (const expected of [{ ...f.expected, dataDir: '/different-archive' },
+        { ...f.expected, sourceFingerprint: 'different-generation' }]) {
+        const first = results.length;
+        await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'history', AbortSignal.timeout(2000), Date.now() + 5000, expected),
+            { name: 'Error', message: 'navigation_unavailable' });
+        const replies = results.slice(first);
+        assert.equal(replies.length, 1);
+        assert.equal(replies[0].status, 'denied');
+        await f.until(() => f.output().includes('mediflow.local-ui.cancel.v1') && f.output().includes(replies[0].requestId));
+        assert.doesNotMatch(f.output(), /mediflow\.local-ui\.navigation\.v1/u);
     }
-    assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
+    assert.equal(await navigateOwnedLocalUiRuntime(f.child, 'identity', AbortSignal.timeout(2000), Date.now() + 5000, f.expected), true);
+    const accepted = results.at(-1);
+    assert.equal(accepted.status, 'accepted');
+    await f.until(() => f.output().includes('mediflow.local-ui.navigation.v1'));
+    await f.cleanup();
+    const navigations = f.output().split('\n').filter(line => line.startsWith('FIXTURE_NAVIGATION '))
+        .map(line => JSON.parse(JSON.parse(line.slice('FIXTURE_NAVIGATION '.length))))
+        .filter(frame => frame.schemaVersion === 'mediflow.local-ui.navigation.v1');
+    assert.deepEqual(navigations.map(({ intent, requestId }) => ({ intent, requestId })),
+        [{ intent: 'identity', requestId: accepted.requestId }]);
 });
 
 
