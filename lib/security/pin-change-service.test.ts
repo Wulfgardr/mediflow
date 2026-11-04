@@ -191,9 +191,12 @@ function webRetirement(
     };
 }
 
+/* A counter, not Math.random: the secret checks below look for the PIN in the whole record,
+   and about 0.14% of random ids contain its digits. */
+let auditSequence = 0;
 function testAuditWriter(db: TestDatabase) {
     return async (input: AuditInput): Promise<string> => {
-        const eventId = `audit-${Math.random()}`;
+        const eventId = `audit-${++auditSequence}`;
         db.insert(auditEvents).values({
             eventId,
             schemaVersion: 1,
