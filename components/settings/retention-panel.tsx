@@ -15,11 +15,10 @@ import { db, type Attachment, type Patient } from '@/lib/db';
 import { clientArchiveGeneration } from '@/lib/security/client-auth-api';
 import {
     RETENTION_CATEGORIES, RETENTION_CATEGORY_LABELS, RETENTION_HOLD_REASONS, RETENTION_MAX_YEARS, RETENTION_PROFILES,
-    RETENTION_SOURCES, effectiveRetentionTerm, type RetentionCategory, type RetentionHoldReason, type RetentionSourceId,
+    RETENTION_SOURCES, effectiveRetentionTerm, windowsForSave, type RetentionCategory, type RetentionHoldReason, type RetentionSourceId,
     type RetentionWindow, type RetentionWindows, type EffectiveTerm, type FascicoloEvaluation, type ProfileTerm,
 } from '@/lib/retention-policy';
 import type { RetentionOverview } from '@/lib/retention-store';
-import type { RetentionProfileId } from '@/lib/retention-policy';
 
 const ENDPOINT = '/api/system/retention';
 const HOLD_REASON_LABELS: Record<RetentionHoldReason, string> = {
@@ -80,19 +79,6 @@ function windowsFromDraft(draft: Draft): RetentionWindows | null {
         windows[category] = { kind: 'years', years } satisfies RetentionWindow;
     }
     return windows;
-}
-
-/*
- * A window saved under another profile can sit at or below the minimum of the active one, also on a
- * category that the profile now keeps without limit and the page no longer lets you edit. Such a window
- * changes nothing: it is left out, so it cannot block saving the other categories.
- */
-function windowsAboveMinimum(profileId: RetentionProfileId, windows: RetentionWindows): RetentionWindows {
-    return Object.fromEntries(Object.entries(windows).filter(([category, window]) => {
-        const minimum = RETENTION_PROFILES[profileId].terms[category as RetentionCategory].term;
-        if (minimum.kind === 'unlimited') return false;
-        return !(minimum.kind === 'years' && window.kind === 'years' && window.years <= minimum.years);
-    })) as RetentionWindows;
 }
 
 export function RetentionPanel() {
@@ -157,7 +143,7 @@ export function RetentionPanel() {
             message: 'Le finestre si applicano a tutti i fascicoli chiusi. Possono solo allungare il minimo del profilo.', confirmLabel: 'Salva finestre' });
         if (!confirmed) return;
         setBusy(true);
-        const result = await send('PUT', { expectedRevision: overview.windowsRevision, windows: windowsAboveMinimum(overview.profileId, parsedDraft) });
+        const result = await send('PUT', { expectedRevision: overview.windowsRevision, windows: windowsForSave(overview.profileId, parsedDraft, overview.windows) });
         setBusy(false);
         if (!result.ok) return fail(result.code);
         showToast({ tone: 'success', title: 'Finestre salvate' });

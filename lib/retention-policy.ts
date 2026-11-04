@@ -234,6 +234,25 @@ export function assertWindowsRespectProfile(profileId: RetentionProfileId, windo
     }
 }
 
+/**
+ * Finestre da inviare al salvataggio. Le categorie illimitate del profilo non sono modificabili.
+ * Una finestra ereditata da un profilo precedente, rimasta com'era e non più lunga del minimo attuale,
+ * non cambia nulla e resta fuori, così non blocca il salvataggio delle altre. Una finestra cambiata dal
+ * titolare arriva sempre al server, che la rifiuta se è sotto il minimo.
+ */
+export function windowsForSave(profileId: RetentionProfileId, edited: RetentionWindows,
+    stored: RetentionWindows): RetentionWindows {
+    return Object.fromEntries((Object.entries(edited) as [RetentionCategory, RetentionWindow][]).filter(([category, window]) => {
+        const minimum = RETENTION_PROFILES[profileId].terms[category].term;
+        if (minimum.kind === 'unlimited') return false;
+        const previous = stored[category];
+        const unchanged = previous !== undefined && previous.kind === window.kind
+            && (window.kind !== 'years' || (previous.kind === 'years' && previous.years === window.years));
+        const noLongerThanMinimum = minimum.kind === 'years' && window.kind === 'years' && window.years <= minimum.years;
+        return !(unchanged && noLongerThanMinimum);
+    })) as RetentionWindows;
+}
+
 export type EffectiveTerm =
     | { kind: 'years'; years: number; origin: 'profile' | 'owner' }
     | { kind: 'unlimited'; origin: 'profile' | 'owner' }
