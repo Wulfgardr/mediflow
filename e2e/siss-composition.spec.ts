@@ -1,5 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
+import { SISS_URLS } from '../lib/siss-urls';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
@@ -23,7 +24,7 @@ test('SISS: diario locale, pre-controllo ed esportazione senza servizi regionali
         const summary = { total: 0, ok: 0, withErrors: 0, withWarnings: 0, errorCount: 0, warningCount: 0, items: [] };
         return route.fulfill({ json: { patientId: new URL(route.request().url()).searchParams.get('patientId'), hasErrors: validationMode === 'blocked', hasWarnings: validationMode === 'warning', therapyMedication: summary, observationVitals: summary } });
     });
-    await page.route('**/api/siss/context', route => route.fulfill({ json: { status: 'handoff', handoffUrl: 'https://synthetic.invalid/siss-ui', clipboardText: null, correlationId: 'w14c-synthetic', message: 'Passaggio sintetico', action: 'menu.open', title: 'Menu SISS', mode: 'portal-handoff' } }));
+    await page.route('**/api/siss/context', route => route.fulfill({ json: { status: 'handoff', handoffUrl: SISS_URLS.MENU, clipboardText: null, correlationId: 'w14c-synthetic', message: 'Passaggio sintetico', action: 'menu.open', title: 'Menu SISS', mode: 'portal-handoff' } }));
     await page.addInitScript(() => {
         const opened: string[] = [];
         Object.assign(window, { __sissSyntheticOpened: opened });
@@ -121,7 +122,7 @@ test('SISS: diario locale, pre-controllo ed esportazione senza servizi regionali
             await expect(completed).toContainText('Esito dichiarato soltanto locale');
         }
         expect(readback).toHaveLength(2); expect(readback.some((item: { notes: string; outcome: string; version: number }) => item.notes.startsWith('ENC:') && item.outcome === 'completed' && item.version === 2)).toBe(true);
-        expect(await page.evaluate(() => (window as Window & { __sissSyntheticOpened?: string[] }).__sissSyntheticOpened)).toEqual(['https://synthetic.invalid/siss-ui']);
+        expect(await page.evaluate(() => (window as Window & { __sissSyntheticOpened?: string[] }).__sissSyntheticOpened)).toEqual([SISS_URLS.MENU]);
         if (!baseline) {
             await expect(page.getByRole('link', { name: 'Nuova voce', exact: true })).toHaveClass(/mf-button-primary/u);
             await row.getByRole('button', { name: 'Azioni passaggio Anagrafe', exact: true }).click();
