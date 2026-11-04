@@ -496,7 +496,7 @@ export async function main(args = process.argv.slice(2)) {
   let terminal = null, useTerminal = false, webSecret = null, instance = null;
   const pairRequests = new Map();
   const ipcStopChildren = new WeakSet();
-  let childOwner = null, leases = null, webJob = null, webJobPending = null;
+  let childOwner = null, leases = null, webJob = null, webJobPending = null, preparing = false;
   const stopChild = async () => {
     if (child && child.exitCode === null && child.signalCode === null && leases?.external) {
       throw new Error('MediFlow è ancora utilizzato da un altro client.');
@@ -524,35 +524,38 @@ export async function main(args = process.argv.slice(2)) {
     return owned;
   };
   const runNpm = async command => {
-    const owned = process.platform === 'win32'
-      ? run(process.execPath, ['-e', `
-          const {spawn} = require('node:child_process');
-          process.once('message', () => {
-            const child = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', ${JSON.stringify('npm ' + (command === 'ci' ? 'ci --ignore-scripts' : command === 'prepare:dependencies' ? 'run prepare:dependencies' : command))}], {stdio:'inherit'});
-            child.once('error', () => process.exit(1));
-            child.once('exit', code => process.exit(code ?? 1));
-          });`], true)
-      : run('npm', command === 'ci' ? ['ci', '--ignore-scripts'] : command === 'prepare:dependencies' ? ['run', command] : ['run', 'build']);
-    const completed = new Promise((resolve, reject) => {
-      owned.once('error', reject);
-      owned.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error(`npm ${command} non completato (${signal || code}). Controlla i log e riprova.`)));
-    });
-    completed.catch(() => {});
-    if (process.platform === 'win32') owned.stderr.pipe(process.stderr);
-    if (process.platform === 'win32') {
-      bindRuntimeOwnership([ownership, archiveOwnership], { kind: 'windows-job', web: childOwner.token });
-      webJobPending = containWindowsWeb(owned, childOwner).then(job => { webJob = job; });
-      try { await webJobPending; } finally { webJobPending = null; }
-      if (!closing) {
-        bindRuntimeOwnership([ownership, archiveOwnership], { kind: 'windows-job', web: childOwner.token, guardian: webJob.owner });
-        owned.send({ type: 'prepare' }, () => {});
+    preparing = true;
+    try {
+      const owned = process.platform === 'win32'
+        ? run(process.execPath, ['-e', `
+            const {spawn} = require('node:child_process');
+            process.once('message', () => {
+              const child = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', ${JSON.stringify('npm ' + (command === 'ci' ? 'ci --ignore-scripts' : command === 'prepare:dependencies' ? 'run prepare:dependencies' : command))}], {stdio:'inherit'});
+              child.once('error', () => process.exit(1));
+              child.once('exit', code => process.exit(code ?? 1));
+            });`], true)
+        : run('npm', command === 'ci' ? ['ci', '--ignore-scripts'] : command === 'prepare:dependencies' ? ['run', command] : ['run', 'build']);
+      const completed = new Promise((resolve, reject) => {
+        owned.once('error', reject);
+        owned.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error(`npm ${command} non completato (${signal || code}). Controlla i log e riprova.`)));
+      });
+      completed.catch(() => {});
+      if (process.platform === 'win32') owned.stderr.pipe(process.stderr);
+      if (process.platform === 'win32') {
+        bindRuntimeOwnership([ownership, archiveOwnership], { kind: 'windows-job', web: childOwner.token });
+        webJobPending = containWindowsWeb(owned, childOwner).then(job => { webJob = job; });
+        try { await webJobPending; } finally { webJobPending = null; }
+        if (!closing) {
+          bindRuntimeOwnership([ownership, archiveOwnership], { kind: 'windows-job', web: childOwner.token, guardian: webJob.owner });
+          owned.send({ type: 'prepare' }, () => {});
+        }
       }
-    }
-    try { await completed; }
-    finally {
-      if (webJob) { await webJob.closed; webJob = null; child = null; childOwner = null; }
-    }
-    if (closing) throw new Error('Avvio interrotto.');
+      try { await completed; }
+      finally {
+        if (webJob) { await webJob.closed; webJob = null; child = null; childOwner = null; }
+      }
+      if (closing) throw new Error('Avvio interrotto.');
+    } finally { preparing = false; }
   };
   const shutdown = (stopError = null) => {
     if (shutdownComplete) return Promise.resolve(true);
@@ -866,7 +869,11 @@ export async function main(args = process.argv.slice(2)) {
   try {
     chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state, runtimeOwner: leases?.receipt.owner ?? null }), choose,
       navigate, cancelNavigation,
-      install: () => installApproval?.(true), stop: () => { if (!leases.requestStop()) return false; void shutdown(); }, nativeAvailable: !!native, development: dirty,
+      install: () => installApproval?.(true), stop: () => {
+        if (preparing) throw Object.assign(new Error('Preparazione in corso. Attendi il completamento prima di arrestare MediFlow.'), { statusCode: 409 });
+        if (!leases.requestStop()) return false;
+        void shutdown();
+      }, nativeAvailable: !!native, development: dirty,
       version: identity.version, folder: path.basename(ROOT), webPort: Number(process.env.PORT || 3000) });
     leases = await createRuntimeLeases({ directory: archiveOwnership?.directory ?? lockDirectory,
       identity: runtimeProcessIdentity, initialPlugin: pluginChannel, onIdle: shutdown,

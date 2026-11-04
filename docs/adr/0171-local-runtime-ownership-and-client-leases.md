@@ -84,6 +84,27 @@ acquisisce un lease e non rilascia sessioni. Solo dopo la conferma viene inviato
 il POST all'URL verificato. La ricevuta alterata viene rifiutata prima del POST;
 il possesso del solo PID o la forma di un UUID non autenticano un endpoint.
 
+## Arresta durante la preparazione della versione, 4 novembre 2026
+
+Il comando HTTP Arresta è negato con 409 mentre il launcher esegue una
+preparazione npm (`ci`, `prepare:dependencies` o `build`), compresa l'attesa del
+Job Windows. La risposta chiede di attendere il completamento. Il rifiuto
+precede il rilascio dei lease locali e la transizione stopping: preparazione,
+proprietà e ricevute restano attive. Al termine, anche in caso di errore,
+Arresta torna disponibile secondo le normali regole dei client collegati.
+
+Su POSIX, npm può uscire prima dei suoi discendenti dopo SIGTERM. In quel
+momento l'assenza del capogruppo non autorizza ulteriori segnali al gruppo e
+l'arresto non può essere dichiarato completo. Rifiutare il comando durante la
+preparazione evita di promettere un arresto che richiederebbe un secondo
+tentativo. I segnali del terminale mantengono il controllo conservativo della
+quiescenza: il rifiuto HTTP non li trasforma in un arresto verificato.
+
+La fixture ordinaria mantiene la preparazione e un discendente sospesi su un
+gate esplicito. Verifica il rifiuto senza segnali, il completamento della
+preparazione e il successivo arresto con rilascio delle ricevute. Il caso è
+incluso nella suite launcher condivisa da macOS, Linux e Windows.
+
 ## Documento Web e recupero della bozza, 29 ottobre 2026
 
 Nel runtime avviato da un plugin, ogni documento Web autenticato è un client.
