@@ -100,3 +100,6 @@ docs/private/
 
 # Test fixture DB is intentionally tracked (read via #filePath by the SQLite store tests)
 !native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/medical_fixture.db
+
+# Build effimera della qualifica visiva locale
+.next-visual-*/
