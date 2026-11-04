@@ -222,14 +222,3 @@ test('05-tastiera-conservazione', async ({ page }, info) => {
 });
 test('06-tastiera-import', async ({ page }, info) => catalog(page, info, true));
 
-// HV-001: qualify only the reproduced mobile dossier overflow; other errors stay unexpected.
-test.afterEach(async ({}, info) => {
-  if (info.title !== '04-C6-PDF-nuova-scheda' || info.project.use.viewport?.width !== 390) return;
-  const knownOnly = info.errors.every(error => {
-    const message = error.message?.replace(/\u001b\[[0-9;]*m/g, '') ?? '';
-    const values = message.match(/Expected: <= (\d+)[\s\S]*Received:\s+(\d+)/);
-    const container = message.match(/(?:identita-da-documento|revisione|conferma-pin|scheda-creata): overflow (MAIN|SECTION)/)?.[1];
-    return !!container && !!values && Number(values[2]) - Number(values[1]) <= (container === 'MAIN' ? 6 : 22);
-  });
-  if (knownOnly) test.fail(true, 'HV-001: overflow C-6 a 390 px, vedi visual-qualification/README.md');
-});

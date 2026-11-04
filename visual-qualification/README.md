@@ -41,16 +41,12 @@ solo il caso corrispondente va marcato `test.fail` con quel riferimento,
 conservando le asserzioni. Nessuna correzione del prodotto appartiene a questo
 harness.
 
-## HV-001: dossier C-6 a 390 px
+## HV-001: dossier C-6 a 390 px (corretto)
 
-Riprodotto il 4 novembre 2026: dopo la selezione del PDF, `main` misura
-395-396 px su 390 px disponibili; le sezioni misurano 380 px su 358 px. L'overflow compare anche nelle sezioni del
-dossier, negli stati `identita-da-documento`, `revisione`, `conferma-pin` e `scheda-creata`.
-Le immagini e le misure sono nel report della corsa. Nessuna correzione del
-prodotto in questo contributo.
-
-Il caso C-6 mobile è atteso-fallire solo se **tutti** gli errori sono misure
-di overflow MAIN/SECTION nei quattro stati elencati, con eccedenza fino a 6 px per MAIN e 22 px per SECTION. Errori di flusso, focus,
-altri contenitori o eccedenze maggiori restano fallimenti inattesi. Se il
-problema scompare, il caso segnala un successo inatteso e richiede di togliere
-questa attesa. Le asserzioni di flusso continuano dopo i controlli di overflow.
+Riprodotto il 4 novembre 2026: a 390 px `main` misurava 395-396 px e le
+sezioni del dossier 380 px su 358. Causa: i due elenchi «Scheda di
+destinazione» e «Scheda» prendevano la larghezza dell'opzione più lunga e la
+griglia del campo non li conteneva. Compariva solo con una scheda dal nome
+lungo già in archivio, quindi nella corsa completa e non nel caso isolato.
+Corretto in `components/patient-bulk-import-panel.module.css`; il caso non è
+più atteso-fallire.
