@@ -1,5 +1,6 @@
 mod adapter;
 mod card;
+mod chain;
 mod clinical;
 mod native;
 pub(crate) mod owner;
@@ -106,14 +107,15 @@ impl Drop for Listener {
 }
 
 fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<AtomicBool>) {
-    let Some(peer) = native::capture(&stream, true) else {
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
+    let Some(peer) = native::capture_channel(&stream) else {
+        let _ = writeln!(stream, "{}", json!({"status": "withdrawn"}));
         return;
     };
     let Ok(reader) = stream.try_clone() else {
         return;
     };
     let _ = stream.set_read_timeout(Some(Duration::from_millis(200)));
-    let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
     let mut reader = BufReader::new(reader);
     let mut pending: Option<Pending> = None;
     let mut bytes = Vec::new();
