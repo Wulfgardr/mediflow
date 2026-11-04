@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { completeSissPortalHandoff, openSissPrescrizione, prepareSissPortalWindow } from './siss';
+import { completeSissPortalHandoff, isAllowedSissHandoffUrl, openSissPrescrizione, prepareSissPortalWindow } from './siss';
 
 type PopupStub = {
     opener: unknown;
@@ -300,5 +300,30 @@ test('completeSissPortalHandoff skips clipboard writes when the document is not 
         restoreNavigator();
         restoreWindow();
         capturedErrors.restore();
+    }
+});
+
+test('the SISS popup only ever navigates to an https page of the regional portal', async () => {
+    for (const handoffUrl of [
+        'javascript:alert(document.cookie)',
+        ' JavaScript:alert(1)',
+        'data:text/html,<script>alert(1)</script>',
+        'http://operatorisiss.servizirl.it/fse/',
+        'https://operatorisiss.servizirl.it.attacker.example/fse/',
+        'https://user:secret@operatorisiss.servizirl.it/fse/',
+        'https://attacker.example/',
+        '/api/patients',
+        '',
+    ]) {
+        assert.equal(isAllowedSissHandoffUrl(handoffUrl), false, handoffUrl);
+        const popup = { ...createPopupStub(), closed: false, close() { this.closed = true; } };
+        const result = await completeSissPortalHandoff({ handoffUrl, popupWindow: popup as unknown as Window });
+        assert.equal(result.success, false, handoffUrl);
+        assert.equal(result.opened, false, handoffUrl);
+        assert.equal(popup.location.href, '', handoffUrl);
+        assert.equal(popup.closed, true, handoffUrl);
+    }
+    for (const handoffUrl of ['https://operatorisiss.servizirl.it/fse/', 'https://operatorisiss.servizirl.it/prescrittivoRegionale/pages/dashboard?x=1']) {
+        assert.equal(isAllowedSissHandoffUrl(handoffUrl), true, handoffUrl);
     }
 });
