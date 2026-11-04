@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import http from 'node:http';
+import { once } from 'node:events';
 import {
     buildOpenMedUpstreamCall,
     normalizeOpenMedLabel,
@@ -150,8 +152,6 @@ test('normalizeOpenMedResponse preserves padded redacted text and original-space
 /* The OpenMed endpoint receives patient text: a redirect from whatever answers on the allowed
    local port must never carry that text to another server. */
 test('the redaction route never follows an OpenMed redirect, for the health check or for patient text', async (t) => {
-    const http = await import('node:http');
-    const { once } = await import('node:events');
     const elsewhereHits: string[] = [];
     const elsewhere = http.createServer((request, response) => {
         elsewhereHits.push(`${request.method} ${request.url}`);

@@ -151,6 +151,8 @@ test('accepts the exact browser origin reconstructed through the local TLS proxy
     assert.equal(response.headers.get('x-middleware-next'), '1');
 });
 
+const LOOPBACK_ORIGIN = 'http://127.0.0.1';
+
 test('a page that rebinds its domain to loopback reaches no API through the real socket boundary', async (t) => {
     installLoopbackIngress();
     const server = http.createServer((incoming, outgoing) => {
@@ -158,7 +160,7 @@ test('a page that rebinds its domain to loopback reaches no API through the real
         for (const [name, value] of Object.entries(incoming.headers)) {
             if (typeof value === 'string') headers.set(name, value);
         }
-        const response = proxy(new NextRequest(`http://127.0.0.1${incoming.url}`, { method: incoming.method, headers }));
+        const response = proxy(new NextRequest(new URL(incoming.url ?? '/', LOOPBACK_ORIGIN), { method: incoming.method, headers }));
         outgoing.end(JSON.stringify([response.status, response.headers.get('x-middleware-next')]));
     });
     server.listen(0, '127.0.0.1');
@@ -175,7 +177,7 @@ test('a page that rebinds its domain to loopback reaches no API through the real
         outgoing.end();
     });
     const rebound = `attacker.example:${port}`;
-    const sameOrigin = { host: rebound, origin: `http://${rebound}`, 'sec-fetch-site': 'same-origin' };
+    const sameOrigin = { host: rebound, origin: new URL(`//${rebound}`, LOOPBACK_ORIGIN).origin, 'sec-fetch-site': 'same-origin' };
     assert.deepEqual(await call('GET', sameOrigin), [421, null]);
     assert.deepEqual(await call('POST', { ...sameOrigin, 'content-type': 'application/json' }), [421, null]);
     assert.deepEqual(await call('GET', { host: `127.0.0.1:${port}` }), [200, '1']);
