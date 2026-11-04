@@ -24,6 +24,7 @@ import {
 } from '@/lib/security/pin-change';
 import type { PassphraseAdoptionPayload, PassphraseChangePayload, PassphraseCredentials, PassphraseRecoveryPayload } from '@/lib/security/passphrase-adoption-validation';
 import { verifyHostCredentials, verifyRecoveryCredentials, verifyUnlockCredentials, type HostCredentialVerification } from '@/lib/security/host-credential-verification';
+import { validateKdfRewrapPayload } from '@/lib/security/kdf-rewrap-validation';
 import { retirePinEraResidues, type PinEraResidues } from '@/lib/security/pin-era-residues';
 import { users } from '@/lib/schema';
 import type { dbServer as dbServerType } from '@/lib/db-server';
@@ -97,7 +98,9 @@ export async function changePin(
     input: PinChangeServiceInput,
     dependencies: PinChangeServiceDependencies = {},
 ): Promise<PinChangeServiceResult> {
-    if (!input.encryptedMasterKey || !input.salt) {
+    // Only a wrapping at the current KDF version, in the exact shape both clients produce, may replace
+    // the stored one: anything else would leave the archive on a weaker KDF or unreadable.
+    if (!validateKdfRewrapPayload({ encryptedMasterKey: input.encryptedMasterKey, salt: input.salt })) {
         return {
             kind: 'failure',
             status: 400,
@@ -131,14 +134,21 @@ export async function changePin(
         };
     }
 
-    const isCurrentPinValid = await bcrypt.compare(input.currentPin, user.passwordHash);
-    if (!isCurrentPinValid) {
-        return {
-            kind: 'failure',
-            status: 401,
-            code: PIN_CHANGE_INVALID_CURRENT_PIN_CODE,
-            message: 'Il PIN attuale non è corretto.',
-        };
+    // A session alone must not allow guessing the PIN, which unwraps the master key: the shared
+    // verifier counts wrong PINs and honours a lock, exactly as it does at login.
+    const verification = await (dependencies.verifyPin ?? verifyHostCredentials)(
+        { username: user.username, pin: input.currentPin },
+        { db, ...(dependencies.writeAuditEvent ? { writeAuditEvent: dependencies.writeAuditEvent } : {}) },
+    );
+    if (verification.kind === 'denied') {
+        return verification.status === 423
+            ? { kind: 'failure', status: 423, code: verification.body.code, message: verification.body.message }
+            : {
+                kind: 'failure',
+                status: 401,
+                code: PIN_CHANGE_INVALID_CURRENT_PIN_CODE,
+                message: 'Il PIN attuale non è corretto.',
+            };
     }
 
     const prepareNativeRetirement = dependencies.prepareNativeSessionsForUserRetirement
