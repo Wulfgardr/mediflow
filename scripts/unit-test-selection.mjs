@@ -24,6 +24,8 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/portable-local-test-selection.test.mjs',
   'scripts/conditional-local-groups.test.mjs',
   'scripts/ci-disposition-selection.test.mjs',
+  // Arresto del server dell'harness visivo: gira nella suite unit, l'harness no.
+  'visual-qualification/owned-server.test.mjs',
   // Explicit route registration; do not discover every app/** test.
   'app/api/patients/route.test.ts',
   'app/api/settings/network-mode.test.ts',
