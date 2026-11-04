@@ -39,7 +39,8 @@
     outline: 2px solid var(--lume-ink-fresh);
     outline-offset: 4px;
 }
-.fileLabel { display: grid; gap: 8px; max-width: 100%; min-width: 0; }
+.fileLabel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; max-width: 100%; min-width: 0; }
+.fileLabel select { max-width: 100%; min-width: 0; }
 .fileActions { align-items: end; }
 .fileControl { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-width: 0; }
 .fileControl button { flex-shrink: 0; }
