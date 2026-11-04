@@ -35,6 +35,7 @@ export async function GET(request: Request) {
     try {
         const response = await fetch(`${validation.url.toString().replace(/\/$/, '')}/health`, {
             cache: 'no-store',
+            redirect: 'error',
             signal: request.signal,
         });
 
@@ -109,6 +110,8 @@ export async function POST(request: Request) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(upstream.payload),
             cache: 'no-store',
+            // Patient text goes only to the validated local endpoint, never where it redirects.
+            redirect: 'error',
             signal: request.signal,
         });
 

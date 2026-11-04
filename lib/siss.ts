@@ -58,12 +58,25 @@ function navigateSissPortalWindow(popupWindow: Window, handoffUrl: string): bool
     }
 }
 
+const SISS_PORTAL_HOSTS: ReadonlySet<string> = new Set(Object.values(SISS_URLS).map((url) => new URL(url).hostname));
+
+/** The popup shares the MediFlow origin until it navigates: only an https page of the regional portal may load there. */
+export function isAllowedSissHandoffUrl(handoffUrl: string): boolean {
+    try {
+        const url = new URL(handoffUrl.trim());
+        return url.protocol === 'https:' && !url.username && !url.password && SISS_PORTAL_HOSTS.has(url.hostname);
+    } catch {
+        return false;
+    }
+}
+
 export function prepareSissPortalWindow(): SissPortalWindow {
     return tryOpenSissPortalWindow();
 }
 
 export async function completeSissPortalHandoff(input: SissPortalHandoffInput): Promise<OpenSissResult> {
-    if (!input.handoffUrl.trim()) {
+    if (!isAllowedSissHandoffUrl(input.handoffUrl)) {
+        try { input.popupWindow?.close(); } catch { /* the blank popup may already be gone */ }
         return {
             success: false,
             opened: false,

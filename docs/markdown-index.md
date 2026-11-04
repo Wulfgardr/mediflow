@@ -114,6 +114,7 @@ distribuzione o sicurezza generale.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [security-audits/README.md](./security-audits/README.md) | Indice e regole editoriali dei rapporti pubblici di sicurezza. | Per trovare un audit, interpretarne lo stato o aggiungere un nuovo rapporto sanitizzato. |
+| [security-audits/2026-11-04-091-security-sweep.md](./security-audits/2026-11-04-091-security-sweep.md) | Ricognizione 0.9.1: correzioni S-01..S-04 con prove e rischi residui dichiarati. | Per le correzioni di sicurezza della 0.9.1 o per scegliere il prossimo lavoro di sicurezza. |
 | [security-audits/2026-10-01-network-patient-authority-fix.md](./security-audits/2026-10-01-network-patient-authority-fix.md) | Finding F-01/F-02, correzione, revisione esatta, prove, provenienza e limiti della candidata locale. | Prima della composizione con PR 372 o di qualunque claim di correzione distribuita. |
 | [analysis/2026-09-07-086-daybreak-security-review.md](./analysis/2026-09-07-086-daybreak-security-review.md) | Review Daybreak storica della 0.8.6 e addenda sanitizzati. | Solo per la revisione e il perimetro storici indicati nel rapporto. |
 
