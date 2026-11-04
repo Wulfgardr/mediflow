@@ -1,6 +1,7 @@
 /* @Codex */
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { hasRejectedIngressHost } from '@/lib/security/loopback-ingress.mjs';
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 
 const WEB_SESSION_COOKIE = 'mediflow_session';
@@ -34,6 +35,12 @@ function denied(): NextResponse {
 
 /** Enforces the Web cookie transport once, before any API route can read a mutation body. */
 export function proxy(request: NextRequest): NextResponse {
+    // A page of another site that rebinds its domain to loopback reaches no API, read or write.
+    if (hasRejectedIngressHost(request)) {
+        const response = NextResponse.json({ error: 'Misdirected request', code: 'request_host_invalid' }, { status: 421 });
+        response.headers.set('Cache-Control', 'no-store');
+        return response;
+    }
     if (!isMutationMethod(request.method) || !hasWebAuthorityCookies(request)) {
         return NextResponse.next();
     }
