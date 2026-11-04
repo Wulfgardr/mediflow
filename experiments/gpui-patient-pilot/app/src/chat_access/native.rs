@@ -1,3 +1,4 @@
+use super::chain::{self, MAX_ANCESTORS, Process};
 #[cfg(target_os = "macos")]
 use std::os::fd::AsRawFd;
 use std::os::unix::net::UnixStream;
@@ -15,6 +16,8 @@ pub(super) struct Peer {
     kind: i32,
     host_hash: [u8; 32],
     host_hash_length: u32,
+    chain_length: u32,
+    chain: [Process; MAX_ANCESTORS],
 }
 
 #[cfg(target_os = "macos")]
@@ -30,25 +33,50 @@ unsafe extern "C" {
     fn MFChatConnectionOpen(fd: i32) -> i32;
 }
 
+pub(super) fn capture_channel(stream: &UnixStream) -> Option<Peer> {
+    capture_checked(stream, true, true)
+}
+
 pub(super) fn capture(stream: &UnixStream, require_host: bool) -> Option<Peer> {
+    capture_checked(stream, require_host, false)
+}
+
+fn capture_checked(stream: &UnixStream, require_host: bool, log: bool) -> Option<Peer> {
     #[cfg(target_os = "macos")]
     {
         let mut peer = Peer::default();
-        if unsafe { MFChatCapturePeer(stream.as_raw_fd(), &mut peer, i32::from(require_host)) } == 1
-        {
-            Some(peer)
-        } else {
-            None
+        let captured =
+            unsafe { MFChatCapturePeer(stream.as_raw_fd(), &mut peer, i32::from(require_host)) }
+                == 1;
+        if !require_host {
+            return captured.then_some(peer);
         }
+        let chain = peer.chain();
+        let decision = if captured {
+            chain::evaluate(chain)
+        } else {
+            Err(chain::Denial::Incomplete)
+        };
+        if log {
+            eprintln!("{}", chain::log_record(chain, &decision));
+        }
+        decision.ok().map(|()| peer)
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (stream, require_host);
+        let _ = (stream, require_host, log);
         None
     }
 }
 
 impl Peer {
+    fn chain(&self) -> &[Process] {
+        &self.chain[..(self.chain_length as usize).min(MAX_ANCESTORS)]
+    }
+    pub(super) fn opener_summary(&self) -> String {
+        chain::summary(self.chain())
+    }
+
     #[cfg(all(test, target_os = "macos"))]
     pub(super) fn test_peer() -> Self {
         Self {
@@ -159,5 +187,52 @@ pub(super) fn biometric(nonce: &[u8; 32]) -> Result<(), &'static str> {
     {
         let _ = nonce;
         Err("Accesso nativo non supportato su questo sistema.")
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+
+    unsafe extern "C" {
+        fn getppid() -> i32;
+    }
+
+    #[test]
+    fn kernel_snapshot_reports_the_actual_parent_in_summary_and_log() {
+        let (stream, _remote) = UnixStream::pair().unwrap();
+        let mut peer = Peer::default();
+        assert_eq!(
+            unsafe { MFChatCapturePeer(stream.as_raw_fd(), &mut peer, 1) },
+            1
+        );
+        let chain = peer.chain();
+        assert_eq!(chain.first().unwrap().pid, unsafe { getppid() });
+        assert!(chain.first().unwrap().executable[0] != 0);
+        let pid = format!("PID {}", unsafe { getppid() });
+        assert!(peer.opener_summary().contains(&pid));
+        assert!(chain::log_record(chain, &chain::evaluate(chain)).contains(&pid));
+    }
+    #[test]
+    fn rejected_kernel_chain_never_reaches_native_confirmation() {
+        use std::{
+            io::Read,
+            sync::{Arc, atomic::AtomicBool, mpsc},
+            time::Duration,
+        };
+        let (stream, mut remote) = UnixStream::pair().unwrap();
+        remote
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let (send, incoming) = mpsc::sync_channel(1);
+        crate::chat_access::handle(stream, send, Arc::new(AtomicBool::new(true)));
+        let mut response = String::new();
+        remote.read_to_string(&mut response).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&response).unwrap();
+        assert_eq!(value, serde_json::json!({"status": "withdrawn"}));
+        assert!(matches!(
+            incoming.try_recv(),
+            Err(mpsc::TryRecvError::Disconnected)
+        ));
     }
 }

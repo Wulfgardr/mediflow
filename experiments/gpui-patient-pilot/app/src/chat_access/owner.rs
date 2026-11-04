@@ -299,6 +299,9 @@ impl Request {
         };
         Some(serde_json::json!({"commandId":id,"outcome":outcome}))
     }
+    pub(crate) fn opener_summary(&self) -> String {
+        self.peer.opener_summary()
+    }
     pub(crate) fn app(&self) -> &'static str {
         self.peer.app()
     }
