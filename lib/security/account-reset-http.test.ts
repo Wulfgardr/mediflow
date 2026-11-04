@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { createHash, randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
@@ -33,7 +33,13 @@ function stop(child: ChildProcess) {
     try { process.kill(-child.pid!, 'SIGKILL'); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
 }
 
-test('real Next HTTP reset survives SIGKILL at each durable boundary and refuses a failed copy', { timeout: 900000 }, async t => {
+// L'harness ferma il server con un segnale al gruppo di processi (PID negativo), che Windows non ha:
+// lì il server resterebbe vivo. Il percorso del giornale è lo stesso su ogni sistema ed è provato da
+// account-reset-journal.test.ts anche su Windows.
+const POSIX_PROCESS_GROUPS = process.platform !== 'win32';
+
+test('real Next HTTP reset survives SIGKILL at each durable boundary and refuses a failed copy',
+    { timeout: 900000, skip: POSIX_PROCESS_GROUPS ? false : 'richiede i gruppi di processi POSIX' }, async t => {
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-reset-http-'));
     const workspace = path.join(temporary, 'workspace'); fs.mkdirSync(workspace);
     for (const entry of ['app', 'components', 'lib', 'packages', 'scripts', 'drizzle', 'public', 'instrumentation.ts',
