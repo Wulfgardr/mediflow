@@ -1366,7 +1366,7 @@ for (const scenario of ['terminal-first','signal-terminal-first','retry-after-fa
     });
 }
 
-import { launcherConfigDirectory, prepareLauncherState } from './launcher-state.mjs';
+import { launcherConfigDirectory, localUiArchiveLock, prepareLauncherState } from './launcher-state.mjs';
 
 test('launcher configuration follows the operating system, independently of the archive', () => {
     assert.equal(launcherConfigDirectory({ platform: 'darwin', home: '/Users/synthetic', env: {} }), '/Users/synthetic/Library/Application Support/MediFlow/launcher');
@@ -1633,7 +1633,24 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     child.once('close', () => record({type:'preparation-closed',pid:child.pid}));
                     return child;
                 }
-                if (executable !== process.execPath || ![${JSON.stringify(path.join(source, 'scripts/source-runtime.mjs'))}, ${JSON.stringify(path.join(source, 'node_modules/next/dist/bin/next'))}].includes(argv[0])) throw new Error('FIXTURE_FOREIGN_CHILD_DENIED');
+                if (${Boolean(lifecycle?.preparationGate)} && (executable === 'npm' || (executable === process.execPath && argv[0] === '-e'))) {
+                    executable = process.execPath;
+                    argv = ['-e', ${JSON.stringify(`
+                        const fs = require('node:fs'), {spawn} = require('node:child_process');
+                        const prepare = () => {
+                            const descendant = spawn(process.execPath, ['-e', ${JSON.stringify(`
+                                const fs = require('node:fs');
+                                process.on('SIGTERM', () => {});
+                                setInterval(() => { if (fs.existsSync(${JSON.stringify(startupGate)})) process.exit(0); }, 10);
+                                process.send({ready:true});
+                            `)}], {stdio:['ignore','ignore','inherit','ipc']});
+                            descendant.once('message', () => console.error('FIXTURE_PREPARATION_WAITING'));
+                            descendant.once('close', () => process.exit(0));
+                            process.on('SIGTERM', () => process.exit(0));
+                        };
+                        if (process.connected) process.once('message', prepare); else prepare();
+                    `)}];
+                } else if (executable !== process.execPath || ![${JSON.stringify(path.join(source, 'scripts/source-runtime.mjs'))}, ${JSON.stringify(path.join(source, 'node_modules/next/dist/bin/next'))}].includes(argv[0])) throw new Error('FIXTURE_FOREIGN_CHILD_DENIED');
                 const inheritedStderr = options.stdio[2] === 2;
                 const child = spawn(executable, argv, inheritedStderr ? { ...options, stdio: [options.stdio[0], options.stdio[1], 'pipe'] } : options);
                 if (inheritedStderr) child.stderr.on('data', bytes => process.stderr.write(bytes));
@@ -1861,7 +1878,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         import crypto from 'node:crypto';
         import { webIdentityProof } from ${JSON.stringify(new URL('./local-ui-web-identity.mjs', import.meta.url).href)};
         import { installLocalUiWebNavigation } from ${JSON.stringify(new URL('./local-ui-web-navigation.mjs', import.meta.url).href)};
-        export const verifySourceRuntime = () => ({ identity: ${JSON.stringify(lifecycle?.preparationFailure ? {...identity,revision:'bbbbbbbbbbbb'} : identity)} });
+        export const verifySourceRuntime = () => ({ identity: ${lifecycle?.preparationGate ? `fs.existsSync(${JSON.stringify(startupGate)}) ? ${JSON.stringify(identity)} :` : ''} ${JSON.stringify(lifecycle?.preparationFailure || lifecycle?.preparationGate ? {...identity,revision:'bbbbbbbbbbbb'} : identity)} });
         if (process.argv[1].endsWith('source-runtime.mjs')) {
             if (process.env.MEDIFLOW_WEB_OWNER_GATE) await new Promise(resolve => {
                 const receive = frame => { if (frame.type === 'mediflow-web-owner-start' && frame.nonce === process.env.MEDIFLOW_WEB_OWNER_GATE) { process.off('message',receive); resolve(); } };
@@ -3505,4 +3522,42 @@ for (const phase of ['guardian-pending','preparation-failed','preparation-failed
     assert.doesNotMatch(f.output(),/Arresto non verificato|cleanup unconfirmed/u);
     assert.ok(f.observations().some(event => event.type === (pending ? 'simulated-job-closed' : 'preparation-closed')));
     assert.equal(f.child.exitCode,pending || chooser ? 0 : 1);
+});
+
+
+test('ordinary launcher refuses stop while version preparation owns live descendants', {timeout:15000}, async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', ['--scelta','web'], false, true, {}, null,
+        {job:'native',preparationGate:true});
+    await f.until(() => /^FIXTURE_PREPARATION_WAITING$/mu.test(f.output()));
+    const file = launcherReceiptFile(f.stateFiles.lockDirectory), receipt = JSON.parse(readFileSync(file));
+    const endpoint = new URL('stop',receipt.choiceUrl);
+    const stop = () => fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:'{}'});
+    try {
+        const state = await (await fetch(new URL('state',receipt.choiceUrl))).json();
+        assert.equal(state.step,'versione'); assert.equal(state.busy,true); assert.equal(state.ready,false);
+        const response = await stop();
+        const message = await response.text();
+        if (response.status === 200) {
+            try { await f.waitForTerminal(); } catch (error) { t.diagnostic(error.message); }
+        }
+        assert.equal(response.status,409,message);
+        assert.match(message,/preparazione/iu);
+        assert.equal(existsSync(file),true);
+        assert.equal(f.child.exitCode,null);
+        const preparation = f.observations().find(event => event.type === 'child-created');
+        assert.equal(process.kill(preparation.pid,0),true);
+        assert.equal(f.observations().some(event => event.type === 'owned-os-call' && event.signal !== 0),false);
+        assert.doesNotMatch(f.output(),/Arresto in corso|Pronto:/u);
+    } finally { f.releaseStartup(); }
+    await f.until(() => f.output().includes('Pronto:'));
+    const response = await stop();
+    assert.equal(response.status,200); await response.text();
+    await f.waitForTerminal();
+    assert.equal(f.child.exitCode,0);
+    assert.equal(existsSync(file),false);
+    assert.equal(existsSync(path.join(f.stateFiles.lockDirectory,'active')),false);
+    const archiveLock = localUiArchiveLock(f.data,{home:f.environment.HOME,env:f.environment});
+    assert.equal(existsSync(path.join(archiveLock,'active')),false);
+    assert.match(f.output(),/MediFlow arrestato\./u);
+    assert.doesNotMatch(f.output(),/Arresto non verificato/u);
 });
