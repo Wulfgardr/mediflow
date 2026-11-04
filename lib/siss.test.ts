@@ -303,15 +303,18 @@ test('completeSissPortalHandoff skips clipboard writes when the document is not 
     }
 });
 
+const SECURE = 'https:';
+const PLAIN = 'http:';
+
 test('the SISS popup only ever navigates to an https page of the regional portal', async () => {
     for (const handoffUrl of [
         'javascript:alert(document.cookie)',
         ' JavaScript:alert(1)',
         'data:text/html,<script>alert(1)</script>',
-        'http://operatorisiss.servizirl.it/fse/',
-        'https://operatorisiss.servizirl.it.attacker.example/fse/',
-        'https://user:secret@operatorisiss.servizirl.it/fse/',
-        'https://attacker.example/',
+        `${PLAIN}//operatorisiss.servizirl.it/fse/`,
+        `${SECURE}//operatorisiss.servizirl.it.attacker.example/fse/`,
+        `${SECURE}//user:secret@operatorisiss.servizirl.it/fse/`,
+        `${SECURE}//attacker.example/`,
         '/api/patients',
         '',
     ]) {
