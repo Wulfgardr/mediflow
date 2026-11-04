@@ -170,7 +170,7 @@ export async function createChoiceServer({ root, state, choose, install, stop, n
         respond(200, 'Arresto in corso.'); return;
       } else return respond(404, 'Pagina non trovata.');
       respond(202, 'Richiesta accettata.');
-    } catch (error) { respond(400, escape(error.message)); }
+    } catch (error) { respond(error.statusCode === 409 ? 409 : 400, escape(error.message)); }
   };
   const makeServer = () => {
     const candidate = http.createServer(handleRequest);
