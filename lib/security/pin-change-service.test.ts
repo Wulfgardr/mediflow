@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 
 import bcrypt from 'bcryptjs';
 import Database from 'better-sqlite3';
@@ -63,6 +64,17 @@ const sourceRequire = createRequire(import.meta.url);
 const { createOwner: createSourceWebOwner } = sourceRequire(
     '../../packages/web-auth-lifecycle-owner/internal/owner.cjs',
 ) as Readonly<{ createOwner(): SourceWebOwner }>;
+
+/** A wrapping in the shape the clients produce (v2, 60 bytes) and a 16-byte salt, both deterministic per label. */
+function fixtureBase64(label: string, length: number): string {
+    let bytes = Buffer.alloc(0);
+    for (let block = 0; bytes.length < length; block += 1) {
+        bytes = Buffer.concat([bytes, createHash('sha256').update(`${label}:${block}`).digest()]);
+    }
+    return bytes.subarray(0, length).toString('base64');
+}
+const wrappedFixture = (label: string) => `v2:${fixtureBase64(label, 60)}`;
+const saltFixture = (label: string) => fixtureBase64(`salt:${label}`, 16);
 
 test.afterEach(() => clearAllSessions());
 
@@ -179,9 +191,12 @@ function webRetirement(
     };
 }
 
+/* A counter, not Math.random: the secret checks below look for the PIN in the whole record,
+   and about 0.14% of random ids contain its digits. */
+let auditSequence = 0;
 function testAuditWriter(db: TestDatabase) {
     return async (input: AuditInput): Promise<string> => {
-        const eventId = `audit-${Math.random()}`;
+        const eventId = `audit-${++auditSequence}`;
         db.insert(auditEvents).values({
             eventId,
             schemaVersion: 1,
@@ -236,7 +251,7 @@ test('native PIN rotation retires both real channel owners and preserves another
         const native = nativePinSession(); const sibling = nativePinSession();
         const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: native, request: new Request('http://127.0.0.1/api/auth/change-pin'),
-            currentPin: '1234', newPin: '5678', encryptedMasterKey: 'v2:native-rewrap', salt: 'native-salt',
+            currentPin: '1234', newPin: '5678', encryptedMasterKey: wrappedFixture('native-rewrap'), salt: saltFixture('native-salt'),
         }, { db, readPairedNativeSession: async () => native, writeAuditEvent: testAuditWriter(db) });
         assert.deepEqual(result, { kind: 'success' });
         assert.equal(getSession(native.id), null); assert.equal(getSession(sibling.id), null);
@@ -244,7 +259,7 @@ test('native PIN rotation retires both real channel owners and preserves another
         assert.equal(physicalWebOwner.resolve(other.issued.sessionId, other.control.controlId).status, 'active');
         const stored = db.select().from(users).where(eq(users.id, 'user-1')).get(); assert.ok(stored);
         assert.equal(await bcrypt.compare('5678', stored.passwordHash), true);
-        assert.equal(stored.encryptedMasterKey, 'v2:native-rewrap');
+        assert.equal(stored.encryptedMasterKey, wrappedFixture('native-rewrap'));
     } finally {
         physicalWebOwner.retire(other.projection, 'delete');
         physicalWebOwner.retire(web.projection, 'delete');
@@ -259,7 +274,7 @@ test('a native request becoming stale during hashing aborts both preparations be
         await seedUser(db); const native = nativePinSession(); let reads = 0;
         const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: native, request: new Request('http://127.0.0.1/api/auth/change-pin'),
-            currentPin: '1234', newPin: '5678', encryptedMasterKey: 'v2:must-not-save', salt: 'must-not-save',
+            currentPin: '1234', newPin: '5678', encryptedMasterKey: wrappedFixture('must-not-save'), salt: saltFixture('must-not-save'),
         }, { db, readPairedNativeSession: async () => ++reads === 1 ? native : null });
         assert.deepEqual(result, { kind: 'unauthorized' });
         assert.equal(reads, 2);
@@ -276,7 +291,7 @@ test('native PIN CAS conflict preserves the winning credential and existing chan
         await seedUser(db); const native = nativePinSession(); let reads = 0;
         const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: native, request: new Request('http://127.0.0.1/api/auth/change-pin'),
-            currentPin: '1234', newPin: '5678', encryptedMasterKey: 'v2:loser', salt: 'loser',
+            currentPin: '1234', newPin: '5678', encryptedMasterKey: wrappedFixture('loser'), salt: saltFixture('loser'),
         }, { db, readPairedNativeSession: async () => {
             if (++reads === 2) db.update(users).set({ passwordHash: 'synthetic-winner-hash', encryptedMasterKey: 'v2:winner' })
                 .where(eq(users.id, 'user-1')).run();
@@ -306,8 +321,8 @@ test('changePin persists the client re-wrap, resets lockout, and writes a redact
             request: new Request('http://127.0.0.1/api/auth/change-pin', { headers: { 'x-request-id': 'pin-test' } }),
             currentPin: '1234',
             newPin: '5678',
-            encryptedMasterKey: 'v2:winner-blob',
-            salt: 'winner-salt',
+            encryptedMasterKey: wrappedFixture('winner-blob'),
+            salt: saltFixture('winner-salt'),
         }, dependencies);
 
         assert.deepEqual(result, { kind: 'success' });
@@ -315,8 +330,8 @@ test('changePin persists the client re-wrap, resets lockout, and writes a redact
         assert.ok(updated);
         assert.equal(await bcrypt.compare('5678', updated.passwordHash), true);
         assert.equal(await bcrypt.compare('1234', updated.passwordHash), false);
-        assert.equal(updated.encryptedMasterKey, 'v2:winner-blob');
-        assert.equal(updated.salt, 'winner-salt');
+        assert.equal(updated.encryptedMasterKey, wrappedFixture('winner-blob'));
+        assert.equal(updated.salt, saltFixture('winner-salt'));
         assert.equal(updated.failedLoginAttempts, 0);
         assert.equal(updated.firstFailedLoginAt, null);
         assert.equal(updated.lockedUntil, null);
@@ -362,8 +377,8 @@ test('changePin removes all old sessions and session-scoped resources only after
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234',
             newPin: '5678',
-            encryptedMasterKey: 'v2:rotated-blob',
-            salt: 'rotated-salt',
+            encryptedMasterKey: wrappedFixture('rotated-blob'),
+            salt: saltFixture('rotated-salt'),
         }, {
             db,
             writeAuditEvent: testAuditWriter(db),
@@ -396,8 +411,8 @@ test('changePin preserves sessions when the credential rotation is rejected', as
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '0000',
             newPin: '5678',
-            encryptedMasterKey: 'v2:unchanged-blob',
-            salt: 'unchanged-salt',
+            encryptedMasterKey: wrappedFixture('unchanged-blob'),
+            salt: saltFixture('unchanged-salt'),
         }, {
             db,
             writeAuditEvent: testAuditWriter(db),
@@ -425,8 +440,8 @@ test('changePin never replaces the wrapping of an account that unlocks with a pa
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234',
             newPin: '5678',
-            encryptedMasterKey: 'v2:pin-wrapping',
-            salt: 'pin-salt',
+            encryptedMasterKey: wrappedFixture('pin-wrapping'),
+            salt: saltFixture('pin-salt'),
         }, {
             db,
             writeAuditEvent: testAuditWriter(db),
@@ -453,8 +468,8 @@ test('changePin compare-and-swap allows exactly one concurrent rotation', async 
         };
         const request = new Request('http://127.0.0.1/api/auth/change-pin');
         const rotations = [
-            { newPin: '5678', encryptedMasterKey: 'v2:blob-a', salt: 'salt-a' },
-            { newPin: '9012', encryptedMasterKey: 'v2:blob-b', salt: 'salt-b' },
+            { newPin: '5678', encryptedMasterKey: wrappedFixture('blob-a'), salt: saltFixture('salt-a') },
+            { newPin: '9012', encryptedMasterKey: wrappedFixture('blob-b'), salt: saltFixture('salt-b') },
         ];
 
         const results = await Promise.all(rotations.map((rotation) => changePin({ archiveGeneration: TEST_GENERATION,
@@ -494,8 +509,8 @@ test('changePin does not mutate credentials when native retirement cannot be pre
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234',
             newPin: '5678',
-            encryptedMasterKey: 'v2:not-written',
-            salt: 'not-written',
+            encryptedMasterKey: wrappedFixture('not-written'),
+            salt: saltFixture('not-written'),
         }, {
             db,
             ...webRetirement(),
@@ -531,8 +546,8 @@ test('changePin denies confirmation after CAS when Web retirement is not termina
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234',
             newPin: '5678',
-            encryptedMasterKey: 'v2:written-before-denial',
-            salt: 'written-before-denial',
+            encryptedMasterKey: wrappedFixture('written-before-denial'),
+            salt: saltFixture('written-before-denial'),
         }, {
             db,
             ...webRetirement('denied'),
@@ -579,8 +594,8 @@ test('changePin keeps every same-user Web sibling terminal when lock wins after 
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234',
             newPin: '5678',
-            encryptedMasterKey: 'v2:race-winner',
-            salt: 'race-winner-salt',
+            encryptedMasterKey: wrappedFixture('race-winner'),
+            salt: saltFixture('race-winner-salt'),
         }, {
             db: raceDb,
             prepareNativeSessionsForUserRetirement: (userId) => {
@@ -858,6 +873,62 @@ test('a session cannot guess the PIN through the adoption: wrong PINs lock the a
         assert.deepEqual(whileLocked.kind === 'failure' && whileLocked.status, 423);
         assert.deepEqual(credentialColumns(db), before);
         assert.ok(storedUser(db).lockedUntil, 'the lock stands');
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('a session cannot guess the PIN through the PIN change: wrong PINs lock the account, and a lock stops the right one', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        db.update(users).set({ failedLoginAttempts: 0, firstFailedLoginAt: null, lockedUntil: null }).run();
+        const before = credentialColumns(db);
+        const dependencies: PinChangeServiceDependencies = { db, writeAuditEvent: testAuditWriter(db), ...webRetirement() };
+        const change = (currentPin: string) => changePin({ archiveGeneration: TEST_GENERATION,
+            session: session('user-1'), request: new Request('http://127.0.0.1/api/auth/change-pin'),
+            currentPin, newPin: '5678', encryptedMasterKey: wrappedFixture('guess'), salt: saltFixture('guess'),
+        }, dependencies);
+
+        for (let attempt = 1; attempt <= 4; attempt += 1) {
+            const wrong = await change('0000');
+            assert.deepEqual(wrong.kind === 'failure' && [wrong.status, wrong.code], [401, 'PIN_CHANGE_INVALID_CURRENT_PIN'], `attempt ${attempt}`);
+            assert.equal(storedUser(db).failedLoginAttempts, attempt, 'every wrong PIN is counted');
+        }
+        const fifth = await change('0000');
+        assert.deepEqual(fifth.kind === 'failure' && [fifth.status, fifth.code], [423, 'AUTH_LOCKED']);
+        const whileLocked = await change(SEEDED_PIN);
+        assert.deepEqual(whileLocked.kind === 'failure' && whileLocked.status, 423);
+        assert.deepEqual(credentialColumns(db), before);
+        assert.ok(storedUser(db).lockedUntil, 'the lock stands');
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('changePin accepts only a wrapping at the current KDF version in the shape the clients produce', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        const before = credentialColumns(db);
+        const dependencies: PinChangeServiceDependencies = { db, writeAuditEvent: testAuditWriter(db), ...webRetirement() };
+        const legacy = wrappedFixture('legacy').slice('v2:'.length);
+        const rejected: Array<[string, string]> = [
+            [legacy, saltFixture('ok')], // unmarked: read back as v1, 100k iterations
+            [`v1:${legacy}`, saltFixture('ok')],
+            ['v2:not-base64!', saltFixture('ok')],
+            [`v2:${legacy.slice(0, 40)}`, saltFixture('ok')],
+            [wrappedFixture('ok'), 'short'],
+            ['', ''],
+        ];
+        for (const [encryptedMasterKey, salt] of rejected) {
+            const result = await changePin({ archiveGeneration: TEST_GENERATION,
+                session: session('user-1'), request: new Request('http://127.0.0.1/api/auth/change-pin'),
+                currentPin: SEEDED_PIN, newPin: '5678', encryptedMasterKey, salt,
+            }, dependencies);
+            assert.deepEqual(result.kind === 'failure' && [result.status, result.code], [400, 'PIN_CHANGE_INVALID_NEW_PIN'], encryptedMasterKey);
+        }
+        assert.deepEqual(credentialColumns(db), before);
     } finally {
         sqlite.close();
     }

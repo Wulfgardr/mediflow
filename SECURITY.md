@@ -50,7 +50,13 @@ disco, una perdita di dati dai backup o l’accesso al filesystem; assumiamo ino
 che possa leggere log, crash report e screenshot.
 
 Anche il traffico localhost resta sensibile: per i client nativi evitare HTTP
-in chiaro quando possibile. Non sono ancora coperti né un sistema operativo
+in chiaro quando possibile. Una pagina di un altro sito che ridiriga il proprio
+dominio su 127.0.0.1 (DNS rebinding) non raggiunge le API: al confine del socket
+una richiesta diretta in loopback con un `Host` diverso da `localhost`,
+`127.x.x.x` o `[::1]` non riceve l'attestazione locale e riceve 421. Un alias
+locale dichiarato (per esempio una voce di `/etc/hosts`) si aggiunge con
+`MEDIFLOW_ALLOWED_HOSTS`, separato da virgole. Le richieste inoltrate dal proxy
+TLS portano la sua prova e conservano il nome del dispositivo associato. Non sono ancora coperti né un sistema operativo
 host completamente compromesso, per esempio da malware che registri i tasti e
 acceda alla memoria, né attacchi mirati al dispositivo fisico mentre
 l’applicazione è sbloccata.

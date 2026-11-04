@@ -1,7 +1,8 @@
 import 'next/dist/server/node-environment.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { IncomingMessage } from 'node:http';
+import http, { IncomingMessage } from 'node:http';
+import { once } from 'node:events';
 import { Socket } from 'node:net';
 import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server.js';
 import { getCloneableBody } from 'next/dist/server/body-streams.js';
@@ -10,6 +11,7 @@ import nextConfig from '@/next.config.ts';
 import { NextRequest } from 'next/server';
 
 import { config, proxy } from '../../proxy';
+import { installLoopbackIngress } from './loopback-ingress.mjs';
 
 const SESSION = 'a'.repeat(64);
 const CONTROL = 'A'.repeat(32);
@@ -147,4 +149,37 @@ test('accepts the exact browser origin reconstructed through the local TLS proxy
     const response = proxy(candidate);
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('x-middleware-next'), '1');
+});
+
+const LOOPBACK_ORIGIN = 'http://127.0.0.1';
+
+test('a page that rebinds its domain to loopback reaches no API through the real socket boundary', async (t) => {
+    installLoopbackIngress();
+    const server = http.createServer((incoming, outgoing) => {
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(incoming.headers)) {
+            if (typeof value === 'string') headers.set(name, value);
+        }
+        const response = proxy(new NextRequest(new URL(incoming.url ?? '/', LOOPBACK_ORIGIN), { method: incoming.method, headers }));
+        outgoing.end(JSON.stringify([response.status, response.headers.get('x-middleware-next')]));
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => server.close());
+    const { port } = server.address() as { port: number };
+    const call = (method: string, headers: Record<string, string>) => new Promise<unknown>((resolve, reject) => {
+        const outgoing = http.request({ hostname: '127.0.0.1', port, path: '/api/auth/setup', method, headers }, (reply) => {
+            let body = '';
+            reply.on('data', (chunk) => { body += chunk; });
+            reply.on('end', () => resolve(JSON.parse(body)));
+        });
+        outgoing.on('error', reject);
+        outgoing.end();
+    });
+    const rebound = `attacker.example:${port}`;
+    const sameOrigin = { host: rebound, origin: new URL(`//${rebound}`, LOOPBACK_ORIGIN).origin, 'sec-fetch-site': 'same-origin' };
+    assert.deepEqual(await call('GET', sameOrigin), [421, null]);
+    assert.deepEqual(await call('POST', { ...sameOrigin, 'content-type': 'application/json' }), [421, null]);
+    assert.deepEqual(await call('GET', { host: `127.0.0.1:${port}` }), [200, '1']);
+    assert.deepEqual(await call('GET', { host: `localhost:${port}` }), [200, '1']);
 });
