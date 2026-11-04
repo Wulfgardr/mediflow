@@ -3,6 +3,7 @@ import { createServer } from 'node:net';
 import { mkdtempSync, mkdirSync, openSync, closeSync, rmSync, writeFileSync, readdirSync, statSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { stopServer, trackClose } from '../visual-qualification/owned-server.mjs';
 
 if (process.env.CI || process.env.PLAYWRIGHT_ALLOW_EXTERNAL_NETWORK === '1') throw new Error('Qualifica solo locale con rete del browser limitata al loopback');
 if (!process.env.VISUAL_091_OUTPUT) throw new Error('Impostare VISUAL_091_OUTPUT a una nuova cartella esterna al repository');
@@ -24,11 +25,13 @@ const run = (args, stdio = 'inherit') => new Promise((resolve, reject) => {
 });
 const log = openSync(path.join(output, 'server.log'), 'wx');
 let server;
+let serverClosed;
 const started = Date.now();
 try {
   if (await run(['scripts/prepare-e2e-db.mjs'])) throw new Error('Preparazione archivio fallita');
   writeFileSync(path.join(temporary, 'SYNTHETIC_ONLY'), 'Qualifica visiva sintetica');
   server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '--turbopack', '--hostname', '127.0.0.1', '--port', String(port)], { env, stdio: ['ignore', log, log] });
+  serverClosed = trackClose(server);
   let ready = false;
   for (let attempt = 0; attempt < 120; attempt++) {
     if (server.exitCode !== null) throw new Error('Server terminato prima della disponibilità');
@@ -40,10 +43,7 @@ try {
   process.exitCode = await run(['node_modules/@playwright/test/cli.js', 'test', '--config', 'visual-qualification/playwright.config.ts', ...process.argv.slice(2)]);
 } finally {
   if (server) {
-    const closed = new Promise(resolve => server.once('close', resolve));
-    server.kill('SIGTERM');
-    const force = setTimeout(() => server.kill('SIGKILL'), 5000);
-    await closed; clearTimeout(force);
+    await stopServer(server, serverClosed);
   }
   closeSync(log);
   rmSync(temporary, { recursive: true, force: true });
