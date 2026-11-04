@@ -423,7 +423,7 @@ test('offline CLI restores keys, receipts and legal holds, and declares the host
     } finally { f.cleanup(); }
 });
 
-test('the CLI terminal fixture waits for a child that closes the terminal before exiting', () => {
+test('the CLI terminal fixture waits for a child that closes the terminal before exiting', { skip: process.platform === 'win32' }, () => {
     // Su Linux la lettura dal terminale dà EIO appena il figlio lo chiude, prima che il processo sia raccolto.
     const child = 'import os, time\nfor fd in (0, 1, 2): os.close(fd)\ntime.sleep(0.5)';
     execFileSync('python3', ['scripts/fixtures/recovery-cli-pty.py'], { encoding: 'utf8', timeout: 20000,
