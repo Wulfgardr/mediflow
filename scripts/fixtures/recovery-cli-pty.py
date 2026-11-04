@@ -21,7 +21,11 @@ try:
                 sent = True
         if child.poll() is not None:
             break
-    if child.poll() is None:
+    # Su Linux la lettura dà EIO appena il figlio chiude il terminale, prima che il processo sia
+    # raccolto: si aspetta l'uscita fino alla scadenza invece di leggere subito lo stato.
+    try:
+        child.wait(timeout=max(0.0, deadline - time.monotonic()))
+    except subprocess.TimeoutExpired:
         child.kill()
         raise RuntimeError('CLI recovery timeout')
     sys.stdout.write(output.decode())
