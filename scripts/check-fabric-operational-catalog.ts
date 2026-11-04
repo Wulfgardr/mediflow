@@ -52,22 +52,83 @@ export function buildOperationalCatalog(sources: Map<string, string>, descriptor
         }
         return [...seen];
     }
-    function permissions(files: string[]) {
-        return files.flatMap(file => {
-            const text = sources.get(file)!;
-            const ast = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
-            const guards = new Set<string>();
-            const visit = (node: ts.Node) => {
-                if (ts.isCallExpression(node) && (ts.isIdentifier(node.expression) || ts.isPropertyAccessExpression(node.expression))) {
-                    const name = node.expression.getText(ast);
-                    if (!/^[\w.]+$/.test(name)) return;
-                    if (/(?:require.*(?:Auth|Session|Scope|Capability|Token|Context)|with(?:Auth|ArchiveRequestContext|FunctionModelDispatch|LeaseCriticalSection)|acquire(?:OrdinaryApplicationContext|Authenticated\w*)|assert.*(?:Consent|Session|FunctionAvailable)|\.killSwitch\.read|readLaneEnabled|this.getMasterKey)/.test(name)) guards.add(name);
+    const compilerOptions: ts.CompilerOptions = { target: ts.ScriptTarget.ESNext, allowJs: true };
+    const compilerHost = ts.createCompilerHost(compilerOptions);
+    const readLibrary = compilerHost.getSourceFile;
+    const sourceFiles = new Map([...sources].filter(([file]) => /\.[cm]?[jt]sx?$/.test(file))
+        .map(([file, text]) => [file, ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true)]));
+    compilerHost.getCurrentDirectory = () => "/";
+    compilerHost.getSourceFile = file => sourceFiles.get(file.replace(/^\//, '')) ?? (file.includes('/typescript/lib/lib.') ? readLibrary(file, ts.ScriptTarget.ESNext) : undefined);
+    compilerHost.fileExists = file => sources.has(file);
+    compilerHost.readFile = file => sources.get(file);
+    compilerHost.resolveModuleNames = (names, file) => names.map(name => {
+        const base = name.startsWith('@/') ? name.slice(2) : name.startsWith('.') ? path.posix.join(path.posix.dirname(file.replace(/^\//, '')), name) : '';
+        const stem = base.replace(/\.[cm]?[jt]sx?$/, '');
+        const resolvedFileName = [base, `${stem}.ts`, `${stem}.tsx`, `${stem}/index.ts`].find(candidate => sources.has(candidate));
+        return resolvedFileName ? { resolvedFileName } : undefined;
+    });
+    const program = ts.createProgram([...sourceFiles.keys()], compilerOptions, compilerHost);
+    const checker = program.getTypeChecker();
+    const guardPattern = /(?:verifyUnlockCredentials|admitNativeBootstrapRouteRequest|require.*(?:Auth|Session|Scope|Capability|Token|Context)|with(?:Auth|ArchiveRequestContext|FunctionModelDispatch|LeaseCriticalSection)|acquire(?:OrdinaryApplicationContext|Authenticated\w*)|assert.*(?:Consent|Session|FunctionAvailable)|\.killSwitch\.read|readLaneEnabled|this.getMasterKey)/;
+    const permissionCache = new Map<string, { invokedFiles: Set<string>; evidence: string[] }>();
+    function permissions(file: string, route: boolean) {
+        const key = `${file}:${route}`;
+        const cached = permissionCache.get(key);
+        if (cached) return cached;
+        const ast = sourceFiles.get(file)!;
+        const guards = new Map<string, Set<string>>();
+        const seen = new Map<ts.Node, number>();
+        const invokedFiles = new Set<string>();
+        let moduleDepth = 0;
+        function follow(node: ts.Node, invoked = false) {
+            let symbol = ts.isIdentifier(node) && ts.isShorthandPropertyAssignment(node.parent)
+                ? checker.getShorthandAssignmentValueSymbol(node.parent) : checker.getSymbolAtLocation(node);
+            if (symbol?.flags && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+            for (const declaration of symbol?.declarations ?? []) {
+                if (ts.isVariableDeclaration(declaration) && !invoked) continue;
+                if (ts.isFunctionDeclaration(declaration) || ts.isMethodDeclaration(declaration)
+                    || ts.isVariableDeclaration(declaration) || ts.isPropertyAssignment(declaration)
+                    || ts.isShorthandPropertyAssignment(declaration)) {
+                    const step = declaration.getSourceFile() === node.getSourceFile() ? 0 : 1;
+                    if (moduleDepth + step > 5) continue;
+                    moduleDepth += step;
+                    visit(declaration, true);
+                    moduleDepth -= step;
                 }
-                ts.forEachChild(node, visit);
-            };
-            visit(ast);
-            return guards.size ? [`${file}: ${[...guards].sort().join(', ')}`] : [];
-        });
+            }
+        }
+        function visit(node: ts.Node, invoked = false) {
+            if ((seen.get(node) ?? Infinity) <= moduleDepth) return;
+            if (ts.isImportDeclaration(node) || ts.isTypeNode(node)) return;
+            if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) && !invoked && !ts.isObjectLiteralExpression(node.parent)) return;
+            seen.set(node, moduleDepth);
+            invokedFiles.add(node.getSourceFile().fileName);
+            const callback = ts.isIdentifier(node) && ((ts.isPropertyAssignment(node.parent) && node.parent.initializer === node)
+                || ts.isShorthandPropertyAssignment(node.parent) || (ts.isCallExpression(node.parent) && node.parent.arguments.includes(node)));
+            if (ts.isCallExpression(node) || callback) {
+                const expression = ts.isCallExpression(node) ? node.expression : node;
+                const name = expression.getText(node.getSourceFile());
+                if (/^[\w.]+$/.test(name) && guardPattern.test(name)) {
+                    const origin = node.getSourceFile().fileName;
+                    if (!guards.has(origin)) guards.set(origin, new Set());
+                    guards.get(origin)!.add(name);
+                } else {
+                    follow(ts.isPropertyAccessExpression(expression) ? expression.name : expression, true);
+                }
+            }
+            if (ts.isIdentifier(node) && !(ts.isVariableDeclaration(node.parent) && node.parent.name === node)) follow(node);
+            ts.forEachChild(node, child => visit(child));
+        }
+        for (const statement of ast.statements) {
+            if (!ts.canHaveModifiers(statement) || !ts.getModifiers(statement)?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue;
+            if (route && ts.isFunctionDeclaration(statement) && !/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(statement.name?.text ?? '')) continue;
+            if (ts.isClassDeclaration(statement)) {
+                for (const member of statement.members) visit(member, true);
+            } else visit(statement, true);
+        }
+        const result = { invokedFiles, evidence: [...guards].sort(([a], [b]) => a.localeCompare(b)).map(([origin, names]) => `${origin}: ${[...names].sort().join(', ')}`) };
+        permissionCache.set(key, result);
+        return result;
     }
     const code = (value: string) => `\`${value}\``;
     const cell = (values: string[]) => values.length ? values.map(code).join('<br>') : 'Nessun percorso rilevato';
@@ -75,9 +136,16 @@ export function buildOperationalCatalog(sources: Map<string, string>, descriptor
         const service = roots[descriptor.id] ?? descriptor.entryPoint;
         if (!service || !sources.has(service)) throw new Error(`${descriptor.id}: servizio mancante`);
         const upstream = descriptor.id === 'ocr' || descriptor.id === 'treatment_reasoning' ? [service, ...reachable(service, callers, 1).filter(testFile)] : reachable(service, callers, 5);
-        const routes = [...new Set([...upstream, ...reachable(service, dependencies, 1)])].filter(file => /^app\/api\/.*\/route\.ts$/.test(file));
-        const guardFiles = [...new Set([service, ...routes.flatMap(route => reachable(route, dependencies, 2)), ...upstream.filter(file => !testFile(file) && !file.startsWith('scripts/')).flatMap(file => reachable(file, dependencies, 1))])];
-        const guards = permissions(guardFiles);
+        const candidateRoutes = [...new Set([...upstream, ...reachable(service, dependencies, 1)])].filter(file => /^app\/api\/.*\/route\.ts$/.test(file));
+        const routes = candidateRoutes.filter(route => !route.startsWith('app/api/auth/') && ((dependencies.get(service) ?? []).includes(route) || permissions(route, true).invokedFiles.has(service)));
+        const routeGuards = routes.map(route => {
+            const { evidence } = permissions(route, true);
+            if (!evidence.length) throw new Error(`${descriptor.id}: permesso non risolto per ${route}`);
+            return evidence;
+        });
+        const capabilityGuards = upstream.filter(file => !testFile(file) && !file.startsWith('scripts/') && !file.startsWith('app/api/'))
+            .map(file => permissions(file, false)).filter(result => result.invokedFiles.has(service)).flatMap(result => result.evidence);
+        const guards = [...new Set([...permissions(service, false).evidence, ...routeGuards.flat(), ...capabilityGuards])];
         if (!guards.length) throw new Error(`${descriptor.id}: permesso non risolto`);
         const directTests = reachable(service, callers, 1).filter(testFile);
         const tests = (directTests.length ? directTests : upstream.filter(testFile)).sort();
@@ -89,7 +157,7 @@ export function buildOperationalCatalog(sources: Map<string, string>, descriptor
         const native = (pattern: RegExp) => clients.filter(([file]) => pattern.test(file)).map(([file]) => file);
         return [code(descriptor.id), code(service), descriptor.id === 'treatment_reasoning' ? 'Negata nella release' : descriptor.venues.length ? cell([...descriptor.venues]) : 'Nessuna venue ammessa', cell(guards.slice(0, 4)), cell([...new Set(web)].sort().slice(0, 4)), cell(native(/^experiments\/gpui-patient-pilot\//).slice(0, 4)), cell(native(/^native\/(?:MediFlow|Shared)/).slice(0, 4)), cell(native(/(?:chat_access|chat-access|mcp\/|plugins\/)/).slice(0, 4)), cell(tests.slice(0, 4))];
     });
-    const text = `# Catalogo operativo Fabric\n\nGenerato da \`scripts/check-fabric-operational-catalog.ts\`. Non modificare a mano.\n\nOgni cella mostra fino a quattro riferimenti, ordinati per percorso. Il catalogo deriva dai descriptor e dai percorsi di importazione del codice corrente. I controlli elencati sono chiamate nel servizio e nei suoi confini API; la loro presenza non concede permessi. I test sono riferimenti di copertura del servizio, non prove dei desktop installati. I consumatori sono riferimenti sorgente alle route o importazioni: nessun percorso rilevato significa raccordo non dimostrato, non parità. Le dipendenze sono seguite per cinque passaggi verso i chiamanti e due verso i controlli API.\n\nOllama e ChatGPT hanno tre celle ciascuno nel gate 0.9.1. La venue del descriptor è distinta dal trasporto ChatGPT (cloud, abbonamento e consenso sui byte). OCR resta indisponibile; Treatment Reasoning è negato da \`assertFunctionAvailableInRelease\`. Le API opzionali non qualificano il gate.\n\n| Funzione | Servizio | Venue descriptor | Permesso e controllo | Web | GPUI | Apple | Chat/plugin | Test del servizio |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n${rows.map(row => `| ${row.join(' | ')} |`).join('\n')}\n`;
+    const text = `# Catalogo operativo Fabric\n\nGenerato da \`scripts/check-fabric-operational-catalog.ts\`. Non modificare a mano.\n\nOgni cella mostra fino a quattro riferimenti, ordinati per percorso. Il catalogo deriva dai descriptor e dai percorsi di importazione del codice corrente. Le route sono collegate tramite richiami al servizio o riferimenti API del servizio; la sola inizializzazione di un modulo condiviso non costituisce un ingresso alla funzione. I controlli elencati sono chiamate raggiungibili dagli export del servizio e dei suoi chiamanti o dagli handler API, seguendo simboli e callback fino a cinque passaggi fra moduli. Ogni route deve avere evidenza propria; la loro presenza non concede permessi. I test sono riferimenti di copertura del servizio, non prove dei desktop installati. I consumatori sono riferimenti sorgente alle route o importazioni: nessun percorso rilevato significa raccordo non dimostrato, non parità. Le dipendenze sono seguite per cinque passaggi verso i chiamanti e cinque verso i controlli API.\n\nOllama e ChatGPT hanno tre celle ciascuno nel gate 0.9.1. La venue del descriptor è distinta dal trasporto ChatGPT (cloud, abbonamento e consenso sui byte). OCR resta indisponibile; Treatment Reasoning è negato da \`assertFunctionAvailableInRelease\`. Le API opzionali non qualificano il gate.\n\n| Funzione | Servizio | Venue descriptor | Permesso e controllo | Web | GPUI | Apple | Chat/plugin | Test del servizio |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n${rows.map(row => `| ${row.join(' | ')} |`).join('\n')}\n`;
     return { text, count: rows.length };
 }
 
