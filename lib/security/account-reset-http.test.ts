@@ -34,8 +34,8 @@ function stop(child: ChildProcess) {
 }
 
 // L'harness ferma il server con un segnale al gruppo di processi (PID negativo), che Windows non ha:
-// lì il server resterebbe vivo. Il percorso del giornale è lo stesso su ogni sistema ed è provato da
-// account-reset-journal.test.ts anche su Windows.
+// lì il server resterebbe vivo. Il giornale non dipende dai gruppi di processi ed è provato da
+// account-reset-journal.test.ts, che la CI esegue su Linux.
 const POSIX_PROCESS_GROUPS = process.platform !== 'win32';
 
 test('real Next HTTP reset survives SIGKILL at each durable boundary and refuses a failed copy',
