@@ -146,3 +146,50 @@ test('normalizeOpenMedResponse preserves padded redacted text and original-space
     assert.equal(response.entities[0]?.start, 2);
     assert.equal(response.entities[0]?.end, 7);
 });
+
+/* The OpenMed endpoint receives patient text: a redirect from whatever answers on the allowed
+   local port must never carry that text to another server. */
+test('the redaction route never follows an OpenMed redirect, for the health check or for patient text', async (t) => {
+    const http = await import('node:http');
+    const { once } = await import('node:events');
+    const elsewhereHits: string[] = [];
+    const elsewhere = http.createServer((request, response) => {
+        elsewhereHits.push(`${request.method} ${request.url}`);
+        response.setHeader('content-type', 'application/json');
+        response.end('{"status":"ok","entities":[]}');
+    });
+    elsewhere.listen(0, '127.0.0.1');
+    await once(elsewhere, 'listening');
+    t.after(() => elsewhere.close());
+    const elsewherePort = (elsewhere.address() as { port: number }).port;
+    const redirecting = http.createServer((request, response) => {
+        response.writeHead(307, { location: `http://127.0.0.1:${elsewherePort}${request.url}` });
+        response.end();
+    });
+    let listeningPort: string | null = null;
+    for (const port of ['18080', '8888', '8080']) { // allowed by lib/local-target.ts
+        try {
+            redirecting.listen(Number(port), '127.0.0.1');
+            await once(redirecting, 'listening');
+            listeningPort = port;
+            break;
+        } catch { /* port in use on this machine: try the next allowed one */ }
+    }
+    if (!listeningPort) { t.skip('no allowed OpenMed port is free'); return; }
+    t.after(() => redirecting.close());
+
+    const previous = process.env.OPENMED_BASE_URL;
+    process.env.OPENMED_BASE_URL = `http://127.0.0.1:${listeningPort}`;
+    t.after(() => { if (previous === undefined) delete process.env.OPENMED_BASE_URL; else process.env.OPENMED_BASE_URL = previous; });
+    const { getOrCreateLocalApiToken } = await import('./security/local-api-token');
+    const route = await import('@/app/api/system/redaction/route');
+    const headers = { 'x-mediflow-token': getOrCreateLocalApiToken(), 'content-type': 'application/json' };
+
+    const health = await (await route.GET(new Request('http://127.0.0.1/api/system/redaction', { headers }))).json();
+    assert.equal(health.available, false);
+    const redaction = await route.POST(new Request('http://127.0.0.1/api/system/redaction', {
+        method: 'POST', headers, body: JSON.stringify({ action: 'extract', text: 'Synthetic Patient' }),
+    }));
+    assert.notEqual(redaction.status, 200);
+    assert.deepEqual(elsewhereHits, []);
+});

@@ -55,6 +55,11 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     aiInsightMode: { write: ['web-session'], note: 'AI insight mode (lib/ai-insight-settings.ts)' },
     aiInsightManualConfig: { write: ['web-session'], note: 'AI insight manual config (lib/ai-insight-settings.ts)' },
     documentRouterControlFlow: { write: ['web-session'], note: 'document router control-flow mode (use-ai-settings-controller)' },
+    // --- OpenMed redaction: the endpoint receives patient text, so it is operator config like aiUrl. ---
+    openmedUrl: { write: ['web-session'], note: 'OpenMed redaction endpoint (app/api/system/redaction, lib/local-target.ts)' },
+    openmedRedactionLang: { write: ['web-session'], note: 'OpenMed default language (lib/openmed-redaction.ts)' },
+    openmedRedactionMethod: { write: ['web-session'], note: 'OpenMed default method (lib/openmed-redaction.ts)' },
+    openmedRedactionConfidenceThreshold: { write: ['web-session'], note: 'OpenMed default threshold (lib/openmed-redaction.ts)' },
 
     // --- AI kill switches (safety toggles; web session only). ---
     aiPatientInsightKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-patient-insight-kill-switch.ts)' },
