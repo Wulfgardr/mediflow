@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
     RETENTION_CATEGORIES, RETENTION_CLASSIFICATION, RETENTION_PROFILES, RetentionError, addCalendarYears,
-    assertWindowsRespectProfile, classifyRetentionRow, effectiveRetentionTerm, evaluateFascicolo, retentionProfileForPreset,
+    assertWindowsRespectProfile, classifyRetentionRow, windowsForSave, effectiveRetentionTerm, evaluateFascicolo, retentionProfileForPreset,
     type FascicoloFacts, type RetentionCategory,
 } from './retention-policy';
 import type { PatientChildTableName } from './patient-cascade';
@@ -85,4 +85,21 @@ test('fascicolo aperto, categoria illimitata, finestra mancante e blocco non son
     const hold = { id: '0b3c1f9e-5a7d-4e2b-9c41-2f6d8e7a1b30', scope: 'patient' as const, patientId: 'synthetic-patient',
         attachmentId: null, reason: 'litigation' as const, placedAt: NOW, placedBy: 'synthetic-admin' };
     assert.equal(evaluateFascicolo(facts([]), 'it-lom-rev04', {}, [hold], NOW).status, 'held');
+});
+
+test('salvataggio finestre: una finestra ereditata e non toccata sotto il minimo non blocca le altre', () => {
+    // Lombardia: referti di laboratorio minimo 5 anni, documentazione ambulatoriale 10.
+    const stored = { lab_report: { kind: 'years', years: 3 }, ambulatory_record: { kind: 'years', years: 12 } } as const;
+    const edited = { lab_report: { kind: 'years', years: 3 }, ambulatory_record: { kind: 'years', years: 15 } } as const;
+    const sent = windowsForSave('it-lom-rev04', edited, stored);
+    assert.deepEqual(sent, { ambulatory_record: { kind: 'years', years: 15 } });
+    assert.doesNotThrow(() => assertWindowsRespectProfile('it-lom-rev04', sent));
+});
+
+test('salvataggio finestre: una finestra cambiata dal titolare sotto il minimo arriva al server e viene rifiutata', () => {
+    const stored = { lab_report: { kind: 'years', years: 8 } } as const;
+    const sent = windowsForSave('it-lom-rev04', { lab_report: { kind: 'years', years: 3 } }, stored);
+    assert.deepEqual(sent, { lab_report: { kind: 'years', years: 3 } });
+    assert.throws(() => assertWindowsRespectProfile('it-lom-rev04', sent), (error: unknown) =>
+        error instanceof RetentionError && error.code === 'below_minimum');
 });
