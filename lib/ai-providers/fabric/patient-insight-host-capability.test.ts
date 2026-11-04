@@ -79,7 +79,7 @@ test('returns a typed review-only proposal after the fixed Fabric pipeline and t
         generatedAt, currentness,
     });
     assert.equal(fixture.checks(), 2);
-    assert.deepEqual(fixture.calls, ['kill', 'currentness', 'lifecycle', 'binding', 'readiness', 'router', 'clock', 'entropy', 'chat', 'currentness']);
+    assert.deepEqual(fixture.calls, ['kill', 'currentness', 'lifecycle', 'binding', 'readiness', 'router', 'clock', 'entropy', 'chat', 'kill', 'currentness']);
     assert.equal(result.writesPerformed, 0); assert.equal(result.apply, 'denied');
     assert.match(result.reviewRef, /^review_[0-9a-f]{32}$/u);
     const serialized = JSON.stringify(result);

@@ -71,6 +71,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/build-mobile-sim-app.test.mjs',
   'scripts/check-capability-mapping.test.mjs',
   'scripts/check-fabric-headless-plane-inventories.test.mjs',
+  'scripts/check-fabric-operational-catalog.test.ts',
   'scripts/check-headless-semantic-plane.test.mjs',
   'scripts/check-standalone-runtime-bundle.test.mjs',
   'scripts/check-who-local-sidecar-manifest.test.mjs',
