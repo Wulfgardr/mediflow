@@ -76,12 +76,13 @@ function harness(tamper = false) {
     const browser = createSmartImportBrowserOrchestrator({ fetch, isCurrent: browserSelection.isCurrent, requestId: (() => { let id = 0; return () => `req_${(++id).toString(16).padStart(32, 'a')}`; })() });
     return { browserSelection, normalizer, browser, counts: () => ({ selectionAcquisitions, ingestAcquisitions, previewAcquisitions, selectionCalls, ingestCalls, previewCalls, killSwitchReads, consumes, chats, routers }), noStore };
 }
+// Due letture dell'interruttore: all'ingresso e al rientro dal modello, prima di restituire la proposta.
 test('runs the synthetic browser-to-wire contract through real HTTP JSON boundaries', async () => {
     const current = harness(); await current.browserSelection.initialize(); const lease = await current.browserSelection.select({ patientId: 'patient.synthetic.1', ambulatoryId: 'ambulatory.synthetic.1' }, true);
     const bound = current.normalizer.captureForCurrentSelection(attachmentInput(), true, lease, current.browserSelection.isCurrent); const root = await current.browser.run(lease, bound);
     assert.deepEqual(parseSmartImportPreviewWireRoot(root), root); assert.equal(root.preview.status, 'available', JSON.stringify(root.preview)); assert.equal(root.preview.writesPerformed, 0); assert.equal(root.preview.apply, 'denied');
     if (root.preview.status === 'available') { assert.equal(root.preview.receipt.provider, 'ollama'); assert.equal(root.preview.provenance.receipt.model, 'synthetic-local-model'); assert.equal('explicitCode' in root.preview.proposal.diagnoses[0], false); }
-    assert.deepEqual(current.counts(), { selectionAcquisitions: 1, ingestAcquisitions: 1, previewAcquisitions: 1, selectionCalls: 1, ingestCalls: 1, previewCalls: 1, killSwitchReads: 1, consumes: 1, chats: 1, routers: 1 }); assert.deepEqual(current.noStore, ['no-store', 'no-store', 'no-store', 'no-store']);
+    assert.deepEqual(current.counts(), { selectionAcquisitions: 1, ingestAcquisitions: 1, previewAcquisitions: 1, selectionCalls: 1, ingestCalls: 1, previewCalls: 1, killSwitchReads: 2, consumes: 1, chats: 1, routers: 1 }); assert.deepEqual(current.noStore, ['no-store', 'no-store', 'no-store', 'no-store']);
 });
 
 test('denies a tampered ingest handle after capability entry and before routing or chat', async () => {
