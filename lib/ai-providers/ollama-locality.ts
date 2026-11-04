@@ -10,6 +10,7 @@ export type OllamaLocalityFailure =
     | 'response_not_local';
 
 export const OLLAMA_LOCAL_KEEP_ALIVE = '30m';
+export const OLLAMA_METADATA_TIMEOUT_MS = 5_000;
 export const OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES = 674;
 // Versioni osservate per il confine locale: ADR 0136, WUL-694 e WUL-602.
 const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^(?:0\.32\.\d+(?:[-+].+)?|0\.33\.3|0\.34\.2|0\.40\.4|0\.40\.5|0\.40\.6)$/;
@@ -126,6 +127,12 @@ async function fetchJson(url: string, init?: RequestInit): Promise<Record<string
     } catch { throw new OllamaLocalityError('provider_unready'); }
 }
 
+async function fetchMetadataJson(url: string, init?: RequestInit): Promise<Record<string, unknown>> {
+    const timeout = AbortSignal.timeout(OLLAMA_METADATA_TIMEOUT_MS);
+    const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+    return fetchJson(url, { ...init, signal });
+}
+
 export async function attestLocalOllamaModel(
     rawBaseUrl: string,
     requestedModel: string,
@@ -133,7 +140,7 @@ export async function attestLocalOllamaModel(
 ): Promise<OllamaLocalAttestation> {
     assertLocalOllamaModelReference(requestedModel);
     const baseUrl = strictOllamaLoopbackBaseUrl(rawBaseUrl);
-    const versionData = await fetchJson(`${baseUrl}/api/version`, { signal });
+    const versionData = await fetchMetadataJson(`${baseUrl}/api/version`, { signal });
     const serverVersion = typeof versionData.version === 'string' ? versionData.version : '';
     if (!serverVersion) throw new OllamaLocalityError('provider_unready');
     if (!SUPPORTED_OLLAMA_LOCALITY_VERSION.test(serverVersion)) {
@@ -142,7 +149,7 @@ export async function attestLocalOllamaModel(
         });
     }
 
-    const tagsData = await fetchJson(`${baseUrl}/api/tags`, { signal });
+    const tagsData = await fetchMetadataJson(`${baseUrl}/api/tags`, { signal });
     const models = Array.isArray(tagsData.models) ? tagsData.models : [];
     const localModel = models.find((item) => {
         if (!isLocalOllamaModelDescriptor(item)) return false;
@@ -151,7 +158,7 @@ export async function attestLocalOllamaModel(
     if (!localModel) throw new OllamaLocalityError('model_not_local');
 
     const canonicalModel = modelName(localModel);
-    const showData = await fetchJson(`${baseUrl}/api/show`, {
+    const showData = await fetchMetadataJson(`${baseUrl}/api/show`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: canonicalModel }),
@@ -174,7 +181,7 @@ export async function attestLocalOllamaModel(
         throw new OllamaLocalityError('model_not_local');
     }
 
-    const runningData = await fetchJson(`${baseUrl}/api/ps`, { signal });
+    const runningData = await fetchMetadataJson(`${baseUrl}/api/ps`, { signal });
     const runningModels = Array.isArray(runningData.models) ? runningData.models : [];
     const loadedModel = runningModels.find((item) => {
         if (!isLocalOllamaModelDescriptor(item)) return false;

@@ -241,7 +241,8 @@
     "test:fhir-r4": "node --test scripts/fhir-r4-gate.test.mjs scripts/verify-fhir-validator-cache.test.mjs scripts/fhir-scale-export-falsification.test.mjs && node scripts/run-strip-types.mjs --test --glob \"lib/fhir/**/*.test.ts\" scripts/fhir-r4-corpus.test.ts",
     "prepare:dependencies": "node scripts/prepare-dependencies.mjs",
     "check:fabric-operational-catalog": "node scripts/run-strip-types.mjs scripts/check-fabric-operational-catalog.ts",
-    "test:fabric-operational-catalog": "node scripts/run-strip-types.mjs --test scripts/check-fabric-operational-catalog.test.ts"
+    "test:fabric-operational-catalog": "node scripts/run-strip-types.mjs --test scripts/check-fabric-operational-catalog.test.ts",
+    "qualify:visual-091": "node scripts/qualify-visual-091.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",
