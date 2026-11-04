@@ -38,6 +38,7 @@ indicata. Non implica merge, distribuzione o verifica del tree composto.
 
 | Data | Rapporto | Revisione esaminata | Stato |
 | --- | --- | --- | --- |
+| 2026-11-04 | [Ricognizione di sicurezza 0.9.1](./2026-11-04-091-security-sweep.md) | `b15393ea6264b5ec9300b346435c3df7f18af67d` | `FIX_VERIFIED` (S-01..S-04); rischi residui dichiarati |
 | 2026-10-01 | [Correzione dell’autorità nelle scritture paziente di rete](./2026-10-01-network-patient-authority-fix.md) | `9f522a872af93711daa98a0c20bc6fe38d47390d` | `FIX_VERIFIED`; `LOCAL_COMPOSITION_VERIFIED`; `HOLD_PUBLICATION` |
 
 ## Rapporti storici collegati
