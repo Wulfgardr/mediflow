@@ -30,9 +30,10 @@ function sources(): FunctionModelSources {
     athenaLifecycle: { status: 'denied', reason: 'missing' }, athenaIdentity: 'synthetic', athenaAvailable: false };
 }
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve }; }
-function fixture(t: TestContext, id: 'patient_insight' | 'smart_import') {
+function fixture(t: TestContext, id: 'patient_insight' | 'smart_import', mode: 'valid' | 'malformed' | 'unavailable' = 'valid') {
     const previous = globalThis.fetch, entered = deferred<void>();
     const model = { name: 'synthetic-clinical:1', model: 'synthetic-clinical:1', size: 1234, digest: 'a'.repeat(64), details: { family: 'synthetic' } };
+    let enabled = true, authenticated = true;
     let signal: AbortSignal | undefined, aborts = 0, chats = 0, released = false;
     let releaseChat = () => {};
     const calls: string[] = [];
@@ -40,7 +41,7 @@ function fixture(t: TestContext, id: 'patient_insight' | 'smart_import') {
         const url = new URL(String(input)); assert.equal(url.origin, 'http://127.0.0.1:11434');
         calls.push(url.pathname);
         if (url.pathname === '/api/version') return Response.json({ version: '0.40.6' });
-        if (url.pathname === '/api/tags' || url.pathname === '/api/ps') return Response.json({ models: [model] });
+        if (url.pathname === '/api/tags' || url.pathname === '/api/ps') return Response.json({ models: mode === 'unavailable' ? [] : [model] });
         if (url.pathname === '/api/show') return Response.json({ details: model.details });
         if (url.pathname === '/api/generate') return Response.json({ model: model.model });
         assert.equal(url.pathname, '/api/chat'); chats++;
@@ -49,7 +50,7 @@ function fixture(t: TestContext, id: 'patient_insight' | 'smart_import') {
         signal = init?.signal ?? undefined;
         return new Promise<Response>((done, reject) => {
             const stop = () => { aborts++; signal?.removeEventListener('abort', stop); reject(new DOMException('Synthetic aborted fetch', 'AbortError')); };
-            releaseChat = () => { released = true; signal?.removeEventListener('abort', stop); done(Response.json({ model: model.model, message: { content: response(id) }, prompt_eval_count: 3, eval_count: 4 })); };
+            releaseChat = () => { released = true; signal?.removeEventListener('abort', stop); done(Response.json({ model: model.model, message: { content: mode === 'malformed' ? '{malformed' : response(id) }, prompt_eval_count: 3, eval_count: 4 })); };
             signal?.addEventListener('abort', stop, { once: true });
             entered.resolve(); if (signal?.aborted) stop();
         });
@@ -61,7 +62,7 @@ function fixture(t: TestContext, id: 'patient_insight' | 'smart_import') {
         const resolution = localProviderRegistry.resolve({ task: 'clinical', provider: 'ollama', models: { clinical: selected.aiModel_clinical! }, endpoint: selected.aiUrl!, chatTimeoutMs: 10000, disableThinking: true });
         return { status: 'available' as const, resolution: guardFunctionModelResolution(resolution) };
     } };
-    const common = { killSwitch: { read: async () => ({ status: 'enabled' as const }) }, lifecycle: { read: () => lifecycle }, binding,
+    const common = { killSwitch: { read: async () => enabled ? { status: 'enabled' as const } : { status: 'denied' as const, code: 'disabled' as const } }, lifecycle: { read: () => lifecycle }, binding,
         readiness: { observeClinical: async () => ({ status: 'available' as const, code: null, observation: { venue: 'local_process' as const, state: 'available' as const, reason: null } }) },
         route: routeHostResolvedCandidateCapability, sources: { clock: () => at, entropy: () => new Uint8Array(16).fill(7) } };
     const pi = createPatientInsightHostCapability({ ...common, currentness: { verify: () => true } });
@@ -69,10 +70,10 @@ function fixture(t: TestContext, id: 'patient_insight' | 'smart_import') {
     const invoke = (extra: object = {}) => id === 'patient_insight'
         ? pi.preview({ requestId: 'request.synthetic.cancel.0001', projection: piProjection, currentness, ...extra })
         : si.preview({ handle: `prj_${'1'.repeat(32)}`, requestId: 'request.synthetic.cancel.0001', ...extra });
-    const handler = createFunctionModelDispatch({ readSources: () => settings, authenticate: async () => 'synthetic-session' })(id,
+    const handler = createFunctionModelDispatch({ readSources: () => settings, authenticate: async () => authenticated ? 'synthetic-session' : null })(id,
         async () => Response.json(await invoke()));
     const run = (controller: AbortController) => handler(new Request('http://localhost/api/ai/' + id + '/preview', { method: 'POST', signal: controller.signal }));
-    return { entered: entered.promise, run, invoke, release: () => releaseChat(), calls,
+    return { disable: () => { enabled = false; }, revoke: () => { authenticated = false; }, entered: entered.promise, run, invoke, release: () => releaseChat(), calls,
         observation: () => ({ fetchAborted: signal?.aborted === true, aborts, chats, released }) };
 }
 for (const id of ['patient_insight', 'smart_import'] as const) {
@@ -102,5 +103,32 @@ for (const id of ['patient_insight', 'smart_import'] as const) {
         const f = fixture(t, id);
         const result = await f.invoke({ signal: new AbortController().signal });
         assert.equal(result.status, 'denied'); assert.equal(result.code, 'input_invalid'); assert.deepEqual(f.calls, []);
+    });
+}
+
+for (const id of ['patient_insight', 'smart_import'] as const) {
+    test(`${id}/ollama: malformed output publishes no proposal and performs no writes`, async t => {
+        const f = fixture(t, id, 'malformed'), work = f.run(new AbortController());
+        await f.entered; f.release();
+        const value = await (await work).json();
+        assert.equal(value.code, 'proposal_invalid'); assert.equal(value.proposal, null);
+        assert.equal(value.writesPerformed, 0); assert.equal(value.apply, 'denied');
+    });
+    test(`${id}/ollama: revoking the function during transport suppresses a valid proposal`, async t => {
+        const f = fixture(t, id), work = f.run(new AbortController());
+        await f.entered; f.disable(); f.release();
+        const value = await (await work).json();
+        assert.equal(value.code, 'kill_switch_disabled'); assert.equal(value.proposal, null);
+        assert.equal(value.writesPerformed, 0); assert.equal(f.observation().chats, 1);
+    });
+    test(`${id}/ollama: missing permission denies before transport`, async t => {
+        const f = fixture(t, id); f.revoke();
+        assert.equal((await f.run(new AbortController())).status, 401); assert.deepEqual(f.calls, []);
+    });
+    test(`${id}/ollama: unavailable model is explicit and has no fallback`, async t => {
+        const f = fixture(t, id, 'unavailable');
+        const value = await (await f.run(new AbortController())).json();
+        assert.equal(value.code, 'provider_failed'); assert.equal(value.proposal, null);
+        assert.equal(value.writesPerformed, 0); assert.equal(f.observation().chats, 0);
     });
 }

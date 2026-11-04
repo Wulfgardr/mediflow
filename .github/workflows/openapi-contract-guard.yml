@@ -75,6 +75,12 @@ jobs:
           npm run check:fabric-generative-runtime-crosswalk
           npm run test:fabric-generative-runtime-crosswalk
 
+      - name: Fabric operational catalog
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run check:fabric-operational-catalog
+          MEDIFLOW_DATA_DIR="$RUNNER_TEMP/fabric-catalog-test" npm run test:fabric-operational-catalog
+
       # Puro fs.readFileSync su cinque file: nessuna rete, nessun DB, nessuna
       # toolchain, ~150 ms. È a contatori espliciti, quindi si romperà a ogni
       # aggiunta legittima di una capability — è il comportamento voluto, come

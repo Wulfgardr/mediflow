@@ -516,3 +516,5 @@ di ciascuna proposta e il limite di autorità dell’host.
 - [territorial/lombardia-services-and-prerequisites.md](./territorial/lombardia-services-and-prerequisites.md): Dodici servizi, priorità PRREG/GCM e prerequisiti Ente/Software House ancora aperti.
 - [territorial/italia-generico-paper-test.md](./territorial/italia-generico-paper-test.md): Prova sulla carta del solo profilo nazionale FSE/INI e SAC, senza servizi regionali.
 - [territorial/aria-letter-draft.md](./territorial/aria-letter-draft.md): Bozza non inviata delle domande ad ARIA, senza richiesta di accesso.
+
+- `docs/analysis/2026-10-31-chat-catalog-fabric/catalogo-operativo.md`: raccordo generato tra capacità Fabric, servizi, controlli di accesso, consumatori e test; limiti delle prove sorgente.

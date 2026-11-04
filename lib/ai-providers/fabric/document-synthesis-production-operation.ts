@@ -238,6 +238,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                     catch { return false; }
                 };
                 const publication = remote ? await executeDocumentSynthesisChatGpt(configuration, sourceSet, stillCurrent) : await dependencies.execute(configuration);
+                if (dependencies.readLaneEnabled() !== true) return previewDenied('lane_disabled');
                 if (!publication) return previewDenied('operation_unavailable');
                 const current = context.owner.withLeaseCriticalSection(context.session, (selection) => selectionAgrees(context, preview, selection) && sameCurrentness(preview.currentness, read(preview)));
                 if (!current) return previewDenied('currentness_mismatch');

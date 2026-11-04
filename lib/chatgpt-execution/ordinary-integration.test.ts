@@ -308,3 +308,37 @@ test('a hard quota notice during ordinary login retires the attempt before hando
         assert.equal(peer.calls.filter(call => call.method === 'thread/start').length, 0);
     } finally { await attempt.dispose(); }
 });
+
+for (const index of [0, 1, 2]) {
+    for (const negative of ['malformed', 'revoked', 'unavailable', 'permission_missing'] as const) {
+        test(`${['patient_insight', 'smart_import', 'document_synthesis'][index]}/chatgpt: ${negative} prevents publication`, async () => {
+            testOnlyAllowContent = true;
+            const value = await context(index, negative !== 'permission_missing');
+            const peer = new Peer();
+            let service: ReturnType<typeof createOrdinaryExecutionService> | undefined;
+            try {
+                if (negative === 'permission_missing') {
+                    assert.throws(() => engine(value, peer));
+                    assert.equal(peer.calls.length, 0);
+                    return;
+                }
+                service = engine(value, peer).service;
+                const request = await selection(service);
+                peer.pendingOutput = negative === 'malformed' ? '{malformed' : JSON.stringify(outputs()[index])
+                    .replaceAll('Bea Riva', tokenFrom(value.read.content.input[0].text));
+                if (negative === 'revoked') peer.onRequest = method => { if (method === 'turn/start') owner.retire(value.session); };
+                if (negative === 'unavailable') peer.modelsAvailable = false;
+                let publication: unknown = null;
+                await assert.rejects(async () => { publication = await service!.generate(request); }, (error: unknown) => {
+                    assert.ok(error instanceof ExecutionError);
+                    if (negative === 'malformed') assert.equal(error.code, 'upstream_error');
+                    if (negative === 'unavailable') assert.equal(error.code, 'model_unavailable');
+                    return true;
+                });
+                assert.equal(publication, null);
+                assert.equal(service.isCurrent({} as never), false);
+                if (negative === 'unavailable') assert.equal(peer.calls.some(call => call.method === 'thread/start'), false);
+            } finally { await service?.dispose(); value.consent.close(); await value.job.close(); testOnlyAllowContent = false; }
+        });
+    }
+}
