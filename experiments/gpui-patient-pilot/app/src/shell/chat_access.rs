@@ -536,7 +536,10 @@ impl ClinicalApp {
             return None;
         }
         let pending = self.chat_access.pending.as_ref()?;
-        let (state, app) = pending.lock().ok().map(|mut p| (p.status(), p.app()))?;
+        let (state, app, opener) = pending
+            .lock()
+            .ok()
+            .map(|mut p| (p.status(), p.app(), p.opener_summary()))?;
         if state == State::Withdrawn {
             return None;
         }
@@ -594,6 +597,7 @@ impl ClinicalApp {
             .flex().flex_col().gap(px(12.))
             .child(heading("native-chat-access-title", if booking_mode { "Conferma la prenotazione del controllo" } else if therapy_mode { "Conferma il cambio di stato della terapia" } else if catalog_mode { catalog_title } else if clinical_mode { "Scegli diagnosi e passi delle note" } else { "Condividi la scheda di prova nella chat?" }, theme))
             .child(text!(format!("App richiedente: {app}")).with_id("native-chat-access-app"))
+            .child(text!(opener).with_id("native-chat-access-opener"))
             .child(text!(format!("Archivio: {}", self.chat_access.archive)).with_id("native-chat-access-archive"))
             .child(div().id("native-chat-access-patient").child(crate::title::title(crate::title::TitleText::patient_question("Paziente: ", self.chat_access.patient.clone(), ""), theme)))
             .child(notice("native-chat-access-operation", if booking_mode { "Prenotazione di un controllo nell’agenda interna della cartella selezionata. Scrivi data e ora, controlla l’anteprima e conferma con il PIN nativo, una sola volta entro 30 secondi. Titolo fisso «Controllo», nessuna nota. Se l’agenda cambia prima della conferma la prenotazione viene respinta. Nessun calendario personale o servizio esterno." } else if therapy_mode { "Scegli la terapia della cartella selezionata e controlla il nuovo stato. La scrittura usa il PIN nativo, una sola volta entro 30 secondi. I nomi restano qui. Touch ID per questa scrittura non è ancora abilitato." } else if catalog_mode { catalog_notice } else if clinical_mode { "Spunta le diagnosi e i passi da condividere. Copia un passo esatto delle note nel campo sotto e aggiungilo, poi spuntalo. La nota intera non è ammessa. Il testo viene dalle tue note, anche con refusi o errori OCR. Il controllo è un aiuto e non è anonimizzazione. Un dato sconosciuto offuscato di proposito può sfuggire. Sei responsabile di ciò che esce: controlla i byte esatti prima della conferma. Il testo non viene riscritto. Puoi togliere la spunta o modificare una copia qui, senza cambiare la cartella. Le date complete sono escluse." } else { "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico." }, theme, false))
