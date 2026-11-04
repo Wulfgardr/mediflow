@@ -85,6 +85,16 @@ fn parse_launch(args: impl IntoIterator<Item = String>) -> Result<Launch, &'stat
     Ok(launch)
 }
 
+gpui::actions!(mediflow_application, [Quit]);
+
+fn bind_application_commands(cx: &mut App) {
+    cx.on_action(|_: &Quit, cx| cx.quit());
+    cx.bind_keys([gpui::KeyBinding::new("cmd-q", Quit, None)]);
+    cx.set_menus([
+        gpui::Menu::new("MediFlow").items([gpui::MenuItem::action("Esci da MediFlow", Quit)])
+    ]);
+}
+
 fn main() {
     if std::env::args().nth(1).as_deref() == Some("--document-preview-worker") {
         let page = std::env::args()
@@ -150,6 +160,7 @@ fn main() {
             eprintln!("Impossibile caricare i caratteri locali di MediFlow: {error}");
             cx.quit(); return;
         }
+        bind_application_commands(cx);
         text_input::bind_keys(cx);
         if launch.demo { demo_app::bind_keys(cx); } else { shell::bind_keys(cx); }
         let display = cx.primary_display();
@@ -187,6 +198,21 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[gpui::test]
+    fn application_quit_is_available_from_keyboard_without_a_view_context(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(|cx| {
+            bind_application_commands(cx);
+            let bindings = cx.all_bindings_for_input(&[gpui::Keystroke::parse("cmd-q").unwrap()]);
+            assert!(
+                bindings
+                    .iter()
+                    .any(|binding| binding.action().as_any().is::<Quit>())
+            );
+        });
+    }
+
     #[test]
     fn unsupported_state_directory_is_distinct_from_invalid_or_nonprivate_paths() {
         assert_eq!(
