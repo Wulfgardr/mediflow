@@ -87,6 +87,13 @@ function timestamp(sources: Sources): string {
 }
 export function createPatientSmartImportHostCapability(dependencies: Dependencies) {
     const sources = dependencies.sources ?? productionSources;
+    async function permissionDenial() {
+        try {
+            const state = await dependencies.killSwitch.read();
+            if (state.status !== 'enabled') return deny(state.code === 'disabled' ? 'kill_switch_disabled' : 'kill_switch_unavailable');
+        } catch { return deny('kill_switch_unavailable'); }
+        return null;
+    }
     return Object.freeze({
         async preview(value: unknown): Promise<PatientSmartImportHostCapabilityResult> {
             const request = input(value);
@@ -103,6 +110,7 @@ export function createPatientSmartImportHostCapability(dependencies: Dependencie
             if (isOrdinaryFunctionSelected('smart_import')) {
                 const generatedAt = timestamp(sources);
                 const result = await executeOwnedOrdinaryProfile('smart_import', createSmartImportOrdinaryTaskProfile({ projection, generatedAt }), () => true);
+                const denied = await permissionDenial(); if (denied) return denied;
                 return Object.freeze({ ...common, status: 'available', code: null,
                     proposal: result.output as PatientSmartImportCapabilityProposal, ...ordinaryResultMetadata(result), reviewRef: reviewRef(sources) });
             }
@@ -165,6 +173,7 @@ export function createPatientSmartImportHostCapability(dependencies: Dependencie
             try { proposal = parsePatientSmartImportCapabilityProposal(response, projection, generatedAt); }
             catch { return failed('proposal_invalid', receipt, provenance); }
 
+            const denied = await permissionDenial(); if (denied) return denied;
             return Object.freeze({ ...common, status: 'available', code: null, proposal, receipt, provenance,
                 reviewRef: correlation });
         },
