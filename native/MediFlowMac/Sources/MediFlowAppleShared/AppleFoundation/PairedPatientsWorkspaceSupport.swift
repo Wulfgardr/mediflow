@@ -28,11 +28,28 @@ enum PairedPatientsWorkspaceSupport {
         return "…\(normalized.suffix(6))"
     }
 
+    /// Nome breve dell'identificativo, da mostrare accanto al valore: un codice
+    /// senza etichetta non dice che cosa sia. STP ed ENI si riconoscono dal prefisso
+    /// seguito da 13 cifre: un codice fiscale può iniziare con le stesse lettere.
+    static func identifierLabel(_ taxCode: String) -> String {
+        let normalized = taxCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        for prefix in ["STP", "ENI"] where normalized.hasPrefix(prefix) {
+            let rest = normalized.dropFirst(prefix.count)
+            if rest.count == 13, rest.allSatisfy({ $0.isASCII && $0.isNumber }) { return prefix }
+        }
+        return "CF"
+    }
+
+    static func labeledCompactTaxCode(_ taxCode: String) -> String {
+        guard let code = cleanedPatientWorkspaceValue(taxCode) else { return "" }
+        return "\(identifierLabel(code)) \(compactTaxCode(code))"
+    }
+
     static func patientMetadata(birthDate: Date?, taxCode: String, at now: Date = Date()) -> String {
         var parts: [String] = []
         if let age = age(from: birthDate, at: now) { parts.append("\(age) anni") }
         if let birthDate { parts.append("nascita \(birthDateFormatter.string(from: birthDate))") }
-        if let code = cleanedPatientWorkspaceValue(taxCode) { parts.append(compactTaxCode(code)) }
+        if cleanedPatientWorkspaceValue(taxCode) != nil { parts.append(labeledCompactTaxCode(taxCode)) }
         return parts.joined(separator: " · ")
     }
 

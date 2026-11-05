@@ -14,7 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Minus, MoreHorizontal, Plus, TrendingDown, TrendingUp } from 'lucide-react';
 import { ApiConflictError, db } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
-import { searchStaticTerminology } from '@/lib/terminology';
+import { formatMeasureValue, formatUnitForDisplay, searchStaticTerminology } from '@/lib/terminology';
 import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
 import {
     applyObservationPrefill,
@@ -485,7 +485,7 @@ export default function ObservationManager({
                 <table className={`${styles.table} ${styles.observationDayTable}`}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Riferimento</th></tr></thead><tbody>
                     {day.items.map(item => { const flag = classifyObservationRange(item.value, item.refLow, item.refHigh); return <tr key={item.id}>
                         <td>{italianLoincLabel(item.code, item.display)}</td>
-                        <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{item.value} {item.unitCode}{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
+                        <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{formatMeasureValue(item.value, item.unitCode)}{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
                         <td className={styles.muted}>{formatReferenceRange(item.refLow, item.refHigh, item.refText) || '—'}</td>
                     </tr>; })}
                 </tbody></table>
@@ -500,7 +500,7 @@ export default function ObservationManager({
                             <td><DisclosureControl onToggle={() => toggleGroup(group.code)} expanded={openGroups.has(group.code)} controls={`param-region-${group.code}`}>
                                 {italianLoincLabel(group.code, group.display)}
                             </DisclosureControl></td>
-                            <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{latest.value} <span className={styles.muted}>{group.unitCode}</span>{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
+                            <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{latest.value} <span className={styles.muted}>{formatUnitForDisplay(group.unitCode)}</span>{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
                             <td className={styles.muted}><time>{new Date(latest.observedAt).toLocaleDateString('it-IT')}</time></td>
                             <td className={styles.secondaryColumn}>{delta === null ? '—' : <span className="inline-flex items-center gap-1">{delta > 0 ? <TrendingUp size={14} aria-label="in aumento" /> : delta < 0 ? <TrendingDown size={14} aria-label="in calo" /> : <Minus size={14} aria-label="stabile" />}{delta > 0 ? '+' : ''}{delta.toLocaleString('it-IT')}</span>}</td>
                         </tr>;
@@ -515,13 +515,13 @@ export default function ObservationManager({
                         const visibleItems = isFull ? group.items : group.items.slice(0,5);
                         return <section key={group.code} id={`param-region-${group.code}`} hidden={!isOpen}>
                             {isOpen && <>
-                                <header className={styles.sectionHead}><h3>{label}</h3><span>{group.unitCode}</span></header>
+                                <header className={styles.sectionHead}><h3>{label}</h3><span>{formatUnitForDisplay(group.unitCode)}</span></header>
                                 <p className={`${styles.muted} lume-code`}>{group.codeSystem} {group.code}</p>
                                 <div className={styles.trend}><Sparkline values={chartValues} /></div>
                                 <table className={`${styles.table} ${styles.observationHistory}`}><thead><tr><th>Data</th><th>Valore</th><th aria-label="Azioni" /></tr></thead><tbody>{visibleItems.map(item => {
                                     const flag = classifyObservationRange(item.value, item.refLow, item.refHigh); const range = formatReferenceRange(item.refLow, item.refHigh, item.refText);
                                     return <tr key={item.id}><td className={styles.muted}><time title={new Date(item.observedAt).toLocaleString('it-IT')}>{new Date(item.observedAt).toLocaleDateString('it-IT')}</time></td>
-                                        <td><strong className={flag ? styles.critical : undefined}>{item.value}</strong> <span className={styles.muted}>{item.unitCode}</span>{flag && <span className={styles.critical}> {flag === 'alto' ? '▲ Alto' : '▼ Basso'}</span>}{range && <small>rif {range}</small>}{item.notes && <small>{item.notes}</small>}</td>
+                                        <td><strong className={flag ? styles.critical : undefined}>{item.value}</strong> <span className={styles.muted}>{formatUnitForDisplay(item.unitCode)}</span>{flag && <span className={styles.critical}> {flag === 'alto' ? '▲ Alto' : '▼ Basso'}</span>}{range && <small>rif {range}</small>}{item.notes && <small>{item.notes}</small>}</td>
                                         <td><PatientSheetMenu label={`Azioni misura ${label} del ${new Date(item.observedAt).toLocaleDateString('it-IT')}`}
                                             trigger={props => <Button {...props} variant="icon" aria-label={`Azioni misura ${label} del ${new Date(item.observedAt).toLocaleDateString('it-IT')}`}><MoreHorizontal size={16} aria-hidden /></Button>}>
                                             <button type="button" role="menuitem" onClick={() => deleteObservation(item.id)}>Elimina misura</button>

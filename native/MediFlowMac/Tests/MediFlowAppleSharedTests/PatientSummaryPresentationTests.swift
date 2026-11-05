@@ -132,7 +132,7 @@ final class PatientSummaryPresentationTests: XCTestCase {
         let birth = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("1951-07-20T00:00:00Z"))
         let now = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("2026-10-29T12:00:00Z"))
         XCTAssertEqual(PairedPatientsWorkspaceSupport.patientMetadata(birthDate: birth, taxCode: "DEMO00000R0000X", at: now),
-                       "75 anni · nascita 20 lug 1951 · …R0000X")
+                       "75 anni · nascita 20 lug 1951 · CF …R0000X")
         XCTAssertEqual(PairedPatientsWorkspaceSupport.patientMetadata(birthDate: nil, taxCode: ""), "")
     }
 
@@ -275,6 +275,15 @@ final class PatientSummaryPresentationTests: XCTestCase {
     }
 
     /* @Codex */
+    func testIdentifierCarriesItsName() {
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.labeledCompactTaxCode("RSSMRA80A01H501U"), "CF …1H501U")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.labeledCompactTaxCode("STP0300010000123"), "STP …000123")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.labeledCompactTaxCode("eni0300010000123"), "ENI …000123")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.labeledCompactTaxCode("  "), "")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.identifierLabel("STPMRA80A01H501U"), "CF")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.identifierLabel("ENIXXX80A01H501U"), "CF")
+    }
+
     func testCompactTaxCodeDoesNotExpandShortValues() {
         XCTAssertEqual(PairedPatientsWorkspaceSupport.compactTaxCode("ABC123"), "ABC123")
     }

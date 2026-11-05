@@ -180,11 +180,11 @@ for (const area of ['turno', 'diario'] as const) test(`Agenda and global diary: 
         await shot('row-menu', link); await page.keyboard.press('Escape'); await expect(actions).toBeFocused();
       }
     } else {
-      await targetSurface.getByRole('button', { name: 'Manuali', exact: true }).click();
+      await targetSurface.getByRole('button', { name: 'Inseriti a mano', exact: true }).click();
       const seventhVisible = await targetSurface.getByText('Settimo controllo inventato', { exact: true }).isVisible();
       observations.push({ seventhVisible }); if (!baseline) expect(seventhVisible).toBe(true);
       await shot('manual-seventh', targetSurface.locator('section').first());
-      await targetSurface.getByRole('button', { name: 'AI', exact: true }).click();
+      await targetSurface.getByRole('button', { name: 'Proposti', exact: true }).click();
       await expect(targetSurface).toContainText('Nessun appuntamento con questo filtro.');
       await targetSurface.getByRole('button', { name: 'Tutti', exact: true }).click();
     }

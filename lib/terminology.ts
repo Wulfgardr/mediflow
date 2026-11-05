@@ -112,7 +112,7 @@ const UCUM_PILOT: StaticCatalogItem[] = [
     { code: 'mm[Hg]', display: 'millimeter of mercury', displayIt: 'mmHg', version: '2.1' },
     { code: '/min', display: 'per minute', displayIt: '/min', version: '2.1' },
     { code: '%', display: 'percent', displayIt: '%', version: '2.1' },
-    { code: 'Cel', display: 'degree Celsius', displayIt: 'gradi C', version: '2.1' },
+    { code: 'Cel', display: 'degree Celsius', displayIt: '°C', version: '2.1' },
     { code: 'kg', display: 'kilogram', displayIt: 'kg', version: '2.1' },
     { code: 'mg/dL', display: 'milligram per deciliter', displayIt: 'mg/dL', version: '2.1' },
     /* WUL-UIUX: unita per il subset ematologia/chimica. Le composte usano
@@ -122,9 +122,41 @@ const UCUM_PILOT: StaticCatalogItem[] = [
     { code: 'U/L', display: 'enzyme unit per liter', displayIt: 'U/L', version: '2.1' },
     { code: 'fL', display: 'femtoliter', displayIt: 'fL', version: '2.1' },
     { code: 'pg', display: 'picogram', displayIt: 'pg', version: '2.1' },
-    { code: '10*3/uL', display: 'thousands per microliter', displayIt: '10^3/uL', version: '2.1' },
-    { code: '10*6/uL', display: 'millions per microliter', displayIt: '10^6/uL', version: '2.1' },
+    { code: '10*3/uL', display: 'thousands per microliter', displayIt: '×10³/µL', version: '2.1' },
+    { code: '10*6/uL', display: 'millions per microliter', displayIt: '×10⁶/µL', version: '2.1' },
 ];
+
+const SUPERSCRIPT: Record<string, string> = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻' };
+
+/** Unità UCUM come la legge un medico: dal catalogo quando c'è, altrimenti una
+    resa prudente del codice (parentesi quadre e graffe tolte, potenze in apice,
+    micro come µ). Il codice UCUM registrato non cambia: cambia solo la lettura. */
+export function formatUnitForDisplay(unitCode: string | null | undefined): string {
+    const code = (unitCode ?? '').trim();
+    if (!code) return '';
+    const known = UCUM_PILOT.find(item => item.code === code);
+    if (known?.displayIt) return known.displayIt;
+    return code
+        .replace(/\{([^}]*)\}/g, (_, annotation: string) => annotation.replace(/_/g, ' ').replace(/(\d)\.(\d)/g, '$1,$2'))
+        .replace(/\[([^\]]*)\]/g, '$1')
+        .replace(/10\*(-?\d+)/g, (_, exp: string) => `×10${[...exp].map(ch => SUPERSCRIPT[ch] ?? ch).join('')}`)
+        .replace(/([a-zA-Z])(\d)(?![\d.,])/g, (_, unit: string, exp: string) => `${unit}${SUPERSCRIPT[exp]}`)
+        .replace(/\bu(?=[gLlm]\b|[gLlm]\/)/g, 'µ')
+        .replace(/^Cel$/, '°C');
+}
+
+/** Valore di una misura con la sua unità leggibile. Un valore senza cifre
+    («non rilevabile») non riceve unità; uno con cifre la conserva anche se non è
+    un numero solo («130/80»). La virgola decimale vale solo per i numeri singoli. */
+export function formatMeasureValue(value: number | string | null | undefined, unitCode: string | null | undefined): string {
+    if (value === null || value === undefined || value === '') return '';
+    const text = String(value).trim();
+    if (typeof value === 'number' && !Number.isFinite(value)) return text;
+    if (!/\d/.test(text)) return String(value);
+    const number = /^-?\d+(?:[.,]\d+)?$/.test(text) ? text.replace('.', ',') : text;
+    const unit = formatUnitForDisplay(unitCode);
+    return unit ? `${number} ${unit}` : number;
+}
 
 export function listTerminologySystems(): TerminologySystemDescriptor[] {
     return SYSTEMS;

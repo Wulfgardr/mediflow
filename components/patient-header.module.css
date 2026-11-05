@@ -14,3 +14,6 @@
 @media (max-width: 750px) {
     .identity h1 { font: var(--type-person-compact); }
 }
+
+/* L'identificativo porta il proprio nome: un codice senza etichetta non dice che cosa sia. */
+.identifierLabel { margin-right: 4px; color: var(--lume-ink-muted); font: var(--type-meta); text-decoration: none; }

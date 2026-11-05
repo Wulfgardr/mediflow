@@ -64,6 +64,7 @@ import { buildPatientModuleRailGroups, filterTerritorialRailGroups } from '@/lib
 import { useTerritorialPacks } from '@/lib/territorial-pack-client';
 import FollowupSuggestions from '@/components/followup-suggestions';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
+import { patientIdentifierLabel } from '@/lib/patient-identifier-label';
 
 /* These helpers are invoked only from explicit UI events. Keeping their
    time and navigation side effects outside render makes that boundary visible
@@ -594,6 +595,7 @@ export default function PatientDetailPage() {
                 birthDateLabel: patient.birthDate ? birthDateLabel : undefined,
                 ageLabel: patient.birthDate ? formatCountLabel(differenceInYears(new Date(currentTimestampMs), new Date(patient.birthDate)), 'anno', 'anni') : undefined,
                 taxCode: patient.taxCode || undefined,
+                identifierLabel: patientIdentifierLabel(patient.taxCode),
             }}
             navGroups={workspaceNavGroups}
             primaryAction={{ href: `/patients/${id}/entries/new`, label: 'Nuova voce', icon: Plus }}

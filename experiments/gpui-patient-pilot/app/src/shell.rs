@@ -3584,12 +3584,20 @@ impl ClinicalApp {
                     "Nascita {}",
                     display_date(patient.birth_date.as_deref())
                 ))))
-                .child(div().type_role(theme, crate::theme::TextRole::Code).child(
-                    crate::title::title(
-                        crate::title::TitleText::code(patient.tax_code.clone()),
-                        theme,
-                    ),
-                ))
+                .child(
+                    div()
+                        .flex()
+                        .gap(px(4.))
+                        .child(div().text_color(theme.secondary).child(text!(
+                            crate::patient_text::identifier_label(&patient.tax_code).to_string()
+                        )))
+                        .child(div().type_role(theme, crate::theme::TextRole::Code).child(
+                            crate::title::title(
+                                crate::title::TitleText::code(patient.tax_code.clone()),
+                                theme,
+                            ),
+                        )),
+                )
                 .child(
                     div()
                         .border_t_1()
@@ -4578,7 +4586,10 @@ impl ClinicalApp {
                             .child(text!(row.display.clone())),
                         div()
                             .type_role(theme, crate::theme::TextRole::Strong)
-                            .child(text!(format!("{} {}", row.value, row.unit_code))),
+                            .child(text!(crate::clinical_units::value(
+                                &row.value,
+                                &row.unit_code
+                            ))),
                     ))
                     .child(
                         div()

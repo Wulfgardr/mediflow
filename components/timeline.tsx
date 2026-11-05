@@ -109,7 +109,7 @@ export default function Timeline({
         : visibleEntries[0]?.id;
 
     const auditToggle = patientDiary && proposal ? (
-        <Button variant="text" aria-pressed={showDeleted} onClick={() => setShowDeleted(value => !value)}>
+        <Button variant="text" className={twin.quietAction} aria-pressed={showDeleted} onClick={() => setShowDeleted(value => !value)}>
             {showDeleted ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
             {showDeleted ? 'Nascondi voci eliminate' : 'Mostra voci eliminate'}
         </Button>

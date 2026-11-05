@@ -2,6 +2,7 @@ mod appointments;
 #[cfg(unix)]
 mod chat_access;
 mod clinical_text;
+mod clinical_units;
 mod components;
 mod demo;
 mod demo_app;

@@ -9,6 +9,8 @@ export type PatientHeaderDetails = {
     ageLabel?: string;
     birthDateLabel?: string;
     taxCode?: string;
+    /** Nome breve dell'identificativo mostrato accanto al valore (es. «CF», «STP»). */
+    identifierLabel?: string;
     allergies?: readonly string[];
 };
 
@@ -22,7 +24,7 @@ export function PatientHeaderIdentity({name,details,titleRef}: {
             {details.sexLabel ? <PrivacyBlur>{details.sexLabel}</PrivacyBlur> : null}
             {details.ageLabel ? <PrivacyBlur>{details.ageLabel}</PrivacyBlur> : null}
             {details.birthDateLabel ? <PrivacyBlur>Nascita {details.birthDateLabel}</PrivacyBlur> : null}
-            {details.taxCode ? <PrivacyBlur className="type-code">{details.taxCode}</PrivacyBlur> : null}
+            {details.taxCode ? <span><abbr title={details.identifierLabel === undefined || details.identifierLabel === 'CF' ? 'Codice fiscale' : undefined} className={styles.identifierLabel}>{details.identifierLabel ?? 'CF'}</abbr> <PrivacyBlur className="type-code">{details.taxCode}</PrivacyBlur></span> : null}
         </p> : null}
         {details.allergies?.length ? <ul className={styles.allergies} aria-label="Allergie">
             {details.allergies.map(allergy => <li key={allergy} className={styles.allergy}>

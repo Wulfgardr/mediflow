@@ -38,3 +38,11 @@
     .patientEntry { grid-template-columns: minmax(0, 1fr); gap: 8px; }
     .margin { flex-direction: row; flex-wrap: wrap; gap: 8px; }
 }
+
+/* Gerarchia della voce: tipo e fonte sono metadati, il titolo guida la lettura.
+   Prima tipo, fonte e titolo avevano lo stesso peso e competevano fra loro. */
+.patientEntry .identity > span { color: var(--lume-ink-muted) !important; font: var(--type-meta); }
+.patientEntry .identity > div > span:first-child { font-weight: 400; }
+/* Le voci eliminate sono una consultazione di controllo, non un'azione principale. */
+.quietAction:global(.mf-button-text) { color: var(--lume-ink-muted); font: var(--type-meta); }
+.quietAction:global(.mf-button-text):hover { color: var(--lume-ink); }
