@@ -2,7 +2,12 @@
 
 Date: 2026-10-26
 Updated: 2026-10-30
-Status: Proposed
+Status: Proposed; superato in parte da [ADR 0180](./0180-athena-fuori-dal-nucleo-modelli-per-dominio.md)
+
+**Aggiornamento del 5 novembre 2026.** ATHENA esce dai requisiti del nucleo in
+ogni release (ADR 0180). Corpora, rapporti e 18 soglie restano come materiale
+di ricerca; una ripresa di Treatment Reasoning richiede un modello e un metodo
+con identità propria su runtime portabile.
 
 ## Cosa ti chiedo di decidere
 
