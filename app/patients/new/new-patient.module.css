@@ -1,5 +1,11 @@
-.navigation.navigation { padding: 0 28px 12px; gap: 12px; }
-.navigation.navigation > a { justify-content: flex-start; flex-wrap: wrap; gap: 4px 8px; padding: 8px 16px; border-radius: 10px; min-height: 40px; }
+.navigation.navigation { padding: 0 28px; gap: 24px; }
+/* Stesso schema delle linguette della Scheda: solo la sezione corrente è
+   segnata, con il filetto d'inchiostro; le altre restano testo silenzioso. */
+.navigation.navigation { border-bottom: 1px solid var(--lume-rule); }
+.navigation.navigation > a { justify-content: flex-start; flex-wrap: wrap; gap: 4px 8px; padding: 10px 0; border: 0; border-radius: 0; min-height: 40px; background: transparent; box-shadow: none; transform: none; color: var(--lume-ink-muted); }
+.navigation.navigation > a:hover { color: var(--lume-ink); background: transparent; }
+.navigation.navigation > a[aria-current='location'] { color: var(--lume-ink); background: transparent; box-shadow: inset 0 -2px var(--lume-ink); }
+.navigation.navigation > a small { color: var(--lume-ink-muted); font-weight: 400; }
 @media (max-width: 1023px) { .navigation.navigation { padding-inline: 20px; } }
 @media (max-width: 700px), (pointer: coarse) { .navigation.navigation > a { min-height: 44px; } }
 .documentSection.documentSection.documentSection { --lume-focal-shadow-opacity: 0; padding: 0; border: 0; border-radius: 0 !important; background: transparent !important; box-shadow: none; }

@@ -689,7 +689,7 @@
 .directoryToolbar .patientSearchField { flex: 1; min-width: 140px; min-height: 40px; border: 1px solid var(--lume-rule-strong); border-radius: 10px; background: var(--lume-surface-focal); padding: 0 12px; }
 .directoryToolbar .patientSearchField input { flex: 1; width: 0; font-size: 0.875rem; background: transparent; }
 .directoryToolbar .inboxScope { display: flex; gap: 12px; padding: 0; border-radius: 10px; background: var(--lume-surface-canvas); margin: 0; }
-.directoryToolbar .scopeChip { min-height: 40px; padding: 8px 16px; border: 0; border-radius: 8px; font: 0.875rem/1.4 var(--lume-font-sans); }
+.directoryToolbar .scopeChip { min-height: 40px; padding: 8px 16px; border: 0; border-radius: var(--lume-radius-control); font: 0.875rem/1.4 var(--lume-font-sans); }
 .directoryToolbar .scopeChipActive { background: var(--lume-surface-focal); color: var(--lume-ink); font-weight: 600; }
 :global(html[data-runtime-twin-design='proposal']) .inboxLayout { display: grid; grid-template-columns: minmax(0, 1fr) 304px; gap: 28px; align-items: stretch; }
 :global(html[data-runtime-twin-design='proposal']) .worklistPanel { container: patient-worklist / inline-size; padding: 0; border: 0; border-radius: 0; background: transparent; min-width: 0; }
