@@ -108,3 +108,141 @@ con SHA-256 verificato. Non viene ripetuta la build né l'esecuzione E2E complet
 Intervento eseguito da gpt-6.1-sol, effort high, senza deleghe; consumi non
 attribuiti. Le prove del raccordo formale sono in
 `docs/formal/therapy-status/README.md`.
+
+## Compatibilità delle scritture precedenti, PR #846
+
+Intervento sul checkout assegnato e sul ramo `claude/identita-paziente-senza-cf`,
+partendo da `9b34d37f74a9c7844918ee60538aefeb74f3c2c2`. Le prove seguenti
+riguardano il diff di questa correzione, con Node 24.22.0, ABI 137, macOS arm64
+e soli archivi sintetici. I valori storici non vengono corretti automaticamente.
+
+La presenza di `identifierType` abilita la validazione per tipo. Quando manca,
+il server conserva il valore di `taxCode` e il suo contratto precedente:
+STP o ENI soltanto con 13 cifre, `cf` altrimenti. La creazione paired mantiene
+il controllo precedente di stringa non vuota. Form e CSV senza tipo mantengono
+il loro controllo precedente di 16 caratteri alfanumerici ASCII. Il CSV legacy
+non trasforma un tipo inferito in una dichiarazione del chiamante.
+
+L’aggiornamento confronta tipo e valore effettivi con quelli salvati dentro
+la transazione. Un identificativo invariato non viene rivalidato o normalizzato,
+anche se è presente nel payload. Un cambio con tipo dichiarato viene validato;
+un cambio senza tipo segue il contratto legacy e aggiorna il tipo inferito.
+Il form usa lo snapshot iniziale della sessione di modifica per la stessa
+decisione. CAS, duplicati, storico e audit atomico restano attivi. Data di
+nascita e calcolo dell’età restano quelli già implementati: nessuna età da CF invalido.
+
+Prima di modificare il runtime sono state aggiunte le asserzioni ai writer reali:
+
+```sh
+MEDIFLOW_DATA_DIR=/tmp/mf846-unit-red node scripts/run-strip-types.mjs --test \
+  --test-name-pattern='identità compatibile' \
+  lib/patient-create-required-audit.test.ts lib/network-patient-write.test.ts
+```
+
+Su `9b34d37f7` falliscono quattro test con `400`: creazione web e paired con
+`SYN` seguito da UUID, aggiornamento web e paired con CF storico invariato.
+Le sole sostituzioni nei test web riguardano autenticazione e cookie; SQLite,
+route, normalizzazione, dispatcher, transazione e audit sono quelli reali.
+I test paired usano il writer reale con sessione e autorità sintetiche.
+
+| Caso | Risultato dopo la correzione |
+| --- | --- |
+| POST web senza tipo, `SYN` seguito da UUID | 201, stringa conservata |
+| Creazione paired precedente senza campi nuovi | 201, tipo inferito `cf` |
+| POST web e paired, tipo `cf` e `RSSMRA80A01H501X` | 400, messaggio italiano, nessun paziente creato |
+| PUT web, sole note sul CF storico errato | 200, CF invariato |
+| PUT web e paired, note e medesimi tipo/valore espliciti | 200, CF e storico invariati, versione incrementata |
+| PUT paired, sole note sul CF storico errato | 200, CF invariato |
+| PUT web e paired, nuovo CF errato dichiarato | 400, riga e audit invariati |
+| PUT web e paired, nuovo valore `TEST-...` senza tipo | 200, valore conservato e tipo inferito |
+
+Passano **191 test** eseguendo insieme `patient-create-required-audit`,
+`network-patient-write`, tutti i file `patient-identity*.test.ts`,
+`patient-write-normalization`, `patient-edit-session-schema` e
+`patient-bulk-import*.test.ts` tramite `run-strip-types.mjs --test`.
+La selezione richiesta `lib/patient-identity*.test.ts` passa anche da sola:
+**26 test**. Copre inoltre schema del form, invio delle sole note,
+rifiuto di un cambio invalido, CSV legacy, duplicati e conservazione delle stringhe.
+
+Il seed della comparazione passa attraverso gli endpoint ordinari del server
+di produzione proprio, sulla porta 38946:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+node experiments/gpui-patient-pilot/comparison/prepare-runtime.mjs candidate \
+  /tmp/mediflow-transition-846-delivery/candidate-private.json \
+  /Users/leonardopegollo/.t3/worktrees/medical-record-app/t3-1380bddb
+```
+
+Il corpus originale non è modificato. SHA-256:
+`856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36`.
+Ricevuta: 5 pazienti, 2 voci di diario, 1 terapia, 2 osservazioni,
+1 controllo e 1 allegato, con adozione della passphrase e pairing completati.
+Non è stata eseguita l’intera comparazione JS/Rust: `run.mjs` ammette soltanto
+Linux; la fase di seed richiesta è stata eseguita direttamente su macOS.
+Non si attribuisce a questa prova equivalenza o prestazione dei due runtime.
+
+E2E dopo `npx next build --webpack` e `npx next start --hostname 127.0.0.1 --port 38945`,
+con `MF085_SYNTHETIC_E2E=1`, `MEDIFLOW_DATA_DIR=/tmp/mf846-e2efinal`,
+`MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1`, `E2E_BASE_URL=http://127.0.0.1:38945`
+e `MEDIFLOW_NEXT_DIST_DIR=.next-visual-mf846-delivery`.
+Le due variabili `MEDIFLOW_APP_FINGERPRINT` e `MEDIFLOW_APP_SOURCE_FINGERPRINT`
+sono fissate a `mf846-compat-local` sia nella build sia nei processi di prova,
+per mantenere coerenti HTML prerenderizzato e server mentre si aggiornano i documenti.
+Gli spec isolati avviano da soli un nuovo standalone e un archivio vuoto per caso;
+sono stati preparati contratto Node e asset public/static della stessa build.
+Chromium usa sandbox e rete limitata al loopback. Un worker, zero retry.
+
+| Spec | Passati | Falliti |
+| --- | ---: | ---: |
+| `e2e/kree8-keyboard.spec.ts` | 2 | 0 |
+| `e2e/siss-composition.spec.ts` | 1 | 0 |
+| `e2e/patient-bulk-import.spec.ts` | 6 | 0 |
+| `e2e/onboarding-experience.spec.ts` | 8 | 0 |
+| `e2e/cockpit-navigation.spec.ts` | 3 | 0 |
+| `e2e/patient-identity-compatibility.spec.ts` | 1 | 0 |
+
+Sono 20 test richiesti più una nuova regressione, tutti passati. Gli esiti dei
+cinque file diversi dal CSV sono in `playwright-final.json`; il CSV finale
+è in `playwright-csv-delivery.json`, ripetuto dopo gli aggiornamenti delle sue
+sole fixture e asserzioni. Entrambi usano la stessa build del runtime.
+Nessun fallimento E2E residuo richiede un confronto con `origin/main`.
+
+La nuova regressione nel browser crea un CF errato attraverso il payload legacy,
+lo apre nel form reale, verifica il rifiuto di un nuovo valore errato e salva
+le note ripristinando il valore iniziale. La richiesta invia soltanto le note
+e la versione; la rilettura conserva CF e tipo, incrementa la versione e mostra
+le note cifrate sul trasporto.
+
+Le fixture che compilano il form nuovo scelgono esplicitamente CF e, quando
+serve, data esatta, usando CF sintetici validi. Il contenuto CSV importato
+resta a sei colonne con `SYNTHETIC0000001` e `SYNTHETIC0000002`; le asserzioni
+del download riconoscono il modello esteso a nove colonne e il nuovo testo dei
+duplicati. Non sono state indebolite le asserzioni su cifratura, conferma,
+destinazione, rilettura o conservazione del paziente preesistente.
+
+Passano `npm run typecheck`, `npm run lint`, tutti i **25 comandi** del job
+`repository-guards` corrente, comprese prove negative e OpenAPI contro
+`origin/main`, oltre al controllo dell’assenza di stato Xcode per utente.
+`npm run verify:therapy-status` passa integralmente: modello corrente con
+5.903.794 stati distinti, tre mutanti, sei testimoni raggiungibili, prove del
+controller e HTTP, mutanti del codice e del percorso terapia in chat.
+`lib/db.ts` non è modificato e non è stato necessario un nuovo raccordo.
+
+Passano anche gli smoke HTTP con server e archivio propri:
+`test:network:home-base-readonly` (1 test), `test:network:home-base-write`
+(3 test), `test:network:home-base-diary-write` (1 test). Il loro primo avvio
+ha rilevato un import senza estensione nel supporto sintetico condiviso,
+corretto in `patient-identity.test-support.ts`; i tre run successivi sono verdi.
+
+Log, ricevute e manifesto SHA-256 dei sei file runtime modificati restano
+separati sotto `/tmp/mf846-20261105-compat/`, senza sovrascrivere i run precedenti.
+La prima selezione E2E ha rilevato metadati incoerenti e asserzioni delle fixture
+rimaste al form/modello precedente; le correzioni e le ripetizioni sono registrate
+in report distinti. Non si attribuiscono questi errori a `origin/main` senza prova.
+
+Non provati in questo intervento: intera suite E2E, intera suite unit,
+test web-core del launcher con browser reale, comparazione completa JS/Rust,
+app Apple avviate, dispositivi fisici e servizi SISS regionali.
+Intervento di gpt-6.1-sol, effort xhigh, senza deleghe; consumi non attribuibili.
+Nessun dato clinico reale letto e nessun merge eseguito.

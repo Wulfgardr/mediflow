@@ -31,13 +31,13 @@ test('template contains the extended headers and no patient data', () => {
 });
 test('UTF-8 identities are not trimmed, transliterated or otherwise rewritten; empty optionals absent', () => {
     const row = preview(`${header}\n  Zoë  ;D’Àngelo; ${code().toLowerCase()} ;;;`).rows[0];
-    assert.deepEqual(row.values, { firstName: '  Zoë  ', lastName: 'D’Àngelo', taxCode: code(), identifierType: 'cf', birthDatePrecision: 'unknown', birthYear: null });
+    assert.deepEqual(row.values, { firstName: '  Zoë  ', lastName: 'D’Àngelo', taxCode: code(), birthDatePrecision: 'unknown', birthYear: null });
     assert.equal(isPatientCsvRowEligible(row), true);
     for (const key of ['birthDate', 'address', 'phone']) assert.equal(Object.hasOwn(row.values!, key), false);
 });
 test('quoted separators, escaped quotes, CRLF and multiline address preserve exact values and line numbers', () => {
     const rows = preview(`\uFEFF${header}\r\n"Ada; A";"D""Angelo";${code()};2000-02-29;"Via ; Prova\r\nInterno ""A""";+3900123\r\n${line(2)}\r\n`).rows;
-    assert.deepEqual(rows[0].values, { firstName: 'Ada; A', lastName: 'D"Angelo', taxCode: code(), identifierType: 'cf', birthDatePrecision: 'exact', birthYear: null, birthDate: '2000-02-29', address: 'Via ; Prova\r\nInterno "A"', phone: '+3900123' });
+    assert.deepEqual(rows[0].values, { firstName: 'Ada; A', lastName: 'D"Angelo', taxCode: code(), birthDatePrecision: 'exact', birthYear: null, birthDate: '2000-02-29', address: 'Via ; Prova\r\nInterno "A"', phone: '+3900123' });
     assert.equal(rows[0].line, 2);
     assert.equal(rows[1].line, 4);
     assert.equal(rows[1].row, 2);

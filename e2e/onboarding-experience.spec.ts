@@ -8,6 +8,7 @@ import type { Locator, Page, TestInfo } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
 import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow } from './utils';
 import { parseWorkProfileState } from '../lib/work-profile';
+import { syntheticTaxCode } from '../lib/patient-identity.test-support';
 
 const PIN = 'FirstUse086'; // Synthetic; exercise the existing text PIN, never a new PIN policy.
 const PASSPHRASE = 'Primo avvio sintetico sicuro';
@@ -318,7 +319,9 @@ test('first use: manual entry creates the first synthetic patient without saving
     await expect(page).toHaveURL(/\/patients\/new$/u);
     await page.locator('input[name="firstName"]').fill('Prima');
     await page.locator('input[name="lastName"]').fill('Sintetica');
-    await page.locator('input[name="taxCode"]').fill('SYNTHETIC0000086');
+    const taxCode = syntheticTaxCode('onboarding-manual-086');
+    await page.getByLabel('Identificativo', { exact: true }).selectOption('cf');
+    await page.locator('input[name="taxCode"]').fill(taxCode);
     const response = page.waitForResponse(item => item.request().method() === 'POST'
         && new URL(item.url()).pathname === '/api/patients');
     await page.getByRole('button', { name: 'Crea scheda', exact: true }).click();
@@ -330,7 +333,7 @@ test('first use: manual entry creates the first synthetic patient without saving
     expect(persisted.status()).toBe(200);
     const rows = await persisted.json();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ firstName: 'Prima', lastName: 'Sintetica', taxCode: 'SYNTHETIC0000086' });
+    expect(rows[0]).toMatchObject({ firstName: 'Prima', lastName: 'Sintetica', taxCode });
     expect(await readProfile(page)).toEqual(before);
     // The same synthetic record remains readable after changing and recovering the access wrapping.
     const nextPassphrase = 'Cambio sintetico sicuro nuovo';

@@ -8585,6 +8585,10 @@ components:
         must be provided. A current version at 9007199254740991 returns 409
         VERSION_CONFLICT before effects, even when the expected version matches.
         The last permitted increment is 9007199254740990 to 9007199254740991.
+        An unchanged identifier retains its stored value even if it fails the
+        new validation. A changed identifier with identifierType is validated
+        for that type. Without identifierType, taxCode keeps the legacy contract;
+        STP/ENI followed by exactly 13 digits infer their type, otherwise cf.
       properties:
         version:
           type: integer
@@ -8698,6 +8702,9 @@ components:
         Patient create payload for paired lifecycle writes. Sensitive optional
         fields must be sealed strings beginning with `ENC:`. Server-controlled
         fields and AI/document fields are rejected.
+        A declared identifierType enables validation for that type. Without it,
+        taxCode keeps the legacy nonblank-string contract and its original value;
+        STP/ENI followed by exactly 13 digits infer their type, otherwise cf.
       properties:
         id:
           type: string

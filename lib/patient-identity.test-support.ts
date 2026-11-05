@@ -1,4 +1,4 @@
-import { isValidItalianTaxCode } from './patient-identity';
+import { isValidItalianTaxCode } from './patient-identity.ts';
 
 export function syntheticTaxCode(seed: number | string = 1): string {
     let hash = typeof seed === 'number' ? seed : [...seed].reduce((value, char) => (Math.imul(value, 31) + char.charCodeAt(0)) >>> 0, 0);

@@ -13,7 +13,7 @@ import { WhoCodeCheck } from '@/components/who-code-check';
 
 import ExemptionSelector from '@/components/exemption-selector';
 
-import { patientSchema, PatientFormValues } from '@/lib/schemas';
+import { createPatientSchema, PatientFormValues } from '@/lib/schemas';
 
 import { patientFormDefaults, type PatientFormSeed } from '@/lib/patient-edit-session';
 import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
@@ -238,10 +238,11 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
 export default function PatientForm({ defaultValues, onSubmit, isSubmitting = false, isEditMode = false, disabled = false }: PatientFormProps) {
     /* useForm caches defaults; its comparison baseline must share that lifetime. */
     const [formattedDefaults] = useState(() => patientFormDefaults(defaultValues));
+    const [formSchema] = useState(() => createPatientSchema(isEditMode ? formattedDefaults : undefined));
     const submittingRef = useRef(false);
     const { register, control, handleSubmit, setValue, watch, formState: { errors, isDirty, isSubmitting: formSubmitting } } = useForm<PatientFormValues>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        resolver: zodResolver(patientSchema) as any,
+        resolver: zodResolver(formSchema) as any,
         // HTML dates are strings; the existing resolver returns Date objects.
         defaultValues: formattedDefaults as unknown as DefaultValues<PatientFormValues>,
     });

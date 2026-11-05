@@ -1,4 +1,4 @@
-import { birthError, identifierError, normalizeIdentifierValue } from './patient-identity';
+import { birthError, identifierError, inferLegacyIdentifierType, normalizeIdentifierValue } from './patient-identity';
 import { hasPatientIdentifierConflict, PATIENT_IDENTIFIER_DUPLICATE } from './patient-identifier-conflict';
 /* WUL-718 one authoritative patient-profile update and membership commit. */
 import { and, eq } from 'drizzle-orm';
@@ -84,10 +84,14 @@ export function updatePatientOperation(input: PatientUpdateOperationInput): Pati
             value: buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, existing) };
 
         const values = { ...input.values };
-        const hasIdentityChange = ['taxCode', 'identifierType'].some(key => Reflect.get(values, key) !== undefined);
+        const hasIdentityWrite = values.taxCode !== undefined || values.identifierType !== undefined;
         const hasBirthChange = ['birthDate', 'birthYear', 'birthDatePrecision'].some(key => Reflect.get(values, key) !== undefined);
         const effective = { ...existing, ...Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) };
-        if (hasIdentityChange) {
+        if (values.identifierType === undefined && values.taxCode !== undefined && values.taxCode !== existing.taxCode) {
+            effective.identifierType = values.identifierType = inferLegacyIdentifierType(values.taxCode);
+        }
+        const hasIdentityChange = effective.taxCode !== existing.taxCode || effective.identifierType !== existing.identifierType;
+        if (hasIdentityChange && input.values.identifierType !== undefined) {
             const error = identifierError(effective.identifierType, effective.taxCode);
             if (error) return { status: 400, value: { error } };
             values.taxCode = normalizeIdentifierValue(effective.identifierType, effective.taxCode);
@@ -101,7 +105,7 @@ export function updatePatientOperation(input: PatientUpdateOperationInput): Pati
             const error = birthError(effective);
             if (error) return { status: 400, value: { error } };
         }
-        if ((hasIdentityChange || input.setPrimaryAmbulatory || values.isArchived === false) && hasPatientIdentifierConflict(tx, effective)) return { status: 409, value: PATIENT_IDENTIFIER_DUPLICATE };
+        if ((hasIdentityWrite || input.setPrimaryAmbulatory || values.isArchived === false) && hasPatientIdentifierConflict(tx, effective)) return { status: 409, value: PATIENT_IDENTIFIER_DUPLICATE };
         const identityChanged = effective.identifierType !== existing.identifierType || effective.taxCode !== existing.taxCode;
         if (identityChanged) values.identifierHistory = JSON.stringify([...JSON.parse(existing.identifierHistory), {
             version: input.expectedVersion + 1, occurredAt: (values.updatedAt ?? new Date()).toISOString(), actorRef: input.audit.actorRef,

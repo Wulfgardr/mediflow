@@ -35,6 +35,10 @@ export function inferIdentifierType(value?: string | null): PatientIdentifierTyp
     const normalized = value?.trim().toUpperCase() ?? '';
     return /^STP[0-9]{13}$/.test(normalized) ? 'stp' : /^ENI[0-9]{13}$/.test(normalized) ? 'eni' : normalized ? 'cf' : 'none';
 }
+export function inferLegacyIdentifierType(value: string): PatientIdentifierType {
+    const type = inferIdentifierType(value);
+    return type === 'none' ? 'cf' : type;
+}
 export function normalizeIdentifierValue(type: PatientIdentifierType, value: string): string {
     return ['cf', 'stp', 'eni'].includes(type) ? value.trim().toUpperCase() : value.trim();
 }

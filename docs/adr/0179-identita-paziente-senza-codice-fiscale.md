@@ -10,13 +10,14 @@ anche data esatta o anno di nascita stimato. Il tipo non prova l’identità civ
 Lo schema SQLite passa da 7 a 8 attraverso l’apertura versionata di ADR 0080,
 con originale verificato e transazione IMMEDIATE. Le colonne sono additive:
 `identifier_type`, `birth_date_precision`, `birth_year`, `identifier_history`.
-I valori esistenti restano identici: prefisso STP o ENI assegna il tipo
-corrispondente, tutti gli altri diventano CF. Una nascita presente diventa
+I valori esistenti restano identici: prefisso STP o ENI seguito da 13 cifre
+assegna il tipo corrispondente, gli altri valori non vuoti diventano CF e
+quelli vuoti diventano `none`. Una nascita presente diventa
 esatta, altrimenti sconosciuta. Non si rivalidano o cancellano valori storici.
 `tax_code` resta NOT NULL: per `none` contiene la stringa vuota, che significa
 assenza di identificativo e permette ai vecchi client di leggere una stringa.
 
-Le nuove scritture validano formato e controllo del CF, omocodia inclusa;
+Le scritture con `identifierType` dichiarato validano formato, giorno e controllo del CF, omocodia inclusa;
 STP ed ENI richiedono il prefisso e 13 cifre. Documento estero e altro
 identificativo accettano al massimo 128 caratteri, senza controlli invisibili.
 La nascita è esatta, stimata al solo anno oppure sconosciuta. L’età dalla data
@@ -39,6 +40,23 @@ OpenAPI v1 passa da 1.54.0 a 1.55.0 con campi facoltativi additivi
 `identifierType`, `birthDatePrecision`, `birthYear`. `taxCode` resta una stringa
 presente, anche quando vuota. I client precedenti ignorano i campi nuovi;
 una risposta vecchia è decodificabile dai modelli Apple aggiornati.
+
+Le richieste senza `identifierType` conservano il contratto precedente di
+`taxCode`, senza aggiungere la validazione per tipo. Il server conserva la
+stringa ricevuta e inferisce STP o ENI soltanto dal prefisso seguito da
+esattamente 13 cifre; altrimenti assegna `cf`. Il writer paired mantiene
+anche il controllo precedente di stringa non vuota. I form e i CSV legacy
+conservano il controllo precedente di 16 caratteri alfanumerici ASCII.
+Un CSV senza tipo compilato non invia come dichiarato il tipo inferito.
+
+Una modifica che lascia invariati tipo e valore salvati non applica la nuova
+validazione all’identificativo storico, anche quando il client li rimanda.
+Il form confronta l’identificativo con il proprio snapshot iniziale, così
+la modifica delle note resta salvabile anche con un CF storico errato.
+Un cambio effettivo con tipo dichiarato applica la validazione per tipo;
+un cambio senza tipo conserva il contratto legacy e aggiorna il tipo inferito.
+CAS, controllo dei duplicati, storico e audit atomico restano applicati.
+La compatibilità non rende valido un CF errato e non consente di ricavarne l’età.
 
 FHIR R4 usa `urn:oid:2.16.840.1.113883.2.9.4.3.2` per il CF e i seguenti
 namespace applicativi, dichiarati qui senza rivendicare profili nazionali:
