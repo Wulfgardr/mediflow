@@ -213,13 +213,13 @@ export default function NewPatientPage() {
             : 'La scheda viene creata solo quando salvi.';
 
     const navItems = [
-        { href: '#documento', label: 'Documento', meta: 'opzionale' },
+        { href: '#documento', label: 'Da un documento', meta: 'facoltativo' },
         ...(importMeta ? [{
             href: '#controllo',
             label: 'Controllo',
             meta: pendingImportReview ? 'pre-compilazione' : 'completato',
         }] : []),
-        { href: '#dati', label: 'Dati', meta: 'scheda' },
+        { href: '#dati', label: 'Dati del paziente' },
     ];
 
     return (
