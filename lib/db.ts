@@ -1,4 +1,4 @@
-import type { PatientIdentifierType, BirthDatePrecision } from './patient-identity';
+import { PatientIdentifierConflictError, PATIENT_IDENTIFIER_DUPLICATE, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity';
 import { decodeBase64, encodeBase64, openPatientDocumentFile, sealPatientDocumentFile } from './security/attachment-file-envelope';
 import backupEncryptedFields from './backup-encrypted-fields.json';
 import type { ProstheticsCatalogSelection, ProstheticsSnapshot } from './reference-data/prosthetics-catalog-contract';
@@ -486,6 +486,10 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         const res = await (collection ? retireOnFailure(request, collection) : request);
         assertCurrent();
         if (!res.ok) {
+            if (this.tableName === 'patients' && res.status === 409 && typeof res.clone === 'function') {
+                const payload = await res.clone().json().catch(() => null);
+                if (payload?.code === PATIENT_IDENTIFIER_DUPLICATE.code) throw new PatientIdentifierConflictError();
+            }
             // Fenced errors never echo server/driver bodies containing patient data.
             if (fenced) throw new Error('Patient create was not confirmed.');
             const errorText = await res.text();
@@ -530,6 +534,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             if (res.status === 409 && isApiVersionConflictPayload(payload)) {
                 throw this.buildVersionConflictError(payload);
             }
+            if (this.tableName === 'patients' && res.status === 409 && payload?.code === PATIENT_IDENTIFIER_DUPLICATE.code) throw new PatientIdentifierConflictError();
             if (this.tableName === 'therapies' && [400, 401, 403, 404, 409, 413, 422, 423].includes(res.status)) throw new ApiWriteRejectedError(res.status);
             if (this.tableName === 'siss_handoff_events') throw new Error(res.status === 409
                 ? 'Il passaggio SISS è cambiato. Ricarica il diario prima di riprovare.' : 'Modifica del passaggio SISS non riuscita.');

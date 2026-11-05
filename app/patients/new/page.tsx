@@ -1,5 +1,6 @@
 'use client';
 
+import { PatientIdentifierConflictError } from '@/lib/patient-identity';
 import { formatCountLabel } from '@/lib/format-count';
 import ink from '@/components/ink-secondary.module.css';
 import styles from './new-patient.module.css';
@@ -202,7 +203,7 @@ export default function NewPatientPage() {
             router.push('/?area=incarico'); // WUL-732: torna alla lista anche senza profilo confermato.
         } catch (error) {
             console.error("Failed to save patient", error);
-            showToast({ tone: 'error', title: 'Errore durante il salvataggio', description: 'Controlla i dati e riprova.' });
+            showToast({ tone: 'error', title: 'Errore durante il salvataggio', description: error instanceof PatientIdentifierConflictError ? error.message : 'Controlla i dati e riprova.' });
         }
     };
 

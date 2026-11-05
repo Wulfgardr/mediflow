@@ -4,13 +4,7 @@ import { patients, patientsToAmbulatories } from './schema';
 import { normalizeIdentifierValue, type PatientIdentifierType } from './patient-identity';
 
 type Reader = Pick<typeof dbServer, 'select'>;
-export const PATIENT_IDENTIFIER_DUPLICATE = {
-    code: 'PATIENT_IDENTIFIER_DUPLICATE',
-    error: 'Un altro paziente di questo ambulatorio ha già lo stesso identificativo. Apri la scheda esistente prima di proseguire.',
-};
-export class PatientIdentifierConflictError extends Error {
-    constructor() { super(PATIENT_IDENTIFIER_DUPLICATE.error); }
-}
+export { PATIENT_IDENTIFIER_DUPLICATE, PatientIdentifierConflictError } from './patient-identity';
 export function hasPatientIdentifierConflict(tx: Reader, input: {
     id: string; identifierType: PatientIdentifierType; taxCode: string; ambulatoryId?: string | null;
 }): boolean {

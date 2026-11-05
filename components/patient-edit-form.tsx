@@ -4,6 +4,7 @@ import { formatCountLabel } from '@/lib/format-count';
 import styles from './clinical-register.module.css';
 import { useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { PatientIdentifierConflictError } from '@/lib/patient-identity';
 import { ApiConflictError, db } from '@/lib/db';
 import {
     PatientEditSession,
@@ -109,6 +110,7 @@ export default function PatientEditForm({ initialRecord, onSaved, onReloaded }: 
 
     const interrupted = result?.status === 'interrupted' ? result : null;
     const conflict = interrupted?.error instanceof ApiConflictError;
+    const identifierConflict = interrupted?.error instanceof PatientIdentifierConflictError ? interrupted.error : null;
     return (
         <div className="space-y-5" aria-busy={busy}>
             {editor.error && <p role="alert" className="mf-alert mf-alert-critical">{editor.error}</p>}
@@ -116,10 +118,10 @@ export default function PatientEditForm({ initialRecord, onSaved, onReloaded }: 
                 <section role="alert" className="mf-alert mf-alert-warning space-y-3">
                     <h3 className="font-semibold">Salvataggio non completato</h3>
                     <p>{formatCountLabel(interrupted.confirmed, 'operazione confermata', 'operazioni confermate')} su {interrupted.total}. Le modifiche già registrate non sono state annullate: il salvataggio può essere parziale.</p>
-                    <p>{conflict
+                    <p>{identifierConflict ? identifierConflict.message : conflict
                         ? 'Un record è cambiato altrove. Rileggi i dati salvati e rivedi le modifiche: non verranno riapplicate con versioni nuove.'
                         : 'L’esito dell’operazione interrotta non è confermato. Il retry mantiene ID e versioni originali e salta le operazioni confermate. Una risposta persa può richiedere la rilettura.'}</p>
-                    {!conflict && <button type="button" onClick={() => void save()} disabled={busy} className="mf-btn-secondary">Riprova operazioni residue</button>}
+                    {!conflict && !identifierConflict && <button type="button" onClick={() => void save()} disabled={busy} className="mf-btn-secondary">Riprova operazioni residue</button>}
                 </section>
             )}
             <div className={styles.toolbar}>
