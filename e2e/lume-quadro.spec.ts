@@ -111,8 +111,8 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
   await expect(page.getByTestId('lume-scheda-surface')).toHaveCSS('box-shadow', 'none');
 
   const measure = quadro.getByRole('region', { name: 'Misure recenti', exact: true });
-  const value = measure.getByRole('cell', { name: /160 mm\[Hg\]/ });
-  await expect(value).toContainText('160 mm[Hg]');
+  const value = measure.getByRole('cell', { name: /160 mmHg/ });
+  await expect(value).toContainText('160 mmHg');
   await expect(value).toHaveCSS('color', await resolveColor(page, '--lume-signal-critical'));
   await expect(value).toHaveCSS('font-variant-numeric', 'tabular-nums');
   await expect(value).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');

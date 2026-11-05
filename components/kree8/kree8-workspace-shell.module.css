@@ -28,7 +28,10 @@
   --k8-pill-warning-fg: color-mix(in srgb, var(--lume-signal-warning) 64%, var(--lume-ink));
   --k8-pill-critical-bg: color-mix(in srgb, var(--lume-signal-critical) 12%, var(--lume-surface-field));
   --k8-pill-critical-fg: color-mix(in srgb, var(--lume-signal-critical) 66%, var(--lume-ink));
-  --k8-primary-bg: var(--lume-ink);
+  /* Un solo colore per l'azione principale in tutta l'app (spec Punto d'inchiostro:
+     «Principale: fondo inchiostro fresco»). Prima il guscio dipingeva di nero i
+     .ui-btn-primary mentre i .mf-button-primary restavano blu. */
+  --k8-primary-bg: var(--lume-ink-fresh);
   --k8-primary-fg: var(--lume-surface-focal);
   /* Lume: accento minerale interattivo (ed e anche il filo, quando un contenuto
      interno segna il fuoco clinico, e ora anche l'anello di focus del guscio). */
@@ -1111,3 +1114,11 @@
   :global(html[data-runtime-twin-design='proposal']) .overviewShell .sectionRail { column-gap: 8px; }
 }
 @media (pointer: fine) and (min-width: 701px) { :global(html[data-runtime-twin-design='proposal']) .headerActionButton { white-space: nowrap; } }
+
+/* Su schermo stretto i comandi dell'intestazione vanno su righe intere invece di
+   spezzare l'etichetta parola per parola («Import / a / elenco / CSV»). */
+@media (max-width: 640px) {
+  .chrome .chromeTopRow { flex-wrap: wrap; row-gap: 12px; }
+  .chrome .headerActionCluster { flex: 1 1 100%; flex-direction: column; align-items: stretch; }
+  .chrome .headerActionCluster > :is(a, button) { justify-content: flex-start; white-space: nowrap; }
+}

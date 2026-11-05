@@ -238,8 +238,8 @@ function railAreaIsSelected(navArea: AreaId, currentArea: AreaId): boolean {
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'all', label: 'Tutti' },
   { id: 'urgent', label: 'Urgenti' },
-  { id: 'ai', label: 'AI' },
-  { id: 'manual', label: 'Manuali' },
+  { id: 'ai', label: 'Proposti' },
+  { id: 'manual', label: 'Inseriti a mano' },
 ];
 
 const STAGES: { id: StageId; index: number; label: string; title: string }[] = [
@@ -850,7 +850,7 @@ function summarizeAgendaBridgeSources(data?: ClinicalAgendaBridgePreview): strin
         return `${source.sourceLabel}: ${source.parsed} letti`;
       }
       if (source.status === 'missing') {
-        return `${source.sourceLabel}: cache assente`;
+        return `${source.sourceLabel}: nessun dato`;
       }
       return `${source.sourceLabel}: non leggibile`;
     })
@@ -871,10 +871,10 @@ function ClinicalAgendaBridgePanel({
         <div className={styles.agendaBridgeHeader}>
           <Cloud size={13} />
           <span>Suggerimenti da e-mail e agenda</span>
-          <PillBadge variant="neutral">lettura locale</PillBadge>
+          <PillBadge variant="neutral">in lettura</PillBadge>
         </div>
         <p className={styles.agendaBridgeCopy}>
-          Sto cercando solo segnali clinici o FBF gia presenti nelle cache locali.
+          Cerco appuntamenti clinici nelle copie locali di posta e calendario.
         </p>
       </div>
     );
@@ -895,21 +895,9 @@ function ClinicalAgendaBridgePanel({
     );
   }
 
-  if (!bridge.data?.enabled) {
-    return (
-      <div className={styles.agendaBridge}>
-        <div className={styles.agendaBridgeHeader}>
-          <Cloud size={13} />
-          <span>Suggerimenti da e-mail e agenda</span>
-          <PillBadge variant="neutral">cache assente</PillBadge>
-        </div>
-        <p className={styles.agendaBridgeCopy}>
-          Pronto per leggere le cache evento del mail assistant, senza importare
-          calendario personale o posta.
-        </p>
-      </div>
-    );
-  }
+  /* Integrazione facoltativa non configurata: nessun pannello. Un riquadro che
+     descrive una funzione spenta è testo che il medico deve leggere senza ricavarne nulla. */
+  if (!bridge.data?.enabled) return null;
 
   return (
     <div className={styles.agendaBridge}>
@@ -917,13 +905,13 @@ function ClinicalAgendaBridgePanel({
         <Cloud size={13} />
         <span>Suggerimenti da e-mail e agenda</span>
         <PillBadge variant="neutral">
-          {bridge.data.stats.candidates} candidati
+          {bridge.data.stats.candidates} da rivedere
         </PillBadge>
       </div>
 
       {candidates.length === 0 ? (
         <p className={styles.agendaBridgeCopy}>
-          Nessun segnale clinico/FBF nella finestra locale. Nulla viene importato.
+          Nessun appuntamento clinico trovato. Nulla viene importato.
           {sourceSummary ? <span> {sourceSummary}.</span> : null}
         </p>
       ) : (

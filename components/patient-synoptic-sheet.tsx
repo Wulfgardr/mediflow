@@ -65,7 +65,7 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
         </Section>
         <Section name="Misure recenti" read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
             <table className={`${register.table} ${reading.measures}`} aria-label="Misure recenti">
-                <thead><tr><th scope="col">Nome</th><th scope="col" className={reading.value}>Valore e unità</th><th scope="col">Data</th><th scope="col" className={register.secondaryColumn}>Variazione</th></tr></thead>
+                <thead><tr><th scope="col">Nome</th><th scope="col" className={reading.value}>Valore</th><th scope="col">Data</th><th scope="col" className={register.secondaryColumn}>Variazione</th></tr></thead>
                 <tbody>{measureRows.map(measure => <tr key={measure.id}>
                     <td>{measure.display}</td><td className={`${reading.value} ${measure.outOfRange ? register.critical : ''}`}>{measure.valueLabel}{measure.outOfRange ? ` · ${measure.outOfRange}` : ''}</td>
                     <td><DateCell date={measure.date} /></td><td className={register.secondaryColumn}>{measure.delta}</td>

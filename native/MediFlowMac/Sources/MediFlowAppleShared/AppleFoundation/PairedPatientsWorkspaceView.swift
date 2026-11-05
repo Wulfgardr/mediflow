@@ -715,7 +715,7 @@ struct PairedPatientsWorkspaceView: View {
                 .inkVoice(28)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityHeading(.h1)
-            Text(PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode))
+            Text(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(detail.taxCode))
                 .font(.subheadline)
                 .codice()
                 .foregroundStyle(.secondary)

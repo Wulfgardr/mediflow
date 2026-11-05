@@ -1,6 +1,6 @@
 import type { Observation } from './db';
 import { classifyObservationRange, toNumericValue } from './observation-range';
-import { resolveStaticTerminology } from './terminology';
+import { formatMeasureValue, formatUnitForDisplay, resolveStaticTerminology } from './terminology';
 
 export function projectQuadroMeasures(observations: Observation[]) {
     const parameters = new Map<string, { latest: Observation; previous?: Observation }>();
@@ -30,9 +30,9 @@ export function projectQuadroMeasures(observations: Observation[]) {
             return {
                 id: item.id,
                 display: resolveStaticTerminology('LOINC', item.code)?.displayIt ?? item.display,
-                valueLabel: `${item.value}${item.unitCode ? ` ${item.unitCode}` : ''}`,
+                valueLabel: formatMeasureValue(item.value, item.unitCode),
                 date: item.observedAt,
-                delta: difference !== null && previous ? `${difference > 0 ? '+' : ''}${String(difference).replace('.', ',')} ${item.unitCode} dal ${new Date(previous.observedAt).toLocaleDateString('it-IT')}`.trim() : undefined,
+                delta: difference !== null && previous ? `${difference > 0 ? '+' : ''}${String(difference).replace('.', ',')} ${formatUnitForDisplay(item.unitCode)} dal ${new Date(previous.observedAt).toLocaleDateString('it-IT')}`.trim() : undefined,
                 outOfRange: classifyObservationRange(item.value, item.refLow, item.refHigh),
             };
         });
