@@ -121,13 +121,16 @@ public struct HomeBasePairedCredentials: Hashable, Sendable {
 }
 
 public struct HomeBasePatientSummary: Identifiable, Codable, Hashable, Sendable {
-    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, isAdi: Bool?, isArchived: Bool?, version: Int, updatedAt: Date?, deletedAt: Date? = nil, deletionReason: String? = nil, diagnoses: String? = nil) {
-        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason; self.diagnoses = diagnoses
+    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, isAdi: Bool?, isArchived: Bool?, version: Int, updatedAt: Date?, deletedAt: Date? = nil, deletionReason: String? = nil, diagnoses: String? = nil, identifierType: String? = nil, birthDatePrecision: String? = nil, birthYear: Int? = nil) {
+        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.identifierType = identifierType; self.birthDatePrecision = birthDatePrecision; self.birthYear = birthYear; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason; self.diagnoses = diagnoses
     }
     public let id: String
     public let firstName: String
     public let lastName: String
     public let birthDate: Date?
+    public let identifierType: String?
+    public let birthDatePrecision: String?
+    public let birthYear: Int?
     public let taxCode: String
     public let isAdi: Bool?
     public let isArchived: Bool?
@@ -139,13 +142,16 @@ public struct HomeBasePatientSummary: Identifiable, Codable, Hashable, Sendable 
 }
 
 public struct HomeBasePatientDetail: Identifiable, Codable, Hashable, Sendable {
-    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, address: String?, phone: String?, caregiver: String?, exemptions: String?, diagnoses: String?, monitoringProfile: String?, statusReason: String?, notes: String?, aiSummary: String?, documentInsights: String?, isAdi: Bool?, isArchived: Bool?, version: Int, ambulatoryId: String?, createdAt: Date?, updatedAt: Date?, deletedAt: Date? = nil, deletionReason: String? = nil, archiveReason: String? = nil, archiveNote: String? = nil) {
-        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.address = address; self.phone = phone; self.caregiver = caregiver; self.exemptions = exemptions; self.diagnoses = diagnoses; self.monitoringProfile = monitoringProfile; self.statusReason = statusReason; self.notes = notes; self.aiSummary = aiSummary; self.documentInsights = documentInsights; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.ambulatoryId = ambulatoryId; self.createdAt = createdAt; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason; self.archiveReason = archiveReason; self.archiveNote = archiveNote
+    public init(id: String, firstName: String, lastName: String, birthDate: Date?, taxCode: String, address: String?, phone: String?, caregiver: String?, exemptions: String?, diagnoses: String?, monitoringProfile: String?, statusReason: String?, notes: String?, aiSummary: String?, documentInsights: String?, isAdi: Bool?, isArchived: Bool?, version: Int, ambulatoryId: String?, createdAt: Date?, updatedAt: Date?, deletedAt: Date? = nil, deletionReason: String? = nil, archiveReason: String? = nil, archiveNote: String? = nil, identifierType: String? = nil, birthDatePrecision: String? = nil, birthYear: Int? = nil) {
+        self.id = id; self.firstName = firstName; self.lastName = lastName; self.birthDate = birthDate; self.taxCode = taxCode; self.identifierType = identifierType; self.birthDatePrecision = birthDatePrecision; self.birthYear = birthYear; self.address = address; self.phone = phone; self.caregiver = caregiver; self.exemptions = exemptions; self.diagnoses = diagnoses; self.monitoringProfile = monitoringProfile; self.statusReason = statusReason; self.notes = notes; self.aiSummary = aiSummary; self.documentInsights = documentInsights; self.isAdi = isAdi; self.isArchived = isArchived; self.version = version; self.ambulatoryId = ambulatoryId; self.createdAt = createdAt; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason; self.archiveReason = archiveReason; self.archiveNote = archiveNote
     }
     public let id: String
     public let firstName: String
     public let lastName: String
     public let birthDate: Date?
+    public let identifierType: String?
+    public let birthDatePrecision: String?
+    public let birthYear: Int?
     public let taxCode: String
     public let address: String?
     public let phone: String?

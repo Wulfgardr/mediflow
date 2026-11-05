@@ -1,5 +1,6 @@
 'use client';
 
+import { PatientIdentifierConflictError } from '@/lib/patient-identity';
 import { formatCountLabel } from '@/lib/format-count';
 import ink from '@/components/ink-secondary.module.css';
 import styles from './new-patient.module.css';
@@ -110,11 +111,11 @@ export default function NewPatientPage() {
             // DUPLICATE CHECK: Enforce uniqueness on Tax Code
             // We check manually here because the DB schema (historical reasons) might not have unique index
             if (data.taxCode) {
-                const existing = (await db.patients.filter((p: any) => p.taxCode === data.taxCode).toArray())[0];
+                const existing = (await db.patients.filter((p: any) => p.taxCode === data.taxCode && p.identifierType === data.identifierType).toArray())[0];
                 if (existing) {
                     const { confirmed } = await confirm({
                         title: 'Scheda già esistente',
-                        message: `Esiste già una scheda con questo codice fiscale: ${existing.lastName} ${existing.firstName}. Vuoi aprire la scheda esistente invece di crearne una nuova?`,
+                        message: `Esiste già una scheda con questo identificativo: ${existing.lastName} ${existing.firstName}. Vuoi aprire la scheda esistente invece di crearne una nuova?`,
                         confirmLabel: 'Apri scheda esistente',
                         cancelLabel: 'Annulla',
                     });
@@ -134,7 +135,7 @@ export default function NewPatientPage() {
             await db.patients.add({
                 id: patientId,
                 ...patientData,
-                birthDate: new Date(patientData.birthDate),
+                birthDate: patientData.birthDate ? new Date(patientData.birthDate) : undefined,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
@@ -202,7 +203,7 @@ export default function NewPatientPage() {
             router.push('/?area=incarico'); // WUL-732: torna alla lista anche senza profilo confermato.
         } catch (error) {
             console.error("Failed to save patient", error);
-            showToast({ tone: 'error', title: 'Errore durante il salvataggio', description: 'Controlla i dati e riprova.' });
+            showToast({ tone: 'error', title: 'Errore durante il salvataggio', description: error instanceof PatientIdentifierConflictError ? error.message : 'Controlla i dati e riprova.' });
         }
     };
 

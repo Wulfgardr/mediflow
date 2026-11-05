@@ -10,7 +10,7 @@ import { revivePatientStructuredFields } from './patient-structured-fields.ts';
 function fixture(): PatientEditRecord {
     return {
         id: 'synthetic-schema-patient', version: 3,
-        firstName: 'Test', lastName: 'Fixture', taxCode: 'SYNTHETIC0000001',
+        firstName: 'Test', lastName: 'Fixture', taxCode: 'RSSMRA80A01H501U',
         birthDate: new Date('1980-02-03T12:34:56.789Z'),
         diagnoses: [{ system: 'ICD-11', code: 'TEST-A', description: 'Synthetic diagnosis', date: new Date('2020-01-02T12:34:56.789Z') }],
         checkups: [{ id: 'synthetic-schema-checkup', patientId: 'synthetic-schema-patient', version: 5,

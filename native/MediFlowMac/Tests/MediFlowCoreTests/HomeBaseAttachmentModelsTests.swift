@@ -4,6 +4,22 @@ import XCTest
 @testable import MediFlowCore
 
 final class HomeBaseAttachmentModelsTests: XCTestCase {
+    func testPatientIdentityDecodesOldAndAdditivePayloads() throws {
+        let old = Data(#"{"id":"synthetic","firstName":"Ada","lastName":"Sintetica","taxCode":"","version":1}"#.utf8)
+        let previous = try JSONDecoder().decode(HomeBasePatientSummary.self, from: old)
+        XCTAssertNil(previous.identifierType)
+        XCTAssertEqual(previous.taxCode, "")
+        let updated = Data(#"{"id":"synthetic","firstName":"Ada","lastName":"Sintetica","taxCode":"","version":1,"identifierType":"none","birthDatePrecision":"estimated","birthYear":1982}"#.utf8)
+        let patient = try JSONDecoder().decode(HomeBasePatientSummary.self, from: updated)
+        XCTAssertEqual(patient.identifierType, "none")
+        XCTAssertEqual(patient.birthDatePrecision, "estimated")
+        XCTAssertEqual(patient.birthYear, 1982)
+        XCTAssertEqual(PatientFieldCrypto.decryptSummary(patient, masterKey: nil).birthYear, 1982)
+        let detail = try JSONDecoder().decode(HomeBasePatientDetail.self, from: updated)
+        XCTAssertEqual(detail.identifierType, "none")
+        XCTAssertEqual(PatientFieldCrypto.decryptDetail(detail, masterKey: nil).birthYear, 1982)
+    }
+
     private let masterKey = SymmetricKey(data: Data(repeating: 7, count: 32))
 
     func testAttachmentReferenceValidatorAcceptsOwnedIds() throws {

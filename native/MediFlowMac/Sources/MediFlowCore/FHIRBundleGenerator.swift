@@ -57,6 +57,9 @@ public struct FHIRPatientInput: Decodable, Equatable {
     public let id: String
     public let firstName: String
     public let lastName: String
+    public let identifierType: String?
+    public let birthDatePrecision: String?
+    public let birthYear: Int?
     public let taxCode: String
     public let birthDate: String?
     public let address: String?
@@ -77,12 +80,18 @@ public struct FHIRPatientInput: Decodable, Equatable {
         isArchived: Bool? = nil,
         caregiver: String? = nil,
         exemptions: [String]? = nil,
-        diagnoses: [FHIRDiagnosisInput]? = nil
+        diagnoses: [FHIRDiagnosisInput]? = nil,
+        identifierType: String? = nil,
+        birthDatePrecision: String? = nil,
+        birthYear: Int? = nil
     ) {
         self.id = id
         self.firstName = firstName
         self.lastName = lastName
         self.taxCode = taxCode
+        self.identifierType = identifierType
+        self.birthDatePrecision = birthDatePrecision
+        self.birthYear = birthYear
         self.birthDate = birthDate
         self.address = address
         self.phone = phone
@@ -265,17 +274,20 @@ public enum FHIRBundleGenerator {
     }
 
     private static func patient(_ patient: FHIRPatientInput, generatedAt: String) -> FHIRJSONValue {
-        object([
+        let value = patient.taxCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let type = patient.identifierType ?? (value.uppercased().hasPrefix("STP") ? "stp" : value.uppercased().hasPrefix("ENI") ? "eni" : value.isEmpty ? "none" : "cf")
+        let systems = ["cf": "urn:oid:2.16.840.1.113883.2.9.4.3.2", "stp": "urn:mediflow:identifier:stp",
+                       "eni": "urn:mediflow:identifier:eni", "passport": "urn:mediflow:identifier:foreign-document", "other": "urn:mediflow:identifier:other"]
+        let identifier: FHIRJSONValue? = value.isEmpty ? nil : systems[type].map { system in
+            .array([object(["use": .string("official"), "system": .string(system), "value": .string(patient.taxCode)])])
+        }
+        let birthDate: String? = patient.birthDatePrecision == "estimated" ? patient.birthYear.map(String.init)
+            : patient.birthDatePrecision == "unknown" ? nil : patient.birthDate.map(dateOnly)
+        return object([
             "resourceType": .string("Patient"),
             "id": .string(patient.id),
             "active": .bool(!(patient.isArchived ?? false)),
-            "identifier": .array([
-                object([
-                    "use": .string("official"),
-                    "system": .string("http://hl7.it/sid/codice-fiscale"),
-                    "value": .string(patient.taxCode),
-                ])
-            ]),
+            "identifier": identifier,
             "name": .array([
                 object([
                     "use": .string("official"),
@@ -284,7 +296,7 @@ public enum FHIRBundleGenerator {
                 ])
             ]),
             "gender": .string("unknown"),
-            "birthDate": patient.birthDate.map { .string(dateOnly($0)) },
+            "birthDate": birthDate.map { .string($0) },
             "address": patient.address.flatMap { $0.isEmpty ? nil : $0 }.map {
                 .array([
                     object([

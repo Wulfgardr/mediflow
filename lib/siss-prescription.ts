@@ -1,3 +1,4 @@
+import type { PatientIdentifierType } from './patient-identity';
 import type { SissTransport, SissTransportMode } from './siss-adapter';
 import { createSissPatientContextHandoff, SissPatientContextError } from './siss-patient-context';
 
@@ -35,6 +36,7 @@ export async function createSissPrescriptionHandoff(
     input: {
         patientId: string;
         patientTaxCode: string | null | undefined;
+        identifierType?: PatientIdentifierType;
     },
     deps: {
         transport?: SissTransport;
@@ -44,7 +46,7 @@ export async function createSissPrescriptionHandoff(
         const result = await createSissPatientContextHandoff(
             {
                 patientId: input.patientId,
-                patientTaxCode: input.patientTaxCode,
+                patientTaxCode: input.patientTaxCode, identifierType: input.identifierType,
                 action: 'prescription.create',
             },
             {

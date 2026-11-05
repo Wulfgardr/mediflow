@@ -1,3 +1,4 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
@@ -65,7 +66,7 @@ async function call(body: unknown) {
 }
 const review = (lastName = `Inventata-${randomUUID()}`, duplicate: 'none' | 'create-separate' = 'none') => ({
     firstName: { action: 'correct', value: 'Lucia' }, lastName: { action: 'correct', value: lastName },
-    taxCode: { action: 'correct', value: `TC${randomUUID()}` }, birthDate: { action: 'correct', value: '1980-02-03' }, duplicate });
+    taxCode: { action: 'correct', value: syntheticTaxCode(randomUUID()) }, birthDate: { action: 'correct', value: '1980-02-03' }, duplicate });
 function effects() {
     return ['patients', 'patients_to_ambulatories', 'attachments'].map(table =>
         (dbServer.$client.prepare(`SELECT count(*) n FROM ${table}`).get() as { n: number }).n);

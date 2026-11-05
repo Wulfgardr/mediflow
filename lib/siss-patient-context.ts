@@ -1,3 +1,4 @@
+import type { PatientIdentifierType } from './patient-identity';
 import type { SissTransport } from './siss-adapter';
 import {
     normalizeSissPatientTaxCode,
@@ -64,6 +65,7 @@ export async function createSissPatientContextHandoff(
     input: {
         patientId: string;
         patientTaxCode: string | null | undefined;
+        identifierType?: PatientIdentifierType;
         action: SissPatientContextAction;
     },
     deps: {
@@ -92,9 +94,9 @@ export async function createSissPatientContextHandoff(
         };
     }
 
-    const fiscalCode = normalizeSissPatientTaxCode(input.patientTaxCode);
+    const fiscalCode = normalizeSissPatientTaxCode(input.patientTaxCode, input.identifierType);
     if (requiresSissPatientFiscalCode(input.action) && !fiscalCode) {
-        throw new SissPatientContextError('Codice fiscale mancante o non valido nel profilo paziente.', {
+        throw new SissPatientContextError('Per preparare SISS serve un codice fiscale, STP o ENI nel profilo paziente.', {
             code: 'SISS_PATIENT_NOT_READY',
             status: 400,
         });

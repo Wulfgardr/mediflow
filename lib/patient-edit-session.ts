@@ -1,3 +1,4 @@
+import { effectiveBirthDatePrecision, inferIdentifierType, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity.ts';
 import type { WhoReference } from './reference-data/icd11-reference';
 /** The editable projection is also the form's default-value source. No I/O. */
 type DateInput = Date | string;
@@ -22,6 +23,7 @@ export type PatientFormSeed = {
     firstName?: string | null;
     lastName?: string | null;
     taxCode?: string | null;
+    identifierType?: PatientIdentifierType; birthDatePrecision?: BirthDatePrecision; birthYear?: number | null;
     birthDate?: DateInput | null;
     address?: string | null;
     phone?: string | null;
@@ -107,6 +109,11 @@ export function patientFormDefaults(seed: PatientFormSeed = {}) {
         firstName: seed.firstName ?? '',
         lastName: seed.lastName ?? '',
         taxCode: seed.taxCode ?? '',
+        // Una scheda nuova parte dal codice fiscale, con il campo visibile; «nessun
+        // identificativo» è una scelta esplicita. Un record esistente senza codice resta «none».
+        identifierType: seed.identifierType ?? (seed.taxCode || seed.id !== undefined ? inferIdentifierType(seed.taxCode) : 'cf'),
+        birthDatePrecision: effectiveBirthDatePrecision(seed),
+        birthYear: seed.birthYear ?? null,
         birthDate: seed.birthDate ? isoDate(seed.birthDate).slice(0, 10) : '',
         address: seed.address ?? '',
         phone: seed.phone ?? '',

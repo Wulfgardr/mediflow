@@ -1,3 +1,4 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
 /* WUL-720 synthetic SQLite and real patient PUT route envelope regression. */
 import assert from 'node:assert/strict';
@@ -233,7 +234,7 @@ for (const [name, item, collection] of [['web', web, webCreate], ['v1', v1, v1Cr
         };
         if (method === 'POST') test(`${name} create identity adapter preserves opaque IDs and generates only for omission`, async () => {
             reset();
-            const body = { firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTH-IDENTITY' };
+            const body = { firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode('SYNTH-IDENTITY') };
             const invokeBody = (value: Record<string, unknown>) => invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/patients', { method, body: JSON.stringify(value) }));
             const before = fullSnapshot();
             assert.equal((await invokeBody({ ...body, id: 42 })).status, 400);
@@ -242,7 +243,7 @@ for (const [name, item, collection] of [['web', web, webCreate], ['v1', v1, v1Cr
             const created = await invokeBody({ ...body, id });
             assert.equal(created.status, 201);
             assert.equal((await created.json()).id, id);
-            const omitted = await invokeBody(body);
+            const omitted = await invokeBody({ ...body, taxCode: syntheticTaxCode('omitted-identity') });
             assert.equal(omitted.status, 201);
             const generated = (await omitted.json()).id;
             assert.match(generated, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
@@ -290,7 +291,7 @@ for (const [name, item, collection] of [['web', web, webCreate], ['v1', v1, v1Cr
         });
         for (const size of [cap-1, cap]) test(`${name} ${method} accepts ${size} bytes and preserves sealed values`, async () => {
             reset();
-            const value = method === 'POST' ? { id:'c05-created', firstName:'Ada', lastName:'Sintetica', taxCode:'SYNTHETIC-CREATE', notes:'ENC:iv:ciphertext' }
+            const value = method === 'POST' ? { id:'c05-created', firstName:'Ada', lastName:'Sintetica', taxCode:syntheticTaxCode('SYNTHETIC-CREATE'), notes:'ENC:iv:ciphertext' }
                 : method === 'PUT' ? { version:3, notes:'ENC:iv:ciphertext' } : {version:3, deletionReason:'ENC:iv:reason'};
             const json = JSON.stringify(value); const raw = json + ' '.repeat(size - new TextEncoder().encode(json).byteLength);
             const response = await invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/patients', { method, body:raw }));

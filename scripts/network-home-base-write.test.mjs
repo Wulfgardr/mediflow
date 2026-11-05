@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { syntheticTaxCode } from '../lib/patient-identity.test-support.ts';
 
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -339,7 +340,7 @@ async function createSeedPatient(ambulatoryId) {
             id: patientId,
             firstName: 'Network',
             lastName: 'Writer',
-            taxCode: `NTW${suffix}`,
+            taxCode: syntheticTaxCode(suffix),
             ambulatoryId,
             notes: 'network-home-base-write-smoke',
             isAdi: false,

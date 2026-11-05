@@ -1,4 +1,5 @@
 'use client';
+import type { PatientIdentifierType } from '@/lib/patient-identity';
 
 import { formatCountLabel } from '@/lib/format-count';
 import { Disclosure } from '@/components/disclosure';
@@ -32,6 +33,7 @@ import {
 type Props = {
     patientId: string;
     patientTaxCode: string | null | undefined;
+    identifierType?: PatientIdentifierType;
     embedded?: boolean;
     fseReadiness: FseReadinessState;
     onRefreshFseReadiness: () => void;
@@ -191,7 +193,7 @@ function healthLabel(health: SissSessionHealth, recent: string, stale: string, a
     return absent;
 }
 
-export default function SissPatientContextPanel({ patientId, patientTaxCode, embedded = false, fseReadiness, onRefreshFseReadiness }: Props) {
+export default function SissPatientContextPanel({ patientId, patientTaxCode, identifierType, embedded = false, fseReadiness, onRefreshFseReadiness }: Props) {
     const [activeAction, setActiveAction] = useState<SissPatientContextAction | null>(null);
     const [feedback, setFeedback] = useState<FeedbackState | null>(null);
     const [sessionStatus, setSessionStatus] = useState<SessionStatusState>({
@@ -200,7 +202,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
         status: null,
     });
 
-    const summary = buildSissPatientContextSummary({ patientTaxCode });
+    const summary = buildSissPatientContextSummary({ patientTaxCode, identifierType });
     const hasTaxCode = summary.patientFiscalCodeReady;
 
     const { showToast } = useToast();

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { syntheticTaxCode } from '../lib/patient-identity.test-support.ts';
 
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
@@ -388,7 +389,7 @@ function buildPatientPayload(name) {
         id: crypto.randomUUID(),
         firstName: 'Concurrency',
         lastName: suffix.slice(0, 8),
-        taxCode: `TST${suffix.slice(0, 13)}`,
+        taxCode: syntheticTaxCode(suffix),
         address: null,
         phone: null,
         caregiver: null,

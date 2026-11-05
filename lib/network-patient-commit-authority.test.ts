@@ -1,3 +1,4 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 import { bindSessionToArchive, currentArchiveGeneration } from './security/archive-session-generation';
 import assert from 'node:assert/strict';
@@ -59,7 +60,7 @@ function fixture(operation: Operation, channel: 'native' | 'web' = 'native') {
         dbServer.insert(patientsToAmbulatories).values({ patientId: id, ambulatoryId: 'synthetic-a' }).run();
     }
     const context = { ...native, session, patientId: id };
-    const body = operation === 'create' ? { id, firstName: 'Synthetic', lastName: 'Created', taxCode: 'SYNTHETIC-NEW' }
+    const body = operation === 'create' ? { id, firstName: 'Synthetic', lastName: 'Created', taxCode: syntheticTaxCode('new') }
         : operation === 'update' ? { version: 3, firstName: 'Changed', phone: 'ENC:aQ==:ZGF0YQ==' } : { version: 3 };
     return { context, body };
 }

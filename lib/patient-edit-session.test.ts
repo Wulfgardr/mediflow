@@ -452,3 +452,12 @@ test('embedded WHO reference survives form projection and a later unrelated edit
     assert.deepEqual(memory.calls[0].changes, { version: 3, firstName: 'Sintetico aggiornato' });
     assert.deepEqual(memory.patient.diagnoses, record.diagnoses);
 });
+
+test('la sessione di modifica si carica con Node senza loader, come nel confronto JS/Rust', async () => {
+    const { spawnSync } = await import('node:child_process');
+    const { pathToFileURL } = await import('node:url');
+    const path = await import('node:path');
+    const source = pathToFileURL(path.resolve('lib/patient-edit-session.ts')).href;
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', `const m = await import(${JSON.stringify(source)}); if (typeof m.PatientEditSession !== 'function') process.exit(2);`], { encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+});

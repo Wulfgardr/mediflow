@@ -31,7 +31,7 @@ function issue(index: number): Owner.WebSessionProjection {
     if (resolution.status !== 'active') throw new Error('Synthetic physical session unavailable');
     return resolution.projection;
 }
-const input = (id: string) => ({ id, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTHETIC0000001',
+const input = (id: string) => ({ id, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'RSSMRA80A01H501U',
     address: 'ENC:synthetic:opaque', phone: 'ENC:synthetic:opaque', ambulatoryId: 'synthetic-B' });
 const fencedHeaders = (preview: PatientCreatePreviewContext) => ({
     'Content-Type': 'application/json', 'X-MediFlow-Patient-Create-Mode': 'fixed-preview-v1',

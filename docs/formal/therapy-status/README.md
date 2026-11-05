@@ -782,3 +782,45 @@ reale con SQLite (`lib/attachment-web-create-currentness.test.ts`, caso «due
 finestre») e dai test del client (`lib/attachment-client-preconditions.test.ts`),
 non da TLC. È aggiornato il solo digest di `lib/db.ts`; `syncCommit` resta
 invariato perché nessuna sorgente della terapia cambia comportamento.
+
+## Raccordo PR #846
+
+Confrontati la sincronizzazione `1c97e50bcc00ad06edcad6df78b85b62ae4272d0`,
+la base `fb6c3966d8b4108c60708af50612359ecf082035`, l'head iniziale
+`300a56ff1031cba557475ffd8f0be359bc3f3c42` e la correzione
+`6978d4816`. Le quattro impronte precedenti coincidono con i file della
+base; gli altri delta da `syncCommit` alla base di `db.ts` sono già raccordati
+sopra per documenti e collezione allegati.
+
+Il delta della PR in `lib/db.ts` aggiunge i tipi dell'identità a `Patient`
+e riconosce il 409 duplicato solo quando `tableName === 'patients'`.
+L'await per leggere il payload clonato dell'add resta dentro quella guardia;
+nessun await delle terapie viene aggiunto. Update e relativi errori delle
+terapie conservano il percorso precedente. Non cambiano transizioni,
+conferma, journal, CAS, ledger, audit o atomicità delle scritture delle terapie.
+
+Sono riesaminate anche le altre tre superfici coperte modificate dalla PR:
+`sqlite-schema.ts` aggiunge esclusivamente le quattro colonne dei pazienti
+e il loro backfill; ora distingue STP ed ENI solo con 13 cifre e assegna
+`none` al valore vuoto. `sqlite-schema-open.ts` porta la versione da 7 a 8.
+`ambulatory-destructive-command-recovery-schema.ts` sottrae queste quattro
+colonne dalla copia canonica in memoria usata per riconoscere gli schemi
+precedenti, conservando i vincoli delle tabelle terapie, audit e comandi.
+I test reali di migrazione, recovery, gare, crash e ripristino passano;
+la migrazione resta fuori dalle proprietà TLC.
+
+Prima di aggiornare le impronte è stata eseguita una copia temporanea del
+verificatore con gli stessi comandi e asserzioni, che segnala le quattro
+derive senza arrestarsi al controllo preliminare. TLC ha completato
+5.903.794 stati distinti, con coda vuota; sono passati i tre controlli
+negativi, i sei testimoni, 188 test `code-current`, i mutanti del controller,
+il controllo del codice ripristinato e le mutazioni della chat.
+Solo dopo questi esiti vengono aggiornate le quattro impronte e `syncCommit`
+alla revisione della correzione. `legacyModelSyncCommit`, modello, statechart,
+invarianti, limiti e mutanti restano invariati. Il gate ufficiale completo
+viene rieseguito sul manifest aggiornato senza esclusioni.
+
+La riesecuzione ufficiale `npm run verify:therapy-status` passa sul manifest
+aggiornato: TLC, tre mutanti, sei testimoni, 188 test causali, due mutanti
+del controller, codice ripristinato e mutazioni della chat. Nessun file
+runtime o test viene modificato dopo questi esiti.

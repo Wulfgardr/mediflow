@@ -1,6 +1,8 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* C05 real patient POST handlers on synthetic SQLite; auth/cookie seams only. */
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -131,7 +133,7 @@ async function create(surface: Surface, id: string, options: {
         requestHeaders.set(PATIENT_CREATE_HEADERS.context, preview.nonce);
         requestHeaders.set(PATIENT_CREATE_HEADERS.target, preview.ambulatoryId);
     }
-    const body = { id, firstName: 'Ada', lastName: 'Sintetica', taxCode: `SYN${id.replaceAll('-', '').slice(-10)}`,
+    const body = { id, firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode(id),
         ambulatoryId: 'c05-create-a', ...options.body };
     const request = new Request(`http://127.0.0.1/${surface === 'v1' ? 'api/v1' : 'api'}/patients`, {
         method: 'POST', headers: requestHeaders, body: JSON.stringify(body),
@@ -143,6 +145,51 @@ function newSession(suffix: string) {
     if (state.session) physicalOwner.retire(state.session, 'dispose');
     state.session = issueSession(suffix);
 }
+
+test('identità compatibile: POST web legacy conserva SYN e CF dichiarato invalido resta 400', async () => {
+    reset(); newSession('identity-compat-create');
+    const taxCode = `SYN${randomUUID()}`;
+    const response = await create('web-legacy', 'legacy-syn', { body: { taxCode } });
+    assert.equal(response.status, 201, await response.clone().text());
+    assert.equal((readBack('legacy-syn').patient as { tax_code: string }).tax_code, taxCode);
+    const rejected = await create('web-legacy', 'invalid-declared', {
+        body: { identifierType: 'cf', taxCode: 'RSSMRA80A01H501X' },
+    });
+    assert.equal(rejected.status, 400);
+    assert.match((await rejected.json()).error, /Controlla il codice fiscale/);
+    assert.equal(readBack('invalid-declared').patient, null);
+});
+
+test('identità compatibile: PUT web preserva il CF storico invariato e rifiuta un nuovo CF invalido', async () => {
+    reset(); newSession('identity-compat-update');
+    const id = 'legacy-invalid-cf';
+    dbServer.insert(patients).values({ id, firstName: 'Ada', lastName: 'Sintetica',
+        taxCode: 'RSSMRA80A01H501X', identifierType: 'cf' }).run();
+    const detail = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route.ts');
+    const update = (body: Record<string, unknown>) => detail.PUT(new Request(`http://127.0.0.1/api/patients/${id}`, {
+        method: 'PUT', headers: { 'content-type': 'application/json', 'x-mediflow-archive-generation': state.generation },
+        body: JSON.stringify(body),
+    }), { params: Promise.resolve({ id }) });
+    for (const identity of [{}, { identifierType: 'cf', taxCode: 'RSSMRA80A01H501X' }]) {
+        const before = readBack(id).patient as { version: number; tax_code: string; identifier_history: string };
+        const response = await update({ version: before.version, notes: 'ENC:iv:synthetic-notes', ...identity });
+        assert.equal(response.status, 200, await response.clone().text());
+        const after = readBack(id).patient as typeof before;
+        assert.equal(after.tax_code, before.tax_code);
+        assert.equal(after.identifier_history, before.identifier_history);
+        assert.equal(after.version, before.version + 1);
+    }
+    const before = readBack(id);
+    const rejected = await update({ version: 3, identifierType: 'cf', taxCode: 'RSSMRA80A01H501Y' });
+    assert.equal(rejected.status, 400);
+    assert.match((await rejected.json()).error, /Controlla il codice fiscale/);
+    assert.deepEqual(readBack(id), before);
+    const legacyValue = `TEST-${randomUUID()}`;
+    assert.equal((await update({ version: 3, taxCode: legacyValue })).status, 200);
+    const legacy = readBack(id).patient as { tax_code: string; identifier_type: string };
+    assert.equal(legacy.tax_code, legacyValue);
+    assert.equal(legacy.identifier_type, 'cf');
+});
 
 for (const surface of ['web-legacy', 'web-fixed-preview-v1', 'v1'] as const) {
     for (const fault of ['FAIL', 'IGNORE'] as const) {

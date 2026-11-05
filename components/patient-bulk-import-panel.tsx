@@ -180,7 +180,7 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
             <div className={styles.panel} data-testid="patient-bulk-import" data-phase={snapshot.phase}>
                 <section className={styles.section} aria-labelledby="bulk-file-title">
                     <h2 id="bulk-file-title">1. Scegli l’elenco</h2>
-                    <p>Compila il modello con nome, cognome e codice fiscale. Data di nascita, indirizzo e telefono sono facoltativi.</p>
+                    <p>Compila nome, cognome e tipo di identificativo. Se non hai un identificativo, indica none e una data di nascita o un anno stimato. Indirizzo e telefono sono facoltativi.</p>
                     <p className={styles.muted}>CSV UTF-8, separatore punto e virgola (;), massimo 2 MiB e 500 righe. Per le date usa YYYY-MM-DD.</p>
                     <div className={`${styles.actions} ${styles.fileActions}`}>
                         <div className={styles.fileLabel}>
@@ -206,8 +206,8 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                     {snapshot.ambulatoryName ? <p>Ambulatorio: <strong>{snapshot.ambulatoryName}</strong></p> : null}
                     <details className={styles.disclosure}>
                         <summary>Formato e limiti della verifica</summary>
-                        <p>Mantieni le sei intestazioni del modello, nello stesso ordine. Nome e cognome: 2–100 caratteri; indirizzo: massimo 500; telefono: massimo 80. Le celle vuote restano assenti.</p>
-                        <p>Nome e cognome non sono modificati. Il codice fiscale viene convertito in maiuscolo dopo la verifica dei 16 caratteri; si rimuovono solo gli spazi esterni. Non si verifica l’attribuzione del codice fiscale.</p>
+                        <p>Mantieni le intestazioni del modello, nello stesso ordine. Le ultime tre colonne indicano tipo di identificativo, precisione della nascita e anno stimato. Il formato precedente a sei colonne resta accettato. Nome e cognome: 2–100 caratteri; indirizzo: massimo 500; telefono: massimo 80. Le celle vuote restano assenti.</p>
+                        <p>Nome e cognome non sono modificati. CF, STP ed ENI vengono verificati e convertiti in maiuscolo; gli altri identificativi conservano il testo dichiarato. Il controllo del CF non verifica a chi è stato attribuito.</p>
                         <p>I duplicati nel file e nelle schede accessibili dell’ambulatorio sono esclusi. Non è una verifica globale: importazioni contemporanee possono creare duplicati.</p>
                         <p>La destinazione è fissata nell’anteprima: ogni scheda viene salvata solo nell’ambulatorio indicato oppure l’invio è negato. Un cambio osservato qui interrompe le righe successive; non annulla salvataggi già conclusi, neppure da altre schede.</p>
                         <p>Il salvataggio usa la cifratura già prevista per indirizzo e telefono; non cambia la protezione degli altri campi. Il file non viene caricato su servizi esterni.</p>
@@ -221,7 +221,7 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                         <h2 id="bulk-preview-title" tabIndex={-1} ref={previewTitle}>2. Controlla l’anteprima</h2>
                         <table className={`${styles.table} ${styles.preview}`} role="table">
                             <caption>Anteprima delle righe del file: nessun salvataggio prima della conferma.</caption>
-                            <thead><tr><th scope="col">Riga</th><th scope="col">Anagrafica</th><th scope="col">Codice fiscale</th><th scope="col">Controllo</th></tr></thead>
+                            <thead><tr><th scope="col">Riga</th><th scope="col">Anagrafica</th><th scope="col">Identificativo</th><th scope="col">Controllo</th></tr></thead>
                             <tbody>{snapshot.preview.rows.map(row => (
                                 <tr key={row.row} role="row" data-testid={`patient-bulk-preview-row-${row.row}`}>
                                     <td role="cell" data-label="Riga">{row.row}<small className={styles.muted}>Linea {row.line}</small></td>
@@ -234,12 +234,12 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                                                 <dt>Telefono</dt><dd><PrivacyBlur>{row.cells[5] || 'Assente'}</PrivacyBlur></dd></dl>
                                         </details>
                                     </td>
-                                    <td role="cell" data-label="Codice fiscale" className="lume-code"><PrivacyBlur>{row.values?.taxCode ?? row.cells[2]}</PrivacyBlur></td>
+                                    <td role="cell" data-label="Identificativo" className="lume-code"><PrivacyBlur>{row.values?.taxCode ?? row.cells[2]}</PrivacyBlur></td>
                                     <td role="cell" data-label="Controllo">
                                         <strong>{isPatientCsvRowEligible(row) ? 'Da aggiungere' : 'Esclusa'}</strong>
                                         {row.issues.map((issue, index) => <p key={`${issue.code}-${index}`}>{issue.field ? `${issue.field}: ` : ''}{issue.message}</p>)}
-                                        {row.duplicateInFile ? <p>Codice fiscale ripetuto nel file: tutte le occorrenze escluse.</p> : null}
-                                        {row.duplicateExisting ? <p>Codice fiscale già presente nell’ambulatorio.</p> : null}
+                                        {row.duplicateInFile ? <p>Stesso tipo e identificativo ripetuti nel file: tutte le occorrenze escluse.</p> : null}
+                                        {row.duplicateExisting ? <p>Stesso tipo e identificativo già presenti nell’ambulatorio.</p> : null}
                                     </td>
                                 </tr>
                             ))}</tbody>
