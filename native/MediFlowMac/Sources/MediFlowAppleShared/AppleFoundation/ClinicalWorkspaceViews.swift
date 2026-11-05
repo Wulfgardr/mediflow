@@ -1159,7 +1159,7 @@ struct ClinicalScalesWorkspaceView: View {
                 Button { Task { await open(patient) } } label: {
                     VStack(alignment: .leading) {
                         Text("\(patient.firstName) \(patient.lastName)")
-                        Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
+                        Text(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType))
                             .font(.caption)
                             .codice()
                             .foregroundStyle(.secondary)

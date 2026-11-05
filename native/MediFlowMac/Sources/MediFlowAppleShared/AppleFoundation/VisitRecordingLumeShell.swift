@@ -46,7 +46,7 @@ struct VisitRecordingLumeShell: View {
             }
         }
         .padding(12)
-        .lumeSurface(zone: .field, cornerRadius: 12)
+        .lumeSurface(zone: .field, cornerRadius: LumeGeometry.writingRadius)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("clinical-workspace-visit-recording")
         .task(id: ownerBinding) {
@@ -209,7 +209,7 @@ struct VisitRecordingLumeShell: View {
                 .inkVoice(17, relativeTo: .body)
                 #endif
                 .foregroundStyle(PlatformColors.pencil)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(PlatformColors.pencil, style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
+                .overlay(RoundedRectangle(cornerRadius: LumeGeometry.writingRadius).stroke(PlatformColors.pencil, style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 90)
                 .clinicalMultilineFieldShape()
