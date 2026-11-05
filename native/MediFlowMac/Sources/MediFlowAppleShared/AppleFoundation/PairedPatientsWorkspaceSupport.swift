@@ -29,11 +29,14 @@ enum PairedPatientsWorkspaceSupport {
     }
 
     /// Nome breve dell'identificativo, da mostrare accanto al valore: un codice
-    /// senza etichetta non dice che cosa sia. STP ed ENI si riconoscono dal prefisso.
+    /// senza etichetta non dice che cosa sia. STP ed ENI si riconoscono dal prefisso
+    /// seguito da 13 cifre: un codice fiscale può iniziare con le stesse lettere.
     static func identifierLabel(_ taxCode: String) -> String {
         let normalized = taxCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        if normalized.hasPrefix("STP") { return "STP" }
-        if normalized.hasPrefix("ENI") { return "ENI" }
+        for prefix in ["STP", "ENI"] where normalized.hasPrefix(prefix) {
+            let rest = normalized.dropFirst(prefix.count)
+            if rest.count == 13, rest.allSatisfy({ $0.isASCII && $0.isNumber }) { return prefix }
+        }
         return "CF"
     }
 
