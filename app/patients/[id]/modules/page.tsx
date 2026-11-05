@@ -590,7 +590,7 @@ export default function PatientDetailPage() {
                 birthDateLabel: patient.birthDate ? birthDateLabel : undefined,
                 ageLabel: patient.birthDate ? formatCountLabel(differenceInYears(new Date(currentTimestampMs), new Date(patient.birthDate)), 'anno', 'anni') : undefined,
                 taxCode: patient.taxCode || undefined,
-                identifierLabel: patientIdentifierLabel(patient.taxCode),
+                identifierLabel: patientIdentifierLabel(patient.taxCode, patient.identifierType),
             }}
             navGroups={workspaceNavGroups}
             primaryAction={{ href: `/patients/${id}/entries/new`, label: 'Nuova voce', icon: Plus }}
