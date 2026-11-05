@@ -69,8 +69,18 @@ export function birthError(input: PatientIdentityInput): string | null {
     if ((input.identifierType ?? inferIdentifierType(input.taxCode)) === 'none' && precision === 'unknown') return 'Senza identificativo serve la data di nascita oppure l’anno stimato.';
     return null;
 }
+/** Precisione da usare in lettura. Una riga scritta senza precisione (writer
+    diretti su SQLite, seed, archivi aggiornati dopo la migrazione) riceve il
+    default «unknown» anche quando ha la data: in lettura vale come data esatta,
+    e con il solo anno come stima. La validazione delle scritture resta stretta. */
+export function effectiveBirthDatePrecision(input: Pick<PatientIdentityInput, 'birthDate' | 'birthDatePrecision' | 'birthYear'>): BirthDatePrecision {
+    const stored = input.birthDatePrecision;
+    if (stored && stored !== 'unknown') return stored;
+    return input.birthDate ? 'exact' : input.birthYear != null ? 'estimated' : 'unknown';
+}
+
 export function patientAgeLabel(patient: PatientIdentityInput, now = new Date()): string | null {
-    const precision = patient.birthDatePrecision ?? (patient.birthDate ? 'exact' : patient.birthYear != null ? 'estimated' : 'unknown');
+    const precision = effectiveBirthDatePrecision(patient);
     if (precision === 'exact' && patient.birthDate) {
         const birth = new Date(patient.birthDate);
         if (!Number.isFinite(birth.getTime()) || birth > now) return null;
