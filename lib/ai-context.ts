@@ -1,3 +1,4 @@
+import { patientAgeLabel } from './patient-identity';
 import { db, type Attachment, type Diagnosis, type DocumentInsight } from '@/lib/db';
 import {
     estimateAIInsightComplexityScore,
@@ -20,7 +21,6 @@ import {
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
 import { scaleInterpretationVersionLabel } from '@/lib/scale-history';
 import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
-import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
 export interface PatientContext {
     summary: string;
@@ -219,19 +219,6 @@ function buildDocumentSourceLabel(fileName: string, date: unknown): string {
     const formattedDate = formatDate(date);
     if (fileName && formattedDate) return `${fileName} (${formattedDate})`;
     return fileName || formattedDate;
-}
-
-function buildAge(birthDate?: Date, taxCode?: string): string {
-    if (birthDate) {
-        return (new Date().getFullYear() - new Date(birthDate).getFullYear()).toString();
-    }
-
-    if (taxCode) {
-        const estimatedYear = estimateBirthYearFromTaxCode(taxCode);
-        if (estimatedYear) return calculateAge(estimatedYear).toString();
-    }
-
-    return 'N/A';
 }
 
 function isNarrativeNoteContaminated(value: string | null | undefined): boolean {
@@ -616,7 +603,7 @@ export async function buildPatientInsightContext(
         };
     }
 
-    const age = buildAge(patient.birthDate, patient.taxCode);
+    const age = patientAgeLabel(patient) ?? 'N/A';
     const allDiagnoses = parsePatientDatedRecords<Diagnosis>(patient.diagnoses)
         .sort((left, right) => compareDatesDesc(left.date, right.date));
     const diagnoses = allDiagnoses.slice(0, MAX_DIAGNOSES);
@@ -799,7 +786,7 @@ export async function buildPatientInsightContext(
     }
 
     const profileLines = [
-        `- Anagrafica clinica: ${patient.lastName} ${patient.firstName}, eta ${age}, CF ${patient.taxCode || 'N/A'}.`,
+        `- Anagrafica clinica: ${patient.lastName} ${patient.firstName}, eta ${age}, Identificativo ${patient.taxCode || 'N/A'}.`,
         `- ADI: ${patient.isAdi ? 'si' : 'no'}.`,
         patient.monitoringProfile ? `- Profilo monitoraggio: ${patient.monitoringProfile}.` : '',
         allowNarrativeNotes ? `- Note scheda: ${compactText(patientNotes, 220)}` : '',
@@ -910,7 +897,7 @@ export async function buildPatientInsightContext(
 
     const prompt = [
         `--- CONTESTO PAZIENTE (ID: ${patient.id}) ---`,
-        `DATI BASE: ${patient.lastName} ${patient.firstName} | Eta: ${age} | CF: ${patient.taxCode || 'N/A'}`,
+        `DATI BASE: ${patient.lastName} ${patient.firstName} | Eta: ${age} | Identificativo: ${patient.taxCode || 'N/A'}`,
         '',
         'REGOLE HARD:',
         '- Ogni claim principale deve terminare con uno o piu riferimenti [Sx] presenti nel contesto oppure [DATI-INCOMPLETI].',

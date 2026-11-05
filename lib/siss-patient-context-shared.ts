@@ -1,3 +1,4 @@
+import { inferIdentifierType, type PatientIdentifierType } from './patient-identity';
 import { SISS_ACTIONS, type SissAction } from './siss-actions';
 
 export const SISS_PATIENT_CONTEXT_ACTIONS = SISS_ACTIONS;
@@ -43,7 +44,8 @@ export function requiresSissPatientFiscalCode(action: SissPatientContextAction):
     return action !== 'menu.open';
 }
 
-export function normalizeSissPatientTaxCode(value: string | null | undefined): string | null {
+export function normalizeSissPatientTaxCode(value: string | null | undefined, type: PatientIdentifierType = inferIdentifierType(value)): string | null {
+    if (!['cf', 'stp', 'eni'].includes(type)) return null;
     const normalized = value?.trim().toUpperCase() ?? '';
     if (!/^[A-Z0-9]{11,16}$/.test(normalized)) {
         return null;
@@ -54,8 +56,9 @@ export function normalizeSissPatientTaxCode(value: string | null | undefined): s
 
 export function buildSissPatientContextSummary(input: {
     patientTaxCode: string | null | undefined;
+    identifierType?: PatientIdentifierType;
 }): SissPatientContextSummary {
-    const patientFiscalCodeReady = normalizeSissPatientTaxCode(input.patientTaxCode) !== null;
+    const patientFiscalCodeReady = normalizeSissPatientTaxCode(input.patientTaxCode, input.identifierType) !== null;
 
     return {
         transportMode: 'portal-handoff',

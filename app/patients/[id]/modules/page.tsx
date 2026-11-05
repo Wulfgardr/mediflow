@@ -1,4 +1,5 @@
 'use client';
+import { patientAgeLabel } from '@/lib/patient-identity';
 
 import { Disclosure } from '@/components/disclosure';
 import { formatCountLabel } from '@/lib/format-count';
@@ -63,7 +64,6 @@ import { deriveOpenLoopProjection, type OpenLoop } from '@/lib/patient-open-loop
 import { buildPatientModuleRailGroups, filterTerritorialRailGroups } from '@/lib/patient-module-rail-mapping';
 import { useTerritorialPacks } from '@/lib/territorial-pack-client';
 import FollowupSuggestions from '@/components/followup-suggestions';
-import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 import { patientIdentifierLabel } from '@/lib/patient-identifier-label';
 
 /* These helpers are invoked only from explicit UI events. Keeping their
@@ -318,15 +318,10 @@ export default function PatientDetailPage() {
 
     const diagnosisItems = Array.isArray(patient.diagnoses) ? patient.diagnoses : [];
     const documentInsights = Array.isArray(patient.documentInsights) ? patient.documentInsights : [];
-    const birthYear = patient.birthDate
-        ? new Date(patient.birthDate).getFullYear()
-        : estimateBirthYearFromTaxCode(patient.taxCode);
-    const birthDateLabel = patient.birthDate
+    const birthDateLabel = patient.birthDate && patient.birthDatePrecision !== 'unknown'
         ? new Date(patient.birthDate).toLocaleDateString('it-IT')
-        : birthYear
-            ? `Stima da codice fiscale (${birthYear})`
-            : 'Non disponibile';
-    const ageLabel = birthYear ? formatCountLabel(calculateAge(birthYear), 'anno', 'anni') : 'Età non disponibile';
+        : patient.birthYear ? `Anno stimato: ${patient.birthYear}` : 'Non disponibile';
+    const ageLabel = patientAgeLabel(patient, new Date(currentTimestampMs)) ?? 'Età non disponibile';
     const activeEntries = (entries ?? []).filter((entry) => !entry.deletedAt);
     const nonScaleEntries = activeEntries.filter((entry) => entry.type !== 'scale');
     const scaleEntries = activeEntries.filter((entry) => entry.type === 'scale');
@@ -742,6 +737,7 @@ export default function PatientDetailPage() {
                         <SissWorkspace
                             patientId={id}
                             patientTaxCode={patient.taxCode}
+                            identifierType={patient.identifierType}
                             canShareFhirFile={canShareFhirFile}
                             onExportFhir={() => setIsExportModalOpen(true)}
                             onShareFhir={handleShareFhir}

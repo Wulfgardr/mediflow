@@ -1,3 +1,5 @@
+import { birthError, identifierError, normalizeIdentifierValue } from './patient-identity';
+import { hasPatientIdentifierConflict, PATIENT_IDENTIFIER_DUPLICATE } from './patient-identifier-conflict';
 /* WUL-718 one authoritative patient-profile update and membership commit. */
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
@@ -32,7 +34,7 @@ type PatientUpdateOperationInput = PatientProfileUpdateContract & {
 
 export type PatientUpdateOperationResult =
     | { status: 200; value: { success: true }; existing: typeof patients.$inferSelect; receipt?: ProfileNotesCommitReceipt }
-    | { status: 404 | 409; value: Record<string, unknown> }
+    | { status: 400 | 404 | 409; value: Record<string, unknown> }
     | NetworkPatientCommitDenial;
 
 export function updatePatientOperation(input: PatientUpdateOperationInput): PatientUpdateOperationResult {
@@ -81,7 +83,32 @@ export function updatePatientOperation(input: PatientUpdateOperationInput): Pati
         if (existing.version >= Number.MAX_SAFE_INTEGER) return { status: 409,
             value: buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, existing) };
 
-        const updated = tx.update(patients).set({ ...input.values, version: input.expectedVersion + 1 })
+        const values = { ...input.values };
+        const hasIdentityChange = ['taxCode', 'identifierType'].some(key => Reflect.get(values, key) !== undefined);
+        const hasBirthChange = ['birthDate', 'birthYear', 'birthDatePrecision'].some(key => Reflect.get(values, key) !== undefined);
+        const effective = { ...existing, ...Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) };
+        if (hasIdentityChange) {
+            const error = identifierError(effective.identifierType, effective.taxCode);
+            if (error) return { status: 400, value: { error } };
+            values.taxCode = normalizeIdentifierValue(effective.identifierType, effective.taxCode);
+            effective.taxCode = values.taxCode;
+        }
+        if (hasBirthChange && values.birthDatePrecision === undefined) {
+            effective.birthDatePrecision = values.birthDate ? 'exact' : values.birthYear != null ? 'estimated' : 'unknown';
+            values.birthDatePrecision = effective.birthDatePrecision;
+        }
+        if (hasBirthChange || hasIdentityChange) {
+            const error = birthError(effective);
+            if (error) return { status: 400, value: { error } };
+        }
+        if ((hasIdentityChange || input.setPrimaryAmbulatory || values.isArchived === false) && hasPatientIdentifierConflict(tx, effective)) return { status: 409, value: PATIENT_IDENTIFIER_DUPLICATE };
+        const identityChanged = effective.identifierType !== existing.identifierType || effective.taxCode !== existing.taxCode;
+        if (identityChanged) values.identifierHistory = JSON.stringify([...JSON.parse(existing.identifierHistory), {
+            version: input.expectedVersion + 1, occurredAt: (values.updatedAt ?? new Date()).toISOString(), actorRef: input.audit.actorRef,
+            previous: { type: existing.identifierType, value: existing.taxCode },
+            next: { type: effective.identifierType, value: effective.taxCode },
+        }]);
+        const updated = tx.update(patients).set({ ...values, version: input.expectedVersion + 1 })
             .where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))
             .run();
         if (updated.changes === 0) {
@@ -117,7 +144,7 @@ export function updatePatientOperation(input: PatientUpdateOperationInput): Pati
                     .filter(([key, value]) => key !== 'version' && key !== 'updatedAt' && value !== undefined)
                     .map(([key]) => key),
                 resourceVersion: input.expectedVersion + 1,
-                flags: input.audit.flags,
+                flags: [...(input.audit.flags ?? []), ...(identityChanged ? [`identifier-history:${input.expectedVersion + 1}`] : [])],
             },
         });
         const receipt = replay ? readProfileNotesCommitReceipt(tx, replay) : null;

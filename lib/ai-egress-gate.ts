@@ -1,3 +1,4 @@
+import { isValidItalianTaxCode } from './patient-identity';
 
 export type EgressGateStatus = 'allowed' | 'closed_pending_redaction_lane' | 'blocked_residual_entities';
 
@@ -16,6 +17,7 @@ export interface EvaluateEgressInput {
     knownIdentifiers?: {
         names?: string[];
         birthDates?: string[];
+        identifiers?: string[];
     };
 }
 
@@ -27,7 +29,6 @@ export function isEgressGateOpen(): false {
 }
 
 const ITALIAN_TAX_CODE_REGEX = /\b[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]\b/gi;
-const CF_STRUCTURE_REGEX = /^[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]$/;
 const NRE_REGION_CODES = new Set([
     '010', '020', '030', '041', '042', '050', '060', '070', '080', '090',
     '100', '110', '120', '130', '140', '150', '160', '170', '180', '190', '200',
@@ -44,31 +45,7 @@ const NOSOLOGICO_REGEX = /\b(?:n(?:\.|r\.?|umero)?\s+)?nosologico\s*(?:n(?:\.|r\
 const PHONE_REGEX = /(?<![\w+])(?:(?:\+|00)39[\s.-]?)?(?:0\d{1,4}|3\d{2})[\s.-]?\d{3,4}[\s.-]?\d{3,4}(?!\w)/g;
 const DATE_REGEX = /\b(?:0[1-9]|[12]\d|3[01])[/.\-](?:0[1-9]|1[0-2])[/.\-](?:19|20)\d{2}\b/g;
 
-const CF_ODD_VALUES: Record<string, number> = {
-    '0': 1, '1': 0, '2': 5, '3': 7, '4': 9, '5': 13, '6': 15, '7': 17, '8': 19, '9': 21,
-    A: 1, B: 0, C: 5, D: 7, E: 9, F: 13, G: 15, H: 17, I: 19, J: 21,
-    K: 2, L: 4, M: 18, N: 20, O: 11, P: 3, Q: 6, R: 8, S: 12, T: 14,
-    U: 16, V: 10, W: 22, X: 25, Y: 24, Z: 23,
-};
-const CF_EVEN_VALUES: Record<string, number> = {
-    '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
-    A: 0, B: 1, C: 2, D: 3, E: 4, F: 5, G: 6, H: 7, I: 8, J: 9,
-    K: 10, L: 11, M: 12, N: 13, O: 14, P: 15, Q: 16, R: 17, S: 18, T: 19,
-    U: 20, V: 21, W: 22, X: 23, Y: 24, Z: 25,
-};
-
-export function isValidItalianTaxCodeChecksum(taxCode: string): boolean {
-    const cf = taxCode.trim().toUpperCase();
-    if (cf.length !== 16 || !CF_STRUCTURE_REGEX.test(cf)) return false;
-
-    let sum = 0;
-    for (let index = 0; index < 15; index += 1) {
-        const value = index % 2 === 0 ? CF_ODD_VALUES[cf[index]] : CF_EVEN_VALUES[cf[index]];
-        if (value === undefined) return false;
-        sum += value;
-    }
-    return String.fromCharCode(65 + (sum % 26)) === cf[15];
-}
+export const isValidItalianTaxCodeChecksum = isValidItalianTaxCode;
 
 export function evaluateEgress(input: EvaluateEgressInput): EgressGateResult {
     const rehydrationMap = new Map<string, string>();
@@ -96,6 +73,8 @@ export function evaluateEgress(input: EvaluateEgressInput): EgressGateResult {
         });
     };
 
+    redact('patient_identifier', /\b(?:STP|ENI)\d{13}\b/gi);
+    for (const value of input.knownIdentifiers?.identifiers ?? []) redactKnownValue('patient_identifier', value, redact);
     redact('team', ITALIAN_TEAM_REGEX);
     redact('nre', NRE_REGEX, (value) => NRE_REGION_CODES.has(value.slice(0, 3)));
     redact('nosologico', NOSOLOGICO_REGEX);

@@ -28,9 +28,9 @@ const sha256 = (value: string) => createHash('sha256').update(value, 'utf8').dig
 function snapshotKnown(input: RedactionSessionInput['knownIdentifiers']): RedactionSessionInput['knownIdentifiers'] {
     if (input === undefined) return undefined;
     if (!input || types.isProxy(input) || Object.getPrototypeOf(input) !== Object.prototype) return fail();
-    const output: { names?: readonly string[]; birthDates?: readonly string[] } = {};
+    const output: { names?: readonly string[]; birthDates?: readonly string[]; identifiers?: readonly string[] } = {};
     for (const key of Reflect.ownKeys(input)) {
-        if (key !== 'names' && key !== 'birthDates') return fail();
+        if (key !== 'names' && key !== 'birthDates' && key !== 'identifiers') return fail();
         const descriptor = Object.getOwnPropertyDescriptor(input, key);
         if (!descriptor || !('value' in descriptor)) return fail();
         const list: unknown = descriptor.value;

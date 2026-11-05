@@ -1,3 +1,4 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
@@ -45,7 +46,7 @@ if (mode === 'receipt') {
         data: 'ENC:c291cmNl:c291cmNl', type: 'application/pdf' as const, size: 512, identity: 'ambiguous' as const, quality: 'ready' as const, candidates: {} };
     const view = api.open(host, { session: host.session, ambulatoryId: host.ambulatoryId, readCurrent: () => source });
     api.preview(host, view.viewId, { firstName: { action: 'correct', value: 'Mario' }, lastName: { action: 'correct', value: 'Rossi' },
-        taxCode: { action: 'correct', value: randomUUID() }, duplicate: 'none' });
+        taxCode: { action: 'correct', value: syntheticTaxCode(randomUUID()) }, duplicate: 'none' });
     process.stdout.write(JSON.stringify({ commandId: view.commandId }) + '\n');
     if (mode === 'before-commit') {
         dbServer.$client.function('synthetic_crash', () => process.kill(process.pid, 'SIGKILL'));

@@ -1,3 +1,4 @@
+import { inferIdentifierType, normalizeIdentifierValue, type PatientIdentifierType } from '../../patient-identity';
 import type {
     PatientDocumentReviewDiagnosis,
     PatientDocumentReviewDraft,
@@ -12,6 +13,7 @@ export const PATIENT_IMPORT_DECISION_SCHEMA_VERSION = 'mediflow.patient_import_d
 export interface ExistingPatientIdentityCandidate {
     id: string;
     taxCode?: string;
+    identifierType?: PatientIdentifierType;
     firstName?: string;
     lastName?: string;
     birthDate?: Date | string | null;
@@ -19,6 +21,7 @@ export interface ExistingPatientIdentityCandidate {
 
 export interface DecidePatientImportTargetInput {
     taxCode?: string;
+    identifierType?: PatientIdentifierType;
     firstName?: string;
     lastName?: string;
     birthDate?: Date | string | null;
@@ -336,7 +339,7 @@ function buildServicePrescriptionDecision(item: PatientDocumentReviewServicePres
 export function decidePatientImportTarget(input: DecidePatientImportTargetInput): PatientImportTargetDecision {
     const normalizedTaxCode = normalizeTaxCode(input.taxCode);
     const taxCodeMatches = normalizedTaxCode
-        ? input.candidates.filter((candidate) => normalizeTaxCode(candidate.taxCode) === normalizedTaxCode)
+        ? input.candidates.filter((candidate) => (candidate.identifierType ?? inferIdentifierType(candidate.taxCode)) === (input.identifierType ?? inferIdentifierType(input.taxCode)) && normalizeIdentifierValue(candidate.identifierType ?? inferIdentifierType(candidate.taxCode), candidate.taxCode ?? '') === normalizeIdentifierValue(input.identifierType ?? inferIdentifierType(input.taxCode), input.taxCode ?? ''))
         : [];
 
     if (taxCodeMatches.length === 1) {

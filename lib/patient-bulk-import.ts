@@ -1,21 +1,26 @@
+import { birthError, identifierError, inferIdentifierType, normalizeIdentifierValue, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity';
 /* bounded, dependency-free CSV validation. No I/O or writes. */
 export const PATIENT_CSV_HEADERS = [
     'nome', 'cognome', 'codice_fiscale', 'data_nascita', 'indirizzo', 'telefono',
 ] as const;
+export const PATIENT_CSV_IDENTITY_HEADERS = [...PATIENT_CSV_HEADERS, 'tipo_identificativo', 'precisione_nascita', 'anno_nascita_stimato'] as const;
 export type PatientCsvColumn = typeof PATIENT_CSV_HEADERS[number];
 export const PATIENT_CSV_LIMITS = Object.freeze({
     fileBytes: 2 * 1024 * 1024,
     rows: 500,
     recordChars: 4096,
     cellChars: 1024,
-    fieldChars: [100, 100, 64, 10, 500, 80] as readonly number[],
+    fieldChars: [100, 100, 128, 10, 500, 80, 16, 16, 4] as readonly number[],
 });
-export const PATIENT_CSV_TEMPLATE = `\uFEFF${PATIENT_CSV_HEADERS.join(';')}\r\n`;
+export const PATIENT_CSV_TEMPLATE = `\uFEFF${PATIENT_CSV_IDENTITY_HEADERS.join(';')}\r\n`;
 
 export type CsvPatientFields = Readonly<{
     firstName: string;
     lastName: string;
     taxCode: string;
+    identifierType?: PatientIdentifierType;
+    birthDatePrecision?: BirthDatePrecision;
+    birthYear?: number | null;
     birthDate?: string;
     address?: string;
     phone?: string;
@@ -39,7 +44,7 @@ export type PatientCsvPreview = Readonly<{ rows: readonly PatientCsvRow[] }>;
 export type PatientCsvResult =
     | { ok: true; preview: PatientCsvPreview }
     | { ok: false; error: PatientCsvIssue & { line?: number } };
-export type ExistingPatientIdentity = Readonly<{ id: string; taxCode: string }>;
+export type ExistingPatientIdentity = Readonly<{ id: string; taxCode: string; identifierType?: PatientIdentifierType }>;
 
 /* ASCII validation MUST precede uppercasing: e.g. Unicode ß must not become SS. */
 export function normalizePatientCsvTaxCode(value: string): string | null {
@@ -80,7 +85,7 @@ function scanCsv(text: string): RawRecord[] {
         field += value;
     };
     const endField = () => {
-        if (cells.length === PATIENT_CSV_HEADERS.length) fail('columns', 'Troppe colonne: usa le sei colonne del modello.');
+        if (cells.length === PATIENT_CSV_IDENTITY_HEADERS.length) fail('columns', 'Troppe colonne: usa le colonne del modello.');
         cells.push(field);
         field = '';
         mode = 'start';
@@ -140,13 +145,13 @@ function scanCsv(text: string): RawRecord[] {
     return records;
 }
 
-function validateRecord(record: RawRecord, index: number): PatientCsvRow {
+function validateRecord(record: RawRecord, index: number, expectedColumns: number): PatientCsvRow {
     const issues: PatientCsvIssue[] = [];
     const issue = (code: string, message: string, field?: PatientCsvColumn) => issues.push({ code, message, ...(field ? { field } : {}) });
-    if (record.cells.length !== PATIENT_CSV_HEADERS.length) {
+    if (record.cells.length !== expectedColumns) {
         issue('columns', 'Servono sei colonne; lascia vuote quelle opzionali.');
     }
-    const [firstName = '', lastName = '', rawTaxCode = '', birthDate = '', address = '', phone = ''] = record.cells;
+    const [firstName = '', lastName = '', rawTaxCode = '', birthDate = '', address = '', phone = '', rawType = '', rawPrecision = '', rawYear = ''] = record.cells;
     record.cells.forEach((value, column) => {
         if (value.length > PATIENT_CSV_LIMITS.fieldChars[column]) {
             issue('field-limit', `Il campo supera ${PATIENT_CSV_LIMITS.fieldChars[column]} caratteri.`, PATIENT_CSV_HEADERS[column]);
@@ -162,19 +167,31 @@ function validateRecord(record: RawRecord, index: number): PatientCsvRow {
     });
     if (firstName.length < 2 || firstName.trim().length < 2) issue('name', 'Il nome deve contenere almeno due caratteri.', 'nome');
     if (lastName.length < 2 || lastName.trim().length < 2) issue('name', 'Il cognome deve contenere almeno due caratteri.', 'cognome');
-    const taxCode = normalizePatientCsvTaxCode(rawTaxCode);
-    if (!taxCode) issue('tax-code', 'Il codice fiscale deve contenere 16 caratteri alfanumerici ASCII.', 'codice_fiscale');
+    const identifierType = (rawType || inferIdentifierType(rawTaxCode)) as PatientIdentifierType;
+    const error = identifierError(identifierType, rawTaxCode);
+    if (error) issue('tax-code', error, 'codice_fiscale');
+    const taxCode = error ? '' : normalizeIdentifierValue(identifierType, rawTaxCode);
+    const birthDatePrecision = (rawPrecision || (birthDate ? 'exact' : rawYear ? 'estimated' : 'unknown')) as BirthDatePrecision;
+    const birthYear = rawYear ? Number(rawYear) : null;
+    const birth = birthError({ identifierType, birthDate, birthDatePrecision, birthYear });
+    if (birth && (!birthDate || isPatientCsvDate(birthDate))) issue('date', birth, 'data_nascita');
     if (birthDate && !isPatientCsvDate(birthDate)) issue('date', 'Usa una data reale nel formato YYYY-MM-DD.', 'data_nascita');
     return {
         row: index + 1, line: record.line, cells: record.cells, issues,
         duplicateInFile: false, duplicateExisting: false,
-        ...(issues.length === 0 && taxCode ? { values: {
-            firstName, lastName, taxCode,
+        ...(issues.length === 0 ? { values: {
+            firstName, lastName, taxCode, identifierType, birthDatePrecision, birthYear,
             ...(birthDate ? { birthDate } : {}),
             ...(address ? { address } : {}),
             ...(phone ? { phone } : {}),
         } } : {}),
     };
+}
+
+function csvIdentityKey(cells: readonly string[]): string | null {
+    const type = (cells[6] || inferIdentifierType(cells[2])) as PatientIdentifierType;
+    const value = cells[2] ?? '';
+    return type === 'none' || identifierError(type, value) ? null : `${type}:${normalizeIdentifierValue(type, value)}`;
 }
 
 export function parsePatientCsv(bytes: Uint8Array): PatientCsvResult {
@@ -193,20 +210,21 @@ export function parsePatientCsv(bytes: Uint8Array): PatientCsvResult {
         const header = records.shift();
         if (!header || header.line !== 1) throw new CsvFailure('header', 'La prima riga deve essere l’intestazione del modello.', 1);
         if (new Set(header.cells).size !== header.cells.length) throw new CsvFailure('header-duplicate', 'Intestazione con colonne duplicate.', 1);
-        if (header.cells.some(cell => !(PATIENT_CSV_HEADERS as readonly string[]).includes(cell))) {
+        if (header.cells.some(cell => !(PATIENT_CSV_IDENTITY_HEADERS as readonly string[]).includes(cell))) {
             throw new CsvFailure('header-unknown', 'Intestazione non riconosciuta: usa il modello e il separatore punto e virgola.', 1);
         }
-        if (header.cells.length !== PATIENT_CSV_HEADERS.length || header.cells.some((cell, i) => cell !== PATIENT_CSV_HEADERS[i])) {
+        if (!([PATIENT_CSV_HEADERS.length, PATIENT_CSV_IDENTITY_HEADERS.length] as number[]).includes(header.cells.length) || header.cells.some((cell, i) => cell !== PATIENT_CSV_IDENTITY_HEADERS[i])) {
             throw new CsvFailure('header-order', 'Usa tutte le sei colonne del modello, nello stesso ordine.', 1);
         }
-        const rows = records.map(validateRecord);
+        if (records.some(record => record.cells.length > header.cells.length)) throw new CsvFailure('columns', 'Troppe colonne rispetto all’intestazione.');
+        const rows = records.map((record, index) => validateRecord(record, index, header.cells.length));
         const counts = new Map<string, number>();
         for (const row of rows) {
-            const code = normalizePatientCsvTaxCode(row.cells[2] ?? '');
+            const code = csvIdentityKey(row.cells);
             if (code) counts.set(code, (counts.get(code) ?? 0) + 1);
         }
         return { ok: true, preview: { rows: rows.map(row => ({ ...row,
-            duplicateInFile: (counts.get(normalizePatientCsvTaxCode(row.cells[2] ?? '') ?? '') ?? 0) > 1,
+            duplicateInFile: (counts.get(csvIdentityKey(row.cells) ?? '') ?? 0) > 1,
         })) } };
     } catch (error) {
         if (error instanceof CsvFailure) return { ok: false, error: { code: error.code, message: error.message, line: error.line } };
@@ -215,9 +233,12 @@ export function parsePatientCsv(bytes: Uint8Array): PatientCsvResult {
 }
 
 export function markExistingPatientDuplicates(preview: PatientCsvPreview, existing: readonly ExistingPatientIdentity[]): PatientCsvPreview {
-    const codes = new Set(existing.map(patient => normalizePatientCsvTaxCode(patient.taxCode)).filter((code): code is string => code !== null));
+    const codes = new Set(existing.map(patient => {
+        const type = patient.identifierType ?? inferIdentifierType(patient.taxCode);
+        return `${type}:${normalizeIdentifierValue(type, patient.taxCode)}`;
+    }));
     return { rows: preview.rows.map(row => ({ ...row,
-        duplicateExisting: codes.has(normalizePatientCsvTaxCode(row.cells[2] ?? '') ?? ''),
+        duplicateExisting: row.values?.identifierType !== 'none' && codes.has(`${row.values?.identifierType}:${row.values?.taxCode}`),
     })) };
 }
 

@@ -23,7 +23,7 @@ export const NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS = new Set([
 // Unknown extension fields remain ignored; newly added local derived fields
 // cannot silently expand paired-client authority.
 const NETWORK_PATIENT_PROFILE_FIELDS = [
-    'firstName', 'lastName', 'taxCode', 'birthDate', 'address', 'phone', 'caregiver',
+    'firstName', 'lastName', 'taxCode', 'identifierType', 'birthDatePrecision', 'birthYear', 'birthDate', 'address', 'phone', 'caregiver',
     'exemptions', 'diagnoses', 'notes', 'monitoringProfile', 'statusReason',
     'archiveReason', 'archiveNote', 'isAdi', 'isArchived', 'ambulatoryId',
 ] as const;

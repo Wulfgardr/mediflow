@@ -1,3 +1,4 @@
+import { IDENTIFIER_TYPES, birthError, identifierError, inferIdentifierType } from './patient-identity';
 import { parseWhoReference, type WhoReference } from './reference-data/icd11-reference';
 import * as z from 'zod';
 import { isWhoCanonicalMmsUri } from './reference-data/icd11-who-local-contract';
@@ -30,7 +31,10 @@ export const checkupSchema = z.object({
 export const patientSchema = z.object({
     firstName: z.string().min(2, "Il nome è troppo corto"),
     lastName: z.string().min(2, "Il cognome è troppo corto"),
-    taxCode: z.string().length(16, "Il codice fiscale deve essere di 16 caratteri").regex(/^[A-Z0-9]+$/i, "Formato non valido"),
+    taxCode: z.string().default(''),
+    identifierType: z.enum(IDENTIFIER_TYPES).optional(),
+    birthDatePrecision: z.enum(['exact', 'estimated', 'unknown']).optional(),
+    birthYear: z.number().int().nullable().optional(),
     birthDate: z.string().optional().or(z.literal('')),
     address: z.string().optional(),
     phone: z.string().optional(),
@@ -42,6 +46,11 @@ export const patientSchema = z.object({
     statusReason: z.string().optional(),
     diagnoses: z.array(diagnosisSchema).optional().default([]),
     checkups: z.array(checkupSchema).optional().default([])
+}).superRefine((value, context) => {
+    const error = identifierError(value.identifierType ?? inferIdentifierType(value.taxCode), value.taxCode);
+    if (error) context.addIssue({ code: 'custom', path: ['taxCode'], message: error });
+    const birth = birthError(value);
+    if (birth) context.addIssue({ code: 'custom', path: [value.birthDatePrecision === 'estimated' ? 'birthYear' : 'birthDate'], message: birth });
 });
 
 export type PatientFormValues = z.infer<typeof patientSchema>;

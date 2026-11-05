@@ -1,3 +1,4 @@
+import { hasPatientIdentifierConflict, PatientIdentifierConflictError, PATIENT_IDENTIFIER_DUPLICATE } from '@/lib/patient-identifier-conflict';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
@@ -157,6 +158,7 @@ export async function POST(request: Request) {
                     insertPatient: values => {
                         if (tx.select({ id: patientRetiredIds.id }).from(patientRetiredIds).where(eq(patientRetiredIds.id, values.id)).get()
                             || tx.select({ id: patients.id }).from(patients).where(eq(patients.id, values.id)).get()) throw new PatientCreateConflictError();
+                        if (hasPatientIdentifierConflict(tx, { ...values, identifierType: values.identifierType ?? 'cf' })) throw new PatientIdentifierConflictError();
                         tx.insert(patients).values(values).run();
                     },
                     insertMembership: (patientId, targetId) => {
@@ -173,6 +175,7 @@ export async function POST(request: Request) {
                     .where(eq(ambulatories.id, normalized.values.ambulatoryId)).get()) throw new PatientCreateDestinationNotFoundError();
                 if (tx.select({ id: patientRetiredIds.id }).from(patientRetiredIds).where(eq(patientRetiredIds.id, normalized.values.id)).get()
                     || tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) throw new PatientCreateConflictError();
+                if (hasPatientIdentifierConflict(tx, { ...normalized.values, identifierType: normalized.values.identifierType ?? 'cf' })) throw new PatientIdentifierConflictError();
                 tx.insert(patients).values(normalized.values).run();
 
                 if (normalized.values.ambulatoryId) {
@@ -190,6 +193,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
+        if (error instanceof PatientIdentifierConflictError) return NextResponse.json(PATIENT_IDENTIFIER_DUPLICATE, { status: 409 });
         if (error instanceof PatientCreateDestinationNotFoundError) return NextResponse.json({ error: 'Ambulatory not found' }, { status: 404 });
         if (error instanceof PatientCreateConflictError) return NextResponse.json({ error: 'Patient create conflict' }, { status: 409 });
         if (lane.kind === 'fenced') {

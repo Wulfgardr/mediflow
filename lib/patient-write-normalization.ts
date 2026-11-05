@@ -1,3 +1,4 @@
+import { birthError, identifierError, inferIdentifierType, normalizeIdentifierValue, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity';
 import { patients } from '@/lib/schema';
 import { normalizePrimaryAmbulatoryIdInput } from './patient-ambulatory-membership';
 
@@ -104,6 +105,14 @@ export function normalizePatientCreateInput(
         return birthDate;
     }
 
+    const identifierType = body.identifierType === undefined ? inferIdentifierType(body.taxCode as string) : body.identifierType as PatientIdentifierType;
+    const identityError = identifierError(identifierType, body.taxCode);
+    if (identityError) return { ok: false, error: identityError };
+    const birthDatePrecision = (body.birthDatePrecision ?? (birthDate.value ? 'exact' : body.birthYear != null ? 'estimated' : 'unknown')) as BirthDatePrecision;
+    const birthYear = body.birthYear == null ? null : body.birthYear as number;
+    const birth = birthError({ identifierType, birthDate: birthDate.value, birthDatePrecision, birthYear });
+    if (birth) return { ok: false, error: birth };
+    if (typeof body.firstName !== 'string' || !body.firstName.trim() || typeof body.lastName !== 'string' || !body.lastName.trim()) return { ok: false, error: 'Inserisci nome e cognome del paziente.' };
     const now = options.now ?? new Date();
 
     return {
@@ -112,7 +121,8 @@ export function normalizePatientCreateInput(
             id,
             firstName: body.firstName as string,
             lastName: body.lastName as string,
-            taxCode: body.taxCode as string,
+            taxCode: identifierType === 'none' ? '' : normalizeIdentifierValue(identifierType, body.taxCode as string),
+            identifierType, birthDatePrecision, birthYear,
             birthDate: birthDate.value,
             address: typeof body.address === 'string' ? body.address : null,
             phone: typeof body.phone === 'string' ? body.phone : null,
@@ -147,6 +157,9 @@ export function normalizePatientUpdateInput(
         firstName: typeof body.firstName === 'string' ? body.firstName : undefined,
         lastName: typeof body.lastName === 'string' ? body.lastName : undefined,
         taxCode: typeof body.taxCode === 'string' ? body.taxCode : undefined,
+        identifierType: body.identifierType as PatientIdentifierType | undefined,
+        birthDatePrecision: body.birthDatePrecision as BirthDatePrecision | undefined,
+        birthYear: body.birthYear as number | null | undefined,
         address: normalizeNullableStringField(body.address),
         phone: normalizeNullableStringField(body.phone),
         caregiver: normalizeNullableStringField(body.caregiver),
