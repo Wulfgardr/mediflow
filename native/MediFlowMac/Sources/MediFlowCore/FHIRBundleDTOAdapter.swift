@@ -30,7 +30,10 @@ public enum FHIRBundleDTOAdapter {
                         system: $0.system ?? "ICD-10",
                         date: $0.date ?? isoDate(Date())
                     )
-                }
+                },
+                identifierType: patient.identifierType,
+                birthDatePrecision: patient.birthDatePrecision,
+                birthYear: patient.birthYear
             ),
             entries: entries.filter { $0.deletedAt == nil }.map {
                 FHIRClinicalEntryInput(
