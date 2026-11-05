@@ -136,6 +136,7 @@ lock persistente o schema non riconosciuto impediscono l'apertura operativa.
 | 4 | ottobre 2026 | Fonti protesiche, originali e snapshot di provenienza. |
 | 5 | ottobre 2026 | Ledger del comando durevole di stato terapia, ADR 0168. |
 | 6 | ottobre 2026 | Ledger dei comandi distruttivi ambulatorio, ADR 0169. |
+| 8 | 5 novembre 2026 | Identificativo tipizzato, precisione nascita, anno stimato e storico identificativi, ADR 0179. |
 | 7 | 31 ottobre 2026 | `portable_import_origins`, indice locale append-only con origine importata o non attestata, escluso dall'export portabile, ADR 0173. Nessun backfill dai marcatori di un file. |
 
 Poiché la versione corrente è validata senza DDL, **ogni modifica allo schema

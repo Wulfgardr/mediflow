@@ -1,4 +1,5 @@
 'use client';
+import type { PatientIdentifierType } from '@/lib/patient-identity';
 
 import { useLiveQueryState } from '@/lib/live-query';
 import { describeFhirExportReadiness, inspectFhirExportReadiness } from '@/lib/fhir/export-readiness';
@@ -12,12 +13,13 @@ import styles from './siss-workspace.module.css';
 type Props = {
     patientId: string;
     patientTaxCode: string | null | undefined;
+    identifierType?: PatientIdentifierType;
     canShareFhirFile: boolean;
     onExportFhir: () => void;
     onShareFhir: () => void | Promise<void>;
 };
 
-export default function SissWorkspace({ patientId, patientTaxCode, canShareFhirFile, onExportFhir, onShareFhir }: Props) {
+export default function SissWorkspace({ patientId, patientTaxCode, identifierType, canShareFhirFile, onExportFhir, onShareFhir }: Props) {
     const checks = useLiveQueryState(
         () => inspectFhirExportReadiness(patientId, async () => {
             const response = await fetch(`/api/fse/validate-patient?patientId=${encodeURIComponent(patientId)}`);
@@ -53,7 +55,7 @@ export default function SissWorkspace({ patientId, patientTaxCode, canShareFhirF
                     )}
                 </div>
             </section>
-            <SissPatientContextPanel patientId={patientId} patientTaxCode={patientTaxCode} fseReadiness={fseReadiness} onRefreshFseReadiness={checks.refresh} embedded />
+            <SissPatientContextPanel patientId={patientId} patientTaxCode={patientTaxCode} identifierType={identifierType} fseReadiness={fseReadiness} onRefreshFseReadiness={checks.refresh} embedded />
             <div className={styles.diary}><SissHandoffDiary patientId={patientId} embedded /></div>
         </div>
     );

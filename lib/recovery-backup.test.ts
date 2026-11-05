@@ -35,6 +35,10 @@ function contents(db: Database.Database) {
     return Object.fromEntries(names.filter(({ name }) => !['archive_generation', 'archive_session_generations'].includes(name))
         .map(({ name }) => [name, db.prepare(`SELECT * FROM ${quote(name)}`).all()]));
 }
+function migratedPatientRows(rows: unknown) {
+    return (rows as Record<string, unknown>[]).map(row => ({ ...row, identifier_type: 'cf',
+        birth_date_precision: row.birth_date == null ? 'unknown' : 'exact', birth_year: null, identifier_history: '[]' }));
+}
 async function fixture(paddingBytes = 0) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-recovery-'));
     const sourceDir = path.join(root, 'source'); const targetDir = path.join(root, 'target');
@@ -274,6 +278,7 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
         const oldFile = path.join(path.dirname(f.source), 'v4-snapshot.db');
         fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
+        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
@@ -295,7 +300,7 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
                 const result = contents(installed);
                 assert.deepEqual(installed.prepare('SELECT * FROM therapy_status_commands').all(), []);
                 assert.deepEqual(result.users, expected.users);
-                assert.deepEqual(result.patients, expected.patients);
+                assert.deepEqual(result.patients, migratedPatientRows(expected.patients));
                 assert.deepEqual(result.durable_review_command_operations, expected.durable_review_command_operations);
                 assertPredecessorAuditHistory(result.audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
                 assert.equal(installed.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
@@ -312,6 +317,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
     try {
         const oldFile = path.join(f.root, 'canonical5.db'); fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
+        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
@@ -327,7 +333,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
             try {
                 const actual = contents(restored);
                 assert.deepEqual(actual.ambulatory_destructive_commands, []);
-                for (const key of ['users','patients','therapy_status_commands','durable_review_command_operations']) assert.deepEqual(actual[key], expected[key]);
+                for (const key of ['users','patients','therapy_status_commands','durable_review_command_operations']) assert.deepEqual(actual[key], key === 'patients' ? migratedPatientRows(expected[key]) : expected[key]);
                 assertPredecessorAuditHistory(actual.audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
                 assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             } finally { restored.close(); }
@@ -349,6 +355,7 @@ for (const alteration of ['none', 'column', 'index', 'view', 'authority-table'])
     try {
         const file = path.join(f.root, 'canonical6.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
+        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('DROP TABLE synthetic_extension');
         old.exec('DROP TABLE portable_import_origins');
         old.pragma('user_version=6');
@@ -365,7 +372,7 @@ for (const alteration of ['none', 'column', 'index', 'view', 'authority-table'])
             await f.restore({ artifact }); const restored = openVersionedSqliteDatabase(f.destination);
             try {
                 assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
-                for (const table of ['users','patients','therapy_status_commands','ambulatory_destructive_commands']) assert.deepEqual(contents(restored)[table], expected[table]);
+                for (const table of ['users','patients','therapy_status_commands','ambulatory_destructive_commands']) assert.deepEqual(contents(restored)[table], table === 'patients' ? migratedPatientRows(expected[table]) : expected[table]);
                 const origins = restored.prepare('SELECT * FROM portable_import_origins').all() as { kind: string; ref: string; origin: string; import_event_id: string }[];
                 const unknown = origins.filter(row => row.origin === 'unattested');
                 assert.equal(unknown.length, (expected.audit_events as unknown[]).length + (expected.therapy_status_commands as unknown[]).length);

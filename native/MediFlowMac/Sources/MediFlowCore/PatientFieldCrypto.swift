@@ -75,7 +75,8 @@ public enum PatientFieldCrypto {
             updatedAt: summary.updatedAt,
             deletedAt: summary.deletedAt,
             deletionReason: decryptStringField(summary.deletionReason, masterKey: masterKey),
-            diagnoses: decryptStructuredField(summary.diagnoses, masterKey: masterKey)
+            diagnoses: decryptStructuredField(summary.diagnoses, masterKey: masterKey),
+            identifierType: summary.identifierType, birthDatePrecision: summary.birthDatePrecision, birthYear: summary.birthYear
         )
     }
 
@@ -108,7 +109,8 @@ public enum PatientFieldCrypto {
             deletionReason: decryptStringField(detail.deletionReason, masterKey: masterKey),
             // archive provenance is sealed JSON-string data, like notes.
             archiveReason: decryptStringField(detail.archiveReason, masterKey: masterKey),
-            archiveNote: decryptStringField(detail.archiveNote, masterKey: masterKey)
+            archiveNote: decryptStringField(detail.archiveNote, masterKey: masterKey),
+            identifierType: detail.identifierType, birthDatePrecision: detail.birthDatePrecision, birthYear: detail.birthYear
         )
     }
 

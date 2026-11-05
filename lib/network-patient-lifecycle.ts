@@ -1,3 +1,4 @@
+import { hasPatientIdentifierConflict, PATIENT_IDENTIFIER_DUPLICATE } from './patient-identifier-conflict';
 import { archiveGenerationForSession } from './security/archive-session-generation';
 import { canIncrementVersion } from './version-concurrency';
 import { randomUUID } from 'node:crypto';
@@ -147,7 +148,7 @@ export function validateNetworkPatientCreateBody(
         }
     }
 
-    if (!hasRequiredString(body.firstName) || !hasRequiredString(body.lastName) || !hasRequiredString(body.taxCode)) {
+    if (!hasRequiredString(body.firstName) || !hasRequiredString(body.lastName) || (body.identifierType !== 'none' && !hasRequiredString(body.taxCode))) {
         return {
             ok: false,
             status: 400,
@@ -229,6 +230,7 @@ export async function createNetworkScopedPatient(
             || tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) {
             return { status: 409 as const, value: { error: 'Patient create conflict' } };
         }
+        if (hasPatientIdentifierConflict(tx, { ...normalized.values, identifierType: normalized.values.identifierType ?? 'cf' })) return { status: 409 as const, value: PATIENT_IDENTIFIER_DUPLICATE };
         tx.insert(patients).values(normalized.values).run();
         tx.insert(patientsToAmbulatories)
             .values({

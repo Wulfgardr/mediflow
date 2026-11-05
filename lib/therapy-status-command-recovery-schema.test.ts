@@ -8,6 +8,7 @@ import { assertTherapyCommandPredecessorRecoverySchema } from './therapy-status-
 
 function predecessor() {
     const db = new Database(':memory:'); initializeSqliteSchema(db);
+    for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year']) db.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
     db.exec('DROP TABLE portable_import_origins; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;'); return db;
 }
 test('canonical v4 remains admitted against its immutable fingerprint without changing bytes', () => {

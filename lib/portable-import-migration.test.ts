@@ -16,10 +16,10 @@ function original() {
         .run('untrusted-history-marker', 'backup.audit.imported', 'success', 'system', 'claimed-host', 'audit_event', 'arbitrary-local-event', 'web');
     const patients = db.prepare('SELECT * FROM patients').all();db.close();return { root, file, patients };
 }
-test('v6 upgrades to v7 atomically, keeps a verified original and never derives authority from old markers', () => {
+test('v6 upgrades to the current schema atomically, keeps a verified original and never derives authority from old markers', () => {
     const f = original(), db = openVersionedSqliteDatabase(f.file);
     assert.equal(db.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
-    assert.equal(CURRENT_SQLITE_SCHEMA_VERSION, 7);
+    assert.ok(CURRENT_SQLITE_SCHEMA_VERSION >= 8);
     assert.deepEqual(db.prepare('SELECT * FROM patients').all(), f.patients);
     assert.deepEqual(db.prepare('SELECT * FROM portable_import_origins').all(), []);
     const copies = readdirSync(f.root).filter(name => name.includes('.schema-original-v6-'));

@@ -459,6 +459,15 @@ function applySchemaGuards(sqlite: Database.Database) {
         throw error;
     }
     try {
+        const identityColumns = sqlite.pragma('table_info(patients)') as { name: string }[];
+        const migrateIdentity = !identityColumns.some(column => column.name === 'identifier_type');
+        const migrateBirth = !identityColumns.some(column => column.name === 'birth_date_precision');
+        ensureColumn(sqlite, 'patients', 'identifier_type', "identifier_type TEXT NOT NULL DEFAULT 'cf'");
+        ensureColumn(sqlite, 'patients', 'birth_date_precision', "birth_date_precision TEXT NOT NULL DEFAULT 'unknown'");
+        ensureColumn(sqlite, 'patients', 'birth_year', 'birth_year INTEGER');
+        ensureColumn(sqlite, 'patients', 'identifier_history', "identifier_history TEXT NOT NULL DEFAULT '[]'");
+        if (migrateIdentity) sqlite.exec("UPDATE patients SET identifier_type = CASE WHEN upper(tax_code) LIKE 'STP%' THEN 'stp' WHEN upper(tax_code) LIKE 'ENI%' THEN 'eni' ELSE 'cf' END");
+        if (migrateBirth) sqlite.exec("UPDATE patients SET birth_date_precision = CASE WHEN birth_date IS NULL THEN 'unknown' ELSE 'exact' END");
         ensureColumn(sqlite, 'patients', 'exemptions', 'exemptions TEXT');
         ensureColumn(sqlite, 'patients', 'diagnoses', 'diagnoses TEXT');
         ensureColumn(sqlite, 'patients', 'monitoring_profile', 'monitoring_profile TEXT');

@@ -1,3 +1,4 @@
+import { hasPatientIdentifierConflict } from './patient-identifier-conflict';
 import { isSealedAttachmentData } from './attachment-payload';
 import 'server-only';
 import { randomUUID } from 'node:crypto';
@@ -222,6 +223,7 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
                         || duplicateSet(tx, command.values) !== command.duplicates) return deny();
                     const used = tx.select({ id: auditEvents.eventId }).from(auditEvents).where(sql`json_extract(${auditEvents.redactedMetadata}, '$.patientDocumentCreate.sourceId') = ${command.source.sourceId}`).get();
                     if (used) return deny();
+                    if (hasPatientIdentifierConflict(tx, { ...command.values, identifierType: command.values.identifierType ?? 'cf', ambulatoryId: host.ambulatoryId })) return deny();
                     if (tx.insert(patients).values({ ...command.values, ambulatoryId: host.ambulatoryId }).run().changes !== 1) return deny();
                     if (tx.insert(patientsToAmbulatories).values({ patientId: command.patientId, ambulatoryId: host.ambulatoryId }).run().changes !== 1) return deny();
                     const currentness = createHostAttachmentCurrentness();

@@ -18,6 +18,7 @@ for (const version of [4, 5, 6]) {
     function predecessor() {
         const db = new Database(':memory:'); initializeSqliteSchema(db);
         db.exec('DROP TABLE portable_import_origins');
+        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year']) db.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         if (version < 6) db.exec('DROP TABLE ambulatory_destructive_commands');
         if (version === 4) db.exec('DROP TABLE therapy_status_commands');
         db.pragma(`user_version=${version}`); return db;
@@ -59,6 +60,7 @@ test('false predecessor stamps cannot hide later or missing terminal ledgers', (
 test('failure after the new v6 DDL rolls back the predecessor ledger, account bytes and stamp', () => {
     const root = mkdtempSync(join(process.env.MEDIFLOW_DATA_DIR!, 'canonical5-rollback-')), file = join(root, 'medical.db');
     const original = openVersionedSqliteDatabase(file);
+    for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year']) original.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
     original.exec('DROP TABLE portable_import_origins; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
     original.prepare("INSERT INTO users(id,username,role,password_hash,encrypted_master_key,salt) VALUES ('synthetic-v5','synthetic-v5','admin','synthetic-hash','v3:synthetic-wrapped-key','synthetic-salt')").run();
     const user = original.prepare("SELECT * FROM users WHERE id='synthetic-v5'").get(); original.close();

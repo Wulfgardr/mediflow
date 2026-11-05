@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.54.0
+  version: 1.55.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -7347,6 +7347,18 @@ components:
             - string
             - 'null'
           format: date-time
+        identifierType:
+          type: string
+          enum: [cf, stp, eni, passport, other, none]
+          description: Tipo dell’identificativo; none conserva taxCode come stringa vuota.
+        birthDatePrecision:
+          type: string
+          enum: [exact, estimated, unknown]
+          description: Precisione dichiarata della nascita.
+        birthYear:
+          type: [integer, 'null']
+          minimum: 1850
+          description: Solo anno stimato, senza giorno o mese inventati.
         taxCode:
           type: string
         isAdi:
@@ -7399,6 +7411,18 @@ components:
             - string
             - 'null'
           format: date-time
+        identifierType:
+          type: string
+          enum: [cf, stp, eni, passport, other, none]
+          description: Tipo dell’identificativo; none conserva taxCode come stringa vuota.
+        birthDatePrecision:
+          type: string
+          enum: [exact, estimated, unknown]
+          description: Precisione dichiarata della nascita.
+        birthYear:
+          type: [integer, 'null']
+          minimum: 1850
+          description: Solo anno stimato, senza giorno o mese inventati.
         taxCode:
           type: string
         address:
@@ -8570,6 +8594,18 @@ components:
           type: string
         lastName:
           type: string
+        identifierType:
+          type: string
+          enum: [cf, stp, eni, passport, other, none]
+          description: Tipo dell’identificativo; none conserva taxCode come stringa vuota.
+        birthDatePrecision:
+          type: string
+          enum: [exact, estimated, unknown]
+          description: Precisione dichiarata della nascita.
+        birthYear:
+          type: [integer, 'null']
+          minimum: 1850
+          description: Solo anno stimato, senza giorno o mese inventati.
         taxCode:
           type: string
         birthDate:
@@ -8672,6 +8708,18 @@ components:
           type: string
         lastName:
           type: string
+        identifierType:
+          type: string
+          enum: [cf, stp, eni, passport, other, none]
+          description: Tipo dell’identificativo; none conserva taxCode come stringa vuota.
+        birthDatePrecision:
+          type: string
+          enum: [exact, estimated, unknown]
+          description: Precisione dichiarata della nascita.
+        birthYear:
+          type: [integer, 'null']
+          minimum: 1850
+          description: Solo anno stimato, senza giorno o mese inventati.
         taxCode:
           type: string
         birthDate:

@@ -1,3 +1,4 @@
+import type { PatientIdentifierType, BirthDatePrecision } from './patient-identity';
 export const PATIENT_PROFILE_UPDATE_OPERATION = Object.freeze({
     id: 'patient-profile.update.v1',
     version: 1,
@@ -10,6 +11,7 @@ export type PatientProfileUpdateContract = Readonly<{
 
 export type PatientProfileUpdatePayload = Readonly<{
     firstName?: string; lastName?: string; taxCode?: string;
+    identifierType?: PatientIdentifierType; birthDatePrecision?: BirthDatePrecision; birthYear?: number | null;
     birthDate?: string | null;
     address?: string | null; phone?: string | null; caregiver?: string | null;
     notes?: string | null; monitoringProfile?: string | null; statusReason?: string | null;
@@ -21,7 +23,7 @@ export type PatientProfileUpdatePayload = Readonly<{
 }>;
 
 export const PATIENT_PROFILE_UPDATE_FIELDS = Object.freeze([
-    'firstName', 'lastName', 'taxCode', 'address', 'phone', 'caregiver', 'notes',
+    'firstName', 'lastName', 'taxCode', 'identifierType', 'birthDatePrecision', 'birthYear', 'address', 'phone', 'caregiver', 'notes',
     'monitoringProfile', 'statusReason', 'archiveReason', 'archiveNote',
     'aiSummary', 'aiSummaryGeneratedAt', 'aiSummaryContextHash', 'documentInsights',
     'isAdi', 'isArchived', 'ambulatoryId', 'birthDate', 'exemptions', 'diagnoses',

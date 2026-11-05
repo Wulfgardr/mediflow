@@ -1,14 +1,15 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 /* synthetic fixtures only; parser tests perform no I/O. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
     isPatientCsvDate, isPatientCsvRowEligible, markExistingPatientDuplicates,
-    normalizePatientCsvTaxCode, parsePatientCsv, PATIENT_CSV_HEADERS, PATIENT_CSV_LIMITS, PATIENT_CSV_TEMPLATE,
+    normalizePatientCsvTaxCode, parsePatientCsv, PATIENT_CSV_HEADERS, PATIENT_CSV_IDENTITY_HEADERS, PATIENT_CSV_LIMITS, PATIENT_CSV_TEMPLATE,
     type PatientCsvPreview,
 } from './patient-bulk-import.ts';
 
 const header = PATIENT_CSV_HEADERS.join(';');
-const code = (index = 1) => `SYNTHETIC${String(index).padStart(7, '0')}`;
+const code = syntheticTaxCode;
 const bytes = (text: string) => new TextEncoder().encode(text);
 const line = (index = 1) => `Ada;Sintetica;${code(index)};;;`;
 const parse = (text: string) => parsePatientCsv(bytes(text));
@@ -24,25 +25,25 @@ function error(text: string, expected: string): void {
     if (!result.ok) assert.equal(result.error.code, expected);
 }
 
-test('template contains the exact six headers and no patient data', () => {
-    assert.equal(PATIENT_CSV_TEMPLATE, `\uFEFF${header}\r\n`);
+test('template contains the extended headers and no patient data', () => {
+    assert.equal(PATIENT_CSV_TEMPLATE, `\uFEFF${PATIENT_CSV_IDENTITY_HEADERS.join(';')}\r\n`);
     assert.equal(preview(PATIENT_CSV_TEMPLATE).rows.length, 0);
 });
 test('UTF-8 identities are not trimmed, transliterated or otherwise rewritten; empty optionals absent', () => {
-    const row = preview(`${header}\n  Zoë  ;D’Àngelo; synthetic0000001 ;;;`).rows[0];
-    assert.deepEqual(row.values, { firstName: '  Zoë  ', lastName: 'D’Àngelo', taxCode: code() });
+    const row = preview(`${header}\n  Zoë  ;D’Àngelo; ${code().toLowerCase()} ;;;`).rows[0];
+    assert.deepEqual(row.values, { firstName: '  Zoë  ', lastName: 'D’Àngelo', taxCode: code(), identifierType: 'cf', birthDatePrecision: 'unknown', birthYear: null });
     assert.equal(isPatientCsvRowEligible(row), true);
     for (const key of ['birthDate', 'address', 'phone']) assert.equal(Object.hasOwn(row.values!, key), false);
 });
 test('quoted separators, escaped quotes, CRLF and multiline address preserve exact values and line numbers', () => {
     const rows = preview(`\uFEFF${header}\r\n"Ada; A";"D""Angelo";${code()};2000-02-29;"Via ; Prova\r\nInterno ""A""";+3900123\r\n${line(2)}\r\n`).rows;
-    assert.deepEqual(rows[0].values, { firstName: 'Ada; A', lastName: 'D"Angelo', taxCode: code(), birthDate: '2000-02-29', address: 'Via ; Prova\r\nInterno "A"', phone: '+3900123' });
+    assert.deepEqual(rows[0].values, { firstName: 'Ada; A', lastName: 'D"Angelo', taxCode: code(), identifierType: 'cf', birthDatePrecision: 'exact', birthYear: null, birthDate: '2000-02-29', address: 'Via ; Prova\r\nInterno "A"', phone: '+3900123' });
     assert.equal(rows[0].line, 2);
     assert.equal(rows[1].line, 4);
     assert.equal(rows[1].row, 2);
 });
 test('ASCII-only CF normalization precedes uppercasing and never erases internal whitespace', () => {
-    assert.equal(normalizePatientCsvTaxCode('  synthetic0000001  '), code());
+    assert.equal(normalizePatientCsvTaxCode('  synthetic0000001  '), 'SYNTHETIC0000001');
     for (const value of ['SYNTHETIß0000001', 'SYNTHETIK0000001', 'SYNTHETIC000 001', '\tsynthetic0000001', '\u00a0synthetic0000001', 'SYNTHETIC00000012']) {
         assert.equal(normalizePatientCsvTaxCode(value), null);
     }
@@ -65,14 +66,14 @@ test('whitespace-only names are invalid without mutating names', () => {
     assert.equal(row.issues.filter(issue => issue.code === 'name').length, 2);
 });
 test('all file occurrences of a duplicate CF are excluded, even when one name is invalid', () => {
-    const rows = preview(`${header}\n${line()}\nA;Altro; synthetic0000001 ;;;\n${line(2)}`).rows;
+    const rows = preview(`${header}\n${line()}\nA;Altro; ${code().toLowerCase()} ;;;\n${line(2)}`).rows;
     assert.equal(rows[0].duplicateInFile, true);
     assert.equal(rows[1].duplicateInFile, true);
     assert.equal(rows.filter(isPatientCsvRowEligible).length, 1);
 });
 test('existing-scope comparison is deterministic, reversible and does not mutate the initial preview', () => {
     const original = preview(`${header}\n${line()}`);
-    const marked = markExistingPatientDuplicates(original, [{ id: 'synthetic-existing', taxCode: ' synthetic0000001 ' }]);
+    const marked = markExistingPatientDuplicates(original, [{ id: 'synthetic-existing', taxCode: ` ${code().toLowerCase()} ` }]);
     assert.equal(marked.rows[0].duplicateExisting, true);
     assert.equal(original.rows[0].duplicateExisting, false);
     assert.equal(markExistingPatientDuplicates(marked, []).rows[0].duplicateExisting, false);

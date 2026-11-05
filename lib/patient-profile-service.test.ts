@@ -1,3 +1,4 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 /* Synthetic SQLite conformance for the common host profile port. */
 import assert from 'node:assert/strict';
@@ -286,6 +287,7 @@ test('real Web, token-only v1 and paired GET adapters preserve the same profile 
     const v1Body = await local.json();
     assert.deepEqual(v1Body, {
         id: patientId, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'PROFILE-SYNTHETIC',
+        identifierType: 'cf', birthDatePrecision: 'unknown', birthYear: null,
         birthDate: '1970-01-01T00:00:00.000Z', address: 'ENC:YWJj:YWRkcmVzcw==', phone: null,
         caregiver: null, exemptions: null, diagnoses: null, monitoringProfile: null, statusReason: null,
         archiveReason: null, archiveNote: null, notes: sealedNotes, aiSummary: null,
@@ -571,7 +573,7 @@ test('an uncertain exception after the real writer commits is terminal without a
 
 test('canonical payload preserves every existing local profile field and timestamp/membership semantics', async () => {
     reset();
-    const body = { firstName: 'Bea', lastName: 'Sintetica aggiornata', taxCode: 'SYNTHETIC-UPDATED',
+    const body = { firstName: 'Bea', lastName: 'Sintetica aggiornata', taxCode: syntheticTaxCode('updated'),
         birthDate: '2000-02-29T00:00:00.000Z', address: 'ENC:YWJj:YQ==', phone: null,
         caregiver: '', notes: sealedNotes, monitoringProfile: 'profile', statusReason: 'ENC:YWJj:cg==',
         archiveReason: 'ENC:YWJj:cg==', archiveNote: 'ENC:YWJj:cg==',

@@ -206,7 +206,7 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                     {snapshot.ambulatoryName ? <p>Ambulatorio: <strong>{snapshot.ambulatoryName}</strong></p> : null}
                     <details className={styles.disclosure}>
                         <summary>Formato e limiti della verifica</summary>
-                        <p>Mantieni le sei intestazioni del modello, nello stesso ordine. Nome e cognome: 2–100 caratteri; indirizzo: massimo 500; telefono: massimo 80. Le celle vuote restano assenti.</p>
+                        <p>Mantieni le intestazioni del modello, nello stesso ordine. Le ultime tre colonne indicano tipo di identificativo, precisione della nascita e anno stimato. Il formato precedente a sei colonne resta accettato. Nome e cognome: 2–100 caratteri; indirizzo: massimo 500; telefono: massimo 80. Le celle vuote restano assenti.</p>
                         <p>Nome e cognome non sono modificati. Il codice fiscale viene convertito in maiuscolo dopo la verifica dei 16 caratteri; si rimuovono solo gli spazi esterni. Non si verifica l’attribuzione del codice fiscale.</p>
                         <p>I duplicati nel file e nelle schede accessibili dell’ambulatorio sono esclusi. Non è una verifica globale: importazioni contemporanee possono creare duplicati.</p>
                         <p>La destinazione è fissata nell’anteprima: ogni scheda viene salvata solo nell’ambulatorio indicato oppure l’invio è negato. Un cambio osservato qui interrompe le righe successive; non annulla salvataggi già conclusi, neppure da altre schede.</p>

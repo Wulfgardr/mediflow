@@ -19,6 +19,7 @@ function toPatientSummary(patient: typeof patients.$inferSelect, includeDiagnose
         lastName: patient.lastName,
         birthDate: toIsoString(patient.birthDate),
         taxCode: patient.taxCode,
+        identifierType: patient.identifierType, birthDatePrecision: patient.birthDatePrecision, birthYear: patient.birthYear,
         isAdi: patient.isAdi ?? null,
         isArchived: patient.isArchived ?? null,
         deletedAt: toIsoString(patient.deletedAt),

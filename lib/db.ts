@@ -1,3 +1,4 @@
+import type { PatientIdentifierType, BirthDatePrecision } from './patient-identity';
 import { decodeBase64, encodeBase64, openPatientDocumentFile, sealPatientDocumentFile } from './security/attachment-file-envelope';
 import backupEncryptedFields from './backup-encrypted-fields.json';
 import type { ProstheticsCatalogSelection, ProstheticsSnapshot } from './reference-data/prosthetics-catalog-contract';
@@ -102,6 +103,9 @@ export interface Patient {
     firstName: string;
     lastName: string;
     taxCode: string;
+    identifierType?: PatientIdentifierType;
+    birthDatePrecision?: BirthDatePrecision;
+    birthYear?: number | null;
     birthDate?: Date;
     address: string;
     phone: string;

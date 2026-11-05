@@ -1,4 +1,5 @@
 'use client';
+import { IDENTIFIER_LABELS, IDENTIFIER_TYPES, patientAgeLabel } from '@/lib/patient-identity';
 
 import { formatCountLabel } from '@/lib/format-count';
 import styles from './clinical-register.module.css';
@@ -11,7 +12,6 @@ import ICDAutocomplete from '@/components/icd-autocomplete';
 import { WhoCodeCheck } from '@/components/who-code-check';
 
 import ExemptionSelector from '@/components/exemption-selector';
-import { estimateBirthYearFromTaxCode, calculateAge } from '@/lib/utils';
 
 import { patientSchema, PatientFormValues } from '@/lib/schemas';
 
@@ -260,8 +260,9 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
     const watchedTaxCode = watch('taxCode');
     const watchedBirthDate = watch('birthDate');
-    const estimatedYear = !watchedBirthDate && watchedTaxCode ? estimateBirthYearFromTaxCode(watchedTaxCode) : null;
-    const estimatedAge = estimatedYear ? calculateAge(estimatedYear) : null;
+    const identifierType = watch('identifierType') ?? 'cf';
+    const birthPrecision = watch('birthDatePrecision') ?? 'unknown';
+    const ageLabel = patientAgeLabel({ taxCode: watch('taxCode'), identifierType, birthDate: watch('birthDate'), birthDatePrecision: birthPrecision, birthYear: watch('birthYear') });
 
     return (
         <form onSubmit={handleSubmit(submitOnce)} className={`${styles.register} ${styles.review} ${styles.patientForm}`}>
@@ -308,35 +309,37 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS} htmlFor="patient-taxCode">Codice fiscale <span className="text-[color:var(--lume-signal-critical)]">*</span></label>
-                        <input
-                            id="patient-taxCode"
-                            aria-invalid={!!errors.taxCode}
-                            aria-describedby={errors.taxCode ? "patient-taxCode-error" : undefined}
-                            {...register('taxCode')}
-                            className={`${FORM_INPUT_CLASS} uppercase lume-code font-semibold tracking-wider`}
-                            placeholder="RSSMRA80A01H501U"
-                            maxLength={16}
-                        />
-                        {errors.taxCode && <p id="patient-taxCode-error" className="mf-field-error" role="alert">{errors.taxCode.message}</p>}
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-identifierType">Identificativo</label>
+                        <select id="patient-identifierType" {...register('identifierType', { onChange: event => {
+                            if (event.target.value === 'none') setValue('taxCode', '', { shouldDirty: true });
+                        } })} className={FORM_INPUT_CLASS}>
+                            {IDENTIFIER_TYPES.map(type => <option key={type} value={type}>{IDENTIFIER_LABELS[type]}</option>)}
+                        </select>
+                        {identifierType !== 'none' && <>
+                            <label className={FORM_LABEL_CLASS} htmlFor="patient-taxCode">{IDENTIFIER_LABELS[identifierType]}</label>
+                            <input id="patient-taxCode" aria-invalid={!!errors.taxCode} {...register('taxCode')} className={FORM_INPUT_CLASS} maxLength={['cf', 'stp', 'eni'].includes(identifierType) ? 16 : 128} />
+                        </>}
+                        {errors.taxCode && <p className="mf-field-error" role="alert">{errors.taxCode.message}</p>}
                     </div>
-
                     <div className="space-y-1">
-                        <div className="flex justify-between items-center mb-1.5">
-                            <label className="mf-field-label mb-0" htmlFor="patient-birthDate">Data di nascita</label>
-                            {estimatedAge !== null && (
-                                <span className="apple-chip">Stima età ~{formatCountLabel(estimatedAge, 'anno', 'anni')} ({estimatedYear})</span>
-                            )}
-                        </div>
-                        <input
-                            type="date"
-                            id="patient-birthDate"
-                            aria-invalid={!!errors.birthDate}
-                            aria-describedby={errors.birthDate ? "patient-birthDate-error" : undefined}
-                            {...register('birthDate')}
-                            className={`${FORM_INPUT_CLASS} dark:[color-scheme:dark]`}
-                        />
-                        {errors.birthDate && <p id="patient-birthDate-error" className="mf-field-error" role="alert">{errors.birthDate.message}</p>}
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-birthPrecision">Nascita</label>
+                        <select id="patient-birthPrecision" {...register('birthDatePrecision', { onChange: event => {
+                            if (event.target.value !== 'exact') setValue('birthDate', '', { shouldDirty: true });
+                            if (event.target.value !== 'estimated') setValue('birthYear', null, { shouldDirty: true });
+                        } })} className={FORM_INPUT_CLASS}>
+                            <option value="exact">Data esatta</option><option value="estimated">Solo anno stimato</option><option value="unknown">Sconosciuta</option>
+                        </select>
+                        {birthPrecision === 'exact' && <>
+                            <label className={FORM_LABEL_CLASS} htmlFor="patient-birthDate">Data di nascita</label>
+                            <input type="date" id="patient-birthDate" {...register('birthDate')} className={FORM_INPUT_CLASS} />
+                        </>}
+                        {birthPrecision === 'estimated' && <>
+                            <label className={FORM_LABEL_CLASS} htmlFor="patient-birthYear">Anno di nascita stimato</label>
+                            <input type="number" id="patient-birthYear" {...register('birthYear', { setValueAs: value => value === '' ? null : Number(value) })} className={FORM_INPUT_CLASS} />
+                        </>}
+                        {ageLabel && <p>{ageLabel}</p>}
+                        {errors.birthDate && <p className="mf-field-error" role="alert">{errors.birthDate.message}</p>}
+                        {errors.birthYear && <p className="mf-field-error" role="alert">{errors.birthYear.message}</p>}
                     </div>
                 </div>
             </div>
@@ -524,7 +527,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                 <p className={styles.previewName}><PrivacyBlur>{[watch('lastName'), watch('firstName')].filter(Boolean).join(' ') || 'Nome da completare'}</PrivacyBlur></p>
                 <p className={styles.muted}>{disabled ? 'Compilazione sospesa: verifica l’esito prima di continuare.' : isEditMode ? 'Dati del modulo aperto. Le modifiche richiedono il salvataggio.' : 'Controlla i dati prima di salvare.'}</p>
                 <dl>
-                    <dt>Codice fiscale</dt><dd className={watchedTaxCode ? 'type-code' : 'type-meta'}><PrivacyBlur>{watchedTaxCode || 'Da completare'}</PrivacyBlur></dd>
+                    <dt>{IDENTIFIER_LABELS[identifierType]}</dt><dd className={watchedTaxCode ? 'type-code' : 'type-meta'}><PrivacyBlur>{watchedTaxCode || 'Da completare'}</PrivacyBlur></dd>
                     <dt>Data di nascita</dt><dd className="lume-registro"><PrivacyBlur>{watchedBirthDate ? new Date(watchedBirthDate).toLocaleDateString('it-IT') : 'Non indicata'}</PrivacyBlur></dd>
                     <dt>Telefono</dt><dd><PrivacyBlur>{watch('phone') || 'Non indicato'}</PrivacyBlur></dd>
                     <dt>Indirizzo</dt><dd><PrivacyBlur>{watch('address') || 'Non indicato'}</PrivacyBlur></dd>

@@ -217,7 +217,7 @@ locali salvano ciò che ricevono.
 ### `patients`: anagrafica e sintesi clinica
 
 - Cifrate: `address`, `phone`, `caregiver`, `exemptions`, `diagnoses`, `status_reason`, `notes`, `ai_summary`, `document_insights`, `archive_reason`, `archive_note`, `deletion_reason`
-- In chiaro: `id`, `first_name`, `last_name`, `tax_code`, `birth_date`, `is_adi`, `is_archived`, `ambulatory_id`, `created_at`, `updated_at`, `monitoring_profile`, `version`, `deleted_at`, `ai_summary_generated_at`, `ai_summary_context_hash`
+- In chiaro: `id`, `first_name`, `last_name`, `tax_code`, `identifier_type`, `identifier_history`, `birth_date_precision`, `birth_year`, `birth_date`, `is_adi`, `is_archived`, `ambulatory_id`, `created_at`, `updated_at`, `monitoring_profile`, `version`, `deleted_at`, `ai_summary_generated_at`, `ai_summary_context_hash`
 - Leggibile senza chiave: nome, cognome, codice fiscale, data di nascita, profilo di monitoraggio, ADI e stato di archiviazione.
 
 ### `patients_to_ambulatories`: appartenenza dei pazienti alle sedi

@@ -128,5 +128,8 @@ di ADR 0158 usano ora i writer reali del diario SISS; lo storico resta leggibile
   conformità ai loro profili.
 - Restano fuori: app Apple e GPUI (non leggono ancora la capacità per
   nascondere sezioni), client paired che ricevono il catalogo farmaci senza la
-  codifica dichiarata, codice fiscale obbligatorio, testi e lingua, cataloghi
+  codifica dichiarata, testi e lingua, cataloghi
   multipli attivi insieme, colonna della forma farmaceutica.
+
+L’identità senza codice fiscale e la precisione della nascita sono definite in
+[ADR 0179](./0179-identita-paziente-senza-codice-fiscale.md).

@@ -1,3 +1,4 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -54,7 +55,7 @@ if(mode==='revoke') {
 } else {
  const source={sourceId:randomUUID(),name:'ENC:bmFtZQ==:bmFtZQ==',path:'ENC:cGF0aA==:cGF0aA==',data:'ENC:c291cmNl:c291cmNl',type:'application/pdf' as const,size:512,identity:'ambiguous' as const,quality:'ready' as const,candidates:{}};
  const view=api.open(host,{session:host.session,ambulatoryId:scope,readCurrent:()=>source});
- api.preview(host,view.viewId,{firstName:{action:'correct',value:'Mario'},lastName:{action:'correct',value:randomUUID()},taxCode:{action:'correct',value:randomUUID()},duplicate:'none'});
+ api.preview(host,view.viewId,{firstName:{action:'correct',value:'Mario'},lastName:{action:'correct',value:randomUUID()},taxCode:{action:'correct',value:syntheticTaxCode(randomUUID())},duplicate:'none'});
  let resume!: () => void;
  const running = phase === 'in-flight' ? api.execute({...host, confirm: () => new Promise<boolean>(resolve => {resume=()=>resolve(true)})}, view.commandId, 'synthetic-confirmation') : undefined;
  const childData = foreign === 'archive' ? mkdtempSync(join(tmpdir(), 'mediflow-foreign-archive-')) : data;

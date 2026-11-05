@@ -1,3 +1,4 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 import { getAttachmentPayloadByteSize, isSealedAttachmentData, isSealedAttachmentValue } from './attachment-payload';
 import { parseAttachmentContentCurrentnessPut } from './api-schemas/attachments';
 import { createSyntheticPdf } from './security/attachment-large-pdf-test-fixture';
@@ -78,7 +79,7 @@ function fixture(scope: string = randomUUID(), options: Parameters<typeof synthe
 }
 function review(): PatientDocumentCreateReview {
     return { firstName: { action: 'correct', value: 'Mario' }, lastName: { action: 'correct', value: randomUUID() },
-        taxCode: { action: 'correct', value: randomUUID() }, duplicate: 'none' };
+        taxCode: { action: 'correct', value: syntheticTaxCode(randomUUID()) }, duplicate: 'none' };
 }
 function effects() {
     return ['patients', 'patients_to_ambulatories', 'attachments'].map(table =>

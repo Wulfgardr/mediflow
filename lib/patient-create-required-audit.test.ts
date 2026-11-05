@@ -1,3 +1,4 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* C05 real patient POST handlers on synthetic SQLite; auth/cookie seams only. */
 import assert from 'node:assert/strict';
@@ -131,7 +132,7 @@ async function create(surface: Surface, id: string, options: {
         requestHeaders.set(PATIENT_CREATE_HEADERS.context, preview.nonce);
         requestHeaders.set(PATIENT_CREATE_HEADERS.target, preview.ambulatoryId);
     }
-    const body = { id, firstName: 'Ada', lastName: 'Sintetica', taxCode: `SYN${id.replaceAll('-', '').slice(-10)}`,
+    const body = { id, firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode(id),
         ambulatoryId: 'c05-create-a', ...options.body };
     const request = new Request(`http://127.0.0.1/${surface === 'v1' ? 'api/v1' : 'api'}/patients`, {
         method: 'POST', headers: requestHeaders, body: JSON.stringify(body),
