@@ -65,10 +65,12 @@ test('Nuova scheda a 390: tab nella colonna e testo con spazio interno', async (
         await assertNotClippedInViewport(link, 'Tab nuova scheda');
         const style = await link.evaluate(element => {
             const css = getComputedStyle(element);
-            return { left: element.getBoundingClientRect().left, padding: parseFloat(css.paddingLeft), align: css.justifyContent };
+            return { left: element.getBoundingClientRect().left, padding: parseFloat(css.paddingLeft), border: parseFloat(css.borderLeftWidth), background: css.backgroundColor, align: css.justifyContent };
         });
         expect(style.left).toBeGreaterThanOrEqual(title!.x - 1);
-        expect(style.padding).toBe(16);
+        // Linguette come nella Scheda: nessuna cornice né fondo, quindi il testo
+        // non ha un bordo da cui staccarsi; con una cornice servirebbero 16 px.
+        if (style.border > 0 || style.background !== 'rgba(0, 0, 0, 0)') expect(style.padding).toBe(16);
         expect(style.align).toBe('flex-start');
     }
     await expect(page.locator('#documento')).toHaveCSS('border-radius', '0px');
