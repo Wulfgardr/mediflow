@@ -76,7 +76,7 @@
 .editorHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
 .editorHeading h2 { margin: 0; font-size: 0.875rem; font-weight: 600; }
 .editorHeading p { margin: 0; color: var(--lume-ink-muted); font-size: 0.75rem; }
-.editor { border-radius: 8px; }
+.editor { border-radius: var(--lume-radius-control); }
 .editor [data-lume-editor-surface="toolbar"] { gap: 12px; padding: 6px; }
 .editor [data-lume-editor-surface="toolbar"] button > span { display: none; }
 .editor [data-lume-editor-surface="canvas"] { padding: 18px 20px 12px; }
@@ -151,12 +151,12 @@
 .sessionStatus svg { flex: none; width: 14px; height: 14px; }
 .sessionControls { display: flex; flex-wrap: wrap; gap: 8px; }
 .sessionControls button { height: 36px; border-radius: 10px; font-size: 0.75rem; }
-.sessionBody textarea { border-radius: 8px; }
+.sessionBody textarea { border-radius: var(--lume-radius-control); }
 .sessionBody input[type="checkbox"] { flex: none; }
 
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 20px; }
 .actions > p { max-width: 36ch; margin: 0; color: var(--lume-ink-muted); font-size: 0.75rem; line-height: 1.5; }
-.saveButton { margin-left: auto; min-height: 42px; padding: 10px 16px; border-radius: 7px; font-size: 0.875rem; }
+.saveButton { margin-left: auto; min-height: 42px; padding: 10px 16px; border-radius: var(--lume-radius-control); font-size: 0.875rem; }
 
 @media (max-width: 680px) {
     .page { padding: 16px 12px 32px; }
@@ -182,7 +182,7 @@
 .actions { position: sticky; z-index: 10; bottom: 0; margin: 20px -24px -24px; padding: 16px 24px; border-top: 1px solid var(--lume-rule-strong); background: var(--lume-surface-focal); border-radius: 0 0 12px 12px; }
 .saveSummary { font-size: 0.875rem; }
 .saveSummary p { margin-top: 4px; font-size: 0.8125rem; color: var(--lume-ink-muted); }
-.saveButton { border-radius: 10px; }
+.saveButton { border-radius: var(--lume-radius-control); }
 @media (max-width: 680px) { .actions { margin-inline: -16px; margin-bottom: -16px; padding: 16px; } .saveButton { min-height: 44px; } }
 
 .layout { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 32px; align-items: start; }
