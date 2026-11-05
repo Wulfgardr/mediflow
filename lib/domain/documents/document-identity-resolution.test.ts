@@ -23,10 +23,10 @@ const baseSource = {
 
 // Synthetic CF-like tokens: structurally valid AND checksum-valid, so the
 // resolver can promote them to high confidence (the check char gates high).
-const SYNTHETIC_PATIENT_CF = 'TSTTST00A00A000X';
-const SYNTHETIC_PRESCRIBER_CF = 'MEDPRS00A00A000X';
-const SYNTHETIC_OPERATOR_CF = 'OPRTST00A00A000L';
-const SYNTHETIC_FACILITY_CF = 'FCLTST00A00A000W';
+const SYNTHETIC_PATIENT_CF = 'TSTTST00A01A000W';
+const SYNTHETIC_PRESCRIBER_CF = 'MEDPRS00A01A000W';
+const SYNTHETIC_OPERATOR_CF = 'OPRTST00A01A000K';
+const SYNTHETIC_FACILITY_CF = 'FCLTST00A01A000V';
 // A structurally valid token with a wrong check char: never reaches high confidence.
 const SYNTHETIC_INVALID_CHECKSUM_CF = 'TSTTST00A00A000A';
 

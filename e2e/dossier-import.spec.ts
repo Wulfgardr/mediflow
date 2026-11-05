@@ -7,18 +7,10 @@ import path from 'node:path';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 
 import { bootstrapUnlockedSession } from './utils';
-import { isValidItalianTaxCodeChecksum } from '../lib/domain/documents/document-identity-resolution';
+import { randomSyntheticTaxCode as syntheticTaxCode } from '../lib/patient-identity.test-support.ts';
 
 const PIN = process.env.E2E_PIN || '1234';
 
-// Codici fiscali sintetici, nuovi a ogni esecuzione, con carattere di controllo valido.
-function syntheticTaxCode(): string {
-    const digits = () => String(Math.floor(Math.random() * 100)).padStart(2, '0');
-    const prefix = `RSSMRA${digits()}A${digits()}Z${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
-    const check = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].find((letter) => isValidItalianTaxCodeChecksum(prefix + letter));
-    if (!check) throw new Error('Synthetic tax code unavailable');
-    return prefix + check;
-}
 const CF_A = syntheticTaxCode();
 let CF_B = syntheticTaxCode();
 while (CF_B === CF_A) CF_B = syntheticTaxCode();

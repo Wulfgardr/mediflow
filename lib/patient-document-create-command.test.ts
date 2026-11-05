@@ -1,3 +1,4 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync } from 'node:fs';
@@ -47,7 +48,7 @@ async function fixture(scope: string = randomUUID()) {
     let current = true;
     const source: PreparedPatientDocument = { sourceId: randomUUID(), name: 'ENC:bmFtZQ==:bmFtZQ==', path: 'ENC:cGF0aA==:cGF0aA==',
         data: 'ENC:c291cmNl:c291cmNl', type: 'application/pdf', size: 512, identity: 'ambiguous', quality: 'ready',
-        candidates: { firstName: 'Rossi', lastName: 'Mario', taxCode: randomUUID() } };
+        candidates: { firstName: 'Rossi', lastName: 'Mario', taxCode: syntheticTaxCode(randomUUID()) } };
     const port = { session: context.session, ambulatoryId: scope, readCurrent: () => { if (!current) throw new Error('Original source retired'); return source; } };
     const review: PatientDocumentCreateReview = { firstName: { action: 'correct', value: 'Mario' }, lastName: { action: 'correct', value: 'Rossi' },
         taxCode: { action: 'approve', value: source.candidates.taxCode! }, duplicate: 'none' };
@@ -93,12 +94,12 @@ test('ambiguous Rossi Mario requires explicit correction; arbitrary fields and d
 });
 test('duplicate needs distinct choice, never merges, and a new collision after review denies', async () => {
     const f = await fixture();
-    dbServer.insert(patients).values({ id: randomUUID(), firstName: 'Mario', lastName: 'Rossi', taxCode: randomUUID() }).run();
+    dbServer.insert(patients).values({ id: randomUUID(), firstName: 'Mario', lastName: 'Rossi', taxCode: syntheticTaxCode(randomUUID()) }).run();
     const before = effects();
     assert.throws(() => f.api.preview(f.host, f.view.viewId, f.review));
     f.api.preview(f.host, f.view.viewId, { ...f.review, duplicate: 'create-separate' });
     const id = randomUUID();
-    dbServer.insert(patients).values({ id, firstName: 'Mario', lastName: 'Rossi', taxCode: randomUUID() }).run();
+    dbServer.insert(patients).values({ id, firstName: 'Mario', lastName: 'Rossi', taxCode: syntheticTaxCode(randomUUID()) }).run();
     await assert.rejects(f.api.execute(f.host, f.view.commandId, pin));
     assert.deepEqual(effects(), { ...before, patients: before.patients + 1, audit_events: before.audit_events + 1 });
     assert.deepEqual(service().receipt(f.host, f.view.commandId), { outcome: 'retired' });
@@ -284,7 +285,7 @@ test('journal schema keeps only opaque references and rejects malformed partial 
 test('labelled approved fields are the only fields inserted; omitted birth date stays empty', async () => {
     const f = await fixture(), api = service();
     const source = { ...f.source, identity: 'labelled' as const,
-        candidates: { firstName: 'Ada', lastName: randomUUID(), taxCode: randomUUID(), birthDate: '1950-01-02' } };
+        candidates: { firstName: 'Ada', lastName: randomUUID(), taxCode: syntheticTaxCode(randomUUID()), birthDate: '1950-01-02' } };
     const view = api.open(f.host, { ...f.port, readCurrent: () => source });
     api.preview(f.host, view.viewId, { firstName: { action: 'approve', value: source.candidates.firstName },
         lastName: { action: 'approve', value: source.candidates.lastName }, taxCode: { action: 'approve', value: source.candidates.taxCode }, duplicate: 'none' });
@@ -305,7 +306,7 @@ test('revocation before preview cannot be renewed and a reused source cannot cre
 });
 test('duplicate review recognizes accented names and repeated whitespace without choosing an identity', async () => {
     const f = await fixture();
-    dbServer.insert(patients).values({ id: randomUUID(), firstName: 'ÉLENA', lastName: 'DE  ROSSI', taxCode: randomUUID() }).run();
+    dbServer.insert(patients).values({ id: randomUUID(), firstName: 'ÉLENA', lastName: 'DE  ROSSI', taxCode: syntheticTaxCode(randomUUID()) }).run();
     const review = { ...f.review, firstName: { action: 'correct' as const, value: 'Élena' }, lastName: { action: 'correct' as const, value: 'De Rossi' } };
     assert.throws(() => f.api.preview(f.host, f.view.viewId, review));
     f.api.preview(f.host, f.view.viewId, { ...review, duplicate: 'create-separate' });

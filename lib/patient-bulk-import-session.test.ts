@@ -1,3 +1,4 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 /* controller ports below are declared synthetic doubles, NOT auth/API evidence. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -7,7 +8,7 @@ import {
     type PatientBulkContext, type PatientBulkCreate, type PatientBulkObserved, type PatientBulkPorts, type PatientBulkWriteGuard,
 } from './patient-bulk-import-session.ts';
 
-const code = (index: number) => `SYNTHETIC${String(index).padStart(7, '0')}`;
+const code = syntheticTaxCode;
 const csv = (indexes = [1, 2, 3]) => `${PATIENT_CSV_HEADERS.join(';')}\n${indexes.map(i => `Ada;Sintetica;${code(i)};2000-02-29;Via Sintetica ${i};+39000${i}`).join('\n')}`;
 function file(text = csv()): Pick<File, 'size' | 'arrayBuffer'> {
     const data = new TextEncoder().encode(text);

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /* @Codex */
 
+import { syntheticTaxCode } from '../lib/patient-identity.test-support.ts';
 import { createCipheriv, createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -200,7 +201,7 @@ function seedRows(db, counts, wrappedMasterKey) {
         id,
         firstName: `Persona${String(patientIndex).padStart(6, '0')}`,
         lastName: `Sintetica${String(patientIndex % 97).padStart(2, '0')}`,
-        taxCode: `PERF${String(patientIndex).padStart(12, '0')}`,
+        taxCode: syntheticTaxCode(patientIndex),
         birthDate: FIXED_NOW_SECONDS - (40 + (patientIndex % 55)) * 365 * 86400,
         address: encryptedFixture(`Via sintetica ${patientIndex % 200}, Comune test`, `${identity}:address`),
         phone: encryptedFixture(`+3902${String(patientIndex).padStart(8, '0')}`, `${identity}:phone`),

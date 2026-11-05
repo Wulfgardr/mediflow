@@ -1,3 +1,4 @@
+import type { PatientIdentifierType, BirthDatePrecision } from './patient-identity';
 export const PATIENT_PROFILE_READ_OPERATION = Object.freeze({
     id: 'patient-profile.read.v1',
     version: 1,
@@ -23,6 +24,9 @@ export interface PatientProfileView {
     firstName: string;
     lastName: string;
     taxCode: string;
+    identifierType?: PatientIdentifierType;
+    birthDatePrecision?: BirthDatePrecision;
+    birthYear?: number | null;
     birthDate: string | null;
     address: string | null;
     phone: string | null;

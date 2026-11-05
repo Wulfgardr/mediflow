@@ -4,11 +4,13 @@
  */
 import type { Page, Request } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
+import { syntheticTaxCode } from '../lib/patient-identity.test-support';
 
 const PIN = 'bulk086086';
 const PASSPHRASE = 'Archivio CSV soltanto sintetico 086086';
 const header = 'nome;cognome;codice_fiscale;data_nascita;indirizzo;telefono';
-const existingCode = 'SYNTHETIC0000009';
+const templateHeader = `${header};tipo_identificativo;precisione_nascita;anno_nascita_stimato`;
+const existingCode = syntheticTaxCode('bulk-existing-009');
 const firstCode = 'SYNTHETIC0000001';
 const secondCode = 'SYNTHETIC0000002';
 const body = [header,
@@ -102,6 +104,7 @@ async function createExistingFromUi(page: Page): Promise<WirePatient> {
     await openNewPatient(page);
     await page.locator('input[name="firstName"]').fill('Preesistente');
     await page.locator('input[name="lastName"]').fill('Sintetico');
+    await page.getByLabel('Identificativo', { exact: true }).selectOption('cf');
     await page.locator('input[name="taxCode"]').fill(existingCode);
     await page.locator('input[name="birthDate"]').fill('1980-01-02');
     await page.locator('input[name="address"]').fill('Via Preesistente Sintetica');
@@ -168,7 +171,7 @@ for (const width of [390, 1440]) for (const theme of ['light', 'dark'] as const)
         const chunks: Buffer[] = [];
         if (!stream) throw new Error('Synthetic template stream unavailable');
         for await (const chunk of stream) chunks.push(Buffer.from(chunk));
-        expect(Buffer.concat(chunks).toString('utf8')).toBe(`\uFEFF${header}\r\n`);
+        expect(Buffer.concat(chunks).toString('utf8')).toBe(`\uFEFF${templateHeader}\r\n`);
         const otherDownloads: string[] = [];
         page.on('download', item => otherDownloads.push(item.suggestedFilename()));
         const capturedResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/patients/create-context');
@@ -182,7 +185,7 @@ for (const width of [390, 1440]) for (const theme of ['light', 'dark'] as const)
         await expect(page.getByTestId('patient-bulk-destination')).toContainText(captured.ambulatoryName);
         await expect(page.getByRole('heading', { name: '2. Controlla l’anteprima', exact: true })).toBeFocused();
         await expect(page.getByTestId('patient-bulk-preview-row-3')).toContainText('Esclusa');
-        await expect(page.getByTestId('patient-bulk-preview-row-4')).toContainText('già presente nell’ambulatorio');
+        await expect(page.getByTestId('patient-bulk-preview-row-4')).toContainText('Stesso tipo e identificativo già presenti nell’ambulatorio.');
         const confirm = page.getByRole('button', { name: 'Conferma e aggiungi 2 pazienti', exact: true });
         await expect(confirm).toBeDisabled();
         expect(creates).toHaveLength(0); expect(await list(page)).toEqual([before]);
@@ -269,7 +272,7 @@ test('React lifecycle: mount, template, preview, cleanup and remount never auto-
     const template = page.getByRole('link', { name: 'Scarica modello CSV', exact: true });
     const href = await template.getAttribute('href');
     expect(href?.startsWith('data:text/csv;charset=utf-8,')).toBe(true);
-    expect(decodeURIComponent(href!.slice(href!.indexOf(',') + 1))).toBe(`\uFEFF${header}\r\n`);
+    expect(decodeURIComponent(href!.slice(href!.indexOf(',') + 1))).toBe(`\uFEFF${templateHeader}\r\n`);
     for (let cycle = 0; cycle < 2; cycle += 1) {
         await expect(page.getByTestId('patient-bulk-import')).toHaveAttribute('data-phase', 'idle');
         await expect(page.getByTestId('patient-bulk-file')).toBeEnabled();

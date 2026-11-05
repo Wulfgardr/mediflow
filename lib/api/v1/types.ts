@@ -1,3 +1,4 @@
+import type { PatientIdentifierType, BirthDatePrecision } from './../../patient-identity';
 // Codex: created 2026-02-01
 
 /* @Codex */
@@ -10,6 +11,9 @@ export type PatientSummary = {
     lastName: string;
     birthDate: string | null;
     taxCode: string;
+    identifierType?: PatientIdentifierType;
+    birthDatePrecision?: BirthDatePrecision;
+    birthYear?: number | null;
     isAdi: boolean | null;
     isArchived: boolean | null;
     /* @Codex */
@@ -29,6 +33,9 @@ export type PatientDetail = {
     lastName: string;
     birthDate: string | null;
     taxCode: string;
+    identifierType?: PatientIdentifierType;
+    birthDatePrecision?: BirthDatePrecision;
+    birthYear?: number | null;
     address: string | null;
     phone: string | null;
     caregiver: string | null;

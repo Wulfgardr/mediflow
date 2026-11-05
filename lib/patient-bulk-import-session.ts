@@ -1,3 +1,4 @@
+import { inferIdentifierType, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity';
 /* manual, sequential orchestration over existing client capabilities. */
 import {
     isPatientCsvRowEligible, markExistingPatientDuplicates, parsePatientCsv, PATIENT_CSV_LIMITS,
@@ -24,6 +25,7 @@ export type PatientBulkCreate = Omit<CsvPatientFields, 'birthDate'> & Readonly<{
 export type PatientBulkObserved = Readonly<{
     id: string; ambulatoryId?: string | null;
     firstName: string; lastName: string; taxCode: string;
+    identifierType?: PatientIdentifierType; birthDatePrecision?: BirthDatePrecision; birthYear?: number | null;
     birthDate?: Date | null; address?: string | null; phone?: string | null;
 }>;
 export type PatientBulkPorts = Readonly<{
@@ -104,6 +106,9 @@ function sameScope(receipt: PatientBulkReceipt, context: PatientBulkContext): bo
 function recordMatches(record: PatientBulkObserved | undefined, input: PatientBulkCreate, context: PatientBulkContext): boolean {
     return record?.id === input.id && record.ambulatoryId === context.ambulatoryId
         && record.firstName === input.firstName && record.lastName === input.lastName && record.taxCode === input.taxCode
+        && (record.identifierType ?? inferIdentifierType(record.taxCode)) === (input.identifierType ?? inferIdentifierType(input.taxCode))
+        && (record.birthYear ?? null) === (input.birthYear ?? null)
+        && (record.birthDatePrecision ?? (record.birthDate ? 'exact' : 'unknown')) === (input.birthDatePrecision ?? (input.birthDate ? 'exact' : 'unknown'))
         && (record.address ?? undefined) === input.address && (record.phone ?? undefined) === input.phone
         && (record.birthDate?.getTime() ?? undefined) === input.birthDate?.getTime();
 }

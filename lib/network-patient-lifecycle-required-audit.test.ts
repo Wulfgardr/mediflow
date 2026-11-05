@@ -1,3 +1,4 @@
+import { syntheticTaxCode } from './patient-identity.test-support.ts';
 /* WUL-720 required network lifecycle audit on real synthetic SQLite. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -36,7 +37,7 @@ function setup(id: string, state: 'absent' | 'active' | 'deleted') {
     dbServer.insert(ambulatories).values({ id: 'c05-network-a', name: 'Ambulatorio sintetico', type: 'live' })
         .onConflictDoNothing().run();
     if (state === 'absent') return;
-    dbServer.insert(patients).values({ id, firstName: 'Ada', lastName: 'Sintetica', taxCode: `SYNTH-${id}`,
+    dbServer.insert(patients).values({ id, firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode(id),
         version: 3, ambulatoryId: 'c05-network-a', address: sealed, isArchived: true,
         ...(state === 'deleted' ? { deletedAt: new Date('2026-01-02'), deletionReason: sealed } : {}),
     }).run();
@@ -73,7 +74,7 @@ for (const fault of ['FAIL', 'IGNORE'] as const) {
                 const ctx = context(id);
                 await assert.rejects(() => operation === 'create'
                     ? lifecycle.createNetworkScopedPatient(ctx, {
-                        id, firstName: 'Ada', lastName: 'Sintetica', taxCode: `SYNTH-${id}`, address: sealed,
+                        id, firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode(id), address: sealed,
                     })
                     : operation === 'delete'
                         ? lifecycle.deleteNetworkScopedPatient(ctx, { version: 3, deletionReason: sealed })
@@ -93,7 +94,7 @@ for (const operation of ['create', 'delete', 'restore'] as const) {
         const ctx = context(id);
         const result = operation === 'create'
             ? await lifecycle.createNetworkScopedPatient(ctx, { id, firstName: 'Ada', lastName: 'Sintetica',
-                taxCode: `SYNTH-${id}`, address: sealed, actorRef: 'forged', sourceSurface: 'job',
+                taxCode: syntheticTaxCode(id), address: sealed, actorRef: 'forged', sourceSurface: 'job',
                 clinicalSentinel: 'SECRET_SYNTHETIC' })
             : operation === 'delete'
                 ? await lifecycle.deleteNetworkScopedPatient(ctx, { version: 3, deletionReason: sealed,
@@ -128,7 +129,7 @@ for (const operation of ['create', 'delete', 'restore'] as const) {
 
         if (operation === 'create') {
             const repeated = await lifecycle.createNetworkScopedPatient(ctx, {
-                id, firstName: 'Ada', lastName: 'Sintetica', taxCode: `SYNTH-${id}`,
+                id, firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode(id),
             });
             assert.deepEqual(repeated, { status: 409, value: { error: 'Patient create conflict' } });
         } else if (operation === 'delete') {
@@ -163,12 +164,12 @@ test('wrong scope, stale version and invalid sealed boundary do not write patien
     }
     const beforeCreate = readBack(createId);
     const wrongCreate = await lifecycle.createNetworkScopedPatient(context(createId), {
-        id: createId, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTH-CREATE',
+        id: createId, firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode('SYNTH-CREATE'),
         ambulatoryId: 'other-scope',
     });
     assert.equal(wrongCreate.status, 403);
     const plaintextCreate = await lifecycle.createNetworkScopedPatient(context(createId), {
-        id: createId, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTH-CREATE', address: 'plaintext',
+        id: createId, firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode('SYNTH-CREATE'), address: 'plaintext',
     });
     assert.equal(plaintextCreate.status, 400);
     const plaintextDelete = await lifecycle.deleteNetworkScopedPatient(context(activeId), {
@@ -184,7 +185,7 @@ test('paired create rejects numeric identity without UUID fallback writes', asyn
     const ctx = context('invalid-id');
     const snapshot = () => sql.prepare('SELECT (SELECT count(*) FROM patients) AS patients, (SELECT count(*) FROM patients_to_ambulatories) AS memberships, (SELECT count(*) FROM audit_events) AS audit').get();
     const before = snapshot();
-    const result = await lifecycle.createNetworkScopedPatient(ctx, { id: 42, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTH-INVALID' });
+    const result = await lifecycle.createNetworkScopedPatient(ctx, { id: 42, firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode('SYNTH-INVALID') });
     assert.deepEqual(result, { status: 400, value: { error: 'Invalid id' } });
     assert.deepEqual(snapshot(), before);
 });
@@ -194,7 +195,7 @@ test('paired duplicate admission denial precedes global identity conflict', asyn
     setup(id, 'active');
     const ctx = context(id);
     const before = readBack(id);
-    const body = { id, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTH-DUPLICATE' };
+    const body = { id, firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode('SYNTH-DUPLICATE') };
     const denied = await lifecycle.createNetworkScopedPatient({ ...ctx, scopeAmbulatoryId: 'missing-scope' }, body);
     assert.equal(denied.status, 403);
     assert.doesNotMatch(JSON.stringify(denied.value), /c05-network-duplicate-denied|Patient create conflict/);
@@ -228,11 +229,18 @@ test('paired create denies a retired identity only after scope admission', async
     setup(id, 'absent');
     sql.prepare('INSERT INTO patient_retired_ids (id) VALUES (?)').run(id);
     const before = readBack(id);
-    const body = { id, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTHETIC-RETIRED' };
+    const body = { id, firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode('SYNTHETIC-RETIRED') };
     const ctx = context(id);
     const denied = await lifecycle.createNetworkScopedPatient({ ...ctx, scopeAmbulatoryId: 'other-scope' }, body);
     assert.equal(denied.status, 403);
     const conflict = await lifecycle.createNetworkScopedPatient(ctx, body);
     assert.deepEqual(conflict, { status: 409, value: { error: 'Patient create conflict' } });
     assert.deepEqual(readBack(id), before);
+});
+test('paired crea none con anno stimato mantenendo taxCode stringa vuota', async () => {
+    const id = 'paired-none-identity'; setup(id, 'absent');
+    const result = await lifecycle.createNetworkScopedPatient(context(id), { id, firstName: 'Ada', lastName: 'Sintetica', identifierType: 'none', taxCode: '', birthDatePrecision: 'estimated', birthYear: 1982 });
+    assert.equal(result.status, 201);
+    const saved = readBack(id); assert.equal(saved.patient?.tax_code, ''); assert.equal(saved.patient?.identifier_type, 'none');
+    assert.equal(saved.patient?.birth_year, 1982); assert.equal(saved.audit.length, 1);
 });

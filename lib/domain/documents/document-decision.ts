@@ -119,6 +119,7 @@ export interface DocumentDecisionClassificationResult {
 }
 
 export interface DocumentDecisionTaxCodeRole {
+    identifierType?: import('../../patient-identity').PatientIdentifierType;
     value: string;
     role: DocumentDecisionIdentityRole;
     confidence: DocumentDecisionConfidence;

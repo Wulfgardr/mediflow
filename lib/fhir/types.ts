@@ -1,3 +1,4 @@
+import type { PatientIdentifierType, BirthDatePrecision } from './../patient-identity';
 export interface FhirDiagnosisInput {
     id?: string;
     code: string;
@@ -11,6 +12,9 @@ export interface FhirPatientInput {
     firstName: string;
     lastName: string;
     taxCode: string;
+    identifierType?: PatientIdentifierType;
+    birthDatePrecision?: BirthDatePrecision;
+    birthYear?: number | null;
     birthDate?: Date | string;
     address?: string;
     phone?: string;

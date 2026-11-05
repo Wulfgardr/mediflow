@@ -10,7 +10,7 @@ test('normalizePatientCreateInput stringifies structured fields and sets default
     const result = normalizePatientCreateInput({
         firstName: 'Ada',
         lastName: 'Lovelace',
-        taxCode: 'LVLADA80A01H501X',
+        taxCode: 'RSSMRA80A01H501U',
         birthDate: '1980-01-01',
         exemptions: ['E01'],
         diagnoses: [{ code: 'A00', description: 'Diag' }],
@@ -42,7 +42,7 @@ test('normalizePatientCreateInput rejects invalid birthDate', () => {
     const result = normalizePatientCreateInput({
         firstName: 'Ada',
         lastName: 'Lovelace',
-        taxCode: 'LVLADA80A01H501X',
+        taxCode: 'RSSMRA80A01H501U',
         birthDate: 'not-a-date',
     }, {
         id: 'pat-1',
@@ -222,10 +222,10 @@ test('create identity validates before fallback and preserves opaque strings exa
         assert.deepEqual(normalizePatientCreateInput({ id }, options), { ok: false, error: 'Invalid id' });
     }
     assert.equal(generated, 0);
-    const opaque = normalizePatientCreateInput({ id: ' opaque ID / 42 ' }, options);
+    const opaque = normalizePatientCreateInput({ id: ' opaque ID / 42 ', firstName: 'Ada', lastName: 'Sintetica', taxCode: 'RSSMRA80A01H501U' }, options);
     assert(opaque.ok); assert.equal(opaque.values.id, ' opaque ID / 42 ');
     assert.equal(generated, 0);
-    const omitted = normalizePatientCreateInput({}, options);
+    const omitted = normalizePatientCreateInput({ firstName: 'Ada', lastName: 'Sintetica', taxCode: 'RSSMRA80A01H501U' }, options);
     assert(omitted.ok); assert.equal(omitted.values.id, 'synthetic-generated-id');
     assert.equal(generated, 1);
 });

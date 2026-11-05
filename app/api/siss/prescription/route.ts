@@ -29,7 +29,7 @@ export async function POST(request: Request) {
         }
 
         const patient = await dbServer
-            .select({ id: patients.id, taxCode: patients.taxCode })
+            .select({ id: patients.id, taxCode: patients.taxCode, identifierType: patients.identifierType })
             .from(patients)
             .where(and(eq(patients.id, patientId), activePatients()))
             .get();
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
         const result = await createSissPrescriptionHandoff({
             patientId: patient.id,
-            patientTaxCode: patient.taxCode,
+            patientTaxCode: patient.taxCode, identifierType: patient.identifierType,
         });
 
         await safeWriteAuditEventFromRequest(request, session, {

@@ -2,6 +2,22 @@ import XCTest
 @testable import MediFlowCore
 
 final class FHIRBundleGeneratorTests: XCTestCase {
+    func testTypedPatientIdentifiersAndEstimatedBirthYear() throws {
+        let systems = ["cf": "urn:oid:2.16.840.1.113883.2.9.4.3.2", "stp": "urn:mediflow:identifier:stp", "eni": "urn:mediflow:identifier:eni", "passport": "urn:mediflow:identifier:foreign-document", "other": "urn:mediflow:identifier:other"]
+        for type in ["cf", "stp", "eni", "passport", "other", "none"] {
+            let input = FHIRBundleInput(generatedAt: "2026-11-05", patient: FHIRPatientInput(id: "synthetic", firstName: "Ada", lastName: "Sintetica", taxCode: type == "none" ? "" : "SYNTHETIC", identifierType: type, birthDatePrecision: "estimated", birthYear: 1982), entries: [], therapies: [], checkups: [], observations: [])
+            guard case .object(let root) = FHIRBundleGenerator.generate(input: input),
+                  case .array(let entries)? = root["entry"], case .object(let entry) = entries[0],
+                  case .object(let patient)? = entry["resource"] else { return XCTFail("Missing synthetic Patient") }
+            XCTAssertEqual(patient["birthDate"], .string("1982"))
+            if type == "none" { XCTAssertNil(patient["identifier"]) }
+            else {
+                guard case .array(let identifiers)? = patient["identifier"], case .object(let identifier) = identifiers[0] else { return XCTFail("Missing identifier") }
+                XCTAssertEqual(identifier["system"], systems[type].map(FHIRJSONValue.string))
+            }
+        }
+    }
+
     private func nativeContractsDir() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

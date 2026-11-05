@@ -41,6 +41,10 @@ function bootstrapDatabase(): { sqlite: Database.Database; db: BetterSQLite3Data
         sqlite.exec(sql);
     }
     // Mirror the patients ensureColumn() guards from lib/db-server.ts (incl. WUL-306).
+    ensureColumn(sqlite, 'patients', 'identifier_type', "identifier_type TEXT NOT NULL DEFAULT 'cf'");
+    ensureColumn(sqlite, 'patients', 'birth_date_precision', "birth_date_precision TEXT NOT NULL DEFAULT 'unknown'");
+    ensureColumn(sqlite, 'patients', 'birth_year', 'birth_year INTEGER');
+    ensureColumn(sqlite, 'patients', 'identifier_history', "identifier_history TEXT NOT NULL DEFAULT '[]'");
     ensureColumn(sqlite, 'patients', 'exemptions', 'exemptions TEXT');
     ensureColumn(sqlite, 'patients', 'diagnoses', 'diagnoses TEXT');
     ensureColumn(sqlite, 'patients', 'monitoring_profile', 'monitoring_profile TEXT');

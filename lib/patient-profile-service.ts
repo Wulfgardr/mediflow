@@ -118,6 +118,7 @@ function projectDetail(patient: PatientRecord): PatientProfileView {
         lastName: patient.lastName,
         birthDate: toIsoString(patient.birthDate),
         taxCode: patient.taxCode,
+        identifierType: patient.identifierType, birthDatePrecision: patient.birthDatePrecision, birthYear: patient.birthYear,
         address: patient.address ?? null,
         phone: patient.phone ?? null,
         caregiver: patient.caregiver ?? null,

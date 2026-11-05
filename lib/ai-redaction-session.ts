@@ -17,6 +17,7 @@ export interface RedactionSessionInput {
     readonly knownIdentifiers?: {
         readonly names?: readonly string[];
         readonly birthDates?: readonly string[];
+        readonly identifiers?: readonly string[];
     };
 }
 
@@ -96,7 +97,7 @@ function snapshot(value: RedactionSessionInput): RedactionSessionInput {
                 return entry;
             });
         };
-        knownIdentifiers = { names: strings('names'), birthDates: strings('birthDates') };
+        knownIdentifiers = { names: strings('names'), birthDates: strings('birthDates'), identifiers: strings('identifiers') };
     }
     // Primitive field types and span semantics are checked by validate below.
     return { text: dataValue(properties, 'text'), entities, knownIdentifiers } as RedactionSessionInput;
@@ -121,7 +122,7 @@ function validate(input: RedactionSessionInput): Span[] {
     if (input.knownIdentifiers !== undefined) {
         if (!input.knownIdentifiers || typeof input.knownIdentifiers !== 'object'
             || Array.isArray(input.knownIdentifiers)) throw new Error('Invalid known identifiers');
-        for (const values of [input.knownIdentifiers.names, input.knownIdentifiers.birthDates]) {
+        for (const values of [input.knownIdentifiers.names, input.knownIdentifiers.birthDates, input.knownIdentifiers.identifiers]) {
             if (values !== undefined && (!Array.isArray(values)
                 || Array.from(values).some(value => typeof value !== 'string'))) {
                 throw new Error('Invalid known identifiers');
@@ -190,6 +191,7 @@ export function createRedactionSession(): Readonly<{
                 knownIdentifiers: input.knownIdentifiers ? {
                     names: input.knownIdentifiers.names ? [...input.knownIdentifiers.names] : undefined,
                     birthDates: input.knownIdentifiers.birthDates ? [...input.knownIdentifiers.birthDates] : undefined,
+                    identifiers: input.knownIdentifiers.identifiers ? [...input.knownIdentifiers.identifiers] : undefined,
                 } : undefined,
             });
             for (const [token, value] of layerOne.rehydrationMap ?? []) {

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
         }
 
         const patient = await dbServer
-            .select({ id: patients.id, taxCode: patients.taxCode })
+            .select({ id: patients.id, taxCode: patients.taxCode, identifierType: patients.identifierType })
             .from(patients)
             .where(and(eq(patients.id, patientId), activePatients()))
             .get();
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
         const result = await createSissPatientContextHandoff({
             patientId: patient.id,
-            patientTaxCode: patient.taxCode,
+            patientTaxCode: patient.taxCode, identifierType: patient.identifierType,
             action,
         });
 

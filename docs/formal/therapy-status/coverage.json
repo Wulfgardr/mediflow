@@ -1,5 +1,5 @@
 {
-  "syncCommit": "1c97e50bcc00ad06edcad6df78b85b62ae4272d0",
+  "syncCommit": "6978d4816f8afc9e4259c9e8af49eb157c7d2c26",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -33,7 +33,7 @@
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
     "components/therapy-manager.tsx": "35ff8ae61fc0e21cf52a3c641b460c634601b879497dc2a0f53c81d23a727308",
-    "lib/db.ts": "95dcc4a1c8aeeaf196d01c36d7439a226c5cbbbef5c5e0a94d7165d23a5f3ba7",
+    "lib/db.ts": "d818ca91a01a9dad7ccaf9ed7bdecb1f889afa5158fcaa88db1c13dc5fa42576",
     "lib/security/client-auth-api.ts": "754aebaedb77bc9629a32d90f754ecc3ee7e89ead880c6add9088dd6449ee5ce",
     "lib/therapy-write-operation.ts": "b89b775f2f3693bee64f00f1bec62e7d895f77955d32f7905d1c49f365739d72",
     "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
@@ -47,12 +47,12 @@
     "lib/therapy-status-command-backup.ts": "1606ac41684c18ed2f7ff6de19e378e0ef1baac5645d1a160c4906faba4bab92",
     "lib/therapy-status-command-schema.ts": "98c0aba0a361ef83655a632be41a257f8b9e99a950591113683a8094e26f4c87",
     "lib/therapy-status-command-recovery-schema.ts": "8231c04d505139c63f36f9657e2a2a0c964cd48b39d4ae4b2d2a0f2c552f5f4a",
-    "lib/ambulatory-destructive-command-recovery-schema.ts": "a61f0d6f31854f516f3ed25eccae5561d251ccc99fbbde07e65ff594e5934c53",
+    "lib/ambulatory-destructive-command-recovery-schema.ts": "ae57d63dbb1a4950ca01f225a089fae80cc5e91443338b1a40907b70d673b987",
     "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
     "lib/backup-encrypted-fields.json": "27d036cb546f048f96ac4f8f9a5eca6f8360a798ba8cf7d173deb19328ac77e3",
     "lib/backup-import-provenance.ts": "13eb1cc6083b5a07489d64cc9d195b82b6b8b660cb9874e4dc46b93fdf25999e",
-    "lib/sqlite-schema.ts": "66f2641796c558334f1aa90346b4c936949cd4abce2d0b30dd06e3a284fcaea1",
-    "lib/sqlite-schema-open.ts": "c02714ffe295b36dd297e9417605382a41566a8d68afe67c96d99568f0c32362",
+    "lib/sqlite-schema.ts": "6796aa5629b870232d42f47b9f8960be32c0dd9a69391e99976d10bdbc26d430",
+    "lib/sqlite-schema-open.ts": "b2a81d2ac4d09d2b3ecf87c7b3c1f74ce22e23d9d8d1a4e2be1249cadca7466e",
     "lib/backup-restore-executor.ts": "227af5f5806ab46a081e660b4462a628db9e3f44ecfeff30ea3e14cf9dbe03ea",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
     "lib/clinical-status-transitions.ts": "67d92e79e1123a3e79399e5907177255f56f9794f9c775b86c67fdade287441f",

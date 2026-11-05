@@ -327,14 +327,14 @@ export async function bindOrdinaryApplicationContext(functionId: OrdinaryFunctio
     const pair = applicationOwner.withLeaseCriticalSection(session, selected => ({ ...selected }));
     const selectionEpoch = applicationOwner.snapshotSelectionEpoch(session), reviewEpoch = applicationOwner.snapshotReviewContextEpoch(session);
     const read = () => dbServer.select({ version: schema.patients.version, firstName: schema.patients.firstName,
-        lastName: schema.patients.lastName, birthDate: schema.patients.birthDate }).from(schema.patients)
+        lastName: schema.patients.lastName, birthDate: schema.patients.birthDate, taxCode: schema.patients.taxCode }).from(schema.patients)
         .innerJoin(schema.patientsToAmbulatories, orm.eq(schema.patients.id, schema.patientsToAmbulatories.patientId))
         .where(orm.and(orm.eq(schema.patients.id, pair.patientId), orm.eq(schema.patientsToAmbulatories.ambulatoryId, pair.ambulatoryId), activePatients())).get();
     const patient = read(); if (!patient || !Number.isSafeInteger(patient.version)) throw new ProductError('revoked');
     const names = [patient.firstName, patient.lastName, [patient.firstName, patient.lastName].filter(Boolean).join(' ')].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
     const birth = patient.birthDate;
     const dates = birth instanceof Date && Number.isFinite(birth.getTime()) ? [birth.toISOString().slice(0,10), `${String(birth.getUTCDate()).padStart(2,'0')}/${String(birth.getUTCMonth()+1).padStart(2,'0')}/${birth.getUTCFullYear()}`] : typeof birth === 'string' && birth ? [birth] : [];
-    entry.knownIdentifiers = Object.freeze({ names: Object.freeze([...new Set(names)]), birthDates: Object.freeze(dates) });
+    entry.knownIdentifiers = Object.freeze({ names: Object.freeze([...new Set(names)]), birthDates: Object.freeze(dates), identifiers: Object.freeze(patient.taxCode ? [patient.taxCode] : []) });
     entry.applicationCurrent = () => {
         try {
             const selected = applicationOwner.withLeaseCriticalSection(session, current => ({ ...current }));
