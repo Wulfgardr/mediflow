@@ -282,6 +282,8 @@ final class PatientSummaryPresentationTests: XCTestCase {
         XCTAssertEqual(PairedPatientsWorkspaceSupport.labeledCompactTaxCode("  "), "")
         XCTAssertEqual(PairedPatientsWorkspaceSupport.identifierLabel("STPMRA80A01H501U"), "CF")
         XCTAssertEqual(PairedPatientsWorkspaceSupport.identifierLabel("ENIXXX80A01H501U"), "CF")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.identifierLabel("STP0300010000123", type: "cf"), "CF")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.labeledCompactTaxCode("AB1234567", type: "passport"), "Documento …234567")
     }
 
     func testCompactTaxCodeDoesNotExpandShortValues() {

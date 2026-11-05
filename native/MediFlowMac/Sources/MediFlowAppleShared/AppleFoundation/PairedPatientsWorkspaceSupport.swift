@@ -31,7 +31,16 @@ enum PairedPatientsWorkspaceSupport {
     /// Nome breve dell'identificativo, da mostrare accanto al valore: un codice
     /// senza etichetta non dice che cosa sia. STP ed ENI si riconoscono dal prefisso
     /// seguito da 13 cifre: un codice fiscale può iniziare con le stesse lettere.
-    static func identifierLabel(_ taxCode: String) -> String {
+    static func identifierLabel(_ taxCode: String, type: String? = nil) -> String {
+        // Il tipo dichiarato vince: il prefisso serve solo per i record che non lo portano.
+        switch type {
+        case "cf": return "CF"
+        case "stp": return "STP"
+        case "eni": return "ENI"
+        case "passport": return "Documento"
+        case "other": return "Identificativo"
+        default: break
+        }
         let normalized = taxCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         for prefix in ["STP", "ENI"] where normalized.hasPrefix(prefix) {
             let rest = normalized.dropFirst(prefix.count)
@@ -40,16 +49,16 @@ enum PairedPatientsWorkspaceSupport {
         return "CF"
     }
 
-    static func labeledCompactTaxCode(_ taxCode: String) -> String {
+    static func labeledCompactTaxCode(_ taxCode: String, type: String? = nil) -> String {
         guard let code = cleanedPatientWorkspaceValue(taxCode) else { return "" }
-        return "\(identifierLabel(code)) \(compactTaxCode(code))"
+        return "\(identifierLabel(code, type: type)) \(compactTaxCode(code))"
     }
 
-    static func patientMetadata(birthDate: Date?, taxCode: String, at now: Date = Date()) -> String {
+    static func patientMetadata(birthDate: Date?, taxCode: String, identifierType: String? = nil, at now: Date = Date()) -> String {
         var parts: [String] = []
         if let age = age(from: birthDate, at: now) { parts.append("\(age) anni") }
         if let birthDate { parts.append("nascita \(birthDateFormatter.string(from: birthDate))") }
-        if cleanedPatientWorkspaceValue(taxCode) != nil { parts.append(labeledCompactTaxCode(taxCode)) }
+        if cleanedPatientWorkspaceValue(taxCode) != nil { parts.append(labeledCompactTaxCode(taxCode, type: identifierType)) }
         return parts.joined(separator: " · ")
     }
 
