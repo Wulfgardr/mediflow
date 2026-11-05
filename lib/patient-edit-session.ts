@@ -109,7 +109,9 @@ export function patientFormDefaults(seed: PatientFormSeed = {}) {
         firstName: seed.firstName ?? '',
         lastName: seed.lastName ?? '',
         taxCode: seed.taxCode ?? '',
-        identifierType: seed.identifierType ?? inferIdentifierType(seed.taxCode),
+        // Una scheda nuova parte dal codice fiscale, con il campo visibile; «nessun
+        // identificativo» è una scelta esplicita. Un record esistente senza codice resta «none».
+        identifierType: seed.identifierType ?? (seed.taxCode || seed.id !== undefined ? inferIdentifierType(seed.taxCode) : 'cf'),
         birthDatePrecision: effectiveBirthDatePrecision(seed),
         birthYear: seed.birthYear ?? null,
         birthDate: seed.birthDate ? isoDate(seed.birthDate).slice(0, 10) : '',

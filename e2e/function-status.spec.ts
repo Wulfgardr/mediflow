@@ -115,6 +115,7 @@ test('WHO selection survives real encrypted patient create/update/read and unrel
     await page.goto('/patients/new');
     await page.locator('input[name="firstName"]').fill('Sintetico');
     await page.locator('input[name="lastName"]').fill('WhoSidecar');
+    await page.getByLabel('Identificativo', { exact: true }).selectOption('other');
     await page.locator('input[name="taxCode"]').fill('WHOTEST000000001');
     await page.locator('input[name="birthDate"]').fill('1980-01-01');
     await page.getByRole('button', { name: 'Aggiungi diagnosi', exact: true }).click();
@@ -191,6 +192,7 @@ test('embedded ICD catalog searches, checks and saves a diagnosis with the real 
     await page.goto('/patients/new');
     await page.locator('input[name="firstName"]').fill('Sintetico');
     await page.locator('input[name="lastName"]').fill('CatalogoIncorporato');
+    await page.getByLabel('Identificativo', { exact: true }).selectOption('other');
     await page.locator('input[name="taxCode"]').fill('WHOTEST000000002');
     await page.locator('input[name="birthDate"]').fill('1980-01-01');
     await page.getByRole('button', { name: 'Aggiungi diagnosi', exact: true }).click();
