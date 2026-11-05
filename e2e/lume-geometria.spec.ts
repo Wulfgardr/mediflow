@@ -114,5 +114,5 @@ test('nuova scheda: è segnata solo la sezione corrente', async ({ page }) => {
   // La sezione non corrente resta testo: nessun fondo pieno, nessuna cornice.
   expect(otherLook).toEqual({ background: 'rgba(0, 0, 0, 0)', border: '0px', shadow: 'none' });
   // La sezione corrente porta il filetto d'inchiostro sotto, come le linguette della Scheda.
-  expect(currentLook.shadow).toMatch(/inset 0px -2px 0px 0px/);
+  expect(currentLook.shadow).toMatch(/0px -2px 0px 0px inset/);
 });
