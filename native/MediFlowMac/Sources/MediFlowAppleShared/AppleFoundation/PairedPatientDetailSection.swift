@@ -116,9 +116,8 @@ struct PairedPatientDetailSection: View {
             // Grouping them is what lets the eye jump to the right one instead
             // of reading the column.
             ChartGroup("Identità") {
-                InfoRow("Codice fiscale", detail.taxCode)
-                if let birth = detail.birthDate {
-                    InfoRow("Data di nascita", birthDateText(birth))
+                ForEach(PairedPatientsWorkspaceSupport.identityRows(taxCode: detail.taxCode, identifierType: detail.identifierType, birthDate: detail.birthDate, birthDatePrecision: detail.birthDatePrecision, birthYear: detail.birthYear), id: \.label) { row in
+                    InfoRow(row.label, row.value)
                 }
             }
 
@@ -341,9 +340,8 @@ struct PairedPatientDetailSection: View {
 
         return LazyVGrid(columns: columns, alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
             ChartGroup("Identità") {
-                macPatientFact("Codice fiscale", detail.taxCode, isCode: true)
-                if let birth = detail.birthDate {
-                    macPatientFact("Data di nascita", birthDateText(birth), isCode: false)
+                ForEach(PairedPatientsWorkspaceSupport.identityRows(taxCode: detail.taxCode, identifierType: detail.identifierType, birthDate: detail.birthDate, birthDatePrecision: detail.birthDatePrecision, birthYear: detail.birthYear), id: \.label) { row in
+                    macPatientFact(row.label, row.value, isCode: row.isCode)
                 }
             }
             if !contacts.isEmpty {
@@ -1067,8 +1065,17 @@ private extension PairedPatientDetailSection {
                 .accessibilityIdentifier("patient-archive-details")
             }
             PatientChartGroup("Dati anagrafici") {
-                PatientChartField(label: "Codice fiscale", value: .make(detail.taxCode), isCode: true)
-                PatientChartField(label: "Data di nascita", value: .make(detail.birthDate.map { birthDateText($0) }))
+                PatientChartField(
+                    label: detail.identifierType == "none"
+                        ? "Identificativo"
+                        : PairedPatientsWorkspaceSupport.identifierTitle(detail.taxCode, type: detail.identifierType),
+                    value: .make(detail.identifierType == "none" ? "Non ancora disponibile" : detail.taxCode),
+                    isCode: detail.identifierType != "none")
+                if detail.birthDatePrecision == "estimated", let year = detail.birthYear {
+                    PatientChartField(label: "Anno di nascita stimato", value: .make(String(year)))
+                } else {
+                    PatientChartField(label: "Data di nascita", value: .make(detail.birthDate.map { birthDateText($0) }))
+                }
             }
             PatientChartGroup("Contatti") {
                 PatientChartField(label: "Indirizzo", value: .make(detail.address,

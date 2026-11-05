@@ -18,8 +18,9 @@ struct CachedPatientProfileView: View {
             Text("Versione \(profile.version) acquisita dall’home-base. Le altre sezioni della cartella richiedono il collegamento.")
                 .font(.subheadline)
             Divider()
-            field("Data di nascita", profile.birthDate.map { ClinicalDatePresentation.birthDate.string(from: $0) })
-            field("Codice fiscale", profile.taxCode)
+            ForEach(PairedPatientsWorkspaceSupport.identityRows(taxCode: profile.taxCode, identifierType: profile.identifierType, birthDate: profile.birthDate, birthDatePrecision: profile.birthDatePrecision, birthYear: profile.birthYear), id: \.label) { row in
+                field(row.label, row.value)
+            }
             field("Indirizzo", profile.address)
             field("Telefono", profile.phone)
             field("Caregiver", profile.caregiver)
