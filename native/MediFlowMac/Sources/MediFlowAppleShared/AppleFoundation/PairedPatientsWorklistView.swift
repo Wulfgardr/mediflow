@@ -706,7 +706,8 @@ struct PairedPatientsWorklistView: View {
     /// disambiguates two patients with the same name at a glance. The masked code
     /// is a matching tool, so it goes second and stays quiet.
     private func patientMetadata(_ patient: HomeBasePatientSummary) -> some View {
-        HStack(spacing: 6) {
+        let identifier = PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType)
+        return HStack(spacing: 6) {
             #if os(macOS)
             let isSelectedRow = model.selectedPatientID == patient.id
             #else
@@ -722,12 +723,16 @@ struct PairedPatientsWorklistView: View {
                     .font(.caption)
                     .registro()
                     .accessibilityIdentifier("patient-cell-age-\(patient.id)")
-                Text("·")
-                    .font(.caption)
+                if !identifier.isEmpty {
+                    Text("·")
+                        .font(.caption)
+                }
             }
-            Text(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType))
-                .font(.caption)
-                .codice()
+            if !identifier.isEmpty {
+                Text(identifier)
+                    .font(.caption)
+                    .codice()
+            }
         }
         .lineLimit(1)
         .foregroundStyle(PlatformColors.secondaryInk)

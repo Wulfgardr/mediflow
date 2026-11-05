@@ -65,6 +65,30 @@ enum PairedPatientsWorkspaceSupport {
         return "\(identifierLabel(code, type: type)) \(compactTaxCode(code))"
     }
 
+    struct IdentityRow: Equatable {
+        let label: String
+        let value: String
+        let isCode: Bool
+    }
+
+    /// Righe «Identità» della scheda: identificativo con il suo nome vero e
+    /// nascita esatta o stimata. Una riga assente vale «non registrato».
+    static func identityRows(taxCode: String, identifierType: String?, birthDate: Date?,
+                             birthDatePrecision: String?, birthYear: Int?) -> [IdentityRow] {
+        var rows: [IdentityRow] = []
+        if identifierType == "none" {
+            rows.append(IdentityRow(label: "Identificativo", value: "Non ancora disponibile", isCode: false))
+        } else if let code = cleanedPatientWorkspaceValue(taxCode) {
+            rows.append(IdentityRow(label: identifierTitle(code, type: identifierType), value: code, isCode: true))
+        }
+        if birthDatePrecision == "estimated", let birthYear {
+            rows.append(IdentityRow(label: "Anno di nascita stimato", value: String(birthYear), isCode: false))
+        } else if let birthDate {
+            rows.append(IdentityRow(label: "Data di nascita", value: birthDateFormatter.string(from: birthDate), isCode: false))
+        }
+        return rows
+    }
+
     /// Età da mostrare. Una data esatta dà l'età; un anno stimato dà «circa»,
     /// perché presentare una stima come dato certo è un errore clinico.
     static func ageText(birthDate: Date?, precision: String? = nil, birthYear: Int? = nil,

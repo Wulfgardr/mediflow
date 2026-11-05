@@ -310,6 +310,25 @@ final class PatientSummaryPresentationTests: XCTestCase {
             "circa 44 anni · nascita anno stimato 1982")
     }
 
+    /// The identity rows of the chart name the identifier truthfully: the
+    /// on-screen check found "Codice fiscale P4471209SY" for a passport.
+    func testIdentityRowsNameTheIdentifierAndTheEstimatedYear() {
+        typealias Row = PairedPatientsWorkspaceSupport.IdentityRow
+        XCTAssertEqual(
+            PairedPatientsWorkspaceSupport.identityRows(taxCode: "P4471209SY", identifierType: "passport", birthDate: nil,
+                                                        birthDatePrecision: "estimated", birthYear: 1968),
+            [Row(label: "Documento", value: "P4471209SY", isCode: true),
+             Row(label: "Anno di nascita stimato", value: "1968", isCode: false)])
+        XCTAssertEqual(
+            PairedPatientsWorkspaceSupport.identityRows(taxCode: "", identifierType: "none", birthDate: nil,
+                                                        birthDatePrecision: "unknown", birthYear: nil),
+            [Row(label: "Identificativo", value: "Non ancora disponibile", isCode: false)])
+        XCTAssertEqual(
+            PairedPatientsWorkspaceSupport.identityRows(taxCode: "STPMRC80A01H501S", identifierType: nil, birthDate: nil,
+                                                        birthDatePrecision: nil, birthYear: nil),
+            [Row(label: "Codice fiscale", value: "STPMRC80A01H501S", isCode: true)])
+    }
+
     func testCompactTaxCodeDoesNotExpandShortValues() {
         XCTAssertEqual(PairedPatientsWorkspaceSupport.compactTaxCode("ABC123"), "ABC123")
     }
