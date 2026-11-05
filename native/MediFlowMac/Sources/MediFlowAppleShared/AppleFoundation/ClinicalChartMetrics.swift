@@ -4,8 +4,8 @@ import SwiftUI
 enum ClinicalChartMetrics {
     static let cardRadius = LumeGeometry.planeRadius
     static let cardPadding: CGFloat = 16
-    static let innerRadius: CGFloat = 0
-    static let rowRadius: CGFloat = 0
+    static let innerRadius = LumeGeometry.rowRadius
+    static let rowRadius = LumeGeometry.rowRadius
     static let fieldRadius = LumeGeometry.controlRadius
     #if os(macOS)
     static let groupSpacing: CGFloat = 16

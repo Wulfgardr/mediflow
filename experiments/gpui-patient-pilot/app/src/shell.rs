@@ -2673,10 +2673,25 @@ impl ClinicalApp {
         };
         let mut lines = vec![
             crate::patient_text::copy_name(&patient.display_name()),
-            format!("Nascita: {}", display_date(patient.birth_date.as_deref())),
             format!(
-                "Codice fiscale: {}",
-                crate::patient_text::copy_code(&patient.tax_code)
+                "Nascita: {}",
+                crate::patient_text::birth_text(
+                    patient.birth_date.as_deref(),
+                    patient.birth_date_precision.as_deref(),
+                    patient.birth_year,
+                )
+            ),
+            format!(
+                "{}: {}",
+                crate::patient_text::identifier_title(
+                    &patient.tax_code,
+                    patient.identifier_type.as_deref()
+                ),
+                if patient.identifier_type.as_deref() == Some("none") {
+                    "non ancora disponibile".to_owned()
+                } else {
+                    crate::patient_text::copy_code(&patient.tax_code)
+                }
             ),
             "Allergie: dato non disponibile".into(),
         ];
@@ -3433,7 +3448,11 @@ impl ClinicalApp {
                 let label = format!(
                     "{}, nascita {}, {}",
                     crate::title::TitleText::name(patient.display_name()).text(),
-                    display_date(patient.birth_date.as_deref()),
+                    crate::patient_text::birth_text(
+                        patient.birth_date.as_deref(),
+                        patient.birth_date_precision.as_deref(),
+                        patient.birth_year
+                    ),
                     if patient.is_archived {
                         "archiviato"
                     } else {
@@ -3494,7 +3513,11 @@ impl ClinicalApp {
                                     .text_color(theme.secondary)
                                     .child(text!(format!(
                                         "{}{}{}",
-                                        display_date(patient.birth_date.as_deref()),
+                                        crate::patient_text::birth_text(
+                                            patient.birth_date.as_deref(),
+                                            patient.birth_date_precision.as_deref(),
+                                            patient.birth_year
+                                        ),
                                         if patient.is_adi { " · ADI" } else { "" },
                                         if patient.is_archived {
                                             " · Archiviato"
@@ -3582,14 +3605,22 @@ impl ClinicalApp {
                 )
                 .child(div().text_color(theme.secondary).child(text!(format!(
                     "Nascita {}",
-                    display_date(patient.birth_date.as_deref())
+                    crate::patient_text::birth_text(
+                        patient.birth_date.as_deref(),
+                        patient.birth_date_precision.as_deref(),
+                        patient.birth_year
+                    )
                 ))))
                 .child(
                     div()
                         .flex()
                         .gap(px(4.))
                         .child(div().text_color(theme.secondary).child(text!(
-                            crate::patient_text::identifier_label(&patient.tax_code).to_string()
+                            crate::patient_text::identifier_label(
+                                &patient.tax_code,
+                                patient.identifier_type.as_deref(),
+                            )
+                            .to_string()
                         )))
                         .child(div().type_role(theme, crate::theme::TextRole::Code).child(
                             crate::title::title(
@@ -3752,7 +3783,11 @@ impl ClinicalApp {
                                         .text_color(theme.secondary)
                                         .child(text!(format!(
                                             "Nascita {}{}{}",
-                                            display_date(patient.birth_date.as_deref()),
+                                            crate::patient_text::birth_text(
+                                                patient.birth_date.as_deref(),
+                                                patient.birth_date_precision.as_deref(),
+                                                patient.birth_year
+                                            ),
                                             if patient.is_adi { " · ADI" } else { "" },
                                             if patient.is_archived {
                                                 " · Scheda archiviata"

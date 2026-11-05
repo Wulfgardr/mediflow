@@ -29,9 +29,19 @@ enum PairedPatientsWorkspaceSupport {
     }
 
     /// Nome breve dell'identificativo, da mostrare accanto al valore: un codice
-    /// senza etichetta non dice che cosa sia. STP ed ENI si riconoscono dal prefisso
-    /// seguito da 13 cifre: un codice fiscale può iniziare con le stesse lettere.
-    static func identifierLabel(_ taxCode: String) -> String {
+    /// senza etichetta non dice che cosa sia. Il tipo dichiarato dalla home-base
+    /// vince; il prefisso serve solo ai record che non lo portano, e STP ed ENI
+    /// valgono solo se seguiti da 13 cifre, perché un codice fiscale può iniziare
+    /// con le stesse lettere. Stessa regola di `lib/patient-identifier-label.ts`.
+    static func identifierLabel(_ taxCode: String, type: String? = nil) -> String {
+        switch type {
+        case "cf": return "CF"
+        case "stp": return "STP"
+        case "eni": return "ENI"
+        case "passport": return "Documento"
+        case "other": return "Identificativo"
+        default: break
+        }
         let normalized = taxCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         for prefix in ["STP", "ENI"] where normalized.hasPrefix(prefix) {
             let rest = normalized.dropFirst(prefix.count)
@@ -40,16 +50,53 @@ enum PairedPatientsWorkspaceSupport {
         return "CF"
     }
 
-    static func labeledCompactTaxCode(_ taxCode: String) -> String {
-        guard let code = cleanedPatientWorkspaceValue(taxCode) else { return "" }
-        return "\(identifierLabel(code)) \(compactTaxCode(code))"
+    /// Titolo per esteso della riga dell'identificativo nella testata della scheda.
+    static func identifierTitle(_ taxCode: String, type: String? = nil) -> String {
+        switch identifierLabel(taxCode, type: type) {
+        case "CF": return "Codice fiscale"
+        case "STP": return "Codice STP"
+        case "ENI": return "Codice ENI"
+        case let label: return label
+        }
     }
 
-    static func patientMetadata(birthDate: Date?, taxCode: String, at now: Date = Date()) -> String {
+    static func labeledCompactTaxCode(_ taxCode: String, type: String? = nil) -> String {
+        guard type != "none", let code = cleanedPatientWorkspaceValue(taxCode) else { return "" }
+        return "\(identifierLabel(code, type: type)) \(compactTaxCode(code))"
+    }
+
+    /// Età da mostrare. Una data esatta dà l'età; un anno stimato dà «circa»,
+    /// perché presentare una stima come dato certo è un errore clinico.
+    static func ageText(birthDate: Date?, precision: String? = nil, birthYear: Int? = nil,
+                        at now: Date = Date()) -> String? {
+        if precision != "estimated", let years = age(from: birthDate, at: now) {
+            return "\(years) \(years == 1 ? "anno" : "anni")"
+        }
+        guard precision == "estimated", let birthYear else { return nil }
+        let currentYear = Calendar(identifier: .gregorian).component(.year, from: now)
+        guard birthYear <= currentYear, currentYear - birthYear < 140 else { return nil }
+        return "circa \(currentYear - birthYear) anni"
+    }
+
+    /// Nascita da mostrare: la data esatta, oppure l'anno dichiarato come stima.
+    static func birthText(birthDate: Date?, precision: String? = nil, birthYear: Int? = nil) -> String? {
+        if precision != "estimated", let birthDate { return birthDateFormatter.string(from: birthDate) }
+        guard precision == "estimated", let birthYear else { return nil }
+        return "anno stimato \(birthYear)"
+    }
+
+    static func patientMetadata(birthDate: Date?, taxCode: String, identifierType: String? = nil,
+                                birthDatePrecision: String? = nil, birthYear: Int? = nil,
+                                at now: Date = Date()) -> String {
         var parts: [String] = []
-        if let age = age(from: birthDate, at: now) { parts.append("\(age) anni") }
-        if let birthDate { parts.append("nascita \(birthDateFormatter.string(from: birthDate))") }
-        if cleanedPatientWorkspaceValue(taxCode) != nil { parts.append(labeledCompactTaxCode(taxCode)) }
+        if let age = ageText(birthDate: birthDate, precision: birthDatePrecision, birthYear: birthYear, at: now) {
+            parts.append(age)
+        }
+        if let birth = birthText(birthDate: birthDate, precision: birthDatePrecision, birthYear: birthYear) {
+            parts.append("nascita \(birth)")
+        }
+        let identifier = labeledCompactTaxCode(taxCode, type: identifierType)
+        if !identifier.isEmpty { parts.append(identifier) }
         return parts.joined(separator: " · ")
     }
 

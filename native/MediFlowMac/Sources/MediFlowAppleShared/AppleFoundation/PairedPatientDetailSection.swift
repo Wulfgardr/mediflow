@@ -1106,7 +1106,9 @@ private extension PairedPatientDetailSection {
                 .lineLimit(2)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("patient-detail-name")
-            Text(PairedPatientsWorkspaceSupport.patientMetadata(birthDate: detail.birthDate, taxCode: detail.taxCode))
+            Text(PairedPatientsWorkspaceSupport.patientMetadata(
+                birthDate: detail.birthDate, taxCode: detail.taxCode, identifierType: detail.identifierType,
+                birthDatePrecision: detail.birthDatePrecision, birthYear: detail.birthYear))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -486,7 +486,7 @@ struct PairedPatientsWorklistView: View {
                                     PairedPatientFlagChip("Nel cestino", tone: .attention)
                                 }
                                 HStack(spacing: 6) {
-                                    Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
+                                    Text(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType))
                                         .font(.caption)
                                         .codice()
                                         .foregroundStyle(.secondary)
@@ -715,15 +715,17 @@ struct PairedPatientsWorklistView: View {
             if patient.isAdi == true {
                 PairedPatientFlagChip("ADI", tone: .info, isOnProminentBackground: isSelectedRow)
             }
-            if let age = PairedPatientsWorkspaceSupport.age(from: patient.birthDate) {
-                Text("\(age) anni")
+            if let age = PairedPatientsWorkspaceSupport.ageText(
+                birthDate: patient.birthDate, precision: patient.birthDatePrecision, birthYear: patient.birthYear
+            ) {
+                Text(age)
                     .font(.caption)
                     .registro()
                     .accessibilityIdentifier("patient-cell-age-\(patient.id)")
                 Text("·")
                     .font(.caption)
             }
-            Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
+            Text(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType))
                 .font(.caption)
                 .codice()
         }
@@ -971,8 +973,8 @@ struct PairedPatientsWorklistView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LumePalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(LumePalette.warning.opacity(0.4)))
+        .background(LumePalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
+        .overlay(RoundedRectangle(cornerRadius: LumeGeometry.controlRadius).strokeBorder(LumePalette.warning.opacity(0.4)))
     }
 
     // Plain tinted capsule (no glass): glass inside the glass card would nest.

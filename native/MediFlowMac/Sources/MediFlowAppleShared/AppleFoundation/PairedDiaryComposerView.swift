@@ -195,7 +195,7 @@ struct PairedDiaryComposerView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
     }
 
     private var newEntryForm: some View {
@@ -285,11 +285,11 @@ struct PairedDiaryComposerView: View {
         .padding(16)
         .background(
             LumePalette.palette(for: colorScheme, isGuardia: isGuardia).writing,
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            in: RoundedRectangle(cornerRadius: LumeGeometry.writingRadius, style: .continuous)
         )
         .overlay {
             let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: LumeGeometry.writingRadius, style: .continuous)
                 .strokeBorder(contrast == .increased ? palette.strongRule : palette.draftRule, lineWidth: 1)
                 .allowsHitTesting(false)
         }
