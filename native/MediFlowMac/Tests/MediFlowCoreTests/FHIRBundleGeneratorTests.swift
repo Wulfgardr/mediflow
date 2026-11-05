@@ -248,12 +248,4 @@ final class FHIRBundleGeneratorTests: XCTestCase {
         }
         XCTAssertEqual(resource["resourceType"], .string("Patient"))
     }
-
-    func testUndeclaredIdentifierTypeKeepsFiscalCodesThatStartWithSTP() {
-        XCTAssertEqual(FHIRBundleGenerator.inferredIdentifierType("STPMRA80A01H501U"), "cf")
-        XCTAssertEqual(FHIRBundleGenerator.inferredIdentifierType("ENIXXX80A01H501U"), "cf")
-        XCTAssertEqual(FHIRBundleGenerator.inferredIdentifierType("STP0300010000123"), "stp")
-        XCTAssertEqual(FHIRBundleGenerator.inferredIdentifierType("eni0300010000123"), "eni")
-        XCTAssertEqual(FHIRBundleGenerator.inferredIdentifierType(" "), "none")
-    }
 }

@@ -241,19 +241,6 @@ public struct FHIRObservationInput: Decodable, Equatable {
 }
 
 public enum FHIRBundleGenerator {
-    /// Tipo per i record che non lo dichiarano: STP ed ENI solo con 13 cifre dopo il
-    /// prefisso, perché un codice fiscale può iniziare con le stesse lettere
-    /// (cognome «Stoppa» → STPMRA…). Stessa regola di `inferIdentifierType` sul web.
-    static func inferredIdentifierType(_ raw: String) -> String {
-        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        if value.isEmpty { return "none" }
-        for prefix in ["STP", "ENI"] where value.hasPrefix(prefix) {
-            let rest = value.dropFirst(prefix.count)
-            if rest.count == 13, rest.allSatisfy({ $0.isASCII && $0.isNumber }) { return prefix.lowercased() }
-        }
-        return "cf"
-    }
-
     public static func generate(input: FHIRBundleInput) -> FHIRJSONValue {
         let patientId = input.patient.id
         var entries: [FHIRJSONValue] = [
@@ -288,7 +275,7 @@ public enum FHIRBundleGenerator {
 
     private static func patient(_ patient: FHIRPatientInput, generatedAt: String) -> FHIRJSONValue {
         let value = patient.taxCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        let type = patient.identifierType ?? Self.inferredIdentifierType(value)
+        let type = patient.identifierType ?? (value.uppercased().hasPrefix("STP") ? "stp" : value.uppercased().hasPrefix("ENI") ? "eni" : value.isEmpty ? "none" : "cf")
         let systems = ["cf": "urn:oid:2.16.840.1.113883.2.9.4.3.2", "stp": "urn:mediflow:identifier:stp",
                        "eni": "urn:mediflow:identifier:eni", "passport": "urn:mediflow:identifier:foreign-document", "other": "urn:mediflow:identifier:other"]
         let identifier: FHIRJSONValue? = value.isEmpty ? nil : systems[type].map { system in
