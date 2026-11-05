@@ -1,0 +1,316 @@
+{
+  "baseRevision": "fb6c3966d8b4108c60708af50612359ecf082035",
+  "codeRevision": "43df67738ab4ffd71ec1e192a5956776cd40afe1",
+  "nodeVersion": "24.22.0",
+  "base": {
+    "command": "MEDIFLOW_DATA_DIR=/tmp/mfid-base npm run -s test:unit",
+    "exitCode": 1,
+    "counts": {
+      "tests": 9794,
+      "pass": 9728,
+      "fail": 35,
+      "cancelled": 0,
+      "skipped": 31,
+      "duration_ms": 319529.239291
+    },
+    "failures": [
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "cancellation before and during import leaves no selectable partial object"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "default host cwd is captured once; later chdir cannot rebind the worker"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "explicit host root, not the library source, binds worker integrity at import and activation"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "host root is lazy for status but mandatory for consent-bound offline worker verification"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "host-root aliases and traversal remain rejected at artifact verification, never canonicalized into authority"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "interrupted staging is not auto-promoted or erased without explicit recovery"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "live lock is not removed by recovery or concurrent import"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "offline import requires digest-bound consent and does not select or activate"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "only Windows/Linux supported architecture combinations are admitted as candidates"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "physical-memory gate blocks activation of even synthetic fixtures; no admission is emitted"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "revocation persists and is terminal for the same release"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "tamper and undeclared artifact files cannot pass staging; old admitted version survives"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "artifact changed after execution is not published as a successful invocation"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "authority lookup is deadline bounded even before process launch"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "controlled execution deadline kills the child and awaits close before releasing the slot"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "inference never acquires/installs an artifact, and never launches when missing or unadmitted"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "malformed, wrong-engine, oversized and empty stdout never succeed"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "mid-flight catalog change and pre-dispatch cancellation prevent output without a fallback"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "one-shot invocation uses isolated args, offline allowlisted environment and true local identity"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "real synthetic Node child exercises stdin/stdout and process close, NOT model inference"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "request cancellation and revocation terminate pending local work"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "single flight blocks concurrent preparation until the verified lease is closed"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "stderr is discarded and bounded; errors never include the raw process output"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "synchronous launch failure clears poll, returns provider_failed and permits a later explicit prepare"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "unconfirmed termination poisons single flight until the actual close event"
+      ],
+      [
+        "lib/ambulatory-hierarchy.test.ts",
+        "paired: two SQLite processes delete-first never leave an orphan"
+      ],
+      [
+        "lib/chatgpt-execution/execution-mac.test.ts",
+        "native source pin is over the complete delivered C bytes, never a caller helper digest"
+      ],
+      [
+        "lib/chatgpt-execution/execution-mac.test.ts",
+        "pinned complete source, receipts and 24 C1 comparisons validate only the fixed projection"
+      ],
+      [
+        "lib/chatgpt-execution/execution-mac.test.ts",
+        "source truncation, wrong receipt and unknown or invalid typed inputs are rejected"
+      ],
+      [
+        "lib/domain/documents/anydoc-apple-vision-ocr.test.ts",
+        "fails closed for blank, malformed, oversized, and hostile image inputs"
+      ],
+      [
+        "lib/domain/documents/anydoc-apple-vision-ocr.test.ts",
+        "recognizes a synthetic image offline with bounded PHI-safe provenance"
+      ],
+      [
+        "lib/domain/documents/anydoc-current-source-composition.test.ts",
+        "continues a real AnyDoc image_or_scan result through offline Apple Vision"
+      ],
+      [
+        "lib/domain/documents/anydoc-current-source-composition.test.ts",
+        "encrypted scanned PDF reaches real Apple Vision only after AnyDoc needsOcr"
+      ],
+      [
+        "lib/native-patient-document.test.ts",
+        "empty scan blocks native review with explicit OCR error and no patient"
+      ],
+      [
+        "lib/native-patient-document.test.ts",
+        "real scanned PDF uses local Apple Vision, stays uncertain and needs manual correction"
+      ]
+    ]
+  },
+  "branch": {
+    "command": "MEDIFLOW_DATA_DIR=/tmp/mfid-final3 npm run -s test:unit",
+    "exitCode": 1,
+    "counts": {
+      "tests": 9814,
+      "pass": 9755,
+      "fail": 28,
+      "cancelled": 0,
+      "skipped": 31,
+      "duration_ms": 290616.679875
+    },
+    "failures": [
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "cancellation before and during import leaves no selectable partial object"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "default host cwd is captured once; later chdir cannot rebind the worker"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "explicit host root, not the library source, binds worker integrity at import and activation"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "host root is lazy for status but mandatory for consent-bound offline worker verification"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "host-root aliases and traversal remain rejected at artifact verification, never canonicalized into authority"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "interrupted staging is not auto-promoted or erased without explicit recovery"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "live lock is not removed by recovery or concurrent import"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "offline import requires digest-bound consent and does not select or activate"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "only Windows/Linux supported architecture combinations are admitted as candidates"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "physical-memory gate blocks activation of even synthetic fixtures; no admission is emitted"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "revocation persists and is terminal for the same release"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts",
+        "tamper and undeclared artifact files cannot pass staging; old admitted version survives"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "artifact changed after execution is not published as a successful invocation"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "authority lookup is deadline bounded even before process launch"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "controlled execution deadline kills the child and awaits close before releasing the slot"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "inference never acquires/installs an artifact, and never launches when missing or unadmitted"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "malformed, wrong-engine, oversized and empty stdout never succeed"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "mid-flight catalog change and pre-dispatch cancellation prevent output without a fallback"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "one-shot invocation uses isolated args, offline allowlisted environment and true local identity"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "real synthetic Node child exercises stdin/stdout and process close, NOT model inference"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "request cancellation and revocation terminate pending local work"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "single flight blocks concurrent preparation until the verified lease is closed"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "stderr is discarded and bounded; errors never include the raw process output"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "synchronous launch failure clears poll, returns provider_failed and permits a later explicit prepare"
+      ],
+      [
+        "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts",
+        "unconfirmed termination poisons single flight until the actual close event"
+      ],
+      [
+        "lib/chatgpt-execution/execution-mac.test.ts",
+        "native source pin is over the complete delivered C bytes, never a caller helper digest"
+      ],
+      [
+        "lib/chatgpt-execution/execution-mac.test.ts",
+        "pinned complete source, receipts and 24 C1 comparisons validate only the fixed projection"
+      ],
+      [
+        "lib/chatgpt-execution/execution-mac.test.ts",
+        "source truncation, wrong receipt and unknown or invalid typed inputs are rejected"
+      ]
+    ]
+  },
+  "addedFailures": [],
+  "removedFailures": [
+    [
+      "lib/ambulatory-hierarchy.test.ts",
+      "paired: two SQLite processes delete-first never leave an orphan"
+    ],
+    [
+      "lib/domain/documents/anydoc-apple-vision-ocr.test.ts",
+      "fails closed for blank, malformed, oversized, and hostile image inputs"
+    ],
+    [
+      "lib/domain/documents/anydoc-apple-vision-ocr.test.ts",
+      "recognizes a synthetic image offline with bounded PHI-safe provenance"
+    ],
+    [
+      "lib/domain/documents/anydoc-current-source-composition.test.ts",
+      "continues a real AnyDoc image_or_scan result through offline Apple Vision"
+    ],
+    [
+      "lib/domain/documents/anydoc-current-source-composition.test.ts",
+      "encrypted scanned PDF reaches real Apple Vision only after AnyDoc needsOcr"
+    ],
+    [
+      "lib/native-patient-document.test.ts",
+      "empty scan blocks native review with explicit OCR error and no patient"
+    ],
+    [
+      "lib/native-patient-document.test.ts",
+      "real scanned PDF uses local Apple Vision, stays uncertain and needs manual correction"
+    ]
+  ]
+}
