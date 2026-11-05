@@ -60,3 +60,11 @@ test('righe scritte senza precisione (default «unknown») ma con la data si leg
     assert.equal(patientFormDefaults({ ...row, birthDate: null, birthYear: 1970 }).birthDatePrecision, 'estimated');
     assert.equal(patientFormDefaults({ ...row, birthDate: null }).birthDatePrecision, 'unknown');
 });
+
+test('una scheda nuova parte dal codice fiscale; un record esistente senza codice resta senza identificativo', async () => {
+    const { patientFormDefaults } = await import('./patient-edit-session.ts');
+    assert.equal(patientFormDefaults({}).identifierType, 'cf');
+    assert.equal(patientFormDefaults({ id: 'p1', taxCode: '' }).identifierType, 'none');
+    assert.equal(patientFormDefaults({ id: 'p1', taxCode: 'STP0300010000123' }).identifierType, 'stp');
+    assert.equal(patientFormDefaults({ id: 'p1', taxCode: 'X', identifierType: 'other' }).identifierType, 'other');
+});

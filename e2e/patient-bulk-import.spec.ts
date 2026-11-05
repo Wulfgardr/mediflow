@@ -106,7 +106,6 @@ async function createExistingFromUi(page: Page): Promise<WirePatient> {
     await page.locator('input[name="lastName"]').fill('Sintetico');
     await page.getByLabel('Identificativo', { exact: true }).selectOption('cf');
     await page.locator('input[name="taxCode"]').fill(existingCode);
-    await page.getByLabel('Nascita', { exact: true }).selectOption('exact');
     await page.locator('input[name="birthDate"]').fill('1980-01-02');
     await page.locator('input[name="address"]').fill('Via Preesistente Sintetica');
     await page.locator('input[name="phone"]').fill('+390000009');

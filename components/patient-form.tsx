@@ -323,21 +323,25 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                         {errors.taxCode && <p className="mf-field-error" role="alert">{errors.taxCode.message}</p>}
                     </div>
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS} htmlFor="patient-birthPrecision">Nascita</label>
-                        <select id="patient-birthPrecision" {...register('birthDatePrecision', { onChange: event => {
-                            if (event.target.value !== 'exact') setValue('birthDate', '', { shouldDirty: true });
-                            if (event.target.value !== 'estimated') setValue('birthYear', null, { shouldDirty: true });
-                        } })} className={FORM_INPUT_CLASS}>
-                            <option value="exact">Data esatta</option><option value="estimated">Solo anno stimato</option><option value="unknown">Sconosciuta</option>
-                        </select>
-                        {birthPrecision === 'exact' && <>
+                        {/* La precisione segue ciò che si compila: data → esatta, solo anno → stima,
+                            nulla → sconosciuta. Nessuna scelta preliminare da fare. */}
+                        {birthPrecision !== 'estimated' ? <>
                             <label className={FORM_LABEL_CLASS} htmlFor="patient-birthDate">Data di nascita</label>
-                            <input type="date" id="patient-birthDate" {...register('birthDate')} className={FORM_INPUT_CLASS} />
-                        </>}
-                        {birthPrecision === 'estimated' && <>
+                            <input type="date" id="patient-birthDate" {...register('birthDate', { onChange: event => {
+                                setValue('birthDatePrecision', event.target.value ? 'exact' : 'unknown', { shouldDirty: true });
+                            } })} className={FORM_INPUT_CLASS} />
+                        </> : <>
                             <label className={FORM_LABEL_CLASS} htmlFor="patient-birthYear">Anno di nascita stimato</label>
-                            <input type="number" id="patient-birthYear" {...register('birthYear', { setValueAs: value => value === '' ? null : Number(value) })} className={FORM_INPUT_CLASS} />
+                            <input type="number" id="patient-birthYear" inputMode="numeric" {...register('birthYear', { setValueAs: value => value === '' || value === null ? null : Number(value) })} className={FORM_INPUT_CLASS} />
                         </>}
+                        <label className="flex min-h-11 items-center gap-2 text-sm">
+                            <input type="checkbox" checked={birthPrecision === 'estimated'} onChange={event => {
+                                setValue('birthDate', '', { shouldDirty: true });
+                                setValue('birthYear', null, { shouldDirty: true });
+                                setValue('birthDatePrecision', event.target.checked ? 'estimated' : 'unknown', { shouldDirty: true });
+                            }} />
+                            Conosco solo l’anno (stima)
+                        </label>
                         {ageLabel && <p>{ageLabel}</p>}
                         {errors.birthDate && <p className="mf-field-error" role="alert">{errors.birthDate.message}</p>}
                         {errors.birthYear && <p className="mf-field-error" role="alert">{errors.birthYear.message}</p>}
