@@ -1,3 +1,10 @@
+export const PATIENT_IDENTIFIER_DUPLICATE = {
+    code: 'PATIENT_IDENTIFIER_DUPLICATE',
+    error: 'Un altro paziente di questo ambulatorio ha già lo stesso identificativo. Apri la scheda esistente prima di proseguire.',
+} as const;
+export class PatientIdentifierConflictError extends Error {
+    constructor() { super(PATIENT_IDENTIFIER_DUPLICATE.error); this.name = 'PatientIdentifierConflictError'; }
+}
 export const IDENTIFIER_TYPES = ['cf', 'stp', 'eni', 'passport', 'other', 'none'] as const;
 export type PatientIdentifierType = typeof IDENTIFIER_TYPES[number];
 export type BirthDatePrecision = 'exact' | 'estimated' | 'unknown';
