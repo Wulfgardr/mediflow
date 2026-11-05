@@ -98,3 +98,13 @@ esercitare i consumatori si usano i finali corretti Q e W.
 2 test. Questa prova verifica il caricamento, non l'esecuzione E2E.
 Il catalogo operativo Fabric viene rigenerato perché il dossier importa ora
 il generatore condiviso, anziché il riconoscitore documentale direttamente.
+
+Verifica finale delle correzioni: passano anche tutti i quattro file
+`lib/patient-identity*.test.ts` (22 test), `npm run typecheck`, `npm run lint`
+e i comandi del job `repository-guards`, inclusi never-regress, confine
+import database e prove negative. Il catalogo rigenerato passa il controllo.
+`npm run prepare:dependencies` conferma SQLite 12.6.2 per darwin-arm64
+con SHA-256 verificato. Non viene ripetuta la build né l'esecuzione E2E completa.
+Intervento eseguito da gpt-6.1-sol, effort high, senza deleghe; consumi non
+attribuiti. Le prove del raccordo formale sono in
+`docs/formal/therapy-status/README.md`.
