@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { normalizePatientCreateInput } from './patient-write-normalization';
-import { identifierError, patientAgeLabel } from './patient-identity';
+import { identifierError, inferIdentifierType, patientAgeLabel } from './patient-identity';
 import { evaluateEgress } from './ai-egress-gate';
 import { createRedactionSession } from './ai-redaction-session';
 import { parsePatientCsv, PATIENT_CSV_IDENTITY_HEADERS } from './patient-bulk-import';
@@ -65,7 +65,8 @@ test('CF con prefisso STP o ENI resta CF in CSV, scritture, SISS e documenti', (
         assert.equal(parsed.ok, true);
         if (!parsed.ok) return;
         assert.deepEqual(parsed.preview.rows[0].issues, []);
-        assert.equal(parsed.preview.rows[0].values?.identifierType, 'cf');
+        const values = parsed.preview.rows[0].values!;
+        assert.equal(values.identifierType ?? inferIdentifierType(values.taxCode), 'cf');
         const normalized = normalizePatientCreateInput({ firstName: 'Ada', lastName: 'Sintetica', taxCode }, { id: taxCode });
         assert.equal(normalized.ok, true);
         if (!normalized.ok) return;

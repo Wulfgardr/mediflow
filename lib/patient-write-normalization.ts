@@ -1,4 +1,4 @@
-import { birthError, identifierError, inferIdentifierType, normalizeIdentifierValue, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity';
+import { birthError, identifierError, inferLegacyIdentifierType, normalizeIdentifierValue, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity';
 import { patients } from '@/lib/schema';
 import { normalizePrimaryAmbulatoryIdInput } from './patient-ambulatory-membership';
 
@@ -105,8 +105,10 @@ export function normalizePatientCreateInput(
         return birthDate;
     }
 
-    const identifierType = body.identifierType === undefined ? inferIdentifierType(body.taxCode as string) : body.identifierType as PatientIdentifierType;
-    const identityError = identifierError(identifierType, body.taxCode);
+    const declaredIdentifier = body.identifierType !== undefined;
+    if (!declaredIdentifier && typeof body.taxCode !== 'string') return { ok: false, error: 'Missing required fields' };
+    const identifierType = declaredIdentifier ? body.identifierType as PatientIdentifierType : inferLegacyIdentifierType(body.taxCode as string);
+    const identityError = declaredIdentifier ? identifierError(identifierType, body.taxCode) : null;
     if (identityError) return { ok: false, error: identityError };
     const birthDatePrecision = (body.birthDatePrecision ?? (birthDate.value ? 'exact' : body.birthYear != null ? 'estimated' : 'unknown')) as BirthDatePrecision;
     const birthYear = body.birthYear == null ? null : body.birthYear as number;
@@ -121,7 +123,7 @@ export function normalizePatientCreateInput(
             id,
             firstName: body.firstName as string,
             lastName: body.lastName as string,
-            taxCode: identifierType === 'none' ? '' : normalizeIdentifierValue(identifierType, body.taxCode as string),
+            taxCode: declaredIdentifier ? identifierType === 'none' ? '' : normalizeIdentifierValue(identifierType, body.taxCode as string) : body.taxCode as string,
             identifierType, birthDatePrecision, birthYear,
             birthDate: birthDate.value,
             address: typeof body.address === 'string' ? body.address : null,

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -38,6 +39,7 @@ const cleanupCookies = installNetworkPatientCookieFixture(DATA_DIR, { cookies: n
 test.after(() => { cleanupCookies(); dbServer.$client.close(); fs.rmSync(DATA_DIR, { recursive: true, force: true }); });
 const { dbServer } = await import('./db-server.ts');
 const { updateNetworkScopedPatient } = await import('./network-patient-write.ts');
+const { createNetworkScopedPatient } = await import('./network-patient-lifecycle.ts');
 
 const SCOPE_AMBULATORY = 'amb-write-scope';
 const PATIENT_ID = 'patient-write-1';
@@ -61,6 +63,48 @@ function resetDatabase(): void {
     }]).run();
     dbServer.insert(patientsToAmbulatories).values([{ patientId: PATIENT_ID, ambulatoryId: SCOPE_AMBULATORY }]).run();
 }
+
+test('identità compatibile: writer paired precedente crea SYN senza campi nuovi', async () => {
+    resetDatabase();
+    const taxCode = `SYN${randomUUID()}`;
+    const result = await createNetworkScopedPatient(makeContext(), { firstName: 'Ada', lastName: 'Sintetica', taxCode });
+    assert.equal(result.status, 201, JSON.stringify(result.value));
+    const row = dbServer.select().from(patients).all().find(patient => patient.taxCode === taxCode);
+    assert.ok(row);
+    assert.equal(row.identifierType, 'cf');
+    const before = dbServer.select().from(patients).all();
+    const rejected = await createNetworkScopedPatient(makeContext(), {
+        firstName: 'Ada', lastName: 'Sintetica', identifierType: 'cf', taxCode: 'RSSMRA80A01H501X',
+    });
+    assert.equal(rejected.status, 400);
+    assert.match(String(Reflect.get(rejected.value, 'error')), /Controlla il codice fiscale/);
+    assert.deepEqual(dbServer.select().from(patients).all(), before);
+});
+
+test('identità compatibile: writer paired preserva CF storico invariato e rifiuta un cambio invalido', async () => {
+    resetDatabase();
+    dbServer.$client.prepare("UPDATE patients SET tax_code='RSSMRA80A01H501X', identifier_type='cf' WHERE id=?").run(PATIENT_ID);
+    for (const identity of [{}, { identifierType: 'cf', taxCode: 'RSSMRA80A01H501X' }]) {
+        const before = dbServer.select().from(patients).all()[0];
+        const result = await updateNetworkScopedPatient(makeContext(), { version: before.version, notes: 'ENC:aXY=:c3ludGhldGlj', ...identity });
+        assert.equal(result.status, 200, JSON.stringify(result.value));
+        const after = dbServer.select().from(patients).all()[0];
+        assert.equal(after.taxCode, before.taxCode);
+        assert.equal(after.identifierHistory, before.identifierHistory);
+        assert.equal(after.version, before.version + 1);
+    }
+    const before = dbServer.select().from(patients).all()[0];
+    const rejected = await updateNetworkScopedPatient(makeContext(), { version: before.version, identifierType: 'cf', taxCode: 'RSSMRA80A01H501Y' });
+    assert.equal(rejected.status, 400);
+    assert.match(String(Reflect.get(rejected.value, 'error')), /Controlla il codice fiscale/);
+    assert.deepEqual(dbServer.select().from(patients).all()[0], before);
+    const legacyValue = `TEST-${randomUUID()}`;
+    const updated = await updateNetworkScopedPatient(makeContext(), { version: before.version, taxCode: legacyValue });
+    assert.equal(updated.status, 200, JSON.stringify(updated.value));
+    const legacy = dbServer.select().from(patients).all()[0];
+    assert.equal(legacy.taxCode, legacyValue);
+    assert.equal(legacy.identifierType, 'cf');
+});
 
 test('network update rejects plaintext sensitive fields', async () => {
     resetDatabase();

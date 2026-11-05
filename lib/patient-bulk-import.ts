@@ -168,19 +168,20 @@ function validateRecord(record: RawRecord, index: number, expectedColumns: numbe
     if (firstName.length < 2 || firstName.trim().length < 2) issue('name', 'Il nome deve contenere almeno due caratteri.', 'nome');
     if (lastName.length < 2 || lastName.trim().length < 2) issue('name', 'Il cognome deve contenere almeno due caratteri.', 'cognome');
     const identifierType = (rawType || inferIdentifierType(rawTaxCode)) as PatientIdentifierType;
-    const error = identifierError(identifierType, rawTaxCode);
+    const error = rawType ? identifierError(identifierType, rawTaxCode)
+        : normalizePatientCsvTaxCode(rawTaxCode) ? null : 'Il codice fiscale deve contenere 16 caratteri alfanumerici ASCII.';
     if (error) issue('tax-code', error, 'codice_fiscale');
     const taxCode = error ? '' : normalizeIdentifierValue(identifierType, rawTaxCode);
     const birthDatePrecision = (rawPrecision || (birthDate ? 'exact' : rawYear ? 'estimated' : 'unknown')) as BirthDatePrecision;
     const birthYear = rawYear ? Number(rawYear) : null;
     const birth = birthError({ identifierType, birthDate, birthDatePrecision, birthYear });
-    if (birth && (!birthDate || isPatientCsvDate(birthDate))) issue('date', birth, 'data_nascita');
+    if (birth && !error && (!birthDate || isPatientCsvDate(birthDate))) issue('date', birth, 'data_nascita');
     if (birthDate && !isPatientCsvDate(birthDate)) issue('date', 'Usa una data reale nel formato YYYY-MM-DD.', 'data_nascita');
     return {
         row: index + 1, line: record.line, cells: record.cells, issues,
         duplicateInFile: false, duplicateExisting: false,
         ...(issues.length === 0 ? { values: {
-            firstName, lastName, taxCode, identifierType, birthDatePrecision, birthYear,
+            firstName, lastName, taxCode, ...(rawType ? { identifierType } : {}), birthDatePrecision, birthYear,
             ...(birthDate ? { birthDate } : {}),
             ...(address ? { address } : {}),
             ...(phone ? { phone } : {}),
@@ -191,7 +192,8 @@ function validateRecord(record: RawRecord, index: number, expectedColumns: numbe
 function csvIdentityKey(cells: readonly string[]): string | null {
     const type = (cells[6] || inferIdentifierType(cells[2])) as PatientIdentifierType;
     const value = cells[2] ?? '';
-    return type === 'none' || identifierError(type, value) ? null : `${type}:${normalizeIdentifierValue(type, value)}`;
+    const error = cells[6] ? identifierError(type, value) : !normalizePatientCsvTaxCode(value);
+    return type === 'none' || error ? null : `${type}:${normalizeIdentifierValue(type, value)}`;
 }
 
 export function parsePatientCsv(bytes: Uint8Array): PatientCsvResult {
@@ -238,7 +240,8 @@ export function markExistingPatientDuplicates(preview: PatientCsvPreview, existi
         return `${type}:${normalizeIdentifierValue(type, patient.taxCode)}`;
     }));
     return { rows: preview.rows.map(row => ({ ...row,
-        duplicateExisting: row.values?.identifierType !== 'none' && codes.has(`${row.values?.identifierType}:${row.values?.taxCode}`),
+        duplicateExisting: row.values !== undefined && row.values.identifierType !== 'none'
+            && codes.has(`${row.values.identifierType ?? inferIdentifierType(row.values.taxCode)}:${row.values.taxCode}`),
     })) };
 }
 
