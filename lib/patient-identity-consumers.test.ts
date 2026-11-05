@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { normalizePatientCreateInput } from './patient-write-normalization';
 import { identifierError, patientAgeLabel } from './patient-identity';
 import { evaluateEgress } from './ai-egress-gate';
 import { createRedactionSession } from './ai-redaction-session';
@@ -55,4 +56,21 @@ test('documenti mantengono il tipo e non uniscono tipi diversi', () => {
     assert.equal(roles.taxCodes[0]?.identifierType, 'stp');
     const decision = decidePatientImportTarget({ identifierType: 'passport', taxCode: 'ABC123', candidates: [{ id: 'other', identifierType: 'other', taxCode: 'ABC123' }] });
     assert.notEqual(decision.action, 'merge_existing_patient');
+});
+
+test('CF con prefisso STP o ENI resta CF in CSV, scritture, SISS e documenti', () => {
+    for (const taxCode of ['STPMRA80A01H501Q', 'ENIXXX80A01H501W']) {
+        const csv = `${PATIENT_CSV_IDENTITY_HEADERS.join(';')}\nAda;Sintetica;${taxCode};;;;;;`;
+        const parsed = parsePatientCsv(new TextEncoder().encode(csv));
+        assert.equal(parsed.ok, true);
+        if (!parsed.ok) return;
+        assert.deepEqual(parsed.preview.rows[0].issues, []);
+        assert.equal(parsed.preview.rows[0].values?.identifierType, 'cf');
+        const normalized = normalizePatientCreateInput({ firstName: 'Ada', lastName: 'Sintetica', taxCode }, { id: taxCode });
+        assert.equal(normalized.ok, true);
+        if (!normalized.ok) return;
+        assert.equal(normalized.values.identifierType, 'cf');
+        assert.equal(buildSissPatientContextSummary({ patientTaxCode: taxCode }).patientFiscalCodeReady, true);
+        assert.equal(resolveDocumentTaxCodeRoles({ text: `Assistito codice fiscale ${taxCode}` }).taxCodes[0]?.identifierType, 'cf');
+    }
 });

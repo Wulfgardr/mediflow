@@ -63,3 +63,38 @@ Apple, con `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer` e fir
 - `swift test --package-path native/MediFlowMac --scratch-path /tmp/mfid-swift-tests --skip-update --filter 'FHIRBundleGeneratorTests|HomeBaseAttachmentModelsTests/testPatientIdentityDecodesOldAndAdditivePayloads'`: 8 test passati, inclusi decodifica vecchia/nuova, conservazione dei campi attraverso la decifratura, identificatori FHIR per tipo e nascita al solo anno.
 
 Non provati: percorso manuale del form nel browser, avvio delle app compilate, dispositivi fisici, firma/distribuzione e servizi SISS reali. I test FHIR verificano il mapping richiesto e il riferimento condiviso con Apple; non qualificano un profilo nazionale né una connessione regionale. Nessun dato clinico reale è stato letto e nessuna PR è stata unita.
+
+## Correzioni PR #846: inferenza e fixture dossier
+
+Riprodotti su `300a56ff1031cba557475ffd8f0be359bc3f3c42`, aggiungendo prima
+le asserzioni e mantenendo il codice iniziale:
+
+- `lib/patient-identity.test.ts`: inferire `STPMRA80A01H501U` restituisce
+  `stp` invece di `cf`.
+- `lib/patient-identity-storage.test.ts`: la migrazione da schema 7 classifica
+  `STPMRA80A01H501U` come `stp` e `ENIXXX80A01H501U` come `eni`,
+  mentre il valore vuoto resta `cf` invece di `none`.
+- Il test delle 10.000 estrazioni, dopo aver estratto senza modifiche il
+  generatore di `e2e/dossier-import.spec.ts` nel supporto condiviso, fallisce
+  con `Synthetic tax code unavailable`.
+
+Dopo la correzione passano 19 test nei tre file `patient-identity.test.ts`,
+`patient-identity-storage.test.ts`, `patient-identity-consumers.test.ts`.
+Il generatore casuale usa giorni 01-28 o 41-68; il validatore resta identico.
+La prova esegue 10.000 estrazioni casuali e 10.000 semi del generatore
+preesistente, tutti validi. La ricerca in `e2e/` e `lib/` non trova altri
+generatori con il difetto del giorno 00-99: il generatore da seme usa 01,
+mentre il seeder produce identificativi TEST, fuori da questo formato CF.
+
+La migrazione applicata da `sqlite-schema-open.ts` vive in `sqlite-schema.ts`:
+usa prefisso STP o ENI seguito da esattamente 13 cifre, con trim e maiuscole.
+CSV, normalizzazione delle scritture e SISS usano l'inferenza comune.
+I test dei consumatori verificano CSV, scritture, SISS e riconoscimento
+nei documenti con CF validi dai prefissi STP ed ENI. Gli esempi richiesti
+con finale U non hanno checksum valido: l'inferenza resta CF, mentre per
+esercitare i consumatori si usano i finali corretti Q e W.
+
+`npx playwright test e2e/dossier-import.spec.ts --list` passa e raccoglie
+2 test. Questa prova verifica il caricamento, non l'esecuzione E2E.
+Il catalogo operativo Fabric viene rigenerato perché il dossier importa ora
+il generatore condiviso, anziché il riconoscitore documentale direttamente.

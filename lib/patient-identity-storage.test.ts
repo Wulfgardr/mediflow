@@ -28,13 +28,13 @@ test('d: migra CF STP ENI senza cambiare i valori, con versione nuova', () => {
     for (const column of ['identifier_type', 'birth_date_precision', 'birth_year', 'identifier_history']) {
         if ((legacy.pragma('table_info(patients)') as { name: string }[]).some(row => row.name === column)) legacy.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
     }
-    const values = ['RSSMRA80A01H501U', 'STP0300010000123', 'ENI0300010000123'];
+    const values = ['RSSMRA80A01H501U', 'STP0300010000123', 'ENI0300010000123', 'STPMRA80A01H501U', 'ENIXXX80A01H501U', ''];
     values.forEach((code, index) => legacy.prepare('INSERT INTO patients(id,first_name,last_name,tax_code,birth_date) VALUES (?, ?, ?, ?, ?)').run(String(index), 'Ada', 'Sintetica', code, index === 0 ? 315532800 : null));
     legacy.pragma('user_version = 7'); legacy.close();
     const migrated = openVersionedSqliteDatabase(file);
     try {
         assert.ok(CURRENT_SQLITE_SCHEMA_VERSION > 7);
-        assert.deepEqual(migrated.prepare('SELECT tax_code, identifier_type, birth_date_precision FROM patients ORDER BY id').all(), values.map((tax_code, i) => ({ tax_code, identifier_type: ['cf', 'stp', 'eni'][i], birth_date_precision: i === 0 ? 'exact' : 'unknown' })));
+        assert.deepEqual(migrated.prepare('SELECT tax_code, identifier_type, birth_date_precision FROM patients ORDER BY id').all(), values.map((tax_code, i) => ({ tax_code, identifier_type: ['cf', 'stp', 'eni', 'cf', 'cf', 'none'][i], birth_date_precision: i === 0 ? 'exact' : 'unknown' })));
         assert.equal(migrated.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
     } finally { migrated.close(); }
     const reopened = openVersionedSqliteDatabase(file); reopened.close();

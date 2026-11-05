@@ -33,7 +33,7 @@ export function isValidItalianTaxCode(value: string): boolean {
 }
 export function inferIdentifierType(value?: string | null): PatientIdentifierType {
     const normalized = value?.trim().toUpperCase() ?? '';
-    return normalized.startsWith('STP') ? 'stp' : normalized.startsWith('ENI') ? 'eni' : normalized ? 'cf' : 'none';
+    return /^STP[0-9]{13}$/.test(normalized) ? 'stp' : /^ENI[0-9]{13}$/.test(normalized) ? 'eni' : normalized ? 'cf' : 'none';
 }
 export function normalizeIdentifierValue(type: PatientIdentifierType, value: string): string {
     return ['cf', 'stp', 'eni'].includes(type) ? value.trim().toUpperCase() : value.trim();
