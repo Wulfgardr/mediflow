@@ -4586,7 +4586,10 @@ impl ClinicalApp {
                             .child(text!(row.display.clone())),
                         div()
                             .type_role(theme, crate::theme::TextRole::Strong)
-                            .child(text!(crate::clinical_units::value(&row.value, &row.unit_code))),
+                            .child(text!(crate::clinical_units::value(
+                                &row.value,
+                                &row.unit_code
+                            ))),
                     ))
                     .child(
                         div()

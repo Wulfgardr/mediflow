@@ -21,8 +21,17 @@ const CATALOG: &[(&str, &str)] = &[
 
 fn superscript(ch: char) -> char {
     match ch {
-        '0' => '⁰', '1' => '¹', '2' => '²', '3' => '³', '4' => '⁴',
-        '5' => '⁵', '6' => '⁶', '7' => '⁷', '8' => '⁸', '9' => '⁹', '-' => '⁻',
+        '0' => '⁰',
+        '1' => '¹',
+        '2' => '²',
+        '3' => '³',
+        '4' => '⁴',
+        '5' => '⁵',
+        '6' => '⁶',
+        '7' => '⁷',
+        '8' => '⁸',
+        '9' => '⁹',
+        '-' => '⁻',
         other => other,
     }
 }
@@ -47,8 +56,12 @@ pub fn unit(code: &str) -> String {
             '[' | ']' => {}
             '_' if in_annotation => plain.push(' '),
             '.' if in_annotation
-                && k > 0 && chars[k - 1].is_ascii_digit()
-                && chars.get(k + 1).is_some_and(|n| n.is_ascii_digit()) => plain.push(','),
+                && k > 0
+                && chars[k - 1].is_ascii_digit()
+                && chars.get(k + 1).is_some_and(|n| n.is_ascii_digit()) =>
+            {
+                plain.push(',')
+            }
             other => plain.push(other),
         }
     }
@@ -70,12 +83,23 @@ pub fn unit(code: &str) -> String {
             }
             // micro: «u» davanti a g, L, l, m alla fine o prima di un separatore
             'u' if (i == 0 || !chars[i - 1].is_ascii_alphabetic())
-                && chars.get(i + 1).is_some_and(|n| matches!(n, 'g' | 'L' | 'l' | 'm'))
-                && chars.get(i + 2).is_none_or(|n| !n.is_ascii_alphanumeric()) => out.push('µ'),
+                && chars
+                    .get(i + 1)
+                    .is_some_and(|n| matches!(n, 'g' | 'L' | 'l' | 'm'))
+                && chars.get(i + 2).is_none_or(|n| !n.is_ascii_alphanumeric()) =>
+            {
+                out.push('µ')
+            }
             // esponente: cifra singola dopo una lettera (m2 → m²)
             d if d.is_ascii_digit()
-                && i > 0 && chars[i - 1].is_ascii_alphabetic()
-                && chars.get(i + 1).is_none_or(|n| !n.is_ascii_digit() && *n != '.' && *n != ',') => out.push(superscript(d)),
+                && i > 0
+                && chars[i - 1].is_ascii_alphabetic()
+                && chars
+                    .get(i + 1)
+                    .is_none_or(|n| !n.is_ascii_digit() && *n != '.' && *n != ',') =>
+            {
+                out.push(superscript(d))
+            }
             other => out.push(other),
         }
         i += 1;
@@ -96,11 +120,23 @@ pub fn value(value: &str, unit_code: &str) -> String {
     }
     let digits = trimmed.strip_prefix('-').unwrap_or(trimmed);
     let mut parts = digits.splitn(2, ['.', ',']);
-    let single = parts.next().is_some_and(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
-        && parts.next().is_none_or(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()));
-    let number = if single { trimmed.replace('.', ",") } else { trimmed.to_string() };
+    let single = parts
+        .next()
+        .is_some_and(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+        && parts
+            .next()
+            .is_none_or(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()));
+    let number = if single {
+        trimmed.replace('.', ",")
+    } else {
+        trimmed.to_string()
+    };
     let unit = unit(unit_code);
-    if unit.is_empty() { number } else { format!("{number} {unit}") }
+    if unit.is_empty() {
+        number
+    } else {
+        format!("{number} {unit}")
+    }
 }
 
 #[cfg(test)]
