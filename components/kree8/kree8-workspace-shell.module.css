@@ -543,7 +543,7 @@
 
 .loadingCard {
   border: 1px dashed var(--k8-line-strong);
-  border-radius: 22px;
+  border-radius: var(--lume-radius-panel);
   padding: 16px;
   background: var(--k8-soft);
   text-align: center;
@@ -558,7 +558,7 @@
 .shell :global(.mf-section),
 .shell :global(.apple-subsection) {
   border-color: var(--k8-line) !important;
-  border-radius: 22px !important;
+  border-radius: var(--lume-radius-panel) !important;
   background: var(--k8-surface) !important;
   color: var(--k8-ink) !important;
   /* Lume: azzera l'ombra ornamentale globale ereditata da globals (giorno 0 24px 64px + filo inset chiaro;
@@ -733,7 +733,7 @@
   background: var(--k8-focal) !important;
   --lume-focal-shadow-opacity: 1;
   border-color: var(--k8-line-strong) !important;
-  border-radius: 22px !important;
+  border-radius: var(--lume-radius-panel) !important;
   box-shadow: none !important;
 }
 
@@ -743,8 +743,8 @@
 
 @media (max-width: 760px) {
   .shell { padding: 8px; }
-  .canvas { --k8-canvas-pad: 10px; border-radius: 22px; }
-  .chrome { border-radius: 14px; padding: 12px; }
+  .canvas { --k8-canvas-pad: 10px; border-radius: var(--lume-radius-panel); }
+  .chrome { border-radius: var(--lume-radius-panel); padding: 12px; }
   .workspaceBody :global(section[id]) { scroll-margin-top: 196px; }
   /* WUL-297: keep room for the privacy toggle on the same row. */
   .backButton { max-width: 100%; flex: 1 1 auto; justify-content: center; }
@@ -904,7 +904,7 @@
   min-height: 39px;
   padding: 9px 12px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--lume-radius-control);
   background: transparent;
   font-size: 0.8125rem;
   font-weight: 400;
