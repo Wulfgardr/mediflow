@@ -1,4 +1,4 @@
-import { inferIdentifierType, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity.ts';
+import { effectiveBirthDatePrecision, inferIdentifierType, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity.ts';
 import type { WhoReference } from './reference-data/icd11-reference';
 /** The editable projection is also the form's default-value source. No I/O. */
 type DateInput = Date | string;
@@ -110,7 +110,7 @@ export function patientFormDefaults(seed: PatientFormSeed = {}) {
         lastName: seed.lastName ?? '',
         taxCode: seed.taxCode ?? '',
         identifierType: seed.identifierType ?? inferIdentifierType(seed.taxCode),
-        birthDatePrecision: seed.birthDatePrecision ?? (seed.birthDate ? 'exact' : seed.birthYear != null ? 'estimated' : 'unknown'),
+        birthDatePrecision: effectiveBirthDatePrecision(seed),
         birthYear: seed.birthYear ?? null,
         birthDate: seed.birthDate ? isoDate(seed.birthDate).slice(0, 10) : '',
         address: seed.address ?? '',

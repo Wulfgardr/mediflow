@@ -49,3 +49,14 @@ test('genera 10.000 CF casuali e 10.000 CF da seme validi senza eccezioni', () =
         assert.equal(isValidItalianTaxCode(syntheticTaxCode(i)), true);
     }
 });
+
+test('righe scritte senza precisione (default «unknown») ma con la data si leggono come data esatta', async () => {
+    const { patientAgeLabel } = await import('./patient-identity.ts');
+    const { patientFormDefaults } = await import('./patient-edit-session.ts');
+    const now = new Date('2026-11-05T12:00:00Z');
+    const row = { taxCode: 'PERF000000000000', birthDate: '1980-03-10T00:00:00.000Z', birthDatePrecision: 'unknown' as const, birthYear: null };
+    assert.equal(patientAgeLabel(row, now), '46 anni');
+    assert.equal(patientFormDefaults(row).birthDatePrecision, 'exact');
+    assert.equal(patientFormDefaults({ ...row, birthDate: null, birthYear: 1970 }).birthDatePrecision, 'estimated');
+    assert.equal(patientFormDefaults({ ...row, birthDate: null }).birthDatePrecision, 'unknown');
+});
