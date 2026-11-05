@@ -317,7 +317,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             {IDENTIFIER_TYPES.map(type => <option key={type} value={type}>{IDENTIFIER_LABELS[type]}</option>)}
                         </select>
                         {identifierType !== 'none' && <>
-                            <label className={FORM_LABEL_CLASS} htmlFor="patient-taxCode">{IDENTIFIER_LABELS[identifierType]}</label>
+                            <label className={`${FORM_LABEL_CLASS} mt-4 block`} htmlFor="patient-taxCode">{IDENTIFIER_LABELS[identifierType]}</label>
                             <input id="patient-taxCode" aria-invalid={!!errors.taxCode} {...register('taxCode')} className={FORM_INPUT_CLASS} maxLength={['cf', 'stp', 'eni'].includes(identifierType) ? 16 : 128} />
                         </>}
                         {errors.taxCode && <p className="mf-field-error" role="alert">{errors.taxCode.message}</p>}
