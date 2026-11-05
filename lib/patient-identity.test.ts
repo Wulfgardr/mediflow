@@ -1,3 +1,5 @@
+import { randomSyntheticTaxCode, syntheticTaxCode } from './patient-identity.test-support.ts';
+import { inferIdentifierType, isValidItalianTaxCode } from './patient-identity';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { patientSchema } from './schemas';
@@ -32,4 +34,18 @@ test('f: FHIR distingue sistemi e non inventa identifier per none', () => {
         assert.equal(resource.identifier?.[0].value, 'SYNTHETIC');
     }
     assert.equal(toFhirPatient({ ...person, id: 'synthetic-none', taxCode: '', identifierType: 'none' } as Parameters<typeof toFhirPatient>[0]).identifier, undefined);
+});
+
+test('inferisce STP ed ENI solo con esattamente 13 cifre', () => {
+    for (const value of ['STPMRA80A01H501U', 'ENIXXX80A01H501U', 'STP123', 'ENI03000100001234']) assert.equal(inferIdentifierType(value), 'cf');
+    assert.equal(inferIdentifierType(' stp0300010000123 '), 'stp');
+    assert.equal(inferIdentifierType('eni0300010000123'), 'eni');
+    assert.equal(inferIdentifierType(' '), 'none');
+});
+
+test('genera 10.000 CF casuali e 10.000 CF da seme validi senza eccezioni', () => {
+    for (let i = 0; i < 10_000; i++) {
+        assert.equal(isValidItalianTaxCode(randomSyntheticTaxCode()), true);
+        assert.equal(isValidItalianTaxCode(syntheticTaxCode(i)), true);
+    }
 });

@@ -1,3 +1,5 @@
+import { isValidItalianTaxCode } from './patient-identity';
+
 export function syntheticTaxCode(seed: number | string = 1): string {
     let hash = typeof seed === 'number' ? seed : [...seed].reduce((value, char) => (Math.imul(value, 31) + char.charCodeAt(0)) >>> 0, 0);
     let letters = '';
@@ -11,4 +13,13 @@ export function syntheticTaxCode(seed: number | string = 1): string {
         sum += i % 2 === 0 ? odd.charCodeAt(value) - 65 : value;
     }
     return partial + String.fromCharCode(65 + sum % 26);
+}
+
+export function randomSyntheticTaxCode(): string {
+    const digits = () => String(Math.floor(Math.random() * 100)).padStart(2, '0');
+    const day = 1 + Math.floor(Math.random() * 28) + (Math.random() < 0.5 ? 40 : 0);
+    const prefix = `RSSMRA${digits()}A${String(day).padStart(2, '0')}Z${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
+    const check = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].find((letter) => isValidItalianTaxCode(prefix + letter));
+    if (!check) throw new Error('Synthetic tax code unavailable');
+    return prefix + check;
 }
