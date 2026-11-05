@@ -202,6 +202,8 @@
 .diagnosisPill {
   min-width: 0;
   max-width: 100%;
+  height: auto;
+  white-space: normal;
   color: var(--ink);
 }
 
@@ -213,10 +215,11 @@
 }
 
 .diagnosisLabel {
+  /* DESIGN.md: i nomi clinici lunghi vanno a capo senza tagli. L'ellissi
+     nascondeva proprio la parte che distingue una diagnosi dall'altra. */
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* commit pulse (replays via React key on state change) */

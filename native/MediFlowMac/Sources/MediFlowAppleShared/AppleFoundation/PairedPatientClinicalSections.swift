@@ -1,4 +1,5 @@
 import SwiftUI
+import MediFlowCore
 import Charts
 
 struct PairedPatientClinicalSections: View {
@@ -325,7 +326,7 @@ struct PairedPatientClinicalSections: View {
                         .font(.title3.weight(.semibold))
                         .registro()
                         .foregroundStyle(observation.deletedAt == nil ? Color.primary : Color.secondary)
-                    Text(observation.unitCode)
+                    Text(ClinicalUnitDisplay.unit(observation.unitCode))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -9,6 +9,7 @@
     "ClinicalRichTextTests.swift",
     "ClinicalScaleInterpretationTests.swift",
     "ClinicalScaleValidationTests.swift",
+    "ClinicalUnitDisplayTests.swift",
     "CryptoGoldenVectorsTests.swift",
     "CryptoGoldenVectorsV2Tests.swift",
     "CryptoSealPassthroughTests.swift",

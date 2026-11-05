@@ -1,6 +1,7 @@
 import CoreGraphics
 import CoreText
 import Foundation
+import MediFlowCore
 #if os(macOS)
 import AppKit
 #else
@@ -233,7 +234,7 @@ public enum PatientReportDocument {
             .compactMap { observation in
                 guard let display = safe(observation.display) else { return nil }
                 var details = ["Data: \(dateTimeLabel(observation.observedAt))"]
-                let valueUnit = [safe(observation.value), safe(observation.unitCode)].compactMap { $0 }.joined(separator: " ")
+                let valueUnit = safe(observation.value).map { ClinicalUnitDisplay.value($0, unitCode: observation.unitCode) } ?? ""
                 if !valueUnit.isEmpty { details.append("Valore: \(valueUnit)") }
                 if let code = safe(observation.code) { details.append("Codice: \(code)") }
                 if let notes = safe(observation.notes) { details.append(notes) }

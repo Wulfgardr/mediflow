@@ -535,7 +535,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             </div>
             <div className={styles.threshold}>
                 <p className="text-xs font-medium" style={{ color: 'var(--lume-ink-muted)' }}>
-                    Campi obbligatori per creare la scheda: <span style={{ color: 'var(--lume-signal-critical)' }}>*</span>.
+                    I campi con <span style={{ color: 'var(--lume-signal-critical)' }}>*</span> sono obbligatori.
                 </p>
                 <button
                     type="submit"

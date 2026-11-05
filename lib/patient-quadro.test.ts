@@ -50,7 +50,7 @@ test('delta solo verso una misura precedente dello stesso codice e unità', () =
 });
 test('non inventa delta per valore testuale, stessa data o range assente', () => {
     const rows = projectQuadroMeasures([observation('a', { value: 'non rilevabile' }), observation('b'), observation('c', { observedAt: new Date('2026-09-01'), value: 'assente' })]);
-    assert.equal(rows[0].valueLabel, 'non rilevabile kg');
+    assert.equal(rows[0].valueLabel, 'non rilevabile');
     assert.ok(rows.every(row => row.delta === undefined && row.outOfRange === null));
 });
 
@@ -77,4 +77,27 @@ test('non confonde tuple contenenti separatori', () => {
         observation('a', { codeSystem: 'A|B' as Observation['codeSystem'], code: 'C' }),
         observation('b', { codeSystem: 'A' as Observation['codeSystem'], code: 'B|C' }),
     ]).length, 2);
+});
+
+test('mostra le unità come le legge un medico, non nel codice UCUM', () => {
+    const rows = projectQuadroMeasures([
+        observation('bp', { code: '8480-6', unitCode: 'mm[Hg]', value: 130, observedAt: new Date('2026-10-03') }),
+        observation('bp-old', { code: '8480-6', unitCode: 'mm[Hg]', value: 140, observedAt: new Date('2026-09-03') }),
+        observation('temp', { code: '8310-5', unitCode: 'Cel', value: 37.5, observedAt: new Date('2026-10-02') }),
+        observation('plt', { code: '777-3', unitCode: '10*3/uL', value: 250, observedAt: new Date('2026-10-01') }),
+        observation('ignota', { code: 'X', unitCode: 'mL/min/{1.73_m2}', value: 60, observedAt: new Date('2026-09-30') }),
+    ]);
+    const label = (id: string) => rows.find(row => row.id === id)?.valueLabel;
+    assert.equal(label('bp'), '130 mmHg');
+    assert.equal(rows.find(row => row.id === 'bp')?.delta, `-10 mmHg dal ${new Date('2026-09-03').toLocaleDateString('it-IT')}`);
+    assert.equal(label('temp'), '37,5 °C');
+    assert.equal(label('plt'), '250 ×10³/µL');
+    assert.equal(label('ignota'), '60 mL/min/1,73 m²');
+});
+
+test('un valore testuale non riceve l’unità di misura', () => {
+    const rows = projectQuadroMeasures([observation('a', { value: 'non rilevabile' })]);
+    assert.equal(rows[0].valueLabel, 'non rilevabile');
+    assert.equal(projectQuadroMeasures([observation('p', { unitCode: 'mm[Hg]', value: '130/80' })])[0].valueLabel, '130/80 mmHg');
+    assert.equal(projectQuadroMeasures([observation('u', { unitCode: 'ug/L', value: 2 })])[0].valueLabel, '2 µg/L');
 });
