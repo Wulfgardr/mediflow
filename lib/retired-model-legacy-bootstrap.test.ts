@@ -42,7 +42,7 @@ test('synthetic archive boots with enabled legacy settings, opaque saved choice 
             assert.equal(view.functions.length, 4);
             const treatment = view.functions.find(row => row.id === 'treatment_reasoning')!;
             assert.deepEqual(treatment.options, []);
-            assert.equal(treatment.enabled, false);
+            assert.equal(treatment.enabled, true);
             assert.equal(treatment.defaultModelOptionId, null);
             assert.equal(treatment.bindingState, 'unsupported');
             assert.doesNotMatch(JSON.stringify(view), /athena|mlx/iu);

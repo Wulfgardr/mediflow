@@ -35,7 +35,10 @@ for (const channel of ['web', 'native'] as const) test(`ordinary ${channel}: no 
 test('local and ChatGPT preferences are never rewritten by presets; direct changes are denied', () => {
     const before = JSON.stringify(sources);
     const view = readFunctionModelPreferences(sources, 'v2');
-    assert.equal(view.functions[3].enabled, false);
+    // the saved switch is shown as saved; availability, not the switch, keeps the function closed.
+    assert.equal(view.functions[3].enabled, true);
+    assert.deepEqual(view.functions[3].options, []);
+    assert.equal(view.functions[3].bindingState, 'unsupported');
     assert.ok(buildFunctionModelCatalog(sources).bindings.filter(b => b.functions.includes('treatment_reasoning')).every(b => !b.available));
     for (const action of ['set', 'set_activation'] as const) assert.throws(() => planFunctionModelUpdate(sources, {
         schemaVersion: 'mediflow.function-preferences-command.v2', commandId: 'synthetic-release-change', expectedRevision: view.revision, expectedCatalogRevision: view.catalogRevision,
@@ -45,7 +48,7 @@ test('local and ChatGPT preferences are never rewritten by presets; direct chang
         const plan = planFunctionModelUpdate(sources, { schemaVersion: 'mediflow.function-preferences-command.v2', commandId: 'synthetic-release-preset', expectedRevision: view.revision,
             expectedCatalogRevision: view.catalogRevision, action: 'preset', presetId });
         assert.equal(plan.writes[FUNCTION_SWITCH_KEYS.treatment_reasoning], undefined);
-        assert.equal(plan.view.functions[3].enabled, false);
+        assert.equal(plan.view.functions[3].enabled, true);
     }
     assert.equal(JSON.stringify(sources), before);
 });
