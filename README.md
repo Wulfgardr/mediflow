@@ -399,9 +399,9 @@ dal canale ChatGPT usato dalle funzioni AI di MediFlow.
 
 MediFlow è progettato e diretto da Leonardo Pegollo. Il codice è scritto in
 gran parte da agenti di coding, **Codex e Claude Code**, su sue istruzioni.
-Intento, pianificazione, architettura, prove richieste e merge sono suoi;
-agli agenti spetta la scrittura. Le decisioni sono documentate negli
-[ADR](./docs/adr/), ogni PR indica modello e strumento usati, e il lavoro
+Intento, pianificazione, architettura, prove richieste e merge sono suoi,
+mentre agli agenti spetta la scrittura. Le decisioni sono documentate negli
+[ADR](./docs/adr/), ogni PR indica modello e strumento usati ed il lavoro
 preso da altri progetti è riconosciuto nei [crediti](./CREDITS.md).
 
 [Che cosa significa «assistito», chi fa che cosa e principi dell'autore](./docs/development-usage.md).

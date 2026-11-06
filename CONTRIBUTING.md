@@ -515,7 +515,7 @@ Le PR scritte con un agente sono benvenute alle stesse condizioni delle altre.
 - Dichiara modello e strumento in fondo alla PR e con `Co-Authored-By` nei
   commit.
 - Se l'agente ha ripreso o adattato codice, testi o design di altri progetti,
-  indica fonte e licenza nella PR e aggiorna [CREDITS.md](./CREDITS.md).
+  indica fonte e licenza nella PR ed aggiorna [CREDITS.md](./CREDITS.md).
 - «I test passano» da solo non basta: servono le prove sul comportamento
   cambiato.
 
