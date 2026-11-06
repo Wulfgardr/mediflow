@@ -715,12 +715,14 @@ struct PairedPatientsWorkspaceView: View {
                 .inkVoice(28)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityHeading(.h1)
-            Text(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(detail.taxCode))
+            Text(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(detail.taxCode, type: detail.identifierType))
                 .font(.subheadline)
                 .codice()
                 .foregroundStyle(.secondary)
-            if let birth = detail.birthDate {
-                Text("Nato il \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birth))")
+            if let birth = PairedPatientsWorkspaceSupport.birthText(
+                birthDate: detail.birthDate, precision: detail.birthDatePrecision, birthYear: detail.birthYear
+            ) {
+                Text(detail.birthDatePrecision == "estimated" ? "Nascita: \(birth)" : "Nato il \(birth)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -994,9 +996,13 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     private func patientWorkspaceHeaderMetadata(_ detail: HomeBasePatientDetail) -> String {
-        var atoms = [PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode)]
-        if let age = PairedPatientsWorkspaceSupport.age(from: detail.birthDate) {
-            atoms.append("\(age) anni")
+        var atoms: [String] = []
+        let identifier = PairedPatientsWorkspaceSupport.labeledCompactTaxCode(detail.taxCode, type: detail.identifierType)
+        if !identifier.isEmpty { atoms.append(identifier) }
+        if let age = PairedPatientsWorkspaceSupport.ageText(
+            birthDate: detail.birthDate, precision: detail.birthDatePrecision, birthYear: detail.birthYear
+        ) {
+            atoms.append(age)
         }
         if let updatedAt = detail.updatedAt {
             atoms.append("Aggiornato \(PairedPatientsWorkspaceSupport.relativeUpdated(updatedAt))")
@@ -1113,8 +1119,8 @@ struct PairedPatientsWorkspaceView: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(LumePalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(LumePalette.warning.opacity(0.4)))
+            .background(LumePalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
+            .overlay(RoundedRectangle(cornerRadius: LumeGeometry.controlRadius).strokeBorder(LumePalette.warning.opacity(0.4)))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("homebase-connection-banner")
         }
@@ -1189,15 +1195,18 @@ struct PairedPatientsWorkspaceView: View {
     ) -> some View {
         DisclosureGroup(isExpanded: $isCompactPatientHeaderExpanded) {
             VStack(alignment: .leading, spacing: ClinicalChartMetrics.itemSpacing) {
-                if let birthDate = detail.birthDate {
-                    headerIdentityRow(
-                        "Nato il",
-                        PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate)
-                    )
+                if let birth = PairedPatientsWorkspaceSupport.birthText(
+                    birthDate: detail.birthDate, precision: detail.birthDatePrecision, birthYear: detail.birthYear
+                ) {
+                    headerIdentityRow(detail.birthDatePrecision == "estimated" ? "Nascita" : "Nato il", birth)
                 }
                 headerIdentityRow(
-                    "Codice fiscale",
-                    PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode)
+                    detail.identifierType == "none"
+                        ? "Identificativo"
+                        : PairedPatientsWorkspaceSupport.identifierTitle(detail.taxCode, type: detail.identifierType),
+                    detail.identifierType == "none"
+                        ? "Non ancora disponibile"
+                        : PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode)
                 )
                 // One uniquely identified revealed child, so a test can prove
                 // the disclosure opened rather than inferring it.

@@ -52,7 +52,7 @@ public struct GlassCard<Content: View>: View {
     private let cornerRadius: CGFloat
     private let content: Content
 
-    public init(cornerRadius: CGFloat = 20, @ViewBuilder content: () -> Content) {
+    public init(cornerRadius: CGFloat = LumeGeometry.planeRadius, @ViewBuilder content: () -> Content) {
         self.cornerRadius = cornerRadius
         self.content = content()
     }

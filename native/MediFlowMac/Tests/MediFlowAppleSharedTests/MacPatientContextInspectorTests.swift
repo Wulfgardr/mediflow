@@ -14,7 +14,7 @@ final class MacPatientContextInspectorTests: XCTestCase {
         )
 
         XCTAssertEqual(snapshot.displayName, "Paziente Esempio")
-        XCTAssertEqual(snapshot.taxCode, "…CF-001")
+        XCTAssertEqual(snapshot.taxCode, "CF …CF-001")
         XCTAssertEqual(snapshot.birthYear, "1972")
         XCTAssertEqual(snapshot.recordState, "Archiviata")
         XCTAssertEqual(snapshot.connectionState, "Cache locale")

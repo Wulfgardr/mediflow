@@ -1360,7 +1360,7 @@ impl ClinicalApp {
                 Ok(patient) => {
                     this.core
                         .receive_read(&request, Ok(profile_for_core(&patient)));
-                    this.patient.detail = ReadLoad::Ready(patient);
+                    this.patient.detail = ReadLoad::Ready(this.with_list_identity(patient));
                 }
                 Err(error) => {
                     this.core
@@ -2016,7 +2016,7 @@ impl ClinicalApp {
             return;
         }
         let writable = !patient.is_archived && patient.deleted_at.is_none();
-        self.patient.detail = ReadLoad::Ready(patient);
+        self.patient.detail = ReadLoad::Ready(self.with_list_identity(patient));
         if self.core.phase() == mediflow_patient_client::Phase::Saved {
             self.saved(
                 "Registrata · contenuto confermato dalla rilettura della scheda.",
@@ -2103,7 +2103,7 @@ impl ClinicalApp {
                     Ok(patient) => {
                         this.core
                             .receive_read(&request, Ok(profile_for_core(&patient)));
-                        this.patient.detail = ReadLoad::Ready(patient);
+                        this.patient.detail = ReadLoad::Ready(this.with_list_identity(patient));
                     }
                     Err(error) => {
                         this.core
@@ -2546,7 +2546,7 @@ impl ClinicalApp {
                                     } else {
                                         this.core.receive_read(&request, Ok(profile_for_core(&patient)));
                                     }
-                                    this.patient.detail = ReadLoad::Ready(patient);
+                                    this.patient.detail = ReadLoad::Ready(this.with_list_identity(patient));
                                 }
                                 Err(error) => {
                                     if error.is_auth_failure() || error == RuntimeError::ArchiveReplaced {
@@ -2673,10 +2673,25 @@ impl ClinicalApp {
         };
         let mut lines = vec![
             crate::patient_text::copy_name(&patient.display_name()),
-            format!("Nascita: {}", display_date(patient.birth_date.as_deref())),
             format!(
-                "Codice fiscale: {}",
-                crate::patient_text::copy_code(&patient.tax_code)
+                "Nascita: {}",
+                crate::patient_text::birth_text(
+                    patient.birth_date.as_deref(),
+                    patient.birth_date_precision.as_deref(),
+                    patient.birth_year,
+                )
+            ),
+            format!(
+                "{}: {}",
+                crate::patient_text::identifier_title(
+                    &patient.tax_code,
+                    patient.identifier_type.as_deref()
+                ),
+                if patient.identifier_type.as_deref() == Some("none") {
+                    "non ancora disponibile".to_owned()
+                } else {
+                    crate::patient_text::copy_code(&patient.tax_code)
+                }
             ),
             "Allergie: dato non disponibile".into(),
         ];
@@ -3433,7 +3448,11 @@ impl ClinicalApp {
                 let label = format!(
                     "{}, nascita {}, {}",
                     crate::title::TitleText::name(patient.display_name()).text(),
-                    display_date(patient.birth_date.as_deref()),
+                    crate::patient_text::birth_text(
+                        patient.birth_date.as_deref(),
+                        patient.birth_date_precision.as_deref(),
+                        patient.birth_year
+                    ),
                     if patient.is_archived {
                         "archiviato"
                     } else {
@@ -3494,7 +3513,11 @@ impl ClinicalApp {
                                     .text_color(theme.secondary)
                                     .child(text!(format!(
                                         "{}{}{}",
-                                        display_date(patient.birth_date.as_deref()),
+                                        crate::patient_text::birth_text(
+                                            patient.birth_date.as_deref(),
+                                            patient.birth_date_precision.as_deref(),
+                                            patient.birth_year
+                                        ),
                                         if patient.is_adi { " · ADI" } else { "" },
                                         if patient.is_archived {
                                             " · Archiviato"
@@ -3582,14 +3605,22 @@ impl ClinicalApp {
                 )
                 .child(div().text_color(theme.secondary).child(text!(format!(
                     "Nascita {}",
-                    display_date(patient.birth_date.as_deref())
+                    crate::patient_text::birth_text(
+                        patient.birth_date.as_deref(),
+                        patient.birth_date_precision.as_deref(),
+                        patient.birth_year
+                    )
                 ))))
                 .child(
                     div()
                         .flex()
                         .gap(px(4.))
                         .child(div().text_color(theme.secondary).child(text!(
-                            crate::patient_text::identifier_label(&patient.tax_code).to_string()
+                            crate::patient_text::identifier_label(
+                                &patient.tax_code,
+                                patient.identifier_type.as_deref(),
+                            )
+                            .to_string()
                         )))
                         .child(div().type_role(theme, crate::theme::TextRole::Code).child(
                             crate::title::title(
@@ -3752,7 +3783,11 @@ impl ClinicalApp {
                                         .text_color(theme.secondary)
                                         .child(text!(format!(
                                             "Nascita {}{}{}",
-                                            display_date(patient.birth_date.as_deref()),
+                                            crate::patient_text::birth_text(
+                                                patient.birth_date.as_deref(),
+                                                patient.birth_date_precision.as_deref(),
+                                                patient.birth_year
+                                            ),
                                             if patient.is_adi { " · ADI" } else { "" },
                                             if patient.is_archived {
                                                 " · Scheda archiviata"
@@ -5881,7 +5916,7 @@ impl ClinicalApp {
         }
         self.selected_id = Some(row.id.clone());
         self.patient = PatientData::default();
-        self.patient.detail = ReadLoad::Ready(row);
+        self.patient.detail = ReadLoad::Ready(self.with_list_identity(row));
         self.patient_section = PatientSection::Overview;
         self.area = Area::Patients;
         self.directory = false;
@@ -6428,6 +6463,41 @@ impl ClinicalApp {
     }
 }
 
+impl ClinicalApp {
+    /// La proiezione del profilo non porta tipo dell'identificativo e precisione
+    /// della nascita (contratto invariato per i client già distribuiti); la riga
+    /// dell'elenco dello stesso paziente sì. Senza questo, un passaporto aperto
+    /// in scheda verrebbe etichettato «CF».
+    fn with_list_identity(&self, patient: PatientDetail) -> PatientDetail {
+        Self::fill_list_identity(&self.patients, &self.global_patients, patient)
+    }
+
+    fn fill_list_identity(
+        patients: &Load<Vec<PatientSummary>>,
+        global_patients: &ReadLoad<Vec<PatientSummary>>,
+        mut patient: PatientDetail,
+    ) -> PatientDetail {
+        let row = patients
+            .ready()
+            .into_iter()
+            .flatten()
+            .chain(global_patients.ready().into_iter().flatten())
+            .find(|row| row.id == patient.id);
+        if let Some(row) = row {
+            patient.identifier_type = patient
+                .identifier_type
+                .take()
+                .or_else(|| row.identifier_type.clone());
+            patient.birth_date_precision = patient
+                .birth_date_precision
+                .take()
+                .or_else(|| row.birth_date_precision.clone());
+            patient.birth_year = patient.birth_year.or(row.birth_year);
+        }
+        patient
+    }
+}
+
 fn profile_for_core(patient: &PatientDetail) -> PatientProfile {
     PatientProfile {
         id: patient.id.clone(),
@@ -6820,6 +6890,45 @@ fn ui_error(error: impl std::fmt::Display) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn profile_projection_takes_identifier_type_and_estimated_year_from_the_list_row() {
+        let summary: PatientSummary = serde_json::from_value(serde_json::json!({
+            "id": "p-1", "firstName": "Tarek", "lastName": "Haddad", "birthDate": null,
+            "taxCode": "P4471209SY", "identifierType": "passport",
+            "birthDatePrecision": "estimated", "birthYear": 1968, "version": 1
+        }))
+        .unwrap();
+        let detail: PatientDetail = serde_json::from_value(serde_json::json!({
+            "id": "p-1", "firstName": "Tarek", "lastName": "Haddad", "birthDate": null,
+            "taxCode": "P4471209SY", "version": 1
+        }))
+        .unwrap();
+        assert_eq!(
+            crate::patient_text::identifier_label(
+                &detail.tax_code,
+                detail.identifier_type.as_deref()
+            ),
+            "CF",
+            "senza il tipo la scheda sbaglierebbe l'etichetta"
+        );
+        let filled =
+            ClinicalApp::fill_list_identity(&Load::Ready(vec![summary]), &ReadLoad::Idle, detail);
+        assert_eq!(
+            crate::patient_text::identifier_label(
+                &filled.tax_code,
+                filled.identifier_type.as_deref()
+            ),
+            "Documento"
+        );
+        assert_eq!(
+            crate::patient_text::birth_text(
+                filled.birth_date.as_deref(),
+                filled.birth_date_precision.as_deref(),
+                filled.birth_year
+            ),
+            "1968, stimato"
+        );
+    }
 
     #[gpui::test]
     fn hcg2_patient_focus_registry_has_stable_traversal(cx: &mut gpui::TestAppContext) {

@@ -486,7 +486,7 @@ struct PairedPatientsWorklistView: View {
                                     PairedPatientFlagChip("Nel cestino", tone: .attention)
                                 }
                                 HStack(spacing: 6) {
-                                    Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
+                                    Text(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType))
                                         .font(.caption)
                                         .codice()
                                         .foregroundStyle(.secondary)
@@ -706,7 +706,8 @@ struct PairedPatientsWorklistView: View {
     /// disambiguates two patients with the same name at a glance. The masked code
     /// is a matching tool, so it goes second and stays quiet.
     private func patientMetadata(_ patient: HomeBasePatientSummary) -> some View {
-        HStack(spacing: 6) {
+        let identifier = PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType)
+        return HStack(spacing: 6) {
             #if os(macOS)
             let isSelectedRow = model.selectedPatientID == patient.id
             #else
@@ -715,17 +716,23 @@ struct PairedPatientsWorklistView: View {
             if patient.isAdi == true {
                 PairedPatientFlagChip("ADI", tone: .info, isOnProminentBackground: isSelectedRow)
             }
-            if let age = PairedPatientsWorkspaceSupport.age(from: patient.birthDate) {
-                Text("\(age) anni")
+            if let age = PairedPatientsWorkspaceSupport.ageText(
+                birthDate: patient.birthDate, precision: patient.birthDatePrecision, birthYear: patient.birthYear
+            ) {
+                Text(age)
                     .font(.caption)
                     .registro()
                     .accessibilityIdentifier("patient-cell-age-\(patient.id)")
-                Text("·")
-                    .font(.caption)
+                if !identifier.isEmpty {
+                    Text("·")
+                        .font(.caption)
+                }
             }
-            Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
-                .font(.caption)
-                .codice()
+            if !identifier.isEmpty {
+                Text(identifier)
+                    .font(.caption)
+                    .codice()
+            }
         }
         .lineLimit(1)
         .foregroundStyle(PlatformColors.secondaryInk)
@@ -971,8 +978,8 @@ struct PairedPatientsWorklistView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LumePalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(LumePalette.warning.opacity(0.4)))
+        .background(LumePalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
+        .overlay(RoundedRectangle(cornerRadius: LumeGeometry.controlRadius).strokeBorder(LumePalette.warning.opacity(0.4)))
     }
 
     // Plain tinted capsule (no glass): glass inside the glass card would nest.
