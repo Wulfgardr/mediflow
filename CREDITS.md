@@ -316,6 +316,7 @@ sono esclusi. La copertura è parziale; i token non misurano costo o qualità.
 - **[Repo Prompt CE](https://github.com/repoprompt/repoprompt-ce)** (Eric Provencher): context engineering open source, usato in alcune sessioni per preparare selezioni e diff per gli agenti.
 - **[CodexBar](https://github.com/steipete/CodexBar)** (Peter Steinberger): visibilità locale sull'uso dei modelli e fonte del conteggio storico del README.
 - **[steipete/agent-scripts](https://github.com/steipete/agent-scripts)** (MIT): parte del flusso di review deriva da qui.
+- **[T3 Code](https://github.com/pingdotgg/t3code)** (Theo Browne, Julius Marminge e team, MIT): il modo di dichiarare lo sviluppo con agenti, il modello di PR e la regola «si valutano le prove, non chi ha scritto» sono adattati dalle loro pratiche pubbliche. MediFlow è sviluppato anche dentro T3 Code.
 
 L'uso dei modelli non trasferisce loro le decisioni: le proposte restano
 materiale da verificare e decisioni, attribuzioni e responsabilità del
