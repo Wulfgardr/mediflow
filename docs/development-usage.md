@@ -2,7 +2,7 @@
 
 MediFlow è progettato e diretto da Leonardo Pegollo. Il codice è scritto in
 gran parte da agenti di coding, Codex e Claude Code, che lavorano su sue
-istruzioni. Intento, pianificazione e scelte sono suoi; agli agenti spetta la
+istruzioni. Intento, pianificazione e scelte sono suoi, mentre agli agenti spetta la
 scrittura. Questa pagina spiega che cosa significa, in pratica, «sviluppo
 assistito», e rende pubblico il consumo di token che lo accompagna.
 
@@ -13,14 +13,14 @@ Ogni modifica passa per gli stessi passaggi. La tabella indica chi li compie.
 | Passaggio | Chi lo compie | Dove si vede |
 | :-- | :-- | :-- |
 | **Intento**: quale problema risolvere e per chi | Leonardo | Issue, [PRODUCT.md](../PRODUCT.md) |
-| **Pianificazione e architettura**: confini, dati, sicurezza, contratti | Leonardo, con agenti che propongono alternative | [ADR](./adr/), [ARCHITECTURE.md](../ARCHITECTURE.md) |
+| **Pianificazione ed architettura**: confini, dati, sicurezza, contratti | Leonardo, con agenti che propongono alternative | [ADR](./adr/), [ARCHITECTURE.md](../ARCHITECTURE.md) |
 | **Scrittura del codice e dei test** | Agenti di coding | Commit con riga `Co-Authored-By`, PR con modello e strumento |
-| **Prove richieste per accettare la modifica** | Leonardo le stabilisce; agenti e CI le eseguono | Sezioni «Prove» e «Non verificato» di ogni PR, workflow CI |
+| **Prove richieste per accettare la modifica** | Leonardo le stabilisce, agenti e CI le eseguono | Sezioni «Prove» e «Non verificato» di ogni PR, workflow CI |
 | **Accettazione e merge** | Leonardo | Storia delle PR su GitHub |
 | **Release e comunicazione** | Leonardo | [Note di versione](../CHANGELOG.md), sito |
 
 Nessun passaggio di decisione è delegato in modo implicito. Quando Leonardo
-autorizza per una sessione di lavoro un agente coordinatore a eseguire il
+autorizza per una sessione di lavoro un agente coordinatore ad eseguire il
 merge, lo fa a condizioni scritte: controlli obbligatori verdi, nessun
 commento di review aperto e verifica locale eseguita. Fuori da queste
 condizioni il merge resta suo.
@@ -38,7 +38,7 @@ riassunte. Le istruzioni personali complete restano fuori dalla repository.
 
 - **Prima l'intento, poi il codice.** Ogni cambiamento non banale nasce da un
   problema scritto e, se tocca confini di dati o sicurezza, da un ADR.
-- **Prove, non impressioni.** Una modifica si accetta per il comportamento
+- **Si accetta ciò che è provato.** Una modifica si accetta per il comportamento
   osservabile: test che falliscono prima e passano dopo, riproduzioni, dati e
   ambienti realistici. Un controllo che non è stato fatto si dichiara.
 - **Un problema per PR**, con un diff che lasci riconoscere lo scopo.
@@ -46,14 +46,14 @@ riassunte. Le istruzioni personali complete restano fuori dalla repository.
   niente dati reali di pazienti nel repository.
 - **Il medico deve capire.** Etichette, azioni e conseguenze si leggono senza
   la spiegazione di uno sviluppatore ([DESIGN.md](../DESIGN.md)).
-- **La complessità deve guadagnarsi il posto.** Si sceglie il modello più
-  semplice che rende corretto il comportamento.
+- **Il modello più semplice.** Fra due soluzioni corrette si sceglie la più
+  semplice, e una complessità in più va giustificata.
 
 ## Attribuzione
 
 - **Agli agenti:** ogni commit scritto con un agente porta la riga
-  `Co-Authored-By` con il modello; ogni PR si chiude con modello e strumento
-  usati. La regola vale dal 6 novembre 2026; i commit precedenti non la
+  `Co-Authored-By` con il modello, ed ogni PR si chiude con modello e strumento
+  usati. La regola vale dal 6 novembre 2026, quindi i commit precedenti non la
   rispettano sempre.
 - **Ad altri autori:** idee, design e codice presi o adattati da altri progetti
   sono riconosciuti in [CREDITS.md](../CREDITS.md) con fonte e licenza. Un agente
