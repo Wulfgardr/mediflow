@@ -13,8 +13,7 @@ function sources(): FunctionModelSources {
     return { settings: { aiProvider: 'ollama', aiUrl: 'http://127.0.0.1:11434',
         aiModel_clinical: 'synthetic-clinical:1', aiModel_reasoning: 'synthetic-reasoning:1',
         ...Object.fromEntries(Object.values(FUNCTION_SWITCH_KEYS).map(key => [key, 'disabled'])) },
-        ollamaLifecycle: { status: 'denied', reason: 'missing' }, athenaLifecycle: { status: 'denied', reason: 'missing' },
-        athenaAvailable: false, athenaIdentity: 'synthetic-not-installed' };
+        ollamaLifecycle: { status: 'denied', reason: 'missing' }, };
 }
 function activation(source: FunctionModelSources, enabled = true): FunctionModelCommand {
     const dto = readFunctionModelPreferences(source, 'v2');
@@ -85,7 +84,7 @@ for (const functionId of FUNCTION_MODEL_IDS) test(`${functionId}: explicit OpenA
 
 test('activation retains stale saved binding and enforces revision/catalog CAS and closed v2 shape', () => {
     let source = sources();
-    const admitted = { ...source, athenaAvailable: true, ollamaLifecycle: { status: 'available', record: { lifecycle: {
+    const admitted = { ...source, ollamaLifecycle: { status: 'available', record: { lifecycle: {
         status: 'available_unqualified', provider: 'ollama', credentialClass: 'local_model' } } } };
     const view = readFunctionModelPreferences(admitted, 'v2');
     const saved = planFunctionModelUpdate(admitted, { ...activation(admitted), action: 'set', functionId: 'patient_insight', enabled: true,

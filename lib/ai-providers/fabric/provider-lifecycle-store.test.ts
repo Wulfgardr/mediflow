@@ -14,9 +14,9 @@ const lifecycle = Object.freeze({
     provider: 'ollama', credentialClass: 'local_model' as const,
     status: 'available_unqualified' as const,
 });
-const athenaLifecycle = Object.freeze({
+const retiredLifecycle = Object.freeze({
     schemaVersion: 'mediflow.ai.provider-lifecycle.v1' as const,
-    provider: 'athena_mlx', credentialClass: 'local_model' as const,
+    provider: 'synthetic_retired', credentialClass: 'local_model' as const,
     status: 'available_unqualified' as const,
 });
 function root(): string {
@@ -112,28 +112,28 @@ test('rejects secret or clinical fields and an occupied writer lock', () => {
     }));
 });
 
-test('isolates Ollama and ATHENA lifecycle records in the same host data directory', () => {
+test('isolates Ollama and secondo provider lifecycle records in the same host data directory', () => {
     const appDataDir = root();
     const ollama = createProviderLifecycleStore(appDataDir, () => new Date('2026-08-22T10:00:00.000Z'), 'ollama');
-    const athena = createProviderLifecycleStore(appDataDir, () => new Date('2026-08-22T10:00:01.000Z'), 'athena_mlx');
+    const retired = createProviderLifecycleStore(appDataDir, () => new Date('2026-08-22T10:00:01.000Z'), 'synthetic_retired');
 
     ollama.save({
         kind: 'admit', expectedVersion: 0, lifecycle,
         actorClass: 'host_service', actorRef: 'actor_11111111111111111111111111111111', receiptRef: 'receipt_11111111111111111111111111111111',
     });
-    expectCode('command_invalid', () => athena.save({
+    expectCode('command_invalid', () => retired.save({
         kind: 'admit', expectedVersion: 0, lifecycle,
         actorClass: 'host_service', actorRef: 'actor_33333333333333333333333333333333', receiptRef: 'receipt_33333333333333333333333333333333',
     }));
-    athena.save({
-        kind: 'admit', expectedVersion: 0, lifecycle: athenaLifecycle,
+    retired.save({
+        kind: 'admit', expectedVersion: 0, lifecycle: retiredLifecycle,
         actorClass: 'host_service', actorRef: 'actor_22222222222222222222222222222222', receiptRef: 'receipt_22222222222222222222222222222222',
     });
 
     assert.equal(ollama.load().lifecycle.provider, 'ollama');
-    assert.equal(athena.load().lifecycle.provider, 'athena_mlx');
+    assert.equal(retired.load().lifecycle.provider, 'synthetic_retired');
     assert.notEqual(
         getProviderLifecycleStorePaths(appDataDir, 'ollama').recordPath,
-        getProviderLifecycleStorePaths(appDataDir, 'athena_mlx').recordPath,
+        getProviderLifecycleStorePaths(appDataDir, 'synthetic_retired').recordPath,
     );
 });

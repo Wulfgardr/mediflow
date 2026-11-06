@@ -168,18 +168,8 @@ test('real checker still exits 1 on an intentionally incomplete physical package
     'check-standalone-runtime-bundle.mjs', 'anydoc-pdf-smoke-diagnostics.mjs',
     'node-runtime-contract.mjs', 'scheduled-backup-runtime-contract.mjs', 'anydoc-pdf-page-worker.mjs',
     'anydoc-pdf-renderer-profiles.json', 'anydoc-tesseract-artifacts.json',
-    'treatment-reasoning-portable-setup.mjs',
   ]) {
     fs.copyFileSync(path.join(root, 'scripts', name), path.join(directory, 'scripts', name));
-  }
-  // Preserve the checker's existing import closure so this fixture reaches PDF smoke.
-  for (const relative of [
-    'lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.ts',
-    'lib/athena-model-identity.ts',
-  ]) {
-    const target = path.join(directory, relative);
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.copyFileSync(path.join(root, relative), target);
   }
   const copiedWorker = fs.readFileSync(path.join(directory, 'scripts', 'anydoc-pdf-page-worker.mjs'));
   assert.equal(createHash('sha256').update(copiedWorker).digest('hex'), WORKER_HASH);

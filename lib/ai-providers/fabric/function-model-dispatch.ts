@@ -72,13 +72,13 @@ export async function functionModelBindingSettings<T extends Readonly<Record<str
 }
 
 /** Captures the scope at binding time, so detached work cannot shed its checks. */
-export function captureFunctionModelTransportGuard(provider: 'ollama' | 'athena_mlx' | 'athena_transformers', model?: string, endpoint?: string) {
+export function captureFunctionModelTransportGuard(provider: 'ollama', model?: string, endpoint?: string) {
     const scope = scopes.getStore();
     return async () => {
-        if (!scope) { if (provider === 'athena_transformers') throw new FunctionModelError('unsupported'); return; }
+        if (!scope) return;
         await scope.verify();
         const binding = scope.selection.binding;
-        if (binding.provider !== provider || (provider === 'athena_transformers' && binding.model !== model) || (provider === 'ollama' && (binding.model !== model || binding.endpoint !== endpoint))) {
+        if (binding.provider !== provider || (provider === 'ollama' && (binding.model !== model || binding.endpoint !== endpoint))) {
             throw new FunctionModelError('binding_stale');
         }
     };
@@ -98,14 +98,4 @@ export function guardFunctionModelResolution(resolution: LocalProviderResolution
             await verify(); return result;
         },
     }) });
-}
-
-/** Host-only selection; no browser provider string is accepted and no missing-scope fallback exists. */
-export function captureTreatmentReasoningDispatch() {
-    const scope = scopes.getStore();
-    if (!scope || scope.selection.functionId !== 'treatment_reasoning'
-        || !['athena_mlx', 'athena_transformers'].includes(scope.selection.binding.provider)) throw new FunctionModelError('unsupported');
-    return Object.freeze({ provider: scope.selection.binding.provider as 'athena_mlx' | 'athena_transformers',
-        modelOptionId: scope.selection.binding.modelOptionId, catalogRevision: scope.selection.catalogRevision,
-        signal: scope.signal, verify: scope.verify });
 }

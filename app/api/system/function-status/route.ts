@@ -10,7 +10,6 @@ import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY } from '@/lib/ai-document-synthes
 import { AI_TREATMENT_REASONING_KILL_SWITCH_KEY } from '@/lib/ai-treatment-reasoning-kill-switch';
 import { createHostLocalProviderBindingService } from '@/lib/ai-providers/host-local-provider-binding';
 import { createHostProviderLifecycleService } from '@/lib/ai-providers/fabric/provider-lifecycle-service';
-import { isAthenaMlxModelAvailable } from '@/lib/athena-mlx-runtime';
 import { getIcd11WhoProductionRuntime } from '@/lib/reference-data/icd11-who-production';
 import { buildFunctionStatus, type FunctionStatusSources } from '@/lib/function-status';
 import { functionModelPreferencesService } from '@/lib/ai-providers/fabric/function-model-preferences-production';
@@ -47,9 +46,8 @@ export async function GET(request: Request) {
             platform: process.platform,
             enabled: { patient_insight: isAiLaneEnabledValue(values.get(keys.patient_insight)), smart_import: isAiLaneEnabledValue(values.get(keys.smart_import)),
                 document_synthesis: isAiLaneEnabledValue(values.get(keys.document_synthesis)), treatment_reasoning: isAiLaneEnabledValue(values.get(keys.treatment_reasoning)) },
-            ollamaLifecycle: lifecycle('ollama'), athenaLifecycle: lifecycle('athena_mlx'),
+            ollamaLifecycle: lifecycle('ollama'),
             clinicalBinding: binding.status === 'available' ? { state: 'configured', model: binding.resolution.receipt.model } : { state: binding.code === 'settings_unavailable' ? 'unavailable' : 'invalid', model: null },
-            athenaArtifact: isAthenaMlxModelAvailable(),
             who: getIcd11WhoProductionRuntime().readiness().status,
         }, new Date().toISOString()), { headers });
     } catch {

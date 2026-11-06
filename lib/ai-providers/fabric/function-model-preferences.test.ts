@@ -21,7 +21,7 @@ function fixture(): FunctionModelSources {
         lifecycle: { status: 'available_unqualified', provider, credentialClass: 'local_model' } } });
     return { settings: { aiProvider: 'ollama', aiUrl: 'http://127.0.0.1:11434', aiModel_clinical: 'synthetic-clinical:1',
         aiModel_reasoning: 'synthetic-reasoning:1', ...Object.fromEntries(Object.values(FUNCTION_SWITCH_KEYS).map(key => [key, 'enabled'])) },
-    ollamaLifecycle: lifecycle('ollama'), athenaLifecycle: lifecycle('athena_mlx'), athenaIdentity: 'synthetic-local-artifact-v1', athenaAvailable: true };
+    ollamaLifecycle: lifecycle('ollama'), };
 }
 function setCommand(sources: FunctionModelSources, overrides: Partial<FunctionModelCommand> = {}): FunctionModelCommand {
     const view = readFunctionModelPreferences(sources);
@@ -40,8 +40,8 @@ const request = (choice?: unknown, signal?: AbortSignal) => new Request('http://
 test('host catalog has four allowed experiences, opaque IDs, no remote admission or endpoint in DTO', () => {
     const sources = fixture(); const catalog = buildFunctionModelCatalog(sources); const view = readFunctionModelPreferences(sources);
     assert.deepEqual(view.functions.map(row => row.id), FUNCTION_MODEL_IDS);
-    assert.equal(catalog.bindings.length, 3);
-    assert.equal(view.functions[3].options.length, 1);
+    assert.equal(catalog.bindings.length, 2);
+    assert.equal(view.functions[3].options.length, 0);
     assert.match(view.functions[0].options[0].modelOptionId, /^model_option_[0-9a-f]{32}$/);
     assert.doesNotMatch(JSON.stringify(view), /127\.0\.0\.1|endpoint|credential|prompt|policy/);
     assert.equal(view.apply, 'denied');
@@ -75,7 +75,7 @@ test('unsupported functions, free model IDs, stale catalog, disabled and unavail
     assert.throws(() => resolveFunctionModelDispatch(sources, 'patient_insight', { modelOptionId: 'arbitrary-model', expectedCatalogRevision: view.catalogRevision }), /input_invalid/);
     assert.throws(() => resolveFunctionModelDispatch(sources, 'patient_insight', { modelOptionId: `model_option_${'0'.repeat(32)}`, expectedCatalogRevision: view.catalogRevision }), /model_not_cataloged/);
     assert.throws(() => resolveFunctionModelDispatch(sources, 'patient_insight', { modelOptionId: option, expectedCatalogRevision: `sha256_${'0'.repeat(64)}` }), /catalog_stale/);
-    assert.throws(() => resolveFunctionModelDispatch({ ...sources, athenaAvailable: false }, 'treatment_reasoning'), /Non disponibile/);
+    assert.throws(() => resolveFunctionModelDispatch({ ...sources, }, 'treatment_reasoning'), /Non disponibile/);
     for (const status of ['degraded', 'revoked']) {
         const unavailable = { ...sources, ollamaLifecycle: { status: 'available', record: { lifecycle: { provider: 'ollama', credentialClass: 'local_model', status } } } };
         assert.throws(() => resolveFunctionModelDispatch(unavailable, 'smart_import'), /provider_unavailable/);
@@ -121,7 +121,7 @@ test('SQLite preset preview/apply/reread is atomic, idempotent and durable acros
         const before = service.read(); const command = preset(readSources(), 'all_off');
         const preview = service.preview(command); assert.equal(preview.writesPerformed, 0); assert.deepEqual(service.read(), before);
         const applied = service.apply(command); assert.deepEqual(service.read(), applied); assert.deepEqual(service.apply(command), applied);
-        assert.ok(applied.functions.every(row => row.id === 'treatment_reasoning' ? row.enabled : !row.enabled));
+        assert.ok(applied.functions.every(row => !row.enabled));
         const child = spawnSync(process.execPath, ['scripts/run-strip-types.mjs', '--input-type=module', '-e',
             `import Database from 'better-sqlite3'; import {readFunctionModelPreferences} from './lib/ai-providers/fabric/function-model-preferences.ts';
             const db=new Database(${JSON.stringify(file)},{readonly:true});
@@ -129,7 +129,7 @@ test('SQLite preset preview/apply/reread is atomic, idempotent and durable acros
             process.stdout.write(JSON.stringify(readFunctionModelPreferences({...${JSON.stringify(source)},settings})));db.close();`], { encoding: 'utf8' });
         assert.equal(child.status, 0, child.stderr); assert.deepEqual(JSON.parse(child.stdout), applied);
         const reset = preset(readSources(), 'host_defaults'); service.apply(reset);
-        assert.ok(service.read().functions.every(row => row.defaultSource === 'host_configuration' && (row.id === 'treatment_reasoning' ? row.enabled : !row.enabled)));
+        assert.ok(service.read().functions.every(row => row.defaultSource === 'host_configuration' && (!row.enabled)));
         // A failed reread rolls all writes back inside the same transaction.
         const rollbackService = createFunctionModelPreferencesService({ readSources, immediate: cb => database.transaction(cb).immediate(),
             writeSettings(writes) { for (const [key,value] of Object.entries(writes)) database.prepare('INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,value);
@@ -223,7 +223,7 @@ test('invalid explicit model roles and remote provider configuration do not fall
         assert.equal(resolveFunctionModelDispatch(invalid, 'document_synthesis').binding.model, 'synthetic-reasoning:1');
     }
     const remote = { ...sources, settings: { ...sources.settings, aiProvider: 'chatgpt' } };
-    assert.equal(buildFunctionModelCatalog(remote).bindings.length, 1);
+    assert.equal(buildFunctionModelCatalog(remote).bindings.length, 0);
     assert.throws(() => resolveFunctionModelDispatch(remote, 'patient_insight'), /model_not_cataloged/);
 });
 
@@ -240,7 +240,7 @@ test('the three available functions can persist their admitted binding and disab
     }
 });
 
-test('ATHENA dispatch denies even with its configured binding', async () => {
+test('Treatment Reasoning dispatch denies even with its configured binding', async () => {
 const sources = fixture(); let calls=0;
 const handler=createFunctionModelDispatch({ authenticate:async()=> 'synthetic-session', readSources:()=>sources })('treatment_reasoning',async()=>{ calls++; return Response.json({}); });
 const response=await handler(request()); assert.equal(response.status,403); assert.equal((await response.json()).code,'treatment_reasoning_unavailable_in_release'); assert.equal(calls,0);

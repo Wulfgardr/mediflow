@@ -13,7 +13,7 @@ const EXPECTED_IDS = Object.freeze([
   'ocr',
   'treatment_reasoning',
 ]);
-const CLAIM_CEILING = 'local source runtime crosswalk for four review-only proposals; OCR unavailable; not release-ready, released, deployed, or authorized for clinical apply';
+const CLAIM_CEILING = 'local source runtime crosswalk for three review-only proposals; OCR and Treatment Reasoning unavailable; not release-ready, released, deployed, or authorized for clinical apply';
 const HISTORICAL_SHA256 = '92586d894827a8e920995fa7cf0e1ce771b636bce3ed77f564015e61606832fa';
 const TOP_LEVEL_KEYS = Object.freeze([
   'schema',
@@ -183,7 +183,7 @@ function validateAvailableCapability(row, catalogBlock, sources) {
   }
 }
 
-function validateOcr(row, catalogBlock, sources) {
+function validateUnavailable(row, catalogBlock, sources) {
   if (row.disposition !== 'unavailable') fail('OCR deve restare unavailable');
   if (row.descriptorEntryPoint !== null) fail('OCR richiede entryPoint null');
   if (row.productionRoot !== null) fail('OCR richiede production root null');
@@ -193,7 +193,7 @@ function validateOcr(row, catalogBlock, sources) {
   if (!catalogBlock.includes("availabilityDisposition: 'unavailable'") || !catalogBlock.includes('entryPoint: null')) {
     fail('OCR descriptor live non è terminalmente unavailable');
   }
-  if (sources.exists('app/api/ai/ocr/route.ts')) fail('OCR espone una route runtime vietata');
+  if (row.id === 'ocr' && sources.exists('app/api/ai/ocr/route.ts')) fail('OCR espone una route runtime vietata');
 }
 
 export function loadFabricGenerativeRuntimeCrosswalk() {
@@ -216,7 +216,7 @@ export function validateFabricGenerativeRuntimeCrosswalk(manifest = loadFabricGe
   if (!Array.isArray(manifest.capabilities) || manifest.capabilities.length !== EXPECTED_IDS.length
     || JSON.stringify(manifest.capabilities.map(({ id }) => id)) !== JSON.stringify(EXPECTED_IDS)) fail('roster capability deve contenere esattamente le cinque identità 0.9.0');
   for (const row of manifest.capabilities) exactKeys(row, CAPABILITY_KEYS, `capability ${row?.id ?? '<unknown>'}`);
-  if (manifest.capabilities.filter(({ disposition }) => disposition === 'proposal_only').length !== 4) fail('quattro capability devono essere proposal_only');
+  if (manifest.capabilities.filter(({ disposition }) => disposition === 'proposal_only').length !== 3) fail('tre capability devono essere proposal_only');
 
   const roots = manifest.capabilities.filter(({ disposition }) => disposition === 'proposal_only').map(({ productionRoot }) => productionRoot);
   if (roots.some((root) => typeof root !== 'string') || new Set(roots).size !== roots.length) fail('production root duplicata o non valida');
@@ -231,141 +231,14 @@ export function validateFabricGenerativeRuntimeCrosswalk(manifest = loadFabricGe
   const catalog = ensureFile(sources, manifest.catalogPath, 'catalogo generativo');
   manifest.capabilities.forEach((row, index) => {
     const block = capabilityBlock(catalog, row.id, manifest.capabilities[index + 1]?.id);
-    if (row.id === 'ocr') validateOcr(row, block, sources);
+    if (row.id === 'ocr' || row.id === 'treatment_reasoning') validateUnavailable(row, block, sources);
     else validateAvailableCapability(row, block, sources);
   });
-  return Object.freeze({ capabilities: 5, proposalOnly: 4, unavailable: 1, release: '0.9.0' });
+  return Object.freeze({ capabilities: 5, proposalOnly: 3, unavailable: 2, release: '0.9.0' });
 }
 
 /** Capability-local proposal. The accepted generic v1 manifest is not widened. */
-export const TREATMENT_PORTABLE_RUNTIME_CROSSWALK = Object.freeze({
-  "schema": "mediflow.ai.treatment-reasoning-runtime-crosswalk.v2",
-  "integrationStatus": "proposed_not_integrated",
-  "capability": "treatment_reasoning",
-  "provider": "athena_transformers",
-  "model": "mims-harvard/ATHENA-R1-Qwen3-8B",
-  "modelRevision": "acacc6b08e341aaf03c9639097255013ac65ebf2",
-  "decision": "proposals/TREATMENT-PORTABLE-ADR.md",
-  "legacyCrosswalk": {
-    "path": "docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json",
-    "sha256": "083df32a984f57add30a940bd1b34c1db264a82f7a1540e2cc7d853eac60550e"
-  },
-  "preferenceSchema": "mediflow.function-preferences.v2",
-  "preferenceHeader": "x-mediflow-function-preferences",
-  "statusSchema": "mediflow.ai.fabric-status.v2",
-  "statusHeader": "x-mediflow-fabric-status",
-  "engineReceiptSchema": "mediflow.ai.treatment-reasoning-engine-receipt.v2",
-  "workerRequestSchema": "mediflow.treatment-portable-worker-request.v2",
-  "workerResultSchema": "mediflow.treatment-portable-worker-result.v1",
-  "outputSchema": "mediflow.treatment_reasoning.v1",
-  "applyPolicy": "none",
-  "runtimeQualification": "not_observed"
-});
-const PORTABLE_SOURCE_REQUIREMENTS = Object.freeze({
-  "lib/ai-providers/fabric/treatment-reasoning-production-root.ts": [
-    "createTreatmentReasoningPortableRuntime",
-    "captureTreatmentReasoningDispatch",
-    "generateWithAthenaMlx",
-    "createTreatmentReasoningPortableProductionService"
-  ],
-  "lib/ai-providers/fabric/treatment-reasoning-production-operation.ts": [
-    "mediflow.ai.treatment-reasoning-engine-receipt.v2"
-  ],
-  "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.ts": [
-    "mediflow.treatment-portable-worker-request.v2",
-    "NODE_ENV: 'production'",
-    "verifySelected",
-    "shell: false"
-  ],
-  "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.ts": [
-    "inventoryOffline",
-    "verifyPortablePublishedMetadata",
-    "assessPortableHardware",
-    "acacc6b08e341aaf03c9639097255013ac65ebf2",
-    "const minimumHostMemoryBytes = processMemoryLimitBytes + 4 * GIB"
-  ],
-  "lib/ai-providers/fabric/treatment-reasoning-portable-disclosure.ts": [
-    "mediflow.ai.treatment-reasoning-disclosure.v2",
-    "runtimeObservation: 'not_observed'",
-    "athena_transformers"
-  ],
-  "lib/ai-providers/fabric/function-model-preferences.ts": [
-    "mediflow.function-preferences.v1",
-    "mediflow.function-preferences.v2",
-    "version === 'v1'",
-    "LegacyFunctionModelOption"
-  ],
-  "lib/ai-providers/fabric/function-model-preferences-http.ts": [
-    "FUNCTION_PREFERENCES_VERSION_HEADER",
-    "requested !== '1'",
-    "parseFunctionModelCommand",
-    "Vary: FUNCTION_PREFERENCES_VERSION_HEADER"
-  ],
-  "lib/function-models/browser.ts": [
-    "mediflow.function-preferences.v2",
-    "x-mediflow-function-preferences",
-    "portableVersion",
-    "exactKeys"
-  ],
-  "app/api/ai/fabric/status/route.ts": [
-    "buildPortableFabricStatusSnapshot",
-    "FABRIC_STATUS_VERSION_HEADER",
-    "requested === '2'"
-  ],
-  "app/settings/ai/fabric/page.tsx": [
-    "parsePortableFabricStatusEnvelope",
-    "FABRIC_STATUS_VERSION_HEADER",
-    "PortableTreatmentSection",
-    "parseFabricSnapshotPair"
-  ],
-  "next.config.ts": [
-    "./scripts/treatment-reasoning-portable-worker.py",
-    "./scripts/treatment-reasoning-portable-setup.mjs",
-    "./lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.ts",
-    "./**/*.safetensors"
-  ],
-  "scripts/check-standalone-runtime-bundle.mjs": [
-    "bundledTreatmentPortableFailure(standaloneDir, root)",
-    "treatmentPortablePrivateArtifact"
-  ],
-  "scripts/treatment-reasoning-portable-setup.mjs": [
-    "TREATMENT_PORTABLE_SOURCE_CLOSURE",
-    "bundledTreatmentPortableFailure",
-    "assertNodeRuntime",
-    "inventory"
-  ],
-  "scripts/treatment-reasoning-portable-worker.py": [
-    "mediflow.treatment-portable-worker-request.v2",
-    "local_files_only=True",
-    "trust_remote_code=False",
-    "targetPlatform"
-  ],
-  "proposals/TREATMENT-PORTABLE-ADR.md": [
-    "PROPOSED",
-    "mediflow.function-preferences.v2"
-  ]
-});
-export function validateTreatmentReasoningPortableCrosswalk(mapping = TREATMENT_PORTABLE_RUNTIME_CROSSWALK, overrides = {}) {
-  exactKeys(mapping, Object.keys(TREATMENT_PORTABLE_RUNTIME_CROSSWALK), 'portable v2 map');
-  for (const key of Object.keys(TREATMENT_PORTABLE_RUNTIME_CROSSWALK)) {
-    if (JSON.stringify(mapping[key]) !== JSON.stringify(TREATMENT_PORTABLE_RUNTIME_CROSSWALK[key])) fail(`portable v2 map drift: ${key}`);
-  }
-  const sources = sourceAccess(overrides);
-  if (createHash('sha256').update(sources.bytes(mapping.legacyCrosswalk.path)).digest('hex') !== mapping.legacyCrosswalk.sha256) fail('portable v2 legacy crosswalk drift');
-  for (const [relative, literals] of Object.entries(PORTABLE_SOURCE_REQUIREMENTS)) {
-    const source = ensureFile(sources, relative, 'portable v2 source');
-    for (const literal of literals) if (!source.includes(literal)) fail(`portable v2 wiring missing: ${relative}: ${literal}`);
-  }
-  // New engine identity must never enter the generic provider/receipt v1 union.
-  for (const relative of ['lib/ai-providers/fabric/contract.ts', 'lib/ai-providers/fabric/resolver.ts']) {
-    if (ensureFile(sources, relative, 'generic v1 source').includes('athena_transformers')) fail('portable engine widened generic v1');
-  }
-  return Object.freeze({ schema: mapping.schema, provider: mapping.provider, applyPolicy: 'none', runtimeQualification: 'not_observed' });
-}
-
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const result = validateFabricGenerativeRuntimeCrosswalk();
-  const portable = validateTreatmentReasoningPortableCrosswalk();
-  console.log(`Treatment portable v2: ${portable.provider}; runtime qualification ${portable.runtimeQualification}; apply ${portable.applyPolicy}.`);
   console.log(`Fabric generative runtime crosswalk OK: ${result.proposalOnly} proposal-only, ${result.unavailable} unavailable, release ${result.release}.`);
 }

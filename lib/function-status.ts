@@ -16,12 +16,11 @@ export type FunctionStatusSnapshot = Readonly<{
 export type FunctionStatusSources = Readonly<{
     platform: string;
     enabled: Readonly<Record<'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning', boolean>>;
-    ollamaLifecycle: string; athenaLifecycle: string;
+    ollamaLifecycle: string;
     clinicalBinding: Readonly<{ state: 'configured' | 'invalid' | 'unavailable'; model: string | null }>;
     /* per-experience preferences override the historical shared role projection. */
     functionBindings?: Readonly<Partial<Record<'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning',
         Readonly<{ state: 'configured' | 'invalid' | 'unavailable'; model: string | null }>>>>;
-    athenaArtifact: boolean;
     who: 'disabled' | 'credentials_absent' | 'configuration_required' | 'offline' | 'configured' | 'available' | 'unavailable';
 }>;
 

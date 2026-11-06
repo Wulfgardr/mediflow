@@ -3,7 +3,7 @@
   "release": "0.9.0",
   "integrationStatus": "local_source_integrated",
   "applyPolicy": "none",
-  "claimCeiling": "local source runtime crosswalk for four review-only proposals; OCR unavailable; not release-ready, released, deployed, or authorized for clinical apply",
+  "claimCeiling": "local source runtime crosswalk for three review-only proposals; OCR and Treatment Reasoning unavailable; not release-ready, released, deployed, or authorized for clinical apply",
   "catalogPath": "lib/ai-providers/fabric/generative-catalog.ts",
   "historicalArtifacts": [
     {
@@ -131,37 +131,13 @@
     },
     {
       "id": "treatment_reasoning",
-      "disposition": "proposal_only",
-      "descriptorEntryPoint": "app/api/ai/treatment-reasoning/preview/route.ts",
-      "productionRoot": "lib/ai-providers/fabric/treatment-reasoning-production-root.ts",
-      "productionRootLiterals": [
-        "acquireTreatmentReasoningPreview",
-        "createTreatmentReasoningProductionService",
-        "generateWithAthenaMlx"
-      ],
-      "requestPath": {
-        "caller": "lib/ai-providers/fabric/treatment-reasoning-browser-controller.ts",
-        "routes": [
-          "/api/ai/treatment-reasoning/ingest",
-          "/api/ai/treatment-reasoning/preview"
-        ]
-      },
-      "wireEvidence": {
-        "path": "lib/ai-providers/fabric/treatment-reasoning-browser-controller.ts",
-        "requiredLiterals": [
-          "mediflow.ai.fabric-resolution.v1",
-          "mediflow.ai.fabric-provenance.v1"
-        ]
-      },
-      "uiEvidence": {
-        "path": "components/treatment-reasoning-panel.tsx",
-        "requestBindingLiteral": "createTreatmentReasoningBrowserController",
-        "requiredLiterals": [
-          "Receipt, provenienza e currentness",
-          "publication.fabricReceipt",
-          "publication.provenance"
-        ]
-      }
+      "disposition": "unavailable",
+      "descriptorEntryPoint": null,
+      "productionRoot": null,
+      "productionRootLiterals": null,
+      "requestPath": null,
+      "wireEvidence": null,
+      "uiEvidence": null
     }
   ],
   "functionModelChoice": {

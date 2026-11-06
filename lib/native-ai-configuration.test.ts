@@ -81,7 +81,7 @@ function fixture() {
         { clientId: principal.clientId, clientPlatform: 'macos' });
     let settings: Record<string, string> = { aiProvider: 'ollama', aiModel: 'synthetic:1', ...Object.fromEntries(Object.values(FUNCTION_SWITCH_KEYS).map(k => [k, 'enabled'])) };
     let writes = 0; let auth = true; let channel: string = 'native'; let duringAuthentication: (() => void) | undefined;
-    const sources = () => ({ settings, ollamaLifecycle: { status: 'available', record: { lifecycle: { status: 'available_unqualified', provider: 'ollama', credentialClass: 'local_model' } } }, athenaLifecycle: null, athenaIdentity: 'synthetic', athenaAvailable: false });
+    const sources = () => ({ settings, ollamaLifecycle: { status: 'available', record: { lifecycle: { status: 'available_unqualified', provider: 'ollama', credentialClass: 'local_model' } } }, });
     const service = createFunctionModelPreferencesService({ readSources: sources, immediate: op => op(), writeSettings(v) { if (Object.keys(v).length) writes++; settings = { ...settings, ...v }; } });
     const http = createNativeConfigurationHttp({ service, async authenticate() {
         duringAuthentication?.();
@@ -107,7 +107,7 @@ test('preview performs zero writes; apply rereads and exact replay performs no s
         const preview = await f.http.PREVIEW(f.request(command)); assert.equal(preview.status, 200);
         assert.equal((await preview.json()).writesPerformed, 0); assert.equal(f.writes(), 0);
         const applied = await f.http.POST(f.request(command)); assert.equal(applied.status, 200);
-        const view = await applied.json(); assert.ok(view.functions.every((v: { id: string; enabled: boolean }) => v.id === 'treatment_reasoning' ? v.enabled : !v.enabled)); assert.equal(f.writes(), 1);
+        const view = await applied.json(); assert.ok(view.functions.every((v: { id: string; enabled: boolean }) => !v.enabled)); assert.equal(f.writes(), 1);
         assert.equal((await f.http.POST(f.request(command))).status, 200); assert.equal(f.writes(), 1);
         const read = await f.http.GET(new Request('https://localhost/api/v1/network/ai/functions'));
         assert.equal((await read.json()).revision, view.revision); assert.equal(read.headers.get('Cache-Control'), 'no-store');
@@ -166,7 +166,7 @@ test('set accepts only catalog option and host_defaults preserves switches', asy
             'the preset preserves Treatment Reasoning without admitting it');
         const allOff = f.command(); assert.equal((await f.http.POST(f.request(allOff))).status, 200);
         assert.equal((await f.http.POST(f.request({ ...f.command(), presetId: 'host_defaults' }))).status, 200);
-        assert.ok(f.service.read().functions.every(v => v.id === 'treatment_reasoning' ? v.enabled : !v.enabled));
+        assert.ok(f.service.read().functions.every(v => !v.enabled));
         assert.ok(f.service.read().functions.every(v => v.defaultSource === 'host_configuration'));
     } finally { f.cleanup(); }
 });

@@ -5,7 +5,6 @@ import test from 'node:test';
 import { parsePatientInsightPreviewWireRoot, serializePatientInsightPreviewWireRoot } from '../ai-providers/fabric/patient-insight-preview-contract';
 import { snapshotSmartImportFabricResolutionReceipt, snapshotSmartImportFabricProvenance } from '../smart-import-fabric-wire';
 import { parseDocumentSynthesisPreviewWire, serializeDocumentSynthesisPreviewWire } from '../ai-providers/fabric/document-synthesis-preview-wire';
-import { parseTreatmentReasoningPublication } from '../ai-providers/fabric/treatment-reasoning-browser-controller';
 import { outputs, profiles } from '../chatgpt-execution/ordinary-content.test-support.ts';
 import { readOrdinaryTaskProfile, readOrdinaryDocumentEnvelope } from '../chatgpt-execution/ordinary-task-profile';
 import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryFunction } from './ordinary-wire';
@@ -38,12 +37,4 @@ test('DS authentic parsed envelope remains privately addressable and exact-byte 
         provenance:{schemaVersion:'mediflow.document-synthesis.publication-provenance.v1',capability:'document_synthesis',sourceSetAuthority:'application_host',inputDigestScope:'ordered_normalized_provider_projection_set',citationSupport:'provider_declared_host_membership_and_locator_validated',modelCausality:'not_established',fabricProvenance:provenance}};
     const wire=serializeDocumentSynthesisPreviewWire(publication);assert.ok(wire);assert.deepEqual(parseDocumentSynthesisPreviewWire(JSON.parse(JSON.stringify(wire))),wire);
     assert.equal(JSON.stringify(wire.publication.citations),JSON.stringify(result.citations));
-});
-test('TR remote trace and receipt are disjoint from Athena; source bindings unchanged',()=>{
-    const parsed=readOrdinaryTaskProfile(profiles()[3]).parseOutput(JSON.stringify(outputs()[3])) as {value:unknown;sourceBindings:unknown};
-    const {receipt,provenance}=metadata('treatment_reasoning');
-    const publication={schemaVersion:'mediflow.ai.treatment-reasoning-publication.chatgpt.v1',capability:'treatment_reasoning',stage:'preview',review:'required',status:'available',value:parsed.value,sourceBindings:parsed.sourceBindings,attestation:receipt,fabricReceipt:receipt,provenance,sourceRevision:'source-revision-synthetic',capturedAt:'2026-09-12T10:00:00.000Z',writesPerformed:0,applyPolicy:'none'};
-    const wire=parseTreatmentReasoningPublication(publication);assert.ok(wire);assert.deepEqual(wire.sourceBindings,parsed.sourceBindings);assert.equal(wire.value.data.trace.mode,'chatgpt_subscription');
-    const poisoned=structuredClone(publication) as unknown as {value:{data:{trace:{mode:string}}}};poisoned.value.data.trace.mode='local_model';assert.equal(parseTreatmentReasoningPublication(poisoned),null);
-    assert.equal(parseTreatmentReasoningPublication({...publication,attestation:{...receipt,provider:'athena_mlx'}}),null);
 });

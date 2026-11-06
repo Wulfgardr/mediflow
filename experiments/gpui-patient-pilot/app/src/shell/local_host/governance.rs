@@ -299,10 +299,6 @@ impl ClinicalApp {
                     .flex_col()
                     .gap(px(8.))
                     .child(text!(provider.label.clone()));
-                if provider.id == "athena_mlx" {
-                    provider_pane =
-                        provider_pane.child(text!("Non disponibile in questa versione"));
-                }
                 provider_pane = provider_pane.child(fact(
                     "Accesso",
                     provider.declared["accessBoundary"]

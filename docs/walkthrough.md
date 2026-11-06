@@ -99,7 +99,6 @@ graph TB
 
     subgraph "Local Services"
         OLLAMA["Ollama :11434"]
-        ATHENA["ATHENA su MLX (processo locale)"]
         ANYDOC["AnyDoc (worker locale)"]
         ICD["ICD-11 WHO<br/>server-only"]
         OPENMED["OpenMed redaction :18080 (shadow)"]
@@ -119,7 +118,6 @@ graph TB
     NET --> DB
     AUTH --> DB
     WEBAPI --> OLLAMA
-    WEBAPI --> ATHENA
     WEBAPI --> ANYDOC
     WEBAPI --> ICD
     WEBAPI --> OPENMED
@@ -135,7 +133,6 @@ graph TB
 | Next.js | `3000` | UI web + API locali |
 | TLS Proxy | `3443` | HTTPS locale per il client macOS |
 | Ollama | `11434` | Provider locale per Patient Insight, Smart Import e Document Synthesis |
-| ATHENA su MLX | n/a | Provider locale dedicato a Treatment Reasoning, se configurato |
 | AnyDoc | n/a | Worker locale senza porta di rete per allegati con testo estraibile |
 | ICD-11 WHO | Loopback del sidecar locale | Ricerca ICD-11 opt-in, risolta dal server; provisioning e prova target separati |
 | OpenMed redaction (shadow) | `18080` | Sidecar locale benchmark/shadow per `redaction.v1` |
@@ -535,7 +532,7 @@ che sia stato realmente eseguito.
 | Patient Insight | UI -> `/api/ai/patient-insight/preview` -> production root host-owned | Ollama | Preview con receipt, provenienza e currentness |
 | Smart Import | controller -> `/api/ai/smart-import/ingest` -> `/api/ai/smart-import/preview` | Ollama | Proposta review-only legata alla selezione corrente |
 | Document Synthesis | controller -> `capture` -> AnyDoc -> `ingest` -> `preview` sotto `/api/ai/document-synthesis/*` | Ollama | Publication da allegato corrente con source binding |
-| Treatment Reasoning | controller -> `/api/ai/treatment-reasoning/ingest` -> `/api/ai/treatment-reasoning/preview` | ATHENA su MLX | Anteprima review-only con source binding |
+| Treatment Reasoning | Catalogo Fabric v1 | Nessun runtime | Non disponibile con motivo stabile |
 
 Ogni route acquisisce la sessione prima del payload clinico. Selezione,
 proiezione dei dati necessari e controllo di validità appartengono al nodo,

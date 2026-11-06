@@ -123,12 +123,7 @@ const nextConfig: NextConfig = {
       "./node_modules/bindings/bindings.js",
       "./node_modules/file-uri-to-path/package.json",
       "./node_modules/file-uri-to-path/index.js",
-      // @Codex: capability-local offline CLI/worker closure; no model/runtime payloads.
-      "./scripts/treatment-reasoning-portable-worker.py",
       "./scripts/gliner-redaction-worker.py", // @Codex: code only; model stays outside the bundle.
-      "./scripts/treatment-reasoning-portable-setup.mjs",
-      "./lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.ts",
-      "./lib/athena-model-identity.ts",
       "./scripts/node-runtime-contract.mjs",
       "./.nvmrc",
       "./scripts/document-child-launcher.mjs",
@@ -167,7 +162,6 @@ const nextConfig: NextConfig = {
     ],
     "/*": [
       // @Codex: Treatment runtime/model data are external, explicitly provisioned objects.
-      "./**/treatment-reasoning-portable/**",
       "./**/*.safetensors",
       "./**/*.gguf",
       "./**/.venv/**",
@@ -213,7 +207,7 @@ const nextConfig: NextConfig = {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
   turbopack: {},
-  serverExternalPackages: ['@mediflow/web-auth-lifecycle-owner', 'pm2'],
+  serverExternalPackages: ['@mediflow/web-auth-lifecycle-owner'],
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;

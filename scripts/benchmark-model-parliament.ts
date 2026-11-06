@@ -124,7 +124,6 @@ type PruneResult = {
 export type ParliamentReport = {
     generatedAt: string;
     baseUrl: string;
-    mlxBaseUrl: string;
     registryPath: string;
     taskCorpusPath: string;
     smartImportCorpusPath: string;
@@ -203,14 +202,12 @@ function parseArgs(argv: string[]) {
         out: null as string | null,
         markdownOut: null as string | null,
         baseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
-        mlxBaseUrl: process.env.MLX_BASE_URL || 'http://127.0.0.1:8080',
         iterations: 1,
         dataDir: process.env.MEDIFLOW_DATA_DIR || null as string | null,
         dbPath: null as string | null,
         keepChallengers: DEFAULT_KEEP_CHALLENGERS,
         protectModels: [] as string[],
         models: null as string[] | null,
-        mlxModels: null as string[] | null,
         applyPrune: false,
     };
 
@@ -234,9 +231,6 @@ function parseArgs(argv: string[]) {
         } else if (value === '--base-url' && argv[index + 1]) {
             args.baseUrl = argv[index + 1];
             index += 1;
-        } else if (value === '--mlx-base-url' && argv[index + 1]) {
-            args.mlxBaseUrl = argv[index + 1];
-            index += 1;
         } else if (value === '--iterations' && argv[index + 1]) {
             args.iterations = Math.max(1, Number.parseInt(argv[index + 1], 10) || 1);
             index += 1;
@@ -257,12 +251,6 @@ function parseArgs(argv: string[]) {
             index += 1;
         } else if (value === '--models' && argv[index + 1]) {
             args.models = argv[index + 1]
-                .split(',')
-                .map((item) => item.trim())
-                .filter(Boolean);
-            index += 1;
-        } else if (value === '--mlx-models' && argv[index + 1]) {
-            args.mlxModels = argv[index + 1]
                 .split(',')
                 .map((item) => item.trim())
                 .filter(Boolean);
@@ -725,7 +713,6 @@ export function buildMarkdown(report: ParliamentReport) {
     lines.push('');
     lines.push(`- Generated at: \`${report.generatedAt}\``);
     lines.push(`- Ollama runtime: \`${report.baseUrl}\``);
-    lines.push(`- MLX runtime: \`${report.mlxBaseUrl}\``);
     lines.push(`- Readiness: \`${report.parliament.readiness}\``);
     lines.push(`- Baseline: \`${report.parliament.baselineModel || 'none'}\``);
     lines.push(`- Challengers kept: ${report.parliament.challengerModels.length > 0 ? report.parliament.challengerModels.map((model) => `\`${model}\``).join(', ') : 'none'}`);
@@ -792,14 +779,12 @@ export async function runModelParliament(options: {
     taskCorpusPath?: string;
     smartImportCorpusPath?: string;
     baseUrl?: string;
-    mlxBaseUrl?: string;
     iterations?: number;
     dbPath?: string | null;
     dataDir?: string | null;
     keepChallengers?: number;
     protectModels?: string[];
     models?: string[];
-    mlxModels?: string[];
     applyPrune?: boolean;
 }): Promise<ParliamentReport> {
     const registryPath = options.registryPath || DEFAULT_REGISTRY_PATH;
@@ -807,28 +792,25 @@ export async function runModelParliament(options: {
     const smartImportCorpusPath = options.smartImportCorpusPath || DEFAULT_SMART_IMPORT_CORPUS_PATH;
     const baseUrls = resolveLocalChatBaseUrls({
         baseUrl: options.baseUrl,
-        mlxBaseUrl: options.mlxBaseUrl,
     });
     const iterations = Math.max(1, options.iterations || 1);
     const keepChallengers = Math.max(0, options.keepChallengers ?? DEFAULT_KEEP_CHALLENGERS);
     const configuredRuntime = readConfiguredRuntime(resolveDbPath(options.dbPath || null, options.dataDir || null), options.protectModels || []);
     const requestedModels = [
         ...(options.models || []),
-        ...(options.mlxModels || []),
     ];
 
     const generative = await runModelStackBenchmark({
         registryPath,
         corpusPath: taskCorpusPath,
         baseUrl: baseUrls.ollama,
-        mlxBaseUrl: baseUrls.mlx,
         iterations,
         models: requestedModels.length > 0 ? requestedModels : undefined,
     });
 
     const runnableTargets = generative.candidates
         .filter((candidate) => candidate.lane === 'generative'
-            && (candidate.runtime === 'ollama_chat' || candidate.runtime === 'mlx_chat')
+            && (candidate.runtime === 'ollama_chat')
             && candidate.executionStatus === 'runnable'
             && candidate.benchmark
             && typeof candidate.runtimeModel === 'string'
@@ -841,7 +823,6 @@ export async function runModelParliament(options: {
     const smartImport = await runSmartImportBenchmark({
         corpusPath: smartImportCorpusPath,
         baseUrl: baseUrls.ollama,
-        mlxBaseUrl: baseUrls.mlx,
         iterations,
         targets: runnableTargets,
     });
@@ -860,7 +841,7 @@ export async function runModelParliament(options: {
     const registryTargetKeys = new Set(
         generative.candidates
             .map((candidate) => (
-                candidate.runtimeModel && (candidate.runtime === 'ollama_chat' || candidate.runtime === 'mlx_chat')
+                candidate.runtimeModel && (candidate.runtime === 'ollama_chat')
                     ? buildLocalChatTargetKey({ runtime: candidate.runtime, model: candidate.runtimeModel })
                     : null
             ))
@@ -878,7 +859,7 @@ export async function runModelParliament(options: {
         .map((candidate) => {
             const contractChamber = assessContractChamber(candidate);
             const smartImportChamber = assessSmartImportChamber(
-                candidate.runtimeModel && (candidate.runtime === 'ollama_chat' || candidate.runtime === 'mlx_chat')
+                candidate.runtimeModel && (candidate.runtime === 'ollama_chat')
                     ? { runtime: candidate.runtime, model: candidate.runtimeModel }
                     : null,
                 smartImportByModel,
@@ -911,7 +892,7 @@ export async function runModelParliament(options: {
     const rawCandidates: CandidateParliamentDecision[] = generative.candidates.map((candidate) => {
         const runtimeModel = candidate.runtimeModel || null;
         const contractChamber = assessContractChamber(candidate);
-        const target = runtimeModel && (candidate.runtime === 'ollama_chat' || candidate.runtime === 'mlx_chat')
+        const target = runtimeModel && (candidate.runtime === 'ollama_chat')
             ? { runtime: candidate.runtime, model: runtimeModel }
             : null;
         const targetKey = target ? buildLocalChatTargetKey(target) : null;
@@ -926,9 +907,6 @@ export async function runModelParliament(options: {
         if (candidate.lane !== 'generative') {
             verdict = 'lane_pending';
             reasons.unshift('Lane-specific adapter or benchmark still pending.');
-        } else if (candidate.runtime === 'mlx_chat') {
-            verdict = 'lane_pending';
-            reasons.unshift('MLX stays benchmark-only inside parliament: no default/runtime promotion or prune policy is applied here.');
         } else if (candidate.executionStatus !== 'runnable') {
             verdict = 'blocked';
         } else if (!runtimeModel || !targetKey || !installedTargetKeys.has(targetKey)) {
@@ -1000,7 +978,6 @@ export async function runModelParliament(options: {
     return {
         generatedAt: new Date().toISOString(),
         baseUrl: baseUrls.ollama,
-        mlxBaseUrl: baseUrls.mlx,
         registryPath,
         taskCorpusPath,
         smartImportCorpusPath,
@@ -1038,14 +1015,12 @@ async function main() {
         taskCorpusPath: args.taskCorpus,
         smartImportCorpusPath: args.smartImportCorpus,
         baseUrl: args.baseUrl,
-        mlxBaseUrl: args.mlxBaseUrl,
         iterations: args.iterations,
         dbPath: args.dbPath,
         dataDir: args.dataDir,
         keepChallengers: args.keepChallengers,
         protectModels: args.protectModels,
         models: args.models || undefined,
-        mlxModels: args.mlxModels || undefined,
         applyPrune: args.applyPrune,
     });
 

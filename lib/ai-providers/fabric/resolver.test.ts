@@ -157,7 +157,7 @@ test('risolve una deterministica in-house senza modello', () => {
     assert.equal(result.receipt.fallbackCount, 0);
 });
 
-test('treatment reasoning e autogestito: provider athena_mlx senza registry', () => {
+test('treatment reasoning resta non eseguibile in ogni sede', () => {
 const descriptor=GENERATIVE_CAPABILITY_DESCRIPTORS.treatment_reasoning;
 for (const venue of ['local_process','cloud','remote_host']) assert.throws(()=>resolveFabricCapability(policyFor(descriptor),{descriptor,venue:venue as never}),/Non disponibile/);
 });

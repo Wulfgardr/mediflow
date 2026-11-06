@@ -85,17 +85,14 @@ test('descrive provider dichiarati ed effettivi senza trasformare lifecycle o re
                 status: 'available_unqualified',
             } },
         }),
-        athena: () => ({ status: 'denied', reason: 'missing' }),
     });
-    const [ollama, athena, openai] = snapshot.providerDisclosure.providers.map(describeProviderDisclosure);
+    const [ollama, openai] = snapshot.providerDisclosure.providers.map(describeProviderDisclosure);
 
     assert.equal(ollama.lifecycle, PROVIDER_DISCLOSURE_LIFECYCLE_LABELS.available_unqualified);
     assert.equal(ollama.runtimeObservation, 'Non osservata: serve una prova dell’operazione corrente.');
     assert.equal(ollama.executionDisposition, 'Nessuna esecuzione corrente osservata');
     assert.equal(ollama.effectiveVenue, 'Non osservata');
     assert.equal(ollama.effectiveEgress, 'Non osservato');
-    assert.equal(athena.lifecycle, 'Lifecycle assente');
-    assert.equal(athena.executionDisposition, 'Negata dal contratto');
     assert.equal(openai.lifecycle, 'Non applicabile');
     assert.equal(openai.executionDisposition, 'Esecuzione disabilitata');
     assert.equal(openai.accessBoundary, 'Un abbonamento consumer non equivale all’accesso API.');

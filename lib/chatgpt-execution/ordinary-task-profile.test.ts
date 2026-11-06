@@ -30,12 +30,11 @@ function piOutput(task = 'patient_insight') { return JSON.stringify({ schemaVers
 function siOutput(task = 'smart_import') { return JSON.stringify({ schemaVersion: 'mediflow.ai.extract.v1', task, summary: 'Nessuna proposta', data: { diagnoses: [], therapies: [], servicePrescriptions: [] } }); }
 function dsOutput(task = 'document_synthesis') { return JSON.stringify({ schemaVersion: 'mediflow.document-synthesis.provider-envelope.v2', output: { schemaVersion: 'mediflow.ai.extract.v1', task, summary: 'Sintesi sintetica', data: { qualityLevel: 'yellow', medications: [], diagnoses: [], problemStatements: [], therapyCandidates: [], servicePrescriptions: [] } }, citations: [{ label: 'S1', quote: 'Documento sintetico.' }], claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] }); }
 
-test('four ordinary profiles preserve their canonical complete outputs', () => {
+test('three ordinary profiles preserve their canonical complete outputs', () => {
     const profiles = [
         [createPatientInsightOrdinaryTaskProfile(PI), piOutput(), 'patient_insight', (value: unknown) => assert.equal((value as { task: string }).task, 'patient_insight')],
         [createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: '2026-09-12T10:00:00.000Z' }), siOutput(), 'smart_import', (value: unknown) => assert.equal((value as { schemaVersion: string }).schemaVersion, 'mediflow.smart-import.proposal.v1')],
         [createDocumentSynthesisOrdinaryTaskProfile(documentSources()), dsOutput(), 'document_synthesis', (value: unknown) => assert.equal((value as { output: { data: { qualityLevel: string } } }).output.data.qualityLevel, 'yellow')],
-        [createTreatmentReasoningOrdinaryTaskProfile(TR), trOutput(), 'treatment_reasoning', (value: unknown) => assert.equal((value as { value: { data: { trace: { mode: string } } } }).value.data.trace.mode, 'chatgpt_subscription')],
     ] as const;
     for (const [profile, output, functionId, verify] of profiles) {
         const read = readOrdinaryTaskProfile(profile);
@@ -54,12 +53,11 @@ test('profiles reject wrong function output and forged handles', () => {
     assert.throws(() => readOrdinaryTaskProfile({}), /ordinary_task_profile_invalid/u);
 });
 
-test('all four profiles reject duplicate decoded keys before canonical normalization', () => {
+test('all three profiles reject duplicate decoded keys before canonical normalization', () => {
     const cases = [
         [createPatientInsightOrdinaryTaskProfile(PI), piOutput()],
         [createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }), siOutput()],
         [createDocumentSynthesisOrdinaryTaskProfile(documentSources()), dsOutput()],
-        [createTreatmentReasoningOrdinaryTaskProfile(TR), trOutput()],
     ] as const;
     for (const [profile, output] of cases) {
         const parser = readOrdinaryTaskProfile(profile).parseOutput;
@@ -74,14 +72,10 @@ test('Patient Insight denies a claim that mixes a supported and a foreign source
     assert.throws(() => readOrdinaryTaskProfile(profile).parseOutput(output), /ordinary_task_output_invalid/u);
 });
 
-test('source-bound Document Synthesis and Treatment Reasoning reject foreign sources and wrong output', () => {
+test('source-bound Document Synthesis reject foreign sources and wrong output', () => {
     const ds = readOrdinaryTaskProfile(createDocumentSynthesisOrdinaryTaskProfile(documentSources()));
-    const tr = readOrdinaryTaskProfile(createTreatmentReasoningOrdinaryTaskProfile(TR));
     for (const invalid of [piOutput(), dsOutput('smart_import'), dsOutput().replace('Documento sintetico.', 'Inventato'), dsOutput().replace('"schemaVersion":', '"extra":1,"extra":2,"schemaVersion":')]) {
         assert.throws(() => ds.parseOutput(invalid), /ordinary_task_output_invalid/u);
-    }
-    for (const invalid of [piOutput(), trOutput().replaceAll('source_synthetic', 'source_foreign'), trOutput().replace('chatgpt_subscription', 'local_model')]) {
-        assert.throws(() => tr.parseOutput(invalid), /ordinary_task_output_invalid/u);
     }
     assert.throws(() => createDocumentSynthesisOrdinaryTaskProfile({ ...documentSources() }), /ordinary_task_input_invalid/u);
     const si = readOrdinaryTaskProfile(createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }));
@@ -96,7 +90,7 @@ test('nullable optional wire fields preserve absence while required null and for
     assert.doesNotThrow(() => ds.parseOutput(JSON.stringify(value)));
     value.output.summary = null;
     assert.throws(() => ds.parseOutput(JSON.stringify(value)), /ordinary_task_output_invalid/u);
-    const inputs = [createPatientInsightOrdinaryTaskProfile(PI), createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }), createDocumentSynthesisOrdinaryTaskProfile(documentSources()), createTreatmentReasoningOrdinaryTaskProfile(TR)];
+    const inputs = [createPatientInsightOrdinaryTaskProfile(PI), createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }), createDocumentSynthesisOrdinaryTaskProfile(documentSources())];
     function check(value: Record<string, unknown>) {
         if (value.type === 'object') {
             assert.equal(value.additionalProperties, false);
@@ -131,7 +125,7 @@ test('profiles deny getters, proxies, unsafe scalars and bounded snapshot overfl
     assert.throws(() => createPatientInsightOrdinaryTaskProfile(getter), /ordinary_task_input_invalid/u);
     assert.throws(() => createPatientInsightOrdinaryTaskProfile(new Proxy(PI, {})), /ordinary_task_input_invalid/u);
     assert.throws(() => createDocumentSynthesisOrdinaryTaskProfile({ rawText: 'x'.repeat(400_001) }), /ordinary_task_input_invalid/u);
-    assert.throws(() => createTreatmentReasoningOrdinaryTaskProfile({ ...TR, patientContext: 'x'.repeat(400_001) }), /ordinary_task_input_invalid/u);
+    assert.throws(() => createTreatmentReasoningOrdinaryTaskProfile(TR), /Non disponibile/u);
     assert.throws(() => createSmartImportOrdinaryTaskProfile({ projection: { ...SI, sources: [] }, generatedAt: SI.capturedAt }), /ordinary_task_input_invalid/u);
     assert.throws(() => createPatientInsightOrdinaryTaskProfile({ ...PI, selection: BigInt(1) } as unknown as typeof PI), /ordinary_task_input_invalid/u);
     assert.throws(() => createPatientInsightOrdinaryTaskProfile({ ...PI, activeConditions: [Number.NaN] } as unknown as typeof PI), /ordinary_task_input_invalid/u);

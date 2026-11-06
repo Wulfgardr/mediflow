@@ -6,7 +6,7 @@ import {
 } from './provider-disclosure.ts';
 
 function lifecycle(
-    provider: 'ollama' | 'athena_mlx',
+    provider: 'ollama' | 'synthetic_other',
     status: 'available_unqualified' | 'degraded' | 'revoked',
 ) {
     return {
@@ -24,27 +24,22 @@ function lifecycle(
 
 function sources(
     ollama: () => unknown = () => lifecycle('ollama', 'available_unqualified'),
-    athena: () => unknown = () => lifecycle('athena_mlx', 'available_unqualified'),
 ): ProviderDisclosureSources {
-    return { ollama, athena };
+    return { ollama };
 }
 
 test('separa dichiarazione provider e stato effettivo senza inventare osservazioni runtime', () => {
     let ollamaReads = 0;
-    let athenaReads = 0;
     const snapshot = buildProviderDisclosureSnapshot(sources(
         () => { ollamaReads += 1; return lifecycle('ollama', 'available_unqualified'); },
-        () => { athenaReads += 1; return lifecycle('athena_mlx', 'degraded'); },
     ));
 
     assert.equal(snapshot.schemaVersion, 'mediflow.ai.provider-disclosure.v1');
     assert.deepEqual(snapshot.providers.map(({ id }) => id), [
         'ollama',
-        'athena_mlx',
         'openai',
         'anthropic',
     ]);
-    assert.deepEqual([ollamaReads, athenaReads], [1, 1]);
 
     assert.deepEqual(snapshot.providers[0], {
         id: 'ollama',
@@ -67,11 +62,6 @@ test('separa dichiarazione provider e stato effettivo senza inventare osservazio
             executionDisposition: 'not_observed',
         },
     });
-    assert.equal(snapshot.providers[1].effective.lifecycle, 'degraded');
-    assert.equal(snapshot.providers[1].effective.executionDisposition, 'denied_by_contract');
-    assert.equal(snapshot.providers[1].effective.runtimeObservation, 'not_observed');
-    assert.equal(snapshot.providers[1].effective.venue, null);
-    assert.equal(snapshot.providers[1].effective.egress, null);
 });
 
 test('missing, corrupt, unavailable, degraded, revoked e malformed falliscono chiusi', () => {
@@ -82,7 +72,7 @@ test('missing, corrupt, unavailable, degraded, revoked e malformed falliscono ch
         ['degraded', () => lifecycle('ollama', 'degraded'), 'degraded'],
         ['revoked', () => lifecycle('ollama', 'revoked'), 'revoked'],
         ['throwing', () => { throw new Error('synthetic'); }, 'unavailable'],
-        ['provider mismatch', () => lifecycle('athena_mlx', 'available_unqualified'), 'invalid'],
+        ['provider mismatch', () => lifecycle('synthetic_other', 'available_unqualified'), 'invalid'],
         ['credential mismatch', () => ({
             ...lifecycle('ollama', 'available_unqualified'),
             record: {

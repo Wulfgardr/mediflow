@@ -4,7 +4,6 @@ export const PROVIDER_DISCLOSURE_SCHEMA_VERSION = 'mediflow.ai.provider-disclosu
 
 export const PROVIDER_DISCLOSURE_IDS = Object.freeze([
     'ollama',
-    'athena_mlx',
     'openai',
     'anthropic',
 ] as const);
@@ -12,7 +11,6 @@ export const PROVIDER_DISCLOSURE_IDS = Object.freeze([
 export type ProviderDisclosureId = typeof PROVIDER_DISCLOSURE_IDS[number];
 export type ProviderDisclosureSources = Readonly<{
     ollama: () => unknown;
-    athena: () => unknown;
 }>;
 
 export type ProviderDisclosureLifecycle =
@@ -52,7 +50,6 @@ export type ProviderDisclosureSnapshot = Readonly<{
     providers: readonly ProviderDisclosureRow[];
 }>;
 
-type LocalProviderId = 'ollama' | 'athena_mlx';
 
 function hasExactKeys(value: object, expected: readonly string[]): boolean {
     const keys = Reflect.ownKeys(value);
@@ -61,7 +58,7 @@ function hasExactKeys(value: object, expected: readonly string[]): boolean {
 
 function readLocalLifecycle(
     read: () => unknown,
-    expectedProvider: LocalProviderId,
+    expectedProvider: 'ollama',
 ): Readonly<{
     lifecycle: ProviderDisclosureLifecycle;
     credentialClass: 'local_model' | null;
@@ -105,7 +102,7 @@ function readLocalLifecycle(
 }
 
 function localRow(
-    id: LocalProviderId,
+    id: 'ollama',
     label: string,
     read: () => unknown,
 ): ProviderDisclosureRow {
@@ -165,7 +162,6 @@ export function buildProviderDisclosureSnapshot(
 ): ProviderDisclosureSnapshot {
     const providers = Object.freeze([
         localRow('ollama', 'Ollama', sources.ollama),
-        localRow('athena_mlx', 'ATHENA', sources.athena),
         cloudRow('openai', 'OpenAI'),
         cloudRow('anthropic', 'Anthropic'),
     ]);
@@ -174,6 +170,3 @@ export function buildProviderDisclosureSnapshot(
         providers,
     });
 }
-
-// Capability-local extension only: PROVIDER_DISCLOSURE_IDS and the v1 projection above stay closed.
-export { buildTreatmentReasoningPortableDisclosure } from './treatment-reasoning-portable-disclosure';

@@ -3,7 +3,7 @@ import { AiFunctionUnavailableError, assertFunctionAvailableInRelease } from '..
 import type { FunctionModelPreferences, FunctionModelCommand, FunctionModelId, FunctionModelChoice, FunctionModelOption, FunctionPreferenceRow, LegacyFunctionModelOption } from '../ai-providers/fabric/function-model-preferences';
 export type { FunctionModelPreferences, FunctionModelCommand, FunctionModelId, FunctionModelChoice, FunctionModelOption, FunctionPreferenceRow, LegacyFunctionModelOption };
 export const names: Record<FunctionModelId, string> = { patient_insight: 'Quadro paziente', smart_import: 'Importazione assistita', document_synthesis: 'Sintesi dei documenti', treatment_reasoning: 'Ragionamento terapeutico' };
-export const providerName = (provider: string) => provider === 'ollama' ? 'Ollama · locale' : provider === 'athena_mlx' ? 'ATHENA MLX · locale' : provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Provider non supportato';
+export const providerName = (provider: string) => provider === 'ollama' ? 'Ollama · locale' : 'Provider non supportato';
 export class ModelUiError extends Error { constructor(readonly code: 'unavailable' | 'provider_unavailable' | 'invalid' | 'conflict' | 'stale' | 'locked') { super(code); } }
 export const errorText = (error: unknown) => error instanceof AiFunctionUnavailableError ? error.message : error instanceof ModelUiError && error.code === 'conflict'
     ? 'Le impostazioni sono cambiate. Rileggi e decidi di nuovo; nulla viene ritentato automaticamente.'
@@ -31,25 +31,12 @@ export function parsePreferences(value: unknown): FunctionModelPreferences {
         const options: FunctionModelOption[] = f.options.map(value => {
             const o = record(value);
             if (!option(o.modelOptionId) || ids.has(o.modelOptionId) || typeof o.label !== 'string' || !o.label.trim() || o.label.length > 256 || /[\u0000-\u001f]/u.test(o.label)
-                || !['ollama', 'athena_mlx', 'athena_transformers'].includes(o.provider as string) || !['available_unqualified', 'unavailable'].includes(o.state as string)) throw new ModelUiError('invalid');
-            const portable = o.provider === 'athena_transformers';
-            exactKeys(o, ['modelOptionId', 'label', 'provider', 'state', ...(portable ? ['provisioningState', 'prerequisites'] : [])]);
-            if (portable && (!portableVersion || id !== 'treatment_reasoning')) throw new ModelUiError('invalid');
-            const states = ['NEEDS_CONTEXT', 'platform_unsupported', 'manifest_invalid', 'license_missing', 'model_not_provisioned',
-                'needs_activation', 'admitted', 'revoked', 'artifact_tampered', 'consent_required', 'cancelled', 'busy', 'interrupted', 'unavailable'];
-            if (portable && (typeof o.provisioningState !== 'string' || !states.includes(o.provisioningState)
-                || !Array.isArray(o.prerequisites) || o.prerequisites.length > 16
-                || !o.prerequisites.every(p => typeof p === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,159}$/u.test(p)) || new Set(o.prerequisites).size !== o.prerequisites.length
-                || (o.state === 'available_unqualified' && (o.provisioningState !== 'admitted' || o.prerequisites.length !== 0)))) throw new ModelUiError('invalid');
-            if (!portable && (o.provisioningState !== undefined || o.prerequisites !== undefined)) throw new ModelUiError('invalid');
+                || o.provider !== 'ollama' || !['available_unqualified', 'unavailable'].includes(o.state as string)) throw new ModelUiError('invalid');
+            exactKeys(o, ['modelOptionId', 'label', 'provider', 'state']);
             ids.add(o.modelOptionId);
             const common = { modelOptionId: o.modelOptionId, label: o.label,
                 state: o.state as 'available_unqualified' | 'unavailable' };
-            if (portable) return { ...common, provider: 'athena_transformers',
-                provisioningState: o.provisioningState as NonNullable<FunctionModelOption['provisioningState']>,
-                prerequisites: Object.freeze([...(o.prerequisites as string[])]) };
-            if (o.provider !== 'ollama' && o.provider !== 'athena_mlx') throw new ModelUiError('invalid');
-            return { ...common, provider: o.provider };
+            return { ...common, provider: 'ollama' };
         });
         return { id, enabled: f.enabled, defaultModelOptionId: f.defaultModelOptionId as string | null, defaultSource: f.defaultSource as 'saved_preference' | 'host_configuration', bindingState: f.bindingState as 'current' | 'stale' | 'unsupported', options };
     });
@@ -57,7 +44,7 @@ export function parsePreferences(value: unknown): FunctionModelPreferences {
         presets: ['host_defaults', 'all_off'] as const, apply: 'denied' as const };
     if (portableVersion) return { ...common, schemaVersion: 'mediflow.function-preferences.v2', functions };
     return { ...common, schemaVersion: 'mediflow.function-preferences.v1', functions: functions.map(row => ({ ...row,
-        options: row.options.filter((option): option is LegacyFunctionModelOption => option.provider !== 'athena_transformers') })) };
+        options: row.options })) };
 
 }
 export async function api(request: typeof fetch, signal: AbortSignal, command?: FunctionModelCommand, preview = false, version: 'v1' | 'v2' = 'v2'): Promise<unknown> {

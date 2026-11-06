@@ -20,8 +20,8 @@ async function until(condition: () => boolean) {
 function functionSnapshot() {
     return buildFunctionStatus({ platform: 'synthetic', enabled: { patient_insight: true, smart_import: false,
         document_synthesis: false, treatment_reasoning: false }, ollamaLifecycle: 'available_unqualified',
-    athenaLifecycle: 'missing', clinicalBinding: { state: 'configured', model: 'synthetic-local' },
-    athenaArtifact: false, who: 'disabled' }, '2026-09-08T00:00:00.000Z');
+    clinicalBinding: { state: 'configured', model: 'synthetic-local' },
+    who: 'disabled' }, '2026-09-08T00:00:00.000Z');
 }
 type Call = { url: string; init: RequestInit; body: unknown };
 function fixture() {

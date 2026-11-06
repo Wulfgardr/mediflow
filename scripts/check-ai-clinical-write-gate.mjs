@@ -21,7 +21,6 @@ const SCHEMA_FILE = 'lib/schema.ts';
 // la riduzione di perimetro resta visibile invece di passare per un gate verde.
 const AI_PATH_GLOBS = [
     { dir: 'lib', prefix: 'ai-' },
-    { dir: 'lib', prefix: 'athena-' },
     { dir: 'lib', prefix: 'network-ai-' },
     { dir: 'lib', prefix: 'patient-insight' },
     { dir: 'lib', prefix: 'patient-smart-import' },

@@ -15,7 +15,6 @@ import { FabricVenueSection } from '@/components/settings/fabric-venue-section';
 import styles from '@/components/settings/settings-lume.module.css';
 import { SETTINGS_CARD_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';
 import type { FabricObservabilitySnapshot } from '@/lib/ai-providers/fabric/routing-observability';
-import { FABRIC_STATUS_VERSION_HEADER, parsePortableFabricStatusEnvelope, type TreatmentReasoningPortableDisclosure } from '@/lib/ai-providers/fabric/treatment-reasoning-portable-disclosure';
 import type { FabricStatusSnapshot } from '@/lib/ai-providers/fabric/status';
 import {
     describeProviderDisclosure,
@@ -30,7 +29,6 @@ type FabricPageState =
         kind: 'ready';
         status: FabricStatusSnapshot;
         observability: FabricObservabilitySnapshot;
-        portable: TreatmentReasoningPortableDisclosure | null;
     }>;
 
 class FabricFetchError extends Error {
@@ -114,7 +112,7 @@ function FabricProviderSection({ snapshot }: { snapshot: FabricStatusSnapshot })
     );
 }
 
-function PortableTreatmentSection() {
+function TreatmentUnavailableSection() {
     return <section className={SETTINGS_CARD_CLASS} aria-labelledby="fabric-treatment-portable-title" data-testid="fabric-treatment-portable">
         <h3 id="fabric-treatment-portable-title">Ragionamento terapeutico</h3>
         <p>{TREATMENT_REASONING_UNAVAILABLE_LABEL}</p>
@@ -131,17 +129,16 @@ export default function SettingsAiFabricPage() {
         async function loadSnapshots() {
             try {
                 const [statusResponse, observabilityResponse] = await Promise.all([
-                    fetch('/api/ai/fabric/status', { headers: { [FABRIC_STATUS_VERSION_HEADER]: '2' }, cache: 'no-store', signal: controller.signal }),
+                    fetch('/api/ai/fabric/status', { cache: 'no-store', signal: controller.signal }),
                     fetch('/api/ai/fabric/observability', { cache: 'no-store', signal: controller.signal }),
                 ]);
                 const [statusValue, observabilityValue] = await Promise.all([
                     readFabricResponse(statusResponse),
                     readFabricResponse(observabilityResponse),
                 ]);
-                const envelope = parsePortableFabricStatusEnvelope(statusValue);
-                const snapshots = parseFabricSnapshotPair(envelope.legacy, observabilityValue);
+                const snapshots = parseFabricSnapshotPair(statusValue, observabilityValue);
                 if (controller.signal.aborted) return;
-                setState({ portable: envelope.treatmentReasoning, kind: 'ready', ...snapshots });
+                setState({ kind: 'ready', ...snapshots });
             } catch (error) {
                 if (controller.signal.aborted) return;
                 setState({
@@ -178,7 +175,7 @@ export default function SettingsAiFabricPage() {
             {/* external account metadata never feeds local preferences or readiness. */}
             <ChatGptAccountPanel />
             <FunctionStatusPanel />
-            {state.kind === 'ready' && state.portable && <PortableTreatmentSection />}
+            {state.kind === 'ready' && <TreatmentUnavailableSection />}
 
             {state.kind === 'loading' ? <FabricLoadingState /> : null}
             {state.kind === 'unauthorized' ? <FabricErrorState unauthorized /> : null}

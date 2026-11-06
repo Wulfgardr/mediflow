@@ -76,7 +76,7 @@ export default function SettingsAiModelsPage() {
                     recommended={[...recommended, { name: 'hf.co/unsloth/medgemma-1.5-4b-it-GGUF', desc: 'MedGemma 4B · alternativa da valutare, non predefinita' }]}
                     provider={aiConfig.provider} targetUrl={aiConfig.url} />
                 <ModelSelector selectorId="reasoning" label="Ragionamento testuale"
-                    description="Per riassunti narrativi e supporto testuale generale; non configura la revisione terapeutica ATHENA."
+                    description="Per riassunti narrativi e supporto testuale generale.."
                     icon={<Cpu aria-hidden="true" className="h-5 w-5" />} value={aiConfig.model_reasoning}
                     onChange={value => setAiConfig(previous => ({ ...previous, model_reasoning: value }))}
                     recommended={[...recommended, { name: 'deepseek-r1:14b', desc: 'DeepSeek R1 14B · ragionamento testuale' }]}

@@ -12,7 +12,6 @@ import {
 import { FABRIC_CAPABILITY_DESCRIPTORS } from './catalog';
 import {
     buildProviderDisclosureSnapshot,
-    buildTreatmentReasoningPortableDisclosure,
     type ProviderDisclosureSnapshot,
     type ProviderDisclosureSources,
 } from './provider-disclosure';
@@ -40,7 +39,6 @@ export type FabricStatusSnapshot = Readonly<{
 
 const UNOBSERVED_PROVIDER_SOURCES: ProviderDisclosureSources = Object.freeze({
     ollama: () => Object.freeze({ status: 'denied', reason: 'unavailable' }),
-    athena: () => Object.freeze({ status: 'denied', reason: 'unavailable' }),
 });
 
 export function buildFabricStatusSnapshot(
@@ -75,11 +73,4 @@ export function buildFabricStatusSnapshot(
         providerDisclosure: buildProviderDisclosureSnapshot(providerSources),
         capabilities: Object.freeze(capabilities),
     });
-}
-
-/** Explicit envelope; never label the portable provider as MLX or as a generic v1 provider. */
-export function buildPortableFabricStatusSnapshot(providerSources: ProviderDisclosureSources,
-    portableSources: Readonly<{ status(): unknown; hardware(): unknown }>): import('./treatment-reasoning-portable-disclosure').PortableFabricStatusSnapshot {
-    return Object.freeze({ schemaVersion: 'mediflow.ai.fabric-status.v2', legacy: buildFabricStatusSnapshot(providerSources),
-        treatmentReasoning: buildTreatmentReasoningPortableDisclosure(portableSources.status, portableSources.hardware) });
 }

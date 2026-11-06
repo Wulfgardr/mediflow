@@ -60,14 +60,14 @@ test('ordinary authenticated operator explicitly admits once with receipt/versio
     assert.equal(admitted.state, 'available_unqualified'); assert.equal(admitted.version, 1);
     assert.match(admitted.receipt!, /^receipt_/); assert.equal(admitted.credentialClass, 'local_model');
     const catalog = buildFunctionModelCatalog({ settings: { aiProvider: 'ollama', aiModel_clinical: 'synthetic-local', aiUrl: 'http://127.0.0.1:11434' },
-        ollamaLifecycle: f.lifecycle.service.read(), athenaLifecycle: { status: 'denied', reason: 'missing' }, athenaIdentity: 'synthetic', athenaAvailable: false });
+        ollamaLifecycle: f.lifecycle.service.read(), });
     assert.equal(catalog.bindings.find(item => item.model === 'synthetic-local')?.available, true);
-    assert.equal(catalog.bindings.find(item => item.provider === 'athena_mlx')?.available, false);
+    assert.ok(catalog.bindings.every(item => item.provider === 'ollama'));
     assert.equal(admitted.inference, 'not_run'); assert.equal(admitted.qualification, 'not_assessed');
     assert.deepEqual(fs.readFileSync(path.join(f.root, 'medical.db')), before);
     assert.deepEqual(await f.service.activate(admitted.revision), admitted); assert.equal(f.calls(), 2);
     const functions = buildFunctionStatus({ platform: 'darwin', enabled: { patient_insight: true, smart_import: false, document_synthesis: false, treatment_reasoning: false },
-        ollamaLifecycle: admitted.state, athenaLifecycle: 'missing', clinicalBinding: { state: 'configured', model: admitted.model }, athenaArtifact: false, who: 'disabled' }, new Date().toISOString());
+        ollamaLifecycle: admitted.state, clinicalBinding: { state: 'configured', model: admitted.model }, who: 'disabled' }, new Date().toISOString());
     assert.equal(functions.functions.find(row => row.id === 'patient_insight')?.state, 'unverified');
     assert.equal(functions.functions.find(row => row.id === 'smart_import')?.state, 'off');
 });

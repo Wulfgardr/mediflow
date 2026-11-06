@@ -16,7 +16,7 @@ export const FIXTURE_CATALOG = {
     id, enabled: id === 'treatment_reasoning', defaultModelOptionId: id === 'treatment_reasoning' ? MODEL_OPTION_ID : null,
     defaultSource: 'host_configuration', bindingState: 'current',
     options: id === 'treatment_reasoning'
-      ? [{ modelOptionId: MODEL_OPTION_ID, label: 'ATHENA / MLX fixture', provider: 'athena_mlx' as const, state: 'available_unqualified' as const }]
+      ? [{ modelOptionId: MODEL_OPTION_ID, label: 'ATHENA / MLX fixture', provider: 'ollama' as const, state: 'available_unqualified' as const }]
       : [],
   })),
 } satisfies FunctionModelPreferences;
@@ -38,7 +38,7 @@ export function publicationFor(projection: Projection) {
       version: 'mediflow.ai.egress-profile.v1',
       egress: 'none',
     },
-    provider: 'athena_mlx',
+    provider: 'ollama',
     model: null,
     providerReceipt: null,
     fallbackCount: 0,
@@ -98,7 +98,7 @@ export function publicationFor(projection: Projection) {
     attestation: {
       schema: 'mediflow.ai.treatment-reasoning-athena-attestation.v1',
       readiness: 'available_unqualified',
-      provider: 'athena_mlx',
+      provider: 'ollama',
       venue: 'local_process',
       egress: 'none',
       receiptRef: RECEIPT_REF,
@@ -109,7 +109,7 @@ export function publicationFor(projection: Projection) {
       schemaVersion: 'mediflow.ai.fabric-provenance.v1',
       capability: 'treatment_reasoning',
       venue: 'local_process',
-      provider: 'athena_mlx',
+      provider: 'ollama',
       model: null,
       preprocessing: ['context_minimization', 'envelope_validation'],
       receipt: fabricReceipt,
@@ -157,4 +157,3 @@ export async function createFixture(page: Page): Promise<{ patientId: string; th
     return { patientId, therapyId };
   }, marker);
 }
-

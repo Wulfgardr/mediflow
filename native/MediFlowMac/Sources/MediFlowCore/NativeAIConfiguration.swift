@@ -46,7 +46,7 @@ public struct NativeAIFunctionPreferences: Codable, Equatable, Sendable {
                   Set(function.options.map(\.id)).count == function.options.count else { throw HomeBaseClientError.contract }
             for option in function.options {
                 guard option.modelOptionId.range(of: "^model_option_[0-9a-f]{32}$", options: .regularExpression) != nil,
-                      ["ollama", "athena_mlx"].contains(option.provider),
+                      option.provider == "ollama",
                       ["available_unqualified", "unavailable"].contains(option.state) else { throw HomeBaseClientError.contract }
             }
         }

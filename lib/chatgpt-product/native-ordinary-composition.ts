@@ -1,3 +1,4 @@
+import { AiFunctionUnavailableError } from '../ai-function-availability';
 /* fixed native application composition, never a request-defined callback. */
 import 'server-only';
 import { assertFunctionAvailableInRelease } from '../ai-function-availability';
@@ -110,17 +111,7 @@ async function originalFunction(request: Request, context: Context): Promise<Res
         return createSmartImportPreviewHttpHandler({ acquirePreview: acquireAuthenticatedSmartImportPreview })(
             requestFor(request, { handle, requestId: requestId() }));
     }
-    if (prepared.functionId === 'treatment_reasoning') {
-        if (source?.functionId !== 'treatment_reasoning') throw new ProductError('revoked');
-        const [{ acquireTreatmentReasoningIngest, acquireTreatmentReasoningPreview }, { createTreatmentReasoningPreviewHttpHandler }] = await Promise.all([
-            import('../ai-providers/fabric/treatment-reasoning-production-root'),
-            import('../ai-providers/fabric/treatment-reasoning-production-http'),
-        ]);
-        const operation = await acquireTreatmentReasoningIngest(); confirm(context);
-        const handle = operation.ingest({ projection: source.input, requestId: requestId() });
-        return createTreatmentReasoningPreviewHttpHandler({ acquirePreview: acquireTreatmentReasoningPreview })(
-            requestFor(request, { handle, requestId: requestId() }));
-    }
+    if (prepared.functionId === 'treatment_reasoning') throw new AiFunctionUnavailableError();
     const document = context.sources ? documents.get(context.sources) : null;
     if (!document?.previewHandle) throw new ProductError('revoked');
     const { createDocumentSynthesisPreviewHttpHandler } = await import('../ai-providers/fabric/document-synthesis-production-http');

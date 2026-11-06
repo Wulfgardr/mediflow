@@ -29,27 +29,6 @@
           }
         },
         {
-          "id": "athena_mlx",
-          "label": "ATHENA",
-          "declared": {
-            "lifecycle": "host_managed",
-            "runtimeObservation": "operation_receipt_required",
-            "venue": "local_process",
-            "egress": "none",
-            "credentialClass": "local_model",
-            "executionDisposition": "proposal_only_candidate",
-            "accessBoundary": "not_applicable"
-          },
-          "effective": {
-            "lifecycle": "unavailable",
-            "runtimeObservation": "not_observed",
-            "venue": null,
-            "egress": null,
-            "credentialClass": null,
-            "executionDisposition": "denied_by_contract"
-          }
-        },
-        {
           "id": "openai",
           "label": "OpenAI",
           "declared": {
@@ -366,11 +345,8 @@
         "class": "generative",
         "operation": "reasoning",
         "review": "review_first",
-        "availabilityDisposition": "proposal_only",
-        "venues": [
-          "local_process",
-          "home_base"
-        ],
+        "availabilityDisposition": "unavailable",
+        "venues": [],
         "egressProfile": {
           "id": "local_only",
           "version": "mediflow.ai.egress-profile.v1",
