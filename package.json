@@ -229,7 +229,7 @@
     "test:api-error-leak": "node scripts/check-api-error-leak.mjs --self-test",
     "build:usage-dashboard": "node scripts/build-usage-dashboard.mjs",
     "check:usage-dashboard": "node scripts/build-usage-dashboard.mjs --check",
-    "test:usage-dashboard": "node --test scripts/build-usage-dashboard.test.mjs scripts/assisted-development-disclosure.test.mjs",
+    "test:usage-dashboard": "node --test scripts/build-usage-dashboard.test.mjs scripts/assisted-development-disclosure.test.mjs scripts/collect-development-usage.test.mjs",
     "test:inventory-browser": "node scripts/conditional-local-groups.mjs --group headless-browser",
     "test:fixture-generators": "node scripts/conditional-local-groups.mjs --group fixture-generators",
     "test:research-boundary": "node scripts/conditional-local-groups.mjs --group research-toolchain",
@@ -242,7 +242,10 @@
     "prepare:dependencies": "node scripts/prepare-dependencies.mjs",
     "check:fabric-operational-catalog": "node scripts/run-strip-types.mjs scripts/check-fabric-operational-catalog.ts",
     "test:fabric-operational-catalog": "node scripts/run-strip-types.mjs --test scripts/check-fabric-operational-catalog.test.ts",
-    "qualify:visual-091": "node scripts/qualify-visual-091.mjs"
+    "qualify:visual-091": "node scripts/qualify-visual-091.mjs",
+    "collect:development-usage": "node scripts/collect-development-usage.mjs",
+    "check:release-usage": "node scripts/check-release-usage.mjs",
+    "test:release-usage": "node --test scripts/check-release-usage.test.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",

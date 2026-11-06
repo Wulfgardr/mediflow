@@ -10,7 +10,7 @@ const START = '<!-- usage-dashboard:start -->';
 const END = '<!-- usage-dashboard:end -->';
 const EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'unknown'];
 const MODELS = new Set([
-  'gpt-5.2', 'gpt-5.2-codex', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.4',
+  'gpt-6.1-sol', 'gpt-6.1-terra', 'claude-opus-5-5', 'claude-haiku-5-5', 'claude-sonnet-5-5', 'gpt-5.2', 'gpt-5.2-codex', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.4',
   'gpt-5.5', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-6-astra',
   'gpt-6-luna', 'gpt-6-sol', 'gpt-daybreak-blue-latest', 'gpt-reserve', 'codex-auto-review',
   'claude-fable-5', 'claude-haiku-4-5', 'claude-opus-4-7', 'claude-opus-4-8',
@@ -70,7 +70,7 @@ export function validate(data) {
   assert.deepEqual(data.environments.map((x) => x.environment).sort(), ['claude', 'codex']);
   for (const source of data.environments) {
     keys(source, ['environment', 'source', 'from', 'to', 'historyCoverageEstablished', 'totalTokens', 'cacheReadTokens']);
-    if (source.environment === 'codex') assert.match(source.source, /^CodexBar \d+\.\d+\.\d+$/);
+    if (source.environment === 'codex') assert.match(source.source, /^(?:Codex local token records \+ historical )?CodexBar \d+\.\d+\.\d+$/);
     else assert.equal(source.source, 'Claude Code local response records');
     assert.equal(source.historyCoverageEstablished, false, 'Project history is partial');
     token(source.totalTokens); token(source.cacheReadTokens);
@@ -171,7 +171,7 @@ ${text(42, 49, 'MediFlow · sviluppo assistito', 'title')}
 ${text(42, 77, `Snapshot ${data.snapshotDate} · log dal ${from} · solo checkout MediFlow verificate`, 'muted')}
 ${text(958, 49, compact(total) + ' token', 'section', 'text-anchor="end"')}
 ${text(42, 105, 'Token registrati, cache inclusa · copertura parziale · altri progetti e attribuzioni incerte esclusi', 'body')}
-${panel(128, '01  Provider del modello · per mese', 'CodexBar e record Claude Code · provider dedotto dal nome del modello', data.history, 'provider')}
+${panel(128, '01  Provider del modello · per mese', 'Record locali e storico CodexBar · provider dedotto dal nome del modello', data.history, 'provider')}
 ${panel(530, '02  Modelli · per mese', 'Otto identificatori principali; tutti gli altri sono inclusi in «Altri modelli»', data.history, 'model', false, 8)}
 ${panel(932, '03  Effort registrato · per giorno', `Solo risposte individuali Codex · ${data.effortSource.from} → ${data.effortSource.to} · ${compact(data.effortSource.totalTokens)} token`, data.effort, 'effort', true)}
 ${text(42, 1352, 'La serie effort è parziale e separata: non si somma allo storico. n.d. = nessun record disponibile.', 'muted')}
