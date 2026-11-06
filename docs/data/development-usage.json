@@ -13,8 +13,8 @@
       "from": "2026-02-02",
       "to": "2026-11-06",
       "historyCoverageEstablished": false,
-      "totalTokens": 33761838420,
-      "cacheReadTokens": 32520794863
+      "totalTokens": 34535287187,
+      "cacheReadTokens": 33279168239
     },
     {
       "environment": "claude",
@@ -22,8 +22,8 @@
       "from": "2026-07-02",
       "to": "2026-11-06",
       "historyCoverageEstablished": false,
-      "totalTokens": 5285443869,
-      "cacheReadTokens": 5179588295
+      "totalTokens": 5300005382,
+      "cacheReadTokens": 5193631015
     }
   ],
   "effortSource": {
@@ -31,8 +31,8 @@
     "timezone": "Europe/Rome",
     "from": "2026-09-03",
     "to": "2026-11-06",
-    "totalTokens": 9811687236,
-    "responseRecords": 67039,
+    "totalTokens": 9822318975,
+    "responseRecords": 67091,
     "missingFiles": 130,
     "completeHistory": false
   },
@@ -2739,7 +2739,7 @@
       "provider": "OpenAI",
       "model": "gpt-6-astra",
       "effort": "unknown",
-      "tokens": 3328692
+      "tokens": 35896186
     },
     {
       "date": "2026-10-28",
@@ -2747,7 +2747,15 @@
       "provider": "OpenAI",
       "model": "gpt-6.1-sol",
       "effort": "unknown",
-      "tokens": 53844297
+      "tokens": 309669141
+    },
+    {
+      "date": "2026-10-28",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "unknown",
+      "tokens": 12499983
     },
     {
       "date": "2026-10-29",
@@ -2755,7 +2763,7 @@
       "provider": "Anthropic",
       "model": "claude-haiku-5-5",
       "effort": "unknown",
-      "tokens": 251858
+      "tokens": 474173
     },
     {
       "date": "2026-10-29",
@@ -2771,7 +2779,7 @@
       "provider": "OpenAI",
       "model": "gpt-6-astra",
       "effort": "unknown",
-      "tokens": 84272862
+      "tokens": 88824048
     },
     {
       "date": "2026-10-29",
@@ -2779,7 +2787,7 @@
       "provider": "OpenAI",
       "model": "gpt-6.1-sol",
       "effort": "unknown",
-      "tokens": 77943715
+      "tokens": 535317236
     },
     {
       "date": "2026-10-29",
@@ -2811,7 +2819,7 @@
       "provider": "Anthropic",
       "model": "claude-haiku-5-5",
       "effort": "unknown",
-      "tokens": 229110
+      "tokens": 433588
     },
     {
       "date": "2026-10-31",
@@ -2987,7 +2995,7 @@
       "provider": "Anthropic",
       "model": "claude-opus-5-5",
       "effort": "unknown",
-      "tokens": 18022809
+      "tokens": 32157529
     },
     {
       "date": "2026-11-06",
@@ -2995,7 +3003,7 @@
       "provider": "OpenAI",
       "model": "gpt-6.1-sol",
       "effort": "unknown",
-      "tokens": 43715802
+      "tokens": 54347541
     }
   ],
   "effort": [
@@ -3877,7 +3885,7 @@
       "provider": "OpenAI",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "tokens": 34513093
+      "tokens": 45144832
     }
   ]
 }

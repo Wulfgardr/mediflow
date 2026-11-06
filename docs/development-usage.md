@@ -183,19 +183,19 @@ le sessioni T3 Code registrate dai rispettivi harness con cwd attribuibile.
 
 <!-- usage-dashboard:start -->
 
-Snapshot: **2026-11-06**. Token registrati nelle checkout verificate di **MediFlow: 39.047.282.289**. Altri progetti e attribuzioni incerte esclusi.
+Snapshot: **2026-11-06**. Token registrati nelle checkout verificate di **MediFlow: 39.835.292.569**. Altri progetti e attribuzioni incerte esclusi.
 
 | Ambiente che registra | Fonte | Periodo disponibile | Token | Cache letta (inclusa) | Copertura |
 | :-- | :-- | :-- | --: | --: | :-- |
-| Codex | Codex local token records + historical CodexBar 0.60.3 | 2026-02-02 → 2026-11-06 | 33.761.838.420 | 32.520.794.863 | Parziale |
-| Claude Code | Claude Code local response records | 2026-07-02 → 2026-11-06 | 5.285.443.869 | 5.179.588.295 | Parziale |
+| Codex | Codex local token records + historical CodexBar 0.60.3 | 2026-02-02 → 2026-11-06 | 34.535.287.187 | 33.279.168.239 | Parziale |
+| Claude Code | Claude Code local response records | 2026-07-02 → 2026-11-06 | 5.300.005.382 | 5.193.631.015 | Parziale |
 
 ### Storico mensile per provider
 
 | Provider dedotto | 2026-02 | 2026-03 | 2026-04 | 2026-05 | 2026-06 | 2026-07 | 2026-08 | 2026-09 | 2026-10 | 2026-11 | Totale |
 | :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
-| OpenAI | 392.724.553 | 1.143.437.723 | 1.300.702.147 | 1.650.113.993 | 327.263.594 | 4.848.219.908 | 10.701.770.867 | 8.317.602.702 | 3.944.034.222 | 1.198.241.683 | 33.824.111.392 |
-| Anthropic | 0 | 0 | 0 | 0 | 0 | 713.927.967 | 15.445.581 | 0 | 2.435.111.125 | 2.058.686.224 | 5.223.170.897 |
+| OpenAI | 392.724.553 | 1.143.437.723 | 1.300.702.147 | 1.650.113.993 | 327.263.594 | 4.848.219.908 | 10.701.770.867 | 8.317.602.702 | 4.706.851.250 | 1.208.873.422 | 34.597.560.159 |
+| Anthropic | 0 | 0 | 0 | 0 | 0 | 713.927.967 | 15.445.581 | 0 | 2.435.537.918 | 2.072.820.944 | 5.237.732.410 |
 
 ### Storico mensile completo per modello
 
@@ -204,10 +204,10 @@ Valori zero indicano assenza di token registrati, non prova di mancato utilizzo.
 | Identificatore modello | 2026-02 | 2026-03 | 2026-04 | 2026-05 | 2026-06 | 2026-07 | 2026-08 | 2026-09 | 2026-10 | 2026-11 | Totale |
 | :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
 | gpt-5.6-sol | 0 | 0 | 0 | 0 | 0 | 3.643.888.650 | 4.535.268.418 | 4.032.171.592 | 0 | 0 | 12.211.328.660 |
+| gpt-6.1-sol | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3.776.228.101 | 1.079.519.521 | 4.855.747.622 |
 | gpt-5.6-luna | 0 | 0 | 0 | 0 | 0 | 36.160.075 | 4.360.662.683 | 222.688.256 | 0 | 0 | 4.619.511.014 |
-| claude-opus-5-5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.413.246.014 | 2.058.666.259 | 4.471.912.273 |
-| gpt-6.1-sol | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3.063.029.736 | 1.068.887.782 | 4.131.917.518 |
-| gpt-6-astra | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.933.011.101 | 658.398.329 | 89.087.292 | 3.680.496.722 |
+| claude-opus-5-5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.413.246.014 | 2.072.800.979 | 4.486.046.993 |
+| gpt-6-astra | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.933.011.101 | 695.517.009 | 89.087.292 | 3.717.615.402 |
 | gpt-5.6-terra | 0 | 0 | 0 | 0 | 0 | 678.987.477 | 1.689.514.162 | 426.875.063 | 0 | 0 | 2.795.376.702 |
 | gpt-5.5 | 0 | 0 | 166.706.103 | 1.649.938.188 | 327.263.594 | 489.183.706 | 0 | 0 | 0 | 0 | 2.633.091.591 |
 | gpt-5.4 | 0 | 1.091.585.133 | 1.124.469.068 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.216.054.201 |
@@ -215,7 +215,7 @@ Valori zero indicano assenza di token registrati, non prova di mancato utilizzo.
 | gpt-6-sol | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 537.845.199 | 0 | 0 | 537.845.199 |
 | gpt-5.3-codex | 303.266.404 | 51.642.499 | 9.526.976 | 175.805 | 0 | 0 | 0 | 0 | 0 | 0 | 364.611.684 |
 | gpt-daybreak-blue-latest | 0 | 0 | 0 | 0 | 0 | 0 | 116.325.604 | 38.563.477 | 48.609.639 | 14.715.173 | 218.213.893 |
-| gpt-6.1-terra | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 173.996.518 | 25.551.436 | 199.547.954 |
+| gpt-6.1-terra | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 186.496.501 | 25.551.436 | 212.047.937 |
 | gpt-6-luna | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 126.448.014 | 0 | 0 | 126.448.014 |
 | gpt-5.2-codex | 78.566.024 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 78.566.024 |
 | claude-sonnet-5-5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 21.384.143 | 0 | 21.384.143 |
@@ -223,18 +223,18 @@ Valori zero indicano assenza di token registrati, non prova di mancato utilizzo.
 | claude-sonnet-5 | 0 | 0 | 0 | 0 | 0 | 9.623.693 | 8.861.454 | 0 | 0 | 0 | 18.485.147 |
 | gpt-5.2 | 10.892.125 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 10.892.125 |
 | claude-opus-5 | 0 | 0 | 0 | 0 | 0 | 0 | 6.584.127 | 0 | 0 | 0 | 6.584.127 |
-| claude-haiku-5-5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 480.968 | 19.965 | 500.933 |
+| claude-haiku-5-5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 907.761 | 19.965 | 927.726 |
 | gpt-5.3-codex-spark | 0 | 210.091 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 210.091 |
 
 ### Provider, modello ed effort registrato
 
-Serie separata: **2026-09-03 → 2026-11-06**, **9.811.687.236 token** in **67.039 risposte**. 130 file indicizzati non erano disponibili: la copertura non è completa.
+Serie separata: **2026-09-03 → 2026-11-06**, **9.822.318.975 token** in **67.091 risposte**. 130 file indicizzati non erano disponibili: la copertura non è completa.
 
 | Provider dedotto | Identificatore modello | Effort registrato | Token |
 | :-- | :-- | :-- | --: |
 | OpenAI | gpt-6-astra | ultra | 2.191.566.524 |
 | OpenAI | gpt-6.1-sol | high | 1.301.952.626 |
-| OpenAI | gpt-6.1-sol | xhigh | 1.118.921.760 |
+| OpenAI | gpt-6.1-sol | xhigh | 1.129.553.499 |
 | OpenAI | gpt-5.6-sol | ultra | 982.521.161 |
 | OpenAI | gpt-6-astra | medium | 771.521.299 |
 | OpenAI | gpt-5.6-sol | medium | 611.967.864 |

@@ -25,8 +25,10 @@ export function attribution(primary) {
       if (!cache.has(cwd)) {
         let ok = false;
         try {
-          const real = fs.realpathSync(cwd);
-          ok = roots.some(root => fs.existsSync(root) && inside(real, fs.realpathSync(root))) || repositoryMatches(git(real, ['remote', 'get-url', 'origin']));
+          // The nearest repository owns the directory: a foreign checkout nested
+          // inside a MediFlow worktree is judged by its own identity.
+          const top = fs.realpathSync(git(fs.realpathSync(cwd), ['rev-parse', '--show-toplevel']));
+          ok = roots.some(root => fs.existsSync(root) && fs.realpathSync(root) === top) || repositoryMatches(git(top, ['remote', 'get-url', 'origin']));
         } catch { /* A directory without Git provenance is excluded. */ }
         cache.set(cwd, ok);
       }
@@ -47,9 +49,12 @@ const day = timestamp => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Ro
 const count = n => Number.isSafeInteger(n) && n >= 0 ? n : 0;
 export async function collectRecords(roots, accepts) {
   const records = new Map();
+  // Codex counters are cumulative per session. Observations from every file of
+  // a session are reconciled first, so partial copies cannot add a delta twice.
+  const sessions = new Map();
   let malformed = 0;
   for (const [environment, directories] of Object.entries(roots)) for (const directory of directories) for await (const file of files(directory)) {
-    let meta = {}, context = {}, previous = 0, previousCache = 0, session;
+    let meta = {}, context = {}, session;
     const input = readline.createInterface({ input: fs.createReadStream(file), crlfDelay: Infinity });
     for await (const line of input) {
       let r;
@@ -62,12 +67,13 @@ export async function collectRecords(roots, accepts) {
       if (environment === 'codex' && r.type === 'event_msg' && p.type === 'token_count' && p.info?.total_token_usage && session) {
         usage = p.info.total_token_usage;
         const current = count(usage.total_tokens);
-        tokens = current >= previous ? current - previous : 0;
-        previous = current;
-        key = `codex:${session}:${current}`;
-        cache = Math.min(tokens, Math.max(0, count(usage.cached_input_tokens) - previousCache));
-        previousCache = count(usage.cached_input_tokens);
-        cwd = context.cwd ?? meta.cwd; model = context.model ?? 'unknown'; effort = context.effort ?? 'unknown';
+        if (!sessions.has(session)) sessions.set(session, new Map());
+        const seen = sessions.get(session);
+        if (!seen.has(current)) {
+          const owner = context.cwd ?? meta.cwd;
+          seen.set(current, { current, cached: count(usage.cached_input_tokens), timestamp: r.timestamp, accepted: Boolean(r.timestamp) && accepts(owner, meta), model: context.model ?? 'unknown', effort: context.effort ?? 'unknown' });
+        }
+        continue;
       } else if (environment === 'claude' && r.type === 'assistant' && r.message?.usage && r.message.id && r.requestId) {
         usage = r.message.usage;
         tokens = count(usage.input_tokens) + count(usage.output_tokens) + count(usage.cache_read_input_tokens) + count(usage.cache_creation_input_tokens);
@@ -78,6 +84,15 @@ export async function collectRecords(roots, accepts) {
       if (!tokens || !r.timestamp || !accepts(cwd, meta)) continue;
       const record = { date: day(r.timestamp), environment, provider: providerFor(model), model, effort, tokens, cache };
       if (!records.has(key) || records.get(key).tokens < tokens) records.set(key, record);
+    }
+  }
+  for (const [session, seen] of sessions) {
+    let previous = 0, previousCache = 0;
+    for (const o of [...seen.values()].sort((a, b) => a.current - b.current)) {
+      const tokens = o.current - previous;
+      const cache = Math.min(tokens, Math.max(0, o.cached - previousCache));
+      previous = o.current; previousCache = Math.max(previousCache, o.cached);
+      if (tokens && o.accepted) records.set(`codex:${session}:${o.current}`, { date: day(o.timestamp), environment: 'codex', provider: providerFor(o.model), model: o.model, effort: o.effort, tokens, cache });
     }
   }
   return { records: [...records.values()], malformed };
