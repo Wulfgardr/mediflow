@@ -515,7 +515,9 @@
           },
           "provider": {
             "enum": [
-              "ollama"
+              "ollama",
+              "athena_mlx",
+              "athena_transformers"
             ]
           },
           "model": {
