@@ -110,3 +110,8 @@ Reasoning disabilitato, senza scelta del modello. I parser descrittivi di
 artefatti storici e il valore `athena_sidecar` dei vecchi envelope restano
 leggibili. Apple e GPUI non presentano più il provider rimosso. Le prove di
 compilazione e i relativi limiti sono riportati sulla PR di attuazione.
+
+Lo schema nativo OpenAPI v1 conserva i valori provider legacy per evitare
+un restringimento incompatibile del contratto pubblicato. Sono valori
+descrittivi di compatibilità e non vengono emessi dalle esecuzioni correnti.
+La rimozione non aggiunge operazioni o permessi al contratto `/api/v1`.
