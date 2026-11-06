@@ -145,7 +145,7 @@ export function readFunctionModelPreferences(sources: FunctionModelSources, vers
                 state: item.available ? 'available_unqualified' as const : 'unavailable' as const };
             return Object.freeze({ ...common, provider: item.provider });
         });
-        return Object.freeze({ id, enabled: id !== 'treatment_reasoning' && isAiLaneEnabledValue(sources.settings[FUNCTION_SWITCH_KEYS[id]]),
+        return Object.freeze({ id, enabled: isAiLaneEnabledValue(sources.settings[FUNCTION_SWITCH_KEYS[id]]),
             defaultModelOptionId: id === 'treatment_reasoning' ? null : selected,
             defaultSource: saved ? 'saved_preference' as const : 'host_configuration' as const,
             bindingState: id === 'treatment_reasoning' ? 'unsupported' as const : stale ? 'stale' as const : !selectedBinding ? 'unsupported' as const : 'current' as const,

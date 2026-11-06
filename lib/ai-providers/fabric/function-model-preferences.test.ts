@@ -121,7 +121,7 @@ test('SQLite preset preview/apply/reread is atomic, idempotent and durable acros
         const before = service.read(); const command = preset(readSources(), 'all_off');
         const preview = service.preview(command); assert.equal(preview.writesPerformed, 0); assert.deepEqual(service.read(), before);
         const applied = service.apply(command); assert.deepEqual(service.read(), applied); assert.deepEqual(service.apply(command), applied);
-        assert.ok(applied.functions.every(row => !row.enabled));
+        assert.ok(applied.functions.every(row => row.id === 'treatment_reasoning' ? row.enabled : !row.enabled));
         const child = spawnSync(process.execPath, ['scripts/run-strip-types.mjs', '--input-type=module', '-e',
             `import Database from 'better-sqlite3'; import {readFunctionModelPreferences} from './lib/ai-providers/fabric/function-model-preferences.ts';
             const db=new Database(${JSON.stringify(file)},{readonly:true});
@@ -129,7 +129,7 @@ test('SQLite preset preview/apply/reread is atomic, idempotent and durable acros
             process.stdout.write(JSON.stringify(readFunctionModelPreferences({...${JSON.stringify(source)},settings})));db.close();`], { encoding: 'utf8' });
         assert.equal(child.status, 0, child.stderr); assert.deepEqual(JSON.parse(child.stdout), applied);
         const reset = preset(readSources(), 'host_defaults'); service.apply(reset);
-        assert.ok(service.read().functions.every(row => row.defaultSource === 'host_configuration' && (!row.enabled)));
+        assert.ok(service.read().functions.every(row => row.defaultSource === 'host_configuration' && (row.id === 'treatment_reasoning' ? row.enabled : !row.enabled)));
         // A failed reread rolls all writes back inside the same transaction.
         const rollbackService = createFunctionModelPreferencesService({ readSources, immediate: cb => database.transaction(cb).immediate(),
             writeSettings(writes) { for (const [key,value] of Object.entries(writes)) database.prepare('INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,value);
