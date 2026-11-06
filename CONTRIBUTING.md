@@ -497,10 +497,27 @@ Una PR è considerata conclusa quando:
 
 - Apri una issue (bug / feature / discussione).
 - Proponi un piano piccolo (cosa cambia, file toccati, come verificare).
-- Invia una PR con:
+- Invia una PR con il [modello](.github/pull_request_template.md):
   - diff piccolo
   - descrizione chiara
-  - note di verifica (comandi eseguiti)
+  - prove: come hai stabilito il problema, come hai controllato la modifica,
+    che cosa hai osservato e che cosa non hai potuto controllare
+  - modello e strumento usati, se ha lavorato un agente
+
+### Contributi scritti con agenti
+
+MediFlow stesso è sviluppato così: [chi fa che cosa](./docs/development-usage.md#che-cosa-significa-assistito).
+Le PR scritte con un agente sono benvenute alle stesse condizioni delle altre.
+
+- Valutiamo problema, perimetro e prove, non lo stile di scrittura né il
+  sospetto che a scrivere sia stato un agente.
+- Chi apre la PR ne risponde: deve saperne spiegare lo scopo e le prove.
+- Dichiara modello e strumento in fondo alla PR e con `Co-Authored-By` nei
+  commit.
+- Se l'agente ha ripreso o adattato codice, testi o design di altri progetti,
+  indica fonte e licenza nella PR ed aggiorna [CREDITS.md](./CREDITS.md).
+- «I test passano» da solo non basta: servono le prove sul comportamento
+  cambiato.
 
 Quando resta un dubbio, consulta prima la documentazione: formula poi
 **una domanda mirata** sul punto che non chiarisce.

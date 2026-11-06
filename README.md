@@ -397,9 +397,14 @@ dal canale ChatGPT usato dalle funzioni AI di MediFlow.
 
 ## Sviluppo assistito
 
-MediFlow è sviluppato con l'assistenza di **Codex e Claude Code** per
-progettazione, implementazione, revisione e verifica. Direzione e
-responsabilità del progetto rimangono dell'autore.
+MediFlow è progettato e diretto da Leonardo Pegollo. Il codice è scritto in
+gran parte da agenti di coding, **Codex e Claude Code**, su sue istruzioni.
+Intento, pianificazione, architettura, prove richieste e merge sono suoi,
+mentre agli agenti spetta la scrittura. Le decisioni sono documentate negli
+[ADR](./docs/adr/), ogni PR indica modello e strumento usati ed il lavoro
+preso da altri progetti è riconosciuto nei [crediti](./CREDITS.md).
+
+[Che cosa significa «assistito», chi fa che cosa e principi dell'autore](./docs/development-usage.md).
 
 <details>
 <summary><strong>Strumenti e consumi dello sviluppo</strong></summary>
