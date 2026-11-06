@@ -69,8 +69,6 @@ Definition of Done qui sotto.
 - Node.js **24.x**, come fissato da `.nvmrc` e `package.json`
 - npm (incluso con Node)
 - Ollama (opzionale, per Patient Insight, Smart Import e Document Synthesis)
-- Apple Silicon, artifact locale ATHENA e toolchain MLX (opzionali, solo per
-  Treatment Reasoning)
 
 Per eseguire `scripts/run-strip-types.mjs --test`, anche tramite npm,
 impostare `MEDIFLOW_DATA_DIR` su una directory sintetica posseduta dal run;
@@ -95,14 +93,8 @@ validità corrente delle fonti. DeepSeek-OCR 2/CUDA resta
 e i punti di raccordo sintetici. Le route OCR legacy rispondono `410` dopo
 l'autenticazione.
 
-Per ATHENA, il perimetro 0.8.5 include Treatment Reasoning solo quando siano
-configurati localmente sia l'artefatto del modello sia il runner MLX.
-L'override controllato dall'host `MEDIFLOW_ATHENA_MLX_GENERATE_BIN` accetta
-soltanto il percorso assoluto di un eseguibile `mlx_lm.generate`, senza
-argomenti o shell. In assenza di override, `uvx` resta offline e si arresta
-se la cache richiesta non è già presente, senza cercare alternative.
-La disponibilità del runner non dimostra che ogni configurazione sia pronta
-all'uso.
+Treatment Reasoning resta nel catalogo come non disponibile. Non richiede
+modelli, runner o installazioni aggiuntive; vedi [ADR 0180](docs/adr/0180-athena-fuori-dal-nucleo-modelli-per-dominio.md).
 
 ---
 

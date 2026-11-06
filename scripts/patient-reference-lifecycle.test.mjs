@@ -17,7 +17,6 @@ const Database = nativeRequire('better-sqlite3');
 const { drizzle } = nativeRequire('drizzle-orm/better-sqlite3');
 const STORE = 'lib/security/durable-review-patient-link-store.ts';
 const PORTABLE = 'lib/security/portable-supervisor-patient-version-production.ts';
-const TREATMENT = 'lib/ai-providers/fabric/treatment-reasoning-production-root.ts';
 const pair = Object.freeze({ reviewId: `review_${'1'.repeat(32)}`, patientId: 'synthetic-active' });
 
 function fixture(t) {
@@ -38,24 +37,10 @@ function fixture(t) {
     const databasePort = { dbServer, hasCanonicalDurableReviewPatientLinkSchema: () => true,
         runDbServerImmediateTransaction: callback => sqlite.transaction(callback).immediate() };
     const unavailable = () => { throw new Error('fixture denies auth/provider/service execution'); };
-    let readTreatment;
     const doubles = {
         'server-only': {}, '../db-server': databasePort, '../../db-server': databasePort,
-        '../../athena-mlx-runtime': { generateWithAthenaMlx: unavailable, isAthenaMlxModelAvailable: unavailable },
-        '../../security/ordinary-application-context': { acquireOrdinaryApplicationContext: unavailable, registerOrdinaryApplicationResource: unavailable },
-        '../../security/web-auth-lifecycle-owner-adapter': { mintResourcePort: unavailable, registerPrivateResource: unavailable, releaseResourcePort: unavailable, unregisterPrivateResource: unavailable },
-        '../../chatgpt-product/ordinary-flow': { isOrdinaryFunctionSelected: unavailable },
-        './treatment-reasoning-chatgpt-production': { createTreatmentReasoningChatGptService: unavailable },
-        './function-model-dispatch': { captureFunctionModelTransportGuard: unavailable, captureTreatmentReasoningDispatch: unavailable },
-        './treatment-reasoning-portable-runtime': { createTreatmentReasoningPortableRuntime: () => Object.freeze({}) },
-        './treatment-reasoning-portable-provisioning': { createPortableProvisioning: () => Object.freeze({}) },
-        './provider-lifecycle-service': { createHostProviderLifecycleService: () => ({ service: Object.freeze({}) }) },
-        './treatment-reasoning-authenticated-projection': { createTreatmentReasoningAuthenticatedProjectionBroker(sources) {
-            readTreatment = sources.readPatientVersion; return Object.freeze({});
-        } },
-        './treatment-reasoning-production-operation': { createTreatmentReasoningProductionService: () => ({ acquireIngest: unavailable, acquirePreview: unavailable }) },
     };
-    const allowed = new Set([STORE, PORTABLE, TREATMENT, 'lib/schema.ts', 'lib/patient-lifecycle.ts', 'lib/version-concurrency.ts',
+    const allowed = new Set([STORE, PORTABLE, 'lib/schema.ts', 'lib/patient-lifecycle.ts', 'lib/version-concurrency.ts',
         'lib/ai-treatment-reasoning-kill-switch.ts', 'lib/ai-lane-kill-switch.ts', 'lib/ai-function-availability.ts']);
     const cache = new Map();
     function load(relative) {
@@ -76,8 +61,7 @@ function fixture(t) {
     }
     const { createDurableReviewPatientLinkStore, DurableReviewPatientLinkStoreError } = load(STORE);
     const { createPortableSupervisorPatientVersionProductionV1, PortableSupervisorPatientVersionProductionV1Error } = load(PORTABLE);
-    load(TREATMENT); assert.equal(typeof readTreatment, 'function');
-    return { sqlite, store: createDurableReviewPatientLinkStore(), readTreatment,
+    return { sqlite, store: createDurableReviewPatientLinkStore(),
         readPortable: createPortableSupervisorPatientVersionProductionV1(),
         denied(run, code) { assert.throws(run, error => error instanceof DurableReviewPatientLinkStoreError && error.code === code); },
         unavailable(run) { assert.throws(run, error => error instanceof PortableSupervisorPatientVersionProductionV1Error && error.code === 'patient_unavailable'); },
@@ -137,16 +121,6 @@ test('durable missing parent denies an existing association without deleting its
     h.unchanged(() => h.denied(() => h.store.readByReviewId(pair.reviewId), 'patient_missing'));
     assert.deepEqual(h.links(), history);
 });
-for (const [patientId, expected] of [['synthetic-active', 7], ['synthetic-archived', 8],
-    ['synthetic-deleted', null], ['synthetic-absent', null], ['synthetic-no-membership', null]]) {
-    test(`Treatment Reasoning exact membership/archive/tombstone semantics: ${patientId}`, t => {
-        const h = fixture(t);
-        h.unchanged(() => {
-            assert.equal(h.readTreatment(patientId, 'synthetic-ambulatory'), expected);
-            assert.equal(h.readTreatment(patientId, 'other-ambulatory'), null);
-        });
-    });
-}
 test('Portable Supervisor preserves archive exclusion, membership and explicit restore semantics', t => {
     const h = fixture(t), read = patientId => h.readPortable(patientId, 'synthetic-ambulatory');
     h.unchanged(() => {

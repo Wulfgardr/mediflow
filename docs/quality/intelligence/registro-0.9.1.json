@@ -106,16 +106,13 @@
         "operation": "reasoning",
         "authorityPlane": "clinical_application",
         "dataClass": "clinical",
-        "venues": [
-          "local_process",
-          "home_base"
-        ],
+        "venues": [],
         "egressProfileId": "local_only",
         "review": "review_first",
-        "availabilityDisposition": "proposal_only",
+        "availabilityDisposition": "unavailable",
         "killSwitch": "aiTreatmentReasoningKillSwitch",
         "contractSchema": "mediflow.treatment_reasoning.v1",
-        "entryPoint": "app/api/ai/treatment-reasoning/preview/route.ts"
+        "entryPoint": null
       },
       "chatCriteria": [],
       "runtimeProof": null,

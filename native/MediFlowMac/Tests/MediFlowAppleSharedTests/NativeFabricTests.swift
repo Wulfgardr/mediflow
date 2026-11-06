@@ -9,10 +9,10 @@ private enum FabricFixture {
     static func selection(_ function: NativeOrdinaryFunction) -> [String: Any] {
         ["modelOptionId": "model_option_" + String(repeating: "a", count: 32), "catalogRevision": "sha256_" + String(repeating: "b", count: 64),
          "preferenceRevision": "sha256_" + String(repeating: "c", count: 64), "source": "host_configuration",
-         "provider": function == .treatmentReasoning ? "athena_mlx" : "ollama", "model": "synthetic-local:1", "venue": "local", "fallback": "none"]
+         "provider": "ollama", "model": "synthetic-local:1", "venue": "local", "fallback": "none"]
     }
     static func result(_ function: NativeOrdinaryFunction) -> [String: Any] {
-        let receipt: [String: Any] = ["capability": function.rawValue, "venue": "local_process", "provider": function == .treatmentReasoning ? "athena_mlx" : "ollama",
+        let receipt: [String: Any] = ["capability": function.rawValue, "venue": "local_process", "provider": "ollama",
             "model": function == .treatmentReasoning ? NSNull() : "synthetic-local:1", "egress": "none", "egressProfile": ["egress": "none"], "fallbackCount": 0]
         switch function {
         case .patientInsight, .smartImport:
@@ -37,13 +37,17 @@ private enum FabricFixture {
 }
 
 final class NativeFabricDTOTests: XCTestCase {
-    func testFourOriginalProposalShapesAndLocalBinding() throws {
-        for function in NativeOrdinaryFunction.allCases {
+    func testThreeAvailableProposalShapesAndLocalBinding() throws {
+        for function in NativeOrdinaryFunction.allCases where function != .treatmentReasoning {
             let ready = try FabricFixture.response("ready", function)
             try ready.validate(function: function)
             let response = try FabricFixture.response("completed", function)
             _ = try response.validatedProposal(function: function, attempt: FabricFixture.id, expected: XCTUnwrap(ready.selection))
         }
+    }
+    func testTreatmentReasoningSelectionIsUnavailable() throws {
+        let response = try FabricFixture.response("ready", .treatmentReasoning)
+        XCTAssertThrowsError(try response.validate(function: .treatmentReasoning))
     }
     func testCloudBindingWrongModelWritesAndStaleExpiryAreDenied() throws {
         for key in ["provider", "venue", "model", "fallback"] {

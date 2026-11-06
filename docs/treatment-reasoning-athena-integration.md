@@ -1,5 +1,10 @@
 # Treatment Reasoning con ATHENA e Intelligence Fabric
 
+> Documento storico. Dal 6 novembre 2026 il codice ATHENA/MLX, i runner e i
+> comandi di installazione descritti qui sono rimossi dal prodotto. Non seguire
+> queste istruzioni per configurare MediFlow. Treatment Reasoning resta non
+> disponibile: [ADR 0180](./adr/0180-athena-fuori-dal-nucleo-modelli-per-dominio.md).
+
 Status: candidato sorgente locale `0.8.5`, review-only
 
 Primary ADR: [ADR 0073](./adr/0073-treatment-reasoning-athena-boundary.md)

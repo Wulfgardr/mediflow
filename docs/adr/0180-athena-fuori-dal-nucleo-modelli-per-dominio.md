@@ -87,3 +87,36 @@ quindi non qualificano un modello come barriera di redazione.
   *Sparks of Weight-Space Programming* (Takehi, Teoh, Zhang, Khattab, MIT
   CSAIL, 2 novembre 2026). Un derivato non entra nel Fabric finché non batte
   la decodifica vincolata da grammatica sullo stesso test.
+
+## Attuazione del 6 novembre 2026
+
+Rimossi dal prodotto i runtime MLX e Transformers dedicati a Treatment
+Reasoning, i relativi launcher, provisioning, download, impostazioni e
+composizioni di esecuzione. Rimossa anche la composizione Treatment Reasoning
+del canale ChatGPT. I due endpoint di anteprima e acquisizione conservano
+soltanto autenticazione e risposta `treatment_reasoning_unavailable_in_release`.
+
+Il catalogo Fabric v1 mantiene le sedici identità e le cinque funzioni
+generative. `treatment_reasoning` è `unavailable`, senza sedi né entry point
+eseguibile; il catalogo dei modelli conserva le quattro funzioni e non propone
+modelli per questa voce. Il crosswalk operativo passa da quattro a tre percorsi
+`proposal_only` e da uno a due `unavailable`; l’artefatto storico con hash resta
+immutato. La revisione derivata del catalogo modelli cambia e le scelte
+precedenti richiedono una nuova verifica, senza riscritture automatiche.
+
+Le impostazioni e i record lifecycle legacy restano su disco: nessuna migrazione
+li cancella. La proiezione corrente ignora i provider rimossi e mostra Treatment
+Reasoning disabilitato, senza scelta del modello. I parser descrittivi di
+artefatti storici e il valore `athena_sidecar` dei vecchi envelope restano
+leggibili. Apple e GPUI non presentano più il provider rimosso. Le prove di
+compilazione e i relativi limiti sono riportati sulla PR di attuazione.
+
+Lo schema nativo OpenAPI v1 conserva i valori provider legacy per evitare
+un restringimento incompatibile del contratto pubblicato. Sono valori
+descrittivi di compatibilità e non vengono emessi dalle esecuzioni correnti.
+La rimozione non aggiunge operazioni o permessi al contratto `/api/v1`.
+
+La fixture golden della preparazione ChatGPT conserva invariati i tre
+percorsi disponibili e rimuove soltanto il quarto caso di esecuzione
+Treatment Reasoning. I test di consenso, contenuto e cancellazione continuano
+sui tre percorsi; per Treatment Reasoning verificano l’indisponibilità.

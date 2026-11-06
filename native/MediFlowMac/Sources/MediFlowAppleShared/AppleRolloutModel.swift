@@ -247,7 +247,7 @@ public extension AppleFoundationSnapshot {
             AppleCapabilityLane(
                 id: "runtime",
                 title: "Runtime locale e AI plane",
-                summary: "La app macOS espone il readiness del bootstrap locale e il bundle packaged supervisiona backend e proxy TLS; Ollama e MLX restano diagnostici, mentre Docker è fuori scope e non app-managed. L'AI mobile resta separata dal data plane clinico.",
+                summary: "La app macOS espone il readiness del bootstrap locale e il bundle packaged supervisiona backend e proxy TLS; Ollama resta diagnostico, mentre Docker è fuori scope e non app-managed. L'AI mobile resta separata dal data plane clinico.",
                 sourceOfTruth: "ADR 0048",
                 macOS: ApplePlatformStatus(phase: .foundation, detail: "Shell home-base primaria con supervisione WebRuntime/TLS e diagnostica provider"),
                 iPhone: ApplePlatformStatus(phase: .blocked, detail: "Nessun comando AI remoto in questa wave"),
@@ -280,7 +280,7 @@ public extension AppleFoundationSnapshot {
             AppleMilestone(
                 id: "runtime",
                 title: "macOS packaged runtime host",
-                summary: "Shell home-base primaria, readiness runtime e supervisione di backend e proxy TLS nel bundle packaged. Ollama e MLX restano diagnostici; Docker è fuori scope e non app-managed.",
+                summary: "Shell home-base primaria, readiness runtime e supervisione di backend e proxy TLS nel bundle packaged. Ollama resta diagnostico; Docker è fuori scope e non app-managed.",
                 issue: "WUL-192",
                 phase: .foundation
             ),

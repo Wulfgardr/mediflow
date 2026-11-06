@@ -19,14 +19,14 @@ test('registra il catalogo generativo congelato', () => {
         smart_import: ['extraction', 'proposal_only', 'aiSmartImportKillSwitch', 'app/api/ai/smart-import/preview/route.ts'],
         document_synthesis: ['synthesis', 'proposal_only', 'aiDocumentSynthesisKillSwitch', 'app/api/ai/document-synthesis/preview/route.ts'],
         ocr: ['ocr', 'unavailable', null, null],
-        treatment_reasoning: ['reasoning', 'proposal_only', 'aiTreatmentReasoningKillSwitch', 'app/api/ai/treatment-reasoning/preview/route.ts'],
+        treatment_reasoning: ['reasoning', 'unavailable', 'aiTreatmentReasoningKillSwitch', null],
     });
     for (const [id, descriptor] of Object.entries(GENERATIVE_CAPABILITY_DESCRIPTORS)) {
         assert.equal(descriptor.id, id);
         assert.equal(descriptor.class, 'generative');
         assert.equal(descriptor.authorityPlane, 'clinical_application');
         assert.equal(descriptor.dataClass, 'clinical');
-        assert.deepEqual(descriptor.venues, id === 'ocr' ? [] : ['local_process', 'home_base']);
+        assert.deepEqual(descriptor.venues, ['ocr', 'treatment_reasoning'].includes(id) ? [] : ['local_process', 'home_base']);
         assert.equal(descriptor.egressProfileId, 'local_only');
         assert.equal(descriptor.review, 'review_first');
         assert.equal(Object.isFrozen(descriptor), true);
@@ -43,7 +43,7 @@ test('ogni schema non nullo compare letteralmente nella sua fonte', () => {
         patient_insight: '../../ai-task-contract-prompts.ts',
         smart_import: '../../ai-task-contract-prompts.ts',
         document_synthesis: '../../ai-task-contract-prompts.ts',
-        treatment_reasoning: '../../treatment-reasoning-service.ts',
+        treatment_reasoning: '../../treatment-reasoning-contract.ts',
     } as const;
 
     for (const descriptor of Object.values(GENERATIVE_CAPABILITY_DESCRIPTORS)) {

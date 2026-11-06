@@ -12,7 +12,7 @@ function fixture(): FunctionModelSources {
         ...Object.fromEntries(Object.values(FUNCTION_SWITCH_KEYS).map(key => [key, 'enabled'])) },
     ollamaLifecycle: { status: 'available', record: { version: 1, lifecycle: {
         provider: 'ollama', credentialClass: 'local_model', status: 'available_unqualified' } } },
-    athenaLifecycle: { status: 'denied', reason: 'missing' }, athenaIdentity: 'synthetic', athenaAvailable: false };
+    };
 }
 const request = (signal?: AbortSignal, choice?: unknown) => new Request('http://localhost/api/ai/patient-insight/preview', {
     method: 'POST', signal, headers: choice ? { [FUNCTION_MODEL_CHOICE_HEADER]: JSON.stringify(choice) } : {},
@@ -118,38 +118,6 @@ test('model and endpoint mismatch still deny before transport; abort never cause
         assert.equal((await handler(request())).status, 409);
     }
     assert.equal(calls, 0);
-});
-
-import { captureTreatmentReasoningDispatch } from './function-model-dispatch';
-import { readFunctionModelPreferences, resolveFunctionModelDispatch } from './function-model-preferences';
-import { parsePreferences } from '../../function-models/browser';
-import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity';
-import type { PortableStatus } from './treatment-reasoning-portable-provisioning';
-const portableStatus = (state: PortableStatus['state'] = 'admitted', revision = 2): PortableStatus => ({
-    schemaVersion: 'mediflow.treatment-portable-status.v1', provider: 'athena_transformers', model: ATHENA_R1_QWEN3_8B_MODEL_ID,
-    state, releaseDigest: 'a'.repeat(64), revision, selected: true, prerequisites: state === 'admitted' ? [] : [state], writesPerformed: 0, applyPolicy: 'none',
-});
-test('portable catalog is unavailable until explicitly admitted and does not change the other three bindings', () => {
-    const before = fixture(); const original = buildFunctionModelCatalog(before);
-    const missing = { ...before, portable: portableStatus('model_not_provisioned', 0) };
-    const missingView = readFunctionModelPreferences(missing, 'v2'); assert.ok(parsePreferences(JSON.parse(JSON.stringify(missingView))));
-    assert.equal(missingView.functions.find(f => f.id === 'treatment_reasoning')!.options.find(o => o.provider === 'athena_transformers')!.state, 'unavailable');
-    const after = buildFunctionModelCatalog({ ...before, portable: portableStatus() });
-    for (const id of ['patient_insight', 'document_synthesis', 'smart_import'] as const) {
-        assert.equal(original.hostDefaults[id], after.hostDefaults[id]);
-        assert.deepEqual(original.bindings.filter(x => x.functions.includes(id)), after.bindings.filter(x => x.functions.includes(id)));
-    }
-    assert.equal(original.bindings.find(x => x.provider === 'athena_mlx')!.modelOptionId, after.bindings.find(x => x.provider === 'athena_mlx')!.modelOptionId);
-});
-test('portable dispatch captures only the scoped exact choice; stale catalog or revocation cannot publish', async () => {
-const sources={...fixture(),portable:portableStatus()}; let invocations=0;
-const handler=createFunctionModelDispatch({readSources:()=>sources,authenticate:async()=> 'synthetic-session'})('treatment_reasoning',async()=>{invocations++;return Response.json({});});
-assert.equal((await handler(request())).status,403);assert.equal(invocations,0);
-});
-test('portable catalog digest changes invalidate a prior explicit request rather than falling back', () => {
-const sources={...fixture(),portable:portableStatus()};const catalog=buildFunctionModelCatalog(sources);
-const option=catalog.bindings.find(b=>b.provider==='athena_transformers')!;
-assert.throws(()=>resolveFunctionModelDispatch(sources,'treatment_reasoning',{modelOptionId:option.modelOptionId,expectedCatalogRevision:catalog.revision}),/Non disponibile/);
 });
 
 for (const trigger of ['request', 'internal'] as const) test(`guard combines authenticated request cancellation with the existing internal signal: ${trigger}`, async () => {

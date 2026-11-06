@@ -258,7 +258,11 @@ Il raccordo con il runtime è descritto in
 La receipt storica `fabric-product-crosswalk-receipt.v1.json` resta immutabile
 con stato `candidate_not_integrated`; non prova lo stato del runtime corrente.
 
-### Precondizione e prova locale ATHENA
+### Storico: precondizione e prova locale ATHENA
+
+Dal 6 novembre 2026 questi runner e le relative impostazioni sono rimossi
+dal prodotto. Le osservazioni seguenti documentano soltanto il percorso
+storico; non sono istruzioni di configurazione correnti. Vedi [ADR 0180](./adr/0180-athena-fuori-dal-nucleo-modelli-per-dominio.md).
 
 La possibilità di usare ATHENA dipende dalla macchina, non dalla sola presenza
 del codice di Treatment Reasoning: modello e runner MLX offline devono essere

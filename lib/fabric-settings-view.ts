@@ -360,7 +360,6 @@ const PROVIDER_EFFECTIVE_KEYS = Object.freeze([
 ] as const);
 const CANONICAL_PROVIDER_DISCLOSURE = buildProviderDisclosureSnapshot({
     ollama: () => ({ status: 'denied', reason: 'unavailable' }),
-    athena: () => ({ status: 'denied', reason: 'unavailable' }),
 });
 
 function hasExactKeys(value: object, expected: readonly string[]): boolean {
@@ -402,7 +401,7 @@ function isCanonicalProviderDisclosure(value: unknown): boolean {
         if (effectiveRecord.runtimeObservation !== 'not_observed'
             || effectiveRecord.venue !== null
             || effectiveRecord.egress !== null) return false;
-        const local = index < 2;
+        const local = expected.id === 'ollama';
         if (!local) {
             return effectiveRecord.lifecycle === 'not_applicable'
                 && effectiveRecord.credentialClass === null

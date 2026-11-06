@@ -62,7 +62,7 @@ function sourcesAt(url: string): FunctionModelSources {
         ...Object.fromEntries(Object.values(FUNCTION_SWITCH_KEYS).map(key => [key, 'enabled'])) },
     ollamaLifecycle: { status: 'available', record: { version: 1,
         lifecycle: { provider: 'ollama', credentialClass: 'local_model', status: 'available_unqualified' } } },
-    athenaLifecycle: { status: 'denied', reason: 'missing' }, athenaIdentity: 'synthetic', athenaAvailable: false };
+    };
 }
 
 for (const version of ['0.33.3', '0.40.4']) for (const id of ['patient_insight', 'smart_import', 'document_synthesis'] as const) {

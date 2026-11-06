@@ -39,7 +39,6 @@ impl AiFunctionId {
 #[serde(rename_all = "snake_case")]
 pub enum AiModelProvider {
     Ollama,
-    AthenaMlx,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]

@@ -214,9 +214,7 @@ export interface FabricExecutionPolicy {
 // ---------------------------------------------------------------------------
 
 // 'in_house' identifica le pipeline deterministiche senza provider AI.
-// 'athena_mlx' identifica la lane MLX locale di treatment reasoning, che non
-// passa dal registry Ollama (matrice serving: lane separata, nessuna eredita).
-export type FabricProviderRef = AIProvider | 'athena_mlx' | 'in_house';
+export type FabricProviderRef = AIProvider | 'in_house';
 
 export interface FabricResolutionReceipt {
     readonly schemaVersion: 'mediflow.ai.fabric-resolution.v1';
@@ -227,8 +225,7 @@ export interface FabricResolutionReceipt {
     readonly provider: FabricProviderRef;
     readonly model: string | null;
     // Ricevuta del registry provider per le capability generative con binding
-    // registry; null per le deterministiche e per le lane generative
-    // autogestite fuori dal registry (oggi 'athena_mlx'). La ricevuta non
+    // registry; null per le deterministiche. La ricevuta non
     // autorizza alcun consumer.
     readonly providerReceipt: ProviderSelectionReceipt | null;
     readonly fallbackCount: 0;

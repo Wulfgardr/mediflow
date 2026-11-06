@@ -43,20 +43,18 @@ function outputs() {
         { schemaVersion: 'mediflow.ai.extract.v1', task: 'patient_insight', summary: 'Bea Riva [S1]', data: { currentState: ['Bea Riva [S1]'], alerts: [], nextSteps: [], gaps: [] } },
         { schemaVersion: 'mediflow.ai.extract.v1', task: 'smart_import', summary: 'Bea Riva', data: { diagnoses: [{ label: 'Ipertensione', icdQuery: 'Hypertension', confidence: 'high', evidence: 'Bea Riva in controllo', sourceId: 'source_synthetic' }], therapies: [], servicePrescriptions: [] } },
         { schemaVersion: 'mediflow.document-synthesis.provider-envelope.v2', output: { schemaVersion: 'mediflow.ai.extract.v1', task: 'document_synthesis', summary: 'Bea Riva', data: { qualityLevel: 'yellow', medications: [], diagnoses: [], problemStatements: [], therapyCandidates: [], servicePrescriptions: [] } }, citations: [{ label: 'S1', quote: 'Bea Riva in controllo.' }], claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] },
-        { schemaVersion: 'mediflow.treatment_reasoning.v1', task: 'treatment_reasoning', summary: 'Bea Riva', data: { recommendation: 'Bea Riva in controllo', keyEvidence: [], reasoning: [], caveats: [], safetyFlags: [], suggestedActions: [], trace: { mode: 'chatgpt_subscription', toolsUsed: [], limitations: [] } }, sourceBindings: [{ claimPath: 'summary', claim: 'Bea Riva', evidenceRefs: ['source_synthetic'] }, { claimPath: 'data.recommendation', claim: 'Bea Riva in controllo', evidenceRefs: ['source_synthetic'] }] },
     ];
 }
-function profiles() { return [createPatientInsightOrdinaryTaskProfile(PI), createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }), createDocumentSynthesisOrdinaryTaskProfile(sourceSet()), createTreatmentReasoningOrdinaryTaskProfile(TR)]; }
+function profiles() { return [createPatientInsightOrdinaryTaskProfile(PI), createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }), createDocumentSynthesisOrdinaryTaskProfile(sourceSet())]; }
 const tokenFrom = (text: string) => { const token = text.match(/\{\{MF_PII_[a-f0-9]{32}_\d+\}\}/u)?.[0]; assert.ok(token); return token; };
 function reset() { calls = []; closes = 0; detection = 'Bea Riva'; behavior = 'normal'; release = undefined; }
 
-test('four named builders emit exactly their canonical prompt bytes and classify dynamic fields', () => {
+test('three named builders emit exactly their canonical prompt bytes and classify dynamic fields', () => {
     const ds = sourceSet();
     const pairs = [
         [createPatientInsightOrdinaryTaskProfile(PI), buildPatientInsightExtractionPrompt('[S1] Bea Riva in controllo\n[S2] Condizione attiva: Condizione di Bea Riva')],
         [createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }), buildPatientSmartImportCapabilityPrompt(SI)],
         [createDocumentSynthesisOrdinaryTaskProfile(ds), buildDocumentSynthesisMultiSourcePrompt(ds).prompt],
-        [createTreatmentReasoningOrdinaryTaskProfile(TR), buildChatGptTreatmentReasoningPrompt(TR)],
     ] as const;
     for (const [profile, prompt] of pairs) {
         const read = readOrdinaryTaskProfile(profile);
@@ -69,7 +67,7 @@ test('four named builders emit exactly their canonical prompt bytes and classify
     assert.doesNotMatch(buildChatGptTreatmentReasoningPrompt(TR), /lane locale/u);
 });
 
-test('four roundtrips retain complete canonical output and original DS citations', async () => {
+test('three roundtrips retain complete canonical output and original DS citations', async () => {
     reset();
     const ps = profiles(), expected = outputs();
     for (let index = 0; index < ps.length; index++) {
@@ -130,20 +128,19 @@ for (const bad of ['duplicate', 'escaped-duplicate', 'nonfinite', 'trailing', 'i
     } finally { await job.close(); }
 });
 
-for (const bad of ['foreign', 'truncated', 'unknown', 'key', 'sourceId', 'claimPath', 'mode']) test(`tokens cannot cross isolation/structural boundaries: ${bad}`, async () => {
-    reset(); const profile = profiles()[bad === 'sourceId' ? 1 : ['claimPath', 'mode'].includes(bad) ? 3 : 0];
+for (const bad of ['foreign', 'truncated', 'unknown', 'key', 'sourceId', 'claimPath']) test(`tokens cannot cross isolation/structural boundaries: ${bad}`, async () => {
+    reset(); const profile = profiles()[bad === 'sourceId' ? 1 : bad === 'claimPath' ? 2 : 0];
     const one = createOrdinaryPreparation(profile, configuration), two = createOrdinaryPreparation(profile, configuration);
     try {
         const a = readPreparedOrdinaryProfile(await one.ready), b = readPreparedOrdinaryProfile(await two.ready);
         const token = tokenFrom(a.content.input[0].text), other = tokenFrom(b.content.input[0].text);
-        let wire = JSON.stringify(outputs()[bad === 'sourceId' ? 1 : ['claimPath','mode'].includes(bad) ? 3 : 0]).replaceAll('Bea Riva', token);
+        let wire = JSON.stringify(outputs()[bad === 'sourceId' ? 1 : bad === 'claimPath' ? 2 : 0]).replaceAll('Bea Riva', token);
         if (bad === 'foreign') wire = wire.replaceAll(token, other);
         if (bad === 'truncated') wire = wire.replaceAll(token, token.slice(0, -1));
         if (bad === 'unknown') wire = wire.replaceAll(token, token.replace(/_\d+\}\}$/u, '_4096}}'));
         if (bad === 'key') wire = wire.replace('"summary":', `"${token}":`);
         if (bad === 'sourceId') wire = wire.replace('"source_synthetic"', JSON.stringify(token));
         if (bad === 'claimPath') wire = wire.replace('"claimPath":"summary"', `"claimPath":"${token}"`);
-        if (bad === 'mode') wire = wire.replace('"chatgpt_subscription"', JSON.stringify(token));
         assert.throws(() => a.parseOutput(wire));
     } finally { await one.close(); await two.close(); }
 });

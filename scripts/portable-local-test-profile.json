@@ -42,7 +42,6 @@
     "local:test:sqlite-repair",
     "local:scripts/stage-chatgpt-execution-mac-assets.test.mjs",
     "local:test:terminology-registry",
-    "local:scripts/treatment-reasoning-portable-setup.test.mjs",
     "local:test:treatment-reasoning",
     "ui06:domain:local",
     "local:tools/code-explorer/extract-files.test.mjs",

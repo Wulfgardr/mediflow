@@ -19,7 +19,7 @@ import { composeDocumentSynthesisProviderProjection } from '../ai-providers/fabr
 import { parseDocumentSynthesisProviderEnvelope, resolveDocumentSynthesisProviderEnvelope } from '../ai-providers/fabric/document-synthesis-provider-envelope';
 import { bindDocumentSynthesisProviderEnvelope } from '../ai-providers/fabric/document-synthesis-provider-envelope-binding';
 import type { DocumentSynthesisClaimCitationsResult } from '../ai-providers/fabric/document-synthesis-claim-citations';
-import { createTreatmentReasoningChatGptOutputContract, type TreatmentReasoningChatGptContent } from '../ai-providers/fabric/treatment-reasoning-athena-output-contract-v2';
+import { AiFunctionUnavailableError } from '../ai-function-availability';
 import {
     buildPatientSmartImportCapabilityPrompt, buildPatientSmartImportCapabilityPlan,
     parsePatientSmartImportCapabilityProposal,
@@ -27,11 +27,11 @@ import {
 } from '../domain/documents/patient-smart-import-capability-contract';
 import { snapshotSmartImportProjection, type SmartImportProjection } from '../smart-import-projection';
 import {
-    buildChatGptTreatmentReasoningPrompt, buildChatGptTreatmentReasoningPlan, type TreatmentReasoningPromptInput,
+    type TreatmentReasoningPromptInput,
 } from '../treatment-reasoning-contract';
 
 export type OrdinaryTaskFunctionId = 'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning';
-export type OrdinaryTaskOutput = PatientInsightExtraction | PatientSmartImportCapabilityProposal | Extract<DocumentSynthesisClaimCitationsResult, { status: 'available' }> | TreatmentReasoningChatGptContent;
+export type OrdinaryTaskOutput = PatientInsightExtraction | PatientSmartImportCapabilityProposal | Extract<DocumentSynthesisClaimCitationsResult, { status: 'available' }>;
 export const ORDINARY_PROFILE_VERSION = 'mediflow.ordinary-redacted-profile.v1' as const;
 export type OrdinaryTaskProfile = object;
 export type OrdinaryTaskProfileRead = Readonly<{
@@ -135,27 +135,7 @@ function validPatientInsightInput(value: unknown): value is PatientInsightProjec
     const input = exact(value, ['schemaVersion', 'clinicalFocus', 'activeConditions', 'currentTherapies', 'recentClinicalEvents']);
     return Boolean(input && input.schemaVersion === 'mediflow.patient-insight.projection.v1' && typeof input.clinicalFocus === 'string' && input.clinicalFocus.length > 0 && input.clinicalFocus.length <= 240 && boundedStrings(input.activeConditions, 12, 240) && boundedStrings(input.currentTherapies, 12, 240) && boundedStrings(input.recentClinicalEvents, 12, 240));
 }
-function validTreatmentInput(value: unknown): value is TreatmentReasoningPromptInput {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-    const input = value as Record<string, unknown>;
-    const keys = Object.keys(input);
-    if (keys.some(key => !['question', 'patientContext', 'sources', 'activeTherapies', 'diagnoses', 'observations'].includes(key))
-        || typeof input.question !== 'string' || !input.question.trim() || input.question.length > 500
-        || typeof input.patientContext !== 'string' || input.patientContext.length > 1200
-        || !Array.isArray(input.sources) || input.sources.length === 0 || input.sources.length > 12) return false;
-    for (const key of ['activeTherapies', 'diagnoses', 'observations']) {
-        if (Object.hasOwn(input, key) && !boundedStrings(input[key], 20, 220)) return false;
-    }
-    const kinds = ['patient-profile', 'diagnosis', 'therapy', 'observation', 'clinical-entry', 'document-insight', 'attachment-evidence', 'clinician-question', 'external-tool-trace'];
-    return input.sources.every(source => {
-        if (!source || typeof source !== 'object' || Array.isArray(source)) return false;
-        if (Object.keys(source).some(key => !['id', 'sourceKind', 'label', 'excerpt', 'date'].includes(key))) return false;
-        return typeof source.id === 'string' && /^[A-Za-z][A-Za-z0-9._:-]{2,119}$/u.test(source.id)
-            && kinds.includes(source.sourceKind) && typeof source.label === 'string' && Boolean(source.label.trim()) && source.label.length <= 180
-            && (!Object.hasOwn(source, 'excerpt') || typeof source.excerpt === 'string' && source.excerpt.length <= 260)
-            && (!Object.hasOwn(source, 'date') || typeof source.date === 'string' && source.date.length <= 80);
-    });
-}
+
 function insightPlan(input: PatientInsightProjection): EmissionPlan {
     let index = 1;
     const parts: EmissionPart[] = [`[S${index++}] `, emissionUnit(input.clinicalFocus)];
@@ -230,20 +210,8 @@ export function createDocumentSynthesisOrdinaryTaskProfile(sourceSet: unknown): 
 }
 
 /** Fixed remote prompt and source-bound content; no execution attestation. */
-export function createTreatmentReasoningOrdinaryTaskProfile(input: TreatmentReasoningPromptInput): OrdinaryTaskProfile {
-    const snapshot = clone(input) as TreatmentReasoningPromptInput;
-    try {
-        if (!validTreatmentInput(snapshot)) return reject('ordinary_task_input_invalid');
-        const allowedEvidenceRefs = snapshot.sources.map(source => source.id);
-        const contract = createTreatmentReasoningChatGptOutputContract({ allowedEvidenceRefs });
-        const prompt = buildChatGptTreatmentReasoningPrompt(snapshot);
-        return register('treatment_reasoning', snapshot, prompt, buildChatGptTreatmentReasoningPlan(snapshot), (text) => {
-            let value: unknown;
-            try { value = JSON.parse(text); } catch { return reject('ordinary_task_output_invalid'); }
-            const result = contract.normalize(value);
-            return result.status === 'accepted' ? result : reject('ordinary_task_output_invalid');
-        });
-    } catch { return reject('ordinary_task_input_invalid'); }
+export function createTreatmentReasoningOrdinaryTaskProfile(_input: TreatmentReasoningPromptInput): OrdinaryTaskProfile {
+    throw new AiFunctionUnavailableError();
 }
 
 /** Resolves only a same-module registered opaque profile and returns immutable content details. */

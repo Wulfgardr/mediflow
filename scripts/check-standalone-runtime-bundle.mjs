@@ -72,7 +72,6 @@ if (process.argv[2] === '--tls-proxy-resources') {
   await checkPackagedTlsProxy(process.argv[3]);
   process.exit(0);
 }
-const { bundledTreatmentPortableFailure, treatmentPortablePrivateArtifact, runTreatmentPortableSelfTest } = await import('./treatment-reasoning-portable-setup.mjs');
 
 // only safe, failure-only smoke diagnostics omit the CLI exception stack.
 class PdfPageWorkerSmokeError extends Error {}
@@ -1116,9 +1115,6 @@ if (process.argv[2] === '--self-test=windows-bootstrap') {
 if (process.argv[2] === '--self-test=windows-icu') {
   runWindowsIcuSelfTest(); process.exit(0);
 }
-if (process.argv[2] === '--self-test=treatment-portable') {
-  console.log(JSON.stringify(runTreatmentPortableSelfTest())); process.exit(0);
-}
 
 if (process.argv[2] === '--self-test') {
   runSelfTest();
@@ -1153,7 +1149,6 @@ const serverPath = path.join(standaloneDir, 'server.js');
 const runtimeContractPath = path.join(standaloneDir, 'mediflow-runtime-contract.json');
 
 const forbiddenMatchers = [
-  treatmentPortablePrivateArtifact,
   (relativePath) => /^medical\.db$/i.test(relativePath),
   (relativePath) => /\.(db|sqlite|sqlite3)$/i.test(relativePath),
   (relativePath) => /^tmp[-_/]/.test(relativePath),
@@ -1191,8 +1186,6 @@ function fail(message) {
   process.exit(1);
 }
 
-const treatmentPortableFailure = bundledTreatmentPortableFailure(standaloneDir, root);
-if (treatmentPortableFailure) fail(treatmentPortableFailure);
 
 const retiredPdfFailure = retiredPdfRuntimeFailure(standaloneDir);
 if (retiredPdfFailure) fail(retiredPdfFailure);

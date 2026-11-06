@@ -1,5 +1,10 @@
 <a id="mlx-operational-parity"></a>
 
+> Documento storico. Dal 6 novembre 2026 il codice ATHENA/MLX, i runner e i
+> comandi di installazione descritti qui sono rimossi dal prodotto. Non seguire
+> queste istruzioni per configurare MediFlow. Treatment Reasoning resta non
+> disponibile: [ADR 0180](./adr/0180-athena-fuori-dal-nucleo-modelli-per-dominio.md).
+
 # Equivalenza operativa MLX
 
 > Stato documento: `SECONDARY`, slice `WUL-165`.

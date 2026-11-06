@@ -36,12 +36,6 @@ const GENERATIVE_TASKS: Readonly<Record<Exclude<GenerativeCapabilityId, 'treatme
     ocr: 'ocr',
 };
 
-// Lane generative con runtime autogestito fuori dal registry Ollama: la
-// ricevuta nomina il provider effettivo della lane, il modello resta risolto
-// dalla lane stessa (matrice serving: ATHENA MLX non eredita il registry).
-const SELF_MANAGED_GENERATIVE: Readonly<Partial<Record<GenerativeCapabilityId, 'athena_mlx'>>> = {
-    treatment_reasoning: 'athena_mlx',
-};
 
 function isGenerative(id: string): id is GenerativeCapabilityId {
     return GENERATIVE_CAPABILITY_IDS.includes(id as GenerativeCapabilityId);
@@ -203,10 +197,7 @@ export function resolveFabricCapability(
         throw new FabricPolicyError('venue_not_allowed');
     }
 
-    const selfManagedProvider = generativeCapability
-        ? SELF_MANAGED_GENERATIVE[descriptor.id as GenerativeCapabilityId] ?? null
-        : null;
-    const requiresRegistryBinding = generativeCapability && selfManagedProvider === null;
+    const requiresRegistryBinding = generativeCapability;
     if (
         descriptor.class !== (generativeCapability ? 'generative' : 'deterministic')
         || requiresRegistryBinding !== Boolean(request.generative)
@@ -254,7 +245,7 @@ export function resolveFabricCapability(
         class: descriptor.class,
         venue: request.venue,
         egressProfile,
-        provider: generative?.receipt.provider ?? selfManagedProvider ?? 'in_house',
+        provider: generative?.receipt.provider ?? 'in_house',
         model: generative?.receipt.model ?? null,
         providerReceipt: generative?.receipt ?? null,
         fallbackCount: 0,

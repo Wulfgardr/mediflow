@@ -8,7 +8,6 @@ import {
   AIP_OPERATION_RPC_LATE_BIND_ENV_V1,
 } from '../../packages/aip/src/child-ipc-contract.ts';
 import { LOCAL_UI_RPC_MODE } from '../../packages/mcp/src/local-ui-contract.ts';
-import { resolveAthenaMlxGenerateBin } from '../athena-mlx-launcher-config.ts';
 import type { LateBoundMcpChildPortV1 } from './authenticated-headless-agent-pre-spawned-mcp-child.ts';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -29,7 +28,6 @@ export type PortableSupervisorChildProcessesOptionsV1 = Readonly<{
   dataDir: string;
   agentKind?: 'mcp' | 'mini' | 'plugin_local_ui';
   /** Explicit host-owned runner for Web only; no parent environment is inherited here. */
-  athenaMlxGenerateBin?: string;
   spawnChild?: SpawnChild;
   nodePath?: string;
   loaderPath?: string;
@@ -143,7 +141,6 @@ export function createPortableSupervisorProductionChildProcessesV1(
 ): PortableSupervisorProductionChildProcessesV1 {
   const agentKind = options.agentKind ?? 'mcp';
   if (agentKind !== 'mcp' && agentKind !== 'mini' && agentKind !== 'plugin_local_ui') throw new Error('agent_kind_invalid');
-  const athenaMlxGenerateBin = resolveAthenaMlxGenerateBin(options.athenaMlxGenerateBin);
   const nodePath = requireAbsoluteFile(options.nodePath ?? process.execPath, 'node');
   const loaderPath = requireAbsoluteFile(options.loaderPath ?? LOADER, 'loader', ROOT_REAL);
   // Node interprets Windows drive letters as URL schemes for --import unless encoded as file URLs.
@@ -169,9 +166,6 @@ export function createPortableSupervisorProductionChildProcessesV1(
       MEDIFLOW_APP_WORKTREE_HASH: identity.worktreeHash,
       MEDIFLOW_APP_SOURCE_FINGERPRINT: identity.sourceFingerprint, MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint,
     });
-  }
-  if (athenaMlxGenerateBin !== undefined) {
-    webEnvironment.MEDIFLOW_ATHENA_MLX_GENERATE_BIN = athenaMlxGenerateBin;
   }
   if (agentKind === 'plugin_local_ui') webEnvironment.MEDIFLOW_PLUGIN_LOCAL_UI = '1';
   const mcpEnvironment = {

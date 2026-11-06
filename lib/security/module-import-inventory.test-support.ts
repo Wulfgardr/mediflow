@@ -24,8 +24,6 @@ export const allowedGenericLoaderExpressions: ReadonlySet<string> = new Set([
     fingerprint('lib/ai-providers/fabric/document-synthesis-provider-binding.test.ts', 'dynamic', 'TemplateExpression', 'VariableStatement', "`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`"),
     fingerprint('lib/ai-providers/fabric/document-synthesis-provider-envelope.test.ts', 'dynamic', 'TemplateExpression', 'VariableStatement', "`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`"),
     fingerprint('lib/ai-providers/fabric/document-synthesis-source-set-currentness-owner.test.ts', 'dynamic', 'Identifier', 'VariableStatement', 'foreignPath'),
-    fingerprint('lib/pm2-manager.test.ts', 'require', 'Identifier', 'VariableStatement', 'managerPath'),
-    fingerprint('lib/pm2-manager.test.ts', 'require', 'Identifier', 'ExpressionStatement', 'managerPath'),
     fingerprint('lib/security/web-auth-control-owner.test.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', "pathToFileURL(join(directory, 'web-auth-control-owner.ts')).href"),
     fingerprint('lib/security/web-auth-control-owner.test.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', "pathToFileURL(join(directory, 'server-session.ts')).href"),
     fingerprint('lib/security/web-auth-control-record.test.ts', 'dynamic', 'PropertyAccessExpression', 'ReturnStatement', 'pathToFileURL(target).href'),
@@ -43,9 +41,6 @@ export const allowedGenericLoaderExpressions: ReadonlySet<string> = new Set([
 const allowedUnsafeLoaderExpressions: ReadonlySet<string> = new Set([
     fingerprint('scripts/document-evidence-backfill-live-db.ts', 'unsafe:require', 'CallExpression', 'VariableStatement', "require('better-sqlite3')"),
     fingerprint('scripts/treatment-reasoning-live-db-smoke.ts', 'unsafe:require', 'CallExpression', 'VariableStatement', "require('better-sqlite3')"),
-    fingerprint('lib/pm2-manager.ts', 'unsafe:require', 'CallExpression', 'VariableStatement', "require('pm2')"),
-    fingerprint('lib/pm2-manager.test.ts', 'unsafe:require', 'CallExpression', 'VariableStatement', 'require(managerPath)'),
-    fingerprint('lib/pm2-manager.test.ts', 'unsafe:require', 'CallExpression', 'ExpressionStatement', 'require(managerPath)'),
     fingerprint('lib/backup-restore-preflight.ts', 'unsafe:require', 'CallExpression', 'ReturnStatement', "require('./data-dir')"),
 ]);
 const allowedProtectedLoaderExpressions: ReadonlyMap<string, number> = new Map([

@@ -1,7 +1,6 @@
 import { assertFunctionAvailableInRelease } from '../../ai-function-availability';
 import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY, nextFunctionModelConfigurationGeneration, readFunctionModelConfigurationGeneration } from './function-model-configuration-generation';
 import { createHash } from 'node:crypto';
-import type { PortableStatus } from './treatment-reasoning-portable-provisioning';
 import { isAiLaneEnabledValue } from '../../ai-lane-kill-switch';
 import { resolveTextModel } from '../../ai-model-selection';
 import { DEFAULT_OLLAMA_BASE_URL, resolveOllamaBaseUrl } from '../base-url';
@@ -15,15 +14,14 @@ export const FUNCTION_SWITCH_KEYS = Object.freeze({ patient_insight: 'aiPatientI
 const CONFIG_KEYS = ['aiProvider', 'aiModel_clinical', 'aiModel_reasoning', 'aiModel', 'aiUrl', 'ollamaUrl'] as const;
 export const FUNCTION_MODEL_SETTING_KEYS = [...CONFIG_KEYS, ...Object.values(FUNCTION_SWITCH_KEYS), FUNCTION_PREFERENCES_KEY, FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY];
 export type FunctionModelSettings = Readonly<Record<string, string | undefined>>;
-export type FunctionModelSources = Readonly<{ settings: FunctionModelSettings; ollamaLifecycle: unknown; athenaLifecycle: unknown;
-    athenaIdentity: string; athenaAvailable: boolean; portable?: PortableStatus }>;
+export type FunctionModelSources = Readonly<{ settings: FunctionModelSettings; ollamaLifecycle: unknown }>;
 export type FunctionModelErrorCode = 'input_invalid' | 'state_corrupt' | 'catalog_stale' | 'revision_conflict' | 'command_conflict'
     | 'model_not_cataloged' | 'unsupported' | 'function_disabled' | 'provider_unavailable' | 'session_stale' | 'binding_stale' | 'unavailable';
 export class FunctionModelError extends Error {
     constructor(public readonly code: FunctionModelErrorCode) { super(`Function model request denied: ${code}`); this.name = 'FunctionModelError'; }
 }
-export type FunctionModelBinding = Readonly<{ modelOptionId: string; model: string; provider: 'ollama' | 'athena_mlx' | 'athena_transformers';
-    endpoint: string | null; functions: readonly FunctionModelId[]; available: boolean; provisioningState?: PortableStatus['state']; prerequisites?: readonly string[] }>;
+export type FunctionModelBinding = Readonly<{ modelOptionId: string; model: string; provider: 'ollama';
+    endpoint: string | null; functions: readonly FunctionModelId[]; available: boolean }>;
 type SavedDefault = Readonly<{ modelOptionId: string; catalogRevision: string }> | null;
 type Defaults = Record<FunctionModelId, SavedDefault>;
 type LastCommand = Readonly<{ id: string; digest: string; resultFingerprint: string }> | null;
@@ -57,13 +55,12 @@ function admitted(value: unknown, provider: string): boolean {
 }
 export function buildFunctionModelCatalog(sources: FunctionModelSources): FunctionModelCatalog {
     const config = Object.fromEntries(CONFIG_KEYS.map(key => [key, sources.settings[key] ?? null]));
-    const legacyRevisionInput = [config, sources.ollamaLifecycle, sources.athenaLifecycle, sources.athenaIdentity, sources.athenaAvailable];
-    const revision = functionModelDigest(sources.portable ? [...legacyRevisionInput, sources.portable] : legacyRevisionInput);
+    const revision = functionModelDigest([config, sources.ollamaLifecycle]);
     const bindings: FunctionModelBinding[] = [];
     const hostDefaults = Object.fromEntries(FUNCTION_MODEL_IDS.map(id => [id, null])) as Record<FunctionModelId, string | null>;
-    const add = (model: string, provider: 'ollama' | 'athena_mlx' | 'athena_transformers', endpoint: string | null, functions: readonly FunctionModelId[], available: boolean) => {
-        const modelOptionId = `model_option_${functionModelDigest([provider, model, endpoint, provider === 'athena_mlx' ? sources.athenaIdentity : provider === 'athena_transformers' ? sources.portable?.releaseDigest ?? null : null]).slice(7, 39)}`;
-        if (!bindings.some(item => item.modelOptionId === modelOptionId)) bindings.push(Object.freeze({ modelOptionId, model, provider, endpoint, functions, available, ...(provider === 'athena_transformers' ? { provisioningState: sources.portable!.state, prerequisites: sources.portable!.prerequisites } : {}) }));
+    const add = (model: string, provider: 'ollama', endpoint: string | null, functions: readonly FunctionModelId[], available: boolean) => {
+        const modelOptionId = `model_option_${functionModelDigest([provider, model, endpoint, null]).slice(7, 39)}`;
+        if (!bindings.some(item => item.modelOptionId === modelOptionId)) bindings.push(Object.freeze({ modelOptionId, model, provider, endpoint, functions, available }));
         return modelOptionId;
     };
     try {
@@ -82,15 +79,6 @@ export function buildFunctionModelCatalog(sources: FunctionModelSources): Functi
             } catch { /* Leave this host role unsupported. */ }
         }
     } catch { /* Invalid provider/endpoint is not a local candidate. */ }
-    hostDefaults.treatment_reasoning = add('ATHENA / MLX', 'athena_mlx', null, Object.freeze(['treatment_reasoning']),
-        false);
-    if (sources.portable) {
-        const portable = sources.portable;
-        const id = add(portable.model, 'athena_transformers', null, Object.freeze(['treatment_reasoning']),
-            false);
-        // This is a host-selected binding, never a fallback from an unavailable MLX choice.
-        hostDefaults.treatment_reasoning = portable.selected ? id : null;
-    }
     return Object.freeze({ revision, bindings: Object.freeze(bindings), hostDefaults: Object.freeze(hostDefaults) });
 }
 function readState(raw: string | undefined): State {
@@ -130,15 +118,11 @@ function lookup(catalog: FunctionModelCatalog, id: FunctionModelId, option: stri
 }
 export type FunctionPreferencesVersion = 'v1' | 'v2';
 export const FUNCTION_PREFERENCES_VERSION_HEADER = 'x-mediflow-function-preferences';
-export type LegacyFunctionModelOption = Readonly<{
-    modelOptionId: string; label: string; provider: 'ollama' | 'athena_mlx';
-    state: 'available_unqualified' | 'unavailable'; provisioningState?: never; prerequisites?: never;
+export type FunctionModelOption = Readonly<{
+    modelOptionId: string; label: string; provider: 'ollama';
+    state: 'available_unqualified' | 'unavailable';
 }>;
-export type PortableFunctionModelOption = Readonly<{
-    modelOptionId: string; label: string; provider: 'athena_transformers';
-    state: 'available_unqualified' | 'unavailable'; provisioningState: PortableStatus['state']; prerequisites: readonly string[];
-}>;
-export type FunctionModelOption = LegacyFunctionModelOption | PortableFunctionModelOption;
+export type LegacyFunctionModelOption = FunctionModelOption;
 export type FunctionPreferenceRow<Option extends FunctionModelOption = FunctionModelOption> = Readonly<{
     id: FunctionModelId; enabled: boolean; defaultModelOptionId: string | null;
     defaultSource: 'saved_preference' | 'host_configuration'; bindingState: 'current' | 'stale' | 'unsupported'; options: readonly Option[];
@@ -156,25 +140,22 @@ export function readFunctionModelPreferences(sources: FunctionModelSources, vers
         const saved = state.defaults[id]; const selected = saved?.modelOptionId ?? catalog.hostDefaults[id];
         const selectedBinding = catalog.bindings.find(item => item.modelOptionId === selected && item.functions.includes(id));
         const stale = saved !== null && (saved.catalogRevision !== catalog.revision || !selectedBinding);
-        const hidden = version === 'v1' && selectedBinding?.provider === 'athena_transformers';
         const options: FunctionModelOption[] = catalog.bindings.filter(item => item.functions.includes(id)).map(item => {
             const common = { modelOptionId: item.modelOptionId, label: item.model,
                 state: item.available ? 'available_unqualified' as const : 'unavailable' as const };
-            if (item.provider === 'athena_transformers') return Object.freeze({ ...common, provider: item.provider,
-                provisioningState: item.provisioningState ?? 'unavailable', prerequisites: item.prerequisites ?? ['unavailable'] });
             return Object.freeze({ ...common, provider: item.provider });
         });
         return Object.freeze({ id, enabled: isAiLaneEnabledValue(sources.settings[FUNCTION_SWITCH_KEYS[id]]),
-            defaultModelOptionId: hidden && !saved ? null : selected,
+            defaultModelOptionId: id === 'treatment_reasoning' ? null : selected,
             defaultSource: saved ? 'saved_preference' as const : 'host_configuration' as const,
-            bindingState: stale || (hidden && saved) ? 'stale' as const : !selectedBinding || hidden ? 'unsupported' as const : 'current' as const,
+            bindingState: id === 'treatment_reasoning' ? 'unsupported' as const : stale ? 'stale' as const : !selectedBinding ? 'unsupported' as const : 'current' as const,
             options: Object.freeze(options) });
     });
     const common = { revision: revision(state, sources.settings), catalogRevision: catalog.revision,
         check: 'configuration_only' as const, presets: ['host_defaults', 'all_off'] as const, apply: 'denied' as const };
     if (version === 'v1') return Object.freeze({ ...common, schemaVersion: 'mediflow.function-preferences.v1',
         functions: Object.freeze(functions.map(row => Object.freeze({ ...row,
-            options: Object.freeze(row.options.filter((option): option is LegacyFunctionModelOption => option.provider !== 'athena_transformers')) }))) });
+            options: row.options }))) });
     return Object.freeze({ ...common, schemaVersion: 'mediflow.function-preferences.v2', functions: Object.freeze(functions) });
 }
 export type FunctionModelChoice = Readonly<{ modelOptionId: string; expectedCatalogRevision: string }>;
@@ -244,8 +225,6 @@ export function planFunctionModelUpdate(sources: FunctionModelSources, value: un
         else {
             // A v1 client cannot opt into a provider outside its closed projection,
             // including through a preset or a null (host-default) choice.
-            const target = option ?? catalog.hostDefaults[id];
-            if (version === 'v1' && catalog.bindings.some(item => item.modelOptionId === target && item.provider === 'athena_transformers')) return fail('unsupported');
             if (option !== null) lookup(catalog, id, option, enabled);
             else if (enabled) lookup(catalog, id, catalog.hostDefaults[id], true);
             defaults[id] = option === null ? null : { modelOptionId: option, catalogRevision: catalog.revision };
@@ -254,7 +233,7 @@ export function planFunctionModelUpdate(sources: FunctionModelSources, value: un
     };
     if (command.action === 'set_activation') {
         // Preserve even stale local bindings unchanged. This does not admit
-        // Ollama/ATHENA, select OpenAI, grant consent or relax any dispatch gate.
+        // un provider locale, select OpenAI, grant consent or relax any dispatch gate.
         writes[FUNCTION_SWITCH_KEYS[command.functionId]] = command.enabled ? 'enabled' : 'disabled';
     } else if (command.action === 'set') set(command.functionId, command.enabled, command.defaultModelOptionId);
     else for (const id of FUNCTION_MODEL_IDS) {

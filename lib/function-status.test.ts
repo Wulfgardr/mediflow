@@ -5,8 +5,7 @@ import { buildFunctionStatus, parseFunctionStatus, FUNCTION_IDS, type FunctionSt
 const time = '2026-09-06T01:00:00.000Z';
 const sources: FunctionStatusSources = {
     platform: 'darwin', enabled: { patient_insight: true, smart_import: true, document_synthesis: true, treatment_reasoning: true },
-    ollamaLifecycle: 'available_unqualified', athenaLifecycle: 'available_unqualified',
-    clinicalBinding: { state: 'configured', model: 'synthetic-local:latest' }, athenaArtifact: true, who: 'configured',
+    ollamaLifecycle: 'available_unqualified', clinicalBinding: { state: 'configured', model: 'synthetic-local:latest' }, who: 'configured',
 };
 const row = (input: FunctionStatusSources, id: string) => buildFunctionStatus(input, time).functions.find(item => item.id === id)!;
 
@@ -24,7 +23,7 @@ test('off overrides provider configuration; missing and revoked providers stay d
         assert.equal(row({ ...sources, ollamaLifecycle: lifecycle }, 'smart_import').state, 'blocked');
     }
     assert.equal(row({ ...sources, clinicalBinding: { state: 'invalid', model: null } }, 'document_synthesis').state, 'needs_setup');
-    assert.equal(row({ ...sources, athenaArtifact: false }, 'treatment_reasoning').state, 'unavailable');
+    assert.equal(row({ ...sources, }, 'treatment_reasoning').state, 'unavailable');
 });
 test('OCR platform support and WHO configuration do not imply successful probes', () => {
     assert.equal(row({ ...sources, platform: 'linux' }, 'document_ocr').state, 'manual');

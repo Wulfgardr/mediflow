@@ -81,7 +81,7 @@ function fixture() {
         { clientId: principal.clientId, clientPlatform: 'macos' });
     let settings: Record<string, string> = { aiProvider: 'ollama', aiModel: 'synthetic:1', ...Object.fromEntries(Object.values(FUNCTION_SWITCH_KEYS).map(k => [k, 'enabled'])) };
     let writes = 0; let auth = true; let channel: string = 'native'; let duringAuthentication: (() => void) | undefined;
-    const sources = () => ({ settings, ollamaLifecycle: { status: 'available', record: { lifecycle: { status: 'available_unqualified', provider: 'ollama', credentialClass: 'local_model' } } }, athenaLifecycle: null, athenaIdentity: 'synthetic', athenaAvailable: false });
+    const sources = () => ({ settings, ollamaLifecycle: { status: 'available', record: { lifecycle: { status: 'available_unqualified', provider: 'ollama', credentialClass: 'local_model' } } }, });
     const service = createFunctionModelPreferencesService({ readSources: sources, immediate: op => op(), writeSettings(v) { if (Object.keys(v).length) writes++; settings = { ...settings, ...v }; } });
     const http = createNativeConfigurationHttp({ service, async authenticate() {
         duringAuthentication?.();
