@@ -1,16 +1,73 @@
-# Sviluppo assistito: disclosure e consumi
+# Come è sviluppato MediFlow: sviluppo assistito e consumi
 
-MediFlow è sviluppato con l’assistenza di modelli AI. Codex e Claude Code
-hanno contribuito a progettazione, scrittura, revisione e verifica dei sorgenti.
-Direzione e responsabilità del progetto rimangono dell’autore. I controlli
-automatizzati non equivalgono a una revisione umana di ogni modifica. L’uso di
-questi strumenti durante lo sviluppo non attiva servizi AI nel gestionale e
-non dimostra qualità o validazione clinica.
+MediFlow è progettato e diretto da Leonardo Pegollo. Il codice è scritto in
+gran parte da agenti di coding, Codex e Claude Code, che lavorano su sue
+istruzioni. Intento, pianificazione e scelte sono suoi; agli agenti spetta la
+scrittura. Questa pagina spiega che cosa significa, in pratica, «sviluppo
+assistito», e rende pubblico il consumo di token che lo accompagna.
 
-Questa pagina rende pubblici gli aggregati disponibili e il modo in cui sono
-letti. Le istruzioni personali usate dagli assistenti per sviluppare restano
-fuori dalla repository. I [crediti](../CREDITS.md#sviluppo-assistito) riconoscono
-gli strumenti impiegati.
+## Che cosa significa «assistito»
+
+Ogni modifica passa per gli stessi passaggi. La tabella indica chi li compie.
+
+| Passaggio | Chi lo compie | Dove si vede |
+| :-- | :-- | :-- |
+| **Intento**: quale problema risolvere e per chi | Leonardo | Issue, [PRODUCT.md](../PRODUCT.md) |
+| **Pianificazione e architettura**: confini, dati, sicurezza, contratti | Leonardo, con agenti che propongono alternative | [ADR](./adr/), [ARCHITECTURE.md](../ARCHITECTURE.md) |
+| **Scrittura del codice e dei test** | Agenti di coding | Commit con riga `Co-Authored-By`, PR con modello e strumento |
+| **Prove richieste per accettare la modifica** | Leonardo le stabilisce; agenti e CI le eseguono | Sezioni «Prove» e «Non verificato» di ogni PR, workflow CI |
+| **Accettazione e merge** | Leonardo | Storia delle PR su GitHub |
+| **Release e comunicazione** | Leonardo | [Note di versione](../CHANGELOG.md), sito |
+
+Nessun passaggio di decisione è delegato in modo implicito. Quando Leonardo
+autorizza per una sessione di lavoro un agente coordinatore a eseguire il
+merge, lo fa a condizioni scritte: controlli obbligatori verdi, nessun
+commento di review aperto e verifica locale eseguita. Fuori da queste
+condizioni il merge resta suo.
+
+«Assistito» non significa che una persona abbia letto ogni riga. Significa che
+una persona ha deciso che cosa costruire, come doveva funzionare e con quali
+prove accettarlo, e che ogni prova è nel repository e si può rieseguire.
+Quello che non è provato è dichiarato come tale, per esempio nei
+[limiti noti](./known-limitations.md).
+
+## Principi dell'autore
+
+Sono le regole che gli agenti ricevono a ogni sessione di lavoro su MediFlow,
+riassunte. Le istruzioni personali complete restano fuori dalla repository.
+
+- **Prima l'intento, poi il codice.** Ogni cambiamento non banale nasce da un
+  problema scritto e, se tocca confini di dati o sicurezza, da un ADR.
+- **Prove, non impressioni.** Una modifica si accetta per il comportamento
+  osservabile: test che falliscono prima e passano dopo, riproduzioni, dati e
+  ambienti realistici. Un controllo che non è stato fatto si dichiara.
+- **Un problema per PR**, con un diff che lasci riconoscere lo scopo.
+- **Locale prima di tutto.** Niente invii al cloud non richiesti e documentati;
+  niente dati reali di pazienti nel repository.
+- **Il medico deve capire.** Etichette, azioni e conseguenze si leggono senza
+  la spiegazione di uno sviluppatore ([DESIGN.md](../DESIGN.md)).
+- **La complessità deve guadagnarsi il posto.** Si sceglie il modello più
+  semplice che rende corretto il comportamento.
+
+## Attribuzione
+
+- **Agli agenti:** ogni commit scritto con un agente porta la riga
+  `Co-Authored-By` con il modello; ogni PR si chiude con modello e strumento
+  usati. La regola vale dal 6 novembre 2026; i commit precedenti non la
+  rispettano sempre.
+- **Ad altri autori:** idee, design e codice presi o adattati da altri progetti
+  sono riconosciuti in [CREDITS.md](../CREDITS.md) con fonte e licenza. Un agente
+  che riusa materiale altrui deve dichiararlo nella PR, come qualunque
+  contributore.
+- **Ai controlli:** le review automatiche e i test non sostituiscono le
+  decisioni sopra. Lo sviluppo assistito non attiva servizi AI nel gestionale
+  e non dimostra qualità o validazione clinica.
+
+## Consumi dello sviluppo
+
+Lo storico dei token accompagna ogni release: mostra quanto contesto i modelli
+hanno elaborato per costruire MediFlow, per provider, modello ed effort. I
+[crediti](../CREDITS.md#sviluppo-assistito) riconoscono gli strumenti impiegati.
 
 ![Storico dei token per provider, modello ed effort registrato; serie e limiti spiegati nelle tabelle seguenti](../screenshots/token-models.svg)
 

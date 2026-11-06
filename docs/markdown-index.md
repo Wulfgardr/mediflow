@@ -212,11 +212,12 @@ limiti.
 | [ARCHITECTURE.md](../ARCHITECTURE.md) | Visione architetturale stabile, confini e non-obiettivi. | Sempre, per cambi tecnici non banali. |
 | [SECURITY.md](../SECURITY.md) | Regole di sicurezza, minacce considerate, oscuramento dei dati identificativi e registrazione degli eventi. | Sempre, per qualunque cambio dati/API. |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Workflow contributivo e Definition of Done. | Sempre, prima di chiudere un task. |
+| [Modello di PR](../.github/pull_request_template.md) | Problema, modifica, prove, non verificato, fonti esterne, modello e strumento. | Ogni volta che si apre una PR. |
 | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | Intended purpose e guard `check:claims` contro overclaim su AI, SISS/FSE, cloud, diagnosi, triage, prescrizione e automazione. | Quando si tocca copy prodotto, UI/help, README, materiale pubblico o confini AI/SISS/FSE. |
 | [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | Proposta storica `WUL-419` per visite registrabili Fluid-style: prima slice senza raw audio/schema/API/UI runtime, transcript/draft PHI e provider esterni solo opt-in; il percorso Apple successivo è governato da ADR 0113. | Quando si lavora su visite registrabili, trascrizione visita, UI web recording-aware, benchmark transcript o sidecar macOS audio. |
 | [CHANGELOG.md](../CHANGELOG.md) | Storico release e cambiamenti rilevanti. | Al bisogno, per contesto versioni. |
 | [CREDITS.md](../CREDITS.md) | Attribuzioni per ispirazioni, modelli, librerie e runtime usati dal progetto. | Quando si verifica provenienza, licenze o uso corretto di contributi esterni. |
-| [Sviluppo assistito e consumi](./development-usage.md) | Disclosure pubblica, storico token e limiti delle fonti. | Per leggere o riprodurre grafici, aggregati e conteggi per provider, modello ed effort. |
+| [Sviluppo assistito e consumi](./development-usage.md) | Chi fa che cosa nello sviluppo assistito, principi dell'autore, attribuzione, storico token e limiti delle fonti. | Per leggere o riprodurre grafici, aggregati e conteggi per provider, modello ed effort. |
 
 ## 🧱 Architettura, flussi e parity
 
