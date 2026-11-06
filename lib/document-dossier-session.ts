@@ -192,11 +192,14 @@ export async function buildDossierInventory(
                 documentDate: date?.date ?? null, parserFacts: candidates.facts, now: ports.now() });
             facts = merged.facts;
             preparedDate = merged.documentDate;
-            prepared = { patient: match.patient, patientLabel: preparedPatientLabel(match.patient), notes: merged.notes, facts: merged.facts.filter((fact) => fact.origin === 'prepared').length };
+            const label = preparedPatientLabel(match.patient);
+            const unread = Boolean(label) && !preparedPatientKey(match.patient, text);
+            prepared = { patient: match.patient, patientLabel: label, facts: merged.facts.filter((fact) => fact.origin === 'prepared').length,
+                notes: unread ? [...merged.notes, 'Il paziente proposto dall’estrazione non è scritto nel documento: la fonte non viene raggruppata sotto di lui.'] : merged.notes };
             // Il CF dell'estrazione raggruppa soltanto: il controllo d'identità resta sui codici letti da MediFlow.
         }
         const documentDate = date ? { value: date.date, source: date.source } : preparedDate ? { value: preparedDate, source: 'text' as const } : null;
-        const group = (match && preparedPatientKey(match.patient)) || groupKeyOf(file.relativePath);
+        const group = (match && preparedPatientKey(match.patient, text)) || groupKeyOf(file.relativePath);
         sources.push({ key, group, relativePath: file.relativePath, fileName: file.name, size: file.size, sha256,
             classification, extraction, text, taxCodes, documentDate,
             facts, classificationResult: candidates.classification,
