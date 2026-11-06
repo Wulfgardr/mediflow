@@ -27,7 +27,7 @@ const lifecycleRecord: Extract<ProviderLifecycleRead, { status: 'available' }>['
 });
 const response = JSON.stringify({
     schemaVersion: 'mediflow.ai.extract.v1', task: 'patient_insight', summary: 'Synthetic summary [S1]',
-    ignoredRaw: 'raw-provider-marker', data: { currentState: ['Synthetic state [S1]'], alerts: [], nextSteps: ['Synthetic review [S4]'], gaps: [] },
+    data: { currentState: ['Synthetic state [S1]'], alerts: [], nextSteps: ['Synthetic review [S4]'], gaps: [] },
 });
 
 function resolution(chat: LocalProviderResolution['adapter']['chat']): LocalProviderResolution {
@@ -69,7 +69,7 @@ test('returns a typed review-only proposal after the fixed Fabric pipeline and t
     const result = await fixture.value.preview({ requestId, projection, currentness });
     assert.equal(result.status, 'available');
     if (result.status !== 'available') return;
-    assert.equal(fixture.provider.maxTokens, 900); assert.deepEqual(fixture.provider.options, { responseFormat: 'json' });
+    assert.equal(fixture.provider.maxTokens, 900); assert.deepEqual(fixture.provider.options, { responseFormat: 'patient_insight' });
     assert.match(fixture.provider.prompt, /\[S1\] Synthetic follow-up/u);
     assert.match(fixture.provider.prompt, /\[S4\] Evento clinico recente: Synthetic review/u);
     assert.doesNotMatch(fixture.provider.prompt, /patient\.synthetic|ambulatory\.synthetic/u);
