@@ -24,7 +24,9 @@ final class AppleRolloutModelTests: XCTestCase {
         let runtimeMilestone = try XCTUnwrap(snapshot.milestones.first { $0.id == "runtime" })
 
         XCTAssertTrue(runtimeLane.summary.contains("supervisiona backend e proxy TLS"))
-        XCTAssertTrue(runtimeLane.summary.contains("restano diagnostici"))
+        XCTAssertTrue(runtimeLane.summary.contains("Ollama resta diagnostico"))
+        XCTAssertFalse(runtimeLane.summary.contains("MLX"))
+        XCTAssertFalse(runtimeMilestone.summary.contains("MLX"))
         XCTAssertTrue(runtimeLane.summary.contains("Docker è fuori scope"))
         XCTAssertEqual(runtimeLane.sourceOfTruth, "ADR 0048")
         XCTAssertEqual(runtimeLane.nextIssue, "Post-0.8 provider lifecycle")
