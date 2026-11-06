@@ -168,7 +168,7 @@ fn unique<'a>(values: impl IntoIterator<Item = &'a str>) -> bool {
         .all(|id| !id.is_empty() && seen.insert(id))
 }
 fn valid_provider(row: &ProviderDisclosureRow) -> bool {
-    let local = matches!(row.id.as_str(), "ollama" | "athena_mlx");
+    let local = row.id == "ollama";
     if !local && !matches!(row.id.as_str(), "openai" | "anthropic") {
         return false;
     }
@@ -205,7 +205,7 @@ fn registry(value: Value) -> Result<FabricRegistry> {
                 .iter()
                 .map(|r| r.id.as_str()),
         )
-        || row.provider_disclosure.providers.len() != 4
+        || row.provider_disclosure.providers.len() != 3
         || row
             .provider_disclosure
             .providers
@@ -390,7 +390,7 @@ mod tests {
         );
         assert!(parsed.lanes[1].complete_report.is_null());
         let parsed = registry(source["registry"].clone()).unwrap();
-        assert_eq!(parsed.provider_disclosure.providers.len(), 4);
+        assert_eq!(parsed.provider_disclosure.providers.len(), 3);
         for (field, value) in [
             ("venue", json!("cloud")),
             ("runtimeObservation", json!("observed")),
@@ -415,8 +415,8 @@ mod tests {
             .iter()
             .find(|r| r.id == "treatment_reasoning")
             .unwrap();
-        assert_eq!(treatment.availability_disposition, "proposal_only");
-        assert_eq!(treatment.venues, ["local_process", "home_base"]);
+        assert_eq!(treatment.availability_disposition, "unavailable");
+        assert!(treatment.venues.is_empty());
         let obs = observations(fixture["observations"].clone()).unwrap();
         assert_eq!(obs.observations.len(), 4);
         assert_eq!(obs.fallback, "denied_by_contract");

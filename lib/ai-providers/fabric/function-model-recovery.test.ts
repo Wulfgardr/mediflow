@@ -14,8 +14,7 @@ function fixture(): FunctionModelSources {
     return { settings: { aiProvider: 'ollama', aiUrl: 'http://127.0.0.1:11434',
         aiModel_clinical: 'synthetic-clinical:1', aiModel_reasoning: 'synthetic-reasoning:1',
         ...Object.fromEntries(Object.values(FUNCTION_SWITCH_KEYS).map(key => [key, 'enabled'])) },
-    ollamaLifecycle: lifecycle('ollama'), athenaLifecycle: lifecycle('athena_mlx'),
-    athenaIdentity: 'synthetic-artifact', athenaAvailable: true };
+    ollamaLifecycle: lifecycle('ollama'), };
 }
 function command(sources: FunctionModelSources, change: Record<string, unknown> = {}): FunctionModelCommand {
     const view = readFunctionModelPreferences(sources);
@@ -76,9 +75,6 @@ test('disabled writes still reject a new noncataloged option and an option belon
     const sources = savedFixture();
     assert.throws(() => planFunctionModelUpdate(sources, command(sources, { enabled: false,
         defaultModelOptionId: `model_option_${'0'.repeat(32)}` })), /model_not_cataloged/);
-    const athena = buildFunctionModelCatalog(sources).hostDefaults.treatment_reasoning;
-    assert.throws(() => planFunctionModelUpdate(sources, command(sources, { enabled: false,
-        defaultModelOptionId: athena })), /unsupported/);
 });
 
 test('an explicit available rebind is still required before a stale preference can execute', () => {
@@ -119,11 +115,11 @@ test('all_off preview/apply/reread preserves stale choices, while host_defaults 
     const preview = service.preview(off); assert.equal(writes, 0); assert.deepEqual(service.read(), baseline);
     assert.equal(preview.proposed.functions[0].bindingState, 'stale');
     const applied = service.apply(off); assert.deepEqual(service.read(), applied); assert.deepEqual(service.apply(off), applied);
-    assert.equal(writes, 5); assert.ok(applied.functions.every(row => row.id === 'treatment_reasoning' ? row.enabled : !row.enabled));
+    assert.equal(writes, 5); assert.ok(applied.functions.every(row => !row.enabled));
     assert.deepEqual(savedDefault(sources), savedDefault(saved));
     const host = preset('host_defaults'); const hostPreview = service.preview(host);
     const reset = service.apply(host); assert.deepEqual(reset, hostPreview.proposed);
-    assert.ok(reset.functions.every(row => (row.id === 'treatment_reasoning' ? row.enabled : !row.enabled) && row.defaultSource === 'host_configuration'));
+    assert.ok(reset.functions.every(row => (!row.enabled) && row.defaultSource === 'host_configuration'));
     assert.equal(reset.functions[0].defaultModelOptionId, buildFunctionModelCatalog(sources).hostDefaults.patient_insight);
 });
 

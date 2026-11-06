@@ -1,8 +1,7 @@
 import { settingsClosure } from './fixtures/settings-closure-gallery';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { buildPortableFabricStatusSnapshot } from '../lib/ai-providers/fabric/status';
-import { FABRIC_STATUS_VERSION_HEADER, parsePortableFabricStatusEnvelope } from '../lib/ai-providers/fabric/treatment-reasoning-portable-disclosure';
+import { buildFabricStatusSnapshot } from '../lib/ai-providers/fabric/status';
 import { FABRIC_VENUES } from '../lib/ai-providers/fabric/contract';
 import { parseFabricSnapshotPair } from '../lib/fabric-settings-view';
 import { buildFunctionStatus } from '../lib/function-status';
@@ -13,15 +12,14 @@ import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 const baseline = process.env.FABRIC_GOVERNANCE_BASELINE === '1';
 const supplemental400 = process.env.FABRIC_GOVERNANCE_SUPPLEMENTAL_400 === '1';
 const captureDirectory = () => process.env.FABRIC_GOVERNANCE_SCREENSHOTS || test.info().outputPath('screenshots');
-const status = buildPortableFabricStatusSnapshot({ ollama: () => ({ status: 'denied', reason: 'missing' }),
-    athena: () => ({ status: 'denied', reason: 'missing' }) }, { status: () => null, hardware: () => null });
+const status = buildFabricStatusSnapshot({ ollama: () => ({ status: 'denied', reason: 'missing' }) });
 const observability = { schemaVersion: 'mediflow.ai.fabric-observability.v1', fallback: 'denied_by_contract',
     observations: FABRIC_VENUES.map(venue => ({ venue, state: 'unknown', reason: 'not_probed' })) };
-parseFabricSnapshotPair(parsePortableFabricStatusEnvelope(status).legacy, observability);
+parseFabricSnapshotPair(status, observability);
 const functions = buildFunctionStatus({ platform: 'synthetic',
     enabled: { patient_insight: false, smart_import: false, document_synthesis: false, treatment_reasoning: false },
-    ollamaLifecycle: 'missing', athenaLifecycle: 'missing', clinicalBinding: { state: 'unavailable', model: null },
-    athenaArtifact: false, who: 'disabled' }, '2026-10-27T00:00:00.000Z');
+    ollamaLifecycle: 'missing', clinicalBinding: { state: 'unavailable', model: null },
+    who: 'disabled' }, '2026-10-27T00:00:00.000Z');
 const readiness = { lanes: ['patient_insight', 'smart_import', 'redaction', 'clinical_entities', 'generative_challenger']
     .map(lane => ({ lane, available: false, report: null })), localControls: [] };
 const parliament = { updatedAt: '2026-10-27T00:00:00.000Z', jsonPath: '/synthetic/parliament.json',
@@ -84,7 +82,6 @@ for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, 
         const req = request.request(), url = new URL(req.url()), path = url.pathname, method = req.method();
         if (url.origin !== new URL(baseURL).origin || !mocked.has(path) || method !== 'GET') return request.fallback();
         calls.push({ path, method });
-        if (path === '/api/ai/fabric/status') expect(req.headers()[FABRIC_STATUS_VERSION_HEADER.toLowerCase()]).toBe('2');
         if (path === '/api/settings/ai/chatgpt/status') return request.fulfill({ json: { state: 'disconnected', notice: null,
             plan: null, loginExpiresAt: null, actions: ['connect'], inferenceEnabled: false, executionBlock: 'data_boundary_unqualified' } });
         if (path === '/api/system/function-status') return request.fulfill({ json: functions });

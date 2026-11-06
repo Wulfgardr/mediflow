@@ -170,16 +170,16 @@ Intelligence Fabric coordina quattro funzioni:
 - **Smart Import:** proposta di dati strutturati a partire da una fonte.
 - **Document Synthesis:** sintesi del contenuto dei documenti.
 - **Treatment Reasoning (Ragionamento terapeutico):** supporto al riesame della terapia.
-  Nella 0.9.1 non è disponibile su nessuna superficie, anche con i pesi
-  presenti: è rinviato a dopo la 0.9.1 insieme ad ATHENA.
+  Non è disponibile su nessuna superficie. Il relativo runtime è stato
+  rimosso con [ADR 0180](./docs/adr/0180-athena-fuori-dal-nucleo-modelli-per-dominio.md).
 
 Ogni risultato resta una proposta da rivedere; nessuna proposta modifica
 la cartella automaticamente. Si scelgono solo modelli ammessi dal sistema
 locale, per funzione o singola richiesta. Un modello assente o non più
 valido non viene sostituito automaticamente.
 
-Ollama può eseguire le prime tre funzioni. ATHENA/MLX è facoltativa e
-riservata al ragionamento terapeutico, con modello e configurazione locali.
+Ollama può eseguire le prime tre funzioni. Treatment Reasoning non richiede
+installazioni aggiuntive e resta non disponibile.
 
 Nelle prove su dati inventati, le tre funzioni Ollama hanno prodotto proposte
 valide; un primo tentativo di Patient Insight è fallito. La prova locale di

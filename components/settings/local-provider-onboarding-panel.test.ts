@@ -8,8 +8,7 @@ import { buildFunctionStatus } from '../../lib/function-status';
 
 function syntheticFunctions() {
     return buildFunctionStatus({ platform: 'synthetic', enabled: { patient_insight: true, smart_import: false,
-        document_synthesis: false, treatment_reasoning: false }, ollamaLifecycle: 'available_unqualified', athenaLifecycle: 'missing',
-    clinicalBinding: { state: 'configured', model: 'synthetic-local' }, athenaArtifact: false, who: 'disabled' }, '2026-09-08T00:00:00.000Z');
+        document_synthesis: false, treatment_reasoning: false }, ollamaLifecycle: 'available_unqualified', clinicalBinding: { state: 'configured', model: 'synthetic-local' }, who: 'disabled' }, '2026-09-08T00:00:00.000Z');
 }
 
 // Mount the real component with React DOM in a browser and synthetic HTTP fixtures.

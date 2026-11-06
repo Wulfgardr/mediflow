@@ -26,7 +26,6 @@ const dataDir = path.join(temporary, 'data');
 const webDirectory = path.join(temporary, 'web');
 fs.mkdirSync(dataDir); fs.mkdirSync(webDirectory);
 process.env.MEDIFLOW_DATA_DIR = dataDir;
-delete process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN;
 const PATIENT = 'patient.synthetic.mini';
 const AMBULATORY = 'ambulatory.synthetic.mini';
 const OTHER_PATIENT = 'patient.synthetic.other-mini';

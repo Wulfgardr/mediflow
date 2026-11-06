@@ -11,7 +11,6 @@ const packageRoots = ['packages/aip', 'packages/mini', 'packages/mcp', 'packages
 const scriptTests = [
     'scripts/check-headless-portable-imports.test.mjs',
     'scripts/intelligent-host-mcp-stdio.test.mjs',
-    'scripts/mediflow-headless-supervisor-athena.test.mjs',
     'scripts/run-headless-portable-tests.test.mjs',
 ];
 

@@ -1,6 +1,6 @@
 /* Synthetic ordinary-content fixtures. No runtime account or clinical data. */
 import assert from 'node:assert/strict';
-import { createPatientInsightOrdinaryTaskProfile, createSmartImportOrdinaryTaskProfile, createDocumentSynthesisOrdinaryTaskProfile, createTreatmentReasoningOrdinaryTaskProfile } from './ordinary-task-profile';
+import { createPatientInsightOrdinaryTaskProfile, createSmartImportOrdinaryTaskProfile, createDocumentSynthesisOrdinaryTaskProfile } from './ordinary-task-profile';
 import { captureDocumentSynthesisSourceSet } from '../ai-providers/fabric/document-synthesis-source-set-contract';
 import type { TreatmentReasoningPromptInput } from '../treatment-reasoning-contract';
 export const configuration = { pythonExecutable: '/synthetic/python', workerPath: '/synthetic/worker', modelDirectory: '/synthetic/model' };
@@ -19,5 +19,5 @@ export function outputs() {
         { schemaVersion: 'mediflow.treatment_reasoning.v1', task: 'treatment_reasoning', summary: 'Bea Riva', data: { recommendation: 'Bea Riva in controllo', keyEvidence: [], reasoning: [], caveats: [], safetyFlags: [], suggestedActions: [], trace: { mode: 'chatgpt_subscription', toolsUsed: [], limitations: [] } }, sourceBindings: [{ claimPath: 'summary', claim: 'Bea Riva', evidenceRefs: ['source_synthetic'] }, { claimPath: 'data.recommendation', claim: 'Bea Riva in controllo', evidenceRefs: ['source_synthetic'] }] },
     ];
 }
-export function profiles() { return [createPatientInsightOrdinaryTaskProfile(PI), createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }), createDocumentSynthesisOrdinaryTaskProfile(sourceSet()), createTreatmentReasoningOrdinaryTaskProfile(TR)]; }
+export function profiles() { return [createPatientInsightOrdinaryTaskProfile(PI), createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }), createDocumentSynthesisOrdinaryTaskProfile(sourceSet())]; }
 export const tokenFrom = (text: string) => { const token = text.match(/\{\{MF_PII_[a-f0-9]{32}_\d+\}\}/u)?.[0]; assert.ok(token); return token; };

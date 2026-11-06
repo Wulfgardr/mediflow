@@ -106,7 +106,7 @@ public struct HomeBaseRuntimeStatusView: View {
 
             optionalServicesSection
 
-            Text("Backend web e proxy TLS sono gli unici servizi gestiti dalla app. Ollama e MLX sono mostrati a scopo diagnostico e non vengono mai installati o avviati automaticamente.")
+            Text("Backend web e proxy TLS sono gli unici servizi gestiti dalla app. Ollama è mostrato a scopo diagnostico e non vengono mai installati o avviati automaticamente.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

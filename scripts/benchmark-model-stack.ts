@@ -17,7 +17,6 @@ type CandidateLane = 'generative' | 'pii' | 'clinical_entities' | 'embedding';
 type CandidateOrigin = 'current_stack' | 'report';
 type CandidateRuntime =
     | 'ollama_chat'
-    | 'mlx_chat'
     | 'external_chat_runtime'
     | 'transformers_token_classification'
     | 'transformers_encoder';
@@ -58,7 +57,6 @@ type StackBenchmarkReport = {
     registryPath: string;
     corpusPath: string;
     baseUrl: string;
-    mlxBaseUrl: string;
     iterations: number;
     schemaVersion: CandidateRegistry['schemaVersion'];
     benchmarkedRuntimeModels: string[];
@@ -92,10 +90,8 @@ function parseArgs(argv: string[]) {
         corpus: DEFAULT_CORPUS_PATH,
         out: null as string | null,
         baseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
-        mlxBaseUrl: process.env.MLX_BASE_URL || 'http://127.0.0.1:8080',
         iterations: 1,
         models: null as string[] | null,
-        mlxModels: null as string[] | null,
     };
 
     for (let index = 2; index < argv.length; index += 1) {
@@ -112,20 +108,11 @@ function parseArgs(argv: string[]) {
         } else if (value === '--base-url' && argv[index + 1]) {
             args.baseUrl = argv[index + 1];
             index += 1;
-        } else if (value === '--mlx-base-url' && argv[index + 1]) {
-            args.mlxBaseUrl = argv[index + 1];
-            index += 1;
         } else if (value === '--iterations' && argv[index + 1]) {
             args.iterations = Math.max(1, Number.parseInt(argv[index + 1], 10) || 1);
             index += 1;
         } else if (value === '--models' && argv[index + 1]) {
             args.models = argv[index + 1]
-                .split(',')
-                .map((item) => item.trim())
-                .filter(Boolean);
-            index += 1;
-        } else if (value === '--mlx-models' && argv[index + 1]) {
-            args.mlxModels = argv[index + 1]
                 .split(',')
                 .map((item) => item.trim())
                 .filter(Boolean);
@@ -166,23 +153,19 @@ export async function runModelStackBenchmark(options: {
     registryPath?: string;
     corpusPath?: string;
     baseUrl?: string;
-    mlxBaseUrl?: string;
     iterations?: number;
     models?: string[];
-    mlxModels?: string[];
 }): Promise<StackBenchmarkReport> {
     const registryPath = options.registryPath || DEFAULT_REGISTRY_PATH;
     const corpusPath = options.corpusPath || DEFAULT_CORPUS_PATH;
     const baseUrls = resolveLocalChatBaseUrls({
         baseUrl: options.baseUrl,
-        mlxBaseUrl: options.mlxBaseUrl,
     });
     const iterations = Math.max(1, options.iterations || 1);
 
     const registry = readRegistry(registryPath);
     const requestedModels = [
         ...(options.models || []),
-        ...(options.mlxModels || []),
     ];
     const allowedModels = requestedModels.length > 0
         ? new Set(requestedModels)
@@ -200,7 +183,6 @@ export async function runModelStackBenchmark(options: {
         ? await runAiTaskContractBenchmark({
             corpusPath,
             baseUrl: baseUrls.ollama,
-            mlxBaseUrl: baseUrls.mlx,
             iterations,
             targets: runnableGenerativeCandidates
                 .map((candidate) => (
@@ -253,7 +235,6 @@ export async function runModelStackBenchmark(options: {
         registryPath,
         corpusPath,
         baseUrl: baseUrls.ollama,
-        mlxBaseUrl: baseUrls.mlx,
         iterations,
         schemaVersion: registry.schemaVersion,
         benchmarkedRuntimeModels: benchmarkReport?.targetModels || [],
@@ -277,10 +258,8 @@ async function main() {
         registryPath: args.registry,
         corpusPath: args.corpus,
         baseUrl: args.baseUrl,
-        mlxBaseUrl: args.mlxBaseUrl,
         iterations: args.iterations,
         models: args.models || undefined,
-        mlxModels: args.mlxModels || undefined,
     });
 
     const output = JSON.stringify(report, null, 2);

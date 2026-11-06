@@ -53,7 +53,6 @@
     "test:attachment-currentness-writers": "node --test scripts/check-attachment-currentness-writers.test.mjs",
     "check:node-runtime": "node scripts/node-runtime-contract.mjs verify",
     "check:standalone-runtime-bundle": "node scripts/check-standalone-runtime-bundle.mjs",
-    "check:mlx-operational-parity": "node scripts/check-mlx-operational-parity.mjs",
     "check:apple-wide-qa": "node scripts/check-apple-wide-qa-manifest.mjs",
     "check:claims": "node scripts/check-claims-guard.mjs",
     "check:terminology-parity": "bash scripts/check-terminology-parity.sh",
@@ -119,7 +118,7 @@
     "report:local-absorption-telemetry": "bash scripts/local-absorption-telemetry.sh",
     "test:local-absorption-telemetry": "node scripts/run-strip-types.mjs --test lib/local-absorption-telemetry.test.ts",
     "test:ai-task-contracts": "node scripts/run-strip-types.mjs --test lib/ai-task-contracts.test.ts",
-    "test:treatment-reasoning": "node scripts/run-strip-types.mjs --test lib/treatment-reasoning-contract.test.ts lib/ai-treatment-reasoning-kill-switch.test.ts lib/treatment-reasoning-context.test.ts lib/treatment-reasoning-service.test.ts lib/athena-mlx-runtime.test.ts scripts/treatment-reasoning-route-boundary.test.mjs",
+    "test:treatment-reasoning": "node scripts/run-strip-types.mjs --test lib/treatment-reasoning-contract.test.ts lib/treatment-reasoning-context.test.ts lib/ai-function-availability.test.ts lib/retired-model-legacy-bootstrap.test.ts",
     "test:report-service": "node scripts/run-strip-types.mjs --test lib/report-service.test.ts",
     "test:fse-validation": "node scripts/run-strip-types.mjs --test lib/fse-validation.test.ts",
     "test:ai-insight-settings": "node scripts/run-strip-types.mjs --test lib/ai-insight-settings.test.ts",
@@ -172,7 +171,6 @@
     "benchmark:model-stack": "node scripts/run-strip-types.mjs scripts/benchmark-model-stack.ts",
     "benchmark:model-parliament": "node scripts/run-strip-types.mjs scripts/benchmark-model-parliament.ts",
     "test:ai-model-parliament": "node scripts/run-strip-types.mjs --test scripts/benchmark-model-parliament.test.ts",
-    "benchmark:mlx:runtime": "node scripts/mlx-run.mjs benchmark",
     "validate:ai-rollout-readiness": "node scripts/run-strip-types.mjs scripts/benchmark-rollout-readiness.ts",
     "validate:ai-task-contracts": "node scripts/run-strip-types.mjs scripts/benchmark-ai-task-contracts.ts --validate --min-contract-rate 0.9",
     "validate:treatment-reasoning": "node scripts/run-strip-types.mjs scripts/benchmark-treatment-reasoning.ts --validate --min-contract-rate 1",
@@ -180,7 +178,6 @@
     "validate:patient-insight": "node scripts/run-strip-types.mjs scripts/benchmark-patient-insight.ts --validate --models qwen3.5:35b-a3b",
     "validate:evidence-absorption": "bash scripts/evidence-absorption-benchmark.sh --validate",
     "test:ai-rollout-readiness": "node scripts/run-strip-types.mjs --test scripts/benchmark-rollout-readiness.test.ts lib/ai-rollout-readiness-storage.test.ts lib/ai-rollout-model-guard.test.ts lib/ai-patient-insight-kill-switch.test.ts lib/ai-smart-import-kill-switch.test.ts lib/ai-document-synthesis-kill-switch.test.ts",
-    "test:mlx:runtime": "node scripts/mlx-run.mjs test",
     "test:terminology-registry": "bash scripts/terminology-registry-test.sh",
     "test:siss-adapter": "bash scripts/siss-adapter-test.sh",
     "test:siss-prescription": "bash scripts/siss-prescription-test.sh",
@@ -263,7 +260,6 @@
     "next": "16.3.8",
     "pdf-lib": "1.17.1",
     "pdfjs-dist": "4.10.38",
-    "pm2": "7.0.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-dropzone": "^14.3.8",
@@ -284,10 +280,7 @@
       "sharp": "0.35.5"
     },
     "ip-address": "10.7.0",
-    "nanoid": "3.3.18",
-    "pm2": {
-      "js-yaml": "4.3.2"
-    }
+    "nanoid": "3.3.18"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

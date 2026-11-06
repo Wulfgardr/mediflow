@@ -41,7 +41,7 @@ export class AiTransparencyEnvelopeError extends Error {
     }
 }
 
-const PROVIDERS = new Set<FabricProviderRef>(['ollama', 'athena_mlx', 'in_house']);
+const PROVIDERS = new Set<FabricProviderRef>(['ollama', 'in_house']);
 const PREPROCESSING = new Set<string>(FABRIC_PREPROCESSING_LABELS);
 const REVIEW_STATES = new Set<string>(CLINICAL_REVIEW_STATES);
 const OLLAMA_TASKS = new Set(['clinical', 'reasoning', 'ocr']);
@@ -85,7 +85,7 @@ function validTimestamp(value: unknown): value is string {
 
 function expectedProvider(capability: FabricCapabilityId): FabricProviderRef {
     if (FABRIC_CAPABILITY_DESCRIPTORS[capability].class === 'deterministic') return 'in_house';
-    return capability === 'treatment_reasoning' ? 'athena_mlx' : 'ollama';
+    return 'ollama';
 }
 
 function snapshotReceipt(value: unknown, capability: FabricCapabilityId): FabricResolutionReceipt | null {

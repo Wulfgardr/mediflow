@@ -63,9 +63,7 @@ export async function installFunctionsMocks(page: Page, baseURL: string, scenari
     let releasePending: () => void = () => {};
     const gate = new Promise<void>(resolve => { releasePending = () => { state.pending = false; resolve(); }; });
     const sources = (): FunctionModelSources => ({ settings: config,
-        ollamaLifecycle: scenario === 'unavailable' ? { status: 'denied', reason: 'missing' } : admitted('ollama'),
-        athenaLifecycle: scenario === 'unavailable' ? { status: 'denied', reason: 'missing' } : admitted('athena_mlx'),
-        athenaAvailable: scenario !== 'unavailable', athenaIdentity: 'synthetic-no-runtime' });
+        ollamaLifecycle: scenario === 'unavailable' ? { status: 'denied', reason: 'missing' } : admitted('ollama') });
     const service = createFunctionModelPreferencesService({ readSources: sources, immediate: work => work(),
         writeSettings(writes) { preferenceWrites.push(structuredClone(writes)); Object.assign(config, writes); } });
     const handler: Parameters<Page['route']>[1] = async route => {
