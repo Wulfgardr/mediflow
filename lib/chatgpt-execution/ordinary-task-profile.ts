@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { PATIENT_INSIGHT_JSON_SCHEMA, SMART_IMPORT_JSON_SCHEMA } from '../ai-providers/extraction-json-schemas';
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 import { scanJsonObject } from '../ai-json-lexical';
@@ -55,12 +56,6 @@ const MAX_CLONE_STRING_CHARS = 400_000;
 const text = (maxLength: number) => Object.freeze({ type: 'string', minLength: 1, maxLength });
 const list = (items: Readonly<Record<string, unknown>>, maxItems: number) => Object.freeze({ type: 'array', items, minItems: 0, maxItems });
 const record = (properties: Record<string, unknown>, required = Object.keys(properties)) => Object.freeze({ type: 'object', additionalProperties: false, required: Object.freeze(required), properties: Object.freeze(properties) });
-const confidence = Object.freeze({ type: 'string', enum: Object.freeze(['high', 'medium', 'low']) });
-const category = Object.freeze({ type: 'string', enum: Object.freeze(['lab', 'imaging', 'visit', 'rehab', 'screening', 'procedure', 'other']) });
-const diagnosis = record({ label: text(240), icdQuery: text(240), confidence, evidence: text(240), sourceId: text(80), explicitCode: text(80) }, ['label', 'icdQuery', 'confidence', 'evidence']);
-const therapy = record({ drugMention: text(240), drugQuery: text(240), activePrinciple: text(240), dosage: text(240), motivation: text(240), therapyState: Object.freeze({ type: 'string', enum: Object.freeze(['active', 'transition', 'uncertain', 'inactive']) }), reviewNote: text(240), confidence, evidence: text(240), sourceId: text(80) }, ['drugMention', 'drugQuery', 'confidence', 'evidence']);
-const serviceItem = record({ serviceName: text(240), category, codeSystem: text(80), serviceCode: text(80), confidence, evidence: text(240), sourceId: text(80) }, ['serviceName', 'confidence', 'evidence']);
-const service = record({ serviceName: text(240), category, priority: text(80), codeSystem: text(80), serviceCode: text(80), clinicalQuestion: text(240), provider: text(240), prescribedAt: text(32), requestReference: text(80), confidence, evidence: text(240), sourceId: text(80), items: list(serviceItem, 32) }, ['serviceName', 'confidence', 'evidence']);
 
 const evidenceRefs = list(text(160), 12);
 const remoteEvidence = record({ id: text(160), statement: text(400), evidenceRefs });
@@ -69,8 +64,8 @@ const remoteAction = record({ id: text(160), intent: Object.freeze({ type: 'stri
 const remoteBinding = record({ claimPath: text(400), claim: text(400), evidenceRefs });
 
 const schemas: Readonly<Record<OrdinaryTaskFunctionId, Readonly<Record<string, unknown>>>> = Object.freeze({
-    patient_insight: record({ schemaVersion: Object.freeze({ type: 'string', const: 'mediflow.ai.extract.v1' }), task: Object.freeze({ type: 'string', const: 'patient_insight' }), summary: text(220), data: record({ currentState: list(text(220), 2), alerts: list(text(220), 2), nextSteps: list(text(220), 3), gaps: list(text(220), 1) }) }),
-    smart_import: record({ schemaVersion: Object.freeze({ type: 'string', const: 'mediflow.ai.extract.v1' }), task: Object.freeze({ type: 'string', const: 'smart_import' }), summary: text(220), data: record({ diagnoses: list(diagnosis, 32), therapies: list(therapy, 32), servicePrescriptions: list(service, 32) }) }),
+    patient_insight: PATIENT_INSIGHT_JSON_SCHEMA,
+    smart_import: SMART_IMPORT_JSON_SCHEMA,
     document_synthesis: DOCUMENT_SYNTHESIS_V2_JSON_SCHEMA as Readonly<Record<string, unknown>>,
     treatment_reasoning: record({ schemaVersion: Object.freeze({ type: 'string', const: 'mediflow.treatment_reasoning.v1' }), task: Object.freeze({ type: 'string', const: 'treatment_reasoning' }), summary: text(480), data: record({ recommendation: text(900), keyEvidence: list(remoteEvidence, 10), reasoning: list(text(400), 8), caveats: list(text(400), 8), safetyFlags: list(remoteFlag, 8), suggestedActions: list(remoteAction, 8), trace: record({ mode: Object.freeze({ type: 'string', const: 'chatgpt_subscription' }), toolsUsed: list(text(160), 0), limitations: list(text(180), 8) }) }), sourceBindings: list(remoteBinding, 18) }),
 });

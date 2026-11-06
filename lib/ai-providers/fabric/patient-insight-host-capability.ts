@@ -1,5 +1,6 @@
 import 'server-only';
 import { isOrdinaryFunctionSelected, executeOwnedOrdinaryProfile, ordinaryResultMetadata } from '../../chatgpt-product/ordinary-flow';
+import { validateGenerativeJson } from '../generative-json-validation';
 import { createPatientInsightOrdinaryTaskProfile } from '../../chatgpt-execution/ordinary-task-profile';
 import type { OrdinaryRemoteReceipt, OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
 
@@ -212,11 +213,12 @@ export function createPatientInsightHostCapability(dependencies: Dependencies) {
             catch { return deny('fabric_denied'); }
             let response: string;
             try {
-                const result = await routedBinding.adapter.chat([{ role: 'user', content: prompt }], undefined, 900, { responseFormat: 'json' });
+                const result = await routedBinding.adapter.chat([{ role: 'user', content: prompt }], undefined, 900, { responseFormat: 'patient_insight' });
                 if (typeof result.content !== 'string') throw new Error('invalid'); response = result.content;
             } catch { return failed('provider_failed', receipt, provenance); }
             let proposal: PatientInsightReviewProposal;
             try {
+                validateGenerativeJson('patient_insight', response);
                 const parsed = parsePatientInsightExtractionResponse(response);
                 if (!isEnvelopeUsable(parsed) || !(parsed.value.summary || parsed.value.data.currentState.length
                     || parsed.value.data.alerts.length || parsed.value.data.nextSteps.length || parsed.value.data.gaps.length)
