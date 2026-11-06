@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-    DOSSIER_PREPARED_SCHEMA, anchorPreparedQuote, parsePreparedExtraction, preparedBulkDecisions, preparedDossierFacts, preparedPatientKey, verifyPreparedFields,
+    DOSSIER_PREPARED_SCHEMA, anchorPreparedQuote, parsePreparedExtraction, preparedBulkDecisions, preparedDossierFacts, preparedFactEligible, preparedPatientKey, verifyPreparedFields,
     preparedTokens, type PreparedFactInput, type PreparedSource,
 } from './dossier-prepared';
 import { extractDossierCandidates, splitDossierUnits, type DossierFact, type DossierRecord } from './dossier-import';
@@ -222,10 +222,10 @@ test('bulk leaves the residual pending when the summary cannot be applied, and i
 });
 
 test('patients group by valid tax code, otherwise by name and birth date', () => {
-    assert.equal(preparedPatientKey({ taxCode: CF_A }), `cf:${CF_A}`);
-    assert.equal(preparedPatientKey({ taxCode: 'RSSMRA80A01F205Z', lastName: 'Rossi', firstName: 'Mario', birthDate: '1980-01-01' }), 'nome:rossi|mario|1980-01-01');
-    assert.equal(preparedPatientKey({ lastName: 'Rossi' }), null);
-    assert.equal(preparedPatientKey(null), null);
+    assert.equal(preparedPatientKey({ taxCode: CF_A }, letter), `cf:${CF_A}`);
+    assert.equal(preparedPatientKey({ taxCode: 'RSSMRA80A01F205Z', lastName: 'Rossi', firstName: 'Mario', birthDate: '1980-01-01' }, letter), 'nome:rossi|mario|1980-01-01');
+    assert.equal(preparedPatientKey({ lastName: 'Rossi' }, letter), null);
+    assert.equal(preparedPatientKey(null, letter), null);
 });
 
 // ---------------------------------------------------------------------------
@@ -353,4 +353,49 @@ test('aid and service names are checked on their words; quantities written aroun
     assert.equal(verifyPreparedFields('prosthetic', { description: 'Siringhe tipo schizzettoni, 3/die, 90 pz/mese' }, preparedTokens(line).map((t) => t.text)).check, 'ok');
     assert.equal(verifyPreparedFields('prosthetic', { description: 'Soluzione fisiologica 100ml, 6 confezioni/die' }, preparedTokens('6 confezioni di soluzione fisiologica 100 ml die').map((t) => t.text)).check, 'ok');
     assert.equal(verifyPreparedFields('prosthetic', { description: 'Deambulatore' }, preparedTokens(line).map((t) => t.text)).check, 'value_missing');
+});
+
+// Controesempi del banco sintetico del 6/11/2026 (mf-intelligenza-20261105/banco, artifacts/mutations.json):
+// estrazioni false che il verificatore accettava. Ognuna deve restare fuori dal blocco.
+function preparedOn(body: string, facts: PreparedFactInput[]) {
+    const { units: bodyUnits } = splitDossierUnits(body, null);
+    return preparedDossierFacts({ source: source(facts), text: body, units: bodyUnits, documentDate: '2026-10-20', parserFacts: [], now })
+        .facts.filter((fact) => fact.origin === 'prepared' && fact.values.preparedCheck !== 'summary');
+}
+const ramipril = (quote: string, extra: Record<string, string> = {}): PreparedFactInput =>
+    ({ kind: 'therapy', quote, values: { drugName: 'Ramipril', dosage: '5 mg 1 cp al mattino', status: 'active', ...extra } });
+
+test('a negation cut off the quote still negates the fact', () => {
+    const [cut] = preparedOn('Data referto: 20/10/2026\nIl paziente non assume Ramipril 5 mg 1 cp al mattino.', [ramipril('Ramipril 5 mg 1 cp al mattino.')]);
+    assert.equal(cut.negated, true, 'il «non» prima della citazione, nella stessa frase, nega il fatto');
+    assert.equal(preparedFactEligible(cut, new Set()), false);
+    const [plain] = preparedOn('Data referto: 20/10/2026\nIl paziente assume Ramipril 5 mg 1 cp al mattino.', [ramipril('Ramipril 5 mg 1 cp al mattino.')]);
+    assert.equal(plain.negated, false);
+    assert.equal(preparedFactEligible(plain, new Set()), true);
+    const [other] = preparedOn('Data referto: 20/10/2026\nNon riferisce allergie. Assume Ramipril 5 mg 1 cp al mattino.', [ramipril('Ramipril 5 mg 1 cp al mattino.')]);
+    assert.equal(other.negated, false, 'una negazione della frase precedente non conta');
+});
+
+test('a therapy of the spouse or another relative is not the patient’s, inside or just before the quote', () => {
+    for (const relative of ['Il coniuge', 'La moglie', 'Il marito', 'La madre', 'Il figlio']) {
+        const body = `Data referto: 20/10/2026\n${relative} assume Ramipril 5 mg 1 cp al mattino.`;
+        const [full] = preparedOn(body, [ramipril(`${relative} assume Ramipril 5 mg 1 cp al mattino.`, { subject: 'paziente' })]);
+        assert.equal(full.values.preparedCheck, 'subject_conflict', `${relative}: citazione intera`);
+        const [cut] = preparedOn(body, [ramipril('Ramipril 5 mg 1 cp al mattino.')]);
+        assert.equal(cut.values.preparedCheck, 'subject_conflict', `${relative}: familiare tagliato dalla citazione`);
+        assert.equal(preparedFactEligible(cut, new Set()), false);
+    }
+    const [own] = preparedOn('Data referto: 20/10/2026\nIl paziente assume Ramipril 5 mg 1 cp al mattino.', [ramipril('Il paziente assume Ramipril 5 mg 1 cp al mattino.')]);
+    assert.equal(own.values.preparedCheck, 'verified');
+    const [family] = preparedOn('Data referto: 20/10/2026\nIl coniuge assume Ramipril 5 mg 1 cp al mattino.', [ramipril('Il coniuge assume Ramipril 5 mg 1 cp al mattino.', { subject: 'familiare' })]);
+    assert.equal(family.values.preparedCheck, 'verified', 'dichiarato familiare: nessun conflitto');
+});
+
+test('the proposed patient groups the source only if MediFlow reads that name or code in the document', () => {
+    const text = 'Data referto: 20/10/2026\nPaziente: PersonaUno SinteticoUno.\nIl paziente assume Ramipril 5 mg 1 cp al mattino.';
+    assert.equal(preparedPatientKey({ firstName: 'PersonaDue', lastName: 'SinteticoDue' }, text), null, 'nome scambiato senza CF');
+    assert.equal(preparedPatientKey({ firstName: 'PersonaUno', lastName: 'SinteticoUno' }, text), 'nome:sinteticouno|personauno|');
+    assert.equal(preparedPatientKey({ taxCode: CF_A }, text), null, 'CF valido ma non scritto nel documento');
+    assert.equal(preparedPatientKey({ taxCode: CF_A }, `${text}\nCF ${CF_A}`), `cf:${CF_A}`);
+    assert.equal(preparedPatientKey({ firstName: 'PersonaUno', lastName: 'SinteticoUno' }, null), null, 'senza testo nessun raggruppamento');
 });

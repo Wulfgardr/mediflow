@@ -159,12 +159,23 @@ export function preparedBySha(extraction: PreparedExtraction | null | undefined)
     return new Map((extraction?.sources ?? []).map((source) => [source.sha256, source]));
 }
 
-/** Chiave di raggruppamento per paziente: CF valido, altrimenti cognome, nome e nascita. */
-export function preparedPatientKey(patient: PreparedPatient | null): string | null {
-    if (!patient) return null;
-    if (patient.taxCode && isValidItalianTaxCodeChecksum(patient.taxCode)) return `cf:${patient.taxCode}`;
+/**
+ * Chiave di raggruppamento per paziente: CF valido, altrimenti cognome, nome e nascita.
+ * Vale solo ciò che MediFlow legge nel testo del documento: un CF o un nome proposti
+ * dall'estrazione e non scritti nel documento non raggruppano la fonte sotto quel paziente.
+ */
+export function preparedPatientKey(patient: PreparedPatient | null, text: string | null): string | null {
+    if (!patient || !text) return null;
+    const written = preparedTokens(text).map((token) => token.text);
+    const inText = (value: string | undefined) => {
+        const wanted = preparedTokens(value ?? '').map((token) => token.text);
+        return wanted.length > 0 && contiguous(written, wanted) >= 0;
+    };
+    if (patient.taxCode && isValidItalianTaxCodeChecksum(patient.taxCode)) {
+        if (new RegExp(`(?:^|[^A-Z0-9])${patient.taxCode}(?:[^A-Z0-9]|$)`, 'u').test(text.toUpperCase())) return `cf:${patient.taxCode}`;
+    }
     const name = [patient.lastName, patient.firstName].map((part) => (part ?? '').toLocaleLowerCase('it-IT').replace(/\s+/gu, ' ').trim());
-    if (name[0] && name[1]) return `nome:${name[0]}|${name[1]}|${patient.birthDate ?? ''}`;
+    if (name[0] && name[1] && inText(patient.lastName) && inText(patient.firstName)) return `nome:${name[0]}|${name[1]}|${patient.birthDate ?? ''}`;
     return null;
 }
 
@@ -300,7 +311,7 @@ function firstNumbersAfter(passage: readonly string[], from: number, wanted: rea
 
 const NEGATION_WORDS = new Set(['non', 'nega', 'negano', 'negato', 'negata', 'assenza', 'assente', 'esclusa', 'escluso', 'escluse', 'esclusi', 'no', 'senza']);
 const SUSPENSION = /^(?:sospes|sospend|interrott|interromp|sospensione|stop)/u;
-const FAMILY_WORDS = /^(?:padre|madre|fratell|sorell|figli|nonn|zi[oaie]$|familiar|genitor|mamma|papa$)/u;
+const FAMILY_WORDS = /^(?:padre|madre|fratell|sorell|figli|nonn|zi[oaie]$|familiar|genitor|mamma|papa$|coniug|moglie$|marito$|consorte$|nipot|cugin|suocer|cognat)/u;
 
 export interface PreparedFieldCheck { check: 'ok' | 'value_missing' | 'status_conflict' | 'subject_conflict'; negated: boolean; notes: string[]; drop: string[] }
 
@@ -323,6 +334,7 @@ export function verifyPreparedFields(kind: DossierFactKind, values: Readonly<Rec
             subjectAt = end - drug.length;
             if (firstNumbersAfter(passage, end, words(values.dosage).filter(isNumber)) < 0) return fail('value_missing');
             if (values.status === 'active' && passage.some((word) => SUSPENSION.test(word))) return fail('status_conflict');
+            if (values.subject !== 'familiare' && passage.some((word) => FAMILY_WORDS.test(word))) return fail('subject_conflict');
             const principle = words(values.activePrinciple);
             if (principle.length && contiguous(drug, principle) < 0) {
                 const near = contiguous(passage.slice(Math.max(0, subjectAt - 6), end + 6), principle) >= 0;
@@ -377,6 +389,15 @@ export function verifyPreparedFields(kind: DossierFactKind, values: Readonly<Rec
     // Una negazione scritta prima del soggetto, nello stesso passo, nega il fatto.
     if (subjectAt > 0 && passage.slice(0, subjectAt).some((word) => NEGATION_WORDS.has(word))) out.negated = true;
     return out;
+}
+
+/** Parole della frase che precede la citazione nella sua unità, fino a un segno di fine frase o a capo. */
+function sentenceBefore(text: string, units: readonly DossierUnit[], evidence: DossierEvidence): string[] {
+    const unit = units.find((candidate) => candidate.index === evidence.unit);
+    if (!unit) return [];
+    const head = unitText(text, unit).slice(0, evidence.start);
+    const boundary = Math.max(head.lastIndexOf('\n'), ...[...head.matchAll(/[.;!?](?=\s)/gu)].map((match) => match.index!));
+    return words(head.slice(boundary + 1));
 }
 
 /** Percentuale d'invalidità: scritta come «N%» o «N per cento» nel testo del passo. */
@@ -509,6 +530,11 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
                 // I valori si confrontano con le parole del documento senza tolleranza, anche in lettura approssimata.
                 const fields = verifyPreparedFields(item.kind, values, anchor.words);
                 negated = fields.negated;
+                // Le parole della stessa frase prima della citazione contano: una negazione o un familiare tagliati fuori restano.
+                const before = sentenceBefore(text, units, anchor.evidence);
+                if (before.some((word) => NEGATION_WORDS.has(word))) negated = true;
+                if (fields.check === 'ok' && (item.kind === 'therapy' || item.kind === 'diagnosis') && values.subject !== 'familiare'
+                    && before.some((word) => FAMILY_WORDS.test(word))) fields.check = 'subject_conflict';
                 for (const field of fields.drop) delete values[field];
                 factNotes.push(...fields.notes);
                 check = fields.check === 'ok' ? (anchor.match === 'exact' ? 'verified' : 'approximate') : fields.check;
