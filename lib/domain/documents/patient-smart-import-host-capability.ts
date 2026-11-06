@@ -1,5 +1,6 @@
 import 'server-only';
 import { isOrdinaryFunctionSelected, executeOwnedOrdinaryProfile, ordinaryResultMetadata, ordinaryApplicationIsCurrent } from '../../chatgpt-product/ordinary-flow';
+import { validateGenerativeJson } from '../../ai-providers/generative-json-validation';
 import { createSmartImportOrdinaryTaskProfile } from '../../chatgpt-execution/ordinary-task-profile';
 import type { OrdinaryRemoteReceipt, OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
 import { randomBytes } from 'node:crypto';
@@ -164,13 +165,13 @@ export function createPatientSmartImportHostCapability(dependencies: Dependencie
             let response: string;
             try {
                 const providerResult = await routedBinding.adapter.chat(
-                    [{ role: 'user', content: prompt }], undefined, 1_100, { responseFormat: 'json' },
+                    [{ role: 'user', content: prompt }], undefined, 1_100, { responseFormat: 'smart_import' },
                 );
                 response = providerResult.content;
                 if (typeof response !== 'string') throw new Error('invalid');
             } catch { return failed('provider_failed', receipt, provenance); }
             let proposal: PatientSmartImportCapabilityProposal;
-            try { proposal = parsePatientSmartImportCapabilityProposal(response, projection, generatedAt); }
+            try { validateGenerativeJson('smart_import', response); proposal = parsePatientSmartImportCapabilityProposal(response, projection, generatedAt); }
             catch { return failed('proposal_invalid', receipt, provenance); }
 
             const denied = await permissionDenial(); if (denied) return denied;
