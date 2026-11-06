@@ -23,7 +23,7 @@ test('il README dichiara chi decide e chi scrive il codice e rimanda alla pagina
 test('la pagina canonica spiega «assistito» passaggio per passaggio', () => {
   const page = read('docs/development-usage.md');
   const roles = section(page, '## Che cosa significa «assistito»');
-  for (const step of ['**Intento**', '**Pianificazione e architettura**', '**Scrittura del codice e dei test**',
+  for (const step of ['**Intento**', '**Pianificazione ed architettura**', '**Scrittura del codice e dei test**',
     '**Prove richieste', '**Accettazione e merge**', '**Release e comunicazione**']) {
     assert.ok(roles.includes(step), `Manca il passaggio ${step}`);
   }
