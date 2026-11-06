@@ -115,3 +115,8 @@ Lo schema nativo OpenAPI v1 conserva i valori provider legacy per evitare
 un restringimento incompatibile del contratto pubblicato. Sono valori
 descrittivi di compatibilità e non vengono emessi dalle esecuzioni correnti.
 La rimozione non aggiunge operazioni o permessi al contratto `/api/v1`.
+
+La fixture golden della preparazione ChatGPT conserva invariati i tre
+percorsi disponibili e rimuove soltanto il quarto caso di esecuzione
+Treatment Reasoning. I test di consenso, contenuto e cancellazione continuano
+sui tre percorsi; per Treatment Reasoning verificano l’indisponibilità.

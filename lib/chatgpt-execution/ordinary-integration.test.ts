@@ -112,7 +112,7 @@ test('real unchanged gate denies ordinary content before thread/turn and audits 
         assert.equal(peer.closed, 1); assert.equal(prep.isPreparedOrdinaryProfileCurrent(value.handle), false);
     } finally { await service.dispose(); await value.job.close(); }
 });
-for (const index of [0, 1, 2, 3]) test(`TEST-ONLY admitted peer roundtrip profile ${index}; exact disclosure/audit/transport, original parser and final binding`, async () => {
+for (const index of [0, 1, 2]) test(`TEST-ONLY admitted peer roundtrip profile ${index}; exact disclosure/audit/transport, original parser and final binding`, async () => {
     testOnlyAllowContent = true; const value = await context(index), { service, peer } = engine(value);
     const count = contentChecks, offset = rows().length;
     try {
