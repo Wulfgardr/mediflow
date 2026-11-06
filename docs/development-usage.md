@@ -174,9 +174,9 @@ dataset pubblico e la sua rappresentazione; non può attestare i log privati.
 Dal 28 settembre lo snapshot viene esteso dai record locali con
 `npm run collect:development-usage`, poi si rigenerano tabelle e SVG con
 `npm run build:usage-dashboard`. La base pubblicata del 27 settembre resta
-conservata separatamente; la copertura successiva dipende dai log disponibili.
+conservata separatamente. La copertura successiva dipende dai log disponibili.
 La [procedura di release](./releases/development-usage.md) descrive fonti,
-esclusioni, controlli e ordine dei commit prima del tag. La raccolta include
+esclusioni, controlli ed ordine dei commit prima del tag. La raccolta include
 le sessioni T3 Code registrate dai rispettivi harness con cwd attribuibile.
 
 ## Conteggi esatti
