@@ -64,3 +64,20 @@ test('CodexBar fallback verifies source directories and excludes overlapping raw
   assert.equal(codexBarFallback(report,[],cwd=>cwd==='/verified').reduce((n,r)=>n+r.tokens,0),10);
   assert.deepEqual(codexBarFallback(report,[{environment:'codex',date:'2026-11-01'}],()=>true),[]);
 });
+test('a foreign checkout nested inside a MediFlow worktree is excluded',t=>{
+  const {repo}=fixture(t);const nested=path.join(repo,'vendor','unrelated');fs.mkdirSync(nested,{recursive:true});
+  git(nested,'init');git(nested,'remote','add','origin','https://github.com/other/unrelated.git');
+  const accepts=attribution(repo);
+  assert.equal(accepts(nested),false);assert.equal(accepts(path.join(repo,'vendor')),true);
+});
+test('a partial copy of a Codex session does not inflate cumulative deltas',async t=>{
+  const {repo,logs}=fixture(t);
+  const meta={type:'session_meta',payload:{id:'session',cwd:repo}};
+  const context={type:'turn_context',payload:{cwd:repo,model:'gpt-6.1-sol',effort:'high'}};
+  const event=n=>({timestamp:'2026-11-01T12:00:00Z',type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{total_tokens:n,cached_input_tokens:n-10}}}});
+  fs.writeFileSync(path.join(logs,'a-full.jsonl'),[meta,context,event(50),event(100)].map(JSON.stringify).join('\n'));
+  fs.writeFileSync(path.join(logs,'b-partial.jsonl'),[meta,context,event(100)].map(JSON.stringify).join('\n'));
+  const records=(await collectRecords({codex:[logs]},attribution(repo))).records;
+  assert.equal(records.reduce((n,r)=>n+r.tokens,0),100);
+  assert.equal(records.reduce((n,r)=>n+r.cache,0),90);
+});
