@@ -195,17 +195,6 @@ test('system revision remains unauthenticated but exposes only launcher and drif
     assert.match(block, /session\s*\?\s*{[\s\S]*branch:\s*getAppBranch\(\)[\s\S]*worktreeHash:\s*getAppWorktreeHash\(\)/, 'revision route should keep detail fields session-only');
 });
 
-test('MLX keeps token-backed status reads but requires web admin for lifecycle writes', () => {
-    const source = readSource('app/api/system/mlx/route.ts');
-    const getBlock = handlerSource(source, 'GET');
-    const postBlock = handlerSource(source, 'POST');
-    const deleteBlock = handlerSource(source, 'DELETE');
-
-    assert.match(getBlock, /requireSessionOrLocalToken\(request\)/, 'MLX status should remain available to paired local surfaces');
-
-    for (const [method, block] of [['POST', postBlock], ['DELETE', deleteBlock]]) {
-        assert.match(block, /requireSession\(\)/, `MLX ${method} should use requireSession()`);
-        assert.match(block, /isWebAdminSession\(session\)/, `MLX ${method} should check web admin`);
-        assert.doesNotMatch(block, /requireSessionOrLocalToken/, `MLX ${method} should not accept local API token fallback`);
-    }
+test('the MLX lifecycle route is gone with ATHENA (ADR 0180)', () => {
+    assert.equal(fs.existsSync(path.join(ROOT, 'app/api/system/mlx/route.ts')), false);
 });
