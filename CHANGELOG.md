@@ -134,6 +134,16 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
   identificativi consultabili
   ([#535](https://github.com/Wulfgardr/mediflow/pull/535)).
 
+### Sviluppo assistito
+
+- README, crediti e [pagina sullo sviluppo assistito](./docs/development-usage.md)
+  spiegano chi fa che cosa: intento, pianificazione, architettura, prove e merge
+  restano all'autore, la scrittura del codice agli agenti. Pubblicati i principi
+  dell'autore. Il nuovo modello di PR chiede prove, limiti, fonti esterne e
+  modello e strumento usati; CONTRIBUTING applica le stesse regole a chi
+  contribuisce con un agente. Un test della CI impedisce che questi elementi
+  spariscano.
+
 ### Manutenzione
 
 - Il riepilogo paziente usa solo i campi necessari ed evita tre copie superflue

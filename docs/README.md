@@ -172,7 +172,8 @@ contratto compatibile e prove locali, distinguendoli dalla CI finale e dal merge
 
 ## Trasparenza sullo sviluppo
 
-[Disclosure e consumi](./development-usage.md) conserva lo storico pubblico dei
+[Sviluppo assistito e consumi](./development-usage.md) spiega chi decide e chi
+scrive il codice, con i principi dell'autore, e conserva lo storico pubblico dei
 token per provider, modello ed effort registrato, con fonti, dati aggregati e
 limiti di attribuzione. Non descrive i consumi del runtime clinico.
 
