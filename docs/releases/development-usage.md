@@ -18,7 +18,7 @@ Non confronta la data della pubblicazione o quella dell'oggetto tag annotato.
 Un errore blocca il controllo CI: GitHub non annulla un tag già creato.
 
 Il raccoglitore opera solo localmente, senza dipendenze aggiuntive né richieste
-ai provider. Legge i rollout Codex attivi e archiviati e i record Claude Code.
+ai provider. Legge i rollout Codex attivi ed archiviati e i record Claude Code.
 Le sessioni T3 Code sono incluse quando il relativo harness scrive in queste
 sedi e la cwd rispetta il confine Git. Una sessione T3 avviata in una scratch
 directory estranea resta esclusa, anche quando parla del progetto.
@@ -32,19 +32,19 @@ La base immutabile `docs/data/development-usage-2026-09-27.json` conserva il
 pubblicato fino al 27 settembre incluso. I nuovi record entrano dal giorno
 successivo: gli eventuali consumi del 27 settembre dopo l'istante originale
 restano fuori per evitare sovrapposizioni non ricostruibili. La serie effort
-mantiene quella base e aggiunge solo i record Codex diretti, senza ricavare
+mantiene quella base ed aggiunge solo i record Codex diretti, senza ricavare
 effort dagli aggregati CodexBar. Il provider è dedotto dal nome del modello.
-Input e output includono la cache una sola volta; i token di ragionamento,
+Input ed output includono la cache una sola volta. I token di ragionamento,
 già compresi nell'output, non vengono sommati nuovamente.
 
 La copertura resta parziale: log cancellati senza metadati Git verificabili,
 righe non decodificabili (conteggiate nel riepilogo locale), altre macchine e
 harness senza record compatibili non sono ricostruiti. Le checkout esistenti
-sono controllate attraverso origin e worktree; quelle cancellate richiedono
+sono controllate attraverso origin e worktree. Quelle cancellate richiedono
 cwd e repository Git registrate nella sessione. Nessuna attribuzione per nome
 della cartella o per contenuto dei prompt. Non aggiungere identificatori
 modello all'allowlist senza esaminarli prima della pubblicazione.
 
 Conservare localmente i log necessari alle raccolte successive: oltre la base
 storica, ogni esecuzione ricalcola dai record disponibili. La CI vede solo gli
-aggregati e non certifica completezza e attribuzione delle fonti private.
+aggregati e non certifica completezza ed attribuzione delle fonti private.
