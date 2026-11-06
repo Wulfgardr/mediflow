@@ -18,6 +18,26 @@ final class FHIRBundleGeneratorTests: XCTestCase {
         }
     }
 
+    /// A record without a declared type (older home-base, older cache) falls back
+    /// to the value. A fiscal code that starts with STP or ENI stays a fiscal code.
+    func testUndeclaredTypeRecognisesStpAndEniOnlyWithThirteenDigits() throws {
+        let cases: [(String, String)] = [
+            ("STPMRA80A01H501U", "urn:oid:2.16.840.1.113883.2.9.4.3.2"),
+            ("ENIXXX80A01H501U", "urn:oid:2.16.840.1.113883.2.9.4.3.2"),
+            ("STP0300010000123", "urn:mediflow:identifier:stp"),
+            (" eni0300010000123", "urn:mediflow:identifier:eni"),
+        ]
+        for (value, system) in cases {
+            let input = FHIRBundleInput(generatedAt: "2026-11-05", patient: FHIRPatientInput(id: "synthetic", firstName: "Ada", lastName: "Sintetica", taxCode: value), entries: [], therapies: [], checkups: [], observations: [])
+            guard case .object(let root) = FHIRBundleGenerator.generate(input: input),
+                  case .array(let entries)? = root["entry"], case .object(let entry) = entries[0],
+                  case .object(let patient)? = entry["resource"],
+                  case .array(let identifiers)? = patient["identifier"], case .object(let identifier) = identifiers[0]
+            else { return XCTFail("Missing identifier for \(value)") }
+            XCTAssertEqual(identifier["system"], .string(system), value)
+        }
+    }
+
     private func nativeContractsDir() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

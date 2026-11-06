@@ -1475,7 +1475,11 @@ impl ClinicalApp {
                 let same_descriptor =
                     catalog.descriptor(scale.descriptor.id) == Some(&scale.descriptor);
                 scale.patient_version = patient.version;
-                self.patient.detail = ReadLoad::Ready(patient);
+                self.patient.detail = ReadLoad::Ready(Self::fill_list_identity(
+                    &self.patients,
+                    &self.global_patients,
+                    patient,
+                ));
                 if same_descriptor {
                     scale.catalog = catalog;
                     form.state = FormState::Draft;

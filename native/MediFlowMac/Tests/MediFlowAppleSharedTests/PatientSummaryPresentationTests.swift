@@ -284,6 +284,51 @@ final class PatientSummaryPresentationTests: XCTestCase {
         XCTAssertEqual(PairedPatientsWorkspaceSupport.identifierLabel("ENIXXX80A01H501U"), "CF")
     }
 
+    /// The declared type wins over the prefix (ADR 0179): a passport number that
+    /// happens to look like an STP code is still a document, and a patient with
+    /// no identifier shows none instead of an empty "CF".
+    func testDeclaredIdentifierTypeWinsOverPrefix() {
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.labeledCompactTaxCode("STP0300010000123", type: "passport"), "Documento …000123")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.labeledCompactTaxCode("AB1234567", type: "other"), "Identificativo …234567")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.labeledCompactTaxCode("STP0300010000123", type: "stp"), "STP …000123")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.labeledCompactTaxCode("", type: "none"), "")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.identifierTitle("RSSMRA80A01H501U"), "Codice fiscale")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.identifierTitle("ENI0300010000123", type: "eni"), "Codice ENI")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.identifierTitle("X", type: "passport"), "Documento")
+    }
+
+    /// An estimated birth year is shown as an estimate, never as an exact age
+    /// or as "no data".
+    func testEstimatedBirthYearIsShownAsEstimate() throws {
+        let now = try XCTUnwrap(Calendar(identifier: .gregorian).date(from: DateComponents(year: 2026, month: 11, day: 5)))
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.ageText(birthDate: nil, precision: "estimated", birthYear: 1982, at: now), "circa 44 anni")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.birthText(birthDate: nil, precision: "estimated", birthYear: 1982), "anno stimato 1982")
+        XCTAssertNil(PairedPatientsWorkspaceSupport.ageText(birthDate: nil, precision: "unknown", birthYear: nil, at: now))
+        XCTAssertEqual(
+            PairedPatientsWorkspaceSupport.patientMetadata(birthDate: nil, taxCode: "", identifierType: "none",
+                                                           birthDatePrecision: "estimated", birthYear: 1982, at: now),
+            "circa 44 anni · nascita anno stimato 1982")
+    }
+
+    /// The identity rows of the chart name the identifier truthfully: the
+    /// on-screen check found "Codice fiscale P4471209SY" for a passport.
+    func testIdentityRowsNameTheIdentifierAndTheEstimatedYear() {
+        typealias Row = PairedPatientsWorkspaceSupport.IdentityRow
+        XCTAssertEqual(
+            PairedPatientsWorkspaceSupport.identityRows(taxCode: "P4471209SY", identifierType: "passport", birthDate: nil,
+                                                        birthDatePrecision: "estimated", birthYear: 1968),
+            [Row(label: "Documento", value: "P4471209SY", isCode: true),
+             Row(label: "Anno di nascita stimato", value: "1968", isCode: false)])
+        XCTAssertEqual(
+            PairedPatientsWorkspaceSupport.identityRows(taxCode: "", identifierType: "none", birthDate: nil,
+                                                        birthDatePrecision: "unknown", birthYear: nil),
+            [Row(label: "Identificativo", value: "Non ancora disponibile", isCode: false)])
+        XCTAssertEqual(
+            PairedPatientsWorkspaceSupport.identityRows(taxCode: "STPMRC80A01H501S", identifierType: nil, birthDate: nil,
+                                                        birthDatePrecision: nil, birthYear: nil),
+            [Row(label: "Codice fiscale", value: "STPMRC80A01H501S", isCode: true)])
+    }
+
     func testCompactTaxCodeDoesNotExpandShortValues() {
         XCTAssertEqual(PairedPatientsWorkspaceSupport.compactTaxCode("ABC123"), "ABC123")
     }

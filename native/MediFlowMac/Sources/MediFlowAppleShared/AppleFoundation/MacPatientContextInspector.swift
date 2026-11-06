@@ -29,8 +29,13 @@ struct MacPatientInspectorSnapshot: Equatable {
 
     init(patient: HomeBasePatientDetail, connectionState: PairedPatientsConnectionState) {
         displayName = "\(patient.lastName) \(patient.firstName)"
-        taxCode = PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode)
-        birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: patient.birthDate) ?? "Non disponibile"
+        let identifier = PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType)
+        taxCode = identifier.isEmpty ? "Non ancora disponibile" : identifier
+        if patient.birthDatePrecision == "estimated", let year = patient.birthYear {
+            birthYear = "\(year), stimato"
+        } else {
+            birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: patient.birthDate) ?? "Non disponibile"
+        }
         recordState = patient.isArchived == true ? "Archiviata" : "Attiva"
         self.connectionState = connectionState.title
     }
@@ -49,7 +54,7 @@ struct MacPatientInspectorContent: View {
             Text(snapshot.displayName).inkVoice(22)
                 .accessibilityIdentifier("clinical-workspace-inspector-patient-name")
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-                row("Codice", snapshot.taxCode)
+                row("Identificativo", snapshot.taxCode)
                 row("Anno", snapshot.birthYear)
                 row("Cartella", snapshot.recordState)
                 row("Origine", snapshot.connectionState)
@@ -66,7 +71,7 @@ struct MacPatientInspectorContent: View {
     }
 
     private var surfaceShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 0, style: .continuous)
+        RoundedRectangle(cornerRadius: LumeGeometry.rowRadius, style: .continuous)
     }
 
     private func row(_ label: String, _ value: String, identifier: String? = nil) -> some View {

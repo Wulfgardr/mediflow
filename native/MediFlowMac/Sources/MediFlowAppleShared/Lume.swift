@@ -292,7 +292,13 @@ public struct LumeCard<Content: View>: View {
     }
 }
 
+/// Scala dei raggi di Punto d'inchiostro (docs/design/punto-inchiostro/01-specifica.md):
+/// righe e record 0, controlli, piano e voce in scrittura. Ogni raggio delle viste
+/// viene da qui; `AppleRadiusScaleTests` rifiuta un numero scritto a mano.
 public enum LumeGeometry {
+    public static let rowRadius: CGFloat = 0
+    /// La voce in scrittura ha lo stesso raggio su ogni piattaforma.
+    public static let writingRadius: CGFloat = 12
     #if os(macOS)
     public static let controlRadius: CGFloat = 8
     public static let planeRadius: CGFloat = 12
@@ -552,7 +558,7 @@ private struct LumeKitPreview: View {
             }
         }
         .padding(24)
-        .lumeSurface(zone: .chrome, cornerRadius: 20)
+        .lumeSurface(zone: .chrome, cornerRadius: LumeGeometry.planeRadius)
         .frame(width: 420)
     }
 }

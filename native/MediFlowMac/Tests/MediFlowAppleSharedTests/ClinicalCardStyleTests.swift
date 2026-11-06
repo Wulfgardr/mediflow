@@ -72,5 +72,57 @@ final class ClinicalCardStyleTests: XCTestCase {
             alpha: pixels[center + 3]
         )
     }
+
+    /// Ogni raggio delle viste Apple viene dalla scala di `LumeGeometry`
+    /// (Punto d'inchiostro: righe 0, controlli, piano, voce in scrittura). Un
+    /// numero scritto a mano accanto alla scala è come le due bande d'avviso a
+    /// 12 su macOS, dove 12 è il raggio del piano e non quello dei controlli.
+    func testViewRadiiComeFromTheLumeScale() throws {
+        let nativeDirectory = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let roots = [
+            nativeDirectory.appendingPathComponent("MediFlowMac/Sources"),
+            nativeDirectory.appendingPathComponent("MediFlowAppleApp/Sources"),
+        ]
+        let literal = try NSRegularExpression(
+            pattern: #"cornerRadius:\s*[0-9]|\.cornerRadius\(\s*[0-9]|Radius\s*:\s*CGFloat\s*=\s*[0-9]"#
+        )
+        var offenders: [String] = []
+        var scanned = 0
+        for root in roots {
+            let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+            while let url = files?.nextObject() as? URL {
+                guard url.pathExtension == "swift" else { continue }
+                scanned += 1
+                let lines = try String(contentsOf: url, encoding: .utf8).components(separatedBy: .newlines)
+                var insideScale = false
+                for (index, line) in lines.enumerated() {
+                    if line.contains("public enum LumeGeometry") { insideScale = true }
+                    if insideScale, line == "}" { insideScale = false; continue }
+                    let range = NSRange(line.startIndex..., in: line)
+                    guard !insideScale, literal.firstMatch(in: line, range: range) != nil else { continue }
+                    /* A modifier's default of 0 means "no rounding", not a radius. */
+                    if line.contains("cornerRadius: CGFloat = 0") { continue }
+                    offenders.append("\(url.lastPathComponent):\(index + 1): \(line.trimmingCharacters(in: .whitespaces))")
+                }
+            }
+        }
+        XCTAssertGreaterThan(scanned, 50, "La guardia deve leggere davvero i sorgenti Apple")
+        XCTAssertEqual(offenders, [], "Raggi scritti a mano fuori da LumeGeometry")
+    }
+
+    func testRadiusScaleMatchesThePuntoInchiostroSpecification() {
+        XCTAssertEqual(LumeGeometry.rowRadius, 0)
+        XCTAssertEqual(LumeGeometry.writingRadius, 12)
+        #if os(macOS)
+        XCTAssertEqual(LumeGeometry.controlRadius, 8)
+        XCTAssertEqual(LumeGeometry.planeRadius, 12)
+        #else
+        XCTAssertEqual(LumeGeometry.controlRadius, 12)
+        XCTAssertEqual(LumeGeometry.planeRadius, 18)
+        #endif
+    }
+
 }
 #endif

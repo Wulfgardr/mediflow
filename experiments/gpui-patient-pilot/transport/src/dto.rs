@@ -66,6 +66,13 @@ pub struct PatientSummary {
     pub last_name: String,
     pub birth_date: Option<String>,
     pub tax_code: mediflow_patient_client::ClinicalCode,
+    /// Tipo dichiarato dalla home-base (ADR 0179); assente sui server precedenti.
+    #[serde(default)]
+    pub identifier_type: Option<String>,
+    #[serde(default)]
+    pub birth_date_precision: Option<String>,
+    #[serde(default)]
+    pub birth_year: Option<i32>,
     #[serde(default, deserialize_with = "nullable_bool")]
     pub is_adi: bool,
     #[serde(default, deserialize_with = "nullable_bool")]
@@ -101,6 +108,13 @@ pub struct PatientDetail {
     pub last_name: String,
     pub birth_date: Option<String>,
     pub tax_code: mediflow_patient_client::ClinicalCode,
+    /// Tipo dichiarato dalla home-base (ADR 0179); assente sui server precedenti.
+    #[serde(default)]
+    pub identifier_type: Option<String>,
+    #[serde(default)]
+    pub birth_date_precision: Option<String>,
+    #[serde(default)]
+    pub birth_year: Option<i32>,
     pub address: Option<String>,
     pub phone: Option<String>,
     pub caregiver: Option<String>,
