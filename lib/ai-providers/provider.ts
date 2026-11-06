@@ -16,7 +16,7 @@ export interface AIStats {
 }
 
 export interface AIChatOptions {
-    responseFormat?: 'json' | 'document_synthesis_v2';
+    responseFormat?: 'json' | 'document_synthesis_v2' | 'patient_insight' | 'smart_import';
     numCtx?: number;
 }
 

@@ -5,7 +5,7 @@ import {
     type ChatMessage,
     type ProviderAdapter,
 } from './provider';
-import { DOCUMENT_SYNTHESIS_V2_JSON_SCHEMA } from './document-synthesis-json-schema';
+import { GENERATIVE_JSON_SCHEMAS } from './generative-json-schemas';
 import { normalizeOllamaBaseUrl } from './base-url';
 import {
     assertLocalOllamaResponse,
@@ -65,10 +65,9 @@ export function buildOllamaChatPayload(
     options?: AIChatOptions,
     disableThinking = false,
 ) {
-    /* only a named internal format selects the compiled schema. */
-    const format = options?.responseFormat === 'document_synthesis_v2'
-        ? DOCUMENT_SYNTHESIS_V2_JSON_SCHEMA
-        : options?.responseFormat === 'json' ? 'json' : undefined;
+    const responseFormat = options?.responseFormat;
+    const format = responseFormat === undefined || responseFormat === 'json'
+        ? responseFormat : GENERATIVE_JSON_SCHEMAS[responseFormat];
     return {
         model,
         messages: toOllamaMessages(messages),

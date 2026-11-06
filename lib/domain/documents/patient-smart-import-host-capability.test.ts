@@ -24,7 +24,7 @@ const lifecycleRecord: Extract<ProviderLifecycleRead, { status: 'available' }>['
 });
 const RESPONSE = JSON.stringify({
     schemaVersion: 'mediflow.ai.extract.v1', task: 'smart_import', summary: 'Proposta sintetica',
-    ignoredRaw: 'raw-provider-marker', data: { diagnoses: [], therapies: [], servicePrescriptions: [] },
+    data: { diagnoses: [], therapies: [], servicePrescriptions: [] },
 });
 function resolution(chat: LocalProviderResolution['adapter']['chat']): LocalProviderResolution {
     const base = localProviderRegistry.resolve({ task: 'clinical', models: { clinical: 'synthetic-local-model' },
@@ -71,7 +71,7 @@ test('returns one frozen review-only proposal after the fixed host pipeline', as
     const binding = resolution(async (_messages, _signal, maxTokens, options) => {
         calls.chat += 1;
         assert.equal(maxTokens, 1_100);
-        assert.deepEqual(options, { responseFormat: 'json' });
+        assert.deepEqual(options, { responseFormat: 'smart_import' });
         return { content: RESPONSE, stats: { latency: 1, tokensIn: 2, tokensOut: 3 } };
     });
     const capability = createPatientSmartImportHostCapability({
