@@ -35,7 +35,7 @@ mock.method(crypto, 'randomBytes', () => Buffer.alloc(16, 0x42));
 syncBuiltinESMExports();
 const { createOrdinaryPreparation, readPreparedOrdinaryProfile, isPreparedOrdinaryProfileCurrent } = await import('./ordinary-preparation');
 
-for (const retirement of ['close', 'abort'] as const) test(`four ordinary profiles retain golden bytes/results and retire RAM mappings on ${retirement}`, async () => {
+for (const retirement of ['close', 'abort'] as const) test(`three ordinary profiles retain golden bytes/results and retire RAM mappings on ${retirement}`, async () => {
     const snapshots = [];
     for (const [index, profile] of profiles().entries()) {
         mappings = [];
