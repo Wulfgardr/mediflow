@@ -680,6 +680,26 @@ test('a mixed inbox folder groups by the prepared patient, and identity is still
     assert.equal(evaluateDraftGroupIdentity(wrong[0], patientsFixture(), 'pb').status, 'discordant');
 });
 
+test('a prepared patient that the document does not name does not group the source', async () => {
+    // Banco sintetico 6/11/2026, falsificazione 10: nome scambiato in un documento senza CF.
+    const text = '%PDF-1.4 sintetico\nReferto\nPaziente: PersonaUno SinteticoUno\nData: 20/10/2026\nIl paziente assume Ramipril 5 mg 1 cp al mattino.';
+    const { ports, files } = setup([['settimana/a.pdf', text]]);
+    const extraction = (lastName: string, firstName: string) => {
+        const parsed = parsePreparedExtraction(JSON.stringify({ schema: DOSSIER_PREPARED_SCHEMA, preparedAt: '2026-11-03T09:00:00Z', preparedBy: 'test',
+            sources: [{ sha256: sha(enc.encode(text)), fileName: 'a.pdf', documentDate: '2026-10-20', patient: { lastName, firstName },
+                coverage: { pages: 1, unreadablePages: [], complete: true },
+                facts: [{ kind: 'therapy', values: { drugName: 'Ramipril', dosage: '5 mg 1 cp al mattino', status: 'active' }, quote: 'Il paziente assume Ramipril 5 mg 1 cp al mattino' }] }] }));
+        assert.ok(parsed.ok);
+        return (parsed as { ok: true; value: PreparedExtraction }).value;
+    };
+    const [swapped] = await buildDossierInventory(ports, files, { ...live, prepared: extraction('SinteticoDue', 'PersonaDue') });
+    assert.equal(swapped.key.startsWith('nome:'), false, 'il nome proposto non è nel documento');
+    assert.ok(swapped.sources[0].prepared?.notes.some((note) => note.includes('non è scritto nel documento')));
+    const [named] = await buildDossierInventory(ports, files, { ...live, prepared: extraction('SinteticoUno', 'PersonaUno') });
+    assert.equal(named.key, 'nome:sinteticouno|personauno|');
+    assert.equal(named.sources[0].prepared?.notes.some((note) => note.includes('non è scritto nel documento')), false);
+});
+
 test('accept verified and apply writes only what the source supports, with active principle and summary', async () => {
     const text = letterText(CF_A);
     const { ports, files, records } = setup([['settimana/a.pdf', text]]);

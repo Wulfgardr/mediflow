@@ -38,6 +38,11 @@ non fidata. L'app non chiama modelli: legge un file scelto dal medico.
    attivo non scritto nel passo diventa una nota da confermare, non un dato. Un testo
    descrittivo (anamnesi, valutazione, imaging, contesto, invalidità) è verificato solo se
    è esso stesso un passo del documento; una riformulazione resta da decidere.
+   Oltre al passo, contano le parole della stessa frase prima della citazione: una
+   negazione («non assume») nega il fatto e un familiare (genitori, figli, fratelli,
+   coniuge, moglie, marito e altri parenti) mette la terapia o la diagnosi in conflitto
+   di soggetto, anche se la citazione li taglia fuori. Il fatto resta visibile e si decide
+   a mano, ma non entra nel blocco.
 4. **Regole del dominio invariate.** Codici LOINC e UCUM solo dal catalogo locale, anche
    se il file ne propone: un valore senza corrispondenza non diventa osservazione e resta
    nella sintesi. Date solo ISO valide e non future; la data del documento letta da
@@ -54,7 +59,10 @@ non fidata. L'app non chiama modelli: legge un file scelto dal medico.
    documento; la voce col testo intero solo se la sintesi è accettata. Una proposta
    preparata uguale a una codificata del parser non si ripete.
 7. **Paziente.** Le fonti si raggruppano per il paziente indicato dall'estrazione (codice
-   fiscale valido, altrimenti cognome, nome e nascita). Il CF dell'estrazione serve solo a
+   fiscale valido, altrimenti cognome, nome e nascita), solo se quel CF o quel cognome e
+   nome sono scritti nel testo letto da MediFlow. Un paziente proposto e non scritto nel
+   documento non raggruppa la fonte, che resta nel gruppo della cartella con una nota.
+   Il CF dell'estrazione serve solo a
    raggruppare: il controllo d'identità di ADR 0175 resta sui codici letti da MediFlow, e
    un'attribuzione sbagliata produce un gruppo discordante e bloccato. Senza CF leggibile
    nessuna scheda viene preselezionata. La nuova scheda riceve dall'estrazione le proposte
