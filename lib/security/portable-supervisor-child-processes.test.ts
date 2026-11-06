@@ -194,3 +194,19 @@ test('Web bootstrap failure before readiness closes IPC and exits without openin
   assert.match(output, /headless Web failed closed/u);
   assert.doesNotMatch(output, /MEDIFLOW_HEADLESS_WEB_READY/u);
 });
+
+test('the child list contains only MCP and Web even with legacy model launcher configuration in the parent', () => {
+  const key = 'MEDIFLOW_ATHENA_MLX_GENERATE_BIN';
+  const previous = process.env[key];
+  process.env[key] = 'invalid retired runner';
+  try {
+    const current = setup();
+    assert.equal(current.calls.length, 2);
+    assert.deepEqual(current.calls.map(call => call.command), [paths.nodePath, paths.nodePath]);
+    assert.deepEqual(current.calls.map(call => call.args.at(-1)), [paths.mcpTargetPath, paths.webTargetPath]);
+    for (const call of current.calls) assert.doesNotMatch(JSON.stringify({ args: call.args, env: call.options.env }), /athena|mlx|python|uvx/iu);
+    current.processes.terminateAll();
+  } finally {
+    if (previous === undefined) delete process.env[key]; else process.env[key] = previous;
+  }
+});

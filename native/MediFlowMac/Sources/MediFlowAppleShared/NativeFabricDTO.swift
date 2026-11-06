@@ -31,7 +31,7 @@ public struct NativeFabricSelection: Decodable, Equatable, Sendable {
               NativeOrdinaryDisclosure.matches(preferenceRevision, "^sha256_[a-f0-9]{64}$"),
               ["saved_preference", "host_configuration"].contains(source), venue == "local", fallback == "none",
               !model.isEmpty, model.count <= 256,
-              function == .treatmentReasoning ? ["athena_mlx", "athena_transformers"].contains(provider) : provider == "ollama"
+              function != .treatmentReasoning, provider == "ollama"
         else { throw NativeOrdinaryContractError.invalid }
     }
 }
@@ -94,7 +94,7 @@ public struct NativeFabricResponse: Decodable, Sendable {
         }
         guard receipt["capability"].string == function.rawValue, receipt["venue"].string == "local_process",
               receipt["provider"].string == expected.provider,
-              expected.provider == "athena_mlx" ? receipt["model"] == .null : receipt["model"].string == expected.model,
+              receipt["model"].string == expected.model,
               function == .patientInsight ? receipt["egress"].string == "none" :
                 (receipt["egressProfile"]["egress"].string == "none" && receipt["fallbackCount"].number == 0)
         else { throw NativeOrdinaryContractError.invalid }

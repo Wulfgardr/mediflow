@@ -18,7 +18,6 @@ async function selectionFixture(t) {
         'packages/patient-profile-contracts/test/conformance.test.mjs',
         'scripts/check-headless-portable-imports.test.mjs',
         'scripts/intelligent-host-mcp-stdio.test.mjs',
-        'scripts/mediflow-headless-supervisor-athena.test.mjs',
         'scripts/run-headless-portable-tests.test.mjs',
     ]) {
         await mkdir(path.dirname(path.join(root, file)), { recursive: true });
@@ -48,7 +47,6 @@ test('rejects each missing required package or script even when other tests rema
         'packages/aip', 'packages/mini', 'packages/mcp', 'packages/patient-profile-contracts',
         'scripts/check-headless-portable-imports.test.mjs',
         'scripts/intelligent-host-mcp-stdio.test.mjs',
-        'scripts/mediflow-headless-supervisor-athena.test.mjs',
         'scripts/run-headless-portable-tests.test.mjs',
     ]) {
         await t.test(missing, async (t) => {
@@ -156,7 +154,6 @@ test('collects only sorted AIP, Mini, MCP, profile, stdio MCP and Supervisor com
             'packages/patient-profile-contracts/test/conformance.test.mjs',
             'scripts/check-headless-portable-imports.test.mjs',
             'scripts/intelligent-host-mcp-stdio.test.mjs',
-            'scripts/mediflow-headless-supervisor-athena.test.mjs',
             'scripts/run-headless-portable-tests.test.mjs', 'lib/forbidden.test.ts',
         ]) await writeFile(path.join(root, file), '');
         assert.deepEqual(await collectHeadlessPortableTests(root), [
@@ -166,7 +163,6 @@ test('collects only sorted AIP, Mini, MCP, profile, stdio MCP and Supervisor com
             'packages/patient-profile-contracts/test/conformance.test.mjs',
             'scripts/check-headless-portable-imports.test.mjs',
             'scripts/intelligent-host-mcp-stdio.test.mjs',
-            'scripts/mediflow-headless-supervisor-athena.test.mjs',
             'scripts/run-headless-portable-tests.test.mjs',
         ]);
     } finally { await rm(root, { recursive: true, force: true }); }

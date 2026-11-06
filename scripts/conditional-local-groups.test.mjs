@@ -112,7 +112,7 @@ test('Apple default entrypoint is lane-backed and other platforms fail explicitl
   assert.throws(() => conditionalGroupPlan(root, 'missing', owned), /Unknown conditional group/);
 });
 
-test('selection exposes generator artifacts, Cargo targets and eight individually proposed external conditions', () => {
+test('selection exposes generator artifacts, Cargo targets and seven individually proposed external conditions', () => {
   const selection = collectConditionalLocalSelections(root);
   assert.equal(selection['conditional:headless-browser'].files.length, 5);
   assert.ok(selection['conditional:headless-browser'].files.includes('scripts/ink-layout-browser.test.mjs'));
@@ -120,8 +120,8 @@ test('selection exposes generator artifacts, Cargo targets and eight individuall
   assert.equal(selection['conditional:research-toolchain'].files.length, 3);
   assert.equal(conditionalGroupPlan(root, 'fixture-generators', owned).artifacts.length, 3);
   const conditions = conditionalLocalGroups.externalConditions;
-  assert.equal(conditions.length, 8);
-  assert.equal(new Set(conditions.map(item => item.file)).size, 8);
+  assert.equal(conditions.length, 7);
+  assert.equal(new Set(conditions.map(item => item.file)).size, 7);
   assert.ok(conditions.every(item => item.owner === '@Wulfgardr' && item.status === 'proposed-condition-not-approved-exclusion' && item.reason && item.condition));
 });
 

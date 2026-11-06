@@ -115,22 +115,22 @@ test('returns explicit fail-closed read dispositions', () => {
     assert.deepEqual(boundary.service.read(), { status: 'denied', reason: 'unavailable' });
 });
 
-test('keeps independent Ollama and ATHENA lifecycle services on one host', () => {
+test('keeps independent Ollama and secondo provider lifecycle services on one host', () => {
     const appDataDir = root();
     const sources = {
         entropy: () => 'e'.repeat(64),
         now: () => '2026-08-22T11:03:00.000Z',
     };
     const ollama = createHostProviderLifecycleService({ appDataDir, provider: 'ollama', sources });
-    const athena = createHostProviderLifecycleService({ appDataDir, provider: 'athena_mlx', sources });
+    const retired = createHostProviderLifecycleService({ appDataDir, provider: 'synthetic_retired', sources });
 
     ollama.control.admit({ expectedVersion: 0, onboarding: enabledLocal('ollama') });
-    athena.control.admit({ expectedVersion: 0, onboarding: enabledLocal('athena_mlx') });
+    retired.control.admit({ expectedVersion: 0, onboarding: enabledLocal('synthetic_retired') });
 
     const ollamaRead = ollama.service.read();
-    const athenaRead = athena.service.read();
+    const retiredRead = retired.service.read();
     assert.equal(ollamaRead.status === 'available' && ollamaRead.record.lifecycle.provider, 'ollama');
-    assert.equal(athenaRead.status === 'available' && athenaRead.record.lifecycle.provider, 'athena_mlx');
-    expectCode('input_invalid', () => athena.control.admit({ expectedVersion: 0, onboarding: enabledLocal('ollama') }));
-    expectCode('input_invalid', () => createHostProviderLifecycleService({ appDataDir, provider: 'ATHENA MLX' }));
+    assert.equal(retiredRead.status === 'available' && retiredRead.record.lifecycle.provider, 'synthetic_retired');
+    expectCode('input_invalid', () => retired.control.admit({ expectedVersion: 0, onboarding: enabledLocal('ollama') }));
+    expectCode('input_invalid', () => createHostProviderLifecycleService({ appDataDir, provider: 'INVALID PROVIDER' }));
 });

@@ -48,7 +48,7 @@ for (const view of ['funzioni', 'modelli']) test(`AI settings ${view}: one faile
         aiPatientInsightKillSwitch: 'disabled', aiSmartImportKillSwitch: 'disabled', aiDocumentSynthesisKillSwitch: 'disabled', aiTreatmentReasoningKillSwitch: 'disabled',
     };
     const preferences = readFunctionModelPreferences({ settings, ollamaLifecycle: { status: 'denied', reason: 'missing' },
-        athenaLifecycle: { status: 'denied', reason: 'missing' }, athenaAvailable: false, athenaIdentity: 'synthetic' }, 'v2');
+        }, 'v2');
     await page.route('**/*', async route => {
         const request = route.request(), url = new URL(request.url()), path = url.pathname;
         if (url.origin !== origin) { blocked.push(url.href); return route.abort(); }

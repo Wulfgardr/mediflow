@@ -17,13 +17,14 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
 
   const providers = page.getByTestId('fabric-provider-section');
   await expect(providers).toBeVisible();
-  for (const provider of ['ollama', 'athena_mlx', 'openai', 'anthropic']) {
+  for (const provider of ['ollama', 'openai', 'anthropic']) {
     await expect(page.getByTestId(`fabric-provider-${provider}`)).toBeVisible();
   }
   await expect(providers).toContainText('Dichiarato');
   await expect(providers).toContainText('Effettivo');
   await expect(page.getByTestId('fabric-provider-ollama')).toContainText('Ollama');
-  await expect(page.getByTestId('fabric-provider-athena_mlx')).toContainText('ATHENA');
+  await expect(page.getByTestId('fabric-provider-athena_mlx')).toHaveCount(0);
+  await expect(providers).not.toContainText('ATHENA');
   await expect(page.getByTestId('fabric-provider-openai')).toContainText('Esecuzione disabilitata');
   await expect(page.getByTestId('fabric-provider-anthropic')).toContainText('Un abbonamento consumer non equivale all’accesso API.');
   await expect(providers).toContainText('Non osservata: serve una prova dell’operazione corrente.');
@@ -45,9 +46,10 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
   await expect(page.getByTestId('fabric-group-deterministic')).toBeVisible();
   await expect(page.getByTestId('fabric-egress-section')).toContainText('Uscita esterna chiusa');
 
-  for (const capability of ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning']) {
+  for (const capability of ['patient_insight', 'smart_import', 'document_synthesis']) {
     await expect(page.getByTestId(`fabric-availability-${capability}`)).toContainText('Solo proposta');
   }
+  await expect(page.getByTestId('fabric-availability-treatment_reasoning')).toContainText('Non disponibile');
   await expect(page.getByTestId('fabric-availability-icd_lookup')).toContainText('Disponibile nell’app');
   await expect(page.getByTestId('fabric-availability-ocr')).toContainText('Non disponibile');
   await expect(page.getByTestId('fabric-capability-ocr')).toContainText('Nessuna sede: funzione non eseguibile');
@@ -77,7 +79,7 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
   });
 });
 
-test('Models settings scopes Ollama roles and keeps ATHENA on its separate lane', async ({ page }) => {
+test('Models settings scopes Ollama roles and no longer mentions ATHENA', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await page.goto('/settings/ai/modelli');
 
@@ -85,7 +87,7 @@ test('Models settings scopes Ollama roles and keeps ATHENA on its separate lane'
   await expect(surface).toBeVisible();
   await expect(surface).toContainText('Sintesi e organizzazione');
   await expect(surface).toContainText('Ragionamento testuale');
-  await expect(surface).toContainText('non configura la revisione terapeutica ATHENA');
+  await expect(surface).not.toContainText('ATHENA');
   await expect(surface).toContainText('La presenza in elenco non abilita le funzioni cliniche.');
   await expect(surface).not.toContainText('Ollama è l’unico provider supportato');
   await expect(surface).not.toContainText('Ollama è l\'unico provider supportato');

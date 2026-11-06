@@ -35,7 +35,7 @@ const FIXTURE_CATALOG = {
     defaultSource: 'host_configuration',
     bindingState: 'current',
     options: id === 'treatment_reasoning'
-      ? [{ modelOptionId: `model_option_${'a'.repeat(32)}`, label: 'ATHENA / MLX', provider: 'athena_mlx', state: 'unavailable' }]
+      ? [{ modelOptionId: `model_option_${'a'.repeat(32)}`, label: 'ATHENA / MLX', provider: 'ollama', state: 'unavailable' }]
       : [{ modelOptionId: FIXTURE_MODEL.modelOptionId, label: FIXTURE_MODEL.model, provider: FIXTURE_MODEL.provider, state: 'available_unqualified' }],
   })),
 } satisfies FunctionModelPreferences;

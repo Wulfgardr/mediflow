@@ -14,7 +14,6 @@ import { decodePortableSupervisorWebIpcFrameV1 } from
 import { createPatientProfileQuerySupervisorPortV1 } from './patient-profile-query-supervisor-port.ts';
 import type { PortableSupervisorPatientProfileQueryGrantV1 } from '../../packages/aip/src/portable-supervisor-web-ipc-contract.ts';
 import { getDataDir } from '../data-dir';
-import { resolveAthenaMlxGenerateBin } from '../athena-mlx-launcher-config.ts';
 import { createCheckupStatusTransitionSupervisorPortV1 } from
   './checkup-status-transition-supervisor-port.ts';
 import { createProductionMcpAgentLauncherWithPreSpawnedChildV1,
@@ -201,7 +200,6 @@ export function createPortableSupervisorProductionV1(
     'spawnChild' | 'webDirectory' | 'webTargetPath' | 'webBuildIdentity'> = {},
 ): PortableSupervisorProductionRuntimeV1 {
   if (agentKind !== 'mcp' && agentKind !== 'mini') throw new Error('agent_kind_invalid');
-  const athenaMlxGenerateBin = resolveAthenaMlxGenerateBin(process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN);
   const now = () => Date.now();
   const dataDir = getDataDir();
   if (!path.isAbsolute(dataDir)) throw new Error('data_directory_path_invalid');
@@ -231,7 +229,7 @@ export function createPortableSupervisorProductionV1(
     now, readHostContext: context.readHostContext,
   });
   const children = createPortableSupervisorProductionChildProcessesV1({
-    ...childOptions, dataDir, athenaMlxGenerateBin, agentKind,
+    ...childOptions, dataDir, agentKind,
   });
   try {
     const checkup = createCheckupStatusTransitionSupervisorPortV1({

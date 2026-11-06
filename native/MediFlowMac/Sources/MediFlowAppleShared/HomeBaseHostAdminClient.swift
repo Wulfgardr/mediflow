@@ -7,7 +7,7 @@ import Foundation
 /// The twenty-one capabilities the function map calls `host-only` were never
 /// missing a backend: `system/update-awareness`, `system/audit`,
 /// `system/network-overview`, `system/native`, `system/backup-restore`,
-/// `system/mlx`, `ai/models` and the rest all exist as local API routes, and
+/// `ai/models` and the rest all exist as local API routes, and
 /// they authenticate with the operator session cookie — the same cookie this app
 /// already holds after login. What was missing was a client. Nothing here adds a
 /// contract, a schema or an endpoint.

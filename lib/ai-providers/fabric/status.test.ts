@@ -28,7 +28,6 @@ const EGRESS_PROFILE_KEYS = ['egress', 'id', 'version'];
 test('espone uno snapshot minimo, ordinato e congelato', () => {
     const snapshot = buildFabricStatusSnapshot({
         ollama: () => ({ status: 'denied', reason: 'missing' }),
-        athena: () => ({ status: 'denied', reason: 'corrupt' }),
     });
 
     assert.deepEqual(Object.keys(snapshot).sort(), SNAPSHOT_KEYS);
@@ -37,10 +36,10 @@ test('espone uno snapshot minimo, ordinato e congelato', () => {
     assert.equal(snapshot.egressGateOpen, false);
     assert.equal(snapshot.readinessNote, 'available_unqualified');
     assert.deepEqual(snapshot.providerDisclosure.providers.map(({ id }) => id), [
-        'ollama', 'athena_mlx', 'openai', 'anthropic',
+        'ollama', 'openai', 'anthropic',
     ]);
     assert.equal(snapshot.providerDisclosure.providers[0].effective.lifecycle, 'missing');
-    assert.equal(snapshot.providerDisclosure.providers[1].effective.lifecycle, 'corrupt');
+    assert.equal(snapshot.providerDisclosure.providers[1].effective.lifecycle, 'not_applicable');
     assert.deepEqual(
         snapshot.capabilities.map((capability) => capability.id),
         Object.keys(FABRIC_CAPABILITY_DESCRIPTORS).sort(),
@@ -64,10 +63,11 @@ test('espone disposition truthful senza trasformarla in readiness provider', () 
     const snapshot = buildFabricStatusSnapshot();
     const byId = Object.fromEntries(snapshot.capabilities.map((capability) => [capability.id, capability]));
 
-    for (const id of ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning']) {
+    for (const id of ['patient_insight', 'smart_import', 'document_synthesis']) {
         assert.equal(byId[id]?.availabilityDisposition, 'proposal_only', id);
     }
     assert.equal(byId.ocr?.availabilityDisposition, 'unavailable');
+    assert.equal(byId.treatment_reasoning?.availabilityDisposition, 'unavailable');
     assert.deepEqual(byId.ocr?.venues, []);
     assert.equal(byId.ocr?.killSwitch, null);
     assert.equal('provider' in byId.ocr, false);

@@ -75,7 +75,6 @@ type ModelReport = {
 export type AiTaskContractBenchmarkReport = {
     generatedAt: string;
     baseUrl: string;
-    mlxBaseUrl: string;
     corpusPath: string;
     corpusSize: number;
     iterations: number;
@@ -102,13 +101,11 @@ function parseArgs(argv: string[]) {
         corpus: DEFAULT_CORPUS_PATH,
         out: null as string | null,
         baseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
-        mlxBaseUrl: process.env.MLX_BASE_URL || 'http://127.0.0.1:8080',
         iterations: 1,
         validate: false,
         minContractRate: 1,
         maxLatencyMs: null as number | null,
         models: null as string[] | null,
-        mlxModels: null as string[] | null,
     };
 
     for (let index = 2; index < argv.length; index += 1) {
@@ -121,9 +118,6 @@ function parseArgs(argv: string[]) {
             index += 1;
         } else if (value === '--base-url' && argv[index + 1]) {
             args.baseUrl = argv[index + 1];
-            index += 1;
-        } else if (value === '--mlx-base-url' && argv[index + 1]) {
-            args.mlxBaseUrl = argv[index + 1];
             index += 1;
         } else if (value === '--iterations' && argv[index + 1]) {
             args.iterations = Math.max(1, Number.parseInt(argv[index + 1], 10) || 1);
@@ -138,12 +132,6 @@ function parseArgs(argv: string[]) {
             index += 1;
         } else if (value === '--models' && argv[index + 1]) {
             args.models = argv[index + 1]
-                .split(',')
-                .map((item) => item.trim())
-                .filter(Boolean);
-            index += 1;
-        } else if (value === '--mlx-models' && argv[index + 1]) {
-            args.mlxModels = argv[index + 1]
                 .split(',')
                 .map((item) => item.trim())
                 .filter(Boolean);
@@ -182,10 +170,9 @@ function buildPrompt(entry: CorpusEntry) {
     };
 }
 
-function buildTargets(models: string[] | null | undefined, mlxModels: string[] | null | undefined) {
+function buildTargets(models: string[] | null | undefined) {
     const explicitTargets: LocalChatTarget[] = [
         ...(models || []).map((model) => ({ runtime: 'ollama_chat' as const, model })),
-        ...(mlxModels || []).map((model) => ({ runtime: 'mlx_chat' as const, model })),
     ];
 
     if (explicitTargets.length > 0) {
@@ -353,26 +340,22 @@ function validateReport(models: ModelReport[], minContractRate: number, maxLaten
 export async function runAiTaskContractBenchmark(options: {
     corpusPath?: string;
     baseUrl?: string;
-    mlxBaseUrl?: string;
     iterations?: number;
     models?: string[];
-    mlxModels?: string[];
     targets?: LocalChatTarget[];
 }): Promise<AiTaskContractBenchmarkReport> {
     const corpusPath = options.corpusPath || DEFAULT_CORPUS_PATH;
     const baseUrls = resolveLocalChatBaseUrls({
         baseUrl: options.baseUrl,
-        mlxBaseUrl: options.mlxBaseUrl,
     });
     const iterations = Math.max(1, options.iterations || 1);
     const targets = options.targets && options.targets.length > 0
         ? options.targets
-        : buildTargets(options.models, options.mlxModels);
+        : buildTargets(options.models);
 
     const corpus = readCorpus(corpusPath);
     const installedModelsByRuntime = {
         ollama_chat: await listInstalledLocalChatModels('ollama_chat', baseUrls.ollama),
-        mlx_chat: await listInstalledLocalChatModels('mlx_chat', baseUrls.mlx),
     };
     const modelReports: ModelReport[] = [];
     for (const target of targets) {
@@ -382,17 +365,14 @@ export async function runAiTaskContractBenchmark(options: {
     return {
         generatedAt: new Date().toISOString(),
         baseUrl: baseUrls.ollama,
-        mlxBaseUrl: baseUrls.mlx,
         corpusPath,
         corpusSize: corpus.length,
         iterations,
         installedModels: [...new Set([
             ...installedModelsByRuntime.ollama_chat,
-            ...installedModelsByRuntime.mlx_chat,
         ])],
         installedTargetKeys: [
             ...installedModelsByRuntime.ollama_chat.map((model) => buildLocalChatTargetKey({ runtime: 'ollama_chat', model })),
-            ...installedModelsByRuntime.mlx_chat.map((model) => buildLocalChatTargetKey({ runtime: 'mlx_chat', model })),
         ],
         installedModelsByRuntime,
         targetModels: targets.map((target) => target.model),
@@ -407,10 +387,8 @@ async function main() {
     const report = await runAiTaskContractBenchmark({
         corpusPath: args.corpus,
         baseUrl: args.baseUrl,
-        mlxBaseUrl: args.mlxBaseUrl,
         iterations: args.iterations,
         models: args.models || undefined,
-        mlxModels: args.mlxModels || undefined,
     });
 
     const output = JSON.stringify(report, null, 2);

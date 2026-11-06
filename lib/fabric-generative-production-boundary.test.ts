@@ -32,7 +32,6 @@ test('the frozen generative catalog points at the authenticated preview routes',
         'app/api/ai/patient-insight/preview/route.ts',
         'app/api/ai/smart-import/preview/route.ts',
         'app/api/ai/document-synthesis/preview/route.ts',
-        'app/api/ai/treatment-reasoning/preview/route.ts',
     ]) {
         assert.match(catalog, new RegExp(route.replaceAll('.', '\\.'), 'u'));
     }

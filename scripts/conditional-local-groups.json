@@ -90,13 +90,6 @@
       "condition": "Bind existing Apple lane to the same recipes/default Swift selection. Record platform skips; do not claim Xcode modes from default Swift invocation."
     },
     {
-      "file": "scripts/mlx-chat-batch-runner-test.sh",
-      "owner": "@Wulfgardr",
-      "status": "proposed-condition-not-approved-exclusion",
-      "reason": "Dry-run still imports mlx.core/mlx_lm and requires .venv_mlx/bin/python3; the lane must provision that runtime explicitly.",
-      "condition": "Use an explicitly provisioned Apple/model lane or per-file owner-approved exclusion; dry-run alone does not remove MLX imports."
-    },
-    {
       "file": "scripts/run-visit-recording-synthetic-benchmark.mjs",
       "owner": "@Wulfgardr",
       "status": "proposed-condition-not-approved-exclusion",

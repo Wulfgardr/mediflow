@@ -132,7 +132,7 @@ non effettua writeback FSE/SISS.
 
 ## 🤖 L'AI manda dati paziente fuori dal computer?
 
-Non nel percorso predefinito. AnyDoc, Apple Vision, Ollama e ATHENA/MLX
+Non nel percorso predefinito. AnyDoc, Apple Vision e Ollama
 lavorano localmente entro i rispettivi limiti. Gli adapter OpenAI/Anthropic
 sono `default OFF`; la loro prova amministrativa richiede intento esatto,
 opt-in dell’host, riferimento al segreto e politiche esplicite di uscita e

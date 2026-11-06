@@ -14,8 +14,7 @@ function fixture(): FunctionModelSources {
     return { settings: { aiProvider: 'ollama', aiUrl: 'http://127.0.0.1:11434',
         aiModel_clinical: 'synthetic-clinical:1', aiModel_reasoning: 'synthetic-reasoning:1',
         ...Object.fromEntries(Object.values(FUNCTION_SWITCH_KEYS).map(key => [key, 'enabled'])) },
-    ollamaLifecycle: lifecycle('ollama'), athenaLifecycle: lifecycle('athena_mlx'),
-    athenaIdentity: 'synthetic-artifact', athenaAvailable: true };
+    ollamaLifecycle: lifecycle('ollama'), };
 }
 function command(sources: FunctionModelSources, change: Record<string, unknown> = {}): FunctionModelCommand {
     const view = readFunctionModelPreferences(sources);
@@ -76,9 +75,6 @@ test('disabled writes still reject a new noncataloged option and an option belon
     const sources = savedFixture();
     assert.throws(() => planFunctionModelUpdate(sources, command(sources, { enabled: false,
         defaultModelOptionId: `model_option_${'0'.repeat(32)}` })), /model_not_cataloged/);
-    const athena = buildFunctionModelCatalog(sources).hostDefaults.treatment_reasoning;
-    assert.throws(() => planFunctionModelUpdate(sources, command(sources, { enabled: false,
-        defaultModelOptionId: athena })), /unsupported/);
 });
 
 test('an explicit available rebind is still required before a stale preference can execute', () => {

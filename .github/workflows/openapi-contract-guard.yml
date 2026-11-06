@@ -89,11 +89,6 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:apple-wide-qa
 
-      # Otto controlli di presenza che fissano il confine «MLX è benchmark-visible,
-      # non runtime clinico». Non richiede MLX, né Ollama, né socket: ~150 ms.
-      - name: MLX operational parity guard
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npm run check:mlx-operational-parity
       - name: OpenAPI contract guard
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |

@@ -67,7 +67,6 @@ nel codice, non una qualifica clinica o la distribuzione di ogni superficie.
 | Web app Next.js | Superficie primaria | Root Kree8 live, UI clinica locale, `/api/*`, `/api/v1/*`, overview `home-base`, coordinamento AI locale |
 | SQLite + Drizzle | Storage autorevole | `medical.db`, schema in `lib/schema.ts` |
 | Ollama | Runtime generativo locale configurabile | Serve Patient Insight, Smart Import e Document Synthesis quando host e modello locali superano la readiness; non è un runtime OCR della 0.8.5 |
-| ATHENA/MLX | Runtime locale configurabile | Serve Treatment Reasoning solo con modello e runner `mlx_lm.generate` pre-provisionati; assenza o configurazione incompleta falliscono in modo chiuso |
 | AnyDoc + Apple Vision | Estrazione documentale locale | AnyDoc resta il primo passaggio; Apple Vision continua soltanto le pagine PDF `needsOcr` sul Mac, con provenienza, currentness e fail-closed |
 | Selector Fabric | Integrato | Discovery compatibile, smoke sintetico e binding atomico per cinque capability; nessuna qualifica runtime implicita |
 | OpenAI / Anthropic | Adapter ufficiali `default OFF` | Probe review-only con transport fake; nessuna credenziale o rete live nel tree |

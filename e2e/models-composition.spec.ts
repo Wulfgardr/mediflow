@@ -50,7 +50,7 @@ async function installClosedMocks(page: Page, baseURL: string) {
             else if (method !== 'GET') { blocked.push(`${method} ${path}`); return route.abort(); }
             return route.fulfill({ json: onboarding() });
         }
-        if (path === '/api/system/function-status') { record(); return route.fulfill({ json: buildFunctionStatus({ platform: 'synthetic', enabled: { patient_insight: false, smart_import: false, document_synthesis: false, treatment_reasoning: false }, ollamaLifecycle: 'available_unqualified', athenaLifecycle: 'missing', clinicalBinding: { state: 'configured', model: String(config.get('aiModel_clinical')) }, athenaArtifact: false, who: 'disabled' }, '2026-10-26T12:00:00.000Z') }); }
+        if (path === '/api/system/function-status') { record(); return route.fulfill({ json: buildFunctionStatus({ platform: 'synthetic', enabled: { patient_insight: false, smart_import: false, document_synthesis: false, treatment_reasoning: false }, ollamaLifecycle: 'available_unqualified', clinicalBinding: { state: 'configured', model: String(config.get('aiModel_clinical')) }, who: 'disabled' }, '2026-10-26T12:00:00.000Z') }); }
         if (path === '/api/system/ai-rollout-readiness') { record(); return route.fulfill({ json: { lanes: ['patient_insight', 'smart_import', 'redaction', 'clinical_entities', 'generative_challenger'].map(lane => ({ lane, available: false, report: null })), localControls: ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning'].map(lane => ({ lane, label: lane, state: 'disabled' })) } }); }
         if (path.startsWith('/api/') && /(?:ai|ollama|mlx|model|provider|download|runtime)/iu.test(path)) { blocked.push(`${method} ${path}`); return route.abort(); }
         return route.continue();

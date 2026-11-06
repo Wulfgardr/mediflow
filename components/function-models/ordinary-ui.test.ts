@@ -102,11 +102,11 @@ for (const enabled of [true, false]) test(`retired Treatment Reasoning retains s
     const summary = loadComponent('./function-preferences-panel.tsx', 'Description');
     const modelOptionId = 'model_option_' + 'a'.repeat(32);
     const row = { id: 'treatment_reasoning', enabled, defaultSource: 'saved_preference', defaultModelOptionId: modelOptionId,
-        options: [{ modelOptionId, label: 'Synthetic saved ATHENA', provider: 'athena_mlx', state: 'unavailable' }] };
+        options: [] };
     const tree = component({ row, disabled: false, activationSupported: true, account: null, preview() { throw new Error('must not propose'); } });
     for (const projection of [tree, summary({ row })]) {
         assert.match(text(projection), /Non disponibile in questa versione/);
-        assert.match(text(projection), /Synthetic saved ATHENA/);
+        assert.doesNotMatch(text(projection), /Synthetic saved/);
         assert.match(text(projection), /Preferenza salvata/);
         assert.ok(text(projection).includes(`Interruttore salvato: ${enabled ? 'attivo' : 'spento'}`));
         assert.match(text(projection), /non viene usata in questa versione/);
