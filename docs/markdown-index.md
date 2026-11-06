@@ -520,3 +520,5 @@ di ciascuna proposta e il limite di autorità dell’host.
 - [territorial/aria-letter-draft.md](./territorial/aria-letter-draft.md): Bozza non inviata delle domande ad ARIA, senza richiesta di accesso.
 
 - `docs/analysis/2026-10-31-chat-catalog-fabric/catalogo-operativo.md`: raccordo generato tra capacità Fabric, servizi, controlli di accesso, consumatori e test; limiti delle prove sorgente.
+
+- [Aggiornare i consumi prima di una release](releases/development-usage.md)

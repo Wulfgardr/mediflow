@@ -123,7 +123,7 @@ function bindingChange(root, mutate) {
 }
 function rejected(root, pattern) {
   const result = collectExplicitNpmSelections(root);
-  assert.equal(Object.keys(result).length, 7);
+  assert.equal(Object.keys(result).length, 8);
   assert.deepEqual(result[suiteId].files, []);
   assert.equal(result[suiteId].binding, null);
   assert.match(result[suiteId].errors.join('\n'), pattern);
@@ -236,12 +236,13 @@ console.log(JSON.stringify(result.files));`;
   assert.deepEqual(JSON.parse(result.stdout), [claimsFile]);
 });
 
-test('seven required npm script bodies and CI bindings select the actual independent expected paths', () => {
+test('eight required npm script bodies and CI bindings select the actual independent expected paths', () => {
   const actual = collectExplicitNpmSelections(sourceRoot);
   assert.deepEqual(Object.fromEntries(Object.entries(actual).map(([id, value]) => [id, value.files])), {
     'npm:test:launcher-helpers': ['scripts/launcher-helpers.test.mjs', 'scripts/windows-system-command.test.mjs'],
     'npm:test:native-launcher': ['scripts/launch-mediflow-mac.test.mjs'],
-    'npm:test:usage-dashboard': ['scripts/build-usage-dashboard.test.mjs', 'scripts/assisted-development-disclosure.test.mjs'],
+    'npm:test:release-usage': ['scripts/check-release-usage.test.mjs'],
+    'npm:test:usage-dashboard': ['scripts/build-usage-dashboard.test.mjs', 'scripts/assisted-development-disclosure.test.mjs', 'scripts/collect-development-usage.test.mjs'],
     'npm:test:database-import-boundary': ['scripts/check-database-import-boundary.test.mjs'],
     'npm:test:fabric-generative-runtime-crosswalk': ['scripts/check-fabric-generative-runtime-crosswalk.test.mjs'],
     'npm:test:anydoc-diagnostics': ['scripts/anydoc-http-diagnostic.test.mjs', 'scripts/anydoc-consumer-diagnostic.test.mjs', 'scripts/anydoc-diagnostic-correlation.test.mjs'],
