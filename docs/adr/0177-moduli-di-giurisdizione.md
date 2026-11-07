@@ -86,7 +86,14 @@ schema. AIFA è una delle fonti:
   denominazione, principio attivo, ATC, forma, confezione, classe di
   rimborsabilità e titolare, anteprima con conteggi e campioni, conferma
   esplicita (`POST /api/drugs/catalog-import`). Il manifest va nella chiave
-  `drugCatalogSource`, riservata al writer del catalogo;
+  `drugCatalogSource`, riservata al writer del catalogo. GPUI offre lo stesso
+  percorso in Repertori, sotto i farmaci AIFA, con la sessione Web del nodo
+  home-base: colonne proposte dal server e modificabili, conteggi, fonte
+  dichiarata, conferma e seconda conferma per la riduzione; i campi JSON del
+  multipart hanno le chiavi in ordine e i byte inviati sono fissati in
+  `experiments/gpui-patient-pilot/transport/tests/fixtures/drug-catalog/`,
+  passati alla route reale da `lib/drug-catalog-gpui-contract.test.ts`
+  (aggiornamento del 7 novembre 2026, decisione G-0 di Leonardo);
 - la sostituzione è atomica con CAS sullo snapshot visto in anteprima,
   conferma aggiuntiva sotto il 90% delle voci e audit
   `reference_data.drug_catalog.updated` nella stessa transazione. Un

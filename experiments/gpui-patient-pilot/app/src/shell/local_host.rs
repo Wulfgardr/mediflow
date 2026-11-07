@@ -1,6 +1,7 @@
 mod archives;
 mod chatgpt;
 mod controls;
+mod drug_catalog;
 mod governance;
 mod macos_preferences;
 mod models;
