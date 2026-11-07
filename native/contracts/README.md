@@ -94,3 +94,18 @@ Apple e GPUI devono leggere questo campo nel dettaglio per alimentare la
 pillola ▲ in testata. La lista compatta non lo include. Il golden
 `crypto-golden-vectors.v1.json` contiene un vettore aggiuntivo
 `patient.allergies`; i vettori precedenti conservano i loro byte.
+
+## Registrazione delle voci di diario
+
+ADR 0183 aggiunge `recordedBy` nullable e facoltativo ai DTO di lettura delle
+voci, locali v1 e paired, insieme all'orario `createdAt` già presente. Il nome
+è testo del profilo in chiaro, fotografato dal server alla scrittura. Un nome
+assente o null resta senza autore. Il campo non è ammesso nelle richieste di
+creazione o modifica. Non ricavarlo da `metadata.authorName`, che descrive
+un'altra provenienza. Le voci SOAP o di sistema non ricevono il nome del medico.
+
+`entry-recording.v1.json` contiene i tre casi comuni a Swift e Rust. I decoder
+accettano nome, null e campo assente. `ClinicalFieldCrypto.decryptEntry`
+conserva il nome. Le GUI native e la lettura SQLite diretta Apple restano
+fuori dalla resa di questa PR. Per la riga usare `recordedBy` e `createdAt`
+del DTO HTTP, con ripiego «Registrata il <data> alle <ora>» senza autore.

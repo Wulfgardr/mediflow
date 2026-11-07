@@ -1,3 +1,5 @@
+import { format } from 'date-fns';
+import { it } from 'date-fns/locale';
 import { isEncryptedFieldValue, isLockedDataPlaceholder } from './locked-field-guard';
 
 type DiaryMetadata = { state: 'absent' | 'unreadable'; value?: undefined }
@@ -67,4 +69,13 @@ export function patientDiaryWorkflowState(metadata: unknown): PatientDiaryWorkfl
         }
     }
     return 'recorded';
+}
+
+export function patientDiaryRegistration(entry: { recordedBy?: string | null; createdAt?: Date | string | null }): string {
+    const author = entry.recordedBy?.trim();
+    const name = author && !isEncryptedFieldValue(author) && !isLockedDataPlaceholder(author) ? ` da ${author}` : '';
+    const createdAt = entry.createdAt ? new Date(entry.createdAt) : null;
+    const timestamp = createdAt && Number.isFinite(createdAt.getTime())
+        ? ` il ${format(createdAt, 'dd MMMM yyyy', { locale: it })} alle ${format(createdAt, 'HH:mm', { locale: it })}` : '';
+    return `Registrata${name}${timestamp}`;
 }

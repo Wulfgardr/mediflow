@@ -160,3 +160,46 @@ test('Diario paziente distingue metadata object/JSON, assenti, illeggibili e sta
     const response = await page.request.get(`/api/entries?patientId=${fixture.patientId}`); const stored = await response.json();
     expect(stored[0]).toMatchObject({ id: fixture.entryId, version: 1, metadata: JSON.stringify(fixture.metadata) });
 });
+
+
+test('registrazione del diario: autore server, orario di creazione e storico senza nome', async ({ page, baseURL }) => {
+    test.setTimeout(90_000);
+    if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).port === '3000') throw new Error('Banco sintetico isolato richiesto');
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const fixture = await page.evaluate(async () => {
+        const post = async (path: string, body: unknown) => {
+            const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+            if (!response.ok) throw new Error(`Synthetic ${path}: ${response.status}`);
+            return response.json();
+        };
+        const patient = await post('patients', { firstName: 'Registrazione', lastName: 'Sintetica', taxCode: crypto.randomUUID(), diagnoses: [] });
+        const body = { patientId: patient.id, type: 'visit', date: '2099-01-01T08:00:00Z', title: 'Registrazione sintetica con autore', content: 'Prova della registrazione sintetica.' };
+        const spoof = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, recordedBy: 'Nome falso del client' }) });
+        if (spoof.status !== 400) throw new Error(`Autore del client accettato: ${spoof.status}`);
+        const entry = await post('entries', body);
+        const rows = await (await fetch(`/api/entries?patientId=${patient.id}`)).json();
+        const stored = rows.find((row: { id: string }) => row.id === entry.id);
+        const profile = await (await fetch('/api/auth/profile')).json();
+        const expected = profile.displayName?.trim() || profile.username;
+        if (!expected || stored.recordedBy !== expected) throw new Error('Autore diverso dal profilo autenticato');
+        const at = new Date(stored.createdAt);
+        return { patientId: patient.id as string, entryId: entry.id as string, author: expected as string,
+            timestamp: `il ${at.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })} alle ${at.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` };
+    });
+    const read = async () => { await page.goto(`/patients/${fixture.patientId}/modules`); await openPatientSection(page, 'diario'); };
+    await read();
+    const row = page.locator('#diario article').filter({ hasText: 'Prova della registrazione sintetica.' });
+    await expect(row.locator('[data-ink="dry"]')).toHaveText(`Registrata da ${fixture.author} ${fixture.timestamp}`);
+    await expect(row.locator('[data-ink="dry"] .lume-point')).toBeVisible();
+    await page.goto('/?area=diario');
+    await expect(page.getByTestId('lume-diario-entry').filter({ hasText: 'Registrazione sintetica con autore' }).locator('[data-ink="dry"]')).toHaveText(`Registrata da ${fixture.author} ${fixture.timestamp}`);
+    await page.route('**/api/entries?*', async route => {
+        if (new URL(route.request().url()).searchParams.get('patientId') !== fixture.patientId) return route.continue();
+        const response = await fetchInterceptedRequest(route); const rows = await response.json();
+        await route.fulfill({ response, json: rows.map((entry: { id: string }) => entry.id === fixture.entryId
+            ? { ...entry, recordedBy: null, metadata: JSON.stringify({ authorName: 'Nome storico dichiarato' }) } : entry) });
+    });
+    await read();
+    await expect(row.locator('[data-ink="dry"]')).toHaveText(`Registrata ${fixture.timestamp}`);
+    await expect(row.locator('[data-ink="dry"]')).not.toContainText('Nome storico dichiarato');
+});

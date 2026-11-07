@@ -164,8 +164,8 @@ locali salvano ciò che ricevono.
 ### `entries`: diario clinico
 
 - Cifrate: `title`, `content`, `metadata`, `attachments`, `deletion_reason`
-- In chiaro: `id`, `patient_id`, `type`, `date`, `created_at`, `setting`, `deleted_at`, `version`, `updated_at`
-- Leggibile senza chiave: tipo, data e setting della nota; chi è il paziente.
+- In chiaro: `id`, `patient_id`, `type`, `date`, `created_at`, `setting`, `deleted_at`, `version`, `updated_at`, `recorded_by`
+- Leggibile senza chiave: tipo, data e setting della nota; chi è il paziente; il nome dell'operatore che l'ha registrata (ADR 0183), come già nell'audit.
 
 ### `exemption_import_receipts`: ricevute di import delle esenzioni
 

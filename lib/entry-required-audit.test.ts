@@ -17,7 +17,7 @@ const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-c05-diary-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'c05-diary-synthetic-token';
-const state: { session: Record<string, unknown> | null; networkContext?: ReturnType<typeof syntheticNetworkPatientAuthority> } = {
+const state: { session: Record<string, unknown> | null; localActorSession?: Record<string, unknown>; networkContext?: ReturnType<typeof syntheticNetworkPatientAuthority> } = {
     session: { id: 'synthetic-web', userId: 'synthetic-admin', role: 'admin', authChannel: 'web' },
 };
 const stateKey = Symbol.for(`c05-diary-seam-${dataDir}`);
@@ -29,13 +29,14 @@ const seam = (name: string, source: string) => {
 };
 const auth = seam('auth.cjs', `const state=globalThis[Symbol.for(${JSON.stringify(`c05-diary-seam-${dataDir}`)})];
 exports.requireSession=async()=>state.session;
-exports.requireLocalApiActorSession=async()=>({id:'synthetic-local',userId:'synthetic-local',role:'admin',authChannel:'system'});
+exports.requireLocalApiActorSession=async()=>state.localActorSession??({id:'synthetic-local',userId:'synthetic-local',role:'admin',authChannel:'system'});
 exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:401});
 exports.forbiddenResponse=()=>Response.json({error:'Forbidden'},{status:403});`);
 const token = seam('token.cjs', `exports.requireLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-diary-synthetic-token'?null:Response.json({error:'Unauthorized'},{status:401});
 exports.hasValidLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-diary-synthetic-token';`);
 const network = seam('network.cjs', `const state=globalThis[Symbol.for(${JSON.stringify(`c05-diary-seam-${dataDir}`)})];
-exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{...state.networkContext,request}});`);
+exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{...state.networkContext,request}});
+exports.requireNetworkCapabilityContext=exports.requireNetworkWriteContext;`);
 const { registerHooks } = load('node:module') as {
     registerHooks: (hooks: { resolve: (specifier: string, context: unknown,
         next: (specifier: string, context: unknown) => { url: string }) => { url: string; shortCircuit?: boolean } }) => { deregister: () => void };
@@ -60,7 +61,7 @@ dbServer.$client.prepare('UPDATE settings SET value=? WHERE key=?').run(JSON.str
 }), NETWORK_PAIRING_STATE_KEY);
 const cookieState = { cookies: new Map([['ambulatory_id', 'c05-diary-a'], ['mediflow_session', state.networkContext.session.id]]) };
 const cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
-const { ambulatories, patients, patientsToAmbulatories, entries } = load('./schema.ts') as typeof import('./schema.ts');
+const { ambulatories, patients, patientsToAmbulatories, entries, users } = load('./schema.ts') as typeof import('./schema.ts');
 const webCreate = load('../app/api/entries/route.ts') as typeof import('../app/api/entries/route.ts');
 const webItem = load('../app/api/entries/[id]/route.ts') as typeof import('../app/api/entries/[id]/route.ts');
 const v1Create = load('../app/api/v1/patients/[id]/entries/route.ts') as typeof import('../app/api/v1/patients/[id]/entries/route.ts');
@@ -111,7 +112,7 @@ function request(method: string, body: unknown, surface: string, raw?: string, e
     return new Request('http://127.0.0.1/api/entries', { method,
         headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', ...(surface === 'web' ? {} : { authorization: 'Bearer c05-diary-synthetic-token' }),
             ...extraHeaders },
-        body: raw ?? JSON.stringify(body),
+        ...(method === 'GET' ? {} : { body: raw ?? JSON.stringify(body) }),
     });
 }
 
@@ -733,4 +734,51 @@ test('scale committed response from a retired session cannot publish success or 
         assert.equal(after.allPatientEntries.length, 1);
         assert.equal(after.audit.length, 1);
     } finally { db.setKey(null); }
+});
+
+for (const surface of ['web', 'v1', 'network'] as const) {
+    test(`${surface} registra il nome del profilo autenticato e conserva lo snapshot dopo una modifica`, async () => {
+        dbServer.update(users).set({ displayName: 'Ada Sintetica' }).where(eq(users.id, 'synthetic-admin')).run();
+        state.localActorSession = { ...state.session, authChannel: 'native' };
+        try {
+            const result = await capture(`autore-${surface}`, surface, 'POST');
+            assertAccepted(result, 201);
+            const row = result.after.allPatientEntries[0] as Record<string, unknown>;
+            assert.equal(row.recorded_by, 'Ada Sintetica');
+            dbServer.update(users).set({ displayName: 'Nome successivo' }).where(eq(users.id, 'synthetic-admin')).run();
+            if (surface === 'network') {
+                const retry = await invoke(surface, 'POST', result.ids, validBody(surface, 'POST', result.ids));
+                assert.equal(retry.status, 200);
+                assert.equal((readBack(result.ids.patientId, result.ids.entryId).allPatientEntries[0] as Record<string, unknown>).recorded_by, 'Ada Sintetica');
+            }
+            const updated = await invoke(surface, 'PUT', result.ids, { version: 1, content: 'ENC:bmV3:Y29udGVudA==' });
+            assert.equal(updated.status, 200);
+            assert.equal((readBack(result.ids.patientId, result.ids.entryId).allPatientEntries[0] as Record<string, unknown>).recorded_by, 'Ada Sintetica');
+            const response = surface === 'web' ? await webCreate.GET(request('GET', undefined, surface))
+                : surface === 'v1' ? await v1Item.GET(request('GET', undefined, surface), { params: Promise.resolve({ id: result.ids.patientId, entryId: result.ids.entryId }) })
+                    : await networkItem.GET(state.networkContext!.request, { params: Promise.resolve({ id: result.ids.patientId, entryId: result.ids.entryId }) });
+            assert.equal(response.status, 200);
+            const dto = await response.json();
+            assert.equal((Array.isArray(dto) ? dto.find((entry: { id: string }) => entry.id === result.ids.entryId) : dto).recordedBy, 'Ada Sintetica');
+        } finally { delete state.localActorSession; }
+    });
+    for (const operation of ['POST', 'PUT'] as const) test(`${surface} ${operation} rifiuta l'autore inviato dal client senza scritture`, async () => {
+        assertRejected(await capture(`autore-falso-${surface}`, surface, operation, {
+            mutateBody: body => ({ ...body, recordedBy: 'Medico inventato dal client' }),
+        }), 400);
+    });
+}
+
+test('profilo senza displayName usa lo username corrente, storico e sistema restano senza autore', async () => {
+    dbServer.update(users).set({ displayName: null }).where(eq(users.id, 'synthetic-admin')).run();
+    const created = await capture('autore-username', 'web', 'POST');
+    assertAccepted(created, 201);
+    const user = dbServer.select().from(users).where(eq(users.id, 'synthetic-admin')).get()!;
+    assert.equal((created.after.allPatientEntries[0] as Record<string, unknown>).recorded_by, user.username);
+    const system = await capture('autore-sistema', 'v1', 'POST');
+    assertAccepted(system, 201);
+    assert.equal((system.after.allPatientEntries[0] as Record<string, unknown>).recorded_by, null);
+    const historical = seed('autore-storico', true);
+    const dto = await v1Item.GET(request('GET', undefined, 'v1'), { params: Promise.resolve({ id: historical.patientId, entryId: historical.entryId }) });
+    assert.equal((await dto.json()).recordedBy, null);
 });

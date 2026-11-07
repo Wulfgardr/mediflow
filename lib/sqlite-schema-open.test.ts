@@ -376,7 +376,7 @@ test('allergies: fresh schema and version 8 upgrade preserve clinical bytes and 
             }
             const opened = openVersionedSqliteDatabase(w.file);
             assert.ok(columns(opened).includes('allergies'), 'structured allergy column required');
-            assert.equal(opened.pragma('user_version', { simple: true }), 9);
+            assert.equal(opened.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             if (existing) {
                 assert.deepEqual(opened.prepare('SELECT notes,version,allergies FROM patients').get(), {
                     notes: 'ENC:cHJpb3I=:bm90ZXM=', version: 4, allergies: null,
@@ -429,9 +429,74 @@ test('allergies: failure after version 9 DDL rolls back the column, clinical row
         assert.deepEqual(originals(w.directory), []);
         const retried = openVersionedSqliteDatabase(w.file);
         try {
-            assert.equal(retried.pragma('user_version', { simple: true }), 9);
+            assert.equal(retried.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             assert.deepEqual(retried.prepare('SELECT * FROM patients').all(), before.map(row => ({ ...(row as Record<string, unknown>), allergies: null })));
         } finally { retried.close(); }
         assert.equal(originals(w.directory).length, 1);
+    } finally { w.cleanup(); }
+});
+
+test('autore: schema nuovo e migrazione v9 conservano voce storica, originale e riapertura senza DDL', () => {
+    for (const existing of [false, true]) {
+        const w = workspace();
+        try {
+            if (existing) {
+                const prior = seed(w.file);
+                if ((prior.pragma('table_info(entries)') as { name: string }[]).some(column => column.name === 'recorded_by')) prior.exec('ALTER TABLE entries DROP COLUMN recorded_by');
+                prior.prepare("INSERT INTO patients(id,first_name,last_name,tax_code) VALUES ('synthetic-author','Ada','Sintetica','SYNTHETIC-AUTHOR')").run();
+                prior.prepare("INSERT INTO entries(id,patient_id,type,title,date,content,version,created_at) VALUES ('historical','synthetic-author','visit','ENC:title:bytes',1,'ENC:content:bytes',4,2)").run();
+                prior.pragma('user_version = 9'); prior.close();
+            }
+            const opened = openVersionedSqliteDatabase(w.file);
+            assert.ok((opened.pragma('table_info(entries)') as { name: string }[]).some(column => column.name === 'recorded_by'));
+            assert.equal(opened.pragma('user_version', { simple: true }), 10);
+            if (existing) {
+                assert.deepEqual(opened.prepare('SELECT content,version,created_at,recorded_by FROM entries').get(), {
+                    content: 'ENC:content:bytes', version: 4, created_at: 2, recorded_by: null,
+                });
+                const original = new Database(path.join(w.directory, originals(w.directory)[0]), { readonly: true });
+                assert.equal(original.pragma('user_version', { simple: true }), 9);
+                assert.equal((original.pragma('table_info(entries)') as { name: string }[]).some(column => column.name === 'recorded_by'), false);
+                original.close();
+            }
+            opened.close();
+            const reopened = openVersionedSqliteDatabase(w.file, file => {
+                const db = new Database(file), prepare = db.prepare.bind(db);
+                db.prepare = ((sql: string) => {
+                    assert.doesNotMatch(sql, /ALTER TABLE|CREATE TABLE/iu);
+                    return prepare(sql);
+                }) as typeof db.prepare;
+                return db;
+            });
+            reopened.close();
+            assert.equal(originals(w.directory).length, existing ? 1 : 0);
+        } finally { w.cleanup(); }
+    }
+});
+
+test('autore: errore dopo il DDL v10 ripristina schema, dati e versione e permette un nuovo tentativo', () => {
+    const w = workspace();
+    try {
+        const prior = seed(w.file);
+        if ((prior.pragma('table_info(entries)') as { name: string }[]).some(column => column.name === 'recorded_by')) prior.exec('ALTER TABLE entries DROP COLUMN recorded_by');
+        prior.pragma('user_version = 9');
+        const schema = prior.prepare('SELECT type,name,sql FROM sqlite_schema ORDER BY type,name').all();
+        prior.close();
+        assert.throws(() => openVersionedSqliteDatabase(w.file, file => {
+            const db = new Database(file), prepare = db.prepare.bind(db);
+            db.prepare = ((sql: string) => {
+                const statement = prepare(sql);
+                if (sql.includes('ADD COLUMN recorded_by')) { statement.run(); throw new Error('SYNTHETIC_AUTHOR_DDL_FAILURE'); }
+                return statement;
+            }) as typeof db.prepare;
+            return db;
+        }), /SYNTHETIC_AUTHOR_DDL_FAILURE/);
+        const after = new Database(w.file, { readonly: true });
+        assert.equal(after.pragma('user_version', { simple: true }), 9);
+        assert.deepEqual(after.prepare('SELECT type,name,sql FROM sqlite_schema ORDER BY type,name').all(), schema);
+        after.close();
+        assert.deepEqual(originals(w.directory), []);
+        const retried = openVersionedSqliteDatabase(w.file);
+        assert.equal(retried.pragma('user_version', { simple: true }), 10); retried.close();
     } finally { w.cleanup(); }
 });

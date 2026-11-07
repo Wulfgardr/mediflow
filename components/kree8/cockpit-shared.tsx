@@ -37,7 +37,7 @@ import {
 /* WUL-362 C1: il candidato AI passa dal view-model canonico condiviso. */
 import { coerceInsightToReadable } from '@/lib/patient-insight-view-model';
 import { stripMarkdownMarks } from '@/lib/clinical-rich-text';
-import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiaryWorkflowState, type PatientDiaryWorkflowState } from '@/lib/patient-diary-metadata';
+import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiaryWorkflowState, patientDiaryRegistration, type PatientDiaryWorkflowState } from '@/lib/patient-diary-metadata';
 import styles from './kree8-clinical-cockpit-foundation.module.css';
 import shellStyles from './kree8-clinical-cockpit-shell.module.css';
 
@@ -124,6 +124,7 @@ type Kree8AgendaClientState = {
 type DiaryEntryState = PatientDiaryWorkflowState | 'deleted';
 
 type DiaryEntryPresentation = {
+  registration?: string;
   author?: string;
   source: string;
   state: DiaryEntryState;
@@ -173,6 +174,7 @@ function entryPresentation(entry: Kree8DiaryEntry, raw?: ClinicalEntry): DiaryEn
     source: firstText(metadata, ['sourceLabel', 'source']) ?? settingSource ?? 'Diario locale',
     state,
     stateLabel: PATIENT_DIARY_WORKFLOW_LABELS[state],
+    registration: state === 'recorded' && raw ? patientDiaryRegistration(raw) : undefined,
   };
 }
 

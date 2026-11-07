@@ -193,15 +193,15 @@ public struct LockedClinicalFields: OptionSet, Hashable, Sendable {
 }
 
 public struct HomeBaseEntrySummary: Identifiable, Codable, Hashable, Sendable {
-    public init(id: String, patientId: String, type: String, title: String, date: Date, content: String, setting: String?, metadata: String?, attachments: String?, deletedAt: Date?, deletionReason: String?, version: Int, createdAt: Date?, updatedAt: Date?, lockedFields: LockedClinicalFields = []) {
-        self.id = id; self.patientId = patientId; self.type = type; self.title = title; self.date = date; self.content = content; self.setting = setting; self.metadata = metadata; self.attachments = attachments; self.deletedAt = deletedAt; self.deletionReason = deletionReason; self.version = version; self.createdAt = createdAt; self.updatedAt = updatedAt; self.lockedFields = lockedFields
+    public init(id: String, patientId: String, type: String, title: String, date: Date, content: String, setting: String?, metadata: String?, attachments: String?, deletedAt: Date?, deletionReason: String?, version: Int, createdAt: Date?, updatedAt: Date?, recordedBy: String? = nil, lockedFields: LockedClinicalFields = []) {
+        self.id = id; self.patientId = patientId; self.type = type; self.title = title; self.date = date; self.content = content; self.setting = setting; self.metadata = metadata; self.attachments = attachments; self.deletedAt = deletedAt; self.deletionReason = deletionReason; self.version = version; self.createdAt = createdAt; self.updatedAt = updatedAt; self.recordedBy = recordedBy; self.lockedFields = lockedFields
     }
 
     /// Excluded from the wire on purpose: the host neither sends nor understands
     /// it, and encoding it back would invent a field the contract does not have.
     private enum CodingKeys: String, CodingKey {
         case id, patientId, type, title, date, content, setting, metadata
-        case attachments, deletedAt, deletionReason, version, createdAt, updatedAt
+        case attachments, deletedAt, deletionReason, version, createdAt, updatedAt, recordedBy
     }
 
     public var lockedFields: LockedClinicalFields = []
@@ -218,6 +218,7 @@ public struct HomeBaseEntrySummary: Identifiable, Codable, Hashable, Sendable {
     public let deletionReason: String?
     public let version: Int
     public let createdAt: Date?
+    public let recordedBy: String?
     public let updatedAt: Date?
 }
 

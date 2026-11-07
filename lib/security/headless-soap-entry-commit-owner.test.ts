@@ -114,6 +114,7 @@ test('commits entry, PHI-safe audit, ledger and canonical receipt atomically, th
 
     const db = database();
     try {
+        assert.equal(db.prepare('SELECT recorded_by FROM entries WHERE id = ?').pluck().get(receipt.entryRef), null);
         const entry = db.prepare(`SELECT id, patient_id AS patientId, type, title, date, content, setting, metadata,
             attachments, deleted_at AS deletedAt, deletion_reason AS deletionReason, version, created_at AS createdAt,
             updated_at AS updatedAt FROM entries WHERE id = ?`).get(receipt.entryRef) as Record<string, unknown>;
