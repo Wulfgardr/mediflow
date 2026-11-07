@@ -8,7 +8,7 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 10 ed i predecessori canonici 4, 5 e 6; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 10 ed i predecessori canonici 4, 5, 6 e 9; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
 ## Raccordo autore del diario del 7 novembre 2026 (ADR 0183)
 
@@ -18,14 +18,20 @@ ricostruzione dei predecessori 4, 5 e 6 rimuove anche questa colonna prima
 del confronto: le tre impronte canoniche restano immutate. Le fixture di
 migrazione e di recupero cifrato ricostruiscono gli stessi schemi storici.
 I test aggiungono il rifiuto di `recorded_by` su ciascun predecessore,
-lo schema nuovo, la migrazione v9, il rollback dopo il DDL v10 ed il retry.
+lo schema nuovo, la migrazione v9, il rollback dopo il DDL v10 ed il retry. Il
+recupero cifrato conserva anche l'ammissione del precedente schema 9. La sua
+nuova impronta è verificata sul codice della base `93ed225c8`, senza riscrivere
+le tre impronte storiche. Una controprova fallisce con
+`RECOVERY_BACKUP_PREFLIGHT_FAILED` prima dell'aggiunta, poi ripristina il v9
+cifrato preservando account e ledger. Anche il punto di ammissione del recovery
+entra fra i file con digest, senza estendere le proprietà di TLC.
 
 `lib/db.ts` aggiunge soltanto il campo facoltativo di lettura a ClinicalEntry.
 Le transizioni delle terapie, le autorità di commit, i comandi e le ricevute
 non cambiano. Modello, statechart, invarianti, testimoni e mutanti restano
-invariati. I digest dei quattro file modificati sono aggiornati dopo le prove
+invariati. I digest dei file modificati sono aggiornati dopo le prove
 sullo schema, sui predecessori e sul recupero cifrato. `syncCommit` indica
-il commit di implementazione 915be2a0b. Il gate completo riesegue anche TLC,
+il commit di implementazione d72bea412. Il gate completo riesegue anche TLC,
 che non dimostra la correttezza della nuova attribuzione del diario: questa
 è verificata dai test API, del componente e dello standalone Web.
 
