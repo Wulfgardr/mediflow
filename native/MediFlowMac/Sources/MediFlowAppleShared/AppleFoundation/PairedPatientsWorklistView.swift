@@ -199,6 +199,7 @@ struct PairedHomeBaseCredentialsSheet: View {
 struct PairedPatientsWorklistView: View {
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    private var usesDenseRows: Bool { isTabletList && !dynamicTypeSize.isAccessibilitySize }
     #endif
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showingCSVImport = false
@@ -212,6 +213,7 @@ struct PairedPatientsWorklistView: View {
     // Compact navigation belongs to the workspace, not to a row.
     var onOpenPatient: ((HomeBasePatientSummary) -> Void)? = nil
     var onOpenVisitComposer: (() -> Void)? = nil
+    var isTabletList: Bool = false
 
     private var mobileVisitPresentation: Binding<Bool> {
         Binding(get: { showingMobileVisit }, set: { showingMobileVisit = $0
@@ -554,7 +556,7 @@ struct PairedPatientsWorklistView: View {
                                     .accessibilityHidden(true)
                             }
                             .padding(.horizontal, 12)
-                            .padding(.vertical, 14)
+                            .padding(.vertical, usesDenseRows ? 0 : 14)
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         }
@@ -627,7 +629,24 @@ struct PairedPatientsWorklistView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         #else
-        if dynamicTypeSize.isAccessibilitySize {
+        if usesDenseRows {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text("\(patient.lastName) \(patient.firstName)")
+                        .inkRegister(weight: .semibold)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if patient.isAdi == true { Text("ADI").font(.caption.weight(.semibold)) }
+                    if let age = PairedPatientsWorkspaceSupport.ageText(
+                        birthDate: patient.birthDate, precision: patient.birthDatePrecision, birthYear: patient.birthYear
+                    ) { Text(age).font(.caption).foregroundStyle(.secondary).monospacedDigit() }
+                }
+                patientDiagnosis(patient)
+            }
+            .frame(height: LumeGeometry.rowHeight)
+            .accessibilityHint(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType))
+        } else if dynamicTypeSize.isAccessibilitySize {
             // Keep clinical context visible with scaled text. A single
             // wrapping summary avoids separate code, description and count rows.
             VStack(alignment: .leading, spacing: 6) {

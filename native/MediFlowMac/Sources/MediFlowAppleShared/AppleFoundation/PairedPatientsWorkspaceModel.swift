@@ -97,6 +97,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published private(set) var prostheticPrescriptions: [HomeBaseProstheticPrescriptionSummary] = []
     @Published private(set) var patientFHIRExportURL: URL?
     @Published private(set) var pendingFHIRWarningValidation: HomeBaseValidatePatientExportResponse?
+    @Published var isDiaryComposerOpen = false
+    var hasNewEntryDraft: Bool {
+        !newEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || newEntryType != .note || !newEntryEditorDocument.isEffectivelyEmpty
+            || !newEntryAttachmentIds.isEmpty
+            || !newEntryVisitTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || newEntryVisitDraftResponse != nil
+    }
     @Published var newEntryTitle = ""
     @Published var newEntryType: PairedDiaryEntryType = .note
     // S7 (Wave 5, D10/D11): the editor's typed model, never a raw string. The
@@ -5173,6 +5181,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     private func clearSelectedPatientWorkspace(preservingSelectionID: String? = nil) {
+        if preservingSelectionID == nil { isDiaryComposerOpen = false }
         // A refresh of the same chart keeps its section; a new context does not.
         if selectedPatientID != preservingSelectionID {
             patientCSVImport?.invalidate()
