@@ -17,6 +17,7 @@ mod dto;
 mod error;
 mod http;
 mod local_host;
+pub mod patient_identity;
 mod ports;
 mod profile_query;
 mod retirement_notice;
