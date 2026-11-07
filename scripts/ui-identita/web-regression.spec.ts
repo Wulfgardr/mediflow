@@ -149,6 +149,7 @@ test('pagina separata: metadati entro il piano alla soglia delle due colonne', a
     };
   });
   console.log('CRITICAL_METADATA ' + JSON.stringify(geometry));
+  await expect(composer.getByRole('button', { name: 'Consulta il Quadro', exact: true })).toBeHidden();
   expect(geometry.pageContent).toBe(1020);
   expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
   expect(geometry.fields).toHaveLength(3);
