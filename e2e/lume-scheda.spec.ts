@@ -128,7 +128,7 @@ async function expectPatientHeaderCommands(page: Page, header: Locator, patientI
   const actions = header.getByRole('button', { name: 'Azioni', exact: true });
   await expect(header.locator('.mf-button-primary')).toHaveCount(1);
   await expect(primary).toHaveClass(/mf-button-primary/);
-  await expect(primary).toHaveAttribute('href', `/patients/${patientId}/entries/new`);
+  await expect(primary).toHaveAttribute('href', `/patients/${patientId}/modules?voce=nuova`);
   await expect(actions).toHaveClass(/mf-button-secondary/);
   await expect(actions).toHaveAttribute('aria-haspopup', 'menu');
   await expect(actions).toHaveAttribute('aria-expanded', 'false');

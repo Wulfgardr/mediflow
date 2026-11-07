@@ -431,9 +431,9 @@ function IncaricoArea({
                           data-patient-index={virtualRow.index}
                           data-testid="lume-patient-row"
                         >
-                          <span className={patientStyles.recordIdentity} title={p.name}><strong>{p.name}</strong><span className={patientStyles.compactDiagnosis}>{diagnosisDescription || 'Diagnosi non registrata'}</span></span>
+                          <span className={patientStyles.recordIdentity} title={p.name}><strong>{p.name}</strong><span className="sr-only">{diagnosisDescription || 'Diagnosi non registrata'}</span></span>
                           <span className={patientStyles.recordAge}>{p.ageLabel}</span>
-                          <span className={patientStyles.recordDiagnosis} title={diagnosisDescription}>{diagnosisDescription || 'Diagnosi non registrata'}</span>
+                          <span aria-hidden="true" className={patientStyles.recordDiagnosis} title={diagnosisDescription}>{diagnosisDescription || 'Diagnosi non registrata'}</span>
                           <span className={patientStyles.patientWhen} data-testid="lume-patient-when">{p.lastTouch}</span>
                           <WorklistTodo todos={todos} patientId={p.id} />
                         </button>

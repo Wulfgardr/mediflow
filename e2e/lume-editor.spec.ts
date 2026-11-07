@@ -158,6 +158,25 @@ async function assertEditorComposition(page: Page, viewCase: ViewCase): Promise<
   if (viewCase.viewport === 'narrow') {
     await toolbar.scrollIntoViewIfNeeded();
     await assertInsideViewport(toolbar, 'toolbar narrow');
+    expect((await toolbar.boundingBox())!.height).toBeLessThanOrEqual(64);
+    const more = toolbar.getByRole('button', { name: 'Altri strumenti di formattazione', exact: true });
+    await more.focus();
+    await more.press('Enter');
+    await expect(more).toHaveAttribute('aria-expanded', 'true');
+    for (const name of ['Titolo', 'Sezione', 'Paragrafo', 'Sottolinea', 'Barrato', 'Riduci rientro', 'Aumenta rientro']) {
+      const command = toolbar.getByRole('button', { name, exact: true });
+      await expect(command).toBeVisible();
+      const box = (await command.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      await assertInsideViewport(command, name);
+    }
+    await assertInsideViewport(toolbar, 'toolbar espansa narrow');
+    await toolbar.getByRole('button', { name: 'Aumenta rientro', exact: true }).focus();
+    await page.keyboard.press('Escape');
+    await expect(more).toBeFocused();
+    await expect(more).toHaveAttribute('aria-expanded', 'false');
+    await expect(toolbar.getByRole('button', { name: 'Sottolinea', exact: true })).toHaveCount(0);
     const attachment = page.getByRole('button', { name: 'Aggiungi allegati alla voce clinica', exact: true });
     await attachment.scrollIntoViewIfNeeded();
     await assertInsideViewport(attachment, 'allegati narrow');
