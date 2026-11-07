@@ -7,6 +7,9 @@ import net from 'node:net';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const scratch = '/Volumes/Vision/mf-ui-identita-20261107-scratch';
+export const httpPort = Number(process.env.MF_BANCO_HTTP_PORT || 3100);
+export const tlsPort = Number(process.env.MF_BANCO_TLS_PORT || 3543);
+for (const port of [httpPort, tlsPort]) if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Porta banco non valida');
 export const data = path.resolve(process.env.MEDIFLOW_DATA_DIR || `${scratch}/apfs/banco`);
 fs.mkdirSync(scratch, { recursive: true });
 function validateData() {
@@ -23,7 +26,7 @@ const read = () => fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePa
 const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 export async function request(route, { method = 'GET', headers = {}, body } = {}) {
-  const response = await fetch(`http://127.0.0.1:3100${route}`, { method, headers: { ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const response = await fetch(`http://127.0.0.1:${httpPort}${route}`, { method, headers: { ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
   const text = await response.text();
   let json; try { json = JSON.parse(text); } catch { json = text; }
   if (!response.ok) throw new Error(`${method} ${route}: ${response.status} ${text.slice(0, 800)}`);
@@ -63,12 +66,12 @@ async function start() {
   const previous = read();
   if (alive(previous.nextPid) && alive(previous.proxyPid)) { await seedReference(); return status(); }
   if (alive(previous.nextPid) || alive(previous.proxyPid)) await stop();
-  await free(3100); await free(3543);
+  await free(httpPort); await free(tlsPort);
   const ip = execFileSync('ifconfig', { encoding: 'utf8' }).match(/inet (10\.211\.55\.\d+)/)?.[1];
   if (!ip) throw new Error('IP Parallels non trovato');
   fs.mkdirSync(data, { recursive: true });
   fs.writeFileSync(`${data}/SYNTHETIC_ONLY`, 'Archivio sintetico creato dal banco UI 2026-11-07\n');
-  const distTarget = `${scratch}/apfs/next-banco`;
+  const distTarget = `${data}/next`;
   const distLink = `${root}/node_modules/.cache/mf-ui-identita`;
   fs.mkdirSync(`${root}/node_modules/.cache`, { recursive: true });
   fs.mkdirSync(distTarget, { recursive: true });
@@ -79,7 +82,7 @@ async function start() {
   if (!fs.existsSync(`${data}/local-api-token`)) fs.writeFileSync(`${data}/local-api-token`, randomBytes(32).toString('hex'), { mode: 0o600 });
   if (!fs.existsSync(`${data}/local-api.crt`)) execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '30', '-keyout', `${data}/local-api.key`, '-out', `${data}/local-api.crt`, '-subj', '/CN=MediFlow Synthetic UI', '-addext', `subjectAltName=DNS:localhost,IP:127.0.0.1,IP:${ip}`], { stdio: 'ignore' });
   fs.chmodSync(`${data}/local-api.key`, 0o600);
-  const state = { data, ip, nextPid: spawnOwned([`${root}/node_modules/next/dist/bin/next`, 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', '3100'], env, 'next.log') };
+  const state = { data, ip, nextPid: spawnOwned([`${root}/node_modules/next/dist/bin/next`, 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', String(httpPort)], env, 'next.log') };
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
   let ready = false;
   for (let n = 0; n < 120; n++) { try { await request('/api/auth/check'); ready = true; break; } catch {} await sleep(1000); }
@@ -88,7 +91,7 @@ async function start() {
   fs.writeFileSync(tsconfig, fs.readFileSync(tsconfig, 'utf8').replace(/,\n\s*"(?:\/Volumes\/Vision\/mf-ui-identita-20261107-scratch\/|\.next-visual-ui-identita\/|node_modules\/\.cache\/mf-ui-identita\/)[^"]+"/g, ''));
   const headers = { Authorization: `Bearer ${fs.readFileSync(`${data}/local-api-token`, 'utf8').trim()}` };
   await request('/api/settings/network.mode', { method: 'PUT', headers, body: { value: 'network-home-base' } });
-  state.proxyPid = spawnOwned([`${root}/scripts/local-api-tls-proxy.mjs`], { ...env, MEDIFLOW_TLS_CERT_PATH: `${data}/local-api.crt`, MEDIFLOW_TLS_KEY_PATH: `${data}/local-api.key`, MEDIFLOW_TLS_PORT: '3543', MEDIFLOW_TLS_BIND_HOST: '0.0.0.0', MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: 'http://127.0.0.1:3100' }, 'proxy.log');
+  state.proxyPid = spawnOwned([`${root}/scripts/local-api-tls-proxy.mjs`], { ...env, MEDIFLOW_TLS_CERT_PATH: `${data}/local-api.crt`, MEDIFLOW_TLS_KEY_PATH: `${data}/local-api.key`, MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_TLS_BIND_HOST: '0.0.0.0', MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: `http://127.0.0.1:${httpPort}` }, 'proxy.log');
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
   await seedReference();
   await sleep(500); return status();
@@ -99,20 +102,24 @@ async function seal(value, key) {
   return `ENC:${Buffer.from(iv).toString('base64')}:${Buffer.from(encrypted).toString('base64')}`;
 }
 async function seedReference() {
-  if (fs.existsSync(`${data}/reference.json`)) return;
+  if (fs.existsSync(`${data}/reference.json`) && JSON.parse(fs.readFileSync(`${data}/reference.json`)).allergiesVersion === 1) return;
   const auth = await login();
   const material = await crypto.subtle.importKey('raw', Buffer.from('314159'), 'PBKDF2', false, ['deriveKey']);
   const kek = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: Buffer.from(auth.json.salt, 'base64'), iterations: 600000, hash: 'SHA-256' }, material, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
   const wrapped = Buffer.from(auth.json.encryptedMasterKey.slice(3), 'base64');
   const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: wrapped.subarray(0, 12) }, kek, wrapped.subarray(12));
   const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
-  const headers = { Cookie: auth.cookie, Origin: 'http://127.0.0.1:3100', 'Sec-Fetch-Site': 'same-origin', 'x-mediflow-archive-generation': auth.json.archiveGeneration };
+  const headers = { Cookie: auth.cookie, Origin: `http://127.0.0.1:${httpPort}`, 'Sec-Fetch-Site': 'same-origin', 'x-mediflow-archive-generation': auth.json.archiveGeneration };
   const { syntheticTaxCode } = await import('../../lib/patient-identity.test-support.ts');
   const existing = (await request('/api/patients', { headers })).json;
   const patients = [];
   for (const [index, firstName, lastName] of [[9001, 'Maria', 'Rossi Sintetica'], [9002, 'Paolo', 'Vuoto Sintetico']]) {
     let patient = existing.find(p => p.taxCode === syntheticTaxCode(index));
-    if (!patient) patient = (await request('/api/patients', { method: 'POST', headers, body: { firstName, lastName, taxCode: syntheticTaxCode(index), birthDate: '1958-04-17T00:00:00Z', diagnoses: index === 9001 ? await seal([{ system: 'ICD-10', code: 'I10', description: 'Ipertensione arteriosa', date: '2026-10-01' }, { system: 'ICD-10', code: 'E11', description: 'Diabete mellito tipo 2', date: '2026-10-01' }], key) : [], notes: await seal(index === 9001 ? 'Allergia riferita ad amoxicillina. Dati interamente inventati per la misura UI.' : 'Paziente sintetico senza diario.', key) } })).json;
+    if (!patient) patient = (await request('/api/patients', { method: 'POST', headers, body: { firstName, lastName, taxCode: syntheticTaxCode(index), birthDate: '1958-04-17T00:00:00Z', diagnoses: index === 9001 ? await seal([{ system: 'ICD-10', code: 'I10', description: 'Ipertensione arteriosa', date: '2026-10-01' }, { system: 'ICD-10', code: 'E11', description: 'Diabete mellito tipo 2', date: '2026-10-01' }], key) : [], allergies: index === 9001 ? await seal([{ substance: 'Amoxicillina' }], key) : null, notes: await seal(index === 9001 ? 'Dati interamente inventati per la misura UI.' : 'Paziente sintetico senza diario.', key) } })).json;
+    if (index === 9001) {
+      const detail = (await request(`/api/patients/${patient.id}`, { headers })).json;
+      await request(`/api/patients/${patient.id}`, { method: 'PUT', headers, body: { version: detail.version, allergies: await seal([{ substance: 'Amoxicillina' }], key), notes: await seal('Dati interamente inventati per la misura UI.', key) } });
+    }
     patients.push(patient.id);
   }
   const entries = [ ['Controllo ambulatoriale', 'Paziente in buone condizioni generali. Pressione 132/78 mmHg, frequenza 72/min. Non riferisce dispnea né dolore toracico. Concordato controllo fra un mese.'], ['Contatto telefonico', 'Riferisce buona aderenza alla terapia e assenza di capogiri. Ricordata la registrazione della pressione a domicilio per sette giorni.'], ['Revisione degli esami', 'Esami sintetici: creatinina 0,9 mg/dL, emoglobina glicata 6,8%. Discussi alimentazione e attività fisica compatibile con le condizioni generali.'], ['Visita di follow-up', 'Diario pressorio mediamente nei limiti. Nessun edema periferico. Prosegue la terapia concordata; rivalutazione programmata.'] ];
@@ -120,11 +127,11 @@ async function seedReference() {
   for (const [i, [title, content]] of entries.entries()) if (!priorEntries.some(e => e.id === `ui-identita-${patients[0]}-entry-${i}`)) await request('/api/entries', { method: 'POST', headers, body: { id: `ui-identita-${patients[0]}-entry-${i}`, patientId: patients[0], type: i === 1 ? 'phone' : 'visit', date: new Date(Date.UTC(2026, 10, 7 - i * 7)).toISOString(), title: await seal(title, key), content: await seal(content, key) } });
   const priorTherapies = (await request(`/api/therapies?patientId=${patients[0]}`, { headers })).json;
   for (const [drugName, dosage] of [['Ramipril', '5 mg, una compressa al mattino'], ['Metformina', '500 mg, una compressa dopo cena']]) if (!priorTherapies.some(t => t.id === `ui-identita-${patients[0]}-${drugName}`)) await request('/api/therapies', { method: 'POST', headers, body: { id: `ui-identita-${patients[0]}-${drugName}`, patientId: patients[0], drugName, dosage, status: 'active', startDate: '2026-10-01T00:00:00Z' } });
-  fs.writeFileSync(`${data}/reference.json`, JSON.stringify({ referenceId: patients[0], emptyId: patients[1] }, null, 2));
+  fs.writeFileSync(`${data}/reference.json`, JSON.stringify({ referenceId: patients[0], emptyId: patients[1], allergiesVersion: 1 }, null, 2));
 }
 async function status() {
   const state = read();
-  const result = { ...state, nextRunning: alive(state.nextPid), proxyRunning: alive(state.proxyPid), syntheticOnly: fs.existsSync(`${data}/SYNTHETIC_ONLY`), http: 'http://127.0.0.1:3100', https: `https://${state.ip}:3543` };
+  const result = { ...state, nextRunning: alive(state.nextPid), proxyRunning: alive(state.proxyPid), syntheticOnly: fs.existsSync(`${data}/SYNTHETIC_ONLY`), http: `http://127.0.0.1:${httpPort}`, https: `https://${state.ip}:${tlsPort}` };
   console.log(JSON.stringify(result, null, 2)); return result;
 }
 async function pair(platform) {
@@ -141,7 +148,7 @@ async function pair(platform) {
   const detail = await request(`/api/v1/network/patients/${reference.referenceId}`, { headers: paired });
   const identity = (await request('/api/v1/network/identity', { headers: paired })).json;
   const tlsPin = createHash('sha256').update(new X509Certificate(fs.readFileSync(`${data}/local-api.crt`)).raw).digest('hex');
-  const result = { platform, protocolVersion: confirmed.protocolVersion, serverURL: `https://${state.ip}:3543`, loopbackURL: 'https://127.0.0.1:3543', tlsPin, username: 'performance-baseline', operatorPin: '314159', ambulatoryId: 'performance-baseline-ambulatory', pairedClientId: confirmed.pairedClient.clientId, pairedClientToken: confirmed.pairedClientToken, grantedCapabilities: confirmed.pairedClient.grantedCapabilities, patientDetailStatus: detail.response.status, identity, reference, gpuiIdentifier: confirmed.pairedClient.clientId, gpuiPairingCode: confirmed.pairedClientToken };
+  const result = { platform, protocolVersion: confirmed.protocolVersion, serverURL: `https://${state.ip}:${tlsPort}`, loopbackURL: `https://127.0.0.1:${tlsPort}`, tlsPin, username: 'performance-baseline', operatorPin: '314159', ambulatoryId: 'performance-baseline-ambulatory', pairedClientId: confirmed.pairedClient.clientId, pairedClientToken: confirmed.pairedClientToken, grantedCapabilities: confirmed.pairedClient.grantedCapabilities, patientDetailStatus: detail.response.status, identity, reference, gpuiIdentifier: confirmed.pairedClient.clientId, gpuiPairingCode: confirmed.pairedClientToken };
   fs.writeFileSync(`${data}/pair-${platform}.json`, JSON.stringify(result, null, 2), { mode: 0o600 });
   console.log(JSON.stringify(result, null, 2));
 }

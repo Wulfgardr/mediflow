@@ -18,7 +18,7 @@ for (const version of [4, 5, 6]) {
     function predecessor() {
         const db = new Database(':memory:'); initializeSqliteSchema(db);
         db.exec('DROP TABLE portable_import_origins');
-        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year']) db.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) db.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         if (version < 6) db.exec('DROP TABLE ambulatory_destructive_commands');
         if (version === 4) db.exec('DROP TABLE therapy_status_commands');
         db.pragma(`user_version=${version}`); return db;
@@ -31,16 +31,17 @@ for (const version of [4, 5, 6]) {
             assert.deepEqual(db.serialize(), before);
         } finally { db.close(); }
     });
-    for (const mutation of ['column', 'index', 'trigger', 'table', 'view', 'false-version'] as const) test(`canonical${version} denies ${mutation} before migration`, () => {
+    for (const mutation of ['column', 'allergies', 'index', 'trigger', 'table', 'view', 'false-version'] as const) test(`canonical${version} denies ${mutation} before migration`, () => {
         const db = predecessor();
         try {
+            if (mutation === 'allergies') db.exec('ALTER TABLE patients ADD COLUMN allergies TEXT');
             if (mutation === 'column') db.exec('ALTER TABLE therapies ADD COLUMN drift TEXT');
             if (mutation === 'index') db.exec('CREATE INDEX drift ON therapies(status)');
             if (mutation === 'trigger') db.exec('CREATE TRIGGER drift BEFORE UPDATE ON therapies BEGIN SELECT RAISE(IGNORE); END');
             if (mutation === 'table') db.exec('CREATE TABLE drift(id TEXT)');
             if (mutation === 'view') db.exec('CREATE VIEW drift AS SELECT id FROM therapies');
             if (mutation === 'false-version') db.pragma('user_version=3');
-            const before = db.serialize(); assert.throws(() => assertAmbulatoryCommandPredecessorRecoverySchema(db));
+            const before = db.serialize(); assert.throws(() => assertAmbulatoryCommandPredecessorRecoverySchema(db), /Recovery predecessor schema incompatible|Unsupported ambulatory command recovery predecessor/);
             assert.deepEqual(db.serialize(), before);
         } finally { db.close(); }
     });
@@ -60,7 +61,7 @@ test('false predecessor stamps cannot hide later or missing terminal ledgers', (
 test('failure after the new v6 DDL rolls back the predecessor ledger, account bytes and stamp', () => {
     const root = mkdtempSync(join(process.env.MEDIFLOW_DATA_DIR!, 'canonical5-rollback-')), file = join(root, 'medical.db');
     const original = openVersionedSqliteDatabase(file);
-    for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year']) original.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+    for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) original.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
     original.exec('DROP TABLE portable_import_origins; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
     original.prepare("INSERT INTO users(id,username,role,password_hash,encrypted_master_key,salt) VALUES ('synthetic-v5','synthetic-v5','admin','synthetic-hash','v3:synthetic-wrapped-key','synthetic-salt')").run();
     const user = original.prepare("SELECT * FROM users WHERE id='synthetic-v5'").get(); original.close();

@@ -11,6 +11,7 @@ function original() {
     const root = mkdtempSync(join(parent, 'v6-')), file = join(root, 'medical.db');
     const db = openVersionedSqliteDatabase(file);
     db.exec('DROP TABLE portable_import_origins; PRAGMA user_version=6;');
+    for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) db.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
     db.prepare('INSERT INTO patients(id,first_name,last_name,tax_code,notes) VALUES (?,?,?,?,?)').run('synthetic-upgrade', 'Persona', 'Sintetica', 'SYNTHETIC-UPGRADE', 'ENC:synthetic:preserved');
     db.prepare('INSERT INTO audit_events(event_id,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface) VALUES (?,?,1,?,?,?,?,?,?)')
         .run('untrusted-history-marker', 'backup.audit.imported', 'success', 'system', 'claimed-host', 'audit_event', 'arbitrary-local-event', 'web');
@@ -19,8 +20,9 @@ function original() {
 test('v6 upgrades to the current schema atomically, keeps a verified original and never derives authority from old markers', () => {
     const f = original(), db = openVersionedSqliteDatabase(f.file);
     assert.equal(db.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
-    assert.ok(CURRENT_SQLITE_SCHEMA_VERSION >= 8);
-    assert.deepEqual(db.prepare('SELECT * FROM patients').all(), f.patients);
+    assert.ok(CURRENT_SQLITE_SCHEMA_VERSION >= 9);
+    assert.deepEqual(db.prepare('SELECT * FROM patients').all(), f.patients.map(row => ({ ...(row as Record<string, unknown>),
+        identifier_type: 'cf', birth_date_precision: 'unknown', birth_year: null, identifier_history: '[]', allergies: null })));
     assert.deepEqual(db.prepare('SELECT * FROM portable_import_origins').all(), []);
     const copies = readdirSync(f.root).filter(name => name.includes('.schema-original-v6-'));
     assert.equal(copies.length, 1);

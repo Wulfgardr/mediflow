@@ -234,3 +234,41 @@ test('network scoped archived-to-active transition retains sealed fields and all
     assert.equal(row.phone, 'ENC:iv:synthetic');
     assert.deepEqual(snapshot(), { firstName: 'Ada', version: 4, ambulatoryId: 'c03-a', memberships: ['c03-a', 'c03-b'] });
 });
+
+for (const [surface, route] of [['web', web], ['v1', v1]] as const) {
+    test(`${surface}: allergies use real browser encryption, version CAS and atomic redacted audit`, async () => {
+        reset();
+        const { db } = await import('./db.ts');
+        const { decryptData } = await import('./security/security.ts');
+        const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+        const allergies = [{ substance: 'Amoxicillina sintetica', reaction: 'Orticaria sintetica', severity: 'moderate' }];
+        db.setKey(key);
+        try {
+            const payload = await db.patients.prepareWritePayload({ allergies } as never, true) as Record<string, unknown>;
+            assert.match(payload.allergies as string, /^ENC:/);
+            const response = await put(route, { version: 3, ...payload });
+            assert.equal(response.status, 200);
+            const read = await route.GET(new Request('http://127.0.0.1/api/patients/c03-patient'), { params: Promise.resolve({ id: 'c03-patient' }) });
+            const detail = await read.json();
+            assert.equal(detail.allergies, payload.allergies);
+            assert.equal(detail.version, 4);
+            const [prefix, iv, ciphertext] = detail.allergies.split(':');
+            assert.equal(prefix, 'ENC');
+            assert.deepEqual(await decryptData(ciphertext, iv, key), allergies);
+            const row = sql.prepare('SELECT allergies,version FROM patients WHERE id=?').get('c03-patient');
+            assert.deepEqual(row, { allergies: payload.allergies, version: 4 });
+            const audit = sql.prepare("SELECT redacted_metadata FROM audit_events WHERE subject_ref='c03-patient' ORDER BY rowid DESC LIMIT 1").get() as { redacted_metadata: string };
+            assert.ok(JSON.parse(audit.redacted_metadata).changedFields.includes('allergies'));
+            assert.doesNotMatch(audit.redacted_metadata, /Amoxicillina|Orticaria|ENC:/);
+            assert.equal((await put(route, { version: 3, allergies: null })).status, 409);
+            assert.deepEqual(sql.prepare('SELECT allergies,version FROM patients WHERE id=?').get('c03-patient'), row);
+            sql.exec("CREATE TRIGGER allergy_audit_fault BEFORE INSERT ON audit_events BEGIN SELECT RAISE(FAIL, 'synthetic audit fault'); END");
+            try {
+                assert.equal((await put(route, { version: 4, allergies: null })).status, 500);
+                assert.deepEqual(sql.prepare('SELECT allergies,version FROM patients WHERE id=?').get('c03-patient'), row);
+            } finally { sql.exec('DROP TRIGGER allergy_audit_fault'); }
+            assert.equal((await put(route, { version: 4, allergies: null })).status, 200);
+            assert.deepEqual(sql.prepare('SELECT allergies,version FROM patients WHERE id=?').get('c03-patient'), { allergies: null, version: 5 });
+        } finally { db.setKey(null); }
+    });
+}

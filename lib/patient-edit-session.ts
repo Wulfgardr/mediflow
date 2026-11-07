@@ -1,4 +1,5 @@
 import { effectiveBirthDatePrecision, inferIdentifierType, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity.ts';
+import { patientAllergiesSchema, type PatientAllergy } from './patient-allergies.ts';
 import type { WhoReference } from './reference-data/icd11-reference';
 /** The editable projection is also the form's default-value source. No I/O. */
 type DateInput = Date | string;
@@ -34,6 +35,7 @@ export type PatientFormSeed = {
     statusReason?: string | null;
     exemptions?: string[];
     diagnoses?: DiagnosisInput[];
+    allergies?: PatientAllergy[];
     checkups?: CheckupFormInput[];
 };
 export type PatientEditRecord = Omit<PatientFormSeed, 'id' | 'checkups'> & {
@@ -124,6 +126,7 @@ export function patientFormDefaults(seed: PatientFormSeed = {}) {
         statusReason: seed.statusReason ?? '',
         exemptions: [...(seed.exemptions ?? [])],
         diagnoses: (seed.diagnoses ?? []).map(diagnosisFormValue),
+        allergies: patientAllergiesSchema.parse(seed.allergies ?? []),
         checkups: (seed.checkups ?? []).map(checkup => ({
             id: checkup.id,
             date: isoDate(checkup.date).slice(0, 10),
