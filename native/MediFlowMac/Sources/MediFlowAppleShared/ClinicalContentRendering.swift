@@ -68,7 +68,8 @@ public enum ClinicalContentRendering {
         styled.enumerateAttribute(.paragraphStyle, in: NSRange(location: 0, length: styled.length)) { value, range, _ in
             let paragraph = (value as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
             #if canImport(AppKit)
-            paragraph.lineSpacing = 3
+            paragraph.lineSpacing = 0
+            paragraph.lineHeightMultiple = 1.5
             #else
             paragraph.lineSpacing = 5
             #endif

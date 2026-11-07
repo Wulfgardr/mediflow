@@ -1,5 +1,8 @@
 import SwiftUI
 import PhotosUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct PairedPatientsWorkspaceView: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -10,6 +13,10 @@ struct PairedPatientsWorkspaceView: View {
     @Environment(\.clinicalNavigationInteraction) private var navigationInteraction
     @State private var patientChartHeaderHidden = false
     @State private var summaryReturn: PatientChartSummaryReturn?
+    #if os(macOS)
+    @State private var macDetailWidth: CGFloat = 0
+    @EnvironmentObject private var recording: VisitRecordingLumeCoordinator
+    #endif
     #if os(iOS)
     @StateObject private var chartScrollMemory = PatientChartScrollMemory()
     #endif
@@ -184,13 +191,16 @@ struct PairedPatientsWorkspaceView: View {
         // Sort is a list-wide setting, not content: as a toolbar menu it
         // states the active order on its own face and stops competing
         // with the patients for first-viewport height.
-        Picker("Ordina", selection: $patientSortMode) {
-            Text("Recenti").tag(PatientListSortMode.recent)
-            Text("Alfabetico").tag(PatientListSortMode.alpha)
+        Menu {
+            Button("Recenti") { patientSortMode = .recent }
+            Button("Alfabetico") { patientSortMode = .alpha }
+        } label: {
+            Text(patientSortMode == .recent ? "Recenti" : "Alfabetico")
+                .foregroundStyle(PlatformColors.ink)
         }
-        .pickerStyle(.menu)
         .background(horizontalSizeClass == .regular ? PlatformColors.selection : .clear,
                     in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
+        .tint(PlatformColors.ink)
         .accessibilityLabel("Ordina pazienti")
         .accessibilityValue(patientSortMode == .recent ? "Recenti" : "Alfabetico")
         .accessibilityIdentifier("patient-sort-menu")
@@ -934,6 +944,21 @@ struct PairedPatientsWorkspaceView: View {
             .accessibilityIdentifier("new-patient-toolbar-button")
         }
 
+        if model.selectedPatient != nil, !isCreatingEntry {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    model.activePatientSection = .overview
+                    isCreatingEntry = true
+                } label: {
+                    Label(model.hasNewEntryDraft ? "Riprendi nuova voce" : "Nuova voce", systemImage: "square.and.pencil")
+                }
+                .buttonStyle(LumePrimaryButtonStyle())
+                .disabled(model.isWorking)
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+                .accessibilityIdentifier("homebase-open-new-entry-button")
+            }
+        }
+
         // Same control, same identifier, on both platforms: the scope belongs
         // with the list it scopes wherever that list is shown.
         ambulatoryScopeToolbarItem
@@ -1065,11 +1090,52 @@ struct PairedPatientsWorkspaceView: View {
                         scroll.scrollTo("patient-chart-scroll-top", anchor: .top)
                     }
                 }
+                macDiaryWritingThreshold
             }
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(key: MacPatientDetailWidthKey.self, value: geometry.size.width)
+                }
+            }
+            .onPreferenceChange(MacPatientDetailWidthKey.self) { macDetailWidth = $0 }
             .background(PlatformColors.chartCardSurface)
             .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-detail")
+        }
+        .onChange(of: model.statusMessage) { status in
+            guard let status, PatientWorkspaceStatusPresentation.isAnnouncementOnly(status), let application = NSApp else { return }
+            NSAccessibility.post(element: application, notification: .announcementRequested,
+                                 userInfo: [.announcement: status, .priority: NSAccessibilityPriorityLevel.medium.rawValue])
+        }
+    }
+
+    @ViewBuilder
+    private var macDiaryWritingThreshold: some View {
+        if let detail = model.selectedPatient, isCreatingEntry,
+           model.activePatientSection == .overview || model.activePatientSection == .diary {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Registra nella scheda di \(detail.lastName) \(detail.firstName)")
+                        .font(.body.weight(.semibold))
+                    Text("Bozza non registrata").font(.caption)
+                    if !model.newEntryAttachmentIds.isEmpty {
+                        Text("\(model.newEntryAttachmentIds.count) allegati selezionati").font(.caption)
+                    }
+                }
+                Spacer(minLength: 8)
+                let listening = recording.state == .recording || recording.state == .finalizing || recording.state == .starting
+                if listening { Text("Ferma l’ascolto prima di registrare").font(.caption) }
+                Button("Registra") { Task { await model.createEntryForSelectedPatient() } }
+                    .buttonStyle(LumePrimaryButtonStyle())
+                    .disabled(!model.canCreateEntry || listening)
+                    .accessibilityIdentifier("homebase-create-entry-button")
+            }
+            .padding(16)
+            .background(PlatformColors.chartCardSurface)
+            .overlay(alignment: .top) { Divider() }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("diary-writing-threshold")
         }
     }
 
@@ -1077,27 +1143,34 @@ struct PairedPatientsWorkspaceView: View {
         let name = "\(detail.lastName) \(detail.firstName)"
         let metadata = patientWorkspaceHeaderMetadata(detail)
 
-        return Group {
-            if dynamicTypeSize >= .accessibility1 {
-                patientWorkspaceHeaderVertical(name: name, metadata: metadata)
-            } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 16) {
-                        patientWorkspaceHeaderName(name)
-                        Spacer(minLength: 16)
-                        patientWorkspaceHeaderAtoms(metadata)
-                    }
+        return VStack(alignment: .leading, spacing: 8) {
+            Group {
+                if dynamicTypeSize >= .accessibility1 {
                     patientWorkspaceHeaderVertical(name: name, metadata: metadata)
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: 16) {
+                            patientWorkspaceHeaderName(name)
+                            Spacer(minLength: 16)
+                            patientWorkspaceHeaderAtoms(metadata)
+                        }
+                        patientWorkspaceHeaderVertical(name: name, metadata: metadata)
+                    }
                 }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(name). \(metadata)")
+            .accessibilityHeading(.h1)
+            PatientAllergyPill(allergies: PatientAllergiesCodec.decodeResult(detail.allergies).values?.map(\.substance) ?? [])
+            if model.isPatientFieldLocked(.allergies) || PatientAllergiesCodec.decodeResult(detail.allergies).isUnreadable {
+                Label("Allergie non disponibili", systemImage: "lock.fill").font(.footnote)
             }
         }
         .padding(.horizontal, 20)
         .padding(.top, 16)
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(name). \(metadata)")
-        .accessibilityHeading(.h1)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("patient-workspace-header")
     }
 
@@ -1155,6 +1228,14 @@ struct PairedPatientsWorkspaceView: View {
             cachedPatientProfile(profile)
         } else if let patientID = model.selectedPatientID {
             pendingPatientDetail(patientID: patientID)
+        } else if model.errorMessage != nil || !isPatientWorklistUsable {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(model.connectionState.title, systemImage: "exclamationmark.circle")
+                    .font(.headline)
+                Button("Apri collegamento") { showsConnectionSetup = true }
+            }
+            .frame(maxWidth: .infinity, minHeight: 260, alignment: .center)
+            .accessibilityIdentifier("patient-detail-unavailable")
         } else {
             emptyDetailState
                 .accessibilityIdentifier("patient-detail-empty")
@@ -1447,7 +1528,7 @@ struct PairedPatientsWorkspaceView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("workspace-error-message")
-        } else if let status = model.statusMessage, (!hidesDemo || (status != "Dati di test caricati." && !status.hasPrefix("Dettaglio "))) {
+        } else if let status = model.statusMessage, isVisibleWorkspaceStatus(status, hidesDemo: hidesDemo) {
             Text(status)
                 .font(.caption)
                 .lumeInchiostro(bozza: false)
@@ -1455,6 +1536,14 @@ struct PairedPatientsWorkspaceView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("workspace-status-message")
         }
+    }
+
+    private func isVisibleWorkspaceStatus(_ status: String, hidesDemo: Bool) -> Bool {
+        #if os(macOS)
+        !PatientWorkspaceStatusPresentation.isAnnouncementOnly(status)
+        #else
+        !hidesDemo || (status != "Dati di test caricati." && !status.hasPrefix("Dettaglio "))
+        #endif
     }
 
     /// The active ambulatory, in the toolbar of the list it scopes.
@@ -1632,6 +1721,17 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     private func patientOverview(_ detail: HomeBasePatientDetail) -> some View {
+        #if os(macOS)
+        VStack(alignment: .leading, spacing: 20) {
+            PatientClinicalOverview(model: model, detail: detail)
+            DisclosureGroup("Altri dati della scheda") { patientProfileFacts(detail) }
+        }
+        #else
+        patientProfileFacts(detail)
+        #endif
+    }
+
+    private func patientProfileFacts(_ detail: HomeBasePatientDetail) -> some View {
         PairedPatientDetailSection(
                 model: model,
                 detail: detail,
@@ -1664,8 +1764,12 @@ struct PairedPatientsWorkspaceView: View {
         VStack(alignment: .leading, spacing: activePatientSectionSpacing) {
             switch model.activePatientSection {
             case .overview:
-            #if os(iOS)
-            let columns = horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
+            #if os(macOS)
+            let usesColumns = macDetailWidth >= 680 && !dynamicTypeSize.isAccessibilitySize
+            #else
+            let usesColumns = horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
+            #endif
+            let columns = usesColumns
                 ? AnyLayout(HStackLayout(alignment: .top, spacing: 28))
                 : AnyLayout(VStackLayout(alignment: .leading, spacing: 28))
             columns {
@@ -1674,9 +1778,6 @@ struct PairedPatientsWorkspaceView: View {
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-chart-columns")
-            #else
-            patientOverview(detail)
-            #endif
             #if os(macOS)
             NativePatientInsightView(workspaceModel: model).chartCard()
             NativeSmartImportView(workspaceModel: model).chartCard()
@@ -1706,10 +1807,10 @@ struct PairedPatientsWorkspaceView: View {
                 DisclosureGroup("Altre sezioni della cartella", isExpanded: chartScrollMemory.disclosure(.contents, patientID: detail.id)) {
                     patientContents.padding(.top, 12)
                 }
+                .disclosureGroupStyle(PatientChartContentsDisclosureStyle())
                 .font(.headline)
                 .padding(.vertical, 16)
                 .overlay(alignment: .top) { Divider() }
-                .accessibilityIdentifier("patient-chart-contents-disclosure")
                 .background {
                     PatientChartScrollAnchor(patientID: detail.id, id: "patient-chart-contents-disclosure", memory: chartScrollMemory)
                 }
@@ -1922,3 +2023,10 @@ struct PatientChartHeaderHiddenKey: PreferenceKey {
     static let defaultValue = false
     static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
 }
+
+#if os(macOS)
+private struct MacPatientDetailWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+#endif
