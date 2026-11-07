@@ -24,10 +24,27 @@ pub(super) struct RetentionArea {
     windows: Vec<Entity<TextInput>>,
     hold_patient: Entity<TextInput>,
     hold_document: Entity<TextInput>,
+    /// Nomi dei fascicoli citati da revisione e blocchi, letti da tutte le sedi, archiviati compresi.
+    pub(super) identities: std::collections::HashMap<String, String>,
+    _subscription: Subscription,
 }
 impl RetentionArea {
     pub(super) fn new(theme: Theme, cx: &mut Context<ClinicalApp>) -> Self {
+        let hold_patient = cx.new(|cx| {
+            TextInput::new(
+                "retention-hold-patient",
+                "Paziente",
+                "Cognome o nome del paziente",
+                false,
+                theme,
+                cx,
+            )
+        });
+        // La ricerca del paziente aggiorna i risultati a ogni carattere.
+        let subscription = cx.subscribe(&hold_patient, |_, _, _: &InputChanged, cx| cx.notify());
         Self {
+            identities: std::collections::HashMap::new(),
+            _subscription: subscription,
             busy: false,
             overview: None,
             command: None,
@@ -41,16 +58,7 @@ impl RetentionArea {
                     })
                 })
                 .collect(),
-            hold_patient: cx.new(|cx| {
-                TextInput::new(
-                    "retention-hold-patient",
-                    "Paziente",
-                    "Cognome o nome del paziente",
-                    false,
-                    theme,
-                    cx,
-                )
-            }),
+            hold_patient,
             hold_document: cx.new(|cx| {
                 TextInput::new(
                     "retention-hold-document",
@@ -71,6 +79,7 @@ impl RetentionArea {
     pub(super) fn withdraw(&mut self, cx: &mut App) {
         self.busy = false;
         self.overview = None;
+        self.identities.clear();
         self.command = None;
         self.message = None;
         for input in self.inputs() {
@@ -149,6 +158,48 @@ impl RetentionArea {
     }
 }
 
+/// Nomi dei pazienti citati nella panoramica, cercati in tutte le sedi fra attivi e archiviati.
+/// Cognome, nome e nascita distinguono anche gli omonimi.
+fn retention_identities(
+    session: &RuntimeSession,
+    overview: &Value,
+) -> Result<std::collections::HashMap<String, String>, RuntimeError> {
+    let wanted: std::collections::HashSet<String> = overview["review"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .chain(overview["holds"].as_array().into_iter().flatten())
+        .filter_map(|item| item["patientId"].as_str().map(str::to_owned))
+        .collect();
+    let mut found = std::collections::HashMap::new();
+    if wanted.is_empty() {
+        return Ok(found);
+    }
+    for ambulatory in session.list_ambulatories()? {
+        for archived in [true, false] {
+            for patient in session.list_patients(&ambulatory.id, archived)? {
+                if wanted.contains(&patient.id) {
+                    let born = patient
+                        .birth_date
+                        .as_deref()
+                        .map(|d| format!(", nato il {d}"))
+                        .unwrap_or_default();
+                    found.insert(
+                        patient.id.clone(),
+                        format!("{} {}{born}", patient.last_name, patient.first_name)
+                            .trim()
+                            .to_owned(),
+                    );
+                }
+            }
+        }
+        if found.len() == wanted.len() {
+            break;
+        }
+    }
+    Ok(found)
+}
+
 fn term_copy(term: &Value) -> String {
     match term["kind"].as_str() {
         Some("years") => format!("{} anni", term["years"]),
@@ -167,6 +218,9 @@ fn date_copy(seconds: &Value) -> String {
 
 impl ClinicalApp {
     fn retention_patient_label(&self, patient_id: &str) -> String {
+        if let Some(name) = self.local_host.retention.identities.get(patient_id) {
+            return name.clone();
+        }
         match &self.patients {
             Load::Ready(patients) => patients
                 .iter()
@@ -190,14 +244,23 @@ impl ClinicalApp {
         let area = &mut self.local_host.retention;
         area.busy = true;
         area.command = None;
+        let session = self.session.clone();
         self.run_local_host(
-            move || access.read_retention(),
+            move || {
+                let overview = access.read_retention()?;
+                let identities = match session {
+                    Some(session) => retention_identities(&session, &overview)?,
+                    None => Default::default(),
+                };
+                Ok((overview, identities))
+            },
             |this, result, cx| {
                 let area = &mut this.local_host.retention;
                 area.busy = false;
                 match result {
-                    Ok(overview) => {
+                    Ok((overview, identities)) => {
                         area.overview = Some(overview);
+                        area.identities = identities;
                         area.fill_windows(cx);
                     }
                     Err(error) if error.retires_session() => {
@@ -292,6 +355,20 @@ impl ClinicalApp {
         );
     }
     fn prepare_retention_discard(&mut self, patient_id: String, cx: &mut Context<Self>) {
+        // Uno scarto definitivo si conferma solo su un fascicolo di cui si legge il nome.
+        if !self
+            .local_host
+            .retention
+            .identities
+            .contains_key(&patient_id)
+        {
+            self.local_host.retention.message = Some((
+                "Il nome di questo fascicolo non è leggibile da questa sessione: lo scarto non può essere confermato.".into(),
+                true,
+            ));
+            cx.notify();
+            return;
+        }
         let label = self.retention_patient_label(&patient_id);
         self.prepare_retention(
             move |access, overview, _| {
@@ -626,6 +703,7 @@ impl ClinicalApp {
                 .flex()
                 .flex_col()
                 .gap(px(4.));
+            let known = area.identities.contains_key(&patient);
             pane = pane.child(if item["status"] == "expired" {
                 row.child(line(
                     &label,
@@ -638,7 +716,7 @@ impl ClinicalApp {
                         "Rivedi lo scarto",
                         theme,
                         false,
-                        enabled,
+                        enabled && known,
                     )
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.prepare_retention_discard(patient.clone(), cx)
@@ -667,6 +745,18 @@ mod tests {
             "categories":[{"id":"ambulatory_record","label":"Fascicolo ambulatoriale"},{"id":"imaging_iconography","label":"Iconografia radiologica"}],
             "counts":{"expired":1,"held":0,"in_retention":3},
             "review":[{"patientId":"patient-a","version":4,"status":"expired","expiresAt":1646092800,"closureEstimate":1,"governing":null,"holdIds":[]}]})
+    }
+
+    fn plan_identities(host: &notes_recovery_tests::Host, archived: Value) {
+        host.plan("GET /api/v1/network/patients")
+            .send((200, archived))
+            .unwrap();
+        host.plan("GET /api/v1/network/patients")
+            .send((200, json!([])))
+            .unwrap();
+    }
+    fn archived_patient() -> Value {
+        json!([{"id":"patient-a","firstName":"Amina","lastName":"Sintetica","birthDate":"1940-01-01","taxCode":"SYNTHETIC","version":4,"isArchived":true,"deletedAt":null}])
     }
 
     #[gpui::test]
@@ -734,6 +824,7 @@ mod tests {
                 overview(1, json!({"ambulatory_record":{"kind":"years","years":12}})),
             ))
             .unwrap();
+        plan_identities(&host, archived_patient());
         view.update(cx, |app, cx| app.confirm_retention(cx));
         cx.run_until_parked();
         assert_eq!(
@@ -811,6 +902,7 @@ mod tests {
         host.plan(&format!("GET {ROUTE}"))
             .send((200, overview(1, json!({}))))
             .unwrap();
+        plan_identities(&host, archived_patient());
         view.update(cx, |app, cx| app.confirm_retention(cx));
         cx.run_until_parked();
         view.update(cx, |app, _| {
@@ -829,6 +921,87 @@ mod tests {
                 .filter(|r| r.starts_with("GET /api/system/retention"))
                 .count(),
             3
+        );
+    }
+
+    /// Un fascicolo archiviato di un'altra sede si scarta solo se se ne legge il nome; la ricerca aggiorna la pagina.
+    #[gpui::test]
+    fn discard_needs_a_readable_identity_and_search_notifies_the_page(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, _| {
+            app.session = Some(host.session.clone());
+            app.area = Area::Settings;
+            app.settings_page = SettingsPage::Retention;
+            app.local_host.authority = Authority::Open(access.clone());
+        });
+        host.plan(&format!("GET {ROUTE}"))
+            .send((200, overview(0, json!({}))))
+            .unwrap();
+        plan_identities(&host, json!([]));
+        view.update(cx, |app, cx| app.read_retention(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            app.prepare_retention_discard("patient-a".into(), cx);
+            assert!(app.local_host.retention.command.is_none());
+            assert!(
+                app.local_host
+                    .retention
+                    .message
+                    .as_ref()
+                    .is_some_and(|(m, e)| *e && m.contains("non è leggibile"))
+            );
+        });
+
+        host.plan(&format!("GET {ROUTE}"))
+            .send((200, overview(0, json!({}))))
+            .unwrap();
+        plan_identities(&host, archived_patient());
+        view.update(cx, |app, cx| app.read_retention(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert_eq!(
+                app.local_host
+                    .retention
+                    .identities
+                    .get("patient-a")
+                    .map(String::as_str),
+                Some("Sintetica Amina, nato il 1940-01-01")
+            );
+            app.prepare_retention_discard("patient-a".into(), cx);
+            assert!(
+                app.local_host
+                    .retention
+                    .command
+                    .as_ref()
+                    .is_some_and(|c| c.summary().contains("Sintetica Amina"))
+            );
+            app.local_host.retention.command = None;
+        });
+
+        let notified = std::rc::Rc::new(std::cell::Cell::new(0));
+        let seen = notified.clone();
+        cx.update(|_, cx| {
+            cx.observe(&view, move |_, _| seen.set(seen.get() + 1))
+                .detach()
+        });
+        let search = view.update(cx, |app, _| app.local_host.retention.hold_patient.clone());
+        cx.update(|_, cx| search.update(cx, |_, cx| cx.emit(InputChanged("sint".into()))));
+        cx.run_until_parked();
+        assert!(
+            notified.get() > 0,
+            "typing in the patient search re-renders the page"
         );
     }
 }
