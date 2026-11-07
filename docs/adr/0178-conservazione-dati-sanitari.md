@@ -148,5 +148,15 @@ produce scaduti.
 - FSE, chat e provider esterni fuori perimetro.
 - Autorizzazione allo scarto prevista dal d.lgs. 42/2004 per archivi pubblici
   e privati tutelati: non verificata da MediFlow, spetta al titolare.
-- Client Apple e GPUI non mostrano la conservazione; non leggono né scrivono
-  le nuove chiavi.
+- Il client Apple non mostra la conservazione. GPUI, sul computer dell'archivio,
+  ha la pagina «Conservazione dei dati» con la sessione Web del nodo home-base:
+  profilo e fonti, finestre del titolare, blocchi sul fascicolo o su un
+  documento indicato per identificativo, revisione dei fascicoli scaduti e
+  scarto con conferma distruttiva. Per non ricalcolare la politica in Rust,
+  `GET /api/system/retention` restituisce anche profilo attivo, fonti citate ed
+  etichette delle categorie. I corpi che GPUI invia sono fissati in
+  `experiments/gpui-patient-pilot/transport/tests/fixtures/retention/` e
+  `lib/retention-gpui-contract.test.ts` li passa alla route reale in sequenza
+  (aggiornamento dell'8 novembre 2026, decisione G-0 di Leonardo). Il blocco su
+  un documento da GPUI chiede l'identificativo del documento: manca ancora la
+  scelta da elenco che offre il Web.
