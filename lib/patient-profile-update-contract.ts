@@ -16,7 +16,7 @@ export type PatientProfileUpdatePayload = Readonly<{
     address?: string | null; phone?: string | null; caregiver?: string | null;
     notes?: string | null; monitoringProfile?: string | null; statusReason?: string | null;
     archiveReason?: string | null; archiveNote?: string | null;
-    exemptions?: string | null; diagnoses?: string | null;
+    exemptions?: string | null; diagnoses?: string | null; allergies?: string | null;
     aiSummary?: string | null; aiSummaryGeneratedAt?: string | null;
     aiSummaryContextHash?: string | null; documentInsights?: string | null;
     isAdi?: boolean; isArchived?: boolean; ambulatoryId?: string | null;
@@ -26,7 +26,7 @@ export const PATIENT_PROFILE_UPDATE_FIELDS = Object.freeze([
     'firstName', 'lastName', 'taxCode', 'identifierType', 'birthDatePrecision', 'birthYear', 'address', 'phone', 'caregiver', 'notes',
     'monitoringProfile', 'statusReason', 'archiveReason', 'archiveNote',
     'aiSummary', 'aiSummaryGeneratedAt', 'aiSummaryContextHash', 'documentInsights',
-    'isAdi', 'isArchived', 'ambulatoryId', 'birthDate', 'exemptions', 'diagnoses',
+    'isAdi', 'isArchived', 'ambulatoryId', 'birthDate', 'exemptions', 'diagnoses', 'allergies',
 ] as const satisfies readonly (keyof PatientProfileUpdatePayload)[]);
 
 export type PatientProfileUpdateEnvelope = PatientProfileUpdateContract & Readonly<{

@@ -15,7 +15,7 @@ import { RuntimeTwinPatientNavigation } from '@/components/runtime-twin-workspac
 import twin from './twin-patient-shell.module.css';
 import layout from '@/components/ink-layout.module.css';
 import sectionRecipe from '@/components/ink-section.module.css';
-import { PatientHeaderIdentity, type PatientHeaderDetails } from '@/components/patient-header-identity';
+import { PatientHeaderAllergies, PatientHeaderIdentity, type PatientHeaderDetails } from '@/components/patient-header-identity';
 
 export type Kree8WorkspaceNavItem = {
   href: string;
@@ -387,6 +387,7 @@ export function Kree8WorkspaceShell({
                   </span>
                 ))}
               </p>
+              {patientDetails ? <PatientHeaderAllergies details={patientDetails} /> : null}
             </div>
           ) : (
             <div className={styles.hero}>
@@ -403,6 +404,7 @@ export function Kree8WorkspaceShell({
                     <PrivacyBlur>{patientLabel}</PrivacyBlur>
                   </p>
                 ) : null}
+                {patientDetails ? <PatientHeaderAllergies details={patientDetails} /> : null}
                 {!proposal ? <p className={styles.subtitle}>{subtitle}</p> : null}
                 {statusLabel && !proposal ? <p className={styles.statusLine}>{statusLabel}</p> : null}
               </div>

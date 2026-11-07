@@ -68,6 +68,20 @@
         "ivB64": "CgsMDQ4PEBESExQV",
         "dataB64": "FkDFIKtm7P/mVcZPMWyA67DZHmc=",
         "enc": "ENC:CgsMDQ4PEBESExQV:FkDFIKtm7P/mVcZPMWyA67DZHmc="
+      },
+      {
+        "name": "patient.allergies",
+        "value": [
+          {
+            "substance": "Amoxicillina sintetica",
+            "reaction": "Orticaria sintetica",
+            "severity": "moderate"
+          }
+        ],
+        "json": "[{\"substance\":\"Amoxicillina sintetica\",\"reaction\":\"Orticaria sintetica\",\"severity\":\"moderate\"}]",
+        "ivB64": "CgsMDQ4PEBESExQV",
+        "dataB64": "fBXVZiCDQd1vr84v+LDgc4TSNr7qoG8LQcqRNeU86+ARcV6IRR5NLUZu5N+iG+2JdJ0nTWwPLdqxHBInv+jzn+jCw4to4OSHbzxmpg174ltIw6n1xN4cqX4JtMT9idw3PtUYcPgsQZ5f+QLgq+df",
+        "enc": "ENC:CgsMDQ4PEBESExQV:fBXVZiCDQd1vr84v+LDgc4TSNr7qoG8LQcqRNeU86+ARcV6IRR5NLUZu5N+iG+2JdJ0nTWwPLdqxHBInv+jzn+jCw4to4OSHbzxmpg174ltIw6n1xN4cqX4JtMT9idw3PtUYcPgsQZ5f+QLgq+df"
       }
     ]
   }
