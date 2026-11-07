@@ -8,7 +8,26 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 9 e i predecessori canonici 4, 5 e 6; le 34 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 10 ed i predecessori canonici 4, 5 e 6; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+
+## Raccordo autore del diario del 7 novembre 2026 (ADR 0183)
+
+Lo schema passa da 9 a 10 aggiungendo `entries.recorded_by` nullable soltanto
+nel passaggio versionato. Le voci esistenti restano senza autore. La
+ricostruzione dei predecessori 4, 5 e 6 rimuove anche questa colonna prima
+del confronto: le tre impronte canoniche restano immutate. Le fixture di
+migrazione e di recupero cifrato ricostruiscono gli stessi schemi storici.
+I test aggiungono il rifiuto di `recorded_by` su ciascun predecessore,
+lo schema nuovo, la migrazione v9, il rollback dopo il DDL v10 ed il retry.
+
+`lib/db.ts` aggiunge soltanto il campo facoltativo di lettura a ClinicalEntry.
+Le transizioni delle terapie, le autorità di commit, i comandi e le ricevute
+non cambiano. Modello, statechart, invarianti, testimoni e mutanti restano
+invariati. I digest dei quattro file modificati sono aggiornati dopo le prove
+sullo schema, sui predecessori e sul recupero cifrato. `syncCommit` indica
+il commit di implementazione 915be2a0b. Il gate completo riesegue anche TLC,
+che non dimostra la correttezza della nuova attribuzione del diario: questa
+è verificata dai test API, del componente e dello standalone Web.
 
 ## Raccordo allergie strutturate del 7 novembre 2026 (ADR 0182)
 
