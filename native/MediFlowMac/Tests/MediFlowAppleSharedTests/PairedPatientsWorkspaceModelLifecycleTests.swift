@@ -26,6 +26,53 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertNil(json["birthYear"])
     }
 
+    /* The picker opens on today: switching the date on is not a choice of date. */
+    func testCreateWithBirthDateSwitchedOnButNotChosenIsRejected() async throws {
+        let source = LifecycleMockDataSource()
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        let (blocked, message) = await MainActor.run { () -> (Bool, String?) in
+            model.startCreatingPatient()
+            model.newPatientFirstName = "Ada"
+            model.newPatientLastName = "Sintetica"
+            model.newPatientIdentifierType = "none"
+            model.newPatientHasBirthDate = true
+            return (!model.canCreatePatient, model.newPatientIdentityError)
+        }
+        XCTAssertTrue(blocked)
+        XCTAssertEqual(message, "Scegli la data di nascita nel calendario.")
+        await model.createPatient()
+        let sent = await source.lastCreate
+        XCTAssertNil(sent)
+        await MainActor.run {
+            model.newPatientBirthDate = ISO8601DateFormatter().date(from: "1974-02-28T00:00:00Z")!
+        }
+        await model.createPatient()
+        let created = await source.lastCreate
+        XCTAssertEqual(created?.birthDate, ISO8601DateFormatter().date(from: "1974-02-28T00:00:00Z"))
+    }
+
+    func testEditBirthDateSwitchedOnWithoutChoosingIsNotSavedAsToday() async throws {
+        let patient = detail(id: "p1", archived: false, version: 4)
+        let source = LifecycleMockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        await model.startEditingPatient()
+        await model.setPatientBirthDatePresent(true)
+        let message = await model.editPatientIdentityError
+        XCTAssertEqual(message, "Scegli la data di nascita nel calendario.")
+        await model.savePatient()
+        let sent = await source.lastUpdate
+        XCTAssertNil(sent)
+        await MainActor.run {
+            model.editPatientBirthDate = ISO8601DateFormatter().date(from: "1950-06-01T00:00:00Z")
+        }
+        await model.savePatient()
+        let update = await source.lastUpdate
+        let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+        XCTAssertEqual(json["birthDate"] as? String, "1950-06-01T00:00:00Z")
+    }
+
     func testADR0179CreateRejectsMalformedCF() async {
         let model = await makeModel(source: LifecycleMockDataSource())
         await model.configurePairedOnlineForTests(masterKey: masterKey)
