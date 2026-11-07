@@ -254,8 +254,7 @@ struct PairedPatientDiarySection: View {
                             .accessibilityIdentifier("entry-row-attachments-\(entry.id)")
                         }
                         HStack(spacing: 6) {
-                            Label("Registrata", systemImage: "circle.fill")
-                            if let registeredAt = entry.createdAt { Text(registeredAt, style: .time) }
+                            Label(PairedPatientsWorkspaceSupport.diaryRegistration(recordedBy: entry.recordedBy, createdAt: entry.createdAt), systemImage: "circle.fill")
                         }
                         .font(.caption)
                         .foregroundStyle(PlatformColors.ink)
