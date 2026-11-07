@@ -24,7 +24,7 @@ import {
     isAiDocumentSynthesisEnabledValue,
 } from '@/lib/ai-document-synthesis-kill-switch';
 import { db, captureAttachmentWritePrecondition, type Attachment } from '@/lib/db';
-import { AttachmentCollectionChangedError, AttachmentCollectionView } from '@/lib/attachment-collection-client';
+import { AttachmentCollectionChangedError, AttachmentCollectionView, AttachmentLegalHoldError } from '@/lib/attachment-collection-client';
 import { requestAnyDocDecryptedLocalExtractionPreview, type AnyDocLocalExtractionPreview } from '@/lib/domain/documents/anydoc-local-extraction-client';
 import { createDocumentUploadQueue, readDocumentDataUrl, type DocumentUploadResult } from '@/lib/domain/documents/document-upload-queue';
 import { useLiveQueryState } from '@/lib/live-query';
@@ -131,6 +131,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [deleteErrorId, setDeleteErrorId] = useState<string | null>(null);
     const [deleteChangedId, setDeleteChangedId] = useState<string | null>(null);
+    const [deleteHeldId, setDeleteHeldId] = useState<string | null>(null);
     const [fileRejections, setFileRejections] = useState<string[]>([]);
     // Files the host definitely did not save, kept until the user resumes against a reread list.
     const [heldUpload, setHeldUpload] = useState<Readonly<{ files: readonly File[]; seenList: unknown; listChanged: boolean }> | null>(null);
@@ -257,7 +258,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
         if (activeDelete.current) return;
         const operation = {};
         activeDelete.current = operation;
-        setDeletingId(file.id); setDeleteErrorId(null); setDeleteChangedId(null);
+        setDeletingId(file.id); setDeleteErrorId(null); setDeleteChangedId(null); setDeleteHeldId(null);
         try {
             const attachmentPrecondition = captureAttachmentWritePrecondition(file);
             const attachmentCollection = AttachmentCollectionView.capture(patientId, currentAttachments);
@@ -279,6 +280,8 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             // Do not log source names, file bytes or backend error bodies.
             if (activeDelete.current === operation && error instanceof AttachmentCollectionChangedError) {
                 setDeleteChangedId(file.id); refreshAttachments();
+            } else if (activeDelete.current === operation && error instanceof AttachmentLegalHoldError) {
+                setDeleteHeldId(file.id);
             } else if (activeDelete.current === operation) setDeleteErrorId(file.id);
         } finally {
             if (activeDelete.current === operation) { activeDelete.current = null; setDeletingId(null); }
@@ -443,10 +446,13 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             </PatientSheetMenu>
 
                     </td></tr>
-                    {(deleteErrorId === file.id || deleteChangedId === file.id || extractingId === file.id || localExtraction?.attachmentId === file.id) && <tr><td colSpan={2}>
+                    {(deleteErrorId === file.id || deleteChangedId === file.id || deleteHeldId === file.id || extractingId === file.id || localExtraction?.attachmentId === file.id) && <tr><td colSpan={2}>
                         {deleteErrorId === file.id && <div className="mt-3" role="alert">
                             <p>Eliminazione non confermata. Rileggi l’elenco prima di riprovare.</p>
                             <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshAttachments} disabled={listLoading}>Rileggi elenco</button>
+                        </div>}
+                        {deleteHeldId === file.id && <div className="mt-3" role="alert" data-testid="attachment-delete-held">
+                            <p>Il documento è sospeso da un blocco di conservazione e non è stato eliminato. Il blocco si revoca in Impostazioni, Conservazione.</p>
                         </div>}
                         {deleteChangedId === file.id && <div className="mt-3" role="alert">
                             <p>L’elenco dei documenti è cambiato dopo l’ultima lettura: il documento non è stato eliminato. Controlla l’elenco aggiornato prima di riprovare.</p>
