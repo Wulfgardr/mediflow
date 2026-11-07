@@ -67,6 +67,62 @@ final class ClinicalCardStyleTests: XCTestCase {
         XCTAssertTrue(workspace.contains(".sharedBackgroundVisibility(.hidden)"))
     }
 
+    func testMacWorklistUsesFlatSelectionAndDesktopDensity() throws {
+        let source = try appleSource("AppleFoundation/PairedPatientsWorklistView.swift")
+        XCTAssertFalse(source.contains("List(selection: $selection)"))
+        XCTAssertTrue(source.contains(".listRowInsets(EdgeInsets())"))
+        XCTAssertTrue(source.contains(".frame(height: dynamicTypeSize.isAccessibilitySize ? nil : LumeGeometry.rowHeight)"))
+        XCTAssertTrue(source.contains(".onMoveCommand"))
+        let hover = source.components(separatedBy: "private struct WorklistRowHover").last!
+        XCTAssertFalse(hover.contains(".padding(.vertical"))
+        XCTAssertFalse(hover.contains("RoundedRectangle"))
+        XCTAssertEqual(LumeGeometry.rowHeight, 40)
+        XCTAssertEqual(LumeGeometry.controlRadius, 8)
+        XCTAssertEqual(LumeGeometry.planeRadius, 12)
+    }
+
+    func testMacDraftUsesToolbarAndFixedRegistrationThreshold() throws {
+        let workspace = try appleSource("AppleFoundation/PairedPatientsWorkspaceView.swift")
+        let composer = try appleSource("AppleFoundation/PairedDiaryComposerView.swift")
+        XCTAssertTrue(workspace.contains("private var macDiaryWritingThreshold"))
+        XCTAssertTrue(workspace.contains(".keyboardShortcut(\"n\", modifiers: [.command, .shift])"))
+        XCTAssertTrue(workspace.contains(".disabled(!model.canCreateEntry || listening)"))
+        XCTAssertFalse(composer.contains("homebase-create-entry-button"))
+        XCTAssertFalse(composer.contains("homebase-open-new-entry-button"))
+        XCTAssertTrue(composer.contains("minimumTextHeight: newEntryMinimumTextHeight"))
+        XCTAssertTrue(composer.contains("#if os(macOS)\n        200"))
+        let editor = try appleSource("AppleFoundation/ClinicalInlineTextView.swift")
+        XCTAssertTrue(editor.contains("text.minSize = NSSize(width: 0, height: minimumHeight)"))
+        XCTAssertTrue(workspace.contains("let usesColumns = macDetailWidth >= 680"))
+        let inline = try appleSource("AppleFoundation/ClinicalInlineEditorSession.swift")
+        XCTAssertTrue(inline.contains("let color = NSColor(PlatformColors.freshInk)"))
+        let prose = try appleSource("ClinicalContentRendering.swift")
+        XCTAssertTrue(prose.contains("LumeTypography.voice(17)"))
+        XCTAssertTrue(prose.contains("paragraph.lineHeightMultiple = 1.5"))
+    }
+
+    func testMacNavigationNamesProductLockAndSerifPageTitle() throws {
+        let source = try appleSource("AppleFoundation/MacWorkspaceRootView.swift")
+        XCTAssertTrue(source.contains("Text(\"MediFlow\").inkVoice(21)"))
+        XCTAssertTrue(source.contains("await workspace.lockSessionNow()"))
+        XCTAssertTrue(source.contains("clinical-workspace-lock-button"))
+        XCTAssertTrue(source.contains("Text(section.title).inkVoice(26)"))
+    }
+
+    func testMacAnnouncementsAndSessionErrorsKeepCoherentVisibleStates() throws {
+        for status in ["42 pazienti caricati in lettura.", "Dettaglio Sintetico aperto.", "Nuovo paziente pronto.", "Modifica anagrafica pronta."] {
+            XCTAssertTrue(PatientWorkspaceStatusPresentation.isAnnouncementOnly(status))
+        }
+        for status in ["Sessione scaduta", "PIN non valido.", "Nessun paziente nello scope corrente.", "Scrittura non confermata. Bozza conservata."] {
+            XCTAssertFalse(PatientWorkspaceStatusPresentation.isAnnouncementOnly(status))
+        }
+        let source = try appleSource("AppleFoundation/PairedPatientsWorkspaceView.swift")
+        XCTAssertTrue(source.contains("!PatientWorkspaceStatusPresentation.isAnnouncementOnly(status)"))
+        XCTAssertTrue(source.contains("notification: .announcementRequested"))
+        XCTAssertTrue(source.contains("model.errorMessage != nil || !isPatientWorklistUsable"))
+        XCTAssertTrue(source.contains("patient-detail-unavailable"))
+    }
+
     func testTabletRowsUseSingleLineAndTouchRowHeight() throws {
         let source = try appleSource("AppleFoundation/PairedPatientsWorklistView.swift")
         XCTAssertTrue(source.contains("isTabletList && !dynamicTypeSize.isAccessibilitySize"))

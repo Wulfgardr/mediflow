@@ -249,21 +249,31 @@ public struct MediFlowMacRootView: View {
     // MARK: - Workspace navigation
 
     private var workspaceNavigation: some View {
-        List(selection: Binding<ClinicalWorkspaceSection?>(
-            get: { scene.section },
-            set: { if let section = $0 { scene.select(section) } }
-        )) {
-            Section("Clinica") {
-                ForEach(ClinicalWorkspaceSection.clinicalSections) { destinationRow($0) }
+        VStack(alignment: .leading, spacing: 0) {
+            Text("MediFlow").inkVoice(21).padding(16)
+            List(selection: Binding<ClinicalWorkspaceSection?>(
+                get: { scene.section },
+                set: { if let section = $0 { scene.select(section) } }
+            )) {
+                Section("Clinica") {
+                    ForEach(ClinicalWorkspaceSection.clinicalSections) { destinationRow($0) }
+                }
+                Section("Consultazione") {
+                    ForEach(Self.referenceSections) { destinationRow($0) }
+                }
             }
-            Section("Consultazione") {
-                ForEach(Self.referenceSections) { destinationRow($0) }
-            }
-            Section("Sistema") {
-                ForEach(Self.systemSections) { destinationRow($0) }
-            }
+            .listStyle(.sidebar)
+            Divider()
+            Button { scene.select(.settings) } label: { Label("Impostazioni", systemImage: "gearshape") }
+                .buttonStyle(.plain).padding(12)
+                .accessibilityIdentifier("clinical-workspace-section-settings-button")
+            Button {
+                if let workspace = scene.workspaceModel { Task { await workspace.lockSessionNow() } }
+            } label: { Label("Blocca", systemImage: "lock") }
+                .buttonStyle(.plain).padding(12)
+                .disabled(scene.workspaceModel == nil)
+                .accessibilityIdentifier("clinical-workspace-lock-button")
         }
-        .listStyle(.sidebar)
         .navigationTitle("MediFlow")
         .accessibilityIdentifier("clinical-workspace-navigation")
     }
@@ -370,7 +380,14 @@ struct MacDetailChrome<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        content
+        VStack(alignment: .leading, spacing: 0) {
+            if section == .patients || section == .settings {
+                Text(section.title).inkVoice(26)
+                    .accessibilityHeading(.h1)
+                    .padding(.horizontal, 20).padding(.vertical, 12)
+            }
+            content
+        }
             .navigationTitle(section.title)
             .navigationSubtitle(subtitle)
     }

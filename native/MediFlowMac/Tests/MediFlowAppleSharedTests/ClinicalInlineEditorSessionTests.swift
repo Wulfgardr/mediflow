@@ -1,11 +1,31 @@
 import SwiftUI
 import XCTest
+#if os(macOS)
+import AppKit
+#endif
 @testable import MediFlowAppleShared
 
 /* Native text storage + actual document binding; no app, DB or simulator. */
 @MainActor
 final class ClinicalInlineEditorSessionTests: XCTestCase {
     #if os(macOS)
+    func testMacDraftNativeTextUsesNewsreader17AndFreshInk() throws {
+        let attributes = ClinicalInlineAttributedText.attributes(.init(text: "Bozza sintetica"), kind: .paragraph)
+        let font = try XCTUnwrap(attributes[.font] as? NSFont)
+        XCTAssertEqual(font.pointSize, 17)
+        XCTAssertTrue(font.fontName.contains("Newsreader"))
+        let ink = try XCTUnwrap(attributes[.foregroundColor] as? NSColor)
+        for (name, palette) in [(NSAppearance.Name.aqua, LumePalette.giorno), (.darkAqua, LumePalette.grafite)] {
+            try XCTUnwrap(NSAppearance(named: name)).performAsCurrentDrawingAppearance {
+                let actual = ink.usingColorSpace(.sRGB)!
+                let expected = NSColor(palette.minerale).usingColorSpace(.sRGB)!
+                XCTAssertEqual(actual.redComponent, expected.redComponent, accuracy: 0.001)
+                XCTAssertEqual(actual.greenComponent, expected.greenComponent, accuracy: 0.001)
+                XCTAssertEqual(actual.blueComponent, expected.blueComponent, accuracy: 0.001)
+            }
+        }
+    }
+
     func testNativeSelectedWordFormattingAndUndoRestoreOriginalHTML() throws {
         let box = Box("<p>Prima parola dopo</p>")
         let controller = ClinicalInlineEditorController()

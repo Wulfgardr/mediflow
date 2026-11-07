@@ -55,6 +55,7 @@ struct ClinicalInlineTextView: NSViewRepresentable {
     let blockID: UUID
     let controller: ClinicalInlineEditorController
     let identifier: String
+    var minimumHeight: CGFloat = 44
     @Environment(\.isEnabled) private var isEnabled
 
     func makeCoordinator() -> Coordinator {
@@ -73,6 +74,7 @@ struct ClinicalInlineTextView: NSViewRepresentable {
         text.usesFontPanel = false
         text.allowsUndo = true
         text.drawsBackground = false
+        text.minSize = NSSize(width: 0, height: minimumHeight)
         text.isVerticallyResizable = true
         text.isHorizontallyResizable = false
         text.autoresizingMask = [.width]
@@ -90,6 +92,7 @@ struct ClinicalInlineTextView: NSViewRepresentable {
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
+        (scroll.documentView as? ClinicalNativeTextView)?.minSize = NSSize(width: 0, height: minimumHeight)
         context.coordinator.session.synchronize(document: $document, enabled: isEnabled)
     }
 
@@ -100,7 +103,7 @@ struct ClinicalInlineTextView: NSViewRepresentable {
         text.textContainer?.containerSize = NSSize(width: max(1, width - 2 * inset.width), height: .greatestFiniteMagnitude)
         if let container = text.textContainer { text.layoutManager?.ensureLayout(for: container) }
         let height = text.textContainer.flatMap { text.layoutManager?.usedRect(for: $0).height } ?? 0
-        return CGSize(width: width, height: max(44, ceil(height + 2 * inset.height)))
+        return CGSize(width: width, height: max(minimumHeight, ceil(height + 2 * inset.height)))
     }
 
     static func dismantleNSView(_ scroll: NSScrollView, coordinator: Coordinator) {
@@ -162,6 +165,7 @@ struct ClinicalInlineTextView: UIViewRepresentable {
     let blockID: UUID
     let controller: ClinicalInlineEditorController
     let identifier: String
+    var minimumHeight: CGFloat = 44
     @Environment(\.isEnabled) private var isEnabled
 
     func makeCoordinator() -> Coordinator {

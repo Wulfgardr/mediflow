@@ -34,19 +34,6 @@ struct PairedDiaryComposerView: View {
             if isCreatingEntry {
                 newEntryForm
             }
-            #if os(macOS)
-            if !isCreatingEntry {
-                Button {
-                    isCreatingEntry = true
-                } label: {
-                    Label(hasPendingNewEntry ? "Riprendi nuova voce" : "Nuova voce", systemImage: "square.and.pencil")
-                        .modifier(PairedDiaryControlLabel())
-                }
-                .disabled(model.isWorking)
-                .buttonStyle(LumePrimaryButtonStyle())
-                .accessibilityIdentifier("homebase-open-new-entry-button")
-            }
-            #endif
         }
         .font(.body)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -196,6 +183,14 @@ struct PairedDiaryComposerView: View {
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
     }
 
+    private var newEntryMinimumTextHeight: CGFloat {
+        #if os(macOS)
+        200
+        #else
+        44
+        #endif
+    }
+
     private var newEntryForm: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Bozza non registrata", systemImage: "circle.fill")
@@ -223,7 +218,8 @@ struct PairedDiaryComposerView: View {
             .accessibilityIdentifier("homebase-new-entry-soap-template-button")
             ClinicalRichTextEditorView(
                 document: $model.newEntryEditorDocument,
-                accessibilityPrefix: "homebase-new-entry-content"
+                accessibilityPrefix: "homebase-new-entry-content",
+                minimumTextHeight: newEntryMinimumTextHeight
             )
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("homebase-new-entry-content-field")
@@ -262,21 +258,6 @@ struct PairedDiaryComposerView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            #if os(macOS)
-            Button {
-                Task { await model.createEntryForSelectedPatient() }
-            } label: {
-                Label("Registra", systemImage: "checkmark")
-                    .modifier(PairedDiaryControlLabel())
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(PlatformColors.freshInk)
-            .disabled(!model.canCreateEntry || isListening)
-            .accessibilityIdentifier("homebase-create-entry-button")
-            if isListening {
-                Text("Ferma l’ascolto prima di registrare").font(.caption)
-            }
-            #endif
             Text("Disponibile solo online: se il Mac non risponde, la voce non viene accodata.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)

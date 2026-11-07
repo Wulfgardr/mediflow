@@ -1178,6 +1178,26 @@ final class MediFlowMobileAppUITests: XCTestCase {
         }
     }
 
+    func testTabletToolbarOpensAndChangesSortWithoutDefaultSelectionCrash() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "Toolbar iPad")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        launch(seedPatients: true, singlePatient: true)
+        XCTAssertTrue(app.buttons["patient-cell-uitest-1"].waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("patient-worklist-control-group").exists)
+        let sort = app.buttons["patient-sort-menu"]
+        waitForUIReady(sort, in: app)
+        XCTAssertEqual(sort.value as? String, "Recenti")
+        sort.tap()
+        let alphabetical = app.buttons["Alfabetico"]
+        waitForUIReady(alphabetical, in: app)
+        alphabetical.tap()
+        XCTAssertEqual(sort.value as? String, "Alfabetico")
+        sort.tap()
+        app.buttons["Recenti"].tap()
+        XCTAssertEqual(sort.value as? String, "Recenti")
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
     func testPatientAllergyHeaderReadsOnlyTheStructuredField() {
         for state in ["absent", "recorded", "locked"] {
             app.terminate()
