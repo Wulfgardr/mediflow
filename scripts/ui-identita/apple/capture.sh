@@ -2,11 +2,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
-scratch=/Volumes/Vision/mf-ui-identita-20261107-scratch/apple
+scratch=${MEDIFLOW_UI_APPLE_SCRATCH:-/Volumes/Vision/mf-ui-identita-20261107-scratch/apple}
 mkdir -p "$scratch"
 finish() {
   result=$?
-  xcrun simctl shutdown all > "$scratch/shutdown.log" 2>&1 || true
+  if [ -n "${udid:-}" ]; then perl -e 'alarm 40; exec @ARGV' xcrun simctl shutdown "$udid" > "$scratch/shutdown.log" 2>&1 || true; fi
   echo "$result" > "$scratch/capture-exit-code.txt"
 }
 trap finish EXIT
@@ -18,11 +18,11 @@ for spec in 'ios-iphone:39C682EE-A9B7-4AE2-AF1F-840D44658BB6' 'ios-ipad:FB0654D2
   platform=ios; [ "$device" != ios-ipad ] || platform=ipados
   python3 scripts/ui-identita/apple/configure.py "$platform"
   python3 scripts/ui-identita/apple/prepare.py
-  xcrun simctl boot "$udid" || true
+  perl -e 'alarm 40; exec @ARGV' xcrun simctl boot "$udid" || true
   perl -e 'alarm 180; exec @ARGV' xcrun simctl bootstatus "$udid" -b
   sleep 5
   python3 scripts/ui-identita/apple/run-capture.py "$device" "$udid" || status=1
   python3 scripts/ui-identita/apple/export.py "$device" || status=1
-  xcrun simctl shutdown "$udid" || true
+  perl -e 'alarm 40; exec @ARGV' xcrun simctl shutdown "$udid" || true
 done
 exit "$status"

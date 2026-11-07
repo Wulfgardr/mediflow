@@ -199,6 +199,7 @@ struct PairedHomeBaseCredentialsSheet: View {
 struct PairedPatientsWorklistView: View {
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    private var usesDenseRows: Bool { isTabletList && !dynamicTypeSize.isAccessibilitySize }
     #endif
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showingCSVImport = false
@@ -212,6 +213,7 @@ struct PairedPatientsWorklistView: View {
     // Compact navigation belongs to the workspace, not to a row.
     var onOpenPatient: ((HomeBasePatientSummary) -> Void)? = nil
     var onOpenVisitComposer: (() -> Void)? = nil
+    var isTabletList: Bool = false
 
     private var mobileVisitPresentation: Binding<Bool> {
         Binding(get: { showingMobileVisit }, set: { showingMobileVisit = $0
@@ -522,20 +524,21 @@ struct PairedPatientsWorklistView: View {
                         .accessibilityIdentifier("patient-trash-row-\(patient.id)")
                     } else {
                         #if os(macOS)
-                        // The selectable affordance is the system's own list
-                        // selection shape, not a border drawn per row: sixty
-                        // permanently outlined rows would be card soup and would
-                        // destroy the alignment that makes a worklist scannable.
-                        // What the row owes is a full-width hit area, room for
-                        // that shape to breathe, and the selected trait, which
-                        // was stated on iOS but missing here.
-                        activePatientLabel(patient)
-                            .modifier(WorklistRowHover())
-                            .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
-                            .tag(patient.id)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityAddTraits(model.selectedPatientID == patient.id ? .isSelected : [])
-                            .accessibilityIdentifier("patient-cell-\(patient.id)")
+                        Button {
+                            guard model.canChangePatientSelection else { return }
+                            patientSelection.wrappedValue = patient.id
+                        } label: {
+                            activePatientLabel(patient)
+                                .padding(.horizontal, 8)
+                                .background(model.selectedPatientID == patient.id ? PlatformColors.selection : .clear)
+                                .overlay(alignment: .bottom) { Divider() }
+                        }
+                        .buttonStyle(.plain)
+                        .modifier(WorklistRowHover())
+                        .listRowInsets(EdgeInsets())
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(model.selectedPatientID == patient.id ? .isSelected : [])
+                        .accessibilityIdentifier("patient-cell-\(patient.id)")
                         #else
                         Button {
                             guard model.canChangePatientSelection else { return }
@@ -554,7 +557,7 @@ struct PairedPatientsWorklistView: View {
                                     .accessibilityHidden(true)
                             }
                             .padding(.horizontal, 12)
-                            .padding(.vertical, 14)
+                            .padding(.vertical, usesDenseRows ? 0 : 14)
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         }
@@ -573,7 +576,8 @@ struct PairedPatientsWorklistView: View {
                     NativePatientSelectionListModifier(
                         selection: patientSelection,
                         isEnabled: model.canChangePatientSelection,
-                        allowsSelection: patientViewMode != .trash
+                        allowsSelection: patientViewMode != .trash,
+                        patientIDs: filteredPatients.map(\.id)
                     )
                 )
                 #else
@@ -607,27 +611,47 @@ struct PairedPatientsWorklistView: View {
     @ViewBuilder
     private func activePatientLabel(_ patient: HomeBasePatientSummary) -> some View {
         #if os(macOS)
-        // Give identity the full first line in a 280–340 pt sidebar.
-        // Recency shares the metadata line, leaving diagnosis its own third line.
-        VStack(alignment: .leading, spacing: 5) {
-            patientName(patient)
+        VStack(alignment: .leading, spacing: 2) {
             if dynamicTypeSize.isAccessibilitySize {
+                patientName(patient)
                 patientMetadata(patient)
-                patientUpdate(patient, alignment: .leading)
+                patientDiagnosis(patient)
             } else {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    patientMetadata(patient)
-                        .layoutPriority(1)
+                HStack(spacing: 8) {
+                    Text("\(patient.lastName) \(patient.firstName)")
+                        .font(.body.weight(.semibold)).lineLimit(1)
                     Spacer(minLength: 4)
-                    patientUpdate(patient, alignment: .trailing)
+                    if let age = PairedPatientsWorkspaceSupport.ageText(
+                        birthDate: patient.birthDate, precision: patient.birthDatePrecision, birthYear: patient.birthYear
+                    ) { Text(age).font(.caption).foregroundStyle(PlatformColors.secondaryInk) }
                 }
+                patientDiagnosis(patient)
             }
-            patientDiagnosis(patient)
         }
+        .foregroundStyle(PlatformColors.ink)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: dynamicTypeSize.isAccessibilitySize ? nil : LumeGeometry.rowHeight)
         .contentShape(Rectangle())
+        .accessibilityHint(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType))
         #else
-        if dynamicTypeSize.isAccessibilitySize {
+        if usesDenseRows {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text("\(patient.lastName) \(patient.firstName)")
+                        .inkRegister(weight: .semibold)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if patient.isAdi == true { Text("ADI").font(.caption.weight(.semibold)) }
+                    if let age = PairedPatientsWorkspaceSupport.ageText(
+                        birthDate: patient.birthDate, precision: patient.birthDatePrecision, birthYear: patient.birthYear
+                    ) { Text(age).font(.caption).foregroundStyle(.secondary).monospacedDigit() }
+                }
+                patientDiagnosis(patient)
+            }
+            .frame(height: LumeGeometry.rowHeight)
+            .accessibilityHint(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType))
+        } else if dynamicTypeSize.isAccessibilitySize {
             // Keep clinical context visible with scaled text. A single
             // wrapping summary avoids separate code, description and count rows.
             VStack(alignment: .leading, spacing: 6) {
@@ -813,8 +837,7 @@ struct PairedPatientsWorklistView: View {
         }
     }
 
-    /// Native selection owns both ink and background on the Mac row.
-    /// A separate light chip made the dark-mode code disappear when selected.
+    /// The selected row owns its ink and background; the code stays unfilled.
     private func diagnosisCodePill(_ code: String, patient: HomeBasePatientSummary) -> some View {
         #if os(macOS)
         Text(code)
@@ -921,6 +944,8 @@ struct PairedPatientsWorklistView: View {
             picker
                 .pickerStyle(.menu)
                 .accessibilityIdentifier("patient-view-mode")
+        } else if isTabletList {
+            tabletPatientViewModePicker
         } else {
             picker
                 .pickerStyle(.segmented)
@@ -933,6 +958,31 @@ struct PairedPatientsWorklistView: View {
                 #endif
                 .accessibilityIdentifier("patient-view-mode")
         }
+    }
+
+    private var tabletPatientViewModePicker: some View {
+        HStack(spacing: 0) {
+            ForEach([PatientListViewMode.active, .archived, .trash], id: \.self) { mode in
+                let title = mode == .active ? "Attivi" : mode == .archived ? "Archiviati" : "Cestino"
+                Button { patientViewMode = mode } label: {
+                    Text(title)
+                        .fontWeight(patientViewMode == mode ? .semibold : .regular)
+                        .frame(maxWidth: .infinity, minHeight: LumeGeometry.rowHeight)
+                        .background(patientViewMode == mode ? PlatformColors.selection : .clear,
+                                    in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(patientViewMode == mode ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .foregroundStyle(PlatformColors.ink)
+        .background(PlatformColors.chartCardSurface,
+                    in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Stato")
+        .accessibilityIdentifier("patient-view-mode")
     }
 
     #if os(macOS)
@@ -1015,16 +1065,24 @@ private struct NativePatientSelectionListModifier: ViewModifier {
     @Binding var selection: String?
     let isEnabled: Bool
     let allowsSelection: Bool
+    let patientIDs: [String]
 
     @ViewBuilder
     func body(content: Content) -> some View {
         #if os(macOS)
         if allowsSelection {
-            List(selection: $selection) {
+            List {
                 content
             }
-            .listStyle(.sidebar)
+            .listStyle(.plain)
+            .onMoveCommand { direction in
+                guard isEnabled, !patientIDs.isEmpty else { return }
+                let current = selection.flatMap { patientIDs.firstIndex(of: $0) }
+                if direction == .down { selection = patientIDs[min((current ?? -1) + 1, patientIDs.count - 1)] }
+                if direction == .up { selection = patientIDs[max((current ?? 1) - 1, 0)] }
+            }
             .worklistTranslucentBackground()
+            .background(PlatformColors.groupedBackground)
             .disabled(!isEnabled)
             .accessibilityLabel("Elenco pazienti")
             .accessibilityIdentifier("patients-selection-list")
@@ -1034,6 +1092,7 @@ private struct NativePatientSelectionListModifier: ViewModifier {
             }
             .listStyle(.sidebar)
             .worklistTranslucentBackground()
+            .background(PlatformColors.groupedBackground)
             .disabled(!isEnabled)
             .accessibilityLabel("Cestino pazienti")
             .accessibilityIdentifier("patients-trash-list")
@@ -1074,13 +1133,7 @@ private struct WorklistRowHover: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            // Separate adjacent records without adding another card.
-            .padding(.vertical, 8)
-            .padding(.horizontal, 4)
-            .background(
-                RoundedRectangle(cornerRadius: ClinicalChartMetrics.rowRadius, style: .continuous)
-                    .fill(isHovering ? PlatformColors.hover : .clear)
-            )
+            .background(isHovering ? PlatformColors.hover : .clear)
             .contentShape(Rectangle())
             .onHover { isHovering = $0 }
             // A hover tint that snaps is noise; one that eases reads as response.

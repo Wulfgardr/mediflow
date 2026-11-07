@@ -28,6 +28,15 @@ enum PatientStructuredFields {
     }
 }
 
+enum PatientWorkspaceStatusPresentation {
+    static func isAnnouncementOnly(_ status: String) -> Bool {
+        status.hasPrefix("Dettaglio ")
+            || status.hasSuffix(" pazienti caricati in lettura.")
+            || status == "Nuovo paziente pronto."
+            || status == "Modifica anagrafica pronta."
+    }
+}
+
 enum PatientChartSummaryCategory: String, CaseIterable, Identifiable {
     case therapies, measures, diary, scales
 
@@ -100,6 +109,33 @@ struct PatientChartReturnState {
 }
 
 #if os(iOS)
+/// Keeps the disclosure's hit region on its label, outside the section links.
+struct PatientChartContentsDisclosureStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button { configuration.isExpanded.toggle() } label: {
+                HStack {
+                    configuration.label
+                    Spacer(minLength: 8)
+                    Image(systemName: configuration.isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption)
+                }
+                .frame(maxWidth: .infinity, minHeight: LumeGeometry.rowHeight, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(configuration.isExpanded ? "Espanso" : "Compresso")
+            .accessibilityIdentifier("patient-chart-contents-disclosure")
+            if configuration.isExpanded {
+                configuration.content
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("patient-chart-contents-disclosure")
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
 struct PatientChartGroup<Content: View>: View {
     @Environment(\.patientChartScrollMemory) private var scrollMemory
     @Environment(\.patientChartPatientID) private var patientID

@@ -49,10 +49,26 @@ final class CaptureTests: XCTestCase {
             try launch()
             let row = patient("Rossi Sintetica")
             guard row.waitForExistence(timeout: 40) else { capture("diagnostica-elenco"); XCTFail("Banco patient Rossi absent"); continue }
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                XCTAssertEqual(row.frame.height, 44, accuracy: 0.5)
+            }
             capture("01-elenco")
             row.tap()
             let name = app.staticTexts["patient-detail-name"]
             XCTAssertTrue(name.waitForExistence(timeout: 20))
+            XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Dettaglio Rossi")).firstMatch.exists)
+            for table in ["problems", "therapies", "measures", "checkups"] {
+                XCTAssertTrue(app.staticTexts["patient-overview-title-\(table)"].exists, "Tabella assente: \(table)")
+            }
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                XCTAssertTrue(app.otherElements["clinical-workspace-sidebar"].exists)
+                XCTAssertTrue(app.buttons["homebase-open-new-entry-button"].label.contains("Nuova voce"))
+                let prose = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "entry-prose-"))
+                XCTAssertGreaterThan(prose.count, 0)
+                for element in prose.allElementsBoundByIndex {
+                    XCTAssertLessThanOrEqual(element.frame.maxX, app.frame.maxX + 1)
+                }
+            }
             capture("02-scheda")
             diary()
             let entry = app.descendants(matching:.any).matching(NSPredicate(format:"identifier BEGINSWITH 'entry-row-'")).firstMatch
@@ -70,6 +86,13 @@ final class CaptureTests: XCTestCase {
                     title.typeText("Bozza sintetica non salvata")
                     if tutorial.exists { tutorial.tap(); title.tap(); title.typeText("Bozza sintetica non salvata") }
                     XCTAssertTrue((title.value as? String)?.contains("Bozza sintetica") == true)
+                    let threshold = app.otherElements["diary-writing-threshold"]
+                    XCTAssertTrue(threshold.waitForExistence(timeout: 5))
+                    XCTAssertTrue(app.keyboards.firstMatch.exists)
+                    let save = app.buttons["homebase-create-entry-button"]
+                    XCTAssertTrue(save.exists)
+                    XCTAssertLessThanOrEqual(threshold.frame.maxY, app.keyboards.firstMatch.frame.minY + 1)
+                    XCTAssertGreaterThan(threshold.frame.height, 44)
                     capture("04-nuova-voce")
                 }
             }
