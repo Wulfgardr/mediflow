@@ -269,7 +269,9 @@ fn request(stream: &mut TcpStream) -> Option<(String, Value)> {
         if body.is_empty() {
             Value::Null
         } else {
-            serde_json::from_slice(&body).unwrap()
+            // Gli upload multipart restano testo, così i test possono leggerne i campi.
+            serde_json::from_slice(&body)
+                .unwrap_or_else(|_| Value::String(String::from_utf8_lossy(&body).into_owned()))
         },
     ))
 }

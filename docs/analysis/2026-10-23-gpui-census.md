@@ -717,7 +717,7 @@ esecuzione di Treatment Reasoning. Le route `/api/system/mlx` e
 | --- | --- | --- | --- |
 | `/settings/conservazione`, `/api/system/retention` | ADR 0178 | Nessuno. GPUI conosce solo la conservazione dei backup (`retention_keep_artifacts`), che è un'altra cosa | Rinvio Web: finestre, blocchi e scarto sono amministrazione del titolare sull'host. **Da approvare** |
 | `/patients/import/dossier`, `/api/documents/dossier-extraction` | ADR 0176 | Nessuno | Rinvio Web: il flusso parte dalla skill di importazione e si rivede nel browser. **Da approvare** |
-| `/api/drugs/catalog-import` | ADR 0177, catalogo farmaci di un'altra agenzia | Nessuno | Rinvio Web, come gli altri repertori caricati da file. **Da approvare** |
+| `/api/drugs/catalog-import` | ADR 0177, catalogo farmaci di un'altra agenzia | Repertori, sotto i farmaci AIFA | Coperta (7 novembre 2026, Leonardo ha respinto il rinvio al Web) |
 | `/api/v1/network/prosthetics-catalog` | ADR 0177 | Sì | Coperta |
 | `/api/system/territorial-packs` (già presente, ora con il cambio d'assetto in Impostazioni) | ADR 0177 | Lettura dell'assetto (`session.rs`) | Coperta: lettura e cambio con conferma nella pagina dell'host (7 novembre 2026, Leonardo ha respinto il rinvio al Web) |
 | `/api/therapy-status-commands/*` | WUL-800 | GPUI usa `/api/auth/native/therapy-status` | Coperta da una route nativa propria |

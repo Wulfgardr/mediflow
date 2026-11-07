@@ -47,3 +47,6 @@ scripts/windows-launcher-bootstrap/prebuilds/win32-x64/manifest.json text eol=lf
 scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/manifest.json text eol=lf
 scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node -text
 scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/system-directory.node -text
+
+# Corpi multipart dei contratti GPUI: i CRLF fanno parte dei byte confrontati.
+experiments/gpui-patient-pilot/transport/tests/fixtures/drug-catalog/*.multipart -text
