@@ -8,6 +8,7 @@ mod models;
 mod network;
 mod parameters;
 mod references;
+mod retention;
 mod security;
 mod who_administration;
 mod work_profile;
@@ -55,6 +56,7 @@ pub(super) struct LocalAdministration {
     controls: controls::ControlsArea,
     network: network::NetworkArea,
     references: references::ReferencesArea,
+    retention: retention::RetentionArea,
     security: security::SecurityArea,
     chatgpt: chatgpt::ChatGptArea,
     models: models::ModelsArea,
@@ -102,6 +104,7 @@ impl LocalAdministration {
             controls: controls::ControlsArea::new(theme, cx),
             network: network::NetworkArea::default(),
             references: references::ReferencesArea::new(theme, cx),
+            retention: retention::RetentionArea::new(theme, cx),
             security: security::SecurityArea::new(
                 theme,
                 retirement_path
@@ -138,6 +141,7 @@ impl LocalAdministration {
                     || self.who_administration.rollback.is_some()
             }
             SettingsPage::Archives => self.archives.has_work(),
+            SettingsPage::Retention => self.retention.command.is_some(),
             _ => false,
         }
     }
@@ -152,6 +156,7 @@ impl LocalAdministration {
             || self.who_administration.busy
             || self.work_profile.busy
             || self.references.busy
+            || self.retention.busy
             || self.chatgpt.busy()
             || self.models.has_work()
             || self.security.has_work()
@@ -182,6 +187,7 @@ impl LocalAdministration {
         self.controls.withdraw(cx);
         self.network = network::NetworkArea::default();
         self.references.withdraw(cx);
+        self.retention.withdraw(cx);
         self.who_administration.withdraw(cx);
         self.security.withdraw(cx);
         self.models.withdraw(cx);
@@ -211,6 +217,7 @@ impl LocalAdministration {
         cx: &mut Context<ClinicalApp>,
     ) {
         self.references.configure(theme, cx);
+        self.retention.configure(theme, self.has_work(), cx);
         self.controls.configure(theme, self.has_work(), cx);
         self.who_administration
             .configure(theme, self.has_work(), cx);
@@ -339,6 +346,9 @@ impl ClinicalApp {
                     }
                     if this.settings_page == SettingsPage::Governance {
                         this.read_governance(cx);
+                    }
+                    if this.settings_page == SettingsPage::Retention {
+                        this.read_retention(cx);
                     }
                     if this.settings_page == SettingsPage::References {
                         this.read_reference_catalog(cx);
@@ -578,6 +588,7 @@ impl ClinicalApp {
                             | SettingsPage::Controls
                             | SettingsPage::Governance
                             | SettingsPage::References
+                            | SettingsPage::Retention
                     )
                 }) {
                     pane = pane.children(rows.iter().map(|&(key, enabled)| {

@@ -1,0 +1,10 @@
+{
+  "confirmed": true,
+  "expectedRevision": 0,
+  "windows": {
+    "ambulatory_record": {
+      "kind": "years",
+      "years": 10
+    }
+  }
+}

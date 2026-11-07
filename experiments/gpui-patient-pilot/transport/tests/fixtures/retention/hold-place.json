@@ -1,0 +1,7 @@
+{
+  "action": "hold.place",
+  "confirmed": true,
+  "expectedRevision": 0,
+  "patientId": "retention-expired",
+  "reason": "litigation"
+}

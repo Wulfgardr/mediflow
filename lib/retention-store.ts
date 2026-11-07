@@ -11,7 +11,8 @@ import {
     evaluateFascicolo, parseRetentionWindows, retentionHoldsDocumentSchema, retentionProfileForPreset, retentionTermToken,
     retentionWindowsDocumentSchema, type FascicoloEvaluation, type FascicoloFacts, type RetentionCategory,
     type RetentionHold, type RetentionHoldReason, type RetentionHoldsDocument, type RetentionProfileId,
-    type RetentionWindowsDocument, RETENTION_HOLD_REASONS,
+    type RetentionWindowsDocument, RETENTION_HOLD_REASONS, RETENTION_PROFILES, RETENTION_SOURCES, RETENTION_CATEGORY_LABELS,
+    type RetentionProfile, type RetentionSource,
 } from './retention-policy';
 
 export type RetentionRunner = Pick<BetterSQLite3Database, 'all' | 'get' | 'run' | 'select' | 'delete'>;
@@ -284,6 +285,10 @@ export type RetentionOverview =
         windows: RetentionWindowsDocument['windows'];
         holdsRevision: number;
         holds: RetentionHold[];
+        /** Minimi e fonti del profilo attivo: i client nativi li mostrano senza ricalcolare la politica. */
+        profile: RetentionProfile;
+        sources: RetentionSource[];
+        categories: { id: RetentionCategory; label: string }[];
         counts: Record<FascicoloEvaluation['status'], number>;
         /** Fascicoli scaduti o sospesi da un blocco: l'elenco di revisione. */
         review: FascicoloEvaluation[];
@@ -298,7 +303,12 @@ export function retentionOverview(tx: RetentionRunner, nowSeconds: number): Rete
     return {
         status: 'ready', evaluatedAt, preset: configuration.preset, profileId: configuration.profileId,
         windowsRevision: configuration.windows.revision, windows: configuration.windows.windows,
-        holdsRevision: configuration.holds.revision, holds: configuration.holds.holds, counts,
+        holdsRevision: configuration.holds.revision, holds: configuration.holds.holds,
+        profile: RETENTION_PROFILES[configuration.profileId],
+        sources: [...new Set(Object.values(RETENTION_PROFILES[configuration.profileId].terms).flatMap(term => term.sourceId ? [term.sourceId] : []))]
+            .map(id => RETENTION_SOURCES[id]),
+        categories: RETENTION_CATEGORIES.map(id => ({ id, label: RETENTION_CATEGORY_LABELS[id] })),
+        counts,
         review: items.filter(item => item.status === 'expired' || item.status === 'held'),
     };
 }
