@@ -42,21 +42,27 @@ test('J-2: con il solo nucleo SISS, portali e PRREG spariscono dalla scheda e i 
   await bootstrapUnlockedSession(page, '314159');
   seedPreset(isolatedRuntime.dataDirectory, 'core+it+lom');
   const patientId = await createPatient(page, 'Lombardia', 'LMBNCL80A01H501K');
+  const navigation = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
   const scheda = async () => {
     await page.goto(`/patients/${patientId}/modules`);
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(navigation).toBeVisible();
   };
 
   await scheda();
-  await expect(page.locator('#siss')).toHaveCount(1);
+  await openPatientSection(page, 'siss');
+  await expect(page.locator('#siss')).toContainText('SISS e FSE');
   await page.screenshot({ path: join(evidence, 'lombardia.png'), fullPage: true });
 
   await applyPreset(page, 'Nucleo internazionale');
   await scheda();
-  await expect(page.locator('#siss')).toHaveCount(0);
-  await expect(page.locator('[href="#siss"]')).toHaveCount(0);
-  await expect(page.getByText('SISS e FSE', { exact: true })).toHaveCount(0);
+  await navigation.getByRole('button', { name: 'Altro', exact: true }).click();
+  await expect(navigation.locator('a[href="#protesica"]')).toBeVisible();
+  await expect(navigation.locator('a[href="#siss"]')).toHaveCount(0);
   await page.screenshot({ path: join(evidence, 'nucleo.png'), fullPage: true });
+  await page.goto(`/patients/${patientId}/modules#siss`);
+  await expect(navigation).toBeVisible();
+  await expect(page.locator('#siss')).toHaveCount(0);
+  await expect(page.getByText('SISS e FSE', { exact: true })).toHaveCount(0);
 
   const headers = await trustedArchiveWebRequestHeaders(page);
   const writers: unknown[] = [];
@@ -69,7 +75,8 @@ test('J-2: con il solo nucleo SISS, portali e PRREG spariscono dalla scheda e i 
 
   await applyPreset(page, 'Italia e Lombardia');
   await scheda();
-  await expect(page.locator('#siss')).toHaveCount(1);
+  await openPatientSection(page, 'siss');
+  await expect(page.locator('#siss')).toContainText('SISS e FSE');
   writeFileSync(join(evidence, 'writer-nucleo.json'), JSON.stringify(writers, null, 2));
 });
 
