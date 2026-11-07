@@ -42,6 +42,7 @@ export type Kree8WorkspaceNavGroups = readonly [
 
 type Kree8WorkspaceShellProps = {
   variant?: 'default' | 'clinical' | 'overview';
+  writing?: boolean;
   eyebrow: string;
   title: string;
   subtitle: string;
@@ -61,6 +62,7 @@ type Kree8WorkspaceShellProps = {
 
 export function Kree8WorkspaceShell({
   variant = 'default',
+  writing = false,
   eyebrow,
   title,
   subtitle,
@@ -340,9 +342,9 @@ export function Kree8WorkspaceShell({
   }, [isClinical, overviewMode, navKey]);
 
   return (
-    <RuntimeTwinFolderContext.Provider value={folderMode ? folderSection : null}>
+    <RuntimeTwinFolderContext.Provider value={folderMode ? writing ? 'quadro' : folderSection : null}>
     <div className={`${sectionRecipe.sections} ${folderMode ? twin.patientShell : `${styles.shell} ${isClinical ? styles.clinicalShell : ''} ${overviewMode ? styles.overviewShell : ''}`}`} ref={rootRef}>
-      <main className={`${layout.container} ${folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`}`} data-folder-section={folderMode ? folderSection : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
+      <main className={`${layout.container} ${folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`}`} data-writing={writing} data-folder-section={folderMode ? folderSection : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
         <header
           className={`${layout.plane} ${folderMode ? twin.patientHeader : `${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}`}
           data-testid={isClinical ? 'lume-scheda-header' : undefined}

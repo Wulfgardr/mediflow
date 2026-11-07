@@ -9,7 +9,7 @@ function source(relativeUrl: string): string {
 
 test('production consumers do not invoke legacy generative write paths', () => {
     const consumers = [
-        source('../app/patients/[id]/entries/new/page.tsx'),
+        source('../components/patient-entry-composer.tsx'),
         source('../components/document-insights-panel.tsx'),
         source('../components/patient-smart-import-fabric-preview-card.tsx'),
         source('../components/document-upload.tsx'),

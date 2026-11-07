@@ -27,7 +27,7 @@ function consumerRead(file: string): () => Promise<unknown> {
 const key = () => crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 
 for (const file of ['components/document-upload.tsx', 'app/patients/[id]/modules/page.tsx', 'components/kree8/kree8-clinical-cockpit.tsx',
-    'components/timeline-entry-card.tsx', 'app/patients/[id]/entries/new/page.tsx', 'components/document-synthesis-fabric-review-card.tsx']) {
+    'components/timeline-entry-card.tsx', 'components/patient-entry-composer.tsx', 'components/document-synthesis-fabric-review-card.tsx']) {
     test(`${file}: attachment list cannot dispatch while locked and resumes only with a new session`, async t => {
         db.setKey(null);
         t.after(() => db.setKey(null));

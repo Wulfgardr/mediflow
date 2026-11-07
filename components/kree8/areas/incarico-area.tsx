@@ -40,9 +40,9 @@ import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 
 function WorklistTodo({ todos, patientId }: { todos: WorklistTodos; patientId: string }) {
   const item = todos.status === 'ready' ? todos.byPatient.get(patientId) : undefined;
-  return <span className={`${patientStyles.patientTodo} ${todos.status === 'ready' && !item ? patientStyles.todoEmpty : ''}`} data-worklist-todo={todos.status}>
+  return <span className={`${patientStyles.patientTodo} ${todos.status === 'ready' && !item ? patientStyles.todoEmpty : ''}`} data-worklist-todo={todos.status} title={item ? `${item.next.title || 'Controllo pianificato'} · ${formatWorkspaceDate(item.next.date)}${item.count > 1 ? ` · Altri ${item.count - 1} controlli` : ''}` : undefined}>
     {todos.status !== 'ready' ? todos.status === 'loading' ? 'Lettura controlli…' : 'Controlli non disponibili'
-      : item ? <><span>{item.next.title || 'Controllo pianificato'}</span><span className={patientStyles.todoDetail}>{formatWorkspaceDate(item.next.date)}</span>{item.count > 1 ? <span className={patientStyles.todoDetail}>{item.count === 2 ? 'Un altro controllo' : `Altri ${item.count - 1} controlli`}</span> : null}</>
+      : item ? <><span>{item.next.title || 'Controllo pianificato'}</span><span className={patientStyles.todoDetail}>{formatWorkspaceDate(item.next.date)}</span>{item.count > 1 ? <span className={patientStyles.todoDetail}><span aria-label={item.count === 2 ? 'Un altro controllo' : `Altri ${item.count - 1} controlli`}>+{item.count - 1}</span></span> : null}</>
         : 'Nessun controllo aperto'}
   </span>;
 }
@@ -431,9 +431,9 @@ function IncaricoArea({
                           data-patient-index={virtualRow.index}
                           data-testid="lume-patient-row"
                         >
-                          <span className={patientStyles.recordIdentity}><strong>{p.name}</strong><span className={patientStyles.compactDiagnosis}>{diagnosisDescription || 'Diagnosi non registrata'}</span></span>
+                          <span className={patientStyles.recordIdentity} title={p.name}><strong>{p.name}</strong><span className={patientStyles.compactDiagnosis}>{diagnosisDescription || 'Diagnosi non registrata'}</span></span>
                           <span className={patientStyles.recordAge}>{p.ageLabel}</span>
-                          <span className={patientStyles.recordDiagnosis}>{diagnosisDescription || 'Diagnosi non registrata'}</span>
+                          <span className={patientStyles.recordDiagnosis} title={diagnosisDescription}>{diagnosisDescription || 'Diagnosi non registrata'}</span>
                           <span className={patientStyles.patientWhen} data-testid="lume-patient-when">{p.lastTouch}</span>
                           <WorklistTodo todos={todos} patientId={p.id} />
                         </button>

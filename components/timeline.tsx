@@ -18,6 +18,7 @@ import twin from './twin-diary.module.css';
 interface TimelineProps {
     entries: TimelineEntryData[] | undefined;
     patientDiary?: boolean;
+    composer?: ReactNode;
     // Shared clinical history, named for the section that owns it.
     label?: string;
     emptyMessage?: string;
@@ -28,6 +29,7 @@ interface TimelineProps {
 export default function Timeline({
     entries,
     patientDiary = false,
+    composer,
     label = 'Diario clinico del paziente',
     emptyMessage = 'Nessuna voce visibile nel diario clinico.',
     section,
@@ -123,13 +125,16 @@ export default function Timeline({
         </button>
     );
 
-    const withHeader = (content: ReactNode) => section
+    const withHeader = (history: ReactNode) => {
+        const content = <>{composer}{composer ? <div className={twin.previousEntries}>{history}</div> : history}</>;
+        return section
         ? <CollapsibleSection {...section} headerAction={auditToggle}>{content}</CollapsibleSection>
         : <>
             {heading ? <header className={sectionRecipe.header}><h4 className={sectionRecipe.heading}>{heading}</h4>{auditToggle}</header>
                 : <div className="flex justify-end">{auditToggle}</div>}
             {content}
         </>;
+    };
 
     if (entries === undefined) return withHeader(<ViewState state="loading" title="Diario in caricamento." />);
     if (!visibleEntries.length) return withHeader(<ViewState state="empty" title={emptyMessage} />);
