@@ -47,6 +47,7 @@ async function originalFixture(page: Page) {
     const url = '/patients/' + patientId + '/modules';
     await page.goto(url); await openPatientSection(page, 'documenti');
     const docs = page.getByTestId('patient-documents');
+    await expect(docs.locator('[data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
     const files = ['A', 'B'].map((letter) => ({ name: 'originale-sintetico-' + letter + '.txt',
         text: 'Testo originale sintetico ' + letter + '. Nessun dato reale.' }));
     const uploads: string[] = [];
