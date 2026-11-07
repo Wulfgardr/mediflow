@@ -26,6 +26,17 @@ struct PairedPatientDetailSection: View {
     /// on iOS against 8 on macOS was itself part of why the phone read as
     /// cramped.
 
+    @ViewBuilder
+    private var allergyHeader: some View {
+        PatientAllergyPill(allergies: allergies)
+        if model.isPatientFieldLocked(.allergies) || PatientAllergiesCodec.decodeResult(detail.allergies).isUnreadable {
+            Label("Allergie non disponibili", systemImage: "lock.fill")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("patient-allergies-unavailable")
+        }
+    }
+
     var body: some View {
         #if os(iOS)
         mobilePatientChart
@@ -40,6 +51,7 @@ struct PairedPatientDetailSection: View {
         let exemptions = exemptionRead.values ?? []
         let groupSpacing = ClinicalChartMetrics.groupSpacing
         return VStack(alignment: .leading, spacing: groupSpacing) {
+            allergyHeader
             #if !os(macOS)
             // On iOS the card is titled by the patient, and the actions sit on
             // that line rather than above it.
@@ -1104,7 +1116,7 @@ private extension PairedPatientDetailSection {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("patient-detail-metadata")
-            PatientAllergyPill(allergies: allergies)
+            allergyHeader
             if detail.isArchived == true {
                 Text("Archiviato").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
             }

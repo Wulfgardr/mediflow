@@ -51,7 +51,20 @@ final class ClinicalCardStyleTests: XCTestCase {
         XCTAssertTrue(source.contains(".background(palette.minerale, in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius"))
         let workspace = try appleSource("AppleFoundation/PairedPatientsWorkspaceView.swift")
         XCTAssertTrue(workspace.contains(".buttonStyle(LumePrimaryButtonStyle())"))
-        XCTAssertTrue(workspace.contains(".safeAreaInset(edge: .bottom, spacing: 0)"))
+        XCTAssertTrue(workspace.contains("mobilePatientThreshold(isWide: isWide)"))
+    }
+
+    func testTabletScopeContainerAndSelectionUseTheControlRadius() throws {
+        let source = try appleSource("AppleFoundation/PairedPatientsWorklistView.swift")
+        let control = source.components(separatedBy: "private var tabletPatientViewModePicker: some View {").last!
+            .components(separatedBy: "#if os(macOS)").first!
+        XCTAssertTrue(source.contains("else if isTabletList"))
+        XCTAssertEqual(control.components(separatedBy: "RoundedRectangle(cornerRadius: LumeGeometry.controlRadius)").count - 1, 2)
+        XCTAssertFalse(control.contains("Capsule"))
+        XCTAssertFalse(control.contains(".segmented"))
+        let workspace = try appleSource("AppleFoundation/PairedPatientsWorkspaceView.swift")
+        XCTAssertTrue(workspace.contains("patient-worklist-control-group"))
+        XCTAssertTrue(workspace.contains(".sharedBackgroundVisibility(.hidden)"))
     }
 
     func testTabletRowsUseSingleLineAndTouchRowHeight() throws {
@@ -65,7 +78,7 @@ final class ClinicalCardStyleTests: XCTestCase {
     func testWritingThresholdStaysOutsideTheScrollingComposer() throws {
         let workspace = try appleSource("AppleFoundation/PairedPatientsWorkspaceView.swift")
         let composer = try appleSource("AppleFoundation/PairedDiaryComposerView.swift")
-        XCTAssertTrue(workspace.contains(".safeAreaInset(edge: .bottom, spacing: 0)"))
+        XCTAssertTrue(workspace.contains("mobilePatientThreshold(isWide: isWide)"))
         XCTAssertTrue(workspace.contains("diary-writing-threshold"))
         XCTAssertTrue(composer.contains("@Binding var isCreatingEntry: Bool"))
         XCTAssertTrue(workspace.contains(".disabled(!model.canCreateEntry)"))
@@ -82,6 +95,9 @@ final class ClinicalCardStyleTests: XCTestCase {
         XCTAssertTrue(component.contains("var allergies: [String] = []"))
         XCTAssertTrue(component.contains("exclamationmark.triangle.fill"))
         XCTAssertTrue(header.contains("PatientAllergyPill(allergies: allergies)"))
+        let workspace = try appleSource("AppleFoundation/PairedPatientsWorkspaceView.swift")
+        XCTAssertTrue(workspace.contains("PatientAllergiesCodec.decodeResult(detail.allergies)"))
+        XCTAssertTrue(header.contains("model.isPatientFieldLocked(.allergies)"))
     }
 
     func testOverviewPresentsFourTablesAndAdaptiveColumns() throws {
@@ -182,6 +198,7 @@ final class ClinicalCardStyleTests: XCTestCase {
     /// numero scritto a mano accanto alla scala è come le due bande d'avviso a
     /// 12 su macOS, dove 12 è il raggio del piano e non quello dei controlli.
     func testViewRadiiComeFromTheLumeScale() throws {
+        try testTabletScopeContainerAndSelectionUseTheControlRadius()
         let nativeDirectory = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

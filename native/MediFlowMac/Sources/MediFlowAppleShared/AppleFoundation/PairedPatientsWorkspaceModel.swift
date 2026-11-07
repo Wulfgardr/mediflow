@@ -201,7 +201,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editPatientIsAdi = false
     @Published private(set) var editPatientExemptions: [String] = []
     enum EncryptedPatientField: Hashable {
-        case address, phone, caregiver, notes, diagnoses, exemptions, archiveReason, archiveNote
+        case address, phone, caregiver, notes, diagnoses, exemptions, archiveReason, archiveNote, allergies
     }
     @Published private(set) var lockedPatientFields: Set<EncryptedPatientField> = []
     private var editablePatientFields: [EncryptedPatientField: PatientFieldCrypto.EditableField] = [:]
@@ -719,7 +719,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             aiSummary: "Quadro clinico stabile, terapia in corso ben tollerata.",
             documentInsights: "Referti recenti coerenti con il quadro noto, nessun nuovo reperto critico.",
             isAdi: patient.isAdi, isArchived: patient.isArchived, version: patient.version,
-            ambulatoryId: "AMB-1", createdAt: nil, updatedAt: patient.updatedAt
+            ambulatoryId: "AMB-1", createdAt: nil, updatedAt: patient.updatedAt,
+            allergies: ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENT_ALLERGIES"].map {
+                $0 == "locked" ? "ENC:locked:uitest" : #"[{"substance":"Amoxicillina","reaction":"Orticaria","severity":"moderate"}]"#
+            }
         )
     }
 
@@ -2486,6 +2489,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             .caregiver: PatientFieldCrypto.resolveStringField(raw.caregiver, masterKey: masterKey),
             .notes: PatientFieldCrypto.resolveStringField(raw.notes, masterKey: masterKey),
             .diagnoses: PatientFieldCrypto.resolveStructuredField(raw.diagnoses, masterKey: masterKey),
+            .allergies: PatientFieldCrypto.resolveStructuredField(raw.allergies, masterKey: masterKey),
             .exemptions: PatientFieldCrypto.resolveStructuredField(raw.exemptions, masterKey: masterKey),
             .archiveReason: PatientFieldCrypto.resolveStringField(raw.archiveReason, masterKey: masterKey),
             .archiveNote: PatientFieldCrypto.resolveStringField(raw.archiveNote, masterKey: masterKey),
@@ -2537,7 +2541,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             createdAt: current.createdAt,
             updatedAt: current.updatedAt,
             archiveReason: editPatientIsArchived ? editPatientArchiveReason.trimmedOrNil : nil,
-            archiveNote: editPatientIsArchived ? editPatientArchiveNote.trimmedOrNil : nil
+            archiveNote: editPatientIsArchived ? editPatientArchiveNote.trimmedOrNil : nil,
+            allergies: current.allergies
         )
     }
     #endif

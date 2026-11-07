@@ -940,6 +940,8 @@ struct PairedPatientsWorklistView: View {
             picker
                 .pickerStyle(.menu)
                 .accessibilityIdentifier("patient-view-mode")
+        } else if isTabletList {
+            tabletPatientViewModePicker
         } else {
             picker
                 .pickerStyle(.segmented)
@@ -952,6 +954,31 @@ struct PairedPatientsWorklistView: View {
                 #endif
                 .accessibilityIdentifier("patient-view-mode")
         }
+    }
+
+    private var tabletPatientViewModePicker: some View {
+        HStack(spacing: 0) {
+            ForEach([PatientListViewMode.active, .archived, .trash], id: \.self) { mode in
+                let title = mode == .active ? "Attivi" : mode == .archived ? "Archiviati" : "Cestino"
+                Button { patientViewMode = mode } label: {
+                    Text(title)
+                        .fontWeight(patientViewMode == mode ? .semibold : .regular)
+                        .frame(maxWidth: .infinity, minHeight: LumeGeometry.rowHeight)
+                        .background(patientViewMode == mode ? PlatformColors.selection : .clear,
+                                    in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(patientViewMode == mode ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .foregroundStyle(PlatformColors.ink)
+        .background(PlatformColors.chartCardSurface,
+                    in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Stato")
+        .accessibilityIdentifier("patient-view-mode")
     }
 
     #if os(macOS)

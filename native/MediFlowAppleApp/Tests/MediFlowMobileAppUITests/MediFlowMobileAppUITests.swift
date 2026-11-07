@@ -1178,6 +1178,28 @@ final class MediFlowMobileAppUITests: XCTestCase {
         }
     }
 
+    func testPatientAllergyHeaderReadsOnlyTheStructuredField() {
+        for state in ["absent", "recorded", "locked"] {
+            app.terminate()
+            app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PATIENT_ALLERGIES"] = state == "absent" ? nil : state
+            launch(seedPatients: true, singlePatient: true)
+            let patient = app.buttons["patient-cell-uitest-1"]
+            XCTAssertTrue(patient.waitForExistence(timeout: 20))
+            patient.tap()
+            XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
+            let pill = sectionView("patient-allergy-pill")
+            let unavailable = sectionView("patient-allergies-unavailable")
+            if state == "recorded" {
+                XCTAssertTrue(pill.waitForExistence(timeout: 5))
+                XCTAssertTrue(pill.label.contains("Amoxicillina"))
+                XCTAssertFalse(unavailable.exists)
+            } else {
+                XCTAssertFalse(pill.exists)
+                XCTAssertEqual(unavailable.exists, state == "locked")
+            }
+        }
+    }
+
     func testAccessibilityAuditCoversWorklistAndAgenda() throws {
         // Let XCTest vary Dynamic Type during the accessibility audit. The
         // debug AX5 override belongs to the dedicated layout tests; here it
@@ -2445,7 +2467,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
             let target = element.identifier.isEmpty ? element.label : element.identifier
             let containers = app.scrollViews.containing(element.elementType, identifier: target)
                 .allElementsBoundByIndex.filter { $0.exists && $0.frame.height > 0 }
-            guard let scroll = containers.min(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) else {
+            guard let scroll = containers.first(where: { $0.identifier == "patient-chart-scroll-view" })
+                ?? containers.min(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) else {
                 return false
             }
             // use the same measured gutter as the verified draft helper;
@@ -3295,9 +3318,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
     }
 
     private func selectInteropPatientScope(_ title: String) {
-        // Actual runs use the ordinary default text size. Do not replace a
-        // missing segmented control with an unscoped label or injected filter.
-        let control = app.segmentedControls["patient-view-mode"]
+        // The native phone segments and the tablet control share this scope.
+        // Require its real options and selected state on both idioms.
+        let control = sectionView("patient-view-mode")
         XCTAssertTrue(revealInteropControl(control))
         let option = control.buttons.matching(NSPredicate(format: "label == %@", title))
         XCTAssertEqual(option.count, 1)
@@ -3663,13 +3686,21 @@ final class MediFlowMobileAppUITests: XCTestCase {
     }
 
     /// Swipes the detail scroll view up until `element` is in the accessibility
-
-    /// Swipes the detail scroll view up until `element` is in the accessibility
     /// tree (or a swipe budget is exhausted). Returns whether it became present.
     /// Interactive targets may also require a reachable hit point before tapping.
     private func scrollDown(to element: XCUIElement, maxSwipes: Int = 12, requireHittable: Bool = false) -> Bool {
+        if requireHittable {
+            let reachable = revealInteropControl(element)
+            if !reachable {
+                let hierarchy = XCTAttachment(string: app.debugDescription)
+                hierarchy.name = "Controllo non raggiungibile: \(element.identifier)"
+                hierarchy.lifetime = .keepAlways
+                add(hierarchy)
+            }
+            return reachable
+        }
         var attempts = 0
-        while (!element.exists || (requireHittable && !element.isHittable)) && attempts < maxSwipes {
+        while !element.exists && attempts < maxSwipes {
             let pane = app.scrollViews["patient-chart-scroll-view"]
             if pane.exists {
                 var visible = pane.frame.intersection(app.frame)
