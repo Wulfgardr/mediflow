@@ -91,7 +91,7 @@ function reset() {
     dbServer.insert(patients).values({
         id: patientId, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'PROFILE-SYNTHETIC',
         birthDate: new Date(0), createdAt: new Date(0), updatedAt: new Date(0),
-        notes: sealedNotes, address: 'ENC:YWJj:YWRkcmVzcw==', phone: null,
+        allergies: 'ENC:c3ludGhldGlj:YWxsZXJneQ==', notes: sealedNotes, address: 'ENC:YWJj:YWRkcmVzcw==', phone: null,
         ambulatoryId: 'profile-a', version: 4, isArchived: false,
     }).run();
     dbServer.insert(patientsToAmbulatories).values({ patientId, ambulatoryId: 'profile-a' }).run();
@@ -289,7 +289,7 @@ test('real Web, token-only v1 and paired GET adapters preserve the same profile 
         id: patientId, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'PROFILE-SYNTHETIC',
         identifierType: 'cf', birthDatePrecision: 'unknown', birthYear: null,
         birthDate: '1970-01-01T00:00:00.000Z', address: 'ENC:YWJj:YWRkcmVzcw==', phone: null,
-        caregiver: null, exemptions: null, diagnoses: null, monitoringProfile: null, statusReason: null,
+        caregiver: null, exemptions: null, diagnoses: null, allergies: 'ENC:c3ludGhldGlj:YWxsZXJneQ==', monitoringProfile: null, statusReason: null,
         archiveReason: null, archiveNote: null, notes: sealedNotes, aiSummary: null,
         aiSummaryGeneratedAt: null, aiSummaryContextHash: null, documentInsights: null,
         isAdi: false, isArchived: false, version: 4, ambulatoryId: 'profile-a',

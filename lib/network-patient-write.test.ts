@@ -179,3 +179,20 @@ test('network update accepts sealed sensitive fields and null clearing', async (
     assert.equal(row.archiveReason, null);
     assert.equal(row.archiveNote, null);
 });
+
+test('paired allergies: sealed update, omitted preservation, conflict and rejected plaintext are atomic', async () => {
+    resetDatabase();
+    const allergies = 'ENC:c3ludGhldGlj:YWxsZXJneQ==';
+    assert.equal((await updateNetworkScopedPatient(makeContext(), { version: 3, allergies })).status, 200);
+    let row = dbServer.select().from(patients).all()[0];
+    assert.equal(row.allergies, allergies);
+    assert.equal(row.version, 4);
+    assert.equal((await updateNetworkScopedPatient(makeContext(), { version: 3, allergies: null })).status, 409);
+    assert.equal((await updateNetworkScopedPatient(makeContext(), { version: 4, allergies: [{ substance: 'Plaintext' }] })).status, 400);
+    assert.deepEqual(dbServer.select().from(patients).all()[0], row);
+    assert.equal((await updateNetworkScopedPatient(makeContext(), { version: 4, notes: null })).status, 200);
+    row = dbServer.select().from(patients).all()[0];
+    assert.equal(row.allergies, allergies);
+    assert.equal((await updateNetworkScopedPatient(makeContext(), { version: 5, allergies: null })).status, 200);
+    assert.equal(dbServer.select().from(patients).all()[0].allergies, null);
+});

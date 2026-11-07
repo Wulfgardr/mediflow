@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.55.0
+  version: 1.56.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -7445,6 +7445,9 @@ components:
             - string
             - 'null'
           description: Sealed opaque exemptions payload beginning with `ENC:`; the paired network boundary rejects plaintext.
+        allergies:
+          type: [string, 'null']
+          description: Elenco cifrato ENC di allergie (sostanza, reazione e gravità facoltative). Null significa nessuna registrazione, non assenza accertata di allergie. In scrittura il campo omesso resta invariato.
         diagnoses:
           type:
             - string
@@ -8637,6 +8640,9 @@ components:
             - string
             - 'null'
           description: Sealed opaque exemptions payload beginning with `ENC:`; the paired network boundary rejects plaintext.
+        allergies:
+          type: [string, 'null']
+          description: Elenco cifrato ENC di allergie (sostanza, reazione e gravità facoltative). Null significa nessuna registrazione, non assenza accertata di allergie. In scrittura il campo omesso resta invariato.
         diagnoses:
           type:
             - string

@@ -1,6 +1,7 @@
 import { IDENTIFIER_TYPES, birthError, identifierError, type PatientIdentityInput } from './patient-identity';
 import { parseWhoReference, type WhoReference } from './reference-data/icd11-reference';
 import * as z from 'zod';
+import { patientAllergiesSchema } from './patient-allergies';
 import { isWhoCanonicalMmsUri } from './reference-data/icd11-who-local-contract';
 
 export const diagnosisSchema = z.object({
@@ -46,6 +47,7 @@ const patientFieldsSchema = z.object({
     monitoringProfile: z.enum(['taken_in_charge', 'extemporaneous']).default('taken_in_charge'),
     statusReason: z.string().optional(),
     diagnoses: z.array(diagnosisSchema).optional().default([]),
+    allergies: patientAllergiesSchema.optional().default([]),
     checkups: z.array(checkupSchema).optional().default([])
 });
 

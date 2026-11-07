@@ -79,3 +79,18 @@ trasporto e non conferisce autorità di scrittura. Per questo la verifica del
 formato non basta a dichiarare la portabilità, che resta
 `HOLD_TRI_OS_CI_SAME_SHA` finché Linux, Windows e macOS non superano i controlli
 sulla stessa SHA candidata.
+
+## Allergie del paziente
+
+ADR 0182 aggiunge `allergies` al dettaglio restituito da
+`GET /api/v1/patients/{id}` e `GET /api/v1/network/patients/{id}`.
+È una stringa `ENC:iv:ciphertext` o null. Il JSON decifrato è un elenco:
+`[{"substance":"Amoxicillina","reaction":"Orticaria","severity":"moderate"}]`.
+Solo `substance` è obbligatoria. Le gravità ammesse sono `mild`, `moderate`,
+`severe` e descrivono la reazione, senza attestare una verifica allergologica.
+Null, campo assente ed elenco vuoto significano nessuna allergia registrata.
+Un errore di decifratura o una forma non riconosciuta resta dato non disponibile.
+Apple e GPUI devono leggere questo campo nel dettaglio per alimentare la
+pillola ▲ in testata. La lista compatta non lo include. Il golden
+`crypto-golden-vectors.v1.json` contiene un vettore aggiuntivo
+`patient.allergies`; i vettori precedenti conservano i loro byte.

@@ -229,3 +229,22 @@ test('create identity validates before fallback and preserves opaque strings exa
     assert(omitted.ok); assert.equal(omitted.values.id, 'synthetic-generated-id');
     assert.equal(generated, 1);
 });
+
+test('allergies: create/update accept only sealed data or null, omission preserves the field', () => {
+    const sealed = 'ENC:c3ludGhldGlj:aW5wdXQ=';
+    const create = normalizePatientCreateInput({ firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTHETIC', allergies: sealed }, { id: 'synthetic-allergy' });
+    assert.equal(create.ok, true);
+    if (create.ok) assert.equal(Reflect.get(create.values, 'allergies'), sealed);
+    for (const allergies of [sealed, null]) {
+        const result = normalizePatientUpdateInput({ allergies }, { expectedVersion: 2 });
+        assert.equal(result.ok, true);
+        if (result.ok) assert.equal(Reflect.get(result.values, 'allergies'), allergies);
+    }
+    const omitted = normalizePatientUpdateInput({ notes: null }, { expectedVersion: 2 });
+    assert.ok(omitted.ok && !Object.hasOwn(omitted.values, 'allergies'));
+    for (const allergies of [[{ substance: 'Amoxicillina' }], 'Amoxicillina', 'ENC:broken', {}, false]) {
+        const result = normalizePatientUpdateInput({ allergies, firstName: 'Ada' }, { expectedVersion: 2 });
+        assert.equal(result.ok, false, 'invalid allergy input must reject the entire update');
+        assert.equal(normalizePatientCreateInput({ firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTHETIC', allergies }, { id: 'synthetic-allergy' }).ok, false);
+    }
+});

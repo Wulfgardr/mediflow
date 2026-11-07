@@ -1,3 +1,4 @@
+import { isSealedPatientAllergies } from './patient-allergies';
 import { birthError, identifierError, inferLegacyIdentifierType, normalizeIdentifierValue, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity';
 import { patients } from '@/lib/schema';
 import { normalizePrimaryAmbulatoryIdInput } from './patient-ambulatory-membership';
@@ -100,6 +101,7 @@ export function normalizePatientCreateInput(
     }
     const id = typeof body.id === 'string' ? body.id
         : typeof options.id === 'function' ? options.id() : options.id;
+    if (!isSealedPatientAllergies(body.allergies)) return { ok: false, error: 'Le allergie devono essere cifrate.' };
     const birthDate = normalizeBirthDateForCreate(body.birthDate);
     if (!birthDate.ok) {
         return birthDate;
@@ -131,6 +133,7 @@ export function normalizePatientCreateInput(
             caregiver: typeof body.caregiver === 'string' ? body.caregiver : null,
             exemptions: normalizeStructuredPatientField(body.exemptions, { allowUndefined: false }),
             diagnoses: normalizeStructuredPatientField(body.diagnoses, { allowUndefined: false }),
+            allergies: body.allergies ?? null,
             monitoringProfile: typeof body.monitoringProfile === 'string' ? body.monitoringProfile : null,
             statusReason: typeof body.statusReason === 'string' ? body.statusReason : null,
             notes: typeof body.notes === 'string' && body.notes.length > 0 ? body.notes : null,
@@ -150,6 +153,7 @@ export function normalizePatientUpdateInput(
     body: Record<string, unknown>,
     options: NormalizePatientUpdateOptions
 ): PatientWriteResult<PatientUpdateValues> {
+    if (!isSealedPatientAllergies(body.allergies)) return { ok: false, error: 'Le allergie devono essere cifrate.' };
     const birthDate = normalizeBirthDateForUpdate(body.birthDate);
     if (!birthDate.ok) {
         return birthDate;
@@ -193,6 +197,8 @@ export function normalizePatientUpdateInput(
     if (normalizedDiagnoses !== undefined) {
         updateValues.diagnoses = normalizedDiagnoses;
     }
+
+    if (body.allergies !== undefined) updateValues.allergies = body.allergies;
 
     if (body.isArchived === false) {
         updateValues.archiveReason = null;
