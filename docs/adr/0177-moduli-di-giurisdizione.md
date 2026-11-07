@@ -63,6 +63,16 @@ protesica. Ora:
   regionale.
 - In Impostazioni, Profilo, «Personalizzazione territoriale» mostra l'assetto
   e lo cambia con conferma esplicita attraverso il canale Web già ammesso.
+- GPUI, sul computer dell'archivio, mostra lo stesso blocco nella pagina
+  dell'host e usa lo stesso canale: la gestione locale apre una sessione Web
+  del nodo home-base, quindi il server non ha un terzo canale di cambio.
+  Prima della conferma rilegge l'assetto e si ferma se la revisione è
+  cambiata; dopo il cambio rilegge l'assetto e le capacità della sessione
+  nativa. Il corpo inviato è fissato in
+  `experiments/gpui-patient-pilot/transport/tests/fixtures/territorial-packs-command.json`,
+  che il test GPUI confronta con la richiesta e
+  `lib/territorial-pack-gpui-contract.test.ts` passa all'handler reale
+  (aggiornamento del 7 novembre 2026, decisione G-0 di Leonardo).
 
 ### Catalogo farmaci con fonte dichiarata
 

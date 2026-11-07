@@ -205,6 +205,16 @@ impl Host {
         self.state.lock().unwrap().identity_replaced = true;
     }
 
+    pub(super) fn bodies(&self, route: &str) -> Vec<Value> {
+        self.requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(seen, _)| seen == route)
+            .map(|(_, body)| body.clone())
+            .collect()
+    }
+
     pub(super) fn request_count(&self) -> usize {
         self.requests.lock().unwrap().len()
     }

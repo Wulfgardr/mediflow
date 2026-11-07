@@ -8,6 +8,7 @@ mod network;
 mod parameters;
 mod references;
 mod security;
+mod territorial;
 mod who_administration;
 mod work_profile;
 use crate::RetirementNotice;
@@ -36,6 +37,7 @@ use std::sync::{
     Arc, Mutex, Weak,
     atomic::{AtomicBool, Ordering},
 };
+pub use territorial::*;
 pub use who_administration::*;
 pub use work_profile::*;
 use zeroize::Zeroizing;
