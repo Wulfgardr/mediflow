@@ -12,6 +12,7 @@ import { AlertTriangle, ArrowLeft, Building2, Calendar, CheckCircle2, ChevronDow
 
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { InkState } from '@/components/ui/ink-state';
+import { ViewState } from '@/components/ui/view-state';
 import { ClinicalRichTextEditor } from '@/components/clinical-rich-text-editor';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
@@ -877,11 +878,13 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
         </section>
     );
 
+    const entriesReadError = <ViewState state="error" title="Voci precedenti non disponibili." />;
+
     const recentDiary = (
         <section className={composerStyles.previousEntries} aria-label="Ultime voci registrate">
             <h2>Voci precedenti</h2>
             {entriesRead.loading ? <p role="status">Lettura delle voci precedenti…</p>
-                : entriesRead.error ? <p role="alert">Voci precedenti non disponibili.</p>
+                : entriesRead.error ? entriesReadError
                     : recentEntries.length ? recentEntries.map(entry => (
                         <details key={entry.id} className={composerStyles.contextSource}>
                             <summary>{formatEntryDate(entry.date)} · <PrivacyBlur>{entry.title}</PrivacyBlur></summary>
@@ -977,7 +980,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
 
     if (localDraft.state === 'loading') return <p role="status">Recupero della bozza…</p>;
 
-    if (embedded) return entryForm;
+    if (embedded) return <>{entryForm}{entriesRead.error ? entriesReadError : null}</>;
 
     if (proposal) {
         return (

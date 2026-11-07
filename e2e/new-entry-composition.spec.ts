@@ -153,7 +153,7 @@ test('Quadro in scrittura distingue lettura, errore e paziente non disponibile',
         const previous = page.getByRole('region', { name: 'Ultime voci registrate', exact: true });
         await expect(previous.getByRole('status')).toContainText('Lettura'); await expect(previous).not.toContainText('Nessuna voce recente');
         release();
-        await expect(previous.getByRole('alert')).toHaveText('Voci precedenti non disponibili.'); await expect(previous).not.toContainText('Nessuna voce recente');
+        await expect(previous.getByRole('alert')).toHaveText('✕ Voci precedenti non disponibili.'); await expect(previous).not.toContainText('Nessuna voce recente');
         for (const name of ['Terapie attive', 'Misure recenti', 'Controlli aperti']) {
             const section = quadro.getByRole('region', { name, exact: true });
             await expect(section.getByRole('alert')).toContainText('Impossibile leggere'); await expect(section).not.toContainText(/Nessun[ao]? /u);
@@ -205,7 +205,7 @@ for (const status of [401, 403, 503, 200]) test(`Nuova voce: lettura precedente 
         await expect(history).toBeVisible();
         await expect(page.getByLabel('MediFlow lock screen')).toHaveCount(0);
         if (status === 503) {
-            await expect(history.getByRole('alert')).toHaveText('Voci precedenti non disponibili.');
+            await expect(history.getByRole('alert')).toHaveText('✕ Voci precedenti non disponibili.');
             await expect(history).not.toContainText('Nessuna voce recente');
         } else {
             await expect(history).toContainText('Nessuna voce recente');

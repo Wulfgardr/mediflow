@@ -35,3 +35,22 @@ test('la voce nella scheda conserva la bozza dopo un rifiuto e registra sul pazi
   await expect(page.locator('#diario article').filter({ hasText: 'Seconda voce sintetica nella stessa scheda.' })).toBeVisible();
   expect(await read()).toHaveLength(2);
 });
+
+test('la voce inline dichiara il diario non leggibile senza perdere la bozza', async ({ page }) => {
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const patient = await page.evaluate(async () => {
+    const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firstName: 'Diario', lastName: 'Non disponibile sintetico', birthDate: '1980-01-01', taxCode: crypto.randomUUID() }) });
+    if (!response.ok) throw new Error(`Paziente sintetico: ${response.status}`);
+    return response.json() as Promise<{ id: string }>;
+  });
+  await page.route('**/api/entries?**', route => route.fulfill({ status: 503, json: { error: 'Diario sintetico non leggibile' } }));
+  await page.goto(`/patients/${patient.id}/modules#diario`);
+  await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
+  const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
+  await editor.fill('Bozza sintetica conservata durante il guasto del diario.');
+  const alert = page.getByRole('alert').filter({ hasText: 'Voci precedenti non disponibili.' });
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText('✕');
+  await expect(alert).toHaveAttribute('data-view-state', 'error');
+  await expect(editor).toHaveText('Bozza sintetica conservata durante il guasto del diario.');
+});
