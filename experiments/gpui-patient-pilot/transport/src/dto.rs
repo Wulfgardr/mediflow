@@ -600,7 +600,10 @@ mod entry_recording_contract {
 
     #[test]
     fn server_author_and_historical_entries_decode_additively() {
-        let cases: serde_json::Value = serde_json::from_str(include_str!("../../../../native/contracts/entry-recording.v1.json")).unwrap();
+        let cases: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../native/contracts/entry-recording.v1.json"
+        ))
+        .unwrap();
         for case in cases.as_array().unwrap() {
             let entry: Entry = serde_json::from_value(case["entry"].clone()).unwrap();
             let expected = (case["name"] == "operatore").then_some("Ada Sintetica");
