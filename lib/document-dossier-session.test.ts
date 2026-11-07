@@ -700,6 +700,32 @@ test('a prepared patient that the document does not name does not group the sour
     assert.equal(named.sources[0].prepared?.notes.some((note) => note.includes('non è scritto nel documento')), false);
 });
 
+test('without a tax code, a patient named in the document blocks a link to a record with another name', async () => {
+    // Banco sintetico 5/11/2026, falsificazione 10: il documento nomina PersonaUno, la scheda scelta è di PersonaDue.
+    const text = '%PDF-1.4 sintetico\nReferto\nPaziente: PersonaUno SinteticoUno\nData: 20/10/2026\nIl paziente assume Ramipril 5 mg 1 cp al mattino.';
+    const extractions = new Map<string, DossierHostExtraction>([[sha(enc.encode(text)), { status: 'extracted', markdown: text.replace('%PDF-1.4 sintetico\n', ''), ocr: null }]]);
+    const patients: DossierPatient[] = [
+        { id: 'p1', firstName: 'PersonaUno', lastName: 'SinteticoUno', taxCode: '', version: 1, diagnoses: [], exemptions: [] },
+        { id: 'p2', firstName: 'PersonaDue', lastName: 'SinteticoDue', taxCode: '', version: 1, diagnoses: [], exemptions: [] },
+    ];
+    const { ports, attachments } = archive(patients, extractions);
+    const [group] = await buildDossierInventory(ports, [file('settimana/a.pdf', text)], live);
+    const wrong = evaluateDraftGroupIdentity(group, patients, 'p2');
+    assert.equal(wrong.blocking, true, wrong.status);
+    await assert.rejects(acquireDossierGroup(ports, { group, patientId: 'p2', confirmed: true, ...live }), DossierIdentityBlocked);
+    assert.equal(attachments.size, 0);
+    // La stessa persona scritta in altro ordine, maiuscole e accenti resta collegabile.
+    const right = evaluateDraftGroupIdentity(group, patients, 'p1');
+    assert.equal(right.blocking, false, right.status);
+    const outcomes = await acquireDossierGroup(ports, { group, patientId: 'p1', confirmed: true, ...live });
+    assert.deepEqual(outcomes.map((item) => item.status), ['stored']);
+    // Un documento senza nome del paziente non blocca: resta la conferma di chi importa.
+    const unnamed = text.replace('Paziente: PersonaUno SinteticoUno\n', '');
+    const plain = archive(patients, new Map([[sha(enc.encode(unnamed)), { status: 'extracted', markdown: unnamed, ocr: null }]]));
+    const [anonymous] = await buildDossierInventory(plain.ports, [file('settimana/b.pdf', unnamed)], live);
+    assert.equal(evaluateDraftGroupIdentity(anonymous, patients, 'p2').blocking, false);
+});
+
 test('accept verified and apply writes only what the source supports, with active principle and summary', async () => {
     const text = letterText(CF_A);
     const { ports, files, records } = setup([['settimana/a.pdf', text]]);
