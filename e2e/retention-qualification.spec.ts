@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/isolated-runtime';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openDocumentActions, openPatientSection } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 import { loginWithWebAuthControl } from '../scripts/web-auth-control-test-client.mjs';
 import Database from 'better-sqlite3';
@@ -21,8 +21,8 @@ test('conservazione: profilo, finestre, blocchi, scarto e autorizzazione su runt
     negatives.push({ case: 'no-session', method, status: 401, body: { error: 'Unauthorized' } });
   }
   await bootstrapUnlockedSession(page, '314159');
-  const headers = await trustedArchiveWebRequestHeaders(page);
-  const db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
+  let headers = await trustedArchiveWebRequestHeaders(page);
+  let db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
   try {
     const setting = db.prepare('INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
     setting.run('territorial.packs', JSON.stringify({ schemaVersion: 'mediflow.territorial-packs.v1', revision: 1, preset: 'core+it+lom' }));
@@ -62,6 +62,19 @@ test('conservazione: profilo, finestre, blocchi, scarto e autorizzazione su runt
     await expect(page.getByText('La finestra è più breve del minimo del profilo attivo.', { exact: true })).toBeVisible();
     expect((await overview()).windows).toEqual(saved.windows);
     await page.reload(); await expect(input).toHaveValue('12');
+
+    // R-4: la finestra salvata sopravvive a un riavvio del server, non solo alla ricarica della pagina.
+    db.close();
+    await isolatedRuntime.restart();
+    db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
+    await bootstrapUnlockedSession(page, '314159');
+    headers = await trustedArchiveWebRequestHeaders(page);
+    await page.goto('/settings/conservazione');
+    await expect(input).toHaveValue('12');
+    const afterRestart = await overview();
+    expect(afterRestart.windows).toEqual(saved.windows);
+    expect(afterRestart.windowsRevision).toBe(saved.windowsRevision);
+    await page.screenshot({ path: join(evidence, 'dopo-riavvio.png'), fullPage: true });
 
     const at = Date.UTC(2000, 0, 1) / 1000;
     const ambulatory = db.prepare('SELECT id FROM ambulatories WHERE is_default=1').pluck().get();
@@ -124,4 +137,73 @@ test('conservazione: profilo, finestre, blocchi, scarto e autorizzazione su runt
   } finally {
     db.close(); writeFileSync(join(evidence, 'http-negatives.json'), JSON.stringify(negatives, null, 2));
   }
+});
+
+test('blocco su documento dal browser: il documento resta finché il blocco non è revocato', async ({ page, isolatedRuntime }, info) => {
+  test.setTimeout(180_000);
+  const evidence = process.env.RETENTION_EVIDENCE_DIR || info.outputPath('retention-documento');
+  mkdirSync(evidence, { recursive: true });
+  await bootstrapUnlockedSession(page, '314159');
+  const db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
+  try {
+    const setting = db.prepare('INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
+    setting.run('territorial.packs', JSON.stringify({ schemaVersion: 'mediflow.territorial-packs.v1', revision: 1, preset: 'core+it+lom' }));
+    setting.run('territorial.packs.initialization', 'synthetic');
+    const patientId = await page.evaluate(async () => {
+      const response = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ firstName: 'Documento', lastName: 'Bloccato', taxCode: 'BLCDCM80A01H501X',
+          birthDate: '1980-01-01T00:00:00.000Z', diagnoses: [] }) });
+      if (!response.ok) throw new Error(`Synthetic patient: HTTP ${response.status}`);
+      return (await response.json() as { id: string }).id;
+    });
+    const name = 'Referto sintetico sotto blocco.txt';
+    const openDocuments = async () => {
+      await page.goto(`/patients/${patientId}/modules`);
+      await openPatientSection(page, 'documenti');
+      const docs = page.getByTestId('patient-documents');
+      await expect(docs.locator('[data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
+      return docs;
+    };
+    let docs = await openDocuments();
+    await docs.locator('input[type="file"]').setInputFiles({ name, mimeType: 'text/plain', buffer: Buffer.from('Referto sintetico. Nessun dato reale.') });
+    await expect(docs.getByRole('status').filter({ hasText: 'allegato salvato' })).toBeVisible();
+    const attachmentId = db.prepare('SELECT id FROM attachments WHERE patient_id=?').pluck().get(patientId) as string;
+    expect(attachmentId).toBeTruthy();
+
+    await page.goto('/settings/conservazione');
+    await page.getByTestId('retention-hold-patient').selectOption(patientId);
+    const holds = page.getByTestId('retention-holds');
+    await holds.getByRole('combobox', { name: 'Documento' }).selectOption(attachmentId);
+    await page.getByTestId('retention-place-hold').click();
+    await expect(holds).toContainText('documento');
+    await holds.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(evidence, 'blocco-documento.png'), fullPage: true });
+
+    const tryDelete = async () => {
+      docs = await openDocuments();
+      await openDocumentActions(page, name);
+      await docs.getByRole('menuitem', { name: 'Elimina ' + name, exact: true }).click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
+    };
+    await tryDelete();
+    await expect(page.getByTestId('attachment-delete-held')).toBeVisible();
+    await page.screenshot({ path: join(evidence, 'eliminazione-respinta.png'), fullPage: true });
+    expect(db.prepare('SELECT id FROM attachments WHERE id=?').get(attachmentId)).toBeTruthy();
+    await page.reload(); await openPatientSection(page, 'documenti');
+    await expect(docs.getByRole('button', { name: `Visualizza ${name}`, exact: true })).toBeVisible();
+
+    await page.goto('/settings/conservazione');
+    await holds.getByRole('button', { name: 'Revoca', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Revoca blocco', exact: true }).click();
+    await expect(holds).toContainText('Nessun blocco attivo.');
+    await tryDelete();
+    await expect(docs.getByRole('button', { name: `Visualizza ${name}`, exact: true })).toHaveCount(0);
+    expect(db.prepare('SELECT id FROM attachments WHERE id=?').get(attachmentId)).toBeUndefined();
+
+    const audit = db.prepare("SELECT event_type, redacted_metadata AS flags FROM audit_events WHERE event_type LIKE 'retention.hold.%' ORDER BY occurred_at,rowid").all() as { event_type: string; flags: string }[];
+    expect(audit.map(row => row.event_type)).toEqual(['retention.hold.placed', 'retention.hold.released']);
+    expect(audit[0].flags).toContain('scope:document');
+    expect(audit[0].flags).toContain(`attachment:${attachmentId}`);
+    writeFileSync(join(evidence, 'audit.json'), JSON.stringify(audit, null, 2));
+  } finally { db.close(); }
 });
