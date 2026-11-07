@@ -148,6 +148,7 @@ test('Document Synthesis ordinary ChatGPT: encrypted fixture, source citation an
   await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'documenti');
   const fileName = `documento-ordinary-${Date.now()}.rtf`;
   const saved = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/attachments');
+  await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
   await page.locator('#documenti input[type="file"]').setInputFiles({ name: fileName, mimeType: 'application/rtf',
     buffer: Buffer.from('{\\rtf1\\ansi Documento sintetico cifrato dalla facade.}') });
   expect((await saved).ok()).toBe(true);
