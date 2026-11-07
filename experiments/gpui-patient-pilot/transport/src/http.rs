@@ -634,6 +634,9 @@ impl RuntimeClient {
                     if (path == ["api", "ai", "local-provider", "onboarding"]
                         && matches!(raw.status, 409 | 503))
                         || (path == ["api", "drugs", "update"] && raw.status == 409)
+                        // ADR 0178: i rifiuti della conservazione portano un codice per chi decide.
+                        || (path == ["api", "system", "retention"]
+                            && matches!(raw.status, 400 | 404 | 409))
                         || (path == ["api", "icd", "proxy"]
                             && query.is_empty()
                             && raw.status == 503)

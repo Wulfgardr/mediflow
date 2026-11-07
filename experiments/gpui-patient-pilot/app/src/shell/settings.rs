@@ -17,6 +17,7 @@ pub(super) enum SettingsPage {
     Controls,
     Host,
     Danger,
+    Retention,
 }
 
 impl SettingsPage {
@@ -36,6 +37,7 @@ impl SettingsPage {
             Self::Controls => 11,
             Self::Host => 12,
             Self::Danger => 13,
+            Self::Retention => 14,
         }
     }
 }
@@ -74,6 +76,9 @@ impl ClinicalApp {
         }
         if page == SettingsPage::References {
             self.read_reference_catalog(cx);
+        }
+        if page == SettingsPage::Retention {
+            self.read_retention(cx);
         }
         if page == SettingsPage::Models {
             self.read_model_configuration(cx);
@@ -134,6 +139,7 @@ impl ClinicalApp {
             SettingsPage::Governance => view.child(self.governance_view(cx)),
             SettingsPage::Controls => view.child(self.controls_view(cx)),
             SettingsPage::Archives => view.child(self.archives_view(cx)),
+            SettingsPage::Retention => view.child(self.retention_view(cx)),
             SettingsPage::References => view.child(self.reference_administration_view(cx)),
             SettingsPage::Profile => view.child(self.account_profile_view(cx)).child(self.work_profile_view(cx)),
             SettingsPage::Appearance => view.child(heading("clinical-workspace-settings-heading", "Aspetto", theme))
@@ -185,6 +191,7 @@ impl ClinicalApp {
                         (SettingsPage::Archives, "Archivi e backup", "Esportazione, verifica e ripristino"),
                         (SettingsPage::Controls, "Controlli", "Evidenze, aggiornamenti, audit e redazione"),
                         (SettingsPage::References, "Repertori", "Stato, fonti e importazione dei cataloghi"),
+                        (SettingsPage::Retention, "Conservazione dei dati", "Termini, blocchi e scarto dei fascicoli"),
                     ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)))
                     .child(section("clinical-workspace-settings-intelligenza", "Intelligenza", theme))
                     .children([
@@ -272,7 +279,7 @@ mod tests {
                 window.draw(cx).clear(cx);
             });
             let nodes = rendered_command::take_text_nodes();
-            assert_eq!(nodes.len(), 12);
+            assert_eq!(nodes.len(), 13);
             let mut unique = HashSet::new();
             for (id, node) in nodes {
                 assert!(
@@ -305,6 +312,7 @@ mod tests {
                     SettingsPage::Archives,
                     SettingsPage::Governance,
                     SettingsPage::Controls,
+                    SettingsPage::Retention,
                 ] {
                     app.settings_page = page;
                     let layout = Layout::for_window(1200., 1.);

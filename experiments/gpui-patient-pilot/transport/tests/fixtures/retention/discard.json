@@ -1,0 +1,7 @@
+{
+  "action": "discard",
+  "confirmed": true,
+  "expectedExpiresAt": 1646092800,
+  "expectedVersion": 1,
+  "patientId": "retention-expired"
+}

@@ -450,7 +450,7 @@ pub struct ClinicalApp {
     ai_refresh_target: ScrollTarget,
     ai_preferences: AiPreferences,
     settings_page: SettingsPage,
-    settings_targets: [ScrollTarget; 14],
+    settings_targets: [ScrollTarget; 15],
     local_host: local_host::LocalAdministration,
     account_profile: AccountProfile,
     who: WhoLookup,

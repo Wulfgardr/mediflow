@@ -5,10 +5,10 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { initializeSqliteSchema } from './sqlite-schema';
 import { commitTerritorialPackTransition, initializeTerritorialPacks } from './territorial-pack-store';
 import { TERRITORIAL_PACK_SCHEMA } from './territorial-packs';
-import { addCalendarYears, RetentionError } from './retention-policy';
+import { addCalendarYears, RETENTION_PROFILES, RetentionError } from './retention-policy';
 import {
     assertAttachmentNotHeld, assertNoRetentionHold, commitRetentionWindows, discardExpiredFascicolo, placeRetentionHold, releaseRetentionHold,
-    reviewRetention, type RetentionAuditEvent,
+    retentionOverview, reviewRetention, type RetentionAuditEvent,
 } from './retention-store';
 
 const CLOSED_AT = Date.UTC(2012, 2, 1) / 1000;
@@ -160,4 +160,21 @@ test('uno stato di conservazione illeggibile non produce scaduti e blocca la can
             expectedExpiresAt: addCalendarYears(CLOSED_AT, 10), confirmed: true }, NOW, audit)), isRetentionError('configuration_error'));
         assert.throws(() => db.transaction(tx => assertNoRetentionHold(tx, 'p-corrupt')), isRetentionError('legal_hold'));
     } finally { sqlite.close(); }
+});
+
+test('la panoramica porta minimi e fonti del profilo attivo, così i client nativi non ricalcolano la politica', () => {
+    const lombardy = fixture('core+it+lom');
+    const overview = lombardy.db.transaction(tx => retentionOverview(tx, NOW));
+    assert.equal(overview.status, 'ready');
+    if (overview.status !== 'ready') return;
+    assert.equal(overview.profile.id, overview.profileId);
+    assert.deepEqual(Object.keys(overview.profile.terms).sort(), Object.keys(RETENTION_PROFILES[overview.profileId].terms).sort());
+    const cited = new Set(Object.values(overview.profile.terms).flatMap(term => term.sourceId ? [term.sourceId] : []));
+    assert.deepEqual(overview.sources.map(source => source.id).sort(), [...cited].sort());
+    assert.ok(overview.sources.every(source => source.href.startsWith('https://')));
+
+    const core = fixture('core');
+    const plain = core.db.transaction(tx => retentionOverview(tx, NOW));
+    assert.equal(plain.status === 'ready' && plain.profile.id, 'none');
+    assert.deepEqual(plain.status === 'ready' && plain.profile, RETENTION_PROFILES.none);
 });
