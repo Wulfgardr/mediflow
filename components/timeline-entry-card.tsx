@@ -7,7 +7,7 @@ import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home
 import { Button } from '@/components/ui/button';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { InkState } from '@/components/ui/ink-state';
-import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiarySource, patientDiaryWorkflowState, readPatientDiaryMetadata } from '@/lib/patient-diary-metadata';
+import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiarySource, patientDiaryWorkflowState, patientDiaryRegistration, readPatientDiaryMetadata } from '@/lib/patient-diary-metadata';
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
@@ -257,8 +257,8 @@ export function TimelineEntryCard({
                 </div>
 
                 {diaryPresentation ? <div className={twin.registration}>
-                    {stateKnown ? <InkState state={presentation.draft ? 'fresh' : 'dry'}>{presentation.stateLabel}</InkState> : <span>{presentation.stateLabel}</span>}
-                    {presentation.author ? <span>Autore: {presentation.author}</span> : null}
+                    {stateKnown ? <InkState state={presentation.draft ? 'fresh' : 'dry'}>{presentation.stateLabel === 'Registrata' ? patientDiaryRegistration(entry) : presentation.stateLabel}</InkState> : <span>{presentation.stateLabel}</span>}
+                    {presentation.author && presentation.stateLabel !== 'Registrata' ? <span>Autore: {presentation.author}</span> : null}
                 </div> : null}
 
                 {metadataUnreadable ? <p className={twin.metadataNotice} role="status">Metadati della voce non leggibili. Autore, fonte e stato non verificabili.</p> : null}

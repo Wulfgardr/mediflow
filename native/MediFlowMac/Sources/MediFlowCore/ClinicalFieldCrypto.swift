@@ -120,7 +120,7 @@ public enum ClinicalFieldCrypto {
             attachments: structured(e.attachments, masterKey),
             deletedAt: e.deletedAt,
             deletionReason: string(e.deletionReason, masterKey),
-            version: e.version, createdAt: e.createdAt, updatedAt: e.updatedAt,
+            version: e.version, createdAt: e.createdAt, updatedAt: e.updatedAt, recordedBy: e.recordedBy,
             lockedFields: locked
         )
     }

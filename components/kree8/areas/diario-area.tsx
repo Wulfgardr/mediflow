@@ -1,3 +1,4 @@
+import { InkState } from '@/components/ui/ink-state';
 import { formatCountLabel } from '@/lib/format-count';
 import ink from '@/components/ink-secondary.module.css';
 import { Fragment, useState } from 'react';
@@ -106,7 +107,7 @@ function DiarioArea({
               data-testid="lume-diario-feed"
             >
               {visibleEntries.map((entry, index) => {
-                const presentation = entry.presentation ?? { source: 'Diario locale', state: entry.deleted ? 'deleted' : 'recorded', stateLabel: entry.deleted ? 'Eliminata' : 'Registrata' };
+                const presentation = entry.presentation ?? { registration: undefined, source: 'Diario locale', state: entry.deleted ? 'deleted' : 'recorded', stateLabel: entry.deleted ? 'Eliminata' : 'Registrata' };
                 const isActive = entry.id === resolvedActiveId;
                 const titleId = `diario-entry-${index}-title`;
                 const descriptionId = `diario-entry-${index}-description`;
@@ -145,6 +146,10 @@ function DiarioArea({
                       {presentation.author ? <span>Autore: {presentation.author}</span> : null}
                       <span>{entry.typeLabel}</span>
                     </div>
+
+                    {presentation.registration ? <div className={`${diaryStyles.provenance} lume-registro`}>
+                      <InkState state="dry">{presentation.registration}</InkState>
+                    </div> : null}
 
                     <div className={diaryStyles.entryFooter}>
                       <span className={diaryStyles.patientIdentity}>

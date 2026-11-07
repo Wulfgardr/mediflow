@@ -162,6 +162,7 @@ export interface Diagnosis {
 }
 
 export interface ClinicalEntry {
+    recordedBy?: string | null;
     id: string;
     patientId: string;
     date: Date;

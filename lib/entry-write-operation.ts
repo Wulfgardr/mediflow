@@ -4,7 +4,7 @@ import { dbServer } from './db-server';
 import { buildEntryVersionConflictPayload } from './entry-concurrency';
 import { activePatients } from './patient-lifecycle';
 import { writeAuditEventInTransaction, type RequiredAuditContext } from './security/audit';
-import { entries, patients, patientsToAmbulatories } from './schema';
+import { entries, patients, patientsToAmbulatories, users } from './schema';
 import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
 
 type CreateInput = {
@@ -87,7 +87,11 @@ export function createEntryOperation(input: CreateInput): Result {
                 ? 'Network diary create id already exists with different content' : 'Conflict' } };
         }
 
-        const inserted = tx.insert(entries).values(input.values).run();
+        const operator = input.audit.actorType === 'user'
+            ? tx.select({ displayName: users.displayName, username: users.username }).from(users)
+                .where(eq(users.id, input.audit.actorRef)).get() : undefined;
+        const recordedBy = operator?.displayName?.trim() || operator?.username || null;
+        const inserted = tx.insert(entries).values({ ...input.values, recordedBy }).run();
         if (inserted.changes !== 1) throw new Error('Entry create did not write exactly one row');
         writeAuditEventInTransaction(tx, {
             eventType: 'entry.created', outcome: 'success',

@@ -170,6 +170,7 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
     });
     insertRow(db, MEMBERSHIP_TABLE, { patient_id: 'w7-h7b-patient', ambulatory_id: 'w7-amb-primary', assigned_at: now + 25 });
     insertRow(db, 'entries', {
+        recorded_by: 'Ada Sintetica al momento della registrazione',
         id: 'w7-entry', patient_id: 'w7-patient', type: 'note', date: now + 3,
         ...(await sealed('entries', ['title', 'content', 'metadata', 'attachments', 'deletion_reason'])),
         setting: 'ambulatorio', deleted_at: now + 4, version: 4, created_at: now + 3, updated_at: now + 4,
