@@ -18,7 +18,9 @@ Lo schema passa da 9 a 10 nell'apertura versionata di ADR 0080, con originale
 verificato, DDL nullable e stamp atomico. La riapertura dello schema corrente
 valida senza DDL. Nessun backfill: voci storiche, nomi e versioni cliniche
 rimangono invariati. Le ricostruzioni dei predecessori v4, v5 e v6 escludono
-anche la colonna v10, conservando le impronte canoniche già pubblicate.
+anche la colonna v10, conservando le impronte canoniche già pubblicate. Il recupero cifrato ammette
+anche il predecessore v9 canonico, con una nuova impronta: i backup creati
+prima di questo aggiornamento restano recuperabili.
 `drizzle/0039_entry_recorded_by.sql` documenta il DDL, senza replay runtime.
 
 Le allowlist delle richieste POST e PUT rifiutano `recordedBy`. Il nome nasce
