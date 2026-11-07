@@ -264,13 +264,25 @@ public struct MediFlowMacRootView: View {
             }
             .listStyle(.sidebar)
             Divider()
-            Button { scene.select(.settings) } label: { Label("Impostazioni", systemImage: "gearshape") }
-                .buttonStyle(.plain).padding(12)
-                .accessibilityIdentifier("clinical-workspace-section-settings-button")
+            Button { scene.select(.settings) } label: {
+                Label("Impostazioni", systemImage: "gearshape")
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(PlatformColors.ink)
+            .fontWeight(scene.section == .settings ? .semibold : .regular)
+            .background(scene.section == .settings ? PlatformColors.selection : .clear)
+            .accessibilityAddTraits(scene.section == .settings ? .isSelected : [])
+            .accessibilityIdentifier("clinical-workspace-section-settings-button")
             Button {
                 if let workspace = scene.workspaceModel { Task { await workspace.lockSessionNow() } }
-            } label: { Label("Blocca", systemImage: "lock") }
-                .buttonStyle(.plain).padding(12)
+            } label: {
+                Label("Blocca", systemImage: "lock")
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                    .contentShape(Rectangle())
+            }
+                .buttonStyle(.plain)
                 .disabled(scene.workspaceModel == nil)
                 .accessibilityIdentifier("clinical-workspace-lock-button")
         }

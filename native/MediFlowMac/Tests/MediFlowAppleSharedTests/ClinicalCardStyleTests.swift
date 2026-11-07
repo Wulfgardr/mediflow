@@ -107,6 +107,7 @@ final class ClinicalCardStyleTests: XCTestCase {
         XCTAssertTrue(source.contains("await workspace.lockSessionNow()"))
         XCTAssertTrue(source.contains("clinical-workspace-lock-button"))
         XCTAssertTrue(source.contains("Text(section.title).inkVoice(26)"))
+        XCTAssertTrue(source.contains(".accessibilityAddTraits(scene.section == .settings ? .isSelected : [])"))
     }
 
     func testMacAnnouncementsAndSessionErrorsKeepCoherentVisibleStates() throws {
