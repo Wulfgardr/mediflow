@@ -219,6 +219,10 @@ function nameWords(value: string): string[] {
 
 const PATIENT_NAME_LINE = /^[\s>*#_-]*(?:paziente|assistit[oa]|nominativo|cognome\s+e\s+nome|nome\s+e\s+cognome)[\s*_]*[:.][\s*_]*(.+)$/iu;
 const NAME_STOP = /^(?:nat[oa]|cf|c|codice|cod|data|nascita|eta|anni|residente|tel|sesso|n|id)$/u;
+/** Parole funzionali: un nome finisce prima di «e», «di», «con»… */
+const NAME_FUNCTION_WORD = /^(?:e|ed|o|od|di|del|della|dei|degli|in|con|per|a|al|alla|non|ha|se|su|da|dal|dalla)$/u;
+/** Descrittori clinici frequenti dopo «Paziente:»: la riga non nomina nessuno. */
+const CLINICAL_DESCRIPTOR = /^(?:vigil|collabor|orientat|disorientat|lucid|cosci|svegli|apiret|febbril|eupnoic|dispnoic|stabil|allettat|deambul|ricoverat|dimess|affett|portator|sedat|agitat|tranquill|sofferent|algic|asintomatic|sintomatic|autonom|dipendent|fragil|anzian|giovane|adult|maschio|femmina|uomo|donna|not[oa]$|nega|riferisc|presenta|lamenta|in$)/u;
 
 /**
  * Nomi del paziente che il documento scrive su una riga con etichetta esplicita
@@ -232,13 +236,15 @@ export function collectDossierPatientNames(text: string): string[][] {
         const head = match[1].replace(/[*_]/gu, ' ').split(/[,;(|]|\d/u)[0];
         const words: string[] = [];
         // Un nome si scrive con l'iniziale maiuscola: «Paziente: vigile, collaborante» non è un nome.
+        let clinical = false;
         for (const raw of head.match(/[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*/gu) ?? []) {
             if (!/^\p{Lu}/u.test(raw)) break;
             const parts = nameWords(raw);
-            if (parts.some((part) => NAME_STOP.test(part))) break;
+            if (parts.some((part) => NAME_STOP.test(part) || NAME_FUNCTION_WORD.test(part))) break;
+            if (parts.some((part) => CLINICAL_DESCRIPTOR.test(part))) { clinical = true; break; }
             words.push(...parts);
         }
-        if (words.length >= 2) names.push(words);
+        if (!clinical && words.length >= 2) names.push(words);
     }
     return names;
 }

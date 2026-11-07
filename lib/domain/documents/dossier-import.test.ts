@@ -432,6 +432,10 @@ test('patient names are read only from a labelled line, as capitalised words', a
         'Assistita: Nicolò D’Amico',
         'Paziente: vigile, collaborante, orientato',
         'Paziente: Collaborante e vigile',
+        'PAZIENTE: VIGILE E COLLABORANTE',
+        'Paziente: Vigile Collaborante',
+        'PAZIENTE: ALLETTATO, NON DEAMBULANTE',
+        'Assistito: Anziano Fragile',
         'Il paziente: riferisce dolore',
         'Ricoverato il paziente Mario Rossi',
     ].join('\n')), [['mario', 'rossi'], ['rossi', 'mario'], ['nicolo', 'd', 'amico']]);
