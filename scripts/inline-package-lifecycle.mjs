@@ -34,6 +34,21 @@ function writeJson(file, value) {
   fs.renameSync(temporary, file);
 }
 
+// Codex reports every launch setting; any value beyond the recorded command and args
+// (environment, working directory, timeouts, disabled state) counts as a local change.
+function codexServer({ transport, enabled, startup_timeout_sec, tool_timeout_sec }) {
+  const { type, command, args, env, env_vars: envVars, cwd, ...rest } = transport;
+  const server = { type, command, args };
+  const extra = { ...rest, enabled, startup_timeout_sec, tool_timeout_sec, env, env_vars: envVars, cwd };
+  const defaults = { enabled: true, startup_timeout_sec: null, tool_timeout_sec: null, env: null, env_vars: [], cwd: null };
+  for (const [key, value] of Object.entries(extra)) {
+    const empty = value === undefined || isDeepStrictEqual(value, defaults[key])
+      || (key === 'env' && value && Object.keys(value).length === 0);
+    if (!empty) server[key] = value;
+  }
+  return server;
+}
+
 export function changeInlinePackage(target, action, packageRoot, name) {
   if (Number(process.versions.node.split('.')[0]) !== 24) throw new Error('Node 24.x required');
   if (!['install', 'revoke'].includes(action)) throw new Error('Expected install or revoke');
@@ -61,7 +76,7 @@ export function changeInlinePackage(target, action, packageRoot, name) {
     if (target.host === 'codex') {
       const servers = JSON.parse(target.run(['mcp', 'list', '--json']));
       current = servers.find(item => item.name === name);
-      if (current) current = { type: 'stdio', command: current.transport.command, args: current.transport.args };
+      if (current) current = codexServer(current);
     } else {
       document = fs.existsSync(target.config) ? JSON.parse(fs.readFileSync(target.config)) : {};
       current = document.mcpServers?.[name];
