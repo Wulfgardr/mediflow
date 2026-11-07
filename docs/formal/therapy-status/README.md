@@ -873,11 +873,18 @@ aggiornato: TLC, tre mutanti, sei testimoni, 188 test causali, due mutanti
 del controller, codice ripristinato e mutazioni della chat. Nessun file
 runtime o test viene modificato dopo questi esiti.
 
+## Riconciliazione del 7 novembre 2026: blocchi di conservazione sugli allegati
+
+`lib/db.ts` cambia solo nel percorso di eliminazione degli allegati: un 409
+`legal_hold` diventa `AttachmentLegalHoldError` (ADR 0178). Confronto con
+`syncCommit` fff8aefc3a6786d64e31019be3398cb6388ee55f: nessuna modifica a transizioni, guardie, await, CAS o
+audit delle terapie, e nessun codice delle terapie legge il testo degli errori di
+eliminazione. Aggiornate a mano l'impronta di `lib/db.ts` e `syncCommit`.
 ## Riconciliazione del 7 novembre 2026: rifiuti 412 nella creazione
 
 `lib/db.ts` cambia solo nel testo dell'errore di creazione: un 412 con codice e
 messaggio (per esempio `PROSTHETICS_CATALOG_REQUIRED`) mostra il solo messaggio.
-Confronto con `syncCommit` 46dfd4274f2740930d5f266e13ec3a05348f20ad: nessuna modifica a transizioni, guardie, await,
+Confronto su 46dfd4274f2740930d5f266e13ec3a05348f20ad, poi sull'unione con main ae2ab57aa37e5837cd4e02e6a8d1c5c8e9988a53 (`syncCommit`), che contiene anche il blocco sugli allegati: nessuna modifica a transizioni, guardie, await,
 CAS o audit delle terapie, e nessun codice delle terapie legge il testo degli
 errori di creazione. Aggiornate a mano l'impronta di `lib/db.ts` e `syncCommit`.
 Modello, configurazione, invarianti, limiti e mutanti TLC restano identici.

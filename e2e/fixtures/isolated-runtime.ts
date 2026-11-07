@@ -34,6 +34,8 @@ export function isolatedRuntimeArguments(bundle: string): string[] {
 }
 
 type IsolatedRuntime = Readonly<{ url: string; dataDirectory: string;
+  /** Stops the server and starts a new process on the same port and data directory. */
+  restart(): Promise<void>;
   offerPairing(options?: { nonce?: string; expiresIn?: number; instance?: string }): { nonce: string; host: string };
   usePairing(nonce: string, host: string, options?: { intent?: string; expiresAt?: number }): Promise<string>;
   cancelNavigation(): void;
@@ -94,28 +96,41 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
         createRequire(${JSON.stringify(serverPath)})(${JSON.stringify(serverPath)});`);
       args = [bootstrap];
     }
-    const child = spawn(process.execPath, args, {
-      cwd: bundle, env: environment, stdio: pluginLocalUiRuntime ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'], windowsHide: true,
+    const launch = () => {
+      const started = spawn(process.execPath, args, {
+        cwd: bundle, env: environment, stdio: pluginLocalUiRuntime ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'], windowsHide: true,
+      });
+      return { child: started, closed: new Promise<void>(resolve => started.once('close', () => resolve())) };
+    };
+    // Require readiness from this child before sending any request to the allocated port.
+    const awaitReady = (started: ReturnType<typeof spawn>) => new Promise<void>((resolve, reject) => {
+      let readySeen = false;
+      const deadline = setTimeout(() => reject(new Error('The isolated server did not become ready.')), 30_000);
+      const settle = (error?: Error) => { clearTimeout(deadline); if (error) reject(error); else resolve(); };
+      let output = '';
+      started.stdout!.on('data', (chunk: Buffer) => {
+        writeSync(log, chunk);
+        output = (output + chunk.toString()).slice(-2_048);
+        if (!readySeen && /Ready in/u.test(output)) { readySeen = true; settle(); }
+      });
+      started.stderr!.on('data', (chunk: Buffer) => writeSync(log, chunk));
+      started.once('error', () => settle(new Error('The isolated server could not start.')));
+      started.once('exit', () => { if (!readySeen) settle(new Error('The isolated server exited before readiness.')); });
     });
-    const closed = new Promise<void>(resolve => child.once('close', () => resolve()));
-    let readySeen = false;
+    const stop = async () => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+      const forceExit = setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      }, 5_000);
+      await closed;
+      clearTimeout(forceExit);
+    };
+    let { child, closed } = launch();
+    let restarts = 0;
     let sourceFingerprint: string | null = null;
     let initialEmptyAccount = false;
     try {
-      // Require readiness from this child before sending any request to the allocated port.
-      await new Promise<void>((resolve, reject) => {
-        const deadline = setTimeout(() => reject(new Error('The isolated server did not become ready.')), 30_000);
-        const settle = (error?: Error) => { clearTimeout(deadline); if (error) reject(error); else resolve(); };
-        let output = '';
-        child.stdout!.on('data', (chunk: Buffer) => {
-          writeSync(log, chunk);
-          output = (output + chunk.toString()).slice(-2_048);
-          if (!readySeen && /Ready in/u.test(output)) { readySeen = true; settle(); }
-        });
-        child.stderr!.on('data', (chunk: Buffer) => writeSync(log, chunk));
-        child.once('error', () => settle(new Error('The isolated server could not start.')));
-        child.once('exit', () => { if (!readySeen) settle(new Error('The isolated server exited before readiness.')); });
-      });
+      await awaitReady(child);
       const revisionResponse = await fetch(`${url}/api/system/revision`);
       expect(revisionResponse.status).toBe(200);
       const revision = await revisionResponse.json();
@@ -130,6 +145,14 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
       initialEmptyAccount = true;
       let lastNavigation: string | undefined;
       await provide({ url, dataDirectory,
+        async restart() {
+          // Same port, same data directory, a new process: nothing survives in memory.
+          if (pluginLocalUiRuntime) throw new Error('restart() is not supported with the local-ui plugin runtime.');
+          await stop();
+          ({ child, closed } = launch());
+          await awaitReady(child);
+          restarts += 1;
+        },
         cancelNavigation() {
           child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.cancel.v1', requestId: lastNavigation }));
         },
@@ -156,19 +179,14 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
       });
     } finally {
       // Only the child we created is terminated. No port-wide kill, account restore or DB edit.
-      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
-      const forceExit = setTimeout(() => {
-        if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
-      }, 5_000);
-      await closed;
-      clearTimeout(forceExit);
+      await stop();
       closeSync(log);
       const keepEvidence = !initialEmptyAccount || testInfo.status !== 'passed';
       await testInfo.attach('isolated-runtime.json', {
         contentType: 'application/json',
         body: JSON.stringify({
           isolated: true, url, node: process.versions.node, platform: process.platform, arch: process.arch,
-          emptyDataBeforeStart: !initialRuntimeServices, initialRuntimeServices, pluginLocalUiRuntime, initialEmptyAccount, sourceFingerprint, childStopped: true,
+          emptyDataBeforeStart: !initialRuntimeServices, initialRuntimeServices, pluginLocalUiRuntime, initialEmptyAccount, sourceFingerprint, childStopped: true, restarts,
           serverSHA256: createHash('sha256').update(readFileSync(serverPath)).digest('hex'),
           runtimeContractSHA256: createHash('sha256').update(readFileSync(contractPath)).digest('hex'),
           sharedDatabaseUsed: false, accountOrDatabaseRestore: false,
