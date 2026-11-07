@@ -709,7 +709,6 @@
 .recordAge, .patientWhen { color: var(--lume-ink-muted); font: 0.8125rem/1.5 var(--lume-font-sans); font-variant-numeric: tabular-nums; }
 .recordAge { white-space: nowrap; }
 .recordDiagnosis { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.compactDiagnosis { display: none; }
 .patientTodo { min-width: 0; display: flex; align-items: baseline; gap: 4px; font-size: 0.8125rem; overflow-wrap: anywhere; }
 .todoEmpty { color: var(--lume-ink-muted); font-weight: 400; }
 .patientTodo > span:first-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -754,7 +753,6 @@ button.directoryAction { background: transparent; border: 1px solid var(--lume-r
   .columnHeadings > :nth-child(2), .columnHeadings > :nth-child(3), .columnHeadings > :nth-child(4), .patientRow .recordAge, .patientRow .recordDiagnosis, .patientRow .patientWhen { display: none; }
   :global(html[data-runtime-twin-design='proposal']) .patientRow { height: 44px; min-height: 44px; }
   .recordIdentity strong { display: block; }
-  .compactDiagnosis { display: none; }
 }
 @media (pointer: coarse) {
   :global(html[data-runtime-twin-design='proposal']) .patientRow, :global(html[data-runtime-twin-design='proposal']) :is(.directoryToolbar, .worklistLensActions, .todoReadState) .directoryAction, .directoryToolbar .scopeChip { min-height: 44px; }

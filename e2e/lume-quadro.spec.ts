@@ -146,7 +146,7 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
 
   const primary = page.getByTestId('lume-scheda-header').getByRole('link', { name: 'Nuova voce', exact: true });
   await expect(primary).toHaveCount(1);
-  await expect(primary).toHaveAttribute('href', `/patients/${patient.id}/entries/new`);
+  await expect(primary).toHaveAttribute('href', `/patients/${patient.id}/modules?voce=nuova`);
   await expect(primary).toHaveCSS('background-color', await resolveColor(page, '--lume-ink-fresh'));
   await assertNotClippedInViewport(primary, 'azione primaria quadro');
   await assertKeyboardFocusProgresses(page, primary, 'azione primaria quadro');

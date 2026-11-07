@@ -340,7 +340,7 @@ for (const width of [1440, 768, 390]) test(`section header, unique creation and 
     await expect(page.locator('[data-view-state=loading]')).toHaveAttribute('role', 'status');
     await expect(page.locator('[data-view-state=loading] button')).toHaveCount(0);
     await expect(page.locator('[data-view-state=error]')).toHaveAttribute('role', 'alert');
-    await expect(page.locator('[data-view-state=error]')).toContainText('◆');
+    await expect(page.locator('[data-view-state=error]')).toContainText('✕ Impossibile leggere le misure.');
     await expect(page.locator('[data-view-state=unavailable]')).toHaveAttribute('role', 'alert');
     await expect(page.locator('[data-view-state=unavailable]')).toContainText('▲');
     await header.getByRole('button').click();

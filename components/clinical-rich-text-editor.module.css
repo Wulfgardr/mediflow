@@ -1,0 +1,7 @@
+.root { container: clinical-editor / inline-size; }
+.toolbar .more { display: none; }
+@container clinical-editor (max-width: 560px) {
+    .toolbar [data-formatting-secondary] { display: none; }
+    .toolbar .more { display: inline-flex; }
+    .toolbar[data-expanded='true'] [data-formatting-secondary] { display: inline-flex; }
+}

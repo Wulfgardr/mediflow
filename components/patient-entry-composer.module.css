@@ -205,7 +205,7 @@
     .page .layout[data-reading-quadro='true'] .columnHeading .resumeDraft { display: inline-flex; }
 }
 
-.editor [data-lume-editor-surface="toolbar"] { flex-wrap: nowrap; overflow-x: auto; gap: 4px; scrollbar-width: thin; }
+.editor [data-lume-editor-surface="toolbar"] { flex-wrap: wrap; gap: 4px; }
 .editor [data-lume-editor-surface="toolbar"] > * { flex: none; }
 .editor [data-lume-editor-surface="toolbar"] > div { margin-left: 0; gap: 4px; }
 .embedded .actions { position: fixed; left: var(--twin-rail, 192px); right: 12px; bottom: 12px; margin: 0; border-radius: 0 0 16px 16px; }
