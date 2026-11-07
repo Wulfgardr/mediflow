@@ -1,6 +1,6 @@
 /* WUL-676: scoped composition for the runtime-twin writing sheet. */
 .page {
-    container-type: inline-size;
+    container: entry-page / inline-size;
     box-sizing: border-box;
     width: 100%;
     max-width: 1400px;
@@ -41,7 +41,7 @@
 .form { min-width: 0; padding: 24px; }
 .metadata {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(215px, 1.35fr);
+    grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(215px, 1.35fr);
     gap: 14px;
     padding-bottom: 22px;
 }
@@ -187,6 +187,7 @@
 
 .layout { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 32px; align-items: start; }
 .quadro, .writingColumn { min-width: 0; }
+.writingColumn { container-type: inline-size; }
 .quadro :global(time) { white-space: nowrap; }
 .columnHeading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
 .columnHeading h2 { margin: 0; color: var(--lume-ink); font: var(--type-section); text-transform: uppercase; letter-spacing: .05em; }
@@ -195,7 +196,7 @@
 .previousEntries { margin-top: 28px; color: var(--lume-ink-muted); }
 .previousEntries h2 { margin: 0 0 12px; font: var(--type-section); text-transform: uppercase; letter-spacing: .05em; }
 .previousEntries p { font: var(--type-prose); white-space: pre-wrap; overflow-wrap: anywhere; }
-@container (max-width: 1000px) {
+@container entry-page (max-width: 1000px) {
     .layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
     .writingColumn { grid-row: 1; }
     .quadro { grid-row: 2; }
@@ -213,4 +214,9 @@
  .embedded .form { padding: 12px; }
  .embedded .metadata { gap: 8px; padding-bottom: 12px; }
  .embedded .actions { left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom)); padding: 12px 16px; border-radius: 0; }
+}
+
+@container (max-width: 600px) {
+    .metadata { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .metadataField:last-child { grid-column: 1 / -1; }
 }

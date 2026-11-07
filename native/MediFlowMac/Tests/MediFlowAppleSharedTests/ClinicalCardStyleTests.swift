@@ -181,7 +181,7 @@ final class ClinicalCardStyleTests: XCTestCase {
         XCTAssertTrue(source.contains(".frame(width: usesDiaryMargin ? 84 : nil"))
         XCTAssertTrue(source.contains("Text(setting).font(.caption).foregroundStyle(.secondary)"))
         XCTAssertTrue(source.contains("Text(type.title).inkRegister(weight: .semibold)"))
-        XCTAssertTrue(source.contains("Label(\"Registrata\", systemImage: \"circle.fill\")"))
+        XCTAssertTrue(source.contains("Label(PairedPatientsWorkspaceSupport.diaryRegistration(recordedBy: entry.recordedBy, createdAt: entry.createdAt), systemImage: \"circle.fill\")"))
         XCTAssertTrue(source.contains(".frame(minWidth: 0, maxWidth: proseWidth, alignment: .leading)"))
     }
 
@@ -248,6 +248,29 @@ final class ClinicalCardStyleTests: XCTestCase {
             rgb: Array(pixels[center..<(center + 3)]),
             alpha: pixels[center + 3]
         )
+    }
+
+    func testAllPatientHeadersKeepAllergyOutsideDisclosure() throws {
+        let source = try appleSource("AppleFoundation/PairedPatientsWorkspaceView.swift")
+        for name in ["compactHeightPatientNavigation", "mobileWidePatientHeader", "patientWorkspaceHeader", "compactPatientHeader"] {
+            let start = try XCTUnwrap(source.range(of: "private func \(name)("))
+            let tail = source[start.upperBound...]
+            let end = tail.range(of: "\n    private ")?.lowerBound ?? tail.endIndex
+            let body = String(tail[..<end])
+            XCTAssertTrue(body.contains("patientAllergyStatus(detail)"), name)
+            if name == "compactPatientHeader" {
+                XCTAssertLessThan(try XCTUnwrap(body.range(of: "patientAllergyStatus(detail)")).lowerBound,
+                                  try XCTUnwrap(body.range(of: "DisclosureGroup(")).lowerBound)
+            }
+        }
+        XCTAssertTrue(source.contains("model.isPatientFieldLocked(.allergies) || result.isUnreadable"))
+        XCTAssertTrue(source.contains("Allergie non disponibili"))
+    }
+
+    func testClosedDiaryComposerOccupiesNoLayoutSpace() throws {
+        let source = try appleSource("AppleFoundation/PairedPatientDiarySection.swift")
+        XCTAssertTrue(source.contains("if isCreatingEntry || model.isEditingEntry || model.isWorking {\n                PairedDiaryComposerView("))
+        XCTAssertFalse(source.contains("\n            Divider()\n\n            if model.entries.isEmpty"))
     }
 
     /// Ogni raggio delle viste Apple viene dalla scala di `LumeGeometry`

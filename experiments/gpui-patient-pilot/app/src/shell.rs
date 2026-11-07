@@ -4439,7 +4439,9 @@ impl ClinicalApp {
                     .child(if entry.locked_fields.iter().any(|field| field == "content") {
                         self.unreadable_field("clinical-workspace-entry-unreadable", cx).into_any_element()
                     } else { clinical_text::render(&entry.content, WritingInk::Dry, theme) })
-                    .child(writing_status(format!("clinical-workspace-entry-status-{id}"), WritingInk::Dry, WritingSurface::Plane, theme))
+                    .child(div().id(SharedString::from(format!("clinical-workspace-entry-status-{id}"))).role(Role::Status).aria_label(SharedString::from(diary_registration(entry.recorded_by.as_deref(), entry.created_at.as_deref(), &chrono::Local))).flex().flex_wrap().gap(px(6.)).type_role(theme, crate::theme::TextRole::Meta).text_color(theme.ink)
+                        .child(crate::components::writing_dot(WritingInk::Dry, WritingSurface::Plane, theme))
+                        .child(text!(diary_registration(entry.recorded_by.as_deref(), entry.created_at.as_deref(), &chrono::Local))))
                     .child(button(format!("clinical-workspace-edit-entry-{id}"), "Modifica voce", theme, false, editable)
                         .when(editable, |el| el.on_click(cx.listener(move |this, _, _, cx| this.edit_record(editing::Kind::Entry, &edit_id, cx)))))
                     .when(!unavailable, |el| el.child(div().flex().child(button(format!("clinical-workspace-copy-entry-{id}"), "Copia voce", theme, false, true)
@@ -9024,4 +9026,61 @@ fn entry_time(date: &str) -> String {
     chrono::DateTime::parse_from_rfc3339(date)
         .map(|date| date.format("%H:%M").to_string())
         .unwrap_or_default()
+}
+
+fn diary_registration<T: chrono::TimeZone>(
+    author: Option<&str>,
+    created_at: Option<&str>,
+    zone: &T,
+) -> String {
+    let mut text = "Registrata".to_string();
+    if let Some(author) = author.map(str::trim).filter(|name| !name.is_empty()) {
+        text.push_str(&format!(" da {author}"));
+    }
+    if let Some(date) =
+        created_at.and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+    {
+        use chrono::Datelike;
+        let date = date.with_timezone(zone).naive_local();
+        let months = [
+            "gennaio",
+            "febbraio",
+            "marzo",
+            "aprile",
+            "maggio",
+            "giugno",
+            "luglio",
+            "agosto",
+            "settembre",
+            "ottobre",
+            "novembre",
+            "dicembre",
+        ];
+        text.push_str(&format!(
+            " il {} {} {} alle {}",
+            date.format("%d"),
+            months[date.month0() as usize],
+            date.format("%Y"),
+            date.format("%H:%M")
+        ));
+    }
+    text
+}
+
+#[test]
+fn diary_registration_uses_only_reported_author_and_registration_time() {
+    let zone = chrono::FixedOffset::east_opt(3600).unwrap();
+    for (author, expected) in [
+        (Some(" Ada Sintetica "), "Registrata da Ada Sintetica"),
+        (None, "Registrata"),
+        (Some(" "), "Registrata"),
+    ] {
+        assert_eq!(
+            diary_registration(author, Some("2026-11-07T09:05:00Z"), &zone),
+            format!("{expected} il 07 novembre 2026 alle 10:05")
+        );
+        for date in [None, Some("invalid")] {
+            assert_eq!(diary_registration(author, date, &zone), expected);
+        }
+    }
 }

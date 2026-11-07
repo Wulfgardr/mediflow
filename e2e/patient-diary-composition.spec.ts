@@ -203,3 +203,35 @@ test('registrazione del diario: autore server, orario di creazione e storico sen
     await expect(row.locator('[data-ink="dry"]')).toHaveText(`Registrata ${fixture.timestamp}`);
     await expect(row.locator('[data-ink="dry"]')).not.toContainText('Nome storico dichiarato');
 });
+
+test('Luogo mostra entrambe le etichette intere nella scheda a 1440 e 390', async ({ page, baseURL }) => {
+    if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || !['127.0.0.1', 'localhost'].includes(new URL(baseURL).hostname) || new URL(baseURL).port === '3000') throw new Error('Runtime e archivio sintetici isolati richiesti');
+    page.on('dialog', dialog => dialog.type() === 'beforeunload' ? dialog.accept() : dialog.dismiss());
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const patientId = await page.evaluate(async () => {
+        const response = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Luogo', lastName: 'Sintetico', taxCode: crypto.randomUUID(), birthDate: '1980-01-01', diagnoses: [] }) });
+        if (!response.ok) throw new Error(String(response.status));
+        return (await response.json()).id as string;
+    });
+    for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 960 });
+        await page.goto(`/patients/${patientId}/modules?voce=nuova`);
+        const select = page.getByRole('combobox', { name: 'Luogo della voce clinica' });
+        await expect(select).toBeVisible();
+        await page.evaluate(() => document.fonts.ready);
+        for (const setting of ['ambulatory', 'home']) {
+            await select.selectOption(setting);
+            const geometry = await select.evaluate(element => {
+                const field = element as HTMLSelectElement;
+                const style = getComputedStyle(field);
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d')!;
+                context.font = style.font;
+                const box = field.getBoundingClientRect();
+                return { needed: context.measureText(field.selectedOptions[0].text).width + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + 24, width: field.clientWidth, right: box.right, viewport: innerWidth };
+            });
+            expect(geometry.width).toBeGreaterThanOrEqual(Math.ceil(geometry.needed));
+            expect(geometry.right).toBeLessThanOrEqual(geometry.viewport);
+        }
+    }
+});
