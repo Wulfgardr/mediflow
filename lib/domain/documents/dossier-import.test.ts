@@ -423,3 +423,30 @@ test('clinical abbreviations do not detach an ICD diagnosis from its family subj
     const own = candidates('Madre deceduta per ca. mammella. Diagnosi: ICD-10 E11 diabete');
     assert.deepEqual(own.filter((f) => f.kind === 'diagnosis').map((f) => f.values.code), ['E11']);
 });
+
+test('patient names are read only from a labelled line, as capitalised words', async () => {
+    const { collectDossierPatientNames, evaluateDossierGroupIdentity } = await import('./dossier-import');
+    assert.deepEqual(collectDossierPatientNames([
+        'Paziente: **Mario Rossi**, codice fiscale RSSMRA80A01F205X',
+        'Cognome e nome: ROSSI MARIO nato il 01/01/1980',
+        'Assistita: Nicolò D’Amico',
+        'Paziente: vigile, collaborante, orientato',
+        'Paziente: Collaborante e vigile',
+        'PAZIENTE: VIGILE E COLLABORANTE',
+        'Paziente: Vigile Collaborante',
+        'PAZIENTE: ALLETTATO, NON DEAMBULANTE',
+        'Assistito: Anziano Fragile',
+        'Il paziente: riferisce dolore',
+        'Ricoverato il paziente Mario Rossi',
+    ].join('\n')), [['mario', 'rossi'], ['rossi', 'mario'], ['nicolo', 'd', 'amico']]);
+    const linked = [{ id: 'p', taxCode: '', firstName: 'Nicolò', lastName: "D'Amico" }];
+    assert.equal(evaluateDossierGroupIdentity([{ taxCodes: [], patientNames: [['nicolo', 'd', 'amico']] }], linked, 'p').status, 'no_document_cf');
+    assert.equal(evaluateDossierGroupIdentity([{ taxCodes: [], patientNames: [['mario', 'rossi']] }], linked, 'p').status, 'discordant_name');
+    // Prescrizione con due riquadri «Cognome e nome» (assistita e prescrittore), come nei moduli di protesica reali.
+    const twoBoxes = collectDossierPatientNames('COGNOME E NOME: D’AMICO NICOLÒ          DATA DI NASCITA:\nCOGNOME E NOME: BIANCHI LUCA          CODICE FISCALE: BN');
+    assert.deepEqual(twoBoxes, [['d', 'amico', 'nicolo'], ['bianchi', 'luca']]);
+    assert.equal(evaluateDossierGroupIdentity([{ taxCodes: [], patientNames: twoBoxes }], linked, 'p').blocking, false);
+    assert.equal(evaluateDossierGroupIdentity([{ taxCodes: [], patientNames: twoBoxes }, { taxCodes: [], patientNames: [['mario', 'rossi']] }], linked, 'p').status, 'discordant_name');
+    // Un'anagrafica senza nome completo non permette il confronto: resta la conferma.
+    assert.equal(evaluateDossierGroupIdentity([{ taxCodes: [], patientNames: [['mario', 'rossi']] }], [{ id: 'p', taxCode: '', lastName: 'D’Amico' }], 'p').blocking, false);
+});
