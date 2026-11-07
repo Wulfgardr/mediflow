@@ -359,7 +359,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
             /* WUL-676: successful programmatic navigation is not
                intercepted by the workspace's link guard. */
             await localDraft.clear().catch(() => showToast({ tone: 'warning', title: 'Voce registrata', description: 'La copia della bozza non è stata rimossa. Non registrarla di nuovo.' }));
-            router.push(`/patients/${id}/modules`);
+            router.push(`/patients/${id}/modules${embedded ? '#diario' : ''}`);
         } catch (error) {
             if (error instanceof AttachmentCollectionChangedError) {
                 attachmentsRead.refresh();
