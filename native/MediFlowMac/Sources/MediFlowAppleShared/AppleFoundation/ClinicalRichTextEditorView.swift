@@ -5,6 +5,7 @@ import MediFlowCore
 struct ClinicalRichTextEditorView: View {
     @Binding var document: ClinicalRichTextEditorDocument
     let accessibilityPrefix: String
+    var minimumTextHeight: CGFloat = 44
     @StateObject private var inlineEditor = ClinicalInlineEditorController()
 
     var body: some View {
@@ -87,9 +88,10 @@ struct ClinicalRichTextEditorView: View {
             }
             ClinicalInlineTextView(
                 document: $document, blockID: block.id, controller: inlineEditor,
-                identifier: "\(accessibilityPrefix)-text-\(block.id.uuidString)"
+                identifier: "\(accessibilityPrefix)-text-\(block.id.uuidString)",
+                minimumHeight: block.id == document.blocks.first?.id ? minimumTextHeight : 44
             )
-            .frame(minHeight: 44)
+            .frame(minHeight: block.id == document.blocks.first?.id ? minimumTextHeight : 44)
         }
         .padding(10)
         .padding(.leading, CGFloat(min(block.containers.filter {

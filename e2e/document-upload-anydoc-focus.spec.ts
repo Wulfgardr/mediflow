@@ -51,6 +51,7 @@ async function createExtractableRtf(page: Page, patientId: string): Promise<Read
   await openDocumentArchive(page, patientId);
   const saved = page.waitForResponse((response) => response.request().method() === 'POST'
     && new URL(response.url()).pathname === '/api/attachments');
+  await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
   await page.locator('#documenti input[type="file"]').setInputFiles({
     name, mimeType: 'application/rtf', buffer: Buffer.from(`{\\rtf1\\ansi ${SYNTHETIC_RTF_TEXT}}`),
   });

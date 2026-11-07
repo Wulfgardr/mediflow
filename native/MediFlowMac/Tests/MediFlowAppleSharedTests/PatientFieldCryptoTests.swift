@@ -9,15 +9,42 @@ final class PatientFieldCryptoTests: XCTestCase {
 
     private var key: SymmetricKey { SymmetricKey(data: Data(base64Encoded: rawKeyB64)!) }
 
-    private func detail(address: String?, diagnoses: String?, notes: String?, archiveReason: String? = nil, archiveNote: String? = nil) -> HomeBasePatientDetail {
+    private func detail(address: String?, diagnoses: String?, notes: String?, archiveReason: String? = nil, archiveNote: String? = nil, allergies: String? = nil) -> HomeBasePatientDetail {
         HomeBasePatientDetail(
             id: "p1", firstName: "Mario", lastName: "Rossi", birthDate: nil, taxCode: "RSSMRA",
             address: address, phone: nil, caregiver: nil, exemptions: nil, diagnoses: diagnoses,
             monitoringProfile: nil, statusReason: nil, notes: notes, aiSummary: nil,
             documentInsights: nil, isAdi: false, isArchived: false, version: 1,
             ambulatoryId: "AMB-1", createdAt: nil, updatedAt: nil,
-            archiveReason: archiveReason, archiveNote: archiveNote
+            archiveReason: archiveReason, archiveNote: archiveNote, allergies: allergies
         )
+    }
+
+    func testAllergiesDecodeFromOptionalPatientDTOAndDecryptAsStructuredData() throws {
+        let json = #"[{"substance":"Amoxicillina","reaction":"Orticaria","severity":"moderate"}]"#
+        let encrypted = try XCTUnwrap(CryptoService.encryptField(json, masterKey: key))
+        let raw = detail(address: nil, diagnoses: nil, notes: "Nessuna deduzione dalle note", allergies: encrypted)
+        let wire = try JSONEncoder().encode(raw)
+        let decoded = try JSONDecoder().decode(HomeBasePatientDetail.self, from: wire)
+        XCTAssertEqual(decoded.allergies, encrypted)
+        XCTAssertEqual(PatientFieldCrypto.decryptDetail(decoded, masterKey: key).allergies, json)
+        XCTAssertEqual(PatientAllergiesCodec.decodeResult(json).values?.map(\.substance), ["Amoxicillina"])
+        for unavailableKey in [nil, SymmetricKey(data: Data(repeating: 9, count: 32))] {
+            XCTAssertNil(PatientFieldCrypto.decryptDetail(decoded, masterKey: unavailableKey).allergies)
+            XCTAssertTrue(PatientFieldCrypto.isLocked(decoded.allergies, masterKey: unavailableKey))
+        }
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: wire) as? [String: Any])
+        legacy.removeValue(forKey: "allergies")
+        XCTAssertNil(try JSONDecoder().decode(HomeBasePatientDetail.self, from: JSONSerialization.data(withJSONObject: legacy)).allergies)
+    }
+
+    func testAllergiesDistinguishMissingAndUnreadableWithoutParsingNotes() {
+        XCTAssertEqual(PatientAllergiesCodec.decodeResult(nil), .absent)
+        XCTAssertEqual(PatientAllergiesCodec.decodeResult("[]"), .absent)
+        for invalid in ["Allergia nelle note", "ENC:corrupt:value", "{}", #"[{"reaction":"Orticaria"}]"#,
+                        #"[{"substance":" "}]"#, #"[{"substance":"Amoxicillina","severity":"unknown"}]"#] {
+            XCTAssertEqual(PatientAllergiesCodec.decodeResult(invalid), .unreadable)
+        }
     }
 
     func testArchiveDetailDecryptsJSONStringFieldsAndHidesUnreadableValues() throws {

@@ -31,6 +31,7 @@ async function fixture(page: Page, bytes = RTF, extension = 'rtf') {
   await openArchive(page, url);
   const saved = page.waitForResponse((response) => response.request().method() === 'POST'
     && new URL(response.url()).pathname === '/api/attachments');
+  await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
   await page.locator('#documenti input[type="file"]').setInputFiles({ name, mimeType: type, buffer: bytes });
   const response = await saved;
   expect(response.status()).toBe(201);
@@ -182,6 +183,7 @@ test('OCR recovery UI: deleting a pending attachment releases the other extracti
   const file = await fixture(page);
   const saved = page.waitForResponse((response) => response.request().method() === 'POST'
     && new URL(response.url()).pathname === '/api/attachments');
+  await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
   await page.locator('#documenti input[type="file"]').setInputFiles({ name: 'synthetic-second.rtf', mimeType: 'application/rtf', buffer: RTF });
   const response = await saved;
   expect(response.ok()).toBe(true);

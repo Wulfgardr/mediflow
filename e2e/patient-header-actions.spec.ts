@@ -26,7 +26,7 @@ for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test
    expect(await control.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})).toBe(true);
   }
  };
- await expect(header.getByRole('link',{name:'Nuova voce',exact:true})).toHaveAttribute('href',`/patients/${id}/entries/new`);
+ await expect(header.getByRole('link',{name:'Nuova voce',exact:true})).toHaveAttribute('href',`/patients/${id}/modules?voce=nuova`);
  await expect(header.locator('a:visible,button:visible,summary:visible')).toHaveCount(2);
  const trigger=header.getByRole('button',{name:'Azioni',exact:true});
  await trigger.focus();await page.keyboard.press('ArrowDown');

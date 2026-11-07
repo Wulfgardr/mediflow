@@ -8,14 +8,15 @@ import { ViewState } from '@/components/ui/view-state';
 import Link from 'next/link';
 import { differenceInYears } from 'date-fns';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, ChevronRight, Pill, Plus } from 'lucide-react';
+import { Activity, ArrowLeft, ChevronRight, Pill, Plus } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/patient-clinical-support';
 import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
+import { PatientEntryComposer } from '@/components/patient-entry-composer';
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
@@ -82,6 +83,7 @@ function navigateToObservationForm(): void {
 export default function PatientDetailPage() {
     const { proposal } = useRuntimeTwinDesign();
     const params = useParams();
+    const writing = useSearchParams().get('voce') === 'nuova';
     const id = params.id as string;
     const [smartImportProposalCapture, setSmartImportProposalCapture] = useState<PatientSmartImportProjectionCaptureInput | null>(null);
     const [insightProposalKey, setInsightProposalKey] = useState<string | null>(null);
@@ -104,7 +106,7 @@ export default function PatientDetailPage() {
     const confirm = useConfirm();
     const { showToast } = useToast();
 
-    const { data: patient, loading: patientLoading, error: patientError } = useLiveQueryState(() => db.patients.get(id), [id], undefined, ['patients']);
+    const { data: patient, loading: patientLoading, error: patientError, refresh: refreshPatient } = useLiveQueryState(() => db.patients.get(id), [id], undefined, ['patients']);
     const entries = useLiveQuery(
         async () => {
             const items = await db.entries.query({ patientId: id, includeDeleted: true }).toArray();
@@ -312,7 +314,7 @@ export default function PatientDetailPage() {
                 backHref="/?area=incarico"
                 backLabel="Pazienti"
             >
-                <div className={workspaceStyles.loadingCard} role={patientError ? 'alert' : 'status'}>{patientError ? 'Impossibile leggere la scheda paziente.' : 'Caricamento scheda paziente...'}</div>
+                <ViewState state={patientError ? 'error' : 'loading'} title={patientError ? 'Impossibile leggere la scheda paziente.' : 'Caricamento scheda paziente…'} action={patientError ? { label: 'Riprova', onClick: refreshPatient } : undefined} />
             </Kree8WorkspaceShell>
         );
     }
@@ -577,6 +579,7 @@ export default function PatientDetailPage() {
     return (
         <Kree8WorkspaceShell
             variant="clinical"
+            writing={writing}
             eyebrow="Scheda clinica"
             title={`${patient.lastName} ${patient.firstName}`}
             subtitle=""
@@ -595,16 +598,19 @@ export default function PatientDetailPage() {
                 identifierLabel: patientIdentifierLabel(patient.taxCode, patient.identifierType),
             }}
             navGroups={workspaceNavGroups}
-            primaryAction={{ href: `/patients/${id}/entries/new`, label: 'Nuova voce', icon: Plus }}
+            primaryAction={writing ? undefined : { href: `/patients/${id}/modules?voce=nuova`, label: 'Nuova voce', icon: Plus }}
             headerActions={(
-                <PatientHeaderActions key={`${patient.id}:${patient.ambulatoryId ?? ''}`}
+                <>
+                {writing ? <Link href={`/patients/${id}/modules`} className="mf-button-secondary" aria-label="Torna alla scheda" title="Torna alla scheda"><ArrowLeft size={16} aria-hidden="true" /><span>Torna alla scheda</span></Link> : null}
+                {!writing ? <PatientHeaderActions key={`${patient.id}:${patient.ambulatoryId ?? ''}`}
                     patientId={patient.id} ambulatoryId={patient.ambulatoryId ?? null} checkups={checkups ?? []}
                     editHref={`/patients/${id}/edit`}
                     canShareFhirFile={canShareFhirFile}
                     onExportFhir={() => setIsExportModalOpen(true)}
                     onShareFhir={handleShareFhir}
                     onReportPdf={handleReportPdf}
-                />
+                /> : null}
+                </>
             )}
         >
             <div className={workspaceStyles.clinicalStack}>
@@ -704,7 +710,7 @@ export default function PatientDetailPage() {
                     <ClinicalRiverTimeline entries={nonScaleEntries} checkups={checkups ?? []} documentInsights={documentInsights} />
                 </CollapsibleSection>
 
-                <Timeline entries={timelineEntries} patientDiary section={{
+                <Timeline entries={timelineEntries} patientDiary composer={writing ? <PatientEntryComposer key={id} embedded /> : undefined} section={{
                     id: 'diario',
                     kicker: 'Diario',
                     title: 'Diario clinico',

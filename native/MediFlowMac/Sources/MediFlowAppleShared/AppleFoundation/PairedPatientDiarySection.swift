@@ -2,11 +2,22 @@ import SwiftUI
 
 struct PairedPatientDiarySection: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @ScaledMetric(relativeTo: .body) private var proseWidth: CGFloat = 480
+
+    private var usesDiaryMargin: Bool {
+        #if os(macOS)
+        !dynamicTypeSize.isAccessibilitySize
+        #else
+        horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
+        #endif
+    }
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @ObservedObject var capabilities: ClinicalWorkspaceCapabilitiesStore
     @Binding var entryTypeFilter: EntryTypeFilter
     @Binding var showsDeletedDiaryEntries: Bool
     @Binding var confirmsReplacingEntryTemplate: Bool
+    @Binding var isCreatingEntry: Bool
     @Binding var entryDeletionCandidate: HomeBaseEntrySummary?
     @Binding var presentingScale: ClinicalScaleDraft?
     @Binding var attachmentDetailCandidate: HomeBaseAttachmentSummary?
@@ -153,7 +164,8 @@ struct PairedPatientDiarySection: View {
             PairedDiaryComposerView(
                 model: model,
                 capabilities: capabilities,
-                confirmsReplacingEntryTemplate: $confirmsReplacingEntryTemplate
+                confirmsReplacingEntryTemplate: $confirmsReplacingEntryTemplate,
+                isCreatingEntry: $isCreatingEntry
             )
 
             Divider()
@@ -169,21 +181,12 @@ struct PairedPatientDiarySection: View {
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(filteredDiaryEntries) { entry in
-                    VStack(alignment: .leading, spacing: 8) {
-                        /* give chronology its own line, preserving the native Registro. */
-                        #if os(iOS)
-                        // A full year and named month make chronology readable.
-                        Text(ClinicalDatePresentation.timestamp.string(from: entry.date))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("entry-date-\(entry.id)")
-                        #else
-                        Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: entry.date))
-                            .font(.subheadline.weight(.medium))
-                            .registro()
-                            .fixedSize(horizontal: false, vertical: true)
-                        #endif
+                    let rowLayout = usesDiaryMargin
+                        ? AnyLayout(HStackLayout(alignment: .top, spacing: 16))
+                        : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                    rowLayout {
+                        entryChronology(entry)
+                        VStack(alignment: .leading, spacing: 8) {
                         VStack(alignment: .leading, spacing: 6) {
                             if entry.lockedFields.contains(.title) {
                                 Label("Titolo non leggibile", systemImage: "lock")
@@ -200,7 +203,10 @@ struct PairedPatientDiarySection: View {
                                 : AnyLayout(HStackLayout(spacing: 8))
                             metadataLayout {
                                 if let type = PairedDiaryEntryType(rawValue: entry.type) {
-                                    PairedPatientFlagChip(type.title, tone: .info)
+                                    Text(type.title).inkRegister(weight: .semibold)
+                                }
+                                if let setting = entry.setting?.trimmingCharacters(in: .whitespacesAndNewlines), !setting.isEmpty {
+                                    Text(setting).font(.caption).foregroundStyle(.secondary)
                                 }
                                 if entry.deletedAt != nil {
                                     PairedPatientFlagChip("Eliminata", tone: .attention)
@@ -217,8 +223,12 @@ struct PairedPatientDiarySection: View {
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("entry-content-locked-\(entry.id)")
                         } else {
-                            ClinicalContentText(entry.content, foregroundStyle: entry.deletedAt == nil ? .primary : .secondary)
-                                .chartProse()
+                            ClinicalContentText(entry.content, foregroundStyle: entry.deletedAt == nil && !isCreatingEntry ? .primary : .secondary)
+                                .inkVoice(17, relativeTo: .body)
+                                .lineSpacing(5)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(minWidth: 0, maxWidth: proseWidth, alignment: .leading)
+                                .accessibilityIdentifier("entry-prose-\(entry.id)")
                         }
                         // S7 (D4): resolves the entry's referenced attachment ids
                         // against the loaded patient attachment list (S6), same
@@ -243,6 +253,14 @@ struct PairedPatientDiarySection: View {
                             }
                             .accessibilityIdentifier("entry-row-attachments-\(entry.id)")
                         }
+                        HStack(spacing: 6) {
+                            Label("Registrata", systemImage: "circle.fill")
+                            if let registeredAt = entry.createdAt { Text(registeredAt, style: .time) }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(PlatformColors.ink)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("entry-registration-\(entry.id)")
                         if let deletedAt = entry.deletedAt {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Eliminata il \(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: deletedAt))")
@@ -288,26 +306,21 @@ struct PairedPatientDiarySection: View {
                                 .accessibilityIdentifier("homebase-delete-entry-button-\(entry.id)")
                             }
                         }
+                        }
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                     }
                         #if os(iOS)
                         // Each dated entry is a readable document block.
                         .padding(.vertical, 20)
-                        .padding(.horizontal, 16)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .overlay(alignment: .bottom) { Divider() }
-                        .padding(.leading, 14)
                         #else
                         .padding(.vertical, 10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .modifier(LumeRigaListaModifier(isSelected: false))
                         .overlay(alignment: .bottom) { Divider() }
-                        // The leading inset goes *outside* the row surface, so the
-                        // Filo runs in a clear channel beside the entries. Inside
-                        // it, the row background painted across the thread and
-                        // left it showing only in the gaps — a continuous
-                        // connector rendered as a column of stubs.
-                        .padding(.leading, 14)
                         #endif
+                        .accessibilityElement(children: .contain)
                         .accessibilityIdentifier("entry-row-\(entry.id)")
                     }
                 }
@@ -316,6 +329,18 @@ struct PairedPatientDiarySection: View {
         }
     }
 
+
+    private func entryChronology(_ entry: HomeBaseEntrySummary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(entry.date, format: .dateTime.day().month(.abbreviated).year())
+            Text(entry.date, format: .dateTime.hour().minute())
+        }
+        .font(.caption)
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .frame(width: usesDiaryMargin ? 84 : nil, alignment: .leading)
+        .accessibilityIdentifier("entry-date-\(entry.id)")
+    }
 
     private var filteredDiaryEntries: [HomeBaseEntrySummary] {
         EntryFiltering.apply(
