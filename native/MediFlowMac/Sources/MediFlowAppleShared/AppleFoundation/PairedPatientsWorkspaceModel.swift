@@ -2593,6 +2593,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         case .null: birthDate = nil
         case .value(let value): birthDate = value
         }
+        let allergies: String?
+        if case let .locked(ciphertext)? = editablePatientFields[.allergies] {
+            allergies = ciphertext
+        } else {
+            allergies = current.allergies
+        }
         return HomeBasePatientDetail(
             id: current.id,
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -2619,7 +2625,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             archiveNote: editPatientIsArchived ? editPatientArchiveNote.trimmedOrNil : nil,
             identifierType: editPatientIdentifierType, birthDatePrecision: editPatientBirthPrecision,
             birthYear: editPatientBirthPrecision == "estimated" ? Int(editPatientBirthYear) : nil,
-            allergies: current.allergies
+            allergies: allergies
         )
     }
     #endif

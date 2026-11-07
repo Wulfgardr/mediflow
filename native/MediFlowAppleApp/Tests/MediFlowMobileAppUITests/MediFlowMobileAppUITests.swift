@@ -1217,10 +1217,23 @@ final class MediFlowMobileAppUITests: XCTestCase {
                 XCTAssertFalse(pill.exists)
                 XCTAssertEqual(unavailable.exists, state == "locked")
             }
+
+            app.buttons["edit-patient-button"].tap()
+            let address = app.textFields["edit-patient-address"]
+            XCTAssertTrue(address.waitForExistence(timeout: 5))
+            address.tap()
+            address.typeText(" - prova sintetica")
+            app.buttons["save-patient-button"].tap()
+            XCTAssertTrue(address.waitForNonExistence(timeout: 10))
+            XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
+            XCTAssertEqual(pill.exists, state == "recorded")
+            XCTAssertEqual(unavailable.exists, state == "locked")
         }
     }
 
     func testAccessibilityAuditCoversWorklistAndAgenda() throws {
+        continueAfterFailure = true
+        defer { continueAfterFailure = false }
         // Let XCTest vary Dynamic Type during the accessibility audit. The
         // debug AX5 override belongs to the dedicated layout tests; here it
         // would make the audit's Dynamic Type result non-probative.
@@ -1243,6 +1256,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let ambulatoryScopePicker = app.buttons["ambulatory-scope-picker"]
         XCTAssertTrue(ambulatoryScopePicker.waitForExistence(timeout: 5))
         XCTAssertTrue(ambulatoryScopePicker.isHittable)
+        attachScreenshot(named: "audit-worklist")
         try app.performAccessibilityAudit()
 
         app.terminate()
