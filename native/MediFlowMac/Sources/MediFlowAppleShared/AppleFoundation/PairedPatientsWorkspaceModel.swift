@@ -152,9 +152,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editPatientFirstName = ""
     @Published var editPatientLastName = ""
     @Published var editPatientTaxCode = ""
+    @Published var editPatientIdentifierType = "cf"
+    @Published var editPatientHasEstimatedBirthYear = false
+    @Published var editPatientBirthYear = ""
     /* the wire day is Gregorian UTC, matching the web date-only editor. */
     @Published var editPatientBirthDate: Date?
-    private var editingPatientBaseline: (id: String, version: Int, birthDate: Date?)?
+    private var editingPatientBaseline: (id: String, version: Int, birthDate: Date?, identifierType: String, taxCode: String, birthDatePrecision: String, birthYear: Int?)?
     private var patientEditGeneration = UUID()
     static var patientBirthDateCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -205,6 +208,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var newPatientFirstName = ""
     @Published var newPatientLastName = ""
     @Published var newPatientTaxCode = ""
+    @Published var newPatientIdentifierType = "cf"
+    @Published var newPatientHasEstimatedBirthYear = false
+    @Published var newPatientBirthYear = ""
     @Published var newPatientHasBirthDate = false
     @Published var newPatientBirthDate = Date()
     @Published var newPatientAddress = ""
@@ -1017,6 +1023,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editPatientFirstName = ""
         editPatientLastName = ""
         editPatientTaxCode = ""
+        editPatientIdentifierType = "cf"
+        editPatientHasEstimatedBirthYear = false
+        editPatientBirthYear = ""
         editPatientAddress = ""
         editPatientPhone = ""
         editPatientCaregiver = ""
@@ -1032,6 +1041,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         newPatientFirstName = ""
         newPatientLastName = ""
         newPatientTaxCode = ""
+        newPatientIdentifierType = "cf"
+        newPatientHasEstimatedBirthYear = false
+        newPatientBirthYear = ""
         newPatientHasBirthDate = false
         newPatientBirthDate = Date()
         newPatientAddress = ""
@@ -1860,7 +1872,41 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         canStartCreatingPatient
         && !newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         && !newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        && !newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && newPatientIdentityError == nil
+    }
+
+    var newPatientBirthPrecision: String {
+        newPatientHasEstimatedBirthYear ? "estimated" : newPatientHasBirthDate ? "exact" : "unknown"
+    }
+
+    var newPatientIdentityError: String? {
+        PatientIdentityForm.identifierError(type: newPatientIdentifierType, value: newPatientTaxCode)
+            ?? PatientIdentityForm.birthError(type: newPatientIdentifierType, precision: newPatientBirthPrecision,
+                date: newPatientHasBirthDate ? newPatientBirthDate : nil, year: newPatientBirthYear)
+    }
+
+    var editPatientBirthPrecision: String {
+        editPatientHasEstimatedBirthYear ? "estimated" : editPatientBirthDate != nil ? "exact" : "unknown"
+    }
+
+    private var patientIdentifierChanged: Bool {
+        guard let baseline = editingPatientBaseline else { return false }
+        return editPatientIdentifierType != baseline.identifierType || editPatientTaxCode != baseline.taxCode
+    }
+
+    private var patientBirthChanged: Bool {
+        guard let baseline = editingPatientBaseline else { return false }
+        return editPatientBirthPrecision != baseline.birthDatePrecision
+            || (editPatientBirthPrecision == "estimated" && editPatientBirthYear != (baseline.birthYear.map(String.init) ?? ""))
+            || (editPatientBirthPrecision == "exact" && { if case .omit = patientBirthDatePatch { return false }; return true }())
+    }
+
+    var editPatientIdentityError: String? {
+        if patientIdentifierChanged,
+           let error = PatientIdentityForm.identifierError(type: editPatientIdentifierType, value: editPatientTaxCode) { return error }
+        guard patientBirthChanged || patientIdentifierChanged else { return nil }
+        return PatientIdentityForm.birthError(type: editPatientIdentifierType, precision: editPatientBirthPrecision,
+            date: editPatientBirthDate, year: editPatientBirthYear)
     }
 
     /* lifecycle and exact manual draft of this create flow only. */
@@ -1870,6 +1916,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         let firstName: String
         let lastName: String
         let taxCode: String
+        let identifierType: String
+        let birthDatePrecision: String
+        let birthYear: String
         let hasBirthDate: Bool
         let birthDate: Date
         let address: String
@@ -1879,7 +1928,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     private var patientCreateDraft: PatientCreateDraft {
         PatientCreateDraft(firstName: newPatientFirstName, lastName: newPatientLastName,
-            taxCode: newPatientTaxCode, hasBirthDate: newPatientHasBirthDate,
+            taxCode: newPatientTaxCode, identifierType: newPatientIdentifierType,
+            birthDatePrecision: newPatientBirthPrecision, birthYear: newPatientBirthYear, hasBirthDate: newPatientHasBirthDate,
             birthDate: newPatientBirthDate, address: newPatientAddress,
             phone: newPatientPhone, caregiver: newPatientCaregiver)
     }
@@ -1890,6 +1940,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         newPatientFirstName = ""
         newPatientLastName = ""
         newPatientTaxCode = ""
+        newPatientIdentifierType = "cf"
+        newPatientHasEstimatedBirthYear = false
+        newPatientBirthYear = ""
         newPatientHasBirthDate = false
         newPatientBirthDate = Date()
         newPatientAddress = ""
@@ -1944,8 +1997,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             let payload = HomeBasePatientCreatePayload(
                 firstName: draft.firstName.trimmingCharacters(in: .whitespacesAndNewlines),
                 lastName: draft.lastName.trimmingCharacters(in: .whitespacesAndNewlines),
-                taxCode: draft.taxCode.trimmingCharacters(in: .whitespacesAndNewlines),
-                birthDate: draft.hasBirthDate ? draft.birthDate : nil,
+                taxCode: PatientIdentityForm.normalized(draft.taxCode, type: draft.identifierType),
+                identifierType: draft.identifierType, birthDatePrecision: draft.birthDatePrecision,
+                birthYear: draft.birthDatePrecision == "estimated" ? Int(draft.birthYear) : nil,
+                birthDate: draft.birthDatePrecision == "exact" ? Self.patientBirthDateCalendar.startOfDay(for: draft.birthDate) : nil,
                 address: try self.sealField(draft.address.trimmedOrNil),
                 phone: try self.sealField(draft.phone.trimmedOrNil),
                 caregiver: try self.sealField(draft.caregiver.trimmedOrNil)
@@ -1983,7 +2038,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         guard let patient = selectedPatient else { return }
         cancelPatientArchive()
         patientEditGeneration = UUID()
-        editingPatientBaseline = (patient.id, patient.version, patient.birthDate)
+        let type = patient.identifierType ?? PatientIdentityForm.inferredType(patient.taxCode)
+        let precision = patient.birthDatePrecision == "estimated" ? "estimated"
+            : patient.birthDate != nil ? "exact" : patient.birthYear != nil ? "estimated" : "unknown"
+        editingPatientBaseline = (patient.id, patient.version, patient.birthDate, type, patient.taxCode, precision, patient.birthYear)
+        editPatientIdentifierType = type
+        editPatientHasEstimatedBirthYear = precision == "estimated"
+        editPatientBirthYear = patient.birthYear.map(String.init) ?? ""
         editPatientBirthDate = patient.birthDate
         editPatientFirstName = patient.firstName
         editPatientLastName = patient.lastName
@@ -2103,7 +2164,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         /* hold the editor's CAS version and reject stale completion. */
         guard let current = selectedPatient, let baseline = editingPatientBaseline,
               baseline.id == current.id, isEditingPatient, !isWorking else { return }
-        if let validation = patientArchiveValidationMessage(isArchived: editPatientIsArchived) {
+        if let validation = editPatientIdentityError ?? patientArchiveValidationMessage(isArchived: editPatientIsArchived) {
             errorMessage = validation
             return
         }
@@ -2135,7 +2196,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             version: baseline.version,
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
             lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
-            taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            taxCode: patientIdentifierChanged ? PatientIdentityForm.normalized(editPatientTaxCode, type: editPatientIdentifierType) : nil,
+            identifierType: patientIdentifierChanged ? editPatientIdentifierType : nil,
+            birthDatePrecision: patientBirthChanged ? editPatientBirthPrecision : nil,
+            birthYear: patientBirthChanged ? (editPatientBirthPrecision == "estimated" ? .value(Int(editPatientBirthYear)!) : .null) : .omit,
             isAdi: editPatientIsAdi,
             isArchived: patientArchiveBaseline?.isArchived == editPatientIsArchived ? nil : editPatientIsArchived,
             address: encryptedPatientPatchValue(editPatientAddress.trimmedOrNil, field: .address, masterKey: masterKey),
@@ -2148,7 +2212,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             exemptions: encryptedPatientPatchValue(
                 ExemptionCodesCodec.encode(editPatientExemptions),
                 field: .exemptions, masterKey: masterKey, structured: true),
-            birthDate: patientBirthDatePatch,
+            birthDate: patientBirthChanged && editPatientBirthPrecision != "exact" ? .null : patientBirthDatePatch,
             archiveReason: archivePatch.reason,
             archiveNote: archivePatch.note
         )
@@ -2501,7 +2565,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     private func editedPatientDetail(from current: HomeBasePatientDetail) -> HomeBasePatientDetail {
         let birthDate: Date? // fixture follows the same nullable patch.
-        switch patientBirthDatePatch {
+        switch editPatientBirthPrecision == "exact" ? patientBirthDatePatch : .null {
         case .omit: birthDate = current.birthDate
         case .null: birthDate = nil
         case .value(let value): birthDate = value
@@ -2511,7 +2575,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
             lastName: editPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines),
             birthDate: birthDate,
-            taxCode: editPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            taxCode: patientIdentifierChanged ? PatientIdentityForm.normalized(editPatientTaxCode, type: editPatientIdentifierType) : current.taxCode,
             address: editPatientAddress.trimmedOrNil,
             phone: editPatientPhone.trimmedOrNil,
             caregiver: editPatientCaregiver.trimmedOrNil,
@@ -2529,7 +2593,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             createdAt: current.createdAt,
             updatedAt: current.updatedAt,
             archiveReason: editPatientIsArchived ? editPatientArchiveReason.trimmedOrNil : nil,
-            archiveNote: editPatientIsArchived ? editPatientArchiveNote.trimmedOrNil : nil
+            archiveNote: editPatientIsArchived ? editPatientArchiveNote.trimmedOrNil : nil,
+            identifierType: editPatientIdentifierType, birthDatePrecision: editPatientBirthPrecision,
+            birthYear: editPatientBirthPrecision == "estimated" ? Int(editPatientBirthYear) : nil
         )
     }
     #endif

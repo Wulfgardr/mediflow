@@ -6,6 +6,198 @@ import XCTest
 final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
     private let masterKey = SymmetricKey(data: Data(repeating: 7, count: 32))
 
+    func testADR0179CreateEmitsDeclaredIdentityAndBirthPrecision() async throws {
+        let source = LifecycleMockDataSource()
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        await MainActor.run {
+            model.startCreatingPatient()
+            model.newPatientFirstName = "Ada"
+            model.newPatientLastName = "Sintetica"
+            model.newPatientTaxCode = "RSSMRA80A01H501U"
+            model.newPatientHasBirthDate = true
+            model.newPatientBirthDate = ISO8601DateFormatter().date(from: "1980-02-29T00:00:00Z")!
+        }
+        await model.createPatient()
+        let payload = await source.lastCreate
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(XCTUnwrap(payload))) as! [String: Any]
+        XCTAssertEqual(json["identifierType"] as? String, "cf")
+        XCTAssertEqual(json["birthDatePrecision"] as? String, "exact")
+        XCTAssertNil(json["birthYear"])
+    }
+
+    func testADR0179CreateRejectsMalformedCF() async {
+        let model = await makeModel(source: LifecycleMockDataSource())
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        let canCreate = await MainActor.run {
+            model.startCreatingPatient()
+            model.newPatientFirstName = "Ada"
+            model.newPatientLastName = "Sintetica"
+            model.newPatientTaxCode = "INVALIDO"
+            return model.canCreatePatient
+        }
+        XCTAssertFalse(canCreate)
+    }
+
+    func testADR0179UnrelatedEditOmitsIdentityIncludingNoIdentifier() async throws {
+        for (type, value) in [("passport", "Doc-Abc"), ("none", ""), ("cf", "CF-STORICO-ERRATO"),
+                              ("stp", "STP1234567890123"), ("eni", "ENI1234567890123"), ("other", "Altro-42")] {
+            let patient = detail(id: "p1", archived: false, version: 4, taxCode: value,
+                                 identifierType: type, birthDatePrecision: "estimated", birthYear: 1974)
+            let source = LifecycleMockDataSource(details: ["p1": patient])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            await model.startEditingPatient()
+            await MainActor.run { model.editPatientNotes = "Nota sintetica aggiornata" }
+            await model.savePatient()
+            let update = await source.lastUpdate
+            let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+            XCTAssertNil(json["taxCode"], type)
+            XCTAssertNil(json["identifierType"], type)
+            XCTAssertNil(json["birthDatePrecision"], type)
+            XCTAssertNil(json["birthYear"], type)
+        }
+    }
+
+    func testADR0179CreateAllIdentifierTypesWithEstimatedYear() async throws {
+        for (type, code) in [("none", ""), ("stp", "stp1234567890123"), ("eni", "eni1234567890123"),
+                             ("passport", "Doc-Abc"), ("other", "Identità-42")] {
+            let source = LifecycleMockDataSource()
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey)
+            let valid = await MainActor.run {
+                model.startCreatingPatient()
+                model.newPatientFirstName = "Ada"
+                model.newPatientLastName = "Sintetica"
+                model.newPatientIdentifierType = type
+                model.newPatientTaxCode = code
+                model.newPatientHasEstimatedBirthYear = true
+                model.newPatientBirthYear = "1974"
+                return model.canCreatePatient
+            }
+            XCTAssertTrue(valid, type)
+            await model.createPatient()
+            let payload = await source.lastCreate
+            let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(XCTUnwrap(payload))) as! [String: Any]
+            XCTAssertEqual(json["taxCode"] as? String, ["stp", "eni"].contains(type) ? code.uppercased() : code)
+            XCTAssertEqual(json["identifierType"] as? String, type)
+            XCTAssertEqual(json["birthDatePrecision"] as? String, "estimated")
+            XCTAssertEqual(json["birthYear"] as? Int, 1974)
+            XCTAssertNil(json["birthDate"])
+        }
+    }
+
+    func testADR0179NoIdentifierNeedsBirthAndCanBeCreatedWithExactDate() async throws {
+        let source = LifecycleMockDataSource()
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        let invalid = await MainActor.run {
+            model.startCreatingPatient()
+            model.newPatientFirstName = "Ada"
+            model.newPatientLastName = "Sintetica"
+            model.newPatientIdentifierType = "none"
+            return model.canCreatePatient
+        }
+        XCTAssertFalse(invalid)
+        await MainActor.run {
+            model.newPatientHasBirthDate = true
+            model.newPatientBirthDate = ISO8601DateFormatter().date(from: "1974-02-28T00:00:00Z")!
+        }
+        await model.createPatient()
+        let payload = await source.lastCreate
+        XCTAssertEqual(payload?.taxCode, "")
+        XCTAssertEqual(payload?.identifierType, "none")
+        XCTAssertEqual(payload?.birthDatePrecision, "exact")
+        XCTAssertNil(payload?.birthYear)
+        XCTAssertEqual(payload?.birthDate, ISO8601DateFormatter().date(from: "1974-02-28T00:00:00Z"))
+    }
+
+    @MainActor
+    func testADR0179IdentityValidationMatchesWebContract() {
+        XCTAssertNil(PatientIdentityForm.identifierError(type: "cf", value: "RSSMRA80A01H501U"))
+        XCTAssertNil(PatientIdentityForm.identifierError(type: "cf", value: "RSSMRA80A01H50MM"))
+        for code in ["RSSMRA80A01H501A", "RSSMRA80A00H501V", "RSSMRA80A32H501Y", "àSSMRA80A01H501U"] {
+            XCTAssertNotNil(PatientIdentityForm.identifierError(type: "cf", value: code), code)
+        }
+        XCTAssertNotNil(PatientIdentityForm.identifierError(type: "stp", value: "STP123"))
+        XCTAssertNotNil(PatientIdentityForm.identifierError(type: "eni", value: "STP1234567890123"))
+        XCTAssertNil(PatientIdentityForm.identifierError(type: "passport", value: "INVALIDO"))
+        XCTAssertNotNil(PatientIdentityForm.identifierError(type: "other", value: "A\nB"))
+        XCTAssertNotNil(PatientIdentityForm.identifierError(type: "other", value: String(repeating: "a", count: 129)))
+        XCTAssertNotNil(PatientIdentityForm.birthError(type: "none", precision: "unknown", date: nil, year: ""))
+        XCTAssertNotNil(PatientIdentityForm.birthError(type: "none", precision: "estimated", date: nil, year: "1849"))
+        XCTAssertNotNil(PatientIdentityForm.birthError(type: "none", precision: "estimated", date: nil, year: "9999"))
+        XCTAssertNotNil(PatientIdentityForm.birthError(type: "cf", precision: "exact", date: Date().addingTimeInterval(86400), year: ""))
+    }
+
+    func testADR0179EditLoadsAndPreservesDeclaredIdentityThenChangesBirthPrecision() async throws {
+        let patient = detail(id: "p1", archived: false, version: 4, taxCode: "Doc-Abc",
+                             identifierType: "passport", birthDatePrecision: "estimated", birthYear: 1974)
+        let source = LifecycleMockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        await model.startEditingPatient()
+        let loaded = await MainActor.run { (model.editPatientIdentifierType, model.editPatientHasEstimatedBirthYear, model.editPatientBirthYear) }
+        XCTAssertEqual(loaded.0, "passport")
+        XCTAssertTrue(loaded.1)
+        XCTAssertEqual(loaded.2, "1974")
+        await MainActor.run {
+            model.editPatientBirthYear = "1975"
+            model.editPatientTaxCode = "Doc-Nuovo"
+        }
+        await model.savePatient()
+        var update = await source.lastUpdate
+        var json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+        XCTAssertEqual(json["identifierType"] as? String, "passport")
+        XCTAssertEqual(json["taxCode"] as? String, "Doc-Nuovo")
+        XCTAssertEqual(json["birthDatePrecision"] as? String, "estimated")
+        XCTAssertEqual(json["birthYear"] as? Int, 1975)
+        XCTAssertTrue(json["birthDate"] is NSNull)
+        let stored = await model.selectedPatient
+        XCTAssertEqual(stored?.identifierType, "passport")
+        XCTAssertEqual(stored?.birthYear, 1975)
+        await model.startEditingPatient()
+        await MainActor.run {
+            model.editPatientHasEstimatedBirthYear = false
+            model.editPatientBirthDate = ISO8601DateFormatter().date(from: "1975-02-28T00:00:00Z")!
+        }
+        await model.savePatient()
+        update = await source.lastUpdate
+        json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+        XCTAssertEqual(json["birthDatePrecision"] as? String, "exact")
+        XCTAssertTrue(json["birthYear"] is NSNull)
+        XCTAssertEqual(json["birthDate"] as? String, "1975-02-28T00:00:00Z")
+        XCTAssertNil(json["identifierType"])
+        await model.startEditingPatient()
+        await MainActor.run { model.editPatientBirthDate = nil }
+        await model.savePatient()
+        update = await source.lastUpdate
+        json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+        XCTAssertEqual(json["birthDatePrecision"] as? String, "unknown")
+        XCTAssertTrue(json["birthDate"] is NSNull)
+        XCTAssertTrue(json["birthYear"] is NSNull)
+    }
+
+    func testADR0179EditToNoIdentifierAndEstimatedYear() async throws {
+        let patient = detail(id: "p1", archived: false, version: 4)
+        let source = LifecycleMockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        await model.startEditingPatient()
+        await MainActor.run {
+            model.editPatientIdentifierType = "none"
+            model.editPatientTaxCode = ""
+            model.editPatientHasEstimatedBirthYear = true
+            model.editPatientBirthYear = "1974"
+        }
+        await model.savePatient()
+        let update = await source.lastUpdate
+        let json = try encodedPatientUpdate(XCTUnwrap(update?.payload))
+        XCTAssertEqual(json["identifierType"] as? String, "none")
+        XCTAssertEqual(json["taxCode"] as? String, "")
+        XCTAssertEqual(json["birthYear"] as? Int, 1974)
+    }
+
     @MainActor
     func testProductionFactoryIgnoresRetiredLocalAuthorityValuesWithUnlockedKey() throws {
         let previous = ProcessInfo.processInfo.environment["MEDIFLOW_LOCAL_AUTHORITY"]
@@ -547,6 +739,7 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         model.newPatientFirstName = "Synthetic"
         model.newPatientLastName = "Create fixture"
         model.newPatientTaxCode = "SYNTHETIC-CREATE"
+        model.newPatientIdentifierType = "other"
     }
 
     func testCreatePatientSealsSensitiveFieldsBeforeLeavingTheModel() async throws {
@@ -560,6 +753,7 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             model.newPatientFirstName = "Ada"
             model.newPatientLastName = "Lovelace"
             model.newPatientTaxCode = "LVLDAA85A41F205X"
+            model.newPatientIdentifierType = "other"
             model.newPatientAddress = "Via Roma 1"
             model.newPatientPhone = "+39 02 555 0100"
             model.newPatientCaregiver = "Caregiver Test"
@@ -1527,6 +1721,10 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         deleted: Bool = false,
         encryptedValue: String? = nil,
         birthDate: Date? = nil,
+        taxCode: String = "RSSMRA80A01H501U",
+        identifierType: String? = nil,
+        birthDatePrecision: String? = nil,
+        birthYear: Int? = nil,
         archiveReason: String? = nil,
         archiveNote: String? = nil
     ) -> HomeBasePatientDetail {
@@ -1535,7 +1733,7 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             firstName: "Mario",
             lastName: "Rossi",
             birthDate: birthDate,
-            taxCode: "RSSMRA80A01H501U",
+            taxCode: taxCode,
             address: encryptedValue,
             phone: encryptedValue,
             caregiver: encryptedValue,
@@ -1554,7 +1752,8 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             updatedAt: Date(timeIntervalSince1970: 1_750_000_000),
             deletedAt: deleted ? Date(timeIntervalSince1970: 1_750_000_100) : nil,
             deletionReason: deleted ? "web-delete" : nil,
-            archiveReason: archiveReason, archiveNote: archiveNote
+            archiveReason: archiveReason, archiveNote: archiveNote,
+            identifierType: identifierType, birthDatePrecision: birthDatePrecision, birthYear: birthYear
         )
     }
 
@@ -1892,7 +2091,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
             firstName: current.firstName,
             lastName: current.lastName,
             birthDate: birthDate,
-            taxCode: current.taxCode,
+            taxCode: payload.taxCode ?? current.taxCode,
             address: current.address,
             phone: current.phone,
             caregiver: current.caregiver,
@@ -1912,7 +2111,10 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
             deletedAt: current.deletedAt,
             deletionReason: current.deletionReason,
             archiveReason: payload.isArchived == false ? nil : applying(payload.archiveReason, to: current.archiveReason),
-            archiveNote: payload.isArchived == false ? nil : applying(payload.archiveNote, to: current.archiveNote)
+            archiveNote: payload.isArchived == false ? nil : applying(payload.archiveNote, to: current.archiveNote),
+            identifierType: payload.identifierType ?? current.identifierType,
+            birthDatePrecision: payload.birthDatePrecision ?? current.birthDatePrecision,
+            birthYear: { switch payload.birthYear { case .omit: return current.birthYear; case .null: return nil; case .value(let year): return year } }()
         )
         details[patientId] = updated
         summaries = summaries.map { summary in

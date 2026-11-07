@@ -74,14 +74,14 @@ function pilotFixture(t) {
   for (const file of [pilotWorkflow, ...['Cargo.toml', 'rust-toolchain.toml', 'app/build.rs', 'client/Cargo.toml', 'transport/Cargo.toml', 'app/Cargo.toml', 'state/Cargo.toml'].map(file => `${pilot}/${file}`)]) {
     write(file, readFileSync(path.join(sourceRoot, file)));
   }
-  for (const file of [...pilotFiles, `${pilot}/app/src/shell/clinical_forms.rs`, `${pilot}/app/src/shell/threshold_actions.rs`, `${pilot}/app/src/shell/ambulatory_commands.rs`, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`, `${pilot}/state/src/lib.rs`, `${pilot}/transport/src/local_host/archives.rs`, `${pilot}/transport/src/local_host/security.rs`]) write(file, 'must not execute');
+  for (const file of [...pilotFiles, `${pilot}/app/src/shell/clinical_forms.rs`, `${pilot}/app/src/shell/threshold_actions.rs`, `${pilot}/app/src/shell/ambulatory_commands.rs`, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`, `${pilot}/state/src/lib.rs`, `${pilot}/transport/src/local_host/archives.rs`, `${pilot}/transport/src/local_host/security.rs`, `${pilot}/transport/src/patient_identity.rs`]) write(file, 'must not execute');
   write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\n#[cfg(unix)]\nmod chat_access;\nmod clinical_text;\nmod clinical_units;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\n#[cfg(unix)]\nmod local_voice;\nmod native_lock;\nmod navigation;\nmod patient_forms;\nmod patient_text;\nmod platform_integration;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nmod title;\nfn main() {}');
   write(`${pilot}/app/src/documents/pdf_native.m`, '#include "adobe_glyph_names.h"');
   write(`${pilot}/app/src/documents/adobe_glyph_names.h`, '// synthetic glyph list');
   write(`${pilot}/app/src/documents.rs`, 'pub(crate) mod pdf;');
   write(`${pilot}/app/src/shell.rs`, '//! Synthetic shell binding fixture\nmod account_profile;\nmod agenda_flow;\nmod ai_preferences;\nmod ai_status;\nmod ambulatories;\nmod ambulatory_commands;\nmod analytics;\n#[cfg(unix)]\nmod chat_access;\nmod clinical_forms;\nmod document_curation;\nmod document_details;\nmod document_library;\nmod local_host;\npub(crate) mod local_preferences;\nmod local_settings;\n#[cfg(unix)]\nmod local_voice;\n#[cfg(test)]\nmod notes_recovery_tests;\n#[cfg(unix)]\nmod patient_document;\n#[cfg(test)]\npub(crate) mod rendered_command;\nmod scales;\nmod settings;\nmod therapy_picker;\nmod threshold_actions;\nmod view_state;\nmod who_lookup;');
   write(`${pilot}/transport/src/session.rs`, 'pub mod patient_document;');
-  write(`${pilot}/transport/src/lib.rs`, '//! Synthetic library binding fixture\n#![forbid(unsafe_code)]\nmod account_profile;\nmod ai_preferences;\nmod ambulatories;\nmod ambulatory_command_recovery;\nmod ambulatory_command_transport;\nmod ambulatory_commands;\nmod analytics;\nmod catalogs;\nmod context;\nmod crypto;\nmod dto;\nmod error;\nmod http;\nmod local_host;\nmod ports;\nmod profile_query;\nmod retirement_notice;\nmod scales;\nmod session;\nmod tls;\nmod who;');
+  write(`${pilot}/transport/src/lib.rs`, '//! Synthetic library binding fixture\n#![forbid(unsafe_code)]\nmod account_profile;\nmod ai_preferences;\nmod ambulatories;\nmod ambulatory_command_recovery;\nmod ambulatory_command_transport;\nmod ambulatory_commands;\nmod analytics;\nmod catalogs;\nmod context;\nmod crypto;\nmod dto;\nmod error;\nmod http;\nmod local_host;\npub mod patient_identity;\nmod ports;\nmod profile_query;\nmod retirement_notice;\nmod scales;\nmod session;\nmod tls;\nmod who;');
   for (const file of ['run.mjs', 'prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs', 'governance.mjs']) {
     write(`${pilot}/comparison/${file}`, readFileSync(path.join(sourceRoot, pilot, 'comparison', file)));
   }
@@ -214,6 +214,8 @@ test('GPUI coverage fails closed when Cargo membership, modules or actual CI inv
     [`${pilot}/app/src/shell.rs`, 'mod view_state;', '#[cfg(feature = "optional")]\nmod view_state;'],
     [`${pilot}/app/src/shell.rs`, 'mod who_lookup;', '// mod who_lookup;'],
     [`${pilot}/app/src/shell.rs`, 'mod who_lookup;', '#[cfg(feature = "optional")]\nmod who_lookup;'],
+    [`${pilot}/transport/src/lib.rs`, 'pub mod patient_identity;', '// pub mod patient_identity;'],
+    [`${pilot}/transport/src/lib.rs`, 'pub mod patient_identity;', '#[cfg(feature = "optional")]\npub mod patient_identity;'],
     [`${pilot}/transport/src/lib.rs`, 'mod session;', '#[cfg(feature = "optional")]\nmod session;'],
     [`${pilot}/transport/src/lib.rs`, 'mod profile_query;', '// mod profile_query;'],
     [`${pilot}/transport/src/lib.rs`, 'mod analytics;', '// mod analytics;'],
