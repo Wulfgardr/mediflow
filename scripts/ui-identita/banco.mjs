@@ -77,7 +77,7 @@ async function start() {
   fs.mkdirSync(data, { recursive: true });
   fs.writeFileSync(`${data}/SYNTHETIC_ONLY`, 'Archivio sintetico creato dal banco UI 2026-11-07\n');
   const distTarget = `${data}/next-output`;
-  const distRelative = `node_modules/.cache/mf-ui-identita-${httpPort}`;
+  const distRelative = `node_modules/.cache/mf-ui-identita-${httpPort}-${createHash('sha256').update(data).digest('hex').slice(0, 8)}`;
   const distLink = `${root}/${distRelative}`;
   fs.mkdirSync(`${root}/node_modules/.cache`, { recursive: true });
   fs.mkdirSync(distTarget, { recursive: true });
@@ -94,7 +94,7 @@ async function start() {
   for (let n = 0; n < 120; n++) { try { await request('/api/auth/check'); ready = true; break; } catch {} await sleep(1000); }
   if (!ready) throw new Error('Next non pronto: consultare next.log');
   const tsconfig = `${root}/tsconfig.json`;
-  fs.writeFileSync(tsconfig, fs.readFileSync(tsconfig, 'utf8').replace(/,\n\s*"(?:\/Volumes\/Vision\/mf-ui-identita-20261107-scratch\/|\.next-visual-ui-identita\/|node_modules\/\.cache\/mf-ui-identita(?:-\d+)?\/)[^"]+"/g, ''));
+  fs.writeFileSync(tsconfig, fs.readFileSync(tsconfig, 'utf8').replace(/,\n\s*"(?:\/Volumes\/Vision\/mf-ui-identita-20261107-scratch\/|\.next-visual-ui-identita\/|node_modules\/\.cache\/mf-ui-identita(?:-[0-9a-f-]+)?\/)[^"]+"/g, ''));
   const headers = { Authorization: `Bearer ${fs.readFileSync(`${data}/local-api-token`, 'utf8').trim()}` };
   await request('/api/settings/network.mode', { method: 'PUT', headers, body: { value: 'network-home-base' } });
   state.proxyPid = spawnOwned([`${root}/scripts/local-api-tls-proxy.mjs`], { ...env, MEDIFLOW_TLS_CERT_PATH: `${data}/local-api.crt`, MEDIFLOW_TLS_KEY_PATH: `${data}/local-api.key`, MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_TLS_BIND_HOST: '0.0.0.0', MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: httpURL }, 'proxy.log');
