@@ -410,7 +410,8 @@ fn birth(values: &[String]) -> Result<(String, Option<String>, Option<i32>), Str
     let (date, year) = match values[9].as_str() {
         "exact" => {
             let parsed = date(&values[3])?.ok_or("Inserisci la data di nascita completa.")?;
-            let day = chrono::NaiveDate::parse_from_str(&parsed[..10], "%Y-%m-%d").unwrap();
+            let day = chrono::NaiveDate::parse_from_str(&values[3], "%Y-%m-%d")
+                .map_err(|_| "Inserisci una data di nascita valida nel formato AAAA-MM-GG.")?;
             if day > chrono::Local::now().date_naive() {
                 return Err("La data di nascita non può essere futura.".into());
             }
@@ -457,6 +458,9 @@ fn date(value: &str) -> Result<Option<String>, String> {
         .map_err(|_| "Inserisci una data di nascita valida nel formato AAAA-MM-GG.".to_owned())?;
     if parsed.format("%Y-%m-%d").to_string() != value {
         return Err("Inserisci la data di nascita completa nel formato AAAA-MM-GG.".into());
+    }
+    if !(1..=9999).contains(&parsed.year()) {
+        return Err("Inserisci la data di nascita nel formato AAAA-MM-GG.".into());
     }
     Ok(Some(format!("{value}T00:00:00.000Z")))
 }
@@ -548,6 +552,19 @@ mod tests {
             serde_json::to_value(profile_patch(&row, &values).unwrap()).unwrap(),
             serde_json::json!({"firstName":"Adele"})
         );
+    }
+
+    #[test]
+    fn adr0179_extended_year_birth_date_is_a_validation_error_not_a_panic() {
+        for value in ["-0001-01-01", "+12345-01-01", "0000-01-01"] {
+            let mut values = adr0179_values("none", "", "exact", "");
+            values[3] = value.into();
+            let outcome = std::panic::catch_unwind(|| create_draft(&values).map(|_| ()));
+            assert!(
+                matches!(outcome, Ok(Err(_))),
+                "{value} must be rejected with a message"
+            );
+        }
     }
 
     #[test]
