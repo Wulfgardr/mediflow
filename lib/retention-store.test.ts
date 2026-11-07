@@ -7,7 +7,7 @@ import { commitTerritorialPackTransition, initializeTerritorialPacks } from './t
 import { TERRITORIAL_PACK_SCHEMA } from './territorial-packs';
 import { addCalendarYears, RetentionError } from './retention-policy';
 import {
-    assertNoRetentionHold, commitRetentionWindows, discardExpiredFascicolo, placeRetentionHold, releaseRetentionHold,
+    assertAttachmentNotHeld, assertNoRetentionHold, commitRetentionWindows, discardExpiredFascicolo, placeRetentionHold, releaseRetentionHold,
     reviewRetention, type RetentionAuditEvent,
 } from './retention-store';
 
@@ -90,6 +90,38 @@ test('un blocco su paziente o documento sospende lo scarto e la cancellazione am
         db.transaction(tx => releaseRetentionHold(tx, { holdId: holds.holds[0].id, expectedRevision: 1, confirmed: true }, audit));
         assert.doesNotThrow(() => db.transaction(tx => assertNoRetentionHold(tx, 'p-held')));
         assert.equal(db.transaction(tx => reviewRetention(tx, NOW)).items[0].status, 'expired');
+    } finally { sqlite.close(); }
+});
+
+test('un blocco ferma la cancellazione del documento bloccato e, se è sul fascicolo, di tutti i suoi documenti', () => {
+    const { sqlite, db, audit } = fixture();
+    try {
+        addPatient(sqlite, 'p-docs', { archived: false, at: NOW - 100 });
+        const attach = sqlite.prepare(`INSERT INTO attachments (id, patient_id, name, type, size, path, created_at, document_source_ref, document_revision, document_freshness_epoch)
+            VALUES (?, 'p-docs', 'ENC:synthetic', 'application/pdf', 1, 'synthetic', ?, ?, 1, 1)`);
+        attach.run('doc-held', NOW - 50, 'b'.repeat(64));
+        attach.run('doc-free', NOW - 50, 'c'.repeat(64));
+        assert.doesNotThrow(() => db.transaction(tx => assertAttachmentNotHeld(tx, 'p-docs', 'doc-held')));
+
+        const documentHold = db.transaction(tx => placeRetentionHold(tx, { patientId: 'p-docs', attachmentId: 'doc-held', reason: 'access_request',
+            expectedRevision: 0, confirmed: true }, ADMIN, NOW, audit));
+        assert.throws(() => db.transaction(tx => assertAttachmentNotHeld(tx, 'p-docs', 'doc-held')), isRetentionError('legal_hold'));
+        assert.doesNotThrow(() => db.transaction(tx => assertAttachmentNotHeld(tx, 'p-docs', 'doc-free')));
+        assert.doesNotThrow(() => db.transaction(tx => assertAttachmentNotHeld(tx, 'p-other', 'doc-held')));
+
+        const both = db.transaction(tx => placeRetentionHold(tx, { patientId: 'p-docs', reason: 'litigation',
+            expectedRevision: documentHold.revision, confirmed: true }, ADMIN, NOW, audit));
+        assert.throws(() => db.transaction(tx => assertAttachmentNotHeld(tx, 'p-docs', 'doc-free')), isRetentionError('legal_hold'));
+
+        let revision = both.revision;
+        for (const hold of both.holds) {
+            revision = db.transaction(tx => releaseRetentionHold(tx, { holdId: hold.id, expectedRevision: revision, confirmed: true }, audit)).revision;
+        }
+        assert.doesNotThrow(() => db.transaction(tx => assertAttachmentNotHeld(tx, 'p-docs', 'doc-held')));
+        assert.doesNotThrow(() => db.transaction(tx => assertAttachmentNotHeld(tx, 'p-docs', 'doc-free')));
+
+        sqlite.prepare("UPDATE settings SET value = '{not json' WHERE key = 'retention.holds'").run();
+        assert.throws(() => db.transaction(tx => assertAttachmentNotHeld(tx, 'p-docs', 'doc-free')), isRetentionError('legal_hold'));
     } finally { sqlite.close(); }
 });
 

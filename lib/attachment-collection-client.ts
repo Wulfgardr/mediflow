@@ -16,6 +16,18 @@ export class AttachmentCollectionChangedError extends Error {
     }
 }
 
+/** The host refused the delete because the document or its whole record is under a retention hold (ADR 0178). Nothing was removed. */
+export class AttachmentLegalHoldError extends Error {
+    constructor() {
+        super('Attachment under legal hold');
+        this.name = 'AttachmentLegalHoldError';
+    }
+}
+
+export function isLegalHoldPayload(payload: unknown): boolean {
+    return Boolean(payload && typeof payload === 'object' && (payload as { code?: unknown }).code === 'legal_hold');
+}
+
 export function isAttachmentCollectionChangedPayload(payload: unknown): boolean {
     return Boolean(payload && typeof payload === 'object'
         && (payload as { code?: unknown }).code === ATTACHMENT_COLLECTION_CHANGED_CODE);

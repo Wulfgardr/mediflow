@@ -5,6 +5,8 @@ import { writeAttachmentWebAudit } from '@/lib/attachment-web-audit';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { attachments } from '@/lib/schema';
+import { assertAttachmentNotHeld } from '@/lib/retention-store';
+import { RetentionError } from '@/lib/retention-policy';
 import { and, eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { buildAttachmentPath } from '@/lib/attachment-path';
@@ -174,6 +176,7 @@ export async function DELETE(
         const deleted = dbServer.transaction((tx): 'deleted' | 'stale' => {
             assertAttachmentExpected(tx, id, patientId, expected);
             if (!attachmentCollectionMatches(tx, patientId, expectedCollection)) return 'stale';
+            assertAttachmentNotHeld(tx, patientId, id);
             const result = tx.delete(attachments).where(and(eq(attachments.id, id),
                 eq(attachments.patientId, patientId), eq(attachments.documentSourceRef, expected.sourceRef),
                 eq(attachments.documentRevision, expected.revision), eq(attachments.documentFreshnessEpoch, expected.freshnessEpoch))).run();
@@ -187,6 +190,9 @@ export async function DELETE(
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
         if (error instanceof AttachmentPreconditionError) return error.response();
+        if (error instanceof RetentionError && error.code === 'legal_hold') {
+            return NextResponse.json({ error: 'Legal hold active', code: 'legal_hold' }, { status: 409 });
+        }
         return NextResponse.json({ error: "Delete Failed" }, { status: 500 });
     }
 }
