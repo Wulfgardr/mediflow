@@ -195,9 +195,14 @@ struct PairedPatientsWorkspaceView: View {
             Button("Recenti") { patientSortMode = .recent }
             Button("Alfabetico") { patientSortMode = .alpha }
         } label: {
-            Text(patientSortMode == .recent ? "Recenti" : "Alfabetico")
-                .foregroundStyle(PlatformColors.ink)
+            HStack(spacing: 4) {
+                Text(patientSortMode == .recent ? "Recenti" : "Alfabetico")
+                Image(systemName: "chevron.down").font(.caption2)
+            }
+            .foregroundStyle(PlatformColors.ink)
+            .padding(8)
         }
+        .buttonStyle(.plain)
         .background(horizontalSizeClass == .regular ? PlatformColors.selection : .clear,
                     in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
         .tint(PlatformColors.ink)
