@@ -582,6 +582,47 @@ pub fn searchable_text(source: &str) -> String {
     parse(source).plain(false)
 }
 
+fn prose_lines(block: Block) -> Vec<Block> {
+    use unicode_segmentation::UnicodeSegmentation;
+    let graphemes: Vec<_> = block
+        .runs
+        .iter()
+        .flat_map(|run| run.text.graphemes(true).map(move |text| (text, run.style)))
+        .collect();
+    let mut lines = Vec::new();
+    let mut start = 0;
+    while start < graphemes.len() {
+        let limit = (start + 64).min(graphemes.len());
+        let end = if limit < graphemes.len() {
+            (start..limit)
+                .rfind(|&index| graphemes[index].0.chars().all(char::is_whitespace))
+                .map_or(limit, |index| index + 1)
+        } else {
+            limit
+        };
+        let mut line = Block {
+            runs: Vec::new(),
+            marker: if start == 0 {
+                block.marker.clone()
+            } else {
+                None
+            },
+            ..block.clone()
+        };
+        for (text, style) in &graphemes[start..end] {
+            for character in text.chars() {
+                line.push(character, *style);
+            }
+        }
+        lines.push(line);
+        start = end;
+    }
+    if lines.is_empty() {
+        lines.push(block);
+    }
+    lines
+}
+
 pub fn render(source: &str, ink: WritingInk, theme: Theme) -> AnyElement {
     let document = parse(source);
     let mut content_theme = theme;
@@ -593,11 +634,13 @@ pub fn render(source: &str, ink: WritingInk, theme: Theme) -> AnyElement {
         ))
         .children(document.blocks.into_iter().enumerate().map(|(index, block)| {
             let accessible = block.plain(true);
+            div().id(("clinical-rich-block", index)).role(Role::Paragraph).aria_label(SharedString::from(accessible))
+                .min_w_0().flex().flex_col()
+                .children(prose_lines(block).into_iter().map(|block| {
             let (content, highlights) = block.styled(content_theme);
             let heading = block.heading;
             let marker = block.marker.clone();
-            div().id(("clinical-rich-block", index)).role(Role::Paragraph).aria_label(SharedString::from(accessible))
-                .min_w_0().flex().items_start().gap(px(8. * theme.scale))
+            div().min_w_0().flex().items_start().gap(px(8. * theme.scale))
                 .pl(px((block.list_depth.saturating_sub(1) as f32 * 18.).min(36.)))
                 .when(block.quote_depth > 0, |element| element
                     .border_l_2().border_color(theme.rule).pl(px(14.)))
@@ -606,6 +649,7 @@ pub fn render(source: &str, ink: WritingInk, theme: Theme) -> AnyElement {
                         .text_color(theme.secondary).child(text!(marker.unwrap_or_default())),
                 ))
                 .child(block_text(content, highlights, heading.is_some(), ink, theme))
+                }))
         }))
         .into_any_element()
 }
@@ -635,6 +679,35 @@ fn block_text(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prose_measure_preserves_text_and_emphasis() {
+        use unicode_segmentation::UnicodeSegmentation;
+        let source = format!(
+            "<p><strong>{}</strong> {}</p>",
+            "e\u{301}".repeat(90),
+            "parola ".repeat(40)
+        );
+        let document = parse(&source);
+        for block in document.blocks {
+            let expected: Vec<_> = block
+                .runs
+                .iter()
+                .flat_map(|run| run.text.chars().map(move |c| (c, run.style)))
+                .collect();
+            let lines = prose_lines(block);
+            for line in &lines {
+                let text: String = line.runs.iter().map(|run| run.text.as_str()).collect();
+                assert!(text.graphemes(true).count() <= 64);
+            }
+            let actual: Vec<_> = lines
+                .iter()
+                .flat_map(|line| line.runs.iter())
+                .flat_map(|run| run.text.chars().map(move |c| (c, run.style)))
+                .collect();
+            assert_eq!(actual, expected);
+        }
+    }
 
     #[test]
     fn content_inks_keep_prose_and_only_pencil_has_a_dashed_underline() {
