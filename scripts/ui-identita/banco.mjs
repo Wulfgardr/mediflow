@@ -72,7 +72,8 @@ async function start() {
   if (alive(previous.nextPid) && alive(previous.proxyPid)) { await seedReference(); return status(); }
   if (alive(previous.nextPid) || alive(previous.proxyPid)) await stop();
   await free(httpPort); await free(tlsPort);
-  const ip = execFileSync('ifconfig', { encoding: 'utf8' }).match(/inet (10\.211\.55\.\d+)/)?.[1];
+  const localOnly = process.env.MF_BANCO_LOCAL_ONLY === '1';
+  const ip = localOnly ? '127.0.0.1' : execFileSync('ifconfig', { encoding: 'utf8' }).match(/inet (10\.211\.55\.\d+)/)?.[1];
   if (!ip) throw new Error('IP Parallels non trovato');
   fs.mkdirSync(data, { recursive: true });
   fs.writeFileSync(`${data}/SYNTHETIC_ONLY`, 'Archivio sintetico creato dal banco UI 2026-11-07\n');
@@ -97,7 +98,7 @@ async function start() {
   fs.writeFileSync(tsconfig, fs.readFileSync(tsconfig, 'utf8').replace(/,\n\s*"(?:\/Volumes\/Vision\/mf-ui-identita-20261107-scratch\/|\.next-visual-ui-identita\/|node_modules\/\.cache\/mf-ui-identita(?:-[0-9a-f-]+)?\/)[^"]+"/g, ''));
   const headers = { Authorization: `Bearer ${fs.readFileSync(`${data}/local-api-token`, 'utf8').trim()}` };
   await request('/api/settings/network.mode', { method: 'PUT', headers, body: { value: 'network-home-base' } });
-  state.proxyPid = spawnOwned([`${root}/scripts/local-api-tls-proxy.mjs`], { ...env, MEDIFLOW_TLS_CERT_PATH: `${data}/local-api.crt`, MEDIFLOW_TLS_KEY_PATH: `${data}/local-api.key`, MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_TLS_BIND_HOST: '0.0.0.0', MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: httpURL }, 'proxy.log');
+  state.proxyPid = spawnOwned([`${root}/scripts/local-api-tls-proxy.mjs`], { ...env, MEDIFLOW_TLS_CERT_PATH: `${data}/local-api.crt`, MEDIFLOW_TLS_KEY_PATH: `${data}/local-api.key`, MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_TLS_BIND_HOST: localOnly ? '127.0.0.1' : '0.0.0.0', MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: httpURL }, 'proxy.log');
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
   await seedReference();
   await sleep(500); return status();
@@ -130,7 +131,11 @@ async function seedReference() {
   }
   const entries = [ ['Controllo ambulatoriale', 'Paziente in buone condizioni generali. Pressione 132/78 mmHg, frequenza 72/min. Non riferisce dispnea né dolore toracico. Concordato controllo fra un mese.'], ['Contatto telefonico', 'Riferisce buona aderenza alla terapia e assenza di capogiri. Ricordata la registrazione della pressione a domicilio per sette giorni.'], ['Revisione degli esami', 'Esami sintetici: creatinina 0,9 mg/dL, emoglobina glicata 6,8%. Discussi alimentazione e attività fisica compatibile con le condizioni generali.'], ['Visita di follow-up', 'Diario pressorio mediamente nei limiti. Nessun edema periferico. Prosegue la terapia concordata; rivalutazione programmata.'] ];
   const priorEntries = (await request(`/api/entries?patientId=${patients[0]}`, { headers })).json;
-  for (const [i, [title, content]] of entries.entries()) if (!priorEntries.some(e => e.id === `ui-identita-${patients[0]}-entry-${i}`)) await request('/api/entries', { method: 'POST', headers, body: { id: `ui-identita-${patients[0]}-entry-${i}`, patientId: patients[0], type: i === 1 ? 'phone' : 'visit', date: new Date(Date.UTC(2026, 10, 7 - i * 7)).toISOString(), title: await seal(title, key), content: await seal(content, key) } });
+  const createdEntryIds = [];
+  for (const [i, [title, content]] of entries.entries()) if (!priorEntries.some(e => e.id === `ui-identita-${patients[0]}-entry-${i}`)) { await request('/api/entries', { method: 'POST', headers, body: { id: `ui-identita-${patients[0]}-entry-${i}`, patientId: patients[0], type: i === 1 ? 'phone' : 'visit', date: new Date(Date.UTC(2026, 10, 7 - i * 7)).toISOString(), title: await seal(title, key), content: await seal(content, key) } }); createdEntryIds.push(`ui-identita-${patients[0]}-entry-${i}`); }
+  const recordedEntries = (await request(`/api/entries?patientId=${patients[0]}`, { headers })).json;
+  const operatorName = auth.json.displayName?.trim() || 'performance-baseline';
+  if (createdEntryIds.some(id => recordedEntries.find(entry => entry.id === id)?.recordedBy !== operatorName)) throw new Error('Autore del banco non corrispondente al profilo autenticato');
   const priorTherapies = (await request(`/api/therapies?patientId=${patients[0]}`, { headers })).json;
   for (const [drugName, dosage] of [['Ramipril', '5 mg, una compressa al mattino'], ['Metformina', '500 mg, una compressa dopo cena']]) if (!priorTherapies.some(t => t.id === `ui-identita-${patients[0]}-${drugName}`)) await request('/api/therapies', { method: 'POST', headers, body: { id: `ui-identita-${patients[0]}-${drugName}`, patientId: patients[0], drugName, dosage, status: 'active', startDate: '2026-10-01T00:00:00Z' } });
   fs.writeFileSync(`${data}/reference.json`, JSON.stringify({ referenceId: patients[0], emptyId: patients[1], allergiesVersion: 1 }, null, 2));

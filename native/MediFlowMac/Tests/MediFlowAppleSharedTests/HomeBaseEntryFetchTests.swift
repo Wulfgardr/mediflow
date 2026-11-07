@@ -12,6 +12,21 @@ final class HomeBaseEntryFetchTests: XCTestCase {
     private func body(id: String = "synthetic-old-entry", patientId: String = "synthetic-patient") -> String {
         "{\"id\":\"\(id)\",\"patientId\":\"\(patientId)\",\"type\":\"note\",\"title\":\"ENC:synthetic\",\"content\":\"ENC:synthetic\",\"date\":\"2025-01-01T00:00:00Z\",\"version\":7}"
     }
+    func testRecordingContractKeepsServerAuthorAndAcceptsHistoricalNullOrMissing() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("../../../contracts/entry-recording.v1.json").standardizedFileURL
+        let cases = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
+        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+        for item in cases {
+            let bytes = try JSONSerialization.data(withJSONObject: try XCTUnwrap(item["entry"]))
+            let entry = try decoder.decode(HomeBaseEntrySummary.self, from: bytes)
+            let expected = item["name"] as? String == "operatore" ? "Ada Sintetica" : nil
+            XCTAssertEqual(entry.recordedBy, expected)
+            XCTAssertEqual(ClinicalFieldCrypto.decryptEntry(entry, masterKey: nil).recordedBy, expected)
+            XCTAssertEqual(entry.createdAt, ISO8601DateFormatter().date(from: "2026-11-07T14:35:00Z"))
+        }
+    }
+
     func testProtocolFetchReadsExactOldEntryFreshWithPairedAndOperatorScope() async throws {
         let source: any HomeBasePatientsDataSource = client { request in
             XCTAssertEqual(request.httpMethod, "GET")

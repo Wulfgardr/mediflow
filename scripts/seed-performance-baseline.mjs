@@ -146,8 +146,8 @@ function seedRows(db, counts, wrappedMasterKey) {
     VALUES (?, 'performance-baseline-ambulatory', ?)
   `);
   const insertEntry = db.prepare(`
-    INSERT INTO entries (id, patient_id, type, title, date, content, metadata, version, created_at, updated_at)
-    VALUES (@id, @patientId, @type, @title, @date, @content, @metadata, 1, @createdAt, @updatedAt)
+    INSERT INTO entries (id, patient_id, type, title, date, content, metadata, recorded_by, version, created_at, updated_at)
+    VALUES (@id, @patientId, @type, @title, @date, @content, @metadata, 'Benchmark sintetico', 1, @createdAt, @updatedAt)
   `);
   const insertObservation = db.prepare(`
     INSERT INTO observations (

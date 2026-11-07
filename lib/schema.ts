@@ -169,6 +169,7 @@ export const entries = sqliteTable('entries', {
     content: text('content').notNull(),
     setting: text('setting'),
     metadata: text('metadata'),
+    recordedBy: text('recorded_by'),
     attachments: text('attachments'),
     deletedAt: integer('deleted_at', { mode: 'timestamp' }),
     deletionReason: text('deletion_reason'),

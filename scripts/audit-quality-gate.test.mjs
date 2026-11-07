@@ -60,8 +60,8 @@ test('diary required-audit guard follows all eight handlers and rejects detached
         const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
         if (operation === 'create') {
             assert.notDeepEqual(validate({ coreSource: change(coreSource,
-                'const inserted = tx.insert(entries).values(input.values).run();',
-                'const inserted = ({ run: () => ({ changes: 1 }), pending: () => tx.insert(entries).values(input.values).run() }).run();') }), []);
+                'const inserted = tx.insert(entries).values({ ...input.values, recordedBy }).run();',
+                'const inserted = ({ run: () => ({ changes: 1 }), pending: () => tx.insert(entries).values({ ...input.values, recordedBy }).run() }).run();') }), []);
         }
         const source = original[sourceKey];
         assert.notDeepEqual(validate({ [sourceKey]: change(source, `mode: '${mode}'`, "mode: 'unadmitted'") }), []);

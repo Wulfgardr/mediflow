@@ -87,6 +87,7 @@ export type AmbulatorySummary = {
 };
 
 export type EntrySummary = {
+    recordedBy?: string | null;
     id: string;
     patientId: string;
     type: string;

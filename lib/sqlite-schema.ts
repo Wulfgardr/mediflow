@@ -495,6 +495,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         ensureColumn(sqlite, 'entries', 'deletion_reason', 'deletion_reason TEXT');
         ensureColumn(sqlite, 'entries', 'version', 'version INTEGER NOT NULL DEFAULT 1');
         ensureColumn(sqlite, 'entries', 'updated_at', 'updated_at INTEGER');
+        ensureColumn(sqlite, 'entries', 'recorded_by', 'recorded_by TEXT');
     } catch (error) {
         console.warn('[MediFlow] Entries schema check failed:', error);
         throw error;

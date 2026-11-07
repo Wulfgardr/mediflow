@@ -279,6 +279,7 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
         fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+        old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
@@ -318,6 +319,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
         const oldFile = path.join(f.root, 'canonical5.db'); fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+        old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
@@ -356,6 +358,7 @@ for (const alteration of ['none', 'column', 'index', 'view', 'authority-table'])
         const file = path.join(f.root, 'canonical6.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+        old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE synthetic_extension');
         old.exec('DROP TABLE portable_import_origins');
         old.pragma('user_version=6');
@@ -435,4 +438,23 @@ test('the CLI terminal fixture waits for a child that closes the terminal before
     const child = 'import os, time\nfor fd in (0, 1, 2): os.close(fd)\ntime.sleep(0.5)';
     execFileSync('python3', ['scripts/fixtures/recovery-cli-pty.py'], { encoding: 'utf8', timeout: 20000,
         input: JSON.stringify({ command: ['python3', '-c', child], key: 'synthetic' }) });
+});
+
+test('encrypted v9 predecessor resta recuperabile dopo l’aggiunta dell’autore', async () => {
+    const f = await fixture();
+    try {
+        const file = path.join(f.root, 'canonical9.db'); fs.writeFileSync(file, f.snapshot);
+        const old = new Database(file);
+        old.exec('DROP TABLE synthetic_extension; ALTER TABLE entries DROP COLUMN recorded_by; PRAGMA user_version=9;');
+        old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE');
+        const expected = contents(old); old.close();
+        const bytes = fs.readFileSync(file), artifact = await encryptRecoveryBackup(bytes, f.key);
+        await f.restore({ artifact });
+        const restored = openVersionedSqliteDatabase(f.destination);
+        try {
+            assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
+            for (const table of ['users', 'patients', 'therapy_status_commands', 'ambulatory_destructive_commands']) assert.deepEqual(contents(restored)[table], expected[table]);
+        } finally { restored.close(); }
+        assert.deepEqual(fs.readFileSync(file), bytes);
+    } finally { f.cleanup(); }
 });

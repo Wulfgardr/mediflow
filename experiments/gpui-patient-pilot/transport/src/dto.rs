@@ -334,6 +334,7 @@ pub struct Entry {
     pub metadata: Option<String>,
     pub attachments: Option<String>,
     pub version: u64,
+    pub recorded_by: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
     pub deleted_at: Option<String>,
@@ -589,6 +590,25 @@ impl ChatWriteResolution {
             }
             Self::Confirmed(ChatWriteOutcome::Rejected) => "Scrittura respinta. Nessuna modifica.",
             Self::Confirmed(ChatWriteOutcome::Closed) => "Comando chiuso senza modifica.",
+        }
+    }
+}
+
+#[cfg(test)]
+mod entry_recording_contract {
+    use super::Entry;
+
+    #[test]
+    fn server_author_and_historical_entries_decode_additively() {
+        let cases: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../native/contracts/entry-recording.v1.json"
+        ))
+        .unwrap();
+        for case in cases.as_array().unwrap() {
+            let entry: Entry = serde_json::from_value(case["entry"].clone()).unwrap();
+            let expected = (case["name"] == "operatore").then_some("Ada Sintetica");
+            assert_eq!(entry.recorded_by.as_deref(), expected);
+            assert_eq!(entry.created_at.as_deref(), Some("2026-11-07T14:35:00Z"));
         }
     }
 }
