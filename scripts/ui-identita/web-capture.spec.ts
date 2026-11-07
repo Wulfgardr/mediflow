@@ -1,0 +1,48 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import { openPatientSection, unlockIfNeeded, isVisible } from '../../e2e/utils';
+const output = '/Users/leonardopegollo/Antigravity/mf-ui-identita-20261107/web';
+const data = process.env.MEDIFLOW_DATA_DIR || '/Volumes/Vision/mf-ui-identita-20261107-scratch/apfs/banco';
+test('sequenza canonica 01-07', async ({ page }, info) => {
+  if (!data.startsWith('/Volumes/Vision/mf-ui-identita-20261107-scratch/') || !fs.existsSync(`${data}/SYNTHETIC_ONLY`)) throw new Error('Solo banco sintetico');
+  const { referenceId, emptyId } = JSON.parse(fs.readFileSync(`${data}/reference.json`, 'utf8'));
+  fs.mkdirSync(output, { recursive: true });
+  const theme = info.project.name.startsWith('giorno') ? 'light' : 'dark';
+  await page.addInitScript(t => localStorage.setItem('mediflow-theme', t), theme);
+  const capture = async (name: string) => {
+    await expect(page.locator('html')).toHaveClass(new RegExp(theme));
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${output}/${name}-${info.project.name}.png`, fullPage: false, animations: 'disabled' });
+  };
+  const navigate = async (url: string) => {
+    await page.goto(url);
+    if (await isVisible(page.getByLabel('PIN operatore').first(), 2500)) await unlockIfNeeded(page, '314159');
+    await expect(page.getByLabel('MediFlow lock screen')).toBeHidden();
+  };
+  await navigate('/?area=incarico');
+  await expect(page.getByText('Rossi Sintetica Maria', { exact: true }).first()).toBeVisible();
+  await capture('01-elenco');
+  await navigate(`/patients/${referenceId}/modules`);
+  await expect(page.getByText('Rossi Sintetica Maria', { exact: true }).first()).toBeVisible();
+  await capture('02-scheda');
+  await openPatientSection(page, 'diario');
+  await expect(page.locator('#diario')).toContainText('Pressione 132/78');
+  await capture('03-diario');
+  await navigate(`/patients/${referenceId}/entries/new`);
+  const editor = page.locator('[contenteditable="true"]').first();
+  await expect(editor).toBeVisible();
+  await editor.fill('Nota sintetica in preparazione: controllo clinico programmato.');
+  await capture('04-nuova-voce');
+  await navigate('/settings');
+  await expect(page.getByRole('heading').first()).toBeVisible();
+  await capture('05-impostazioni');
+  await navigate(`/patients/${emptyId}/modules`);
+  await openPatientSection(page, 'diario');
+  await expect(page.locator('#diario')).toContainText(/Nessun|Non ci sono|vuoto/i);
+  await capture('06-vuoto');
+  await page.route('**/api/patients/synthetic-nonexistent-patient**', route => route.abort('connectionrefused'));
+  await navigate('/patients/synthetic-nonexistent-patient/modules');
+  await expect(page.getByText(/Impossibile leggere la scheda paziente/i).first()).toBeVisible();
+  await capture('07-errore');
+});
