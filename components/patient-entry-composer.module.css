@@ -1,6 +1,6 @@
 /* WUL-676: scoped composition for the runtime-twin writing sheet. */
 .page {
-    container-type: inline-size;
+    container: entry-page / inline-size;
     box-sizing: border-box;
     width: 100%;
     max-width: 1400px;
@@ -196,7 +196,7 @@
 .previousEntries { margin-top: 28px; color: var(--lume-ink-muted); }
 .previousEntries h2 { margin: 0 0 12px; font: var(--type-section); text-transform: uppercase; letter-spacing: .05em; }
 .previousEntries p { font: var(--type-prose); white-space: pre-wrap; overflow-wrap: anywhere; }
-@container (max-width: 1000px) {
+@container entry-page (max-width: 1000px) {
     .layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
     .writingColumn { grid-row: 1; }
     .quadro { grid-row: 2; }
