@@ -500,6 +500,11 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
                 if (res.status === 409 && isAttachmentCollectionChangedPayload(parseJsonOrNull(errorText))) throw new AttachmentCollectionChangedError();
                 collection.invalidate();
             }
+            // A precondition refusal carries a message written for the user (e.g. PROSTHETICS_CATALOG_REQUIRED).
+            const refusal = res.status === 412 ? parseJsonOrNull(errorText) as { code?: unknown; error?: unknown } | null : null;
+            if (refusal && typeof refusal.code === 'string' && /^[A-Z_]+$/u.test(refusal.code) && typeof refusal.error === 'string') {
+                throw new Error(refusal.error);
+            }
             throw new Error(`Failed to add item: ${res.status} ${res.statusText} - ${errorText}`);
         }
         const data = await (collection ? retireOnFailure(res.json(), collection) : res.json());
