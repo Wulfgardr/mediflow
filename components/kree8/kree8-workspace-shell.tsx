@@ -191,7 +191,7 @@ export function Kree8WorkspaceShell({
       window.removeEventListener('hashchange', selectFromHash);
       root.removeEventListener('click', selectFromLink);
     };
-  }, [isClinical, folderMode, navKey, composition, pathname]);
+  }, [isClinical, folderMode, navKey, composition, pathname, writing]);
 
   /* Lume focal locus + scrollspy (WUL-55, F2c). Un solo effetto governa la vita
      dei bersagli: li scopre nel DOM dentro QUESTO guscio (querySelector sul ref,

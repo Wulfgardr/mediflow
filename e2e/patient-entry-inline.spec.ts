@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession } from './utils';
 
 test('la voce nella scheda conserva la bozza dopo un rifiuto e registra sul paziente scelto', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -22,8 +22,7 @@ test('la voce nella scheda conserva la bozza dopo un rifiuto e registra sul pazi
   expect(await read()).toEqual([]);
   await page.unroute('**/api/entries');
   await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
-  await openPatientSection(page, 'diario');
+  await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules#diario$`));
   await expect(page.locator('#diario article')).toContainText('Resoconto sintetico scritto nella scheda.');
   const saved = await read();
   expect(saved).toHaveLength(1);
