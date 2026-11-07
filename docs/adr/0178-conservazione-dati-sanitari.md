@@ -114,6 +114,14 @@ fascicolo e anche la cancellazione amministrata di ADR 0066
 (`/api/system/purge-patient`). Registrazione e revoca sono tracciate in audit.
 Un elenco dei blocchi illeggibile vale come blocco.
 
+Il blocco ferma anche l'eliminazione ordinaria di un documento allegato
+(`DELETE /api/attachments/[id]`): un blocco sul documento ferma quel documento,
+un blocco sul fascicolo ferma tutti i documenti del paziente. Il server risponde
+409 `legal_hold` e la scheda Documenti dice che il documento è sospeso da un
+blocco. Aggiornamento del 7/11/2026: prima il blocco su documento sospendeva
+soltanto lo scarto e la cancellazione amministrata, e il documento bloccato si
+poteva eliminare dalla scheda.
+
 ### Stato e schema
 
 Finestre e blocchi vivono in due chiavi `settings` (`retention.windows`,

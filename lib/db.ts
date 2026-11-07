@@ -9,7 +9,7 @@ import type { ProstheticsCatalogSelection, ProstheticsSnapshot } from './referen
 import { encryptData, decryptData } from './security/security';
 import type { WhoReference } from './reference-data/icd11-reference';
 import { notifyDbChange } from './live-query';
-import { AttachmentCollectionChangedError, isAttachmentCollectionChangedPayload, type AttachmentCollectionView } from './attachment-collection-client';
+import { AttachmentCollectionChangedError, AttachmentLegalHoldError, isAttachmentCollectionChangedPayload, isLegalHoldPayload, type AttachmentCollectionView } from './attachment-collection-client';
 import {
     LOCKED_DATA_PLACEHOLDER,
     isLockedDataPlaceholder,
@@ -592,6 +592,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             if (!res.ok) {
                 const payload = await res.json().catch(() => null);
                 assertCurrent();
+                if (this.tableName === 'attachments' && res.status === 409 && isLegalHoldPayload(payload)) throw new AttachmentLegalHoldError();
                 if (collection) {
                     if (res.status === 409 && isAttachmentCollectionChangedPayload(payload)) throw new AttachmentCollectionChangedError();
                     // A 409 or 404 on the row itself is a definite refusal; anything else may hide a commit.
