@@ -8,7 +8,30 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 7 e i predecessori canonici 4, 5 e 6; le 31 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 9 e i predecessori canonici 4, 5 e 6; le 34 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+
+## Raccordo allergie strutturate del 7 novembre 2026 (ADR 0182)
+
+Lo schema corrente passa da 8 a 9 in `lib/sqlite-schema-open.ts`.
+L'inizializzatore corrente `lib/sqlite-schema.ts` aggiunge la colonna nullable
+`patients.allergies`: nell'apertura versionata di un archivio esistente il DDL
+segue la copia verificata dell'originale, nella stessa transazione dello stamp.
+La riapertura della versione 9 valida lo schema senza eseguire DDL.
+`lib/db.ts` aggiunge il tipo ed il campo facoltativo. Il registro
+`lib/backup-encrypted-fields.json` include le allergie cifrate.
+
+La ricostruzione in memoria dei predecessori canonici 4, 5 e 6 esclude anche
+`allergies` in `lib/ambulatory-destructive-command-recovery-schema.ts`, come
+esclude le colonne della versione 8. Le impronte storiche restano immutate.
+Le prove coprono ammissione in sola lettura, rifiuto di una colonna allergie
+su un predecessore, recupero cifrato, migrazione da v6 e v8, rollback del DDL
+allergie e nuovo tentativo. Le fixture storiche non contengono la colonna v9.
+
+Transizioni delle terapie, comandi, ricevute ed autorità di scrittura restano
+invariati, insieme a modello, statechart, invarianti, testimoni e mutanti.
+I digest sono ricalcolati sui file finali e `syncCommit` identifica il commit
+con la correzione del controllo dei predecessori. Il gate completo resta
+necessario: TLC non verifica schema, migrazione o cifratura.
 
 ## Raccordo PR #769 del 31 ottobre 2026: autorità network al commit
 

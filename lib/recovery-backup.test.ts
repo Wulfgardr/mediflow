@@ -37,7 +37,7 @@ function contents(db: Database.Database) {
 }
 function migratedPatientRows(rows: unknown) {
     return (rows as Record<string, unknown>[]).map(row => ({ ...row, identifier_type: 'cf',
-        birth_date_precision: row.birth_date == null ? 'unknown' : 'exact', birth_year: null, identifier_history: '[]' }));
+        birth_date_precision: row.birth_date == null ? 'unknown' : 'exact', birth_year: null, identifier_history: '[]', allergies: null }));
 }
 async function fixture(paddingBytes = 0) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-recovery-'));
@@ -278,7 +278,7 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
         const oldFile = path.join(path.dirname(f.source), 'v4-snapshot.db');
         fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
-        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
@@ -317,7 +317,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
     try {
         const oldFile = path.join(f.root, 'canonical5.db'); fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
-        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
@@ -355,7 +355,7 @@ for (const alteration of ['none', 'column', 'index', 'view', 'authority-table'])
     try {
         const file = path.join(f.root, 'canonical6.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
-        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('DROP TABLE synthetic_extension');
         old.exec('DROP TABLE portable_import_origins');
         old.pragma('user_version=6');
