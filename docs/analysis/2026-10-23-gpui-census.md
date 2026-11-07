@@ -680,3 +680,56 @@ dell'ambulatorio verificati. Il servizio dell'elenco unisce
 questa verifica. Sono provati il primario A con appartenenza B e un contesto
 in cui il paziente è davvero assente. P-01, CAS, audit e allegati restano quelli
 esistenti. Questa correzione non chiude le voci G-4 ancora aperte.
+
+## Riconciliazione con main del 7 novembre 2026
+
+Base: `origin/main` a `70f0b000e`. Metodo: confronto di `app/**/page.tsx` e
+`app/api/**/route.ts` fra il censimento (`0a1980f32`) e main, poi ricerca dei
+consumatori nel sorgente GPUI (`experiments/gpui-patient-pilot`) e Apple
+(`native/`). Solo lettura del codice: nessuna compilazione e nessun avvio.
+Questa sezione aggiorna l'assegnazione del lavoro. Non attesta parità raggiunta
+e non approva esclusioni.
+
+### Rimozioni di ADR 0180
+
+[#852](https://github.com/Wulfgardr/mediflow/pull/852) rimuove ATHENA, MLX ed
+esecuzione di Treatment Reasoning. Le route `/api/system/mlx` e
+`/api/system/treatment-reasoning/athena-mlx` non esistono più.
+
+| Riga | Prima | Ora |
+| --- | --- | --- |
+| P09 Treatment Reasoning | Proposta, fonti e revisione da portare in GPUI (G-5d, G-6j) | Assenza da provare: nessuna superficie di esecuzione, nessun invito ad attivarla, modelli non presentati come pronti. Nel sorgente GPUI resta solo la lettura delle preferenze precedenti (`ai_preferences.rs`, identificativo `athena_transformers`), per compatibilità |
+| P59 Runtime MLX | Stato e gestione del runtime da portare in GPUI | Riga chiusa: la route Web non esiste più |
+| G-5d | ATHENA/MLX locale con proposta, fonti e revisione | Si chiude con prove di assenza su Web, GPUI e chat, come I-3, I-3b, W-8, G-5 e C-7 nella matrice v5 |
+
+### Identità di ADR 0179 e dati della testata
+
+| Riga | Stato su main |
+| --- | --- |
+| `identita`, G-6a, G-8b | Tipo d'identificativo e precisione della nascita: Web [#846](https://github.com/Wulfgardr/mediflow/pull/846), presentazione nativa [#849](https://github.com/Wulfgardr/mediflow/pull/849), moduli nuovo paziente e modifica in Apple e GPUI [#857](https://github.com/Wulfgardr/mediflow/pull/857). Residuo: schermata GPUI dal vivo sul Mac (le prove usano il renderer headless) |
+| G-4d | Nuova scheda da documento: in GPUI passa da `/api/auth/native/patient-document`, non dalla route Web `/api/patients/document-create`. Identità senza codice fiscale e nascita stimata vanno provate in questo percorso |
+| Navigazione, testata, identità/allergia | Allergie cifrate e strutturate in testata: Web [#860](https://github.com/Wulfgardr/mediflow/pull/860), GPUI [#859](https://github.com/Wulfgardr/mediflow/pull/859). La dipendenza da WUL-789 per dati strutturati è soddisfatta per le allergie |
+| Diario | Autore della voce («Registrata da»): Web [#866](https://github.com/Wulfgardr/mediflow/pull/866), Apple e GPUI [#867](https://github.com/Wulfgardr/mediflow/pull/867) |
+
+### Superfici Web nate dopo il censimento
+
+| Superficie Web | Decisione | Consumatore GPUI | Proposta |
+| --- | --- | --- | --- |
+| `/settings/conservazione`, `/api/system/retention` | ADR 0178 | Nessuno. GPUI conosce solo la conservazione dei backup (`retention_keep_artifacts`), che è un'altra cosa | Rinvio Web: finestre, blocchi e scarto sono amministrazione del titolare sull'host. **Da approvare** |
+| `/patients/import/dossier`, `/api/documents/dossier-extraction` | ADR 0176 | Nessuno | Rinvio Web: il flusso parte dalla skill di importazione e si rivede nel browser. **Da approvare** |
+| `/api/drugs/catalog-import` | ADR 0177, catalogo farmaci di un'altra agenzia | Nessuno | Rinvio Web, come gli altri repertori caricati da file. **Da approvare** |
+| `/api/v1/network/prosthetics-catalog` | ADR 0177 | Sì | Coperta |
+| `/api/system/territorial-packs` (già presente, ora con il cambio d'assetto in Impostazioni) | ADR 0177 | Lettura dell'assetto (`session.rs`) | La lettura è coperta. Cambiare l'assetto da GPUI: rinvio Web proposto. **Da approvare** |
+| `/api/therapy-status-commands/*` | WUL-800 | GPUI usa `/api/auth/native/therapy-status` | Coperta da una route nativa propria |
+| `/api/auth/ambulatory-commands/*`, `/api/auth/ambulatory-bootstrap/*` | Ambulatori su GPUI | Sì, tutto il ciclo, compresi `close` e `receipt` | Coperta |
+| `/api/auth/local-client/*`, `/api/auth/native/*` | Accesso e comandi nativi | Sì | Coperta |
+| `/api/auth/reset/previous` | Recupero dell'account sul Web | GPUI accede con il PIN precedente tramite `/api/auth/local-client/login` | Coperta per l'accesso; il reset resta sul Web |
+| `/api/plugin-local-ui/*` | ADR 0159, plugin locale | Nessuno: è un canale del plugin, non una vista | Fuori dal perimetro GPUI |
+| `/api/v1/network/ai/fabric/*`, `/api/v1/network/ai/authority-retirement` | Intelligence Fabric | Solo Apple | Per GPUI resta il criterio di G-5 e I-1: niente AI implicita, funzioni spente o assenti dichiarate |
+
+### Cosa resta per chiudere G-0
+
+1. Leonardo approva o respinge i quattro rinvii Web marcati «Da approvare».
+   Il contratto non accetta il rinvio al Web come esclusione implicita.
+2. Le prove di assenza per G-5d entrano nella qualifica GPUI (I-1).
+3. Le schermate GPUI dal vivo sul Mac restano un residuo delle righe G-6a e G-8b.
