@@ -362,3 +362,76 @@ test('migrazione da versione 3 conserva originali verificati, ricevute e fonte d
         openVersionedSqliteDatabase(w.file).close(); assert.equal(originals(w.directory).length, 1);
     } finally { w.cleanup(); }
 });
+
+test('allergies: fresh schema and version 8 upgrade preserve clinical bytes and verified original', () => {
+    for (const existing of [false, true]) {
+        const w = workspace();
+        try {
+            if (existing) {
+                const prior = seed(w.file);
+                if (columns(prior).includes('allergies')) prior.exec('ALTER TABLE patients DROP COLUMN allergies');
+                prior.prepare('INSERT INTO patients(id,first_name,last_name,tax_code,notes,version) VALUES (?,?,?,?,?,?)')
+                    .run('synthetic-allergy', 'Ada', 'Sintetica', 'SYNTHETIC', 'ENC:cHJpb3I=:bm90ZXM=', 4);
+                prior.pragma('user_version = 8'); prior.close();
+            }
+            const opened = openVersionedSqliteDatabase(w.file);
+            assert.ok(columns(opened).includes('allergies'), 'structured allergy column required');
+            assert.equal(opened.pragma('user_version', { simple: true }), 9);
+            if (existing) {
+                assert.deepEqual(opened.prepare('SELECT notes,version,allergies FROM patients').get(), {
+                    notes: 'ENC:cHJpb3I=:bm90ZXM=', version: 4, allergies: null,
+                });
+                assert.equal(originals(w.directory).length, 1);
+                const original = new Database(path.join(w.directory, originals(w.directory)[0]), { readonly: true });
+                assert.equal(original.pragma('user_version', { simple: true }), 8);
+                assert.equal(columns(original).includes('allergies'), false);
+                original.close();
+            }
+            opened.close();
+            const reopened = openVersionedSqliteDatabase(w.file); reopened.close();
+            assert.equal(originals(w.directory).length, existing ? 1 : 0);
+        } finally { w.cleanup(); }
+    }
+});
+
+
+test('allergies: failure after version 9 DDL rolls back the column, clinical rows and schema stamp', () => {
+    const w = workspace();
+    try {
+        const prior = seed(w.file);
+        prior.exec('ALTER TABLE patients DROP COLUMN allergies');
+        prior.prepare('INSERT INTO patients(id,first_name,last_name,tax_code,notes,version) VALUES (?,?,?,?,?,?)')
+            .run('synthetic-allergy-rollback', 'Ada', 'Sintetica', 'SYNTHETIC-ROLLBACK', 'ENC:cHJpb3I=:bm90ZXM=', 4);
+        prior.pragma('user_version = 8');
+        const before = prior.prepare('SELECT * FROM patients').all();
+        const schema = prior.prepare('SELECT type,name,sql FROM sqlite_schema ORDER BY type,name').all();
+        prior.close();
+        assert.throws(() => openVersionedSqliteDatabase(w.file, file => {
+            const db = new Database(file), prepare = db.prepare.bind(db);
+            db.prepare = ((sql: string) => {
+                const statement = prepare(sql);
+                if (sql.includes('ADD COLUMN allergies')) {
+                    statement.run();
+                    throw new Error('SYNTHETIC_ALLERGY_DDL_FAILURE');
+                }
+                return statement;
+            }) as typeof db.prepare;
+            return db;
+        }), /SYNTHETIC_ALLERGY_DDL_FAILURE/);
+        const rolledBack = new Database(w.file, { readonly: true });
+        try {
+            assert.equal(rolledBack.pragma('user_version', { simple: true }), 8);
+            assert.equal(columns(rolledBack).includes('allergies'), false);
+            assert.deepEqual(rolledBack.prepare('SELECT * FROM patients').all(), before);
+            assert.deepEqual(rolledBack.prepare('SELECT type,name,sql FROM sqlite_schema ORDER BY type,name').all(), schema);
+            assert.equal(rolledBack.pragma('integrity_check', { simple: true }), 'ok');
+        } finally { rolledBack.close(); }
+        assert.deepEqual(originals(w.directory), []);
+        const retried = openVersionedSqliteDatabase(w.file);
+        try {
+            assert.equal(retried.pragma('user_version', { simple: true }), 9);
+            assert.deepEqual(retried.prepare('SELECT * FROM patients').all(), before.map(row => ({ ...(row as Record<string, unknown>), allergies: null })));
+        } finally { retried.close(); }
+        assert.equal(originals(w.directory).length, 1);
+    } finally { w.cleanup(); }
+});

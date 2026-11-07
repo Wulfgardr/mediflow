@@ -33,6 +33,7 @@ export interface PatientProfileView {
     caregiver: string | null;
     exemptions: string | null;
     diagnoses: string | null;
+    allergies?: string | null;
     monitoringProfile: string | null;
     statusReason: string | null;
     archiveReason: string | null;

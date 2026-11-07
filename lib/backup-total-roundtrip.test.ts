@@ -154,9 +154,11 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
 
     insertRow(db, 'ambulatories', { id: 'w7-amb-primary', name: 'Ambulatorio sintetico W7', address: 'fixture locale', type: 'synthetic', is_default: 1, version: 3, created_at: now });
     insertRow(db, 'ambulatories', { id: 'w7-amb-secondary', name: 'Ambulatorio sintetico secondario', type: 'synthetic', is_default: 0, version: 2, created_at: now + 1 });
+    const allergyCipher = await encryptData([{ substance: 'Amoxicillina sintetica', reaction: 'Orticaria sintetica', severity: 'moderate' }], masterKey);
     insertRow(db, 'patients', {
         id: 'w7-patient', first_name: 'Synthetic', last_name: 'Roundtrip', tax_code: 'SYNTHETIC-W7', birth_date: -631_152_000,
         ...(await sealed('patients', ['address', 'phone', 'caregiver', 'exemptions', 'diagnoses', 'status_reason', 'notes', 'ai_summary', 'document_insights', 'archive_reason', 'archive_note', 'deletion_reason'])),
+        allergies: `ENC:${allergyCipher.iv}:${allergyCipher.data}`,
         monitoring_profile: 'synthetic-monitoring', is_adi: 1, is_archived: 1, deleted_at: now - 10, version: 7,
         ambulatory_id: 'w7-amb-primary', created_at: now, updated_at: now + 2,
     });

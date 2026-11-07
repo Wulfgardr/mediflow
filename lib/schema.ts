@@ -112,6 +112,7 @@ export const patients = sqliteTable('patients', {
     caregiver: text('caregiver'),
     exemptions: text('exemptions'),
     diagnoses: text('diagnoses'),
+    allergies: text('allergies'),
     monitoringProfile: text('monitoring_profile'),
     statusReason: text('status_reason'),
     notes: text('notes'),
