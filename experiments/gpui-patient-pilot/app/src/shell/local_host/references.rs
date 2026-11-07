@@ -22,6 +22,7 @@ pub(super) struct ReferencesArea {
     prosthetics_fields: Vec<Entity<TextInput>>,
     source_entries: Option<Value>,
     pub(super) document: Option<Arc<mediflow_runtime_client::PreparedProstheticsDocument>>,
+    pub(super) drug: super::drug_catalog::DrugCatalogArea,
 }
 const PROSTHETICS_FIELD_LABELS: [&str; 13] = [
     "Posizione codice sistema",
@@ -54,6 +55,7 @@ impl ReferencesArea {
             who_consent: false,
             source_entries: None,
             document: None,
+            drug: super::drug_catalog::DrugCatalogArea::new(theme, cx),
             prosthetics_fields: PROSTHETICS_FIELD_LABELS
                 .into_iter()
                 .enumerate()
@@ -107,6 +109,7 @@ impl ReferencesArea {
         self.who_consent = false;
         self.source_entries = None;
         self.document = None;
+        self.drug.withdraw(cx);
         for field in self.fields.iter().chain(self.prosthetics_fields.iter()) {
             field.update(cx, |input, cx| input.retire(cx));
         }
@@ -121,9 +124,10 @@ impl ReferencesArea {
                 )
             });
         }
+        self.drug.configure(theme, self.busy, cx);
     }
 }
-fn line(label: &str, value: impl AsRef<str>, theme: Theme) -> Div {
+pub(super) fn line(label: &str, value: impl AsRef<str>, theme: Theme) -> Div {
     div().min_w_0().text_color(theme.secondary).child({
         let text = gpui::Text::new(
             gpui::ElementId::Name(label.to_owned().into()),
@@ -928,7 +932,7 @@ impl ClinicalApp {
                 };
             }
         }
-        pane.child(
+        let pane = pane.child(
             button(
                 "references-file",
                 "Seleziona file e prepara anteprima",
@@ -937,7 +941,13 @@ impl ClinicalApp {
                 enabled,
             )
             .on_click(cx.listener(|this, _, _, cx| this.pick_reference_file(cx))),
-        )
+        );
+        // Il file di un'altra agenzia sostituisce lo stesso catalogo dei farmaci, con un percorso suo.
+        if area.catalog == ReferenceCatalog::Aifa {
+            pane.child(self.drug_catalog_view(cx))
+        } else {
+            pane
+        }
     }
 }
 
