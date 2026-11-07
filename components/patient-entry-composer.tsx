@@ -791,9 +791,6 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                 </div>
             )}
 
-            <p role="status" data-testid="local-draft-status">{localDraft.error || (!localDraft.hasDraft ? 'Nessuna bozza da conservare.' : localDraft.state === 'recovered'
-                ? 'Bozza recuperata. Rivedi il testo prima di registrarlo. Gli allegati vanno selezionati di nuovo.'
-                : !localDraft.saved ? 'Conservazione della bozza in corso…' : 'Testo e dati della bozza conservati cifrati in questo browser. Gli allegati vanno selezionati di nuovo.')}</p>
             <ClinicalRichTextEditor
                 className={proposal ? composerStyles.editor : undefined}
                 description={proposal ? "Usa la barra per formattare il testo. Tab passa al controllo successivo." : undefined}
@@ -801,6 +798,9 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                 onChange={value => { setEditState('dirty'); setContent(value); }}
                 placeholder={'S: Sintomi e motivo della visita\nO: Parametri, esame obiettivo, dati oggettivi\nA: Valutazione clinica e ipotesi\nP: Piano, follow-up, indicazioni'}
             />
+            <p className="type-meta mt-3" role="status" data-testid="local-draft-status">{localDraft.error || (!localDraft.hasDraft ? 'Nessuna bozza da conservare.' : localDraft.state === 'recovered'
+                ? 'Bozza recuperata. Rivedi il testo prima di registrarlo. Gli allegati vanno selezionati di nuovo.'
+                : !localDraft.saved ? 'Conservazione della bozza in corso…' : 'Testo e dati della bozza conservati cifrati in questo browser. Gli allegati vanno selezionati di nuovo.')}</p>
         </section>
     );
     const attachmentPicker = (

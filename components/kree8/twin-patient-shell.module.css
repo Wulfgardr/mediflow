@@ -104,8 +104,3 @@
  .patientCanvas[data-writing='true'] .actions > a { min-width: 44px; }
  .patientCanvas[data-writing='true'] .actions > a > span { display: none; }
 }
-
-@media (max-width: 700px) {
- .patientCanvas[data-writing='true'] .patientBody { padding-top: 8px; }
- .patientCanvas[data-writing='true'] .patientBody :global(#diario > div:not([data-section-header])) { padding-top: 8px; }
-}

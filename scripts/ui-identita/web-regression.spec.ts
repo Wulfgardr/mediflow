@@ -34,6 +34,8 @@ test('formattazione compatta lascia almeno 200 px di testo sopra la soglia', asy
   page.on('dialog', dialog => dialog.type() === 'beforeunload' ? dialog.accept() : dialog.dismiss());
   for (const route of ['entries/new', 'modules?voce=nuova']) {
   await navigate(page, `/patients/${reference()}/${route}`);
+  await expect(page.getByText('Rossi Sintetica Maria', { exact: true }).first()).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
   const editor = page.locator('[contenteditable="true"]').first();
   await expect(editor).toBeVisible();
   await editor.fill('Nota sintetica in preparazione: controllo clinico programmato.');

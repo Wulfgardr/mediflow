@@ -126,9 +126,9 @@ export default function Timeline({
     );
 
     const withHeader = (history: ReactNode) => {
-        const content = <>{composer}{composer ? <div className={twin.previousEntries}>{history}</div> : history}</>;
+        const content = <>{composer}{composer ? <div className={twin.previousEntries}>{auditToggle}{history}</div> : history}</>;
         return section
-        ? <CollapsibleSection {...section} headerAction={auditToggle}>{content}</CollapsibleSection>
+        ? <CollapsibleSection {...section} headerAction={composer ? undefined : auditToggle}>{content}</CollapsibleSection>
         : <>
             {heading ? <header className={sectionRecipe.header}><h4 className={sectionRecipe.heading}>{heading}</h4>{auditToggle}</header>
                 : <div className="flex justify-end">{auditToggle}</div>}
