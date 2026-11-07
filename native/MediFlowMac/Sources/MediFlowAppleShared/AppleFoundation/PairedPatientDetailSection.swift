@@ -11,6 +11,7 @@ struct PairedPatientDetailSection: View {
 
     var onOpenSummary: ((PatientChartSummaryCategory) -> Void)? = nil
     var summaryReturn: PatientChartSummaryReturn? = nil
+    var allergies: [String] = []
     #if os(iOS)
     @Environment(\.patientChartScrollMemory) private var scrollMemory
     @AccessibilityFocusState(for: .voiceOver) private var focusedSummaryCategory: PatientChartSummaryCategory?
@@ -24,6 +25,17 @@ struct PairedPatientDetailSection: View {
     /// per-platform spacing constants this view used to keep are gone: 4 points
     /// on iOS against 8 on macOS was itself part of why the phone read as
     /// cramped.
+
+    @ViewBuilder
+    private var allergyHeader: some View {
+        PatientAllergyPill(allergies: allergies)
+        if model.isPatientFieldLocked(.allergies) || PatientAllergiesCodec.decodeResult(detail.allergies).isUnreadable {
+            Label("Allergie non disponibili", systemImage: "lock.fill")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("patient-allergies-unavailable")
+        }
+    }
 
     var body: some View {
         #if os(iOS)
@@ -39,6 +51,7 @@ struct PairedPatientDetailSection: View {
         let exemptions = exemptionRead.values ?? []
         let groupSpacing = ClinicalChartMetrics.groupSpacing
         return VStack(alignment: .leading, spacing: groupSpacing) {
+            allergyHeader
             #if !os(macOS)
             // On iOS the card is titled by the patient, and the actions sit on
             // that line rather than above it.
@@ -1018,25 +1031,8 @@ private extension PairedPatientDetailSection {
         let exemptions = exemptionRead.values ?? []
         return VStack(alignment: .leading, spacing: 0) {
             mobilePatientHeader.padding(.bottom, 16)
-            PatientChartGroup((model.isPatientFieldLocked(.diagnoses) || diagnosisRead.isUnreadable) ? "Diagnosi" : "Diagnosi · \(diagnoses.count)", anchorID: "patient-detail-diagnoses") {
-                if model.isPatientFieldLocked(.diagnoses) {
-                    Label("Diagnosi protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
-                        .font(.footnote).foregroundStyle(.secondary)
-                        .accessibilityIdentifier("patient-diagnoses-locked")
-                } else if diagnosisRead.isUnreadable {
-                    unreadableField("Diagnosi")
-                } else if diagnoses.isEmpty {
-                    Text("Nessuna diagnosi registrata.").font(.footnote).foregroundStyle(.secondary)
-                        .accessibilityIdentifier("patient-diagnoses-empty")
-                } else {
-                    ForEach(Array(diagnoses.enumerated()), id: \.offset) { _, diagnosis in
-                        PatientChartField(label: diagnosis.code.isEmpty ? "Diagnosi" : diagnosis.code,
-                            value: .recorded(diagnosis.description), labelIsCode: !diagnosis.code.isEmpty)
-                            .accessibilityLabel(diagnosis.displayText)
-                    }
-                }
-            }
-            .accessibilityIdentifier("patient-detail-diagnoses")
+            PatientClinicalOverview(model: model, detail: detail)
+                .padding(.bottom, 20)
             PatientChartGroup((model.isPatientFieldLocked(.exemptions) || exemptionRead.isUnreadable) ? "Esenzioni" : "Esenzioni · \(exemptions.count)", anchorID: "patient-detail-exemptions") {
                 if model.isPatientFieldLocked(.exemptions) {
                     Label("Esenzioni protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
@@ -1146,6 +1142,7 @@ private extension PairedPatientDetailSection {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("patient-detail-metadata")
+            allergyHeader
             if detail.isArchived == true {
                 Text("Archiviato").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
             }

@@ -198,8 +198,8 @@ public struct AppleFoundationMobileRootView: View {
     #endif
     @State private var section: ClinicalWorkspaceSection
     @State private var showsProjectSurfaces = false
-    @State private var showsProjectSidebar = false
     @State private var selectedOtherSection: ClinicalWorkspaceSection?
+    @State private var patientDestinationID: String?
     // URL intents and project paths belong to this window, never to defaults.
     @State private var projectNavigationPath: [ClinicalWorkspaceSection] = []
     @StateObject private var navigationRouter = ClinicalNavigationRouter()
@@ -257,10 +257,19 @@ public struct AppleFoundationMobileRootView: View {
                     .inkWorkspaceTitle(section.title)
             }
             #else
-            mobileTabWorkspace
-                .overlay(alignment: .leading) {
-                    if usesSplitLayout && showsProjectSidebar { mobileProjectSidebar }
+            if usesSplitLayout {
+                HStack(spacing: 0) {
+                    mobileClinicalSidebar.frame(width: 192)
+                    Divider()
+                    if section == .patients {
+                        detailView(for: section)
+                    } else {
+                        NavigationStack { detailView(for: section).inkWorkspaceTitle(section.title) }
+                    }
                 }
+            } else {
+                mobileTabWorkspace
+            }
             #endif
         }
         .task(id: workspaceModel.clinicalWorkspaceConnection?.identity) {
@@ -272,6 +281,9 @@ public struct AppleFoundationMobileRootView: View {
             // when the answer arrived.
             workspaceModel.updateAvailableCapabilities(capabilitiesStore.settledCapabilityKeys)
             workspaceModel.updateTerritorialPacks(capabilitiesStore.territorialPacks)
+        }
+        .onChange(of: workspaceModel.selectedPatientID) { selected in
+            if selected == nil { patientDestinationID = nil }
         }
         .sheet(isPresented: $showsProjectSurfaces) { projectSurfaceSheet }
         .modifier(ClinicalNavigationReception(
@@ -298,35 +310,33 @@ public struct AppleFoundationMobileRootView: View {
     }
 
     #if os(iOS)
-    private var mobileProjectSidebar: some View {
-        ZStack(alignment: .leading) {
-            Color.black.opacity(0.08)
-                .contentShape(Rectangle())
-                .onTapGesture { showsProjectSidebar = false }
-                .accessibilityLabel("Chiudi navigazione")
-                .accessibilityAddTraits(.isButton)
-            NavigationStack {
-                projectSidebar
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Chiudi") { showsProjectSidebar = false }
-                        }
-                    }
+    private var mobileClinicalSidebar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("MediFlow").inkVoice(21).padding(16)
+            ForEach([ClinicalWorkspaceSection.patients, .agenda, .diary, .repertori, .analytics, .scales]) { item in
+                sidebarButton(item)
+                    .padding(.horizontal, 12)
+                    .background(item == section ? PlatformColors.selection : .clear)
             }
-            .frame(width: 320)
-            .shadow(radius: 8)
-            .accessibilityAddTraits(.isModal)
-        }
-    }
-
-    @ToolbarContentBuilder
-    private var mobileProjectToolbar: some ToolbarContent {
-        if usesSplitLayout {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Navigazione", systemImage: "sidebar.left") { showsProjectSidebar = true }
-                    .accessibilityIdentifier("clinical-workspace-project-menu-button")
+            Spacer(minLength: 16)
+            sidebarButton(.settings).padding(.horizontal, 12)
+                .background(section == .settings ? PlatformColors.selection : .clear)
+            Button {
+                Task { await workspaceModel.lockSessionNow() }
+            } label: {
+                Label("Blocca", systemImage: "lock")
+                    .frame(maxWidth: .infinity, minHeight: LumeGeometry.rowHeight, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .disabled(workspaceModel.isWorking)
+            .accessibilityIdentifier("clinical-workspace-lock-button")
         }
+        .padding(.vertical, 12)
+        .background(PlatformColors.groupedBackground)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("clinical-workspace-sidebar")
     }
 
     private var mobileTabWorkspace: some View {
@@ -343,7 +353,6 @@ public struct AppleFoundationMobileRootView: View {
                         NavigationStack {
                             detailView(for: item)
                                 .inkWorkspaceTitle(item.title)
-                                .toolbar { mobileProjectToolbar }
                         }
                     }
                 }
@@ -354,7 +363,6 @@ public struct AppleFoundationMobileRootView: View {
             }
             NavigationStack {
                 compactOtherContent
-                    .toolbar { mobileProjectToolbar }
             }
             .tag(ClinicalWorkspaceSection.settings)
             .tabItem { Label("Altro", systemImage: "ellipsis") }
@@ -396,7 +404,6 @@ public struct AppleFoundationMobileRootView: View {
         Button {
             selectedOtherSection = [.patients, .agenda, .diary].contains(item) ? nil : item
             selectSection(item)
-            showsProjectSidebar = false
         } label: {
             HStack {
                 Label(item.title, systemImage: item.symbolName)
@@ -404,7 +411,9 @@ public struct AppleFoundationMobileRootView: View {
                 if item == section { Image(systemName: "checkmark") }
             }
             .foregroundStyle(PlatformColors.ink)
-            .frame(minHeight: LumeGeometry.rowHeight)
+            .fontWeight(item == section ? .semibold : .regular)
+            .frame(maxWidth: .infinity, minHeight: LumeGeometry.rowHeight, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .listRowBackground(item == section ? PlatformColors.selection : Color.clear)
@@ -448,7 +457,6 @@ public struct AppleFoundationMobileRootView: View {
             showsProjectSurfaces = false
             selectedOtherSection = [.patients, .agenda, .diary].contains(target) ? nil : target
             section = target
-            showsProjectSidebar = false
         }
     }
 
@@ -467,14 +475,11 @@ public struct AppleFoundationMobileRootView: View {
     private func detailView(for section: ClinicalWorkspaceSection) -> some View {
         switch section {
         case .patients:
-            PairedPatientsWorkspaceView(model: workspaceModel, capabilities: capabilitiesStore, onShowProject: {
+            PairedPatientsWorkspaceView(model: workspaceModel, capabilities: capabilitiesStore,
+                patientDestinationID: $patientDestinationID, onShowProject: {
                 navigationRouter.cancel()
-                if usesSplitLayout {
-                    showsProjectSidebar = true
-                } else {
-                    projectNavigationPath = []
-                    showsProjectSurfaces = true
-                }
+                projectNavigationPath = []
+                showsProjectSurfaces = true
             })
                 // Container, so the identifier names this workspace only and is
                 // not propagated onto descendants. Without it the identifier was

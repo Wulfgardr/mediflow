@@ -133,7 +133,7 @@ struct HomeBasePatientCacheStore {
             diagnoses: patient.diagnoses, monitoringProfile: nil, statusReason: patient.statusReason,
             notes: patient.notes, aiSummary: nil, documentInsights: nil, isAdi: patient.isAdi,
             isArchived: patient.isArchived, version: patient.version, ambulatoryId: patient.ambulatoryId,
-            createdAt: patient.createdAt, updatedAt: patient.updatedAt, identifierType: patient.identifierType, birthDatePrecision: patient.birthDatePrecision, birthYear: patient.birthYear)
+            createdAt: patient.createdAt, updatedAt: patient.updatedAt, identifierType: patient.identifierType, birthDatePrecision: patient.birthDatePrecision, birthYear: patient.birthYear, allergies: patient.allergies)
         try savePayload(CachePayload(version: 2, context: context, cachedAt: list.cachedAt,
             patients: list.patients, detail: CachedDetail(cachedAt: now(), patient: profile)))
     }

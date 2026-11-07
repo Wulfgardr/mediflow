@@ -29,6 +29,17 @@ final class ClinicalContentRenderingTests: XCTestCase {
 
     #if canImport(AppKit)
     @MainActor
+    func testMacDiaryProseUsesNewsreader17AndOneAndAHalfLineHeight() throws {
+        let text = ClinicalContentRendering.nativeAttributedString(from: "<p>Prosa sintetica</p>")
+        let attributes = text.attributes(at: 0, effectiveRange: nil)
+        let font = try XCTUnwrap(attributes[.font] as? NSFont)
+        let paragraph = try XCTUnwrap(attributes[.paragraphStyle] as? NSParagraphStyle)
+        XCTAssertEqual(font.pointSize, 17)
+        XCTAssertTrue(font.fontName.contains("Newsreader"))
+        XCTAssertEqual(paragraph.lineHeightMultiple, 1.5)
+    }
+
+    @MainActor
     func testSwiftUIContentDrawsNestedMarkersAtDifferentIndents() async throws {
         let html = "<ol><li>Prima voce<ol><li>Seconda voce</li></ol></li></ol>"
         let rendering = ClinicalContentTextModel()
@@ -170,7 +181,7 @@ final class ClinicalContentRenderingTests: XCTestCase {
         XCTAssertEqual(attributes("Sottolineato")[.underlineStyle] as? Int, 1)
         XCTAssertEqual(attributes("Barrato")[.strikethroughStyle] as? Int, 1)
         XCTAssertEqual((attributes("Fonte")[.link] as? URL)?.absoluteString, "https://127.0.0.1/nota")
-        XCTAssertEqual(try XCTUnwrap(attributes("Fonte")[.font] as? NSFont).pointSize, 13.5)
+        XCTAssertEqual(try XCTUnwrap(attributes("Fonte")[.font] as? NSFont).pointSize, 17)
     }
 
     @MainActor

@@ -1,12 +1,12 @@
 from pathlib import Path
 import subprocess, sys, re, os, time
 
-scratch = Path('/Volumes/Vision/mf-ui-identita-20261107-scratch/apple')
-out = Path('/Users/leonardopegollo/Antigravity/mf-ui-identita-20261107')
+scratch = Path(os.environ.get('MEDIFLOW_UI_APPLE_SCRATCH', '/Volumes/Vision/mf-ui-identita-20261107-scratch/apple'))
+out = Path(os.environ.get('MEDIFLOW_UI_CAPTURE_OUTPUT', '/Users/leonardopegollo/Antigravity/mf-ui-identita-20261107'))
 device, udid = sys.argv[1:]
 result = scratch / f'{device}-{time.strftime("%Y%m%d-%H%M%S")}.xcresult'
 cmd = ['xcodebuild', '-project', str(scratch/'capture-project/MediFlowAppleApp.xcodeproj'), '-scheme', 'MediFlowMobileApp', '-configuration', 'Debug', '-destination', f'platform=iOS Simulator,id={udid}', '-derivedDataPath', str(scratch/'CaptureDerivedData'), '-clonedSourcePackagesDirPath', str(scratch/'packages'), '-parallel-testing-enabled', 'NO', '-maximum-concurrent-test-simulator-destinations', '1', '-test-timeouts-enabled', 'YES', '-default-test-execution-time-allowance', '900', '-maximum-test-execution-time-allowance', '1000', '-resultBundlePath', str(result), 'CODE_SIGNING_ALLOWED=NO', 'test']
-(out/device).mkdir(exist_ok=True)
+(out/device).mkdir(parents=True, exist_ok=True)
 # Le catture canoniche di un giro precedente non devono sopravvivere: export.py conta solo i file di questa corsa.
 for stale in (out/device).glob('0[1-7]-*.png'):
     stale.unlink()
@@ -21,6 +21,7 @@ with (scratch/f'{device}-test.log').open('w') as log:
         if marker:
             name = marker[1]
             print(f'{device}: {name}', flush=True)
+            subprocess.run(['xcrun', 'simctl', 'bootstatus', udid, '-b'], check=True, timeout=180)
             for attempt in range(2):
                 try:
                     snap = subprocess.run(['xcrun', 'simctl', 'io', udid, 'screenshot', str(out/device/f'{name}.png')], capture_output=True, text=True, timeout=40)

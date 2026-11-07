@@ -97,6 +97,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published private(set) var prostheticPrescriptions: [HomeBaseProstheticPrescriptionSummary] = []
     @Published private(set) var patientFHIRExportURL: URL?
     @Published private(set) var pendingFHIRWarningValidation: HomeBaseValidatePatientExportResponse?
+    @Published var isDiaryComposerOpen = false
+    var hasNewEntryDraft: Bool {
+        !newEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || newEntryType != .note || !newEntryEditorDocument.isEffectivelyEmpty
+            || !newEntryAttachmentIds.isEmpty
+            || !newEntryVisitTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || newEntryVisitDraftResponse != nil
+    }
     @Published var newEntryTitle = ""
     @Published var newEntryType: PairedDiaryEntryType = .note
     // S7 (Wave 5, D10/D11): the editor's typed model, never a raw string. The
@@ -198,7 +206,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editPatientIsAdi = false
     @Published private(set) var editPatientExemptions: [String] = []
     enum EncryptedPatientField: Hashable {
-        case address, phone, caregiver, notes, diagnoses, exemptions, archiveReason, archiveNote
+        case address, phone, caregiver, notes, diagnoses, exemptions, archiveReason, archiveNote, allergies
     }
     @Published private(set) var lockedPatientFields: Set<EncryptedPatientField> = []
     private var editablePatientFields: [EncryptedPatientField: PatientFieldCrypto.EditableField] = [:]
@@ -720,7 +728,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             aiSummary: "Quadro clinico stabile, terapia in corso ben tollerata.",
             documentInsights: "Referti recenti coerenti con il quadro noto, nessun nuovo reperto critico.",
             isAdi: patient.isAdi, isArchived: patient.isArchived, version: patient.version,
-            ambulatoryId: "AMB-1", createdAt: nil, updatedAt: patient.updatedAt
+            ambulatoryId: "AMB-1", createdAt: nil, updatedAt: patient.updatedAt,
+            allergies: ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENT_ALLERGIES"].map {
+                $0 == "locked" ? "ENC:locked:uitest" : #"[{"substance":"Amoxicillina","reaction":"Orticaria","severity":"moderate"}]"#
+            }
         )
     }
 
@@ -2553,6 +2564,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             .caregiver: PatientFieldCrypto.resolveStringField(raw.caregiver, masterKey: masterKey),
             .notes: PatientFieldCrypto.resolveStringField(raw.notes, masterKey: masterKey),
             .diagnoses: PatientFieldCrypto.resolveStructuredField(raw.diagnoses, masterKey: masterKey),
+            .allergies: PatientFieldCrypto.resolveStructuredField(raw.allergies, masterKey: masterKey),
             .exemptions: PatientFieldCrypto.resolveStructuredField(raw.exemptions, masterKey: masterKey),
             .archiveReason: PatientFieldCrypto.resolveStringField(raw.archiveReason, masterKey: masterKey),
             .archiveNote: PatientFieldCrypto.resolveStringField(raw.archiveNote, masterKey: masterKey),
@@ -2581,6 +2593,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         case .null: birthDate = nil
         case .value(let value): birthDate = value
         }
+        let allergies: String?
+        if case let .locked(ciphertext)? = editablePatientFields[.allergies] {
+            allergies = ciphertext
+        } else {
+            allergies = current.allergies
+        }
         return HomeBasePatientDetail(
             id: current.id,
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -2606,7 +2624,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             archiveReason: editPatientIsArchived ? editPatientArchiveReason.trimmedOrNil : nil,
             archiveNote: editPatientIsArchived ? editPatientArchiveNote.trimmedOrNil : nil,
             identifierType: editPatientIdentifierType, birthDatePrecision: editPatientBirthPrecision,
-            birthYear: editPatientBirthPrecision == "estimated" ? Int(editPatientBirthYear) : nil
+            birthYear: editPatientBirthPrecision == "estimated" ? Int(editPatientBirthYear) : nil,
+            allergies: allergies
         )
     }
     #endif
@@ -5250,6 +5269,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     private func clearSelectedPatientWorkspace(preservingSelectionID: String? = nil) {
+        if preservingSelectionID == nil { isDiaryComposerOpen = false }
         // A refresh of the same chart keeps its section; a new context does not.
         if selectedPatientID != preservingSelectionID {
             patientCSVImport?.invalidate()
