@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 import { secureBrowserUse } from '../../e2e/fixtures/secure-browser';
-const scratch = process.env.MF_BANCO_ARTIFACTS || '/Volumes/Vision/mf-ui-identita-20261107-scratch';
+const scratch = process.env.MF_BANCO_ARTIFACTS || process.env.MF_BANCO_RESULTS_DIR || '/Volumes/Vision/mf-ui-identita-20261107-scratch';
 const httpPort = process.env.MF_BANCO_HTTP_PORT || '3100';
 if (process.env.CI || process.env.PLAYWRIGHT_ALLOW_EXTERNAL_NETWORK === '1') throw new Error('Solo browser locale con sandbox e rete loopback');
 export default defineConfig({

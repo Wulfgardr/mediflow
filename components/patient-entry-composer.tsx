@@ -14,6 +14,8 @@ import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { InkState } from '@/components/ui/ink-state';
 import { ViewState } from '@/components/ui/view-state';
 import { ClinicalRichTextEditor } from '@/components/clinical-rich-text-editor';
+import { patientAllergiesForHeader } from '@/lib/patient-allergies';
+import { PatientHeaderAllergies } from '@/components/patient-header-identity';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { AttachmentCollectionChangedError, AttachmentCollectionView, uploadFilesOnce } from '@/lib/attachment-collection-client';
@@ -994,6 +996,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                         <h1 className="type-page-title">Nuova voce clinica<span aria-hidden="true">.</span></h1>
                         <p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : patientRead.loading ? 'Caricamento paziente…' : 'Paziente non disponibile.'}</p>
                     </div>
+                    {patient ? <PatientHeaderAllergies details={patientAllergiesForHeader(patient.allergies)} /> : null}
                 </header>
                 <div className={composerStyles.layout} data-reading-quadro={isReadingQuadro}>
                     <aside className={composerStyles.quadro} aria-label="Quadro durante la scrittura">
@@ -1031,6 +1034,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
             subtitle="Registra una visita, un contatto remoto o una nota breve."
             backHref={`/patients/${id}/modules`}
             backLabel="Torna alla scheda paziente"
+            patientDetails={patient ? patientAllergiesForHeader(patient.allergies) : undefined}
             patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
             navItems={workspaceNavItems}
         >

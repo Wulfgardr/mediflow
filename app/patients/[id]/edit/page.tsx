@@ -11,6 +11,7 @@ import PatientActionModal, { ActionData } from '@/components/patient-action-moda
 import { useEffect, useState } from 'react';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { patientAllergiesForHeader } from '@/lib/patient-allergies';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
@@ -205,6 +206,7 @@ export default function EditPatientPage() {
             subtitle="Aggiorna anagrafica, contatti, diagnosi, agenda e profilo assistenziale."
             backHref={`/patients/${id}/modules`}
             backLabel="Torna alla scheda paziente"
+            patientDetails={patientAllergiesForHeader(patient.allergies)}
             patientLabel={`${patient.lastName} ${patient.firstName}`}
             navItems={workspaceNavItems}
         >

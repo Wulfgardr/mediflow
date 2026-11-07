@@ -26,7 +26,7 @@ Next usa `dev --webpack`: permette di compilare le sole pagine necessarie alla m
 
 La data dir predefinita è `scratch/apfs/banco`. `MEDIFLOW_DATA_DIR` può selezionare un'altra directory sotto lo scratch. Il banco rifiuta percorsi esterni ed archivi senza il marcatore `SYNTHETIC_ONLY`. Le porte predefinite 3100 e 3543 devono essere libere oppure possedute dal banco. `MF_BANCO_HTTP_PORT` e `MF_BANCO_TLS_PORT` selezionano porte diverse, conservate nello stato. Ogni archivio usa una propria build sotto la data dir, con un collegamento distinto per porta HTTP e archivio. Stop arresta i gruppi di processi registrati nel suo stato.
 
-Operatore `performance-baseline`, PIN pubblico `314159`. Quaranta pazienti di baseline e due pazienti di riferimento. Maria Rossi Sintetica ha quattro voci, due diagnosi, due terapie e l'allergia nelle note cliniche: il modello paziente corrente non ha un campo dedicato per le allergie. Le voci sono state create dopo login ed apertura della chiave tramite PIN, usando le API Web con cifratura come nel client. Il diario di Paolo Vuoto Sintetico è vuoto.
+Operatore `performance-baseline`, PIN pubblico `314159`. Quaranta pazienti di baseline e due pazienti di riferimento. Maria Rossi Sintetica ha quattro voci, due diagnosi, due terapie e l'allergia ad amoxicillina nel campo strutturato cifrato `allergies`, senza ripeterla nelle note cliniche. Le voci sono state create dopo login ed apertura della chiave tramite PIN, usando le API Web con cifratura come nel client. Il diario di Paolo Vuoto Sintetico è vuoto.
 
 `pair ios|ipados|macos|windows|linux` conferma il pairing e stampa JSON con URL HTTPS, impronta SHA-256 del certificato DER, identificativo e token, credenziali sintetiche ed esito della lettura della scheda. Per GPUI usare `gpuiIdentifier` e `gpuiPairingCode`. La verifica integrata della scheda usa HTTP loopback, il trasporto HTTPS è verificato separatamente. I JSON restano nella data dir.
 
@@ -52,3 +52,7 @@ node scripts/ui-identita/banco.mjs stop
 ```
 
 `web-regression.spec.ts` verifica errore e ripetizione, area di scrittura compatta, densità a 1440×900, data e ora nel margine del diario, autore esplicito, scrittura dalla scheda e sezioni delle Impostazioni. Le catture conservano invece l'altezza iniziale di 960 px.
+
+Sono supportate anche `MF_BANCO_CAPTURE_DIR` per le PNG e
+`MF_BANCO_RESULTS_DIR` per i risultati Playwright. Un banco già popolato
+riceve le allergie strutturate con un aggiornamento versionato.

@@ -27,6 +27,7 @@ import type { ObservationPrefill } from '@/lib/observation-prefill';
 import PatientActionModal from '@/components/patient-action-modal';
 import { PatientProfileNotes } from '@/components/patient-profile-notes';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
+import { patientAllergiesForHeader } from '@/lib/patient-allergies';
 import { PatientHeaderActions } from '@/components/patient-header-actions';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
 import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-import-fabric-preview-card';
@@ -590,6 +591,7 @@ export default function PatientDetailPage() {
                 `Aggiornato ${updatedLabel}`,
             ]}
             patientDetails={{
+                ...patientAllergiesForHeader(patient.allergies),
                 birthDateLabel: patient.birthDate ? birthDateLabel : undefined,
                 ageLabel: patient.birthDate ? formatCountLabel(differenceInYears(new Date(currentTimestampMs), new Date(patient.birthDate)), 'anno', 'anni') : undefined,
                 taxCode: patient.taxCode || undefined,

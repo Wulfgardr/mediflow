@@ -489,6 +489,7 @@ impl ClinicalApp {
         }
         match self.patient_section {
             PatientSection::Overview => vec![
+                ReadObject::Parametri,
                 ReadObject::Terapie,
                 ReadObject::Controlli,
                 ReadObject::Diario,
@@ -506,7 +507,11 @@ impl ClinicalApp {
         let objects = if background
             && Layout::for_window(f32::from(window.viewport_size().width), self.text_scale).wide
         {
-            vec![ReadObject::Terapie, ReadObject::Controlli]
+            vec![
+                ReadObject::Parametri,
+                ReadObject::Terapie,
+                ReadObject::Controlli,
+            ]
         } else {
             self.visible_read_objects()
         };

@@ -33,6 +33,7 @@ function createDb() {
             caregiver TEXT,
             exemptions TEXT,
             diagnoses TEXT,
+            allergies TEXT,
             monitoring_profile TEXT,
             status_reason TEXT,
             notes TEXT,

@@ -83,6 +83,7 @@ const fields = [
     await encField('patient.diagnoses', [{ code: 'E11.9', description: 'Diabete tipo 2', system: 'ICD-10', date: '2026-01-01T00:00:00.000Z' }]),
     await encField('checkup.notes.empty', ''),
     await encField('observation.value.number', 1.25),
+    await encField('patient.allergies', [{ substance: 'Amoxicillina sintetica', reaction: 'Orticaria sintetica', severity: 'moderate' }]),
 ];
 
 const out = {

@@ -1,4 +1,5 @@
 'use client';
+import { ALLERGY_SEVERITY_LABELS } from '@/lib/patient-allergies';
 import { IDENTIFIER_LABELS, IDENTIFIER_TYPES, patientAgeLabel } from '@/lib/patient-identity';
 
 import { formatCountLabel } from '@/lib/format-count';
@@ -150,6 +151,36 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
             </button>
         </div>
     );
+}
+
+function AllergiesFieldArray({ control, register, errors }: { control: Control<PatientFormValues>; register: UseFormRegister<PatientFormValues>; errors: FieldErrors<PatientFormValues> }) {
+    const { fields, append, remove } = useFieldArray({ control, name: 'allergies' });
+    return <section aria-labelledby="patient-allergies-title" className="space-y-4">
+        <h4 id="patient-allergies-title">Allergie</h4>
+        {fields.length === 0 ? <p className="type-meta">Nessuna allergia registrata</p> : null}
+        {fields.map((field, index) => <div key={field.id} className="grid grid-cols-1 gap-4 border-b pb-4 md:grid-cols-2" style={{ borderColor: 'var(--lume-line)' }}>
+            <div>
+                <label className={FORM_LABEL_CLASS} htmlFor={`allergy-${field.id}-substance`}>Sostanza *</label>
+                <input id={`allergy-${field.id}-substance`} {...register(`allergies.${index}.substance`)} className={FORM_INPUT_CLASS} aria-invalid={!!errors.allergies?.[index]?.substance} />
+                {errors.allergies?.[index]?.substance ? <p role="alert">{errors.allergies[index]?.substance?.message}</p> : null}
+            </div>
+            <div>
+                <label className={FORM_LABEL_CLASS} htmlFor={`allergy-${field.id}-reaction`}>Reazione</label>
+                <input id={`allergy-${field.id}-reaction`} {...register(`allergies.${index}.reaction`)} className={FORM_INPUT_CLASS} aria-invalid={!!errors.allergies?.[index]?.reaction} />
+                {errors.allergies?.[index]?.reaction ? <p role="alert">{errors.allergies[index]?.reaction?.message}</p> : null}
+            </div>
+            <div>
+                <label className={FORM_LABEL_CLASS} htmlFor={`allergy-${field.id}-severity`}>Gravità della reazione</label>
+                <select id={`allergy-${field.id}-severity`} {...register(`allergies.${index}.severity`, { setValueAs: value => value || undefined })} className={FORM_INPUT_CLASS}>
+                    <option value="">Non indicata</option>
+                    {Object.entries(ALLERGY_SEVERITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+            </div>
+            <button type="button" onClick={() => remove(index)} className="ui-btn-secondary self-end" aria-label={`Rimuovi allergia ${index + 1}`}>Rimuovi allergia</button>
+        </div>)}
+        <button type="button" onClick={() => append({ substance: '' })} disabled={fields.length >= 100} className="ui-btn-secondary">Aggiungi allergia</button>
+        {errors.allergies?.root?.message ? <p role="alert">{errors.allergies.root.message}</p> : null}
+    </section>;
 }
 
 function CheckupsFieldArray({ control, register, errors }: { control: Control<PatientFormValues>, register: UseFormRegister<PatientFormValues>, errors: FieldErrors<PatientFormValues> }) {
@@ -513,6 +544,8 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             )}
                         </div>
                     </div>
+
+                    <AllergiesFieldArray control={control} register={register} errors={errors} />
 
                     <div className="space-y-1">
                         <label className={FORM_LABEL_CLASS} htmlFor="patient-notes">Note cliniche e contesto</label>
