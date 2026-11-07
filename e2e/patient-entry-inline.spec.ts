@@ -23,8 +23,15 @@ test('la voce nella scheda conserva la bozza dopo un rifiuto e registra sul pazi
   await page.unroute('**/api/entries');
   await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules#diario$`));
+  await expect(page.locator('#diario article')).toBeVisible();
   await expect(page.locator('#diario article')).toContainText('Resoconto sintetico scritto nella scheda.');
   const saved = await read();
   expect(saved).toHaveLength(1);
   expect(saved[0]).toMatchObject({ patientId: patient.id, version: 1, type: 'visit', setting: 'ambulatory' });
+  await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
+  await editor.fill('Seconda voce sintetica nella stessa scheda.');
+  await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules#diario$`));
+  await expect(page.locator('#diario article').filter({ hasText: 'Seconda voce sintetica nella stessa scheda.' })).toBeVisible();
+  expect(await read()).toHaveLength(2);
 });
