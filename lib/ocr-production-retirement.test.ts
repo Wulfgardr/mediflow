@@ -7,7 +7,7 @@ function source(relativeUrl: string): string {
 }
 
 test('new diary entry attachment flow never starts inline OCR or generative document synthesis', () => {
-    const page = source('../app/patients/[id]/entries/new/page.tsx');
+    const page = source('../components/patient-entry-composer.tsx');
 
     assert.doesNotMatch(page, /\/api\/ocr\/extract|extractPatientDataSmart|extractDocumentTextForSummary|synthesizeDocument|getAiModelLabels|AI OCR|OCR\/Sintesi/u);
     assert.match(page, /summarySnapshot:\s*summary/u);

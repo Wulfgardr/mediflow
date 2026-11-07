@@ -155,15 +155,20 @@ test('Evidence Stack web: loading ed empty hanno segnali distinti', async ({ pag
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const marker = `${Date.now()}`.slice(-8);
   const patientId = await createSyntheticPatient(page, marker);
+  let releaseRead!: () => void;
+  const patientRead = new Promise<void>(resolve => { releaseRead = resolve; });
   await page.route(`**/api/patients/${patientId}`, async (route) => {
-    if (route.request().method() === 'GET') {
-      await new Promise((resolve) => setTimeout(resolve, 700));
-    }
+    if (route.request().method() === 'GET') await patientRead;
     await route.continue();
   });
-  const navigation = page.goto(`/patients/${patientId}/modules`);
-  await expect(page.getByText('Caricamento scheda paziente...', { exact: true })).toBeVisible();
-  await navigation;
+  await page.goto(`/patients/${patientId}/modules`);
+  const loading = page.locator('[data-view-state=loading]').filter({ hasText: 'Caricamento scheda paziente…' });
+  try {
+    await expect(loading).toBeVisible();
+    await expect(loading).toHaveAttribute('role', 'status');
+    await expect(page.getByTestId('patient-documents')).toHaveCount(0);
+  } finally { releaseRead(); }
+  await expect(loading).toHaveCount(0);
 
   await openPatientSection(page, 'documenti');
   await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();

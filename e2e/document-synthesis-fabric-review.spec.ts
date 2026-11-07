@@ -156,6 +156,7 @@ async function createFixture(page: Page): Promise<{ patientId: string; attachmen
   await openDocumentArchive(page, fixture.patientId);
   const saved = page.waitForResponse(response => response.request().method() === 'POST'
     && new URL(response.url()).pathname === '/api/attachments');
+  await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
   await page.locator('#documenti input[type="file"]').setInputFiles({ name: fixture.attachmentName,
     mimeType: 'application/rtf', buffer: attachmentBytes });
   const response = await saved;
@@ -270,6 +271,7 @@ test('Document Synthesis Fabric mostra una proposta con verifica, provenienza e 
   const nextName = 'seconda-fonte-sintetica.txt';
   const saved = page.waitForResponse(response => response.request().method() === 'POST'
     && new URL(response.url()).pathname === '/api/attachments');
+  await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
   await page.locator('#documenti input[type="file"]').setInputFiles({ name: nextName,
     mimeType: 'text/plain', buffer: Buffer.from('Seconda fonte sintetica, senza dati reali.') });
   expect((await saved).ok()).toBe(true);

@@ -7,9 +7,14 @@ import net from 'node:net';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const scratch = '/Volumes/Vision/mf-ui-identita-20261107-scratch';
-export const httpPort = Number(process.env.MF_BANCO_HTTP_PORT || 3100);
-export const tlsPort = Number(process.env.MF_BANCO_TLS_PORT || 3543);
-for (const port of [httpPort, tlsPort]) if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Porta banco non valida');
+export const httpPort = port('MF_BANCO_HTTP_PORT', 3100);
+export const tlsPort = port('MF_BANCO_TLS_PORT', 3543);
+function port(name, fallback) {
+  const value = Number(process.env[name] || fallback);
+  if (!Number.isInteger(value) || value < 1024 || value > 65535 || value === 3000) throw new Error(`Porta non ammessa: ${name}`);
+  return value;
+}
+const httpURL = `http://127.0.0.1:${httpPort}`;
 export const data = path.resolve(process.env.MEDIFLOW_DATA_DIR || `${scratch}/apfs/banco`);
 fs.mkdirSync(scratch, { recursive: true });
 function validateData() {
@@ -26,7 +31,7 @@ const read = () => fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePa
 const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 export async function request(route, { method = 'GET', headers = {}, body } = {}) {
-  const response = await fetch(`http://127.0.0.1:${httpPort}${route}`, { method, headers: { ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const response = await fetch(`${httpURL}${route}`, { method, headers: { ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
   const text = await response.text();
   let json; try { json = JSON.parse(text); } catch { json = text; }
   if (!response.ok) throw new Error(`${method} ${route}: ${response.status} ${text.slice(0, 800)}`);
@@ -71,27 +76,28 @@ async function start() {
   if (!ip) throw new Error('IP Parallels non trovato');
   fs.mkdirSync(data, { recursive: true });
   fs.writeFileSync(`${data}/SYNTHETIC_ONLY`, 'Archivio sintetico creato dal banco UI 2026-11-07\n');
-  const distTarget = `${data}/next`;
-  const distLink = `${root}/node_modules/.cache/mf-ui-identita`;
+  const distTarget = `${data}/next-output`;
+  const distRelative = `node_modules/.cache/mf-ui-identita-${httpPort}-${createHash('sha256').update(data).digest('hex').slice(0, 8)}`;
+  const distLink = `${root}/${distRelative}`;
   fs.mkdirSync(`${root}/node_modules/.cache`, { recursive: true });
   fs.mkdirSync(distTarget, { recursive: true });
   if (!fs.existsSync(distLink)) fs.symlinkSync(distTarget, distLink, 'dir');
   if (fs.realpathSync(distLink) !== fs.realpathSync(distTarget)) throw new Error('Dist link occupato da altro banco');
-  const env = { ...process.env, MEDIFLOW_DATA_DIR: data, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', MEDIFLOW_NEXT_DIST_DIR: 'node_modules/.cache/mf-ui-identita', NEXT_TELEMETRY_DISABLED: '1', NODE_PATH: `${root}/node_modules` };
+  const env = { ...process.env, MEDIFLOW_DATA_DIR: data, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', MEDIFLOW_NEXT_DIST_DIR: distRelative, NEXT_TELEMETRY_DISABLED: '1', NODE_PATH: `${root}/node_modules` };
   if (!fs.existsSync(`${data}/medical.db`)) execFileSync(process.execPath, ['scripts/run-strip-types.mjs', 'scripts/seed-performance-baseline.mjs', '--data-dir', data, '--patients', '40', '--entries-per-patient', '0', '--observations-per-patient', '0', '--documents-per-patient', '0'], { cwd: root, env, stdio: ['ignore', fs.openSync(`${data}/seed.log`, 'a'), 'inherit'] });
   if (!fs.existsSync(`${data}/local-api-token`)) fs.writeFileSync(`${data}/local-api-token`, randomBytes(32).toString('hex'), { mode: 0o600 });
   if (!fs.existsSync(`${data}/local-api.crt`)) execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '30', '-keyout', `${data}/local-api.key`, '-out', `${data}/local-api.crt`, '-subj', '/CN=MediFlow Synthetic UI', '-addext', `subjectAltName=DNS:localhost,IP:127.0.0.1,IP:${ip}`], { stdio: 'ignore' });
   fs.chmodSync(`${data}/local-api.key`, 0o600);
-  const state = { data, ip, nextPid: spawnOwned([`${root}/node_modules/next/dist/bin/next`, 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', String(httpPort)], env, 'next.log') };
+  const state = { data, ip, httpPort, tlsPort, nextPid: spawnOwned([`${root}/node_modules/next/dist/bin/next`, 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', String(httpPort)], env, 'next.log') };
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
   let ready = false;
   for (let n = 0; n < 120; n++) { try { await request('/api/auth/check'); ready = true; break; } catch {} await sleep(1000); }
   if (!ready) throw new Error('Next non pronto: consultare next.log');
   const tsconfig = `${root}/tsconfig.json`;
-  fs.writeFileSync(tsconfig, fs.readFileSync(tsconfig, 'utf8').replace(/,\n\s*"(?:\/Volumes\/Vision\/mf-ui-identita-20261107-scratch\/|\.next-visual-ui-identita\/|node_modules\/\.cache\/mf-ui-identita\/)[^"]+"/g, ''));
+  fs.writeFileSync(tsconfig, fs.readFileSync(tsconfig, 'utf8').replace(/,\n\s*"(?:\/Volumes\/Vision\/mf-ui-identita-20261107-scratch\/|\.next-visual-ui-identita\/|node_modules\/\.cache\/mf-ui-identita(?:-[0-9a-f-]+)?\/)[^"]+"/g, ''));
   const headers = { Authorization: `Bearer ${fs.readFileSync(`${data}/local-api-token`, 'utf8').trim()}` };
   await request('/api/settings/network.mode', { method: 'PUT', headers, body: { value: 'network-home-base' } });
-  state.proxyPid = spawnOwned([`${root}/scripts/local-api-tls-proxy.mjs`], { ...env, MEDIFLOW_TLS_CERT_PATH: `${data}/local-api.crt`, MEDIFLOW_TLS_KEY_PATH: `${data}/local-api.key`, MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_TLS_BIND_HOST: '0.0.0.0', MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: `http://127.0.0.1:${httpPort}` }, 'proxy.log');
+  state.proxyPid = spawnOwned([`${root}/scripts/local-api-tls-proxy.mjs`], { ...env, MEDIFLOW_TLS_CERT_PATH: `${data}/local-api.crt`, MEDIFLOW_TLS_KEY_PATH: `${data}/local-api.key`, MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_TLS_BIND_HOST: '0.0.0.0', MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: httpURL }, 'proxy.log');
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
   await seedReference();
   await sleep(500); return status();
@@ -109,7 +115,7 @@ async function seedReference() {
   const wrapped = Buffer.from(auth.json.encryptedMasterKey.slice(3), 'base64');
   const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: wrapped.subarray(0, 12) }, kek, wrapped.subarray(12));
   const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
-  const headers = { Cookie: auth.cookie, Origin: `http://127.0.0.1:${httpPort}`, 'Sec-Fetch-Site': 'same-origin', 'x-mediflow-archive-generation': auth.json.archiveGeneration };
+  const headers = { Cookie: auth.cookie, Origin: httpURL, 'Sec-Fetch-Site': 'same-origin', 'x-mediflow-archive-generation': auth.json.archiveGeneration };
   const { syntheticTaxCode } = await import('../../lib/patient-identity.test-support.ts');
   const existing = (await request('/api/patients', { headers })).json;
   const patients = [];
@@ -131,7 +137,7 @@ async function seedReference() {
 }
 async function status() {
   const state = read();
-  const result = { ...state, nextRunning: alive(state.nextPid), proxyRunning: alive(state.proxyPid), syntheticOnly: fs.existsSync(`${data}/SYNTHETIC_ONLY`), http: `http://127.0.0.1:${httpPort}`, https: `https://${state.ip}:${tlsPort}` };
+  const result = { ...state, nextRunning: alive(state.nextPid), proxyRunning: alive(state.proxyPid), syntheticOnly: fs.existsSync(`${data}/SYNTHETIC_ONLY`), http: httpURL, https: `https://${state.ip}:${tlsPort}` };
   console.log(JSON.stringify(result, null, 2)); return result;
 }
 async function pair(platform) {

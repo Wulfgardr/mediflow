@@ -23,7 +23,7 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
         return route.continue();
     });
     try {
-        await bootstrapUnlockedSession(page, '1234');
+        await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
         const fixture = await page.evaluate(async () => {
             const post = async (path: string, body: unknown) => { const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); if (!response.ok) throw new Error(`${path}: ${response.status}`); return response.json(); };
             const patient = await post('patients', { firstName: 'Voce', lastName: 'Sintetica', taxCode: `N16${crypto.randomUUID().replaceAll('-', '').slice(0, 13).toUpperCase()}`, birthDate: '1980-01-01', diagnoses: [{ code: 'SYN16', system: 'ICD-10', description: 'Problema inventato W16' }] });
@@ -113,7 +113,7 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
         await page.getByTestId('document-viewer').getByRole('button', { name: 'Chiudi', exact: true }).click();
         await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
         await editor.fill('Bozza inventata da abbandonare senza scrivere W16.');
-        await composer.getByRole('link', { name: 'Torna alla scheda paziente', exact: true }).click();
+        await page.getByRole('link', { name: 'Torna alla scheda', exact: true }).click();
         await zoom.setZoom(4);
         await expect.poll(() => page.getByRole('dialog').evaluate(element => { const box = element.getBoundingClientRect(); return box.top >= -1 && box.bottom <= innerHeight + 1; })).toBe(true);
         const leave = page.getByRole('button', { name: 'Esci senza salvare', exact: true });
@@ -132,7 +132,7 @@ test('Quadro in scrittura distingue lettura, errore e paziente non disponibile',
     test.skip(process.env.NEW_ENTRY_BASELINE === '1', 'Il Quadro non esiste nella composizione precedente');
     test.setTimeout(90_000);
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw new Error('Runtime e archivio sintetici isolati richiesti');
-    await bootstrapUnlockedSession(page, '1234');
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const patientId = await page.evaluate(async () => {
         const response = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Quadro', lastName: 'Lettura sintetica', taxCode: `N16${crypto.randomUUID().replaceAll('-', '').slice(0, 13).toUpperCase()}`, birthDate: '1980-01-01', diagnoses: [] }) });
         if (!response.ok) throw new Error(`Synthetic patient: ${response.status}`); return (await response.json()).id as string;
@@ -153,7 +153,7 @@ test('Quadro in scrittura distingue lettura, errore e paziente non disponibile',
         const previous = page.getByRole('region', { name: 'Ultime voci registrate', exact: true });
         await expect(previous.getByRole('status')).toContainText('Lettura'); await expect(previous).not.toContainText('Nessuna voce recente');
         release();
-        await expect(previous.getByRole('alert')).toHaveText('Voci precedenti non disponibili.'); await expect(previous).not.toContainText('Nessuna voce recente');
+        await expect(previous.getByRole('alert')).toHaveText('✕ Voci precedenti non disponibili.'); await expect(previous).not.toContainText('Nessuna voce recente');
         for (const name of ['Terapie attive', 'Misure recenti', 'Controlli aperti']) {
             const section = quadro.getByRole('region', { name, exact: true });
             await expect(section.getByRole('alert')).toContainText('Impossibile leggere'); await expect(section).not.toContainText(/Nessun[ao]? /u);
@@ -178,7 +178,7 @@ test('Quadro in scrittura distingue lettura, errore e paziente non disponibile',
 for (const status of [401, 403, 503, 200]) test(`Nuova voce: lettura precedente ${status} rispetta disponibilità e autorità`, async ({ page, baseURL }) => {
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw new Error('Runtime e archivio sintetici isolati richiesti');
     await page.route('**/api/siss/session-status', route => route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } }));
-    await bootstrapUnlockedSession(page, '1234');
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const patientId = await page.evaluate(async () => {
         const response = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Lettura', lastName: 'Sintetica', taxCode: `H16${crypto.randomUUID().replaceAll('-', '').slice(0, 13).toUpperCase()}`, birthDate: '1980-01-01', diagnoses: [] }) });
         if (!response.ok) throw new Error(`Synthetic patient: ${response.status}`);
@@ -205,7 +205,7 @@ for (const status of [401, 403, 503, 200]) test(`Nuova voce: lettura precedente 
         await expect(history).toBeVisible();
         await expect(page.getByLabel('MediFlow lock screen')).toHaveCount(0);
         if (status === 503) {
-            await expect(history.getByRole('alert')).toHaveText('Voci precedenti non disponibili.');
+            await expect(history.getByRole('alert')).toHaveText('✕ Voci precedenti non disponibili.');
             await expect(history).not.toContainText('Nessuna voce recente');
         } else {
             await expect(history).toContainText('Nessuna voce recente');

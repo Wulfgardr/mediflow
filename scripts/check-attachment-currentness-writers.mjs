@@ -16,7 +16,7 @@ const SELF = new Set(['scripts/check-attachment-currentness-writers.mjs', 'scrip
 const record = (path, kind, fingerprint, count, disposition = 'current', code) => ({ path, kind, fingerprint, count, disposition, code });
 export const CONTRACT = [
     record('app/api/attachments/[id]/route.ts', 'orm-delete', '9dfcd7c23ef693ef', 1),
-    record('app/patients/[id]/entries/new/page.tsx', 'facade-add', '1d6bb4422d8e4dd4', 1, 'delegated'),
+    record('components/patient-entry-composer.tsx', 'facade-add', '1d6bb4422d8e4dd4', 1, 'delegated'),
     record('components/document-upload.tsx', 'facade-add', '33869fb80e772839', 1, 'delegated'),
     record('components/document-upload.tsx', 'facade-delete', '62de05dc465e2ddf', 1, 'delegated'),
     record('lib/document-dossier-ports.ts', 'facade-add', '572ca168dd9fffe9', 1, 'delegated'),

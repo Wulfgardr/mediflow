@@ -34,15 +34,16 @@
 .registration { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 16px; color: var(--lume-ink-muted); font: var(--type-meta); }
 .patientEntry :global(.mf-option-card) { min-height: 44px; padding: 8px 0 !important; border: 0; border-radius: 0 !important; background: transparent; box-shadow: none; }
 .patientEntry :global(.truncate) { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
-@container (max-width: 600px) {
+@container patient-canvas (width < 700px) {
     .patientEntry { grid-template-columns: minmax(0, 1fr); gap: 8px; }
     .margin { flex-direction: row; flex-wrap: wrap; gap: 8px; }
 }
 
-/* Gerarchia della voce: tipo e fonte sono metadati, il titolo guida la lettura.
-   Prima tipo, fonte e titolo avevano lo stesso peso e competevano fra loro. */
-.patientEntry .identity > span { color: var(--lume-ink-muted) !important; font: var(--type-meta); }
-.patientEntry .identity > div > span:first-child { font-weight: 400; }
+.patientEntry .identity { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.patientEntry .identity > span { color: var(--lume-ink) !important; font: var(--type-strong); }
+.patientEntry .identity > div { margin: 0; font: var(--type-meta); }
+.previousEntries { margin-top: 28px; color: var(--lume-ink-muted); }
+.previousEntries :is(.entryTitle, .patientEntry .identity > span, .patientEntry :global(.prose)) { color: var(--lume-ink-muted) !important; }
 /* Le voci eliminate sono una consultazione di controllo, non un'azione principale. */
 .quietAction:global(.mf-button-text) { color: var(--lume-ink-muted); font: var(--type-meta); }
 .quietAction:global(.mf-button-text):hover { color: var(--lume-ink); }

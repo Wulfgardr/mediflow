@@ -245,6 +245,11 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "scripts/ui-identita/web-regression.spec.ts",
+    "reason": "Regressioni visive locali sul banco sintetico APFS: npx playwright test -c scripts/ui-identita/playwright.config.ts web-regression; fuori dagli shard CI.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "scripts/ui-identita/web-capture.spec.ts",
     "reason": "Catture UI sintetiche locali: npx playwright test -c scripts/ui-identita/playwright.config.ts; fuori dagli shard CI.",
     "owner": "@Wulfgardr"
