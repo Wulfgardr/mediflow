@@ -204,6 +204,15 @@ export function assertNoRetentionHold(tx: RetentionRunner, patientId: string): v
     if (!holds || holds.holds.some(hold => hold.patientId === patientId)) throw new RetentionError('legal_hold');
 }
 
+/** La cancellazione di un documento allegato si ferma se il documento o l'intero fascicolo sono bloccati. */
+export function assertAttachmentNotHeld(tx: RetentionRunner, patientId: string, attachmentId: string): void {
+    const raw = readSetting(tx, RETENTION_HOLDS_KEY);
+    if (raw === undefined) return;
+    const holds = parseDocument(raw, retentionHoldsDocumentSchema, null);
+    if (!holds || holds.holds.some(hold => hold.patientId === patientId
+        && (hold.scope === 'patient' || hold.attachmentId === attachmentId))) throw new RetentionError('legal_hold');
+}
+
 // --- Scarto ---
 
 export type RetentionDiscardReceipt = {
