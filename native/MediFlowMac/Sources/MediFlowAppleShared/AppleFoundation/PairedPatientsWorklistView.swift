@@ -1167,15 +1167,39 @@ struct PairedPatientCreateView: View {
                         .accessibilityIdentifier("new-patient-first-name")
                     TextField("Cognome", text: $model.newPatientLastName)
                         .accessibilityIdentifier("new-patient-last-name")
-                    TextField("Codice fiscale", text: $model.newPatientTaxCode)
-                        .accessibilityIdentifier("new-patient-tax-code")
+                    Picker("Identificativo", selection: $model.newPatientIdentifierType) {
+                        ForEach(PatientIdentityForm.identifierTypes, id: \.self) { type in
+                            Text(PatientIdentityForm.label(type)).tag(type)
+                        }
+                    }
+                    .accessibilityIdentifier("new-patient-identifier-type")
+                    .onChange(of: model.newPatientIdentifierType) { type in
+                        if type == "none" { model.newPatientTaxCode = "" }
+                    }
+                    if model.newPatientIdentifierType != "none" {
+                        TextField(PatientIdentityForm.label(model.newPatientIdentifierType), text: $model.newPatientTaxCode)
+                            .accessibilityIdentifier("new-patient-tax-code")
+                    }
                 }
                 Section {
+                    Toggle("Conosco solo l’anno (stima)", isOn: $model.newPatientHasEstimatedBirthYear)
+                        .accessibilityIdentifier("new-patient-estimated-birth")
+                        .onChange(of: model.newPatientHasEstimatedBirthYear) { estimated in
+                            if estimated { model.newPatientHasBirthDate = false }
+                            model.newPatientBirthYear = ""
+                        }
+                    if model.newPatientHasEstimatedBirthYear {
+                        TextField("Anno di nascita stimato", text: $model.newPatientBirthYear)
+                            .accessibilityIdentifier("new-patient-birth-year")
+                    } else {
                     Toggle("Data di nascita", isOn: $model.newPatientHasBirthDate)
                         .accessibilityIdentifier("new-patient-has-birth-date")
                     if model.newPatientHasBirthDate {
-                        DatePicker("Nascita", selection: $model.newPatientBirthDate, displayedComponents: .date)
+                        DatePicker("Nascita", selection: $model.newPatientBirthDate, in: ...Date(), displayedComponents: .date)
+                            .environment(\.calendar, PairedPatientsWorkspaceModel.patientBirthDateCalendar)
+                            .environment(\.timeZone, PairedPatientsWorkspaceModel.patientBirthDateCalendar.timeZone)
                             .accessibilityIdentifier("new-patient-birth-date")
+                    }
                     }
                     TextField("Indirizzo (opzionale)", text: $model.newPatientAddress)
                         .accessibilityIdentifier("new-patient-address")
@@ -1184,11 +1208,11 @@ struct PairedPatientCreateView: View {
                     TextField("Caregiver (opzionale)", text: $model.newPatientCaregiver)
                         .accessibilityIdentifier("new-patient-caregiver")
                 }
-                Text("Crea la cartella nell’archivio attivo. I campi protetti vengono cifrati sul dispositivo.")
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundStyle(.secondary)
+                if let error = model.newPatientIdentityError,
+                   !model.newPatientTaxCode.isEmpty || model.newPatientIdentifierType == "none" {
+                    Text(error).foregroundStyle(LumePalette.critical)
+                        .accessibilityIdentifier("new-patient-identity-error")
+                }
                 if let error = model.errorMessage {
                     Text(error)
                         .foregroundStyle(LumePalette.critical)

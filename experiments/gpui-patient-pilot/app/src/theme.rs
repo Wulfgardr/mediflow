@@ -305,6 +305,15 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn canonical_canvas_and_plane_colors() {
+        for (dark, shade, paper) in [(false, 0xe8eaee, 0xffffff), (true, 0x101216, 0x1a1d22)] {
+            let theme = Theme::for_dark(dark);
+            assert_eq!(theme.shade, rgb(shade).into());
+            assert_eq!(theme.paper, rgb(paper).into());
+        }
+    }
+
     macro_rules! voice {
         ($test:ident, $role:expr, $family:expr, $s1:expr, $s2:expr, $weight:expr, $h1:expr, $h2:expr) => {
             #[test]

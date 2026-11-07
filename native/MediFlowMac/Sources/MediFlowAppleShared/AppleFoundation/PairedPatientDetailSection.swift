@@ -628,8 +628,29 @@ struct PairedPatientDetailSection: View {
                 .accessibilityIdentifier("edit-patient-firstName")
             TextField("Cognome", text: $model.editPatientLastName)
                 .accessibilityIdentifier("edit-patient-lastName")
-            TextField("Codice fiscale", text: $model.editPatientTaxCode)
-                .accessibilityIdentifier("edit-patient-taxCode")
+            Picker("Identificativo", selection: $model.editPatientIdentifierType) {
+                ForEach(PatientIdentityForm.identifierTypes, id: \.self) { type in
+                    Text(PatientIdentityForm.label(type)).tag(type)
+                }
+            }
+            .accessibilityIdentifier("edit-patient-identifier-type")
+            .onChange(of: model.editPatientIdentifierType) { type in
+                if type == "none" { model.editPatientTaxCode = "" }
+            }
+            if model.editPatientIdentifierType != "none" {
+                TextField(PatientIdentityForm.label(model.editPatientIdentifierType), text: $model.editPatientTaxCode)
+                    .accessibilityIdentifier("edit-patient-taxCode")
+            }
+            Toggle("Conosco solo l’anno (stima)", isOn: $model.editPatientHasEstimatedBirthYear)
+                .accessibilityIdentifier("edit-patient-estimated-birth")
+                .onChange(of: model.editPatientHasEstimatedBirthYear) { estimated in
+                    if estimated { model.editPatientBirthDate = nil }
+                    model.editPatientBirthYear = ""
+                }
+            if model.editPatientHasEstimatedBirthYear {
+                TextField("Anno di nascita stimato", text: $model.editPatientBirthYear)
+                    .accessibilityIdentifier("edit-patient-birth-year")
+            } else {
             Toggle("Data di nascita presente", isOn: Binding(
                 get: { model.editPatientBirthDate != nil },
                 set: { model.setPatientBirthDatePresent($0) }
@@ -645,6 +666,11 @@ struct PairedPatientDetailSection: View {
                 .environment(\.timeZone, PairedPatientsWorkspaceModel.patientBirthDateCalendar.timeZone)
                 .disabled(model.isWorking)
                 .accessibilityIdentifier("edit-patient-birthDate")
+            }
+            }
+            if let error = model.editPatientIdentityError {
+                Text(error).foregroundStyle(LumePalette.critical)
+                    .accessibilityIdentifier("edit-patient-identity-error")
             }
             TextField("Indirizzo", text: $model.editPatientAddress)
                 .accessibilityIdentifier("edit-patient-address")

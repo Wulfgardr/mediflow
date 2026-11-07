@@ -32,7 +32,7 @@ function issue(index: number): Owner.WebSessionProjection {
     return resolution.projection;
 }
 const input = (id: string) => ({ id, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'RSSMRA80A01H501U',
-    address: 'ENC:synthetic:opaque', phone: 'ENC:synthetic:opaque', ambulatoryId: 'synthetic-B' });
+    address: 'ENC:synthetic:opaque', phone: 'ENC:synthetic:opaque', allergies: 'ENC:c3ludGhldGlj:YWxsZXJneQ==', ambulatoryId: 'synthetic-B' });
 const fencedHeaders = (preview: PatientCreatePreviewContext) => ({
     'Content-Type': 'application/json', 'X-MediFlow-Patient-Create-Mode': 'fixed-preview-v1',
     'X-MediFlow-Patient-Create-Context': preview.nonce, 'X-MediFlow-Patient-Create-Target': preview.ambulatoryId,
@@ -164,6 +164,7 @@ if (!state) throw new Error('Synthetic route fixture is no longer active');
         assert.equal(state.cookieReads, reads); assert.equal(rows('patients')[0].ambulatory_id, 'synthetic-A');
         assert.equal(rows('patients_to_ambulatories')[0].ambulatory_id, 'synthetic-A');
         assert.equal(rows('patients')[0].address, input('x').address); assert.equal(rows('patients')[0].phone, input('x').phone);
+        assert.equal(rows('patients')[0].allergies, input('x').allergies);
         assert.equal(state.audit.length, 1); assert.equal(JSON.stringify(state.audit).includes(preview.nonce), false);
         assert.deepEqual(await response.json(), { id: 'synthetic-fixed-A' });
     });

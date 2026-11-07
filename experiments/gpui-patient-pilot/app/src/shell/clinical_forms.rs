@@ -7,6 +7,18 @@ impl ClinicalApp {
             return div();
         };
         let review = form.state != FormState::Draft;
+        let field_indices = if matches!(form.kind, FormKind::PatientNew | FormKind::PatientProfile)
+        {
+            patient_forms::visible_field_indices(
+                &form
+                    .fields
+                    .iter()
+                    .map(|field| field.value(cx))
+                    .collect::<Vec<_>>(),
+            )
+        } else {
+            (0..form.fields.len()).collect()
+        };
         let comparison = form.kind == FormKind::Notes && self.core.has_notes_comparison();
         div().min_w_0().max_w_full().flex().flex_col().gap(px(20.))
             .when(comparison, |el| el.child(self.notes_comparison_view()))
@@ -32,7 +44,7 @@ impl ClinicalApp {
                 .child(text!(format!("{} · copia scelta in memoria", format_size(upload.bytes.len() as u64))))
                 .child(div().text_color(theme.secondary).child(text!("Il formato è associato all'estensione del file. La conferma non interpreta il contenuto e non apre il documento.")))))
             .when(form.kind == FormKind::Therapy, |el| el.child(self.therapy_picker_view(cx)))
-            .children(form.fields.iter().enumerate()
+            .children(field_indices.into_iter().map(|index| (index, &form.fields[index]))
                 .filter(|(index, field)| !(form.kind == FormKind::Therapy && *index == 0 && field.read_only))
                 .map(|(index, field)| self.field_view(field, format!("clinical-workspace-form-field-{index}"), cx)))
             .when(form.kind == FormKind::Entry && !review, |el| el.child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)

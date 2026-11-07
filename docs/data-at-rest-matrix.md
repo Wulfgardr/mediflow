@@ -7,8 +7,8 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 13.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
-criterio 1. Aggiornata il 3 novembre 2026 per finestre e blocchi della conservazione (ADR 0178); il 21 ottobre 2026 per il marker Web di cambio stato
+**Versione 14.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+criterio 1. Aggiornata il 7 novembre 2026 per le allergie cifrate (ADR 0182); il 3 novembre 2026 per finestre e blocchi della conservazione (ADR 0178); il 21 ottobre 2026 per il marker Web di cambio stato
 terapia (ADR 0156); il 13 ottobre 2026 per i permessi del database adottato dalla cartella
 dell’applicazione; l’11 ottobre per credenziali v3 e generazione dell’archivio, recupero cifrato completo e permessi delle copie di riparazione; la prima classificazione era su `main` `bcb7af46a`.
 
@@ -216,7 +216,7 @@ locali salvano ciò che ricevono.
 
 ### `patients`: anagrafica e sintesi clinica
 
-- Cifrate: `address`, `phone`, `caregiver`, `exemptions`, `diagnoses`, `status_reason`, `notes`, `ai_summary`, `document_insights`, `archive_reason`, `archive_note`, `deletion_reason`
+- Cifrate: `address`, `phone`, `caregiver`, `exemptions`, `diagnoses`, `allergies`, `status_reason`, `notes`, `ai_summary`, `document_insights`, `archive_reason`, `archive_note`, `deletion_reason`
 - In chiaro: `id`, `first_name`, `last_name`, `tax_code`, `identifier_type`, `identifier_history`, `birth_date_precision`, `birth_year`, `birth_date`, `is_adi`, `is_archived`, `ambulatory_id`, `created_at`, `updated_at`, `monitoring_profile`, `version`, `deleted_at`, `ai_summary_generated_at`, `ai_summary_context_hash`
 - Leggibile senza chiave: nome, cognome, codice fiscale, data di nascita, profilo di monitoraggio, ADI e stato di archiviazione.
 

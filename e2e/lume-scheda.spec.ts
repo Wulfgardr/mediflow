@@ -318,7 +318,8 @@ for (const schedaCase of CASES) {
     await expectPatientIdentityPrivate(header, patient);
     await expect(records.getByRole('link', { name: patient.name, exact: true }).locator('.liquid-blur')).toHaveCount(1);
     await page.goto(`/patients/${patient.id}/entries/new`);
-    const label = page.getByTestId('progressive-entry-composer').locator('header p');
+    const label = page.getByTestId('progressive-entry-composer').locator('header p').filter({ hasText: patient.name });
+    await expect(label).toHaveCount(1);
     await expect(label).toContainText(patient.name);
     await expect(label.locator('.liquid-blur')).toHaveCount(1);
     await page.goto(`/patients/${patient.id}/modules`);

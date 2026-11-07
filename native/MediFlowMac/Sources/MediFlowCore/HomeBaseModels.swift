@@ -1144,6 +1144,9 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
     public let firstName: String?
     public let lastName: String?
     public let taxCode: String?
+    public let identifierType: String?
+    public let birthDatePrecision: String?
+    public let birthYear: PatchValue<Int>
     public let isAdi: Bool?
     public let isArchived: Bool?
     public let address: PatchValue<String>
@@ -1167,6 +1170,9 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         firstName: String? = nil,
         lastName: String? = nil,
         taxCode: String? = nil,
+        identifierType: String? = nil,
+        birthDatePrecision: String? = nil,
+        birthYear: PatchValue<Int> = .omit,
         isAdi: Bool? = nil,
         isArchived: Bool? = nil,
         address: PatchValue<String> = .omit,
@@ -1185,6 +1191,9 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         self.firstName = firstName
         self.lastName = lastName
         self.taxCode = taxCode
+        self.identifierType = identifierType
+        self.birthDatePrecision = birthDatePrecision
+        self.birthYear = birthYear
         self.isAdi = isAdi
         self.isArchived = isArchived
         self.address = address
@@ -1201,7 +1210,7 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, firstName, lastName, taxCode, isAdi, isArchived
+        case version, firstName, lastName, taxCode, isAdi, isArchived, identifierType, birthDatePrecision, birthYear
         case address, phone, caregiver, notes, monitoringProfile, statusReason, diagnoses
         case exemptions, birthDate, archiveReason, archiveNote
     }
@@ -1212,6 +1221,9 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
         try container.encodeIfPresent(firstName, forKey: .firstName)
         try container.encodeIfPresent(lastName, forKey: .lastName)
         try container.encodeIfPresent(taxCode, forKey: .taxCode)
+        try container.encodeIfPresent(identifierType, forKey: .identifierType)
+        try container.encodeIfPresent(birthDatePrecision, forKey: .birthDatePrecision)
+        try container.encodePatch(birthYear, forKey: .birthYear)
         try container.encodeIfPresent(isAdi, forKey: .isAdi)
         try container.encodeIfPresent(isArchived, forKey: .isArchived)
         try container.encodePatch(address, forKey: .address)
@@ -1239,6 +1251,9 @@ public struct HomeBasePatientCreatePayload: Encodable, Sendable {
     public let firstName: String
     public let lastName: String
     public let taxCode: String
+    public let identifierType: String?
+    public let birthDatePrecision: String?
+    public let birthYear: Int?
     public let birthDate: Date?
     public let address: String?
     public let phone: String?
@@ -1257,6 +1272,9 @@ public struct HomeBasePatientCreatePayload: Encodable, Sendable {
         firstName: String,
         lastName: String,
         taxCode: String,
+        identifierType: String? = nil,
+        birthDatePrecision: String? = nil,
+        birthYear: Int? = nil,
         birthDate: Date? = nil,
         address: String? = nil,
         phone: String? = nil,
@@ -1274,6 +1292,9 @@ public struct HomeBasePatientCreatePayload: Encodable, Sendable {
         self.firstName = firstName
         self.lastName = lastName
         self.taxCode = taxCode
+        self.identifierType = identifierType
+        self.birthDatePrecision = birthDatePrecision
+        self.birthYear = birthYear
         self.birthDate = birthDate
         self.address = address
         self.phone = phone
@@ -1288,7 +1309,7 @@ public struct HomeBasePatientCreatePayload: Encodable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, ambulatoryId, firstName, lastName, taxCode, birthDate, address, phone, caregiver
+        case id, ambulatoryId, firstName, lastName, taxCode, birthDate, address, phone, caregiver, identifierType, birthDatePrecision, birthYear
         case exemptions, diagnoses, monitoringProfile, statusReason, notes, isAdi
     }
 
