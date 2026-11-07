@@ -215,9 +215,8 @@ impl ClinicalApp {
         let area = &mut self.local_host.references.drug;
         match result {
             Ok(DrugCatalogReply::Ready(preview)) => {
-                if !preview.counted() {
-                    area.fill_mapping(preview.mapping(), cx);
-                }
+                // I campi mostrano sempre la mappatura su cui il server ha risposto.
+                area.fill_mapping(preview.mapping(), cx);
                 area.preview = Some(preview);
             }
             Ok(DrugCatalogReply::Refused(message)) => area.message = Some((message, true)),
@@ -270,6 +269,15 @@ impl ClinicalApp {
         let Some(preview) = area.preview.clone().filter(DrugCatalogPreview::counted) else {
             return;
         };
+        // La sostituzione usa le colonne contate: se i campi sono cambiati dopo il conteggio, si conta di nuovo.
+        if area.mapping(preview.header().len(), cx).ok().as_ref() != Some(preview.mapping()) {
+            area.message = Some((
+                "Le colonne o il separatore sono cambiati dopo il conteggio: conta di nuovo le righe prima della sostituzione.".into(),
+                true,
+            ));
+            cx.notify();
+            return;
+        }
         match access.prepare_drug_catalog_import(&preview, area.source_value(cx)) {
             Ok(command) => {
                 area.command = Some(Arc::new(command));
@@ -623,6 +631,36 @@ mod tests {
             serde_json::from_str::<Value>(field(counted, "mapping").unwrap()).unwrap(),
             json!({"delimiter":";","columns":{"codice":0,"denominazione":1,"principio_attivo":2}})
         );
+
+        // 2b. Una colonna corretta dopo il conteggio non passa con la mappatura vecchia: va contata di nuovo.
+        view.update(cx, |app, cx| {
+            app.local_host.references.drug.columns[2]
+                .update(cx, |input, cx| input.set_content("", cx));
+            app.prepare_drug_catalog(cx);
+            let area = &app.local_host.references.drug;
+            assert!(area.command.is_none());
+            assert!(
+                area.message.as_ref().is_some_and(|(m, error)| *error
+                    && m.starts_with("Le colonne o il separatore sono cambiati"))
+            );
+            area.columns[2].update(cx, |input, cx| input.set_content("3", cx));
+            app.local_host
+                .references
+                .drug
+                .delimiter
+                .update(cx, |input, cx| input.set_content(",", cx));
+            app.prepare_drug_catalog(cx);
+            assert!(
+                app.local_host.references.drug.command.is_none(),
+                "a changed delimiter also needs a recount"
+            );
+            app.local_host
+                .references
+                .drug
+                .delimiter
+                .update(cx, |input, cx| input.set_content(";", cx));
+            app.local_host.references.drug.message = None;
+        });
 
         // 3. Fonte dichiarata e revisione: nessuna scrittura prima della conferma.
         let requests = host.request_count();
