@@ -19,7 +19,7 @@
  */
 
 import {
-    DOSSIER_FACT_TARGET, DOSSIER_SCHEMA_VERSION, classifyDossierSource, collectDossierTaxCodes,
+    DOSSIER_FACT_TARGET, DOSSIER_SCHEMA_VERSION, classifyDossierSource, collectDossierPatientNames, collectDossierTaxCodes,
     dossierFactBlockers, dossierFactFingerprint, dossierFactRef, dossierResidualSegments, evaluateDossierCoverage, evaluateDossierGroupIdentity,
     extractDossierCandidates, findExplicitDocumentDate, latestAppliedOutcome, preservationIsCurrent, readDossierRecord, reconcileDossierFacts,
     resolveDossierText, splitDossierUnits, writeDossierRecordIntoSnapshot,
@@ -104,6 +104,7 @@ export interface DossierDraftSource {
     extraction: DossierExtraction;
     text: string | null;
     taxCodes: DossierTaxCodeEvidence[];
+    patientNames: string[][];
     documentDate: DossierRecord['documentDate'];
     facts: DossierFact[];
     classificationResult: DossierRecord['classification'];
@@ -153,7 +154,7 @@ export async function buildDossierInventory(
         try { bytes = await file.read(); } catch {
             sources.push({ key, group: groupKeyOf(file.relativePath), relativePath: file.relativePath, fileName: file.name, size: file.size, sha256: '',
                 classification: { kind: 'unknown', mediaType: file.type || 'application/octet-stream', extractable: false, reason: 'File non leggibile dal browser.' },
-                extraction: { state: 'not_extracted', reason: 'unknown' }, text: null, taxCodes: [], documentDate: null, facts: [],
+                extraction: { state: 'not_extracted', reason: 'unknown' }, text: null, taxCodes: [], patientNames: [], documentDate: null, facts: [],
                 classificationResult: 'unknown', status: 'unreadable', file });
             continue;
         }
@@ -183,6 +184,7 @@ export async function buildDossierInventory(
             ? extractDossierCandidates({ fileName: file.name, text, units: extraction.units, documentDate: date?.date ?? null, exemptionCodes })
             : { facts: [], classification: 'unknown' as const };
         const taxCodes = text ? collectDossierTaxCodes(text) : [];
+        const patientNames = text ? collectDossierPatientNames(text) : [];
         const match = duplicateOf ? undefined : preparedSources.get(sha256);
         let facts = candidates.facts;
         let prepared: DossierDraftSource['prepared'];
@@ -201,7 +203,7 @@ export async function buildDossierInventory(
         const documentDate = date ? { value: date.date, source: date.source } : preparedDate ? { value: preparedDate, source: 'text' as const } : null;
         const group = (match && preparedPatientKey(match.patient, text)) || groupKeyOf(file.relativePath);
         sources.push({ key, group, relativePath: file.relativePath, fileName: file.name, size: file.size, sha256,
-            classification, extraction, text, taxCodes, documentDate,
+            classification, extraction, text, taxCodes, patientNames, documentDate,
             facts, classificationResult: candidates.classification,
             status: duplicateOf ? 'duplicate_in_selection' : 'ready', ...(duplicateOf ? { duplicateOf } : {}), ...(prepared ? { prepared } : {}), file });
         options.onProgress?.(index + 1, files.length);
@@ -302,7 +304,7 @@ function initialRecord(source: DossierDraftSource, ports: DossierPorts, identity
         extractionAttempts: source.classification.extractable
             ? [{ at: confirmedAt, outcome: source.extraction.state === 'extracted' ? 'extracted' : 'failed',
                 ...(source.extraction.state === 'failed' ? { detail: source.extraction.detail } : {}) }] : [],
-        identity: { taxCodes: source.taxCodes, status: identity.status, confirmedAt },
+        identity: { taxCodes: source.taxCodes, patientNames: source.patientNames, status: identity.status, confirmedAt },
         documentDate: source.documentDate,
         classification: source.classificationResult,
         facts: source.facts,
@@ -606,10 +608,11 @@ export async function retryDossierExtraction(
         guard();
         if (!patient) return 'stale';
         const taxCodes = collectDossierTaxCodes(text);
-        const identity = evaluateDossierGroupIdentity([{ taxCodes }], [patient], input.patientId);
+        const patientNames = collectDossierPatientNames(text);
+        const identity = evaluateDossierGroupIdentity([{ taxCodes, patientNames }], [patient], input.patientId);
         const known = new Set(record.facts.map((fact) => fact.factId));
         next = { ...record, updatedAt: at, extraction, documentDate: date,
-            identity: { ...record.identity, taxCodes, status: identity.status },
+            identity: { ...record.identity, taxCodes, patientNames, status: identity.status },
             classification: proposed.classification,
             facts: [...record.facts, ...proposed.facts.filter((fact) => !known.has(fact.factId))],
             residualReview: { state: 'pending' },

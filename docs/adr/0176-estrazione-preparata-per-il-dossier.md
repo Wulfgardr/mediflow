@@ -65,7 +65,13 @@ non fidata. L'app non chiama modelli: legge un file scelto dal medico.
    Il CF dell'estrazione serve solo a
    raggruppare: il controllo d'identità di ADR 0175 resta sui codici letti da MediFlow, e
    un'attribuzione sbagliata produce un gruppo discordante e bloccato. Senza CF leggibile
-   nessuna scheda viene preselezionata. La nuova scheda riceve dall'estrazione le proposte
+   nessuna scheda viene preselezionata, e se il documento scrive il paziente su una riga con
+   etichetta («Paziente:», «Assistito:», «Cognome e nome:», parole con l'iniziale maiuscola)
+   almeno uno dei nomi scritti deve essere quello della scheda scelta: altrimenti il gruppo è
+   bloccato (`discordant_name`). Un secondo nome sullo stesso documento, come il prescrittore
+   nei moduli di protesica, non blocca (aggiornamento del 7 novembre 2026: falsificazione 10
+   del banco del 5 novembre, misurata anche sui 33 documenti reali del lotto del 3 novembre,
+   zero blocchi sulla scheda giusta). La nuova scheda riceve dall'estrazione le proposte
    d'anagrafica mancanti, sempre con un gesto del medico e il PIN.
 8. **Dossier già acquisiti.** Una fonte già nel dossier riceve le nuove proposte
    preparate da decidere solo se il testo conservato è lo stesso su cui sono state
