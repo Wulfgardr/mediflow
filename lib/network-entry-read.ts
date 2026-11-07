@@ -33,6 +33,7 @@ function toEntrySummary(entry: typeof entries.$inferSelect): EntrySummary {
         deletedAt: toIsoString(entry.deletedAt),
         deletionReason: entry.deletionReason ?? null,
         version: entry.version,
+        recordedBy: entry.recordedBy ?? null,
         createdAt: toIsoString(entry.createdAt),
         updatedAt: toIsoString(entry.updatedAt),
     };

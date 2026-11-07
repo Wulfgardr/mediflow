@@ -19,6 +19,7 @@ for (const version of [4, 5, 6]) {
         const db = new Database(':memory:'); initializeSqliteSchema(db);
         db.exec('DROP TABLE portable_import_origins');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) db.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+        db.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         if (version < 6) db.exec('DROP TABLE ambulatory_destructive_commands');
         if (version === 4) db.exec('DROP TABLE therapy_status_commands');
         db.pragma(`user_version=${version}`); return db;
@@ -31,9 +32,10 @@ for (const version of [4, 5, 6]) {
             assert.deepEqual(db.serialize(), before);
         } finally { db.close(); }
     });
-    for (const mutation of ['column', 'allergies', 'index', 'trigger', 'table', 'view', 'false-version'] as const) test(`canonical${version} denies ${mutation} before migration`, () => {
+    for (const mutation of ['column', 'allergies', 'recorded_by', 'index', 'trigger', 'table', 'view', 'false-version'] as const) test(`canonical${version} denies ${mutation} before migration`, () => {
         const db = predecessor();
         try {
+            if (mutation === 'recorded_by') db.exec('ALTER TABLE entries ADD COLUMN recorded_by TEXT');
             if (mutation === 'allergies') db.exec('ALTER TABLE patients ADD COLUMN allergies TEXT');
             if (mutation === 'column') db.exec('ALTER TABLE therapies ADD COLUMN drift TEXT');
             if (mutation === 'index') db.exec('CREATE INDEX drift ON therapies(status)');
@@ -62,6 +64,7 @@ test('failure after the new v6 DDL rolls back the predecessor ledger, account by
     const root = mkdtempSync(join(process.env.MEDIFLOW_DATA_DIR!, 'canonical5-rollback-')), file = join(root, 'medical.db');
     const original = openVersionedSqliteDatabase(file);
     for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) original.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+    original.exec('ALTER TABLE entries DROP COLUMN recorded_by');
     original.exec('DROP TABLE portable_import_origins; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
     original.prepare("INSERT INTO users(id,username,role,password_hash,encrypted_master_key,salt) VALUES ('synthetic-v5','synthetic-v5','admin','synthetic-hash','v3:synthetic-wrapped-key','synthetic-salt')").run();
     const user = original.prepare("SELECT * FROM users WHERE id='synthetic-v5'").get(); original.close();

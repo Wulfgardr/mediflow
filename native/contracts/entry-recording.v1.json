@@ -1,0 +1,43 @@
+[
+  {
+    "name": "operatore",
+    "entry": {
+      "id": "synthetic-entry",
+      "patientId": "synthetic-patient",
+      "type": "visit",
+      "title": "Controllo sintetico",
+      "date": "2020-01-01T08:00:00Z",
+      "content": "Testo clinico sintetico",
+      "version": 1,
+      "createdAt": "2026-11-07T14:35:00Z",
+      "recordedBy": "Ada Sintetica"
+    }
+  },
+  {
+    "name": "storico-null",
+    "entry": {
+      "id": "synthetic-entry",
+      "patientId": "synthetic-patient",
+      "type": "visit",
+      "title": "Controllo sintetico",
+      "date": "2020-01-01T08:00:00Z",
+      "content": "Testo clinico sintetico",
+      "version": 1,
+      "createdAt": "2026-11-07T14:35:00Z",
+      "recordedBy": null
+    }
+  },
+  {
+    "name": "storico-assente",
+    "entry": {
+      "id": "synthetic-entry",
+      "patientId": "synthetic-patient",
+      "type": "visit",
+      "title": "Controllo sintetico",
+      "date": "2020-01-01T08:00:00Z",
+      "content": "Testo clinico sintetico",
+      "version": 1,
+      "createdAt": "2026-11-07T14:35:00Z"
+    }
+  }
+]

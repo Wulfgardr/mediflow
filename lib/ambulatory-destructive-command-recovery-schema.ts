@@ -17,6 +17,7 @@ export function assertAmbulatoryCommandPredecessorRecoverySchema(probe: Database
         initializeSqliteSchema(canonical);
         canonical.exec('DROP TABLE portable_import_origins');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) canonical.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+        canonical.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         if (version < 6) canonical.exec('DROP TABLE ambulatory_destructive_commands');
         if (version === 4) canonical.exec('DROP TABLE therapy_status_commands');
         const expected = schemaSnapshot(canonical);

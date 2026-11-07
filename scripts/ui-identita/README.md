@@ -26,7 +26,7 @@ Next usa `dev --webpack`: permette di compilare le sole pagine necessarie alla m
 
 La data dir predefinita è `scratch/apfs/banco`. `MEDIFLOW_DATA_DIR` può selezionare un'altra directory sotto lo scratch. Il banco rifiuta percorsi esterni ed archivi senza il marcatore `SYNTHETIC_ONLY`. `MF_BANCO_HTTP_PORT` e `MF_BANCO_TLS_PORT` configurano le porte (default 3100 e 3543), che devono essere libere oppure possedute dal banco. Stop arresta i gruppi di processi registrati nel suo stato.
 
-Operatore `performance-baseline`, PIN pubblico `314159`. Quaranta pazienti di baseline e due pazienti di riferimento. Maria Rossi Sintetica ha quattro voci, due diagnosi, due terapie e l'allergia ad amoxicillina nel campo strutturato cifrato `allergies`, senza ripeterla nelle note cliniche. Le voci sono state create dopo login ed apertura della chiave tramite PIN, usando le API Web con cifratura come nel client. Il diario di Paolo Vuoto Sintetico è vuoto.
+Operatore `performance-baseline`, PIN pubblico `314159`. Quaranta pazienti di baseline e due pazienti di riferimento. Maria Rossi Sintetica ha quattro voci, due diagnosi, due terapie e l'allergia ad amoxicillina nel campo strutturato cifrato `allergies`, senza ripeterla nelle note cliniche. Ogni nuova voce di riferimento verifica il nome restituito dal server (`Benchmark sintetico`, displayName di `performance-baseline`). Le fixture già presenti rimangono storiche, senza backfill del nome. Le voci sono state create dopo login ed apertura della chiave tramite PIN, usando le API Web con cifratura come nel client. Il diario di Paolo Vuoto Sintetico è vuoto.
 
 `pair ios|ipados|macos|windows|linux` conferma il pairing e stampa JSON con URL HTTPS, impronta SHA-256 del certificato DER, identificativo e token, credenziali sintetiche ed esito della lettura della scheda. Per GPUI usare `gpuiIdentifier` e `gpuiPairingCode`. La verifica integrata della scheda usa HTTP loopback, il trasporto HTTPS è verificato separatamente. I JSON restano nella data dir.
 
@@ -44,3 +44,6 @@ Per una lane isolata, usare una data dir e porte proprie, per esempio
 La build Next resta nella data dir della lane. Le catture accettano
 `MF_BANCO_CAPTURE_DIR` per le PNG e `MF_BANCO_RESULTS_DIR` per i risultati Playwright.
 Un banco già popolato riceve il campo strutturato con un aggiornamento versionato.
+
+Per le sole catture Web senza interfaccia Parallels, `MF_BANCO_LOCAL_ONLY=1`
+limita banco e proxy TLS al loopback. Non verifica connessioni da client remoti.
