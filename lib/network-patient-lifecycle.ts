@@ -70,6 +70,7 @@ const NETWORK_CREATE_SENSITIVE_FIELDS = [
     'caregiver',
     'exemptions',
     'diagnoses',
+    'allergies',
     'statusReason',
     'notes',
     'archiveReason',

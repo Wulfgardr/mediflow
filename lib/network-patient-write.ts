@@ -24,7 +24,7 @@ export const NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS = new Set([
 // cannot silently expand paired-client authority.
 const NETWORK_PATIENT_PROFILE_FIELDS = [
     'firstName', 'lastName', 'taxCode', 'identifierType', 'birthDatePrecision', 'birthYear', 'birthDate', 'address', 'phone', 'caregiver',
-    'exemptions', 'diagnoses', 'notes', 'monitoringProfile', 'statusReason',
+    'exemptions', 'diagnoses', 'allergies', 'notes', 'monitoringProfile', 'statusReason',
     'archiveReason', 'archiveNote', 'isAdi', 'isArchived', 'ambulatoryId',
 ] as const;
 
@@ -36,6 +36,7 @@ export const NETWORK_UPDATE_SEALED_PATIENT_FIELDS = [
     'caregiver',
     'exemptions',
     'diagnoses',
+    'allergies',
     'notes',
     'statusReason',
     'archiveReason',

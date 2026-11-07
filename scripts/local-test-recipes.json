@@ -800,6 +800,15 @@
         "scripts/network-home-base-ingress.test.mjs"
       ],
       "prerequisites": "Owned synthetic Next and TLS proxies on loopback, E2E_TLS_URL, E2E_BASE_URL, MEDIFLOW_TLS_CERT_PATH and local API token. A non-loopback source address assigned on this host, with destination still 127.0.0.1."
+    },
+    {
+      "id": "scripts/inline-package-acceptance.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/inline-package-acceptance.mjs"
+      ],
+      "prerequisites": "Node 24, npm ci and prepare:dependencies; mediflow-chat-demo dependencies and build; absolute MEDIFLOW_CODEX_BIN and MEDIFLOW_CLAUDE_BIN. Uses new temporary homes, synthetic seed, loopback MCP and no model credentials. Does not launch desktop apps."
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { PatientIdentifierConflictError, PATIENT_IDENTIFIER_DUPLICATE, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity';
 import { decodeBase64, encodeBase64, openPatientDocumentFile, sealPatientDocumentFile } from './security/attachment-file-envelope';
+import type { PatientAllergy } from './patient-allergies';
 import backupEncryptedFields from './backup-encrypted-fields.json';
 import type { ProstheticsCatalogSelection, ProstheticsSnapshot } from './reference-data/prosthetics-catalog-contract';
 // API Client Facade for SQLite Backend
@@ -128,6 +129,7 @@ export interface Patient {
     notes?: string;
     monitoringProfile?: string;
     diagnoses?: Diagnosis[];
+    allergies?: PatientAllergy[];
     ambulatoryId?: string;
     version?: number;
 }

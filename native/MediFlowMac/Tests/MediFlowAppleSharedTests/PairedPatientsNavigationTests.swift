@@ -178,6 +178,7 @@ final class PairedPatientsNavigationTests: XCTestCase {
             model.newPatientFirstName = "Paziente"
             model.newPatientLastName = "Sintetico"
             model.newPatientTaxCode = "SYNTHETIC-CREATE"
+            model.newPatientIdentifierType = "other"
             model.newPatientHasBirthDate = true
             model.newPatientBirthDate = Date(timeIntervalSince1970: 1)
             model.newPatientAddress = "Indirizzo sintetico"
@@ -222,6 +223,7 @@ final class PairedPatientsNavigationTests: XCTestCase {
         model.newPatientFirstName = "Paziente"
         model.newPatientLastName = "Sintetico"
         model.newPatientTaxCode = "SYNTHETIC-CREATE"
+            model.newPatientIdentifierType = "other"
         XCTAssertTrue(model.canCreatePatient)
 
         model.cancelCreatingPatient()

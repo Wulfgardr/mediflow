@@ -470,6 +470,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         if (migrateBirth) sqlite.exec("UPDATE patients SET birth_date_precision = CASE WHEN birth_date IS NULL THEN 'unknown' ELSE 'exact' END");
         ensureColumn(sqlite, 'patients', 'exemptions', 'exemptions TEXT');
         ensureColumn(sqlite, 'patients', 'diagnoses', 'diagnoses TEXT');
+        ensureColumn(sqlite, 'patients', 'allergies', 'allergies TEXT');
         ensureColumn(sqlite, 'patients', 'monitoring_profile', 'monitoring_profile TEXT');
         ensureColumn(sqlite, 'patients', 'status_reason', 'status_reason TEXT');
         ensureColumn(sqlite, 'patients', 'version', 'version INTEGER NOT NULL DEFAULT 1');

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import { openPatientSection, unlockIfNeeded, isVisible } from '../../e2e/utils';
-const output = process.env.MF_BANCO_CAPTURES || '/Users/leonardopegollo/Antigravity/mf-ui-identita-20261107/web';
+const output = process.env.MF_BANCO_CAPTURES || process.env.MF_BANCO_CAPTURE_DIR || '/Users/leonardopegollo/Antigravity/mf-ui-identita-20261107/web';
 const data = process.env.MEDIFLOW_DATA_DIR || '/Volumes/Vision/mf-ui-identita-20261107-scratch/apfs/banco';
 test('sequenza canonica 01-07', async ({ page }, info) => {
   if (!data.startsWith('/Volumes/Vision/mf-ui-identita-20261107-scratch/') || !fs.existsSync(`${data}/SYNTHETIC_ONLY`)) throw new Error('Solo banco sintetico');
@@ -45,4 +45,37 @@ test('sequenza canonica 01-07', async ({ page }, info) => {
   await navigate('/patients/synthetic-nonexistent-patient/modules');
   await expect(page.getByText(/Impossibile leggere la scheda paziente/i).first()).toBeVisible();
   await capture('07-errore');
+});
+
+
+test('allergie: pillola dal campo strutturato e modifica della scheda', async ({ page }) => {
+  const { referenceId, emptyId } = JSON.parse(fs.readFileSync(`${data}/reference.json`, 'utf8'));
+  await page.goto(`/patients/${referenceId}/modules`);
+  if (await isVisible(page.getByLabel('PIN operatore').first(), 2500)) await unlockIfNeeded(page, '314159');
+  await expect(page.getByRole('list', { name: 'Allergie', exact: true })).toContainText('Amoxicillina');
+  await expect(page.getByRole('list', { name: 'Allergie', exact: true })).toContainText('▲');
+  await page.goto(`/patients/${emptyId}/modules`);
+  await expect(page.getByText('Allergie: nessuna registrata', { exact: true })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Allergie', exact: true })).toHaveCount(0);
+  await page.goto(`/patients/${emptyId}/edit`);
+  await page.getByRole('button', { name: 'Aggiungi allergia', exact: true }).click();
+  await page.getByLabel('Sostanza *', { exact: true }).fill('Lattice sintetico');
+  await page.getByLabel('Reazione', { exact: true }).fill('Orticaria sintetica');
+  await page.getByLabel('Gravità della reazione', { exact: true }).selectOption('moderate');
+  await page.getByRole('button', { name: 'Aggiorna scheda', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/patients/${emptyId}/modules`));
+  await expect(page.getByRole('list', { name: 'Allergie', exact: true })).toContainText('Lattice sintetico');
+  await page.goto(`/patients/${emptyId}/edit`);
+  await expect(page.getByLabel('Sostanza *', { exact: true })).toHaveValue('Lattice sintetico');
+  await expect(page.getByLabel('Reazione', { exact: true })).toHaveValue('Orticaria sintetica');
+  await expect(page.getByLabel('Gravità della reazione', { exact: true })).toHaveValue('moderate');
+  await page.getByLabel('Sostanza *', { exact: true }).fill('Nichel sintetico');
+  await page.getByRole('button', { name: 'Aggiorna scheda', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/patients/${emptyId}/modules`));
+  await expect(page.getByRole('list', { name: 'Allergie', exact: true })).toContainText('Nichel sintetico');
+  await page.goto(`/patients/${emptyId}/edit`);
+  await page.getByRole('button', { name: 'Rimuovi allergia 1', exact: true }).click();
+  await page.getByRole('button', { name: 'Aggiorna scheda', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/patients/${emptyId}/modules`));
+  await expect(page.getByText('Allergie: nessuna registrata', { exact: true })).toBeVisible();
 });

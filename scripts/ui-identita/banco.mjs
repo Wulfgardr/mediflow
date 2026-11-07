@@ -108,7 +108,7 @@ async function seal(value, key) {
   return `ENC:${Buffer.from(iv).toString('base64')}:${Buffer.from(encrypted).toString('base64')}`;
 }
 async function seedReference() {
-  if (fs.existsSync(`${data}/reference.json`)) return;
+  if (fs.existsSync(`${data}/reference.json`) && JSON.parse(fs.readFileSync(`${data}/reference.json`)).allergiesVersion === 1) return;
   const auth = await login();
   const material = await crypto.subtle.importKey('raw', Buffer.from('314159'), 'PBKDF2', false, ['deriveKey']);
   const kek = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: Buffer.from(auth.json.salt, 'base64'), iterations: 600000, hash: 'SHA-256' }, material, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
@@ -121,7 +121,11 @@ async function seedReference() {
   const patients = [];
   for (const [index, firstName, lastName] of [[9001, 'Maria', 'Rossi Sintetica'], [9002, 'Paolo', 'Vuoto Sintetico']]) {
     let patient = existing.find(p => p.taxCode === syntheticTaxCode(index));
-    if (!patient) patient = (await request('/api/patients', { method: 'POST', headers, body: { firstName, lastName, taxCode: syntheticTaxCode(index), birthDate: '1958-04-17T00:00:00Z', diagnoses: index === 9001 ? await seal([{ system: 'ICD-10', code: 'I10', description: 'Ipertensione arteriosa', date: '2026-10-01' }, { system: 'ICD-10', code: 'E11', description: 'Diabete mellito tipo 2', date: '2026-10-01' }], key) : [], notes: await seal(index === 9001 ? 'Allergia riferita ad amoxicillina. Dati interamente inventati per la misura UI.' : 'Paziente sintetico senza diario.', key) } })).json;
+    if (!patient) patient = (await request('/api/patients', { method: 'POST', headers, body: { firstName, lastName, taxCode: syntheticTaxCode(index), birthDate: '1958-04-17T00:00:00Z', diagnoses: index === 9001 ? await seal([{ system: 'ICD-10', code: 'I10', description: 'Ipertensione arteriosa', date: '2026-10-01' }, { system: 'ICD-10', code: 'E11', description: 'Diabete mellito tipo 2', date: '2026-10-01' }], key) : [], allergies: index === 9001 ? await seal([{ substance: 'Amoxicillina' }], key) : null, notes: await seal(index === 9001 ? 'Dati interamente inventati per la misura UI.' : 'Paziente sintetico senza diario.', key) } })).json;
+    if (index === 9001) {
+      const detail = (await request(`/api/patients/${patient.id}`, { headers })).json;
+      await request(`/api/patients/${patient.id}`, { method: 'PUT', headers, body: { version: detail.version, allergies: await seal([{ substance: 'Amoxicillina' }], key), notes: await seal('Dati interamente inventati per la misura UI.', key) } });
+    }
     patients.push(patient.id);
   }
   const entries = [ ['Controllo ambulatoriale', 'Paziente in buone condizioni generali. Pressione 132/78 mmHg, frequenza 72/min. Non riferisce dispnea né dolore toracico. Concordato controllo fra un mese.'], ['Contatto telefonico', 'Riferisce buona aderenza alla terapia e assenza di capogiri. Ricordata la registrazione della pressione a domicilio per sette giorni.'], ['Revisione degli esami', 'Esami sintetici: creatinina 0,9 mg/dL, emoglobina glicata 6,8%. Discussi alimentazione e attività fisica compatibile con le condizioni generali.'], ['Visita di follow-up', 'Diario pressorio mediamente nei limiti. Nessun edema periferico. Prosegue la terapia concordata; rivalutazione programmata.'] ];
@@ -129,7 +133,7 @@ async function seedReference() {
   for (const [i, [title, content]] of entries.entries()) if (!priorEntries.some(e => e.id === `ui-identita-${patients[0]}-entry-${i}`)) await request('/api/entries', { method: 'POST', headers, body: { id: `ui-identita-${patients[0]}-entry-${i}`, patientId: patients[0], type: i === 1 ? 'phone' : 'visit', date: new Date(Date.UTC(2026, 10, 7 - i * 7)).toISOString(), title: await seal(title, key), content: await seal(content, key) } });
   const priorTherapies = (await request(`/api/therapies?patientId=${patients[0]}`, { headers })).json;
   for (const [drugName, dosage] of [['Ramipril', '5 mg, una compressa al mattino'], ['Metformina', '500 mg, una compressa dopo cena']]) if (!priorTherapies.some(t => t.id === `ui-identita-${patients[0]}-${drugName}`)) await request('/api/therapies', { method: 'POST', headers, body: { id: `ui-identita-${patients[0]}-${drugName}`, patientId: patients[0], drugName, dosage, status: 'active', startDate: '2026-10-01T00:00:00Z' } });
-  fs.writeFileSync(`${data}/reference.json`, JSON.stringify({ referenceId: patients[0], emptyId: patients[1] }, null, 2));
+  fs.writeFileSync(`${data}/reference.json`, JSON.stringify({ referenceId: patients[0], emptyId: patients[1], allergiesVersion: 1 }, null, 2));
 }
 async function status() {
   const state = read();

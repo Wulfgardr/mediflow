@@ -3122,7 +3122,7 @@ impl ClinicalApp {
                 .child(self.appearance((layout.width-2.*layout.margin).min(640.)-2.*if layout.compact {16.} else {28.},true,cx)))
             .child(self.local_preferences_status(cx))
             .child(div().flex().flex_col().gap(px(8.))
-                .child(heading("clinical-workspace-connect-heading", if paired { "Accedi al tuo archivio" } else { "Collega questo dispositivo" }, theme))
+                .child(crate::components::heading_with_role("clinical-workspace-connect-heading", if paired { "Accedi al tuo archivio" } else { "Collega questo dispositivo" }, theme, crate::theme::TitleRole::Threshold))
                 .child(div().text_color(theme.secondary).type_role(theme, crate::theme::TextRole::Body)
                     .child(text!(if paired { "Sblocca i dati con il tuo account personale." } else { "Usa i dati di abbinamento già assegnati al dispositivo sul computer che ospita l'archivio." }))));
         if let Some(pairing) = &self.pairing {
@@ -3779,6 +3779,9 @@ impl ClinicalApp {
                                 ))
                                 .child(
                                     div()
+                                        .flex()
+                                        .flex_wrap()
+                                        .gap(px(8.))
                                         .type_role(theme, crate::theme::TextRole::Meta)
                                         .text_color(theme.secondary)
                                         .child(text!(format!(
@@ -3794,35 +3797,64 @@ impl ClinicalApp {
                                             } else {
                                                 ""
                                             }
-                                        ))),
-                                )
-                                .when(!layout.compact, |el| {
-                                    el.child(
-                                        div().type_role(theme, crate::theme::TextRole::Code).child(
-                                            crate::title::title(
-                                                crate::title::TitleText::code(
-                                                    patient.tax_code.clone(),
-                                                ),
-                                                theme,
-                                            ),
-                                        ),
-                                    )
-                                }),
+                                        )))
+                                        .when(!layout.compact, |el| {
+                                            el.child(
+                                                div()
+                                                    .type_role(theme, crate::theme::TextRole::Code)
+                                                    .child(crate::title::title(
+                                                        crate::title::TitleText::code(
+                                                            patient.tax_code.clone(),
+                                                        ),
+                                                        theme,
+                                                    )),
+                                            )
+                                        }),
+                                ),
                         )
                         .child(
-                            button(
-                                "clinical-workspace-back-directory",
-                                self.patient_back_label(),
-                                theme,
-                                false,
-                                self.form.is_none(),
-                            )
-                            .debug_selector(|| "clinical-workspace-back-directory".into())
-                            .when(self.form.is_none(), |el| {
-                                el.on_click(cx.listener(|this, _, _, cx| {
-                                    this.back_from_patient(cx);
-                                }))
-                            }),
+                            div()
+                                .flex()
+                                .flex_wrap()
+                                .justify_end()
+                                .gap(px(8.))
+                                .when(!layout.compact, |el| {
+                                    el.child(
+                                        button(
+                                            "clinical-workspace-new-entry",
+                                            "Nuova voce",
+                                            theme,
+                                            true,
+                                            writable && self.can_write(FormKind::Entry),
+                                        )
+                                        .when(
+                                            writable && self.can_write(FormKind::Entry),
+                                            |el| {
+                                                el.on_click(cx.listener(|this, _, window, cx| {
+                                                    this.open_form(FormKind::Entry, window, cx)
+                                                }))
+                                            },
+                                        ),
+                                    )
+                                })
+                                .child(
+                                    button(
+                                        "clinical-workspace-back-directory",
+                                        self.patient_back_label(),
+                                        theme,
+                                        false,
+                                        self.form.is_none(),
+                                    )
+                                    .debug_selector(|| "clinical-workspace-back-directory".into())
+                                    .when(
+                                        self.form.is_none(),
+                                        |el| {
+                                            el.on_click(cx.listener(|this, _, _, cx| {
+                                                this.back_from_patient(cx);
+                                            }))
+                                        },
+                                    ),
+                                ),
                         ),
                 )
                 .child(
@@ -3830,10 +3862,7 @@ impl ClinicalApp {
                         .id("clinical-workspace-allergies")
                         .accessibility_id("clinical-workspace-allergies")
                         .role(Role::Note)
-                        .aria_label("Allergie: dato non disponibile in questa scheda")
-                        .type_role(theme, crate::theme::TextRole::Meta)
-                        .text_color(theme.secondary)
-                        .child(text!("Allergie: dato non disponibile in questa scheda")),
+                        .child(allergy_label(None, theme)),
                 )
                 .when(!layout.compact, |el| {
                     el.child(
@@ -3841,23 +3870,6 @@ impl ClinicalApp {
                             .flex()
                             .flex_wrap()
                             .gap(px(8.))
-                            .child(
-                                button(
-                                    "clinical-workspace-new-entry",
-                                    "Nuova voce",
-                                    theme,
-                                    true,
-                                    writable && self.can_write(FormKind::Entry),
-                                )
-                                .when(
-                                    writable && self.can_write(FormKind::Entry),
-                                    |el| {
-                                        el.on_click(cx.listener(|this, _, window, cx| {
-                                            this.open_form(FormKind::Entry, window, cx)
-                                        }))
-                                    },
-                                ),
-                            )
                             .child(
                                 button("clinical-workspace-refresh", "Rileggi", theme, false, true)
                                     .on_click(cx.listener(|this, _, _, cx| {
@@ -4011,16 +4023,12 @@ impl ClinicalApp {
                         "QUADRO",
                         theme,
                     ))
-                    .child(
-                        div()
-                            .type_role(theme, crate::theme::TextRole::Strong)
-                            .child({
-                                let text = text!("Problemi e contesto");
-                                #[cfg(test)]
-                                let text = crate::shell::rendered_command::observe_text(text);
-                                text
-                            }),
-                    )
+                    .child(overview_heading(
+                        "clinical-overview-problems",
+                        "Problemi e contesto",
+                        diagnoses.as_ref().ok().map(Vec::len),
+                        theme,
+                    ))
                     .when(diagnoses.is_err(), |el| {
                         el.child(
                             self.unreadable_field("clinical-workspace-diagnoses-unavailable", cx),
@@ -4059,9 +4067,14 @@ impl ClinicalApp {
                     .flex()
                     .flex_col()
                     .gap(px(8.))
-                    .child(section(
+                    .child(overview_heading(
                         "clinical-workspace-active-therapies-heading",
-                        "TERAPIE ATTIVE",
+                        "Terapie attive",
+                        self.patient.therapies.ready().map(|rows| {
+                            rows.iter()
+                                .filter(|row| row.status == "active" && row.deleted_at.is_none())
+                                .count()
+                        }),
                         theme,
                     ))
                     .when(
@@ -4136,9 +4149,14 @@ impl ClinicalApp {
                     .flex()
                     .flex_col()
                     .gap(px(8.))
-                    .child(section(
+                    .child(overview_heading(
                         "clinical-workspace-followup-heading",
-                        "PROSSIMI CONTROLLI",
+                        "Controlli aperti",
+                        self.patient.checkups.ready().map(|rows| {
+                            rows.iter()
+                                .filter(|row| row.status == "pending" && row.deleted_at.is_none())
+                                .count()
+                        }),
                         theme,
                     ))
                     .child(
@@ -4220,6 +4238,78 @@ impl ClinicalApp {
                                             crate::shell::rendered_command::observe_text(text);
                                         text
                                     })
+                            }),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(overview_heading(
+                        "clinical-overview-observations",
+                        "Misure recenti",
+                        self.patient
+                            .observations
+                            .ready()
+                            .map(|rows| rows.iter().filter(|row| row.deleted_at.is_none()).count()),
+                        theme,
+                    ))
+                    .when(
+                        self.patient
+                            .observations
+                            .state(ReadObject::Parametri)
+                            .is_some(),
+                        |el| {
+                            el.child(self.patient_read_hint(
+                                "clinical-overview-observations-state",
+                                &self.patient.observations,
+                                ReadObject::Parametri,
+                                cx,
+                            ))
+                        },
+                    )
+                    .when(
+                        self.patient
+                            .observations
+                            .ready()
+                            .is_some_and(|rows| rows.iter().all(|row| row.deleted_at.is_some())),
+                        |el| {
+                            el.child(self.empty_read_state(
+                                "clinical-overview-observations-empty",
+                                ReadObject::Parametri,
+                                cx,
+                            ))
+                        },
+                    )
+                    .children(
+                        self.patient
+                            .observations
+                            .ready()
+                            .into_iter()
+                            .flatten()
+                            .filter(|row| row.deleted_at.is_none())
+                            .map(|row| {
+                                div()
+                                    .border_b_1()
+                                    .border_color(theme.rule)
+                                    .py(px(12.))
+                                    .child(record_header(
+                                        theme,
+                                        div()
+                                            .type_role(theme, crate::theme::TextRole::Strong)
+                                            .child(text!(row.display.clone())),
+                                        div().child(text!(crate::clinical_units::value(
+                                            &row.value,
+                                            &row.unit_code
+                                        ))),
+                                    ))
+                                    .child(
+                                        div()
+                                            .type_role(theme, crate::theme::TextRole::Meta)
+                                            .text_color(theme.secondary)
+                                            .child(text!(display_date(Some(&row.observed_at)))),
+                                    )
                             }),
                     ),
             )
@@ -4337,20 +4427,26 @@ impl ClinicalApp {
                 let clipboard = format!("{} · {}\n{}\n{}", display_date(Some(&entry.date)), entry_type_label(&entry.entry_type), title, prose);
                 div().id(SharedString::from(format!("clinical-workspace-entry-{id}"))).debug_selector(|| format!("clinical-workspace-entry-{id}")).role(Role::Article)
                     .aria_label(SharedString::from(format!("{}, {}", title, display_date(Some(&entry.date)))))
-                    .border_b_1().border_color(theme.rule).pb(px(24.)).flex().flex_col().gap(px(8.))
-                    .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
-                        .child(text!(format!("{} · {}", display_date(Some(&entry.date)), entry_type_label(&entry.entry_type)))))
+                    .border_b_1().border_color(theme.rule).pb(px(24.)).flex().gap(px(12.))
+                    .child(div().w(px(84.)).flex_shrink_0().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
+                        .child(text!(display_date(Some(&entry.date))))
+                        .child(text!(entry_time(&entry.date))))
+                    .child(div().flex_1().min_w_0().flex().flex_col().gap(px(8.))
+                    .child(div().flex().flex_wrap().gap(px(8.))
+                        .child(div().type_role(theme, crate::theme::TextRole::Strong).child(text!(entry_type_label(&entry.entry_type))))
+                        .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary).child(text!(entry.setting.clone().unwrap_or_default()))))
                     .child(div().type_role(theme, crate::theme::TextRole::Strong).child(text!(title)))
                     .child(if entry.locked_fields.iter().any(|field| field == "content") {
                         self.unreadable_field("clinical-workspace-entry-unreadable", cx).into_any_element()
                     } else { clinical_text::render(&entry.content, WritingInk::Dry, theme) })
+                    .child(writing_status(format!("clinical-workspace-entry-status-{id}"), WritingInk::Dry, WritingSurface::Plane, theme))
                     .child(button(format!("clinical-workspace-edit-entry-{id}"), "Modifica voce", theme, false, editable)
                         .when(editable, |el| el.on_click(cx.listener(move |this, _, _, cx| this.edit_record(editing::Kind::Entry, &edit_id, cx)))))
                     .when(!unavailable, |el| el.child(div().flex().child(button(format!("clinical-workspace-copy-entry-{id}"), "Copia voce", theme, false, true)
                         .on_click(cx.listener(move |this, _, _, cx| {
                             cx.write_to_clipboard(ClipboardItem::new_string(clipboard.clone()));
                             this.message = Some(("Voce copiata.".into(), false)); cx.notify();
-                        })))))
+                        }))))))
             }))
             .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
                 .child(text!("Liste, enfasi e barrature conservano il significato del testo registrato. Per modifiche di formattazione e allegati usa l'editor corrente.")))
@@ -4385,7 +4481,7 @@ impl ClinicalApp {
                             "clinical-workspace-new-therapy",
                             "Nuova terapia",
                             theme,
-                            true,
+                            false,
                             writable,
                         )
                         .when(writable, |el| {
@@ -7195,7 +7291,7 @@ mod tests {
                         .into_any_element()
                 })
             },
-            if kind == 0 { 3 } else { 6 },
+            if kind == 0 { 2 } else { 5 },
         );
     }
 
@@ -7643,7 +7739,7 @@ mod tests {
                 app.overview(&patient, cx).into_any_element()
             })
             },
-            3,
+            2,
         );
     }
 
@@ -8836,4 +8932,55 @@ mod review706b_callers {
         );
         assert_eq!(lines.join(""), "Elettroencefalografico");
     }
+}
+
+fn overview_heading(
+    id: &'static str,
+    label: &str,
+    count: Option<usize>,
+    theme: crate::theme::Theme,
+) -> Div {
+    div()
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap(px(8.))
+        .child(section(id, label, theme))
+        .child(
+            div()
+                .type_role(theme, crate::theme::TextRole::Meta)
+                .text_color(theme.secondary)
+                .child(text!(count.map_or_else(
+                    || "Non disponibile".into(),
+                    |count| count.to_string()
+                ))),
+        )
+}
+
+fn allergy_label(known: Option<&str>, theme: crate::theme::Theme) -> Div {
+    let known = known.filter(|value| !value.trim().is_empty());
+    div()
+        .type_role(theme, crate::theme::TextRole::Meta)
+        .text_color(if known.is_some() {
+            theme.warning
+        } else {
+            theme.secondary
+        })
+        .when(known.is_some(), |el| {
+            el.rounded(px(999.))
+                .border_1()
+                .border_color(theme.warning)
+                .px(px(8.))
+                .py(px(4.))
+        })
+        .child(text!(known.map_or_else(
+            || "Allergie: dato non disponibile in questa scheda".into(),
+            |value| format!("▲ Allergie: {value}")
+        )))
+}
+
+fn entry_time(date: &str) -> String {
+    chrono::DateTime::parse_from_rfc3339(date)
+        .map(|date| date.format("%H:%M").to_string())
+        .unwrap_or_default()
 }

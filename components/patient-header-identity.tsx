@@ -12,6 +12,7 @@ export type PatientHeaderDetails = {
     /** Nome breve dell'identificativo mostrato accanto al valore (es. «CF», «STP»). */
     identifierLabel?: string;
     allergies?: readonly string[];
+    allergiesUnavailable?: boolean;
 };
 
 export function PatientHeaderIdentity({name,details,titleRef}: {
@@ -26,10 +27,16 @@ export function PatientHeaderIdentity({name,details,titleRef}: {
             {details.birthDateLabel ? <PrivacyBlur>Nascita {details.birthDateLabel}</PrivacyBlur> : null}
             {details.taxCode ? <span><abbr title={details.identifierLabel === undefined || details.identifierLabel === 'CF' ? 'Codice fiscale' : undefined} className={styles.identifierLabel}>{details.identifierLabel ?? 'CF'}</abbr> <PrivacyBlur className="type-code">{details.taxCode}</PrivacyBlur></span> : null}
         </p> : null}
+        <PatientHeaderAllergies details={details} />
+    </div>;
+}
+
+export function PatientHeaderAllergies({ details }: { details: PatientHeaderDetails }) {
+    return <>
         {details.allergies?.length ? <ul className={styles.allergies} aria-label="Allergie">
             {details.allergies.map(allergy => <li key={allergy} className={styles.allergy}>
                 <span aria-hidden="true">▲ </span><PrivacyBlur>{allergy}</PrivacyBlur>
             </li>)}
-        </ul> : null}
-    </div>;
+        </ul> : <p className={styles.details}>{details.allergiesUnavailable ? 'Allergie: dato non disponibile' : 'Allergie: nessuna registrata'}</p>}
+    </>;
 }
