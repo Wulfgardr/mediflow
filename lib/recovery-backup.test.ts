@@ -439,3 +439,22 @@ test('the CLI terminal fixture waits for a child that closes the terminal before
     execFileSync('python3', ['scripts/fixtures/recovery-cli-pty.py'], { encoding: 'utf8', timeout: 20000,
         input: JSON.stringify({ command: ['python3', '-c', child], key: 'synthetic' }) });
 });
+
+test('encrypted v9 predecessor resta recuperabile dopo l’aggiunta dell’autore', async () => {
+    const f = await fixture();
+    try {
+        const file = path.join(f.root, 'canonical9.db'); fs.writeFileSync(file, f.snapshot);
+        const old = new Database(file);
+        old.exec('DROP TABLE synthetic_extension; ALTER TABLE entries DROP COLUMN recorded_by; PRAGMA user_version=9;');
+        old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE');
+        const expected = contents(old); old.close();
+        const bytes = fs.readFileSync(file), artifact = await encryptRecoveryBackup(bytes, f.key);
+        await f.restore({ artifact });
+        const restored = openVersionedSqliteDatabase(f.destination);
+        try {
+            assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
+            for (const table of ['users', 'patients', 'therapy_status_commands', 'ambulatory_destructive_commands']) assert.deepEqual(contents(restored)[table], expected[table]);
+        } finally { restored.close(); }
+        assert.deepEqual(fs.readFileSync(file), bytes);
+    } finally { f.cleanup(); }
+});
