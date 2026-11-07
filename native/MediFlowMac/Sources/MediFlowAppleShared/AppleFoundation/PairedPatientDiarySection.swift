@@ -161,14 +161,14 @@ struct PairedPatientDiarySection: View {
         VStack(alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
             diaryHeader
 
-            PairedDiaryComposerView(
-                model: model,
-                capabilities: capabilities,
-                confirmsReplacingEntryTemplate: $confirmsReplacingEntryTemplate,
-                isCreatingEntry: $isCreatingEntry
-            )
-
-            Divider()
+            if isCreatingEntry || model.isEditingEntry || model.isWorking {
+                PairedDiaryComposerView(
+                    model: model,
+                    capabilities: capabilities,
+                    confirmsReplacingEntryTemplate: $confirmsReplacingEntryTemplate,
+                    isCreatingEntry: $isCreatingEntry
+                )
+            }
 
             if model.entries.isEmpty {
                 Text("Nessuna voce diario caricata.")

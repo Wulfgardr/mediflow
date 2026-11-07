@@ -124,3 +124,36 @@ test('Impostazioni compatte con sezioni scorrevoli e margini di 16 px', async ({
   await expect(body).toHaveCSS('padding-left', '16px');
   await expect(body).toHaveCSS('padding-right', '16px');
 });
+
+
+test('pagina separata: metadati entro il piano alla soglia delle due colonne', async ({ page }) => {
+  test.skip(test.info().project.name !== 'giorno-1440');
+  page.on('dialog', dialog => dialog.type() === 'beforeunload' ? dialog.accept() : dialog.dismiss());
+  await navigate(page, `/patients/${reference()}/entries/new`);
+  const composer = page.getByTestId('progressive-entry-composer');
+  await expect(composer).toBeVisible();
+  await composer.evaluate(element => { (element as HTMLElement).style.width = '1060px'; (element as HTMLElement).style.maxWidth = 'none'; });
+  await page.evaluate(() => document.fonts.ready);
+  const geometry = await composer.evaluate(element => {
+    const form = element.querySelector('form')!;
+    const metadata = form.querySelector('[class*="metadata"]')!;
+    const box = form.getBoundingClientRect();
+    return {
+      pageContent: element.clientWidth - 40,
+      columns: getComputedStyle(element.querySelector('[class*="layout"]')!).gridTemplateColumns,
+      clientWidth: form.clientWidth, scrollWidth: form.scrollWidth,
+      fields: Array.from(metadata.querySelectorAll('select, input')).map(field => {
+        const rect = field.getBoundingClientRect();
+        return { left: rect.left - box.left, right: rect.right - box.left, width: rect.width };
+      }), formWidth: box.width,
+    };
+  });
+  console.log('CRITICAL_METADATA ' + JSON.stringify(geometry));
+  expect(geometry.pageContent).toBe(1020);
+  expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
+  expect(geometry.fields).toHaveLength(3);
+  for (const field of geometry.fields) {
+    expect(field.left).toBeGreaterThanOrEqual(0);
+    expect(field.right).toBeLessThanOrEqual(geometry.formWidth);
+  }
+});

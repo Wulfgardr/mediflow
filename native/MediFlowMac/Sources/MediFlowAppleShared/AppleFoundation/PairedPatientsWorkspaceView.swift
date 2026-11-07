@@ -481,6 +481,18 @@ struct PairedPatientsWorkspaceView: View {
     }
     #endif
 
+    @ViewBuilder
+    private func patientAllergyStatus(_ detail: HomeBasePatientDetail) -> some View {
+        let result = PatientAllergiesCodec.decodeResult(detail.allergies)
+        if model.isPatientFieldLocked(.allergies) || result.isUnreadable {
+            Label("Allergie non disponibili", systemImage: "exclamationmark.triangle.fill")
+                .font(.footnote)
+                .accessibilityIdentifier("patient-allergy-unavailable")
+        } else {
+            PatientAllergyPill(allergies: result.values?.map(\.substance) ?? [])
+        }
+    }
+
     // Compact uses a destination; wide layouts retain list and chart together.
     @ViewBuilder
     private var layoutBody: some View {
@@ -824,31 +836,34 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     private func compactHeightPatientNavigation(_ detail: HomeBasePatientDetail) -> some View {
-        HStack(spacing: 12) {
-            Text("\(detail.lastName) \(detail.firstName)")
-                .inkVoice(28)
-                .lineLimit(1)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("patient-workspace-header")
-            Menu {
-                Picker("Sezione clinica", selection: mobilePatientSectionSelection) {
-                    ForEach(PatientWorkspaceSection.allCases) { section in
-                        Label(section.title, systemImage: section.symbolName).tag(section)
+        VStack(alignment: .leading, spacing: 8) {
+            patientAllergyStatus(detail)
+            HStack(spacing: 12) {
+                Text("\(detail.lastName) \(detail.firstName)")
+                    .inkVoice(28)
+                    .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("patient-workspace-header")
+                Menu {
+                    Picker("Sezione clinica", selection: mobilePatientSectionSelection) {
+                        ForEach(PatientWorkspaceSection.allCases) { section in
+                            Label(section.title, systemImage: section.symbolName).tag(section)
+                        }
                     }
+                } label: {
+                    Label(model.activePatientSection.title, systemImage: "chevron.down")
+                        .font(.subheadline)
+                        .frame(minWidth: 44, minHeight: 44)
                 }
-            } label: {
-                Label(model.activePatientSection.title, systemImage: "chevron.down")
-                    .font(.subheadline)
-                    .frame(minWidth: 44, minHeight: 44)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Sezione clinica")
+                .accessibilityValue(model.activePatientSection.title)
+                .accessibilityIdentifier("patient-section-picker")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Sezione clinica")
-            .accessibilityValue(model.activePatientSection.title)
-            .accessibilityIdentifier("patient-section-picker")
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("patient-section-navigation")
         }
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("patient-section-navigation")
     }
 
     /* The wide chart always states identity and recency. */
@@ -874,8 +889,8 @@ struct PairedPatientsWorkspaceView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            patientAllergyStatus(detail)
         }
-        .overlay(alignment: .bottomTrailing) { PatientAllergyPill() }
         .padding(.horizontal, 24)
         .padding(.top, 20)
         .padding(.bottom, 12)
@@ -1166,10 +1181,7 @@ struct PairedPatientsWorkspaceView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(name). \(metadata)")
             .accessibilityHeading(.h1)
-            PatientAllergyPill(allergies: PatientAllergiesCodec.decodeResult(detail.allergies).values?.map(\.substance) ?? [])
-            if model.isPatientFieldLocked(.allergies) || PatientAllergiesCodec.decodeResult(detail.allergies).isUnreadable {
-                Label("Allergie non disponibili", systemImage: "lock.fill").font(.footnote)
-            }
+            patientAllergyStatus(detail)
         }
         .padding(.horizontal, 20)
         .padding(.top, 16)
@@ -1406,46 +1418,51 @@ struct PairedPatientsWorkspaceView: View {
         _ detail: HomeBasePatientDetail,
         matchesContainerWidth: Bool = true
     ) -> some View {
-        DisclosureGroup(isExpanded: $isCompactPatientHeaderExpanded) {
-            VStack(alignment: .leading, spacing: ClinicalChartMetrics.itemSpacing) {
-                if let birth = PairedPatientsWorkspaceSupport.birthText(
-                    birthDate: detail.birthDate, precision: detail.birthDatePrecision, birthYear: detail.birthYear
-                ) {
-                    headerIdentityRow(detail.birthDatePrecision == "estimated" ? "Nascita" : "Nato il", birth)
+        VStack(alignment: .leading, spacing: 8) {
+            patientAllergyStatus(detail)
+            DisclosureGroup(isExpanded: $isCompactPatientHeaderExpanded) {
+                VStack(alignment: .leading, spacing: ClinicalChartMetrics.itemSpacing) {
+                    if let birth = PairedPatientsWorkspaceSupport.birthText(
+                        birthDate: detail.birthDate, precision: detail.birthDatePrecision, birthYear: detail.birthYear
+                    ) {
+                        headerIdentityRow(detail.birthDatePrecision == "estimated" ? "Nascita" : "Nato il", birth)
+                    }
+                    headerIdentityRow(
+                        detail.identifierType == "none"
+                            ? "Identificativo"
+                            : PairedPatientsWorkspaceSupport.identifierTitle(detail.taxCode, type: detail.identifierType),
+                        detail.identifierType == "none"
+                            ? "Non ancora disponibile"
+                            : PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode)
+                    )
+                    // One uniquely identified revealed child, so a test can prove
+                    // the disclosure opened rather than inferring it.
+                    .accessibilityIdentifier("patient-compact-header-taxcode")
                 }
-                headerIdentityRow(
-                    detail.identifierType == "none"
-                        ? "Identificativo"
-                        : PairedPatientsWorkspaceSupport.identifierTitle(detail.taxCode, type: detail.identifierType),
-                    detail.identifierType == "none"
-                        ? "Non ancora disponibile"
-                        : PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode)
-                )
-                // One uniquely identified revealed child, so a test can prove
-                // the disclosure opened rather than inferring it.
-                .accessibilityIdentifier("patient-compact-header-taxcode")
+                .padding(.top, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                // The whole header is one affordance: tap it anywhere to close it.
+                //
+                // A DisclosureGroup only toggles on its *label*, but its frame grows
+                // to include the block it reveals — so where a tap lands depends on
+                // how tall the revealed block happens to be. Setting the name at
+                // headline and giving the rows real spacing pushed the expanded
+                // frame's centre below the label, and the header opened and would
+                // not close again. Making the revealed block toggle too removes the
+                // dependency on that measurement instead of tuning it: a reader who
+                // taps the birth date to dismiss the block gets what they asked for.
+                .contentShape(.rect)
+                .onTapGesture { isCompactPatientHeaderExpanded = false }
+                // Container for the revealed block only, so the group's identifier
+                // stops propagating onto these Text children and each keeps its own.
+                // Deliberately not on the DisclosureGroup or its label: that is what
+                // preserves the native button role and its expanded/collapsed state.
+                .accessibilityElement(children: .contain)
+            } label: {
+                compactPatientHeaderLabel(detail)
             }
-            .padding(.top, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            // The whole header is one affordance: tap it anywhere to close it.
-            //
-            // A DisclosureGroup only toggles on its *label*, but its frame grows
-            // to include the block it reveals — so where a tap lands depends on
-            // how tall the revealed block happens to be. Setting the name at
-            // headline and giving the rows real spacing pushed the expanded
-            // frame's centre below the label, and the header opened and would
-            // not close again. Making the revealed block toggle too removes the
-            // dependency on that measurement instead of tuning it: a reader who
-            // taps the birth date to dismiss the block gets what they asked for.
-            .contentShape(.rect)
-            .onTapGesture { isCompactPatientHeaderExpanded = false }
-            // Container for the revealed block only, so the group's identifier
-            // stops propagating onto these Text children and each keeps its own.
-            // Deliberately not on the DisclosureGroup or its label: that is what
-            // preserves the native button role and its expanded/collapsed state.
-            .accessibilityElement(children: .contain)
-        } label: {
-            compactPatientHeaderLabel(detail)
+            .accessibilityHint("Mostra o nasconde data di nascita e codice fiscale mascherato.")
+            .accessibilityIdentifier("patient-compact-header-disclosure")
         }
         // A DisclosureGroup paints its whole label with the accent colour, so a
         // `.foregroundStyle` on the name alone lost: the patient's name rendered
@@ -1465,8 +1482,7 @@ struct PairedPatientsWorkspaceView: View {
         // expanded/collapsed state; the label view carries the patient identity.
         // The identifier goes on the control itself, so it is not the one the
         // workspace ancestor propagates to unnamed descendants.
-        .accessibilityHint("Mostra o nasconde data di nascita e codice fiscale mascherato.")
-        .accessibilityIdentifier("patient-compact-header-disclosure")
+        .accessibilityElement(children: .contain)
         // `containerRelativeFrame` resolves against the nearest container, which
         // for a safe-area inset is not the column the inset belongs to. In the
         // two-column arrangement the header is already bounded by its column, so
