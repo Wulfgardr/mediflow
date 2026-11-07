@@ -67,7 +67,7 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
     const cache = new Map();
     const allowed = new Set([
         'app/api/checkups/[id]/route.ts', 'lib/patient-edit-session.ts', 'lib/schema.ts',
-        'lib/patient-identity.ts', 'lib/patient-lifecycle.ts', 'lib/checkup-concurrency.ts', 'lib/version-concurrency.ts',
+        'lib/patient-identity.ts', 'lib/patient-allergies.ts', 'lib/patient-lifecycle.ts', 'lib/checkup-concurrency.ts', 'lib/version-concurrency.ts',
         'lib/api-v1-clinical-lifecycle.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts',
         'lib/api-error-response.ts', 'lib/archive-generation.ts', 'lib/security/archive-write-request.ts',
         'lib/security/loopback-ingress.mjs', 'lib/checkup-json-body.ts', 'lib/bounded-request-body.ts', 'lib/checkup-write-operation.ts',
@@ -101,7 +101,7 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
         const result = ts.transpileModule(source, { fileName: filename, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
         const require = name => {
             if (Object.hasOwn(doubles, name)) return doubles[name];
-            if (name.startsWith('node:') || name === 'drizzle-orm' || name === 'drizzle-orm/sqlite-core') return nativeRequire(name);
+            if (name.startsWith('node:') || name === 'zod' || name === 'drizzle-orm' || name === 'drizzle-orm/sqlite-core') return nativeRequire(name);
             const resolved = name.startsWith('@/') ? name.slice(2) : path.posix.normalize(path.posix.join(path.posix.dirname(relative), name));
             const target = (resolved.endsWith('.ts') || resolved === 'lib/security/loopback-ingress.mjs') ? resolved : `${resolved}.ts`;
             // The mutation operation uses relative imports for these same fixture seams.
