@@ -159,7 +159,7 @@ async function assertEditorComposition(page: Page, viewCase: ViewCase): Promise<
     await toolbar.scrollIntoViewIfNeeded();
     await assertInsideViewport(toolbar, 'toolbar narrow');
     expect((await toolbar.boundingBox())!.height).toBeLessThanOrEqual(64);
-    const more = toolbar.getByRole('button', { name: 'Altri strumenti di formattazione', exact: true });
+    const more = toolbar.getByRole('button', { name: /^(Altri|Riduci) strumenti di formattazione$/u });
     await more.focus();
     await more.press('Enter');
     await expect(more).toHaveAttribute('aria-expanded', 'true');
