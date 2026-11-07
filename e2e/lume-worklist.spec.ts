@@ -90,7 +90,7 @@ test('menu mobile, sezioni e composizione restano raggiungibili da tastiera', as
   const header = page.getByTestId('lume-scheda-header');
   const name = await header.getByRole('heading').innerText();
   await header.getByRole('link', { name: 'Nuova voce', exact: true }).click();
-  await expect(page.getByTestId('progressive-entry-composer')).toContainText(name);
+  await expect(page.getByTestId('lume-editor-workflow')).toContainText(name);
   await assertNoHorizontalOverflow(page, [{ label: 'compositore', selector: 'document' }]);
 });
 

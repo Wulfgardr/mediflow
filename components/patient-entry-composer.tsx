@@ -1,0 +1,1101 @@
+'use client';
+
+import { restoreEntryDraftDate, type EntryLocalDraft } from '@/lib/entry-local-draft';
+import { useEntryLocalDraft } from '@/hooks/use-entry-local-draft';
+import { formatCountLabel } from '@/lib/format-count';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { useDropzone } from 'react-dropzone';
+import { v4 as uuidv4 } from 'uuid';
+import { AlertTriangle, ArrowLeft, Building2, Calendar, CheckCircle2, ChevronDown, ClipboardList, Clock, FileCheck2, FileText, Home, Loader2, Mic, MicOff, Paperclip, Pause, Play, RotateCcw, Save, Square, Stethoscope, Upload, Video, Wand2, X } from 'lucide-react';
+
+import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
+import { InkState } from '@/components/ui/ink-state';
+import { ViewState } from '@/components/ui/view-state';
+import { ClinicalRichTextEditor } from '@/components/clinical-rich-text-editor';
+import { patientAllergiesForHeader } from '@/lib/patient-allergies';
+import { PatientHeaderAllergies } from '@/components/patient-header-identity';
+import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
+import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
+import { AttachmentCollectionChangedError, AttachmentCollectionView, uploadFilesOnce } from '@/lib/attachment-collection-client';
+import { db, type Attachment, type ClinicalEntry, type Therapy, type Observation, type Checkup } from '@/lib/db';
+import { clinicalRichTextToPlainText, isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
+import { useLiveQueryState } from '@/lib/live-query';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/components/ui/toast-provider';
+import type { VisitMedicationCandidate, VisitSessionEvent, VisitSessionState } from '@/lib/visit-transcript-draft';
+/* WUL-676: one clinical form, with a prototype presentation. */
+import { useRuntimeTwinDesign, useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
+import PrivacyBlur from '@/components/privacy-blur';
+import composerStyles from './patient-entry-composer.module.css';
+
+/* WUL-420 */
+const VISIT_DRAFT_PLACEHOLDER = [
+    'S: motivo della visita, sintomi riferiti, contesto funzionale',
+    'O: parametri, esame obiettivo, elementi documentali',
+    'A: valutazione clinica da rivedere',
+    'P: piano, follow-up, indicazioni condivise',
+].join('\n');
+
+/* WUL-420 */
+function escapeClinicalDraftText(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/* WUL-420 */
+function formatVisitDraftAsClinicalHtml(value: string): string {
+    return value
+        .trim()
+        .split(/\n{2,}/)
+        .map((block) => `<p>${escapeClinicalDraftText(block.trim()).replace(/\n/g, '<br>')}</p>`)
+        .join('');
+}
+
+/* WUL-420 */
+function formatEntryDate(value: Date | string | number | null | undefined): string {
+    if (!value) return 'data non disponibile';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return 'data non disponibile';
+    return new Intl.DateTimeFormat('it-IT', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    }).format(date);
+}
+
+/* WUL-421 */
+type VisitSessionUiState = VisitSessionState | 'processing' | 'processed';
+
+export function PatientEntryComposer({ embedded = false }: { embedded?: boolean }) {
+    const params = useParams();
+    const router = useRouter();
+    const { showToast } = useToast();
+    const { proposal } = useRuntimeTwinDesign();
+    const id = params.id as string;
+
+    const now = new Date();
+    const defaultDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+
+    const [type, setType] = useState<'visit' | 'remote' | 'note'>('visit');
+    const [content, setContent] = useState('');
+    const [setting, setSetting] = useState<'ambulatory' | 'home'>('ambulatory');
+    const [entryDate, setEntryDate] = useState(defaultDate);
+    const [editState, setEditState] = useState<EntryLocalDraft['editState']>('pristine');
+    const [dateSource, setDateSource] = useState<EntryLocalDraft['dateSource']>('default');
+    const [files, setFiles] = useState<File[]>([]);
+    // Files the server already stored in an earlier attempt of this entry: a retry reuses their ids.
+    const confirmedUploads = useRef(new Map<File, string>());
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState('');
+    /* WUL-420 */
+    const [dictatedDraft, setDictatedDraft] = useState('');
+    const [isDictatedDraftReviewed, setIsDictatedDraftReviewed] = useState(false);
+    /* WUL-421 */
+    const [visitSessionState, setVisitSessionState] = useState<VisitSessionUiState>('idle');
+    const [visitSessionStartedAt, setVisitSessionStartedAt] = useState<number | null>(null);
+    const [visitSessionEvents, setVisitSessionEvents] = useState<VisitSessionEvent[]>([]);
+    const [visitDraftError, setVisitDraftError] = useState('');
+    const [visitMedicationCandidates, setVisitMedicationCandidates] = useState<VisitMedicationCandidate[]>([]);
+    const [isContextOpen, setIsContextOpen] = useState(false);
+    const [isReadingQuadro, setIsReadingQuadro] = useState(false);
+    const draftValue = useMemo(() => ({ editState, dateSource, type, content, setting, entryDate, dictatedDraft }), [editState, dateSource, type, content, setting, entryDate, dictatedDraft]);
+    const localDraft = useEntryLocalDraft(id, draftValue, draft => {
+        setType(draft.type); setContent(draft.content); setSetting(draft.setting);
+        setEditState('dirty'); setDateSource(draft.dateSource);
+        setEntryDate(restoreEntryDraftDate(draft, defaultDate)); setDictatedDraft(draft.dictatedDraft); setIsDictatedDraftReviewed(false);
+    });
+    const writingRef = useRef<HTMLDivElement>(null);
+    const quadroHeadingRef = useRef<HTMLHeadingElement>(null);
+    const consultQuadro = () => {
+        setIsReadingQuadro(true);
+        requestAnimationFrame(() => quadroHeadingRef.current?.focus());
+    };
+    const resumeDraft = () => {
+        setIsReadingQuadro(false);
+        requestAnimationFrame(() => writingRef.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus());
+    };
+    const hasUnsavedChanges = !isClinicalRichTextBlank(content)
+        || type !== 'visit'
+        || setting !== 'ambulatory'
+        || dateSource === 'user'
+        || files.length > 0
+        || dictatedDraft.trim().length > 0
+        || visitSessionEvents.length > 0;
+
+    /* WUL-676: keep the workspace guard active during pending saves. */
+    useRuntimeTwinPendingForm(hasUnsavedChanges, localDraft.clear);
+    const patientRead = useLiveQueryState(() => db.patients.get(id), [id], undefined, ['patients']);
+    const patient = patientRead.data;
+    /* WUL-420 */
+    const entriesRead = useLiveQueryState<ClinicalEntry[]>(
+        async () => db.entries.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }),
+        [id],
+        undefined,
+        ['entries'],
+    );
+    const patientEntries = useMemo(() => entriesRead.data ?? [], [entriesRead.data]);
+    /* WUL-420 */
+    const attachmentsRead = useLiveQueryState<Attachment[]>(
+        async () => db.attachments.query({ patientId: id }).toArray({ signal: db.getSessionReadSignal() }),
+        [id],
+        undefined,
+        ['attachments'],
+    );
+    const patientAttachments = attachmentsRead.data ?? [];
+
+    const activeTherapies = useLiveQueryState<Therapy[]>(
+        async () => proposal
+            ? (await db.therapies.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }))
+                .filter((therapy) => therapy.status === 'active' && !therapy.deletedAt)
+            : [],
+        [id, proposal],
+        undefined,
+        ['therapies'],
+    );
+
+    const measuresRead = useLiveQueryState<Observation[]>(
+        async () => proposal ? db.observations.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }) : [],
+        [id, proposal], undefined, ['observations'],
+    );
+    const checkupsRead = useLiveQueryState<Checkup[]>(
+        async () => proposal ? (await db.checkups.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }))
+            .filter(checkup => !checkup.deletedAt && checkup.status !== 'completed' && checkup.status !== 'cancelled')
+            .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime()) : [],
+        [id, proposal], undefined, ['checkups'],
+    );
+    const quadroTherapies = useMemo(() => activeTherapies.data?.slice().sort((left, right) => {
+        const leftTime = left.startDate ? new Date(left.startDate).getTime() : 0;
+        const rightTime = right.startDate ? new Date(right.startDate).getTime() : 0;
+        return rightTime - leftTime;
+    }), [activeTherapies.data]);
+
+    const onDrop = useCallback((acceptedFiles: File[]) => {
+        setFiles((prev) => [...prev, ...acceptedFiles]);
+    }, []);
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+
+    const removeFile = (index: number) => {
+        setFiles((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+    };
+
+    /* WUL-420 */
+    const handleDictatedDraftChange = (value: string) => {
+        setEditState('dirty');
+        setDictatedDraft(value);
+        setIsDictatedDraftReviewed(false);
+        setVisitMedicationCandidates([]);
+        setVisitDraftError('');
+    };
+
+    /* WUL-421 */
+    const getVisitEventAtMs = useCallback(() => {
+        if (visitSessionStartedAt === null) return 0;
+        return Math.max(0, Math.round(performance.now() - visitSessionStartedAt));
+    }, [visitSessionStartedAt]);
+
+    const appendVisitEvent = useCallback((type: VisitSessionEvent['type']) => {
+        setVisitSessionEvents((currentEvents) => [...currentEvents, { type, atMs: getVisitEventAtMs() }]);
+    }, [getVisitEventAtMs]);
+
+    const startVisitSession = () => {
+        setVisitSessionStartedAt(performance.now());
+        setVisitSessionEvents([{ type: 'start', atMs: 0 }]);
+        setVisitMedicationCandidates([]);
+        setVisitDraftError('');
+        setVisitSessionState('recording');
+    };
+
+    const pauseVisitSession = () => {
+        appendVisitEvent('pause');
+        setVisitSessionState('paused');
+    };
+
+    const resumeVisitSession = () => {
+        appendVisitEvent('resume');
+        setVisitSessionState('recording');
+    };
+
+    const stopVisitSession = () => {
+        appendVisitEvent('stop');
+        setVisitSessionState('stopped');
+    };
+
+    const resetVisitSession = () => {
+        setVisitSessionState('idle');
+        setVisitSessionStartedAt(null);
+        setVisitSessionEvents([]);
+        setVisitMedicationCandidates([]);
+        setVisitDraftError('');
+        setIsDictatedDraftReviewed(false);
+    };
+
+    const processVisitDraft = async () => {
+        if (!dictatedDraft.trim() || visitSessionState === 'processing') return;
+
+        setVisitSessionState('processing');
+        setVisitDraftError('');
+
+        try {
+            const response = await fetch('/api/visit-session/draft', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patientId: id,
+                    transcript: dictatedDraft,
+                    events: visitSessionEvents,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`visit-draft-${response.status}`);
+            }
+
+            const result = await response.json() as {
+                draftText?: string;
+                medications?: VisitMedicationCandidate[];
+            };
+
+            setDictatedDraft(result.draftText || dictatedDraft);
+            setVisitMedicationCandidates(result.medications || []);
+            setIsDictatedDraftReviewed(false);
+            setVisitSessionState('processed');
+        } catch (_error) {
+            setVisitDraftError('Elaborazione non riuscita. Il transcript resta modificabile manualmente.');
+            setVisitSessionState(visitSessionEvents.some((event) => event.type === 'stop') ? 'stopped' : 'idle');
+        }
+    };
+
+    /* WUL-420 */
+    const insertReviewedDraft = () => {
+        if (!dictatedDraft.trim() || !isDictatedDraftReviewed) return;
+
+        setEditState('dirty');
+        const draftHtml = formatVisitDraftAsClinicalHtml(dictatedDraft);
+        setContent((currentContent) => {
+            const normalizedCurrentContent = sanitizeClinicalRichTextHtml(currentContent);
+            if (isClinicalRichTextBlank(normalizedCurrentContent)) return draftHtml;
+            return `${normalizedCurrentContent}<p><strong>Bozza dettata rivista</strong></p>${draftHtml}`;
+        });
+        setIsDictatedDraftReviewed(false);
+    };
+
+    const handleSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (localDraft.state === 'loading') return;
+        const normalizedContent = sanitizeClinicalRichTextHtml(content);
+
+        if (isClinicalRichTextBlank(normalizedContent)) {
+            showToast({ tone: 'warning', title: 'Resoconto clinico mancante', description: 'Inserisci un resoconto clinico prima di registrare la voce.' });
+            return;
+        }
+
+        // New files join the documents listed in this page: a list not yet read cannot be the precondition.
+        let attachmentCollection: AttachmentCollectionView | undefined;
+        if (files.length > 0) {
+            try {
+                attachmentCollection = AttachmentCollectionView.capture(id,
+                    attachmentsRead.loading || attachmentsRead.error ? undefined : attachmentsRead.data);
+            } catch {
+                showToast({ tone: 'warning', title: 'Documenti in cartella non disponibili', description: 'Gli allegati non sono stati salvati. Attendi la lettura dei documenti in cartella e registra di nuovo.' });
+                attachmentsRead.refresh();
+                return;
+            }
+        }
+
+        setIsSubmitting(true);
+        setUploadProgress('Salvataggio allegati...');
+
+        try {
+            const attachmentIds = await uploadFilesOnce(files, confirmedUploads.current, async (file) => {
+                const summary = 'Allegato alla voce clinica · revisione documentale richiesta';
+                const attachmentId = uuidv4();
+
+                const base64Data = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                await db.attachments.add({
+                    id: attachmentId,
+                    patientId: id,
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    path: `uploads/${file.name}`,
+                    data: base64Data,
+                    summarySnapshot: summary,
+                    createdAt: new Date(),
+                }, { attachmentCollection });
+                return attachmentId;
+            });
+
+            setUploadProgress('Salvataggio voce diario...');
+
+            const typeLabels: Record<string, string> = {
+                visit: 'Visita ambulatoriale',
+                remote: 'Contatto remoto',
+                note: 'Nota clinica',
+            };
+
+            await db.entries.add({
+                id: uuidv4(),
+                patientId: id,
+                type,
+                title: typeLabels[type] || 'Nuova Voce',
+                date: new Date(entryDate),
+                content: normalizedContent,
+                setting,
+                attachments: attachmentIds,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            });
+
+            /* WUL-676: successful programmatic navigation is not
+               intercepted by the workspace's link guard. */
+            await localDraft.clear().catch(() => showToast({ tone: 'warning', title: 'Voce registrata', description: 'La copia della bozza non è stata rimossa. Non registrarla di nuovo.' }));
+            if (embedded) window.history.replaceState(null, '', `/patients/${id}/modules#diario`);
+            else router.push(`/patients/${id}/modules`);
+        } catch (error) {
+            if (error instanceof AttachmentCollectionChangedError) {
+                attachmentsRead.refresh();
+                showToast({ tone: 'warning', title: 'Documenti in cartella cambiati', description: confirmedUploads.current.size
+                    ? 'L’elenco dei documenti è cambiato durante il salvataggio. La voce non è stata registrata; gli allegati già salvati restano in cartella e non verranno caricati di nuovo. Controlla i documenti e registra di nuovo.'
+                    : 'L’elenco dei documenti è cambiato dopo l’ultima lettura. La voce e gli allegati non sono stati salvati: i file restano nel modulo, controlla i documenti in cartella e registra di nuovo.' });
+                setIsSubmitting(false);
+                setUploadProgress('');
+                return;
+            }
+            console.error(error);
+            showToast({ tone: 'error', title: 'Errore durante il salvataggio', description: 'Riprova.' });
+            setIsSubmitting(false);
+            setUploadProgress('');
+        }
+    };
+
+    const types = [
+        { id: 'visit', label: 'Visita', icon: Stethoscope },
+        { id: 'remote', label: 'Remoto', icon: Video },
+        { id: 'note', label: 'Nota', icon: FileText },
+    ];
+    /* WUL-420 */
+    const recentEntries = useMemo(() => {
+        return [...patientEntries]
+            .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+            .slice(0, 3);
+    }, [patientEntries]);
+    /* WUL-420 */
+    const visitEntryCount = useMemo(() => {
+        return patientEntries.filter((entry) => entry.type === 'visit').length;
+    }, [patientEntries]);
+    /* WUL-420 */
+    const sourceCount = (patient?.documentInsights?.length ?? 0) + patientAttachments.length + files.length;
+    const hasDictatedDraft = dictatedDraft.trim().length > 0;
+    const canInsertReviewedDraft = type === 'visit' && hasDictatedDraft && isDictatedDraftReviewed;
+    const acceptedNoteHasContent = !isClinicalRichTextBlank(content);
+    /* WUL-421 */
+    const visitSessionStatusLabel: Record<VisitSessionUiState, string> = {
+        idle: proposal ? 'Da avviare' : 'Pronta locale',
+        recording: proposal ? 'Sessione avviata' : 'In registrazione',
+        paused: 'In pausa',
+        stopped: proposal ? 'Sessione terminata' : 'Fermata',
+        processing: 'Elaborazione',
+        processed: 'Bozza pronta',
+    };
+    const canProcessVisitDraft = type === 'visit'
+        && hasDictatedDraft
+        && visitSessionState !== 'recording'
+        && visitSessionState !== 'processing';
+    const workspaceNavItems: Kree8WorkspaceNavItem[] = [
+        { href: '#dati', label: 'Dati', meta: setting === 'home' ? 'domicilio' : 'ambulatorio' },
+        ...(type === 'visit' ? [{ href: '#sessione-visita', label: 'Sessione', meta: visitSessionStatusLabel[visitSessionState].toLowerCase() }] : []),
+        { href: '#resoconto', label: 'Resoconto' },
+        { href: '#allegati', label: 'Allegati', meta: String(files.length) },
+        { href: '#contesto', label: 'Contesto', meta: String(sourceCount) },
+    ];
+
+    /* WUL-676: reuse each field/editor/tool and its handlers. The
+       comparison changes wrappers/order, never creates another form state. */
+    const metadataFields = proposal ? (
+        <div id="dati" className={composerStyles.metadata}>
+            <label className={composerStyles.metadataField}>
+                <span>Tipo</span>
+                <select value={type} onChange={(event) => { setEditState('dirty'); setType(event.target.value as typeof type); }} aria-label="Tipo di voce">
+                    {types.map((entryType) => <option key={entryType.id} value={entryType.id}>{entryType.label}</option>)}
+                </select>
+            </label>
+            <label className={composerStyles.metadataField}>
+                <span>Luogo</span>
+                <select value={setting} onChange={(event) => { setEditState('dirty'); setSetting(event.target.value as typeof setting); }} aria-label="Luogo della voce clinica">
+                    <option value="ambulatory">Ambulatorio</option>
+                    <option value="home">Domicilio</option>
+                </select>
+            </label>
+            <label className={composerStyles.metadataField}>
+                <span>Data e ora</span>
+                <input
+                    type="datetime-local"
+                    value={entryDate}
+                    onChange={(event) => { setEditState('dirty'); setDateSource('user'); setEntryDate(event.target.value); }}
+                    aria-label="Data e ora della voce clinica"
+                    aria-describedby="entry-date-description"
+                    required
+                />
+                <span id="entry-date-description" className="sr-only">Puoi retrodatare la voce quando ricostruisci il diario.</span>
+            </label>
+        </div>
+    ) : (
+        <>
+            <div id="dati" className="grid gap-6 pb-7 md:grid-cols-[220px_minmax(0,1fr)]">
+                <div className="space-y-2">
+                    <label className="section-kicker flex items-center gap-2">
+                        <Calendar className="h-3.5 w-3.5" />
+                        Data e ora
+                    </label>
+                    <div className="relative">
+                        <Clock className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-[color:var(--lume-ink-muted)]" />
+                        <input
+                            type="datetime-local"
+                            value={entryDate}
+                            onChange={(e) => { setEditState('dirty'); setDateSource('user'); setEntryDate(e.target.value); }}
+                            className="w-full rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] py-3 pl-12 pr-4 text-sm font-medium text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] focus:shadow-[var(--lume-focus-ring)] dark:[color-scheme:dark]"
+                            aria-label="Data e ora della voce clinica"
+                            aria-describedby="entry-date-description"
+                            required
+                        />
+                    </div>
+                    <p id="entry-date-description" className="text-xs leading-5 text-[color:var(--lume-ink-muted)]">
+                        Puoi retrodatare la voce quando ricostruisci il diario.
+                    </p>
+                </div>
+
+                <div className="space-y-2">
+                    <p id="entry-setting-label" className="section-kicker">Luogo</p>
+                    <div className="grid grid-cols-2 gap-3" role="group" aria-labelledby="entry-setting-label">
+                        <button
+                            type="button"
+                            onClick={() => { setEditState('dirty'); setSetting('ambulatory'); }}
+                            aria-pressed={setting === 'ambulatory'}
+                            className={cn(
+                                'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[var(--lume-radius-control)] border px-4 text-sm font-semibold transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
+                                setting === 'ambulatory'
+                                    ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]'
+                                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]'
+                            )}
+                        >
+                            <Building2 className="h-4 w-4" />
+                            <span>Ambulatorio</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setEditState('dirty'); setSetting('home'); }}
+                            aria-pressed={setting === 'home'}
+                            className={cn(
+                                'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[var(--lume-radius-control)] border px-4 text-sm font-semibold transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
+                                setting === 'home'
+                                    ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]'
+                                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]'
+                            )}
+                        >
+                            <Home className="h-4 w-4" />
+                            <span>Domicilio</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] py-7">
+                <p id="entry-type-label" className="section-kicker">Tipo di voce</p>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3" role="group" aria-labelledby="entry-type-label">
+                    {types.map((currentType) => {
+                        const Icon = currentType.icon;
+                        const isSelected = type === currentType.id;
+
+                        return (
+                            <button
+                                key={currentType.id}
+                                type="button"
+                                onClick={() => { setEditState('dirty'); setType(currentType.id as 'visit' | 'remote' | 'note'); }}
+                                aria-pressed={isSelected}
+                                className={cn(
+                                    'lume-press flex items-center gap-3 rounded-[var(--lume-radius-card)] border px-4 py-4 text-left transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
+                                    isSelected
+                                        ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]'
+                                        : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]'
+                                )}
+                            >
+                                <div className={cn(
+                                    'flex h-11 w-11 items-center justify-center rounded-[16px] border',
+                                    isSelected
+                                        ? 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink)]'
+                                        : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]',
+                                )}>
+                                    <Icon className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{currentType.label}</p>
+                                    <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
+                                        {currentType.id === 'visit'
+                                            ? 'In presenza, con esame obiettivo e piano.'
+                                            : currentType.id === 'remote'
+                                                ? 'Contatto a distanza, follow-up o riallineamento.'
+                                                : 'Nota breve, decisione o memo clinico.'}
+                                    </p>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </>
+    );
+
+    const visitSessionContent = (
+        <section key="session" id={proposal ? undefined : "sessione-visita"} className={proposal ? composerStyles.sessionBody : "border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] py-7"}>
+            {!proposal ? (
+                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <p className="section-kicker">Sessione visita</p>
+                        <h2 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">
+                            Bozza dettata e revisione
+                        </h2>
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] px-3 py-2 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
+                        <MicOff className="h-4 w-4" />
+                        <span>Audio non attivo</span>
+                    </div>
+                </div>
+            ) : null}
+
+            <div className={proposal ? composerStyles.sessionLayout : "grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)]"}>
+                <div className={proposal ? composerStyles.sessionOverview : "min-w-0 space-y-3"}>
+                    <div className={proposal ? composerStyles.capabilityNote : "flex items-start gap-3"}>
+                        <div className={proposal ? composerStyles.capabilityIcon : "flex h-10 w-10 items-center justify-center rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] text-[color:var(--lume-ink-muted)]"} style={{ flex: 'none' }}>
+                            <AlertTriangle className="h-4 w-4" style={{ flex: 'none' }} aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{proposal ? 'Solo testo · nessun audio' : 'Transcript locale'}</p>
+                            <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
+                                {proposal ? 'Inserisci o incolla il testo. I comandi segnano avvio, pause e fine della sessione.' : 'Il backend elabora testo ed eventi pausa; nessun audio viene acquisito da questa vista.'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className={proposal ? composerStyles.sessionMetrics : "grid gap-2 text-xs"}>
+                        <div className={proposal ? composerStyles.sessionStatus : "flex items-center justify-between rounded-[14px] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-3 py-2 text-[color:var(--lume-accent)]"} role="status" aria-live="polite">
+                            <span className="font-semibold">{visitSessionStatusLabel[visitSessionState]}</span>
+                            {visitSessionState === 'processing' ? null : <CheckCircle2 className="h-4 w-4" />}
+                        </div>
+                        <div className={proposal ? composerStyles.sessionCounter : "flex items-center justify-between rounded-[14px] bg-[color:color-mix(in_srgb,var(--lume-ink)_3%,var(--lume-surface-field))] px-3 py-2 text-[color:var(--lume-ink-muted)]"}>
+                            <span>Pause</span>
+                            <span>{visitSessionEvents.filter((event) => event.type === 'pause').length}</span>
+                        </div>
+                        <div className={proposal ? composerStyles.sessionCounter : "flex items-center justify-between rounded-[14px] bg-[color:color-mix(in_srgb,var(--lume-ink)_3%,var(--lume-surface-field))] px-3 py-2 text-[color:var(--lume-ink-muted)]"}>
+                            <span>Eventi</span>
+                            <span>{visitSessionEvents.length}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div className={proposal ? composerStyles.sessionControls : "flex flex-wrap gap-2"}>
+                        {visitSessionState === 'idle' || visitSessionState === 'processed' ? (
+                            <button
+                                type="button"
+                                onClick={startVisitSession}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-3 text-sm font-semibold text-[color:var(--lume-accent)]"
+                            >
+                                <Play className="h-4 w-4" />
+                                <span>{proposal ? 'Avvia sessione' : 'Avvia'}</span>
+                            </button>
+                        ) : null}
+                        {visitSessionState === 'recording' ? (
+                            <button
+                                type="button"
+                                onClick={pauseVisitSession}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-sm font-semibold text-[color:var(--lume-ink)]"
+                            >
+                                <Pause className="h-4 w-4" />
+                                <span>Pausa</span>
+                            </button>
+                        ) : null}
+                        {visitSessionState === 'paused' ? (
+                            <button
+                                type="button"
+                                onClick={resumeVisitSession}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-3 text-sm font-semibold text-[color:var(--lume-accent)]"
+                            >
+                                <Play className="h-4 w-4" />
+                                <span>Riprendi</span>
+                            </button>
+                        ) : null}
+                        {visitSessionState === 'recording' || visitSessionState === 'paused' ? (
+                            <button
+                                type="button"
+                                onClick={stopVisitSession}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-sm font-semibold text-[color:var(--lume-ink)]"
+                            >
+                                <Square className="h-4 w-4" />
+                                <span>{proposal ? 'Chiudi sessione' : 'Ferma'}</span>
+                            </button>
+                        ) : null}
+                        {visitSessionState === 'stopped' || visitSessionState === 'processed' ? (
+                            <button
+                                type="button"
+                                onClick={resetVisitSession}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-sm font-semibold text-[color:var(--lume-ink-muted)]"
+                            >
+                                <RotateCcw className="h-4 w-4" />
+                                <span>{proposal ? 'Reimposta sessione' : 'Reset'}</span>
+                            </button>
+                        ) : null}
+                        <button
+                            type="button"
+                            disabled={!canProcessVisitDraft}
+                            onClick={processVisitDraft}
+                            className="inline-flex h-10 items-center justify-center gap-2 rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-3 text-sm font-semibold text-[color:var(--lume-accent)] transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                            {visitSessionState === 'processing' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                            <span>Elabora bozza</span>
+                        </button>
+                    </div>
+                    {visitDraftError ? (
+                        <div role="alert" className="flex items-start gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-2 text-xs font-semibold text-[color:var(--lume-ink)]">
+                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
+                            <span>{visitDraftError}</span>
+                        </div>
+                    ) : null}
+                    <div className="space-y-2">
+                        <label htmlFor="dictated-draft" className="section-kicker flex items-center gap-2">
+                            {!proposal && visitSessionState === 'recording' ? <Mic className="h-3.5 w-3.5" /> : <ClipboardList className="h-3.5 w-3.5" />}
+                            {proposal ? 'Bozza o transcript' : 'Bozza dettata o transcript'}
+                        </label>
+                        <textarea
+                            id="dictated-draft"
+                            value={dictatedDraft}
+                            onChange={(event) => handleDictatedDraftChange(event.target.value)}
+                            placeholder={VISIT_DRAFT_PLACEHOLDER}
+                            className={cn(
+                                'min-h-[180px] w-full resize-y rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm leading-6 outline-none transition-colors duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)] placeholder:text-[color:var(--lume-ink-muted)] focus:border-[color:color-mix(in_srgb,var(--lume-accent)_28%,transparent)] focus:shadow-[var(--lume-focus-ring)]',
+                                isDictatedDraftReviewed ? 'text-[color:var(--lume-ink)]' : 'text-[color:var(--lume-ink-muted)]',
+                            )}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-4 md:flex-row md:items-center md:justify-between">
+                        <label className="flex min-w-0 items-start gap-3 text-sm leading-5 text-[color:var(--lume-ink)]">
+                            <input
+                                type="checkbox"
+                                checked={isDictatedDraftReviewed}
+                                disabled={!hasDictatedDraft}
+                                onChange={(event) => setIsDictatedDraftReviewed(event.target.checked)}
+                                className="mt-1 h-4 w-4 rounded border-[color:color-mix(in_srgb,var(--lume-ink)_22%,transparent)] text-[color:var(--lume-accent)]"
+                            />
+                            <span>
+                                Ho rivisto questa proposta prima di usarla nel resoconto.
+                            </span>
+                        </label>
+                        <button
+                            type="button"
+                            disabled={!canInsertReviewedDraft}
+                            onClick={insertReviewedDraft}
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-4 text-sm font-semibold text-[color:var(--lume-accent)] transition-[background-color,border-color,color] duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)] hover:bg-[color:color-mix(in_srgb,var(--lume-accent)_12%,var(--lume-surface-field))] disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                            <FileCheck2 className="h-4 w-4" />
+                            <span>{proposal ? 'Inserisci nel resoconto' : 'Porta nel resoconto'}</span>
+                        </button>
+                    </div>
+
+                    {visitMedicationCandidates.length > 0 ? (
+                        <div className="space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <p className="section-kicker">Farmaci rilevati</p>
+                                <span className="rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] px-2.5 py-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
+                                    Non importati
+                                </span>
+                            </div>
+                            <div className="grid gap-2">
+                                {visitMedicationCandidates.map((candidate) => (
+                                    <div key={`${candidate.drugMention}-${candidate.evidence}`} className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_9%,transparent)] py-2">
+                                        <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{candidate.drugMention}</p>
+                                        <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
+                                            {candidate.match
+                                                ? `${candidate.match.name}${candidate.match.atc ? ` · ATC ${candidate.match.atc}` : ''}`
+                                                : 'Match catalogo non trovato'}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+
+                    <div className="grid gap-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-4 md:grid-cols-2">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">Bozza</p>
+                            <p className={cn('mt-1 text-sm font-semibold transition-colors duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)]', isDictatedDraftReviewed ? 'text-[color:var(--lume-ink)]' : 'text-[color:var(--lume-ink-muted)]')}>
+                                {hasDictatedDraft ? (proposal && isDictatedDraftReviewed ? 'Rivista' : 'Da revisione') : 'Vuota'}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">Resoconto</p>
+                            <p className="mt-1 text-sm font-semibold text-[color:var(--lume-ink-muted)]">
+                                {acceptedNoteHasContent ? 'In compilazione' : 'Vuoto'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+    const visitSession = type === 'visit' ? (
+        proposal ? (
+            <details key="session" id="sessione-visita" className={composerStyles.session}>
+                <summary className={composerStyles.sessionSummary}>
+                    <ClipboardList className={composerStyles.icon} aria-hidden="true" />
+                    <span>Bozza locale e sessione</span>
+                    <span className={composerStyles.optional}>Facoltativa · solo testo</span>
+                    <ChevronDown className={composerStyles.disclosureIcon} aria-hidden="true" />
+                </summary>
+                {visitSessionContent}
+            </details>
+        ) : visitSessionContent
+    ) : null;
+
+    const clinicalEditor = (
+        <section key="editor" id="resoconto" className={proposal ? composerStyles.writing : "border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] py-7"}>
+            {proposal ? (
+                <div className={composerStyles.editorHeading}>
+                    <h2>Resoconto clinico</h2>
+                    <p data-testid="lume-entry-draft-state" role="status">
+                        <InkState state="fresh">{acceptedNoteHasContent ? 'Bozza non registrata' : 'Bozza vuota'}</InkState>
+                    </p>
+                </div>
+            ) : (
+                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <p className="section-kicker">Resoconto clinico</p>
+                        <h2 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">
+                            Scrivi la voce
+                        </h2>
+                    </div>
+                    <p
+                        className="text-xs font-medium text-[color:var(--lume-ink-muted)]"
+                        data-testid="lume-entry-draft-state"
+                        role="status"
+                    >
+                        Bozza clinica · {acceptedNoteHasContent ? 'non ancora registrata' : 'vuota'}
+                    </p>
+                </div>
+            )}
+
+            <ClinicalRichTextEditor
+                className={proposal ? composerStyles.editor : undefined}
+                description={proposal ? "Usa la barra per formattare il testo. Tab passa al controllo successivo." : undefined}
+                value={content}
+                onChange={value => { setEditState('dirty'); setContent(value); }}
+                placeholder={'S: Sintomi e motivo della visita\nO: Parametri, esame obiettivo, dati oggettivi\nA: Valutazione clinica e ipotesi\nP: Piano, follow-up, indicazioni'}
+            />
+            <p className="type-meta mt-3" role="status" data-testid="local-draft-status">{localDraft.error || (!localDraft.hasDraft ? 'Nessuna bozza da conservare.' : localDraft.state === 'recovered'
+                ? 'Bozza recuperata. Rivedi il testo prima di registrarlo. Gli allegati vanno selezionati di nuovo.'
+                : !localDraft.saved ? 'Conservazione della bozza in corso…' : 'Testo e dati della bozza conservati cifrati in questo browser. Gli allegati vanno selezionati di nuovo.')}</p>
+        </section>
+    );
+    const attachmentPicker = (
+        <section key="attachments" id="allegati" aria-label="Allegati della voce" className={proposal ? composerStyles.attachments : "border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] py-7"}>
+            {!proposal ? (
+                <div className="mb-4">
+                    <p className="section-kicker">Allegati</p>
+                    <h2 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">
+                        Documenti e referti collegati
+                    </h2>
+                </div>
+            ) : null}
+
+            <div className="space-y-3">
+                {!proposal ? (
+                    <label className="flex items-center gap-2 text-sm font-medium text-[color:var(--lume-ink)]">
+                        <Paperclip className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
+                        Allegati della voce
+                    </label>
+                ) : null}
+
+                <div
+                    {...getRootProps({ role: 'button', 'aria-label': 'Aggiungi allegati alla voce clinica' })}
+                    className={proposal ? cn(composerStyles.addFile, isDragActive && composerStyles.dropActive) : cn(
+                        'rounded-[var(--lume-radius-card)] border p-6 text-center transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
+                        isDragActive
+                            ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)]'
+                            : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]'
+                    )}
+                >
+                    <input {...getInputProps()} />
+                    {proposal ? (
+                        <>
+                            <Paperclip className={composerStyles.icon} aria-hidden="true" />
+                            <span>{isDragActive ? 'Rilascia i file' : 'Allega file'}</span>
+                            {files.length > 0 ? <span className={composerStyles.fileCount}>({files.length})</span> : null}
+                        </>
+                    ) : (
+                        <>
+                            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-accent)]">
+                                <Upload className="h-5 w-5" />
+                            </div>
+                            <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Clicca o trascina qui i file</p>
+                            <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">PDF, immagini, referti e documenti clinici.</p>
+                        </>
+                    )}
+                </div>
+
+                {files.length > 0 ? (
+                    <div className={proposal ? composerStyles.fileList : "grid grid-cols-1 gap-3 md:grid-cols-2"}>
+                        {files.map((file, index) => (
+                            <div key={index} className={proposal ? composerStyles.fileRow : "flex items-center gap-3 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-3"}>
+                                <div className={proposal ? composerStyles.fileIcon : "flex h-10 w-10 items-center justify-center rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink-muted)]"}>
+                                    <FileText className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-semibold text-[color:var(--lume-ink)]" title={file.name}>{file.name}</p>
+                                    <p className="text-xs text-[color:var(--lume-ink-muted)]">{(file.size / 1024).toFixed(0)} KB</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => removeFile(index)}
+                                    className="rounded-[12px] p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] hover:text-[color:var(--lume-accent)]"
+                                    aria-label={`Rimuovi allegato ${file.name}`}
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+            </div>
+        </section>
+    );
+
+    const entriesReadError = <ViewState state="error" title="Voci precedenti non disponibili." />;
+
+    const recentDiary = (
+        <section className={composerStyles.previousEntries} aria-label="Ultime voci registrate">
+            <h2>Voci precedenti</h2>
+            {entriesRead.loading ? <p role="status">Lettura delle voci precedenti…</p>
+                : entriesRead.error ? entriesReadError
+                    : recentEntries.length ? recentEntries.map(entry => (
+                        <details key={entry.id} className={composerStyles.contextSource}>
+                            <summary>{formatEntryDate(entry.date)} · <PrivacyBlur>{entry.title}</PrivacyBlur></summary>
+                            <p><PrivacyBlur>{clinicalRichTextToPlainText(entry.content)}</PrivacyBlur></p>
+                        </details>
+                    )) : <p>Nessuna voce recente disponibile.</p>}
+        </section>
+    );
+
+    const entryForm = (
+        <div
+            className={proposal ? `${composerStyles.sheet} ${embedded ? composerStyles.embedded : ''}` : "patient-detail-section lume-panel border p-6 md:p-7"}
+            data-lume-elevated={proposal ? undefined : "true"}
+            data-testid="lume-editor-workflow"
+        >
+            <form onSubmit={handleSubmit} className={proposal ? composerStyles.form : "space-y-0"} aria-label="Nuova voce clinica">
+                {metadataFields}
+                {proposal
+                    ? [clinicalEditor, attachmentPicker, visitSession]
+                    : [visitSession, clinicalEditor, attachmentPicker]}
+                {proposal ? (
+                    <details
+                        className={composerStyles.context}
+                        open={isContextOpen}
+                        onToggle={(event) => setIsContextOpen(event.currentTarget.open)}
+                    >
+                        <summary className={composerStyles.sessionSummary}>
+                            <FileText className={composerStyles.icon} aria-hidden="true" />
+                            <span>Consulta cartella</span>
+                            <span className={composerStyles.optional}>Sola lettura</span>
+                            <ChevronDown className={composerStyles.disclosureIcon} aria-hidden="true" />
+                        </summary>
+                        <div className={composerStyles.contextBody}>
+                            <section aria-label="Terapie attive registrate">
+                                <h3>Terapie attive registrate</h3>
+                                {activeTherapies.loading ? <p role="status">Caricamento terapie…</p> : activeTherapies.error ? (
+                                    <div role="alert">
+                                        <p>Terapie non disponibili.</p>
+                                        <button type="button" onClick={activeTherapies.refresh} className={composerStyles.addFile}>Riprova</button>
+                                    </div>
+                                ) : activeTherapies.data?.length ? (
+                                    <ul className={composerStyles.contextList}>
+                                        {activeTherapies.data.map((therapy) => (
+                                            <li key={therapy.id}>
+                                                <strong><PrivacyBlur>{therapy.drugName}</PrivacyBlur></strong>
+                                                <p><PrivacyBlur>{therapy.dosage}</PrivacyBlur></p>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : <p>Nessuna terapia attiva registrata.</p>}
+                            </section>
+                            <section aria-label="Documenti in cartella">
+                                <h3>Documenti in cartella</h3>
+                                {patientAttachments.length ? (
+                                    <div className={composerStyles.contextList}>
+                                        {patientAttachments.map((attachment) => (
+                                            <details key={attachment.id} className={composerStyles.contextSource}>
+                                                <summary><PrivacyBlur>{attachment.name}</PrivacyBlur></summary>
+                                                <p>{formatEntryDate(attachment.createdAt)} · Sintesi registrata</p>
+                                                <p><PrivacyBlur>{attachment.summarySnapshot || 'Sintesi non disponibile.'}</PrivacyBlur></p>
+                                            </details>
+                                        ))}
+                                    </div>
+                                ) : <p>Nessun documento disponibile.</p>}
+                            </section>
+                        </div>
+                    </details>
+                ) : null}
+                <div className={proposal ? composerStyles.actions : "flex justify-end border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-4"}>
+                    {proposal ? <div className={composerStyles.saveSummary} role="status"><InkState state="fresh">{isSubmitting ? 'Registrazione in corso' : 'Bozza non registrata'}</InkState><p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : patientRead.loading ? 'Caricamento paziente…' : 'Paziente non disponibile.'} · 1 voce di diario{files.length ? ` · ${files.length} allegati` : ''}</p></div> : null}
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        data-lume-primary="true"
+                        className={cn("ui-btn-primary px-8 py-3 disabled:cursor-not-allowed disabled:opacity-50", proposal && composerStyles.saveButton)}
+                    >
+                        {isSubmitting ? (
+                            <>
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                                <span>{uploadProgress || 'Salvataggio...'}</span>
+                            </>
+                        ) : (
+                            <>
+                                <Save className="h-5 w-5" />
+                                <span>Registra nel diario</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+
+    if (localDraft.state === 'loading') return <p role="status">Recupero della bozza…</p>;
+
+    if (embedded) return <>{entryForm}{entriesRead.error ? entriesReadError : null}</>;
+
+    if (proposal) {
+        return (
+            <div className={composerStyles.page} data-testid="progressive-entry-composer">
+                <header className={composerStyles.header}>
+                    <Link href={`/patients/${id}/modules`} className={composerStyles.back}>
+                        <ArrowLeft className={composerStyles.icon} aria-hidden="true" />
+                        Torna alla scheda paziente
+                    </Link>
+                    <div className={composerStyles.titleRow}>
+                        <h1 className="type-page-title">Nuova voce clinica<span aria-hidden="true">.</span></h1>
+                        <p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : patientRead.loading ? 'Caricamento paziente…' : 'Paziente non disponibile.'}</p>
+                    </div>
+                    {patient ? <PatientHeaderAllergies details={patientAllergiesForHeader(patient.allergies)} /> : null}
+                </header>
+                <div className={composerStyles.layout} data-reading-quadro={isReadingQuadro}>
+                    <aside className={composerStyles.quadro} aria-label="Quadro durante la scrittura">
+                        <div className={composerStyles.columnHeading}>
+                            <h2 ref={quadroHeadingRef} tabIndex={-1}>Quadro</h2>
+                            <button type="button" className={`mf-button-text ${composerStyles.resumeDraft}`} onClick={resumeDraft}>Riprendi la bozza</button>
+                        </div>
+                        {patientRead.loading ? <p role="status">Lettura del Quadro…</p>
+                            : patientRead.error ? <p role="alert">Quadro non disponibile: impossibile leggere il paziente.</p>
+                                : !patient ? <p role="alert">Paziente non disponibile. Il Quadro non può essere letto.</p>
+                                    : <PatientSynopticSheet
+                                        problems={{ data: Array.isArray(patient.diagnoses) ? patient.diagnoses : [], loading: false, error: null }}
+                                        therapies={{ ...activeTherapies, data: quadroTherapies }}
+                                        measures={measuresRead}
+                                        checkups={checkupsRead}
+                                    />}
+                    </aside>
+                    <div className={composerStyles.writingColumn} ref={writingRef}>
+                        <div className={composerStyles.columnHeading}>
+                            <h2>Diario</h2>
+                            <button type="button" className={`mf-button-text ${composerStyles.consultQuadro}`} onClick={consultQuadro}>Consulta il Quadro</button>
+                        </div>
+                        {entryForm}
+                        {recentDiary}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <Kree8WorkspaceShell
+            eyebrow="Diario clinico"
+            title="Nuova voce clinica"
+            subtitle="Registra una visita, un contatto remoto o una nota breve."
+            backHref={`/patients/${id}/modules`}
+            backLabel="Torna alla scheda paziente"
+            patientDetails={patient ? patientAllergiesForHeader(patient.allergies) : undefined}
+            patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
+            navItems={workspaceNavItems}
+        >
+            <div className={workspaceStyles.workspaceGrid} style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
+                <div className={workspaceStyles.primaryStack}>
+                    {entryForm}
+                </div>
+                <aside
+                    id="contesto"
+                    className={`${workspaceStyles.secondaryStack} min-w-0 max-w-full border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] px-2 pt-7`}
+                    aria-labelledby="entry-context-title"
+                >
+                    <div className="min-w-0">
+                        <p className="section-kicker">Contesto paziente</p>
+                        <h2 id="entry-context-title" className="mt-1 break-words text-lg font-semibold text-[color:var(--lume-ink)]">
+                            Sessione ancorata a {patient ? `${patient.lastName} ${patient.firstName}` : 'un paziente in caricamento'}
+                        </h2>
+                        <p className="mt-2 max-w-[72ch] text-sm leading-6 text-[color:var(--lume-ink-muted)]">
+                            Il contesto resta nello stesso flusso della voce. Bozza dettata, allegati e salvataggio richiedono sempre revisione esplicita.
+                        </p>
+                    </div>
+                    <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+                        <section className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-4">
+                            <p className="section-kicker">Caso</p>
+                            <p className="mt-2 break-words text-sm font-semibold text-[color:var(--lume-ink)]">
+                                {patient ? `${patient.lastName} ${patient.firstName}` : 'Caricamento...'}
+                            </p>
+                            <p className="lume-registro mt-2 text-xs text-[color:var(--lume-ink-muted)]">
+                                {formatCountLabel(visitEntryCount, 'visita', 'visite')} · {formatCountLabel(sourceCount, 'fonte', 'fonti')}
+                            </p>
+                            {patient?.diagnoses?.length ? (
+                                <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
+                                    {patient.diagnoses.slice(0, 3).map((diagnosis) => diagnosis.description).join(' · ')}
+                                </p>
+                            ) : null}
+                        </section>
+
+                        <section className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-4">
+                            <p className="section-kicker">Diario recente</p>
+                            <div className="mt-2">
+                                {recentEntries.length > 0 ? recentEntries.map((entry) => (
+                                    <div key={entry.id} className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_9%,transparent)] py-2 first:border-t-0 first:pt-0">
+                                        <p className="lume-registro text-xs text-[color:var(--lume-ink-muted)]">{formatEntryDate(entry.date)}</p>
+                                        <p className="mt-1 text-sm font-semibold text-[color:var(--lume-ink)]">{entry.title}</p>
+                                    </div>
+                                )) : (
+                                    <p className="text-sm text-[color:var(--lume-ink-muted)]">Nessuna voce recente disponibile.</p>
+                                )}
+                            </div>
+                        </section>
+
+                        <section className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-4">
+                            <p className="section-kicker">Stato onesto</p>
+                            <div className="mt-2 space-y-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
+                                <p>La bozza dettata resta fuori dal diario finché non la porti nel resoconto.</p>
+                                <p>La voce viene registrata solo con l&apos;azione primaria Registra nel diario.</p>
+                            </div>
+                        </section>
+                    </div>
+                </aside>
+            </div>
+        </Kree8WorkspaceShell>
+    );
+}

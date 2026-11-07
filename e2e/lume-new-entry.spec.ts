@@ -198,7 +198,11 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
     await expect(editor).toHaveAccessibleDescription(
       'Usa la barra per formattare il testo. Tab passa al controllo successivo.',
     );
-    await expect(page.getByRole('group', { name: 'Strumenti del resoconto clinico', exact: true })).toMatchAriaSnapshot(`
+    const toolbar = page.getByRole('group', { name: 'Strumenti del resoconto clinico', exact: true });
+    const moreTools = toolbar.getByRole('button', { name: /^(Altri|Riduci) strumenti di formattazione$/u });
+    const compactTools = await moreTools.isVisible();
+    if (compactTools) await moreTools.click();
+    await expect(toolbar).toMatchAriaSnapshot(`
       - group "Strumenti del resoconto clinico":
         - button "Titolo"
         - button "Sezione"
@@ -211,7 +215,13 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
         - button "Barrato"
         - button "Riduci rientro"
         - button "Aumenta rientro"
+        ${compactTools ? '- button "Riduci strumenti di formattazione" [expanded]' : ''}
     `);
+    if (compactTools) {
+      await page.keyboard.press('Escape');
+      await expect(moreTools).toBeFocused();
+      await expect(moreTools).toHaveAttribute('aria-expanded', 'false');
+    }
 
     // ordinary native selects preserve type/setting values and
     // keyboard order; the previous segmented buttons are no longer rendered.

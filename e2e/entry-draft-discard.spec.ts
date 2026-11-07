@@ -3,7 +3,7 @@ import { bootstrapUnlockedSession } from './utils';
 
 for (const storageFailure of [false, true]) {
     test(`explicit draft discard removes the browser copy before leaving, storage failure=${storageFailure}`, async ({ page }) => {
-        await bootstrapUnlockedSession(page, '1234');
+        await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
         const patient = await page.evaluate(async () => {
             const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ firstName: 'Scarto', lastName: 'Sintetico', taxCode: `DSC${crypto.randomUUID().replaceAll('-', '').slice(0, 13)}`, birthDate: '1980-01-01' }) });

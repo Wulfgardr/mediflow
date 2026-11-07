@@ -4,7 +4,7 @@ import test from 'node:test';
 import ts from 'typescript';
 
 test('new-entry history explicitly rejects unavailable authenticated lists', () => {
-    const file = new URL('../app/patients/[id]/entries/new/page.tsx', import.meta.url);
+    const file = new URL('../components/patient-entry-composer.tsx', import.meta.url);
     const source = ts.createSourceFile(file.pathname, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     let callback: ts.Expression | undefined;
     const visit = (node: ts.Node) => {

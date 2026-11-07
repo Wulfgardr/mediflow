@@ -79,7 +79,7 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
       } else {
         await expect(row('A')).toContainText('Nessun controllo aperto');
         await expect(row('B')).toContainText('Controllo pressorio confermato');
-        await expect(row('C')).toContainText('Altri 2 controlli');
+        await expect(row('C')).toHaveAccessibleName(/Altri 2 controlli/u);
         await expect(row('C')).toContainText('Rivalutazione concordata');
         if (frame.containerWidth < 700) expect(frame.columns).toEqual(['Paziente', 'Da fare']);
         expect(frame.primaryCount).toBe(1);
@@ -110,7 +110,7 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
     expect(new Set((frames as { palette: string }[]).map(frame => frame.palette)).size).toBe(2);
     const allControls = fixture.state.checkups;
     fixture.state.checkups = allControls.filter(control => control.id !== 'c3');
-    await page.reload(); await expect(row('C')).toContainText('Un altro controllo');
+    await page.reload(); await expect(row('C')).toHaveAccessibleName(/Un altro controllo/u);
     fixture.state.checkups = allControls;
     fixture.state.checkupStatus = 503;
     fixture.state.checkupHold = new Promise<void>(resolve => { release = resolve; });
@@ -146,7 +146,7 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
     await expect(search).toHaveValue('Inventata C');
     await expect(row('C')).toBeFocused(); await expect(row('C')).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('button', { name: 'Attivi', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await expect(row('C')).toContainText('Altri 2 controlli');
+    await expect(row('C')).toHaveAccessibleName(/Altri 2 controlli/u);
     expect(errors).toEqual([]); expect(fixture.blocked).toEqual([]);
   } finally {
     release();

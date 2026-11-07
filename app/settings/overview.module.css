@@ -81,3 +81,5 @@
 }
 
 @media (min-width: 1024px) { .overview .index { display: none; } }
+
+@media (max-width: 1023px) { .overview .index { display: none; } }
