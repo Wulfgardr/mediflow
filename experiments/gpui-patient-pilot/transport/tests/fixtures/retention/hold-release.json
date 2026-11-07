@@ -1,0 +1,6 @@
+{
+  "action": "hold.release",
+  "confirmed": true,
+  "expectedRevision": 1,
+  "holdId": "HOLD-ID"
+}

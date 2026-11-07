@@ -8,6 +8,7 @@ mod models;
 mod network;
 mod parameters;
 mod references;
+mod retention;
 mod security;
 mod territorial;
 mod who_administration;
@@ -32,6 +33,7 @@ use reqwest::{
     Method,
     header::{COOKIE, HeaderMap},
 };
+pub use retention::*;
 pub use security::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
