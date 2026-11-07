@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { Bold, Heading1, Heading2, IndentDecrease, IndentIncrease, Italic, List, ListOrdered, Pilcrow, Strikethrough, Underline } from 'lucide-react';
+import { Bold, Ellipsis, Heading1, Heading2, IndentDecrease, IndentIncrease, Italic, List, ListOrdered, Pilcrow, Strikethrough, Underline } from 'lucide-react';
 
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
 import { cn } from '@/lib/utils';
+import styles from './clinical-rich-text-editor.module.css';
 
 /*
  * WUL-UIUX: document.execCommand e deprecato e incoerente cross-browser.
@@ -78,6 +79,8 @@ export function ClinicalRichTextEditor({
     const descriptionId = useId();
     const editorId = useId();
     const [isFocused, setIsFocused] = useState(false);
+    const [expandedTools, setExpandedTools] = useState(false);
+    const moreToolsRef = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
         execCommandSafe('defaultParagraphSeparator', 'p', true);
@@ -107,6 +110,7 @@ export function ClinicalRichTextEditor({
         editor.focus();
         execCommandSafe(command, value);
         syncValue();
+        setExpandedTools(false);
     };
 
     const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
@@ -121,7 +125,7 @@ export function ClinicalRichTextEditor({
             data-lume-editor-work-in-progress="true"
             data-testid="lume-clinical-editor"
             className={cn(
-                'min-w-0 max-w-full overflow-hidden rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-focal)] transition-[border-color] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)]',
+                styles.root, 'min-w-0 max-w-full overflow-hidden rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-focal)] transition-[border-color] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)]',
                 isFocused
                     ? 'border-[color:var(--lume-accent)]'
                     : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)]',
@@ -134,11 +138,19 @@ export function ClinicalRichTextEditor({
                 aria-controls={editorId}
                 aria-label="Strumenti del resoconto clinico"
                 data-lume-editor-surface="toolbar"
-                className="flex min-w-0 max-w-full flex-wrap items-center gap-2 border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-2"
+                data-expanded={expandedTools}
+                onKeyDown={event => {
+                    if (event.key === 'Escape' && expandedTools) {
+                        setExpandedTools(false);
+                        moreToolsRef.current?.focus();
+                    }
+                }}
+                className={cn(styles.toolbar, "flex min-w-0 max-w-full flex-wrap items-center gap-2 border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-2")}
             >
                 {BLOCK_ACTIONS.map(({ command, icon: Icon, label, value: actionValue }) => (
                     <button
                         key={`${command}-${label}`}
+                        data-formatting-secondary={command === 'formatBlock' || undefined}
                         type="button"
                         onClick={() => runCommand(command, actionValue)}
                         className={TOOLBAR_BUTTON_CLASS}
@@ -153,6 +165,7 @@ export function ClinicalRichTextEditor({
                 {INLINE_ACTIONS.map(({ command, icon: Icon, label }) => (
                     <button
                         key={command}
+                        data-formatting-secondary={command !== 'bold' && command !== 'italic' || undefined}
                         type="button"
                         onClick={() => runCommand(command)}
                         className={TOOLBAR_BUTTON_CLASS}
@@ -164,7 +177,7 @@ export function ClinicalRichTextEditor({
                     </button>
                 ))}
 
-                <div className="ml-auto flex items-center gap-3">
+                <div data-formatting-secondary className="ml-auto flex items-center gap-3">
                     <button
                         type="button"
                         onClick={() => runCommand('outdent')}
@@ -184,6 +197,11 @@ export function ClinicalRichTextEditor({
                         <IndentIncrease className="h-4 w-4" />
                     </button>
                 </div>
+                <button ref={moreToolsRef} type="button" className={cn(TOOLBAR_BUTTON_CLASS, styles.more)}
+                    aria-label={expandedTools ? 'Riduci strumenti di formattazione' : 'Altri strumenti di formattazione'}
+                    aria-expanded={expandedTools} onClick={() => setExpandedTools(value => !value)}>
+                    <Ellipsis className="h-4 w-4" aria-hidden="true" />
+                </button>
             </div>
 
             {/* #75 */}

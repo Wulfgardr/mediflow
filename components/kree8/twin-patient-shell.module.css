@@ -66,7 +66,7 @@
   --k8-focal: var(--lume-surface-focal);
   --k8-focal-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
 }
-.patientCanvas { min-height: 100%; }
+.patientCanvas { min-height: 100%; container-name: patient-canvas; }
 
 /* The overview places the existing diary beside the clinical context. */
 .patientBody[data-folder-section='quadro'] .readingPane > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; align-items: start; }
@@ -80,4 +80,27 @@
  .patientHeader { padding: 20px var(--ink-plane-inset); }
  .identity h1 { font: var(--type-person-compact); }
  .patientBody { padding: 20px var(--ink-plane-inset) 32px; }
+}
+
+.patientCanvas[data-writing='true'] .patientHeader { position: sticky; top: 0; z-index: 20; background: var(--lume-surface-focal); border-bottom: 1px solid var(--lume-rule); }
+.patientCanvas[data-writing='true'] > nav { display: none; }
+.patientCanvas[data-writing='true'] .patientBody { padding-bottom: 160px; }
+.patientCanvas[data-writing='true'] .readingPane > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; align-items: start; }
+.patientCanvas[data-writing='true'] .patientBody :global(#quadro),
+.patientCanvas[data-writing='true'] .patientBody :global(#diario) { display: block; }
+.patientCanvas[data-writing='true'] .patientBody :global(#attenzione) { display: none; }
+@media (max-width: 1000px) {
+ .patientCanvas[data-writing='true'] .readingPane > div { display: flex; flex-direction: column; align-items: stretch; gap: 28px; }
+ .patientCanvas[data-writing='true'] :global(#diario) { order: -1; }
+}
+@media (max-width: 700px) {
+ .patientCanvas[data-writing='true'] .patientHeader { flex-direction: row; align-items: flex-start; gap: 12px; padding-block: 12px; }
+ .patientCanvas[data-writing='true'] .actions { max-width: 120px; justify-content: flex-end; }
+ .patientCanvas[data-writing='true'] .actions > :is(a,button) { padding: 8px; }
+}
+
+.patientCanvas[data-writing='true'] .patientBody :global(#diario > [data-section-header] > h3) { flex-basis: auto; }
+@media (max-width: 700px) {
+ .patientCanvas[data-writing='true'] .actions > a { min-width: 44px; }
+ .patientCanvas[data-writing='true'] .actions > a > span { display: none; }
 }

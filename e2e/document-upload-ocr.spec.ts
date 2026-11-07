@@ -60,6 +60,7 @@ async function openSyntheticAttachment(page: Page, scenario: Scenario, bytes: Bu
   // The ordinary facade encrypts the upload. Plaintext API seeds do NOT qualify this test.
   const saved = page.waitForResponse(response => response.request().method() === 'POST'
     && new URL(response.url()).pathname === '/api/attachments');
+  await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
   await page.locator('#documenti input[type="file"]').setInputFiles({ name, mimeType: type, buffer: bytes });
   const response = await saved;
   expect(response.ok()).toBe(true);

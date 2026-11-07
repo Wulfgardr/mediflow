@@ -182,8 +182,8 @@ export function TimelineEntryCard({
                                     {presentation.stateLabel}
                                 </span> : null}
                                 {!diaryPresentation ? <span className="lume-registro">{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span> : null}
-                                {diaryPresentation && settingLabel && settingLabel !== presentation.source ? <span>{settingLabel}</span> : null}
-                                <span>{proposal && !diaryPresentation ? '' : 'Fonte: '}{presentation.source}</span>
+                                {diaryPresentation ? <span>{settingLabel ?? 'Luogo non registrato'}</span> : null}
+                                {!diaryPresentation || (presentation.source !== settingLabel && presentation.source !== 'Diario locale') ? <span>{proposal && !diaryPresentation ? '' : 'Fonte: '}{presentation.source}</span> : null}
                                 {presentation.author && !diaryPresentation ? <span>Autore: {presentation.author}</span> : null}
                                 {!proposal && entry.setting && (
                                     <span className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 ${entry.setting === 'home' ? 'border-[color:var(--lume-signal-warning)] text-[color:var(--lume-signal-warning)]' : 'border-[color:var(--lume-signal-success)] text-[color:var(--lume-signal-success)]'}`}>
@@ -257,8 +257,7 @@ export function TimelineEntryCard({
                 </div>
 
                 {diaryPresentation ? <div className={twin.registration}>
-                    {stateKnown ? <InkState state={presentation.draft ? 'fresh' : 'dry'}>{presentation.stateLabel === 'Registrata' ? patientDiaryRegistration(entry) : presentation.stateLabel}</InkState> : <span>{presentation.stateLabel}</span>}
-                    {presentation.author && presentation.stateLabel !== 'Registrata' ? <span>Autore: {presentation.author}</span> : null}
+                    {stateKnown ? <InkState state={presentation.draft ? 'fresh' : 'dry'}>{presentation.stateLabel === 'Registrata' ? patientDiaryRegistration(entry) : `${presentation.stateLabel}${presentation.author ? ` da ${presentation.author}` : ''}`}</InkState> : <span>{presentation.stateLabel}{presentation.author ? ` · Autore: ${presentation.author}` : ''}</span>}
                 </div> : null}
 
                 {metadataUnreadable ? <p className={twin.metadataNotice} role="status">Metadati della voce non leggibili. Autore, fonte e stato non verificabili.</p> : null}

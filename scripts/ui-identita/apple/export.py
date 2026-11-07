@@ -1,7 +1,7 @@
 from pathlib import Path
-import subprocess, struct, sys
-scratch = Path('/Volumes/Vision/mf-ui-identita-20261107-scratch/apple')
-out = Path('/Users/leonardopegollo/Antigravity/mf-ui-identita-20261107')
+import subprocess, struct, sys, os
+scratch = Path(os.environ.get('MEDIFLOW_UI_APPLE_SCRATCH', '/Volumes/Vision/mf-ui-identita-20261107-scratch/apple'))
+out = Path(os.environ.get('MEDIFLOW_UI_CAPTURE_OUTPUT', '/Users/leonardopegollo/Antigravity/mf-ui-identita-20261107'))
 sha = subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
 names=['01-elenco','02-scheda','03-diario','04-nuova-voce','05-impostazioni','06-vuoto','07-errore']
 missing = 0

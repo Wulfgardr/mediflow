@@ -25,6 +25,20 @@ final class ClinicalContrastTests: XCTestCase {
     private let dayField = RGB(0xf5, 0xf5, 0xf4)        // giorno.field
     private let infoTone = RGB(0x33, 0x50, 0x6b)        // tone .info (minerale)
 
+    func testCanonicalSelectionKeepsSecondaryInkAboveNormalTextContrast() throws {
+        func rgb(_ hex: String) throws -> RGB {
+            let value = try XCTUnwrap(UInt32(hex.dropFirst(), radix: 16))
+            return RGB(Int((value >> 16) & 255), Int((value >> 8) & 255), Int(value & 255))
+        }
+        XCTAssertLessThan(try rgb(LumePalette.giorno.inkMutedHex).contrastRatio(against: rgb("#007aff")), 4.5)
+        for palette in [LumePalette.giorno, LumePalette.grafite] {
+            let ratio = try rgb(palette.inkMutedHex).contrastRatio(against: rgb(palette.selectionHex))
+            XCTAssertGreaterThanOrEqual(ratio, 4.5)
+            let critical = LumePalette.resolvedHex(for: .critical, using: palette)
+            XCTAssertGreaterThanOrEqual(try rgb(critical).contrastRatio(against: rgb(palette.fieldHex)), 4.5)
+        }
+    }
+
     /// The two fills a selected row can put behind a chip on macOS: the accent
     /// tint when the list has focus, and the grey when it does not.
     private let focusedSelection = RGB(0x0a, 0x63, 0xce)

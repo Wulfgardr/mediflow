@@ -249,21 +249,43 @@ public struct MediFlowMacRootView: View {
     // MARK: - Workspace navigation
 
     private var workspaceNavigation: some View {
-        List(selection: Binding<ClinicalWorkspaceSection?>(
-            get: { scene.section },
-            set: { if let section = $0 { scene.select(section) } }
-        )) {
-            Section("Clinica") {
-                ForEach(ClinicalWorkspaceSection.clinicalSections) { destinationRow($0) }
+        VStack(alignment: .leading, spacing: 0) {
+            Text("MediFlow").inkVoice(21).padding(16)
+            List(selection: Binding<ClinicalWorkspaceSection?>(
+                get: { scene.section },
+                set: { if let section = $0 { scene.select(section) } }
+            )) {
+                Section("Clinica") {
+                    ForEach(ClinicalWorkspaceSection.clinicalSections) { destinationRow($0) }
+                }
+                Section("Consultazione") {
+                    ForEach(Self.referenceSections) { destinationRow($0) }
+                }
             }
-            Section("Consultazione") {
-                ForEach(Self.referenceSections) { destinationRow($0) }
+            .listStyle(.sidebar)
+            Divider()
+            Button { scene.select(.settings) } label: {
+                Label("Impostazioni", systemImage: "gearshape")
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                    .contentShape(Rectangle())
             }
-            Section("Sistema") {
-                ForEach(Self.systemSections) { destinationRow($0) }
+            .buttonStyle(.plain)
+            .foregroundStyle(PlatformColors.ink)
+            .fontWeight(scene.section == .settings ? .semibold : .regular)
+            .background(scene.section == .settings ? PlatformColors.selection : .clear)
+            .accessibilityAddTraits(scene.section == .settings ? .isSelected : [])
+            .accessibilityIdentifier("clinical-workspace-section-settings-button")
+            Button {
+                if let workspace = scene.workspaceModel { Task { await workspace.lockSessionNow() } }
+            } label: {
+                Label("Blocca", systemImage: "lock")
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                    .contentShape(Rectangle())
             }
+                .buttonStyle(.plain)
+                .disabled(scene.workspaceModel == nil)
+                .accessibilityIdentifier("clinical-workspace-lock-button")
         }
-        .listStyle(.sidebar)
         .navigationTitle("MediFlow")
         .accessibilityIdentifier("clinical-workspace-navigation")
     }
@@ -370,7 +392,14 @@ struct MacDetailChrome<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        content
+        VStack(alignment: .leading, spacing: 0) {
+            if section == .patients || section == .settings {
+                Text(section.title).inkVoice(26)
+                    .accessibilityHeading(.h1)
+                    .padding(.horizontal, 20).padding(.vertical, 12)
+            }
+            content
+        }
             .navigationTitle(section.title)
             .navigationSubtitle(subtitle)
     }

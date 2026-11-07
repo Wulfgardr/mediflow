@@ -1,7 +1,7 @@
 from pathlib import Path
-import shutil, subprocess, base64
+import shutil, subprocess, base64, os
 root = Path(__file__).resolve().parents[3]
-scratch = Path('/Volumes/Vision/mf-ui-identita-20261107-scratch/apple')
+scratch = Path(os.environ.get('MEDIFLOW_UI_APPLE_SCRATCH', '/Volumes/Vision/mf-ui-identita-20261107-scratch/apple'))
 project = scratch / 'capture-project'
 project.mkdir(exist_ok=True)
 for name in ['Sources', 'Assets.xcassets']:

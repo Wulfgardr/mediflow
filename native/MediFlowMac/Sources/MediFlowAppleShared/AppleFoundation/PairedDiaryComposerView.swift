@@ -11,7 +11,7 @@ struct PairedDiaryComposerView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.lumeGuardia) private var isGuardia
     @Environment(\.colorSchemeContrast) private var contrast
-    @State private var isCreatingEntry = false
+    @Binding var isCreatingEntry: Bool
     @State private var hasOpenedVisitDraft = false
     @FocusState private var focusedTitle: TitleField?
 
@@ -33,15 +33,6 @@ struct PairedDiaryComposerView: View {
 
             if isCreatingEntry {
                 newEntryForm
-            } else {
-                Button {
-                    isCreatingEntry = true
-                } label: {
-                    Label(hasPendingNewEntry ? "Riprendi nuova voce" : "Nuova voce", systemImage: "square.and.pencil")
-                        .modifier(PairedDiaryControlLabel())
-                }
-                .disabled(model.isWorking)
-                .accessibilityIdentifier("homebase-open-new-entry-button")
             }
         }
         .font(.body)
@@ -63,13 +54,7 @@ struct PairedDiaryComposerView: View {
         #endif
     }
 
-    private var hasPendingNewEntry: Bool {
-        !model.newEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || model.newEntryType != .note
-            || !model.newEntryEditorDocument.isEffectivelyEmpty
-            || !model.newEntryAttachmentIds.isEmpty
-            || hasPendingVisitDraft
-    }
+    private var hasPendingNewEntry: Bool { model.hasNewEntryDraft || hasPendingVisitDraft }
 
     private var hasPendingVisitDraft: Bool {
         #if os(macOS)
@@ -198,6 +183,14 @@ struct PairedDiaryComposerView: View {
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
     }
 
+    private var newEntryMinimumTextHeight: CGFloat {
+        #if os(macOS)
+        200
+        #else
+        44
+        #endif
+    }
+
     private var newEntryForm: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Bozza non registrata", systemImage: "circle.fill")
@@ -225,7 +218,8 @@ struct PairedDiaryComposerView: View {
             .accessibilityIdentifier("homebase-new-entry-soap-template-button")
             ClinicalRichTextEditorView(
                 document: $model.newEntryEditorDocument,
-                accessibilityPrefix: "homebase-new-entry-content"
+                accessibilityPrefix: "homebase-new-entry-content",
+                minimumTextHeight: newEntryMinimumTextHeight
             )
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("homebase-new-entry-content-field")
@@ -263,19 +257,6 @@ struct PairedDiaryComposerView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-            }
-            Button {
-                Task { await model.createEntryForSelectedPatient() }
-            } label: {
-                Label("Registra", systemImage: "checkmark")
-                    .modifier(PairedDiaryControlLabel())
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(PlatformColors.freshInk)
-            .disabled(!model.canCreateEntry || isListening)
-            .accessibilityIdentifier("homebase-create-entry-button")
-            if isListening {
-                Text("Ferma l’ascolto prima di registrare").font(.caption)
             }
             Text("Disponibile solo online: se il Mac non risponde, la voce non viene accodata.")
                 .font(.footnote)
