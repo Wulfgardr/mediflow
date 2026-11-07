@@ -181,7 +181,7 @@ final class ClinicalCardStyleTests: XCTestCase {
         XCTAssertTrue(source.contains(".frame(width: usesDiaryMargin ? 84 : nil"))
         XCTAssertTrue(source.contains("Text(setting).font(.caption).foregroundStyle(.secondary)"))
         XCTAssertTrue(source.contains("Text(type.title).inkRegister(weight: .semibold)"))
-        XCTAssertTrue(source.contains("Label(\"Registrata\", systemImage: \"circle.fill\")"))
+        XCTAssertTrue(source.contains("Label(PairedPatientsWorkspaceSupport.diaryRegistration(recordedBy: entry.recordedBy, createdAt: entry.createdAt), systemImage: \"circle.fill\")"))
         XCTAssertTrue(source.contains(".frame(minWidth: 0, maxWidth: proseWidth, alignment: .leading)"))
     }
 
