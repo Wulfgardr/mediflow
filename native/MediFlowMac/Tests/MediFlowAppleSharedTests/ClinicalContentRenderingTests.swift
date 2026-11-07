@@ -170,7 +170,7 @@ final class ClinicalContentRenderingTests: XCTestCase {
         XCTAssertEqual(attributes("Sottolineato")[.underlineStyle] as? Int, 1)
         XCTAssertEqual(attributes("Barrato")[.strikethroughStyle] as? Int, 1)
         XCTAssertEqual((attributes("Fonte")[.link] as? URL)?.absoluteString, "https://127.0.0.1/nota")
-        XCTAssertEqual(try XCTUnwrap(attributes("Fonte")[.font] as? NSFont).pointSize, 13.5)
+        XCTAssertEqual(try XCTUnwrap(attributes("Fonte")[.font] as? NSFont).pointSize, 17)
     }
 
     @MainActor

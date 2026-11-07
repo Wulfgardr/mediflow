@@ -168,6 +168,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
             }
             if UIDevice.current.userInterfaceIdiom == .phone {
                 app.navigationBars.buttons.element(boundBy: 0).tap()
+            } else if app.buttons["patient-back-to-worklist"].exists {
+                app.buttons["patient-back-to-worklist"].tap()
             }
             if departure == "patient-change" {
                 let second = app.buttons["patient-cell-demo-1"]
@@ -175,6 +177,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
                 second.tap()
                 if UIDevice.current.userInterfaceIdiom == .phone {
                     app.navigationBars.buttons.element(boundBy: 0).tap()
+                } else if app.buttons["patient-back-to-worklist"].exists {
+                    app.buttons["patient-back-to-worklist"].tap()
                 }
             }
             XCTAssertTrue(first.waitForExistence(timeout: 10))
@@ -319,7 +323,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             XCTAssertEqual(direct.label, section.rawValue, file: file, line: line)
             XCTAssertGreaterThanOrEqual(direct.frame.height, 44, file: file, line: line)
             XCTAssertGreaterThanOrEqual(direct.frame.width, 44, file: file, line: line)
-            XCTAssertTrue(direct.isHittable, "The section action must stay reachable", file: file, line: line)
+            waitForUIReady(direct, in: app, timeout: 10, file: file, line: line)
             if !direct.isSelected { direct.tap() }
             let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in direct.isSelected }, object: direct)
             XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed,
@@ -361,6 +365,10 @@ final class MediFlowMobileAppUITests: XCTestCase {
             row.tap()
             openPatientSection(.overview, file: file, line: line)
         } else {
+            if app.buttons["patient-back-to-worklist"].exists {
+                app.buttons["patient-back-to-worklist"].tap()
+                XCTAssertTrue(row.waitForExistence(timeout: 5), file: file, line: line)
+            }
             XCTAssertTrue(row.isSelected, "The visible patient row must remain selected", file: file, line: line)
         }
     }
@@ -545,53 +553,35 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     // #142: the outer project sidebar must overlay the iPad patient workspace.
     func testProjectSidebarPreservesPatientWorkspaceWidthOnIPad() throws {
-        // Not applicable on iPhone: skipping keeps the iPhone suite meaningful
-        // instead of reporting a device mismatch as a product failure.
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad-only layout contract")
-
         launch(seedPatients: true, section: "modules")
-        let patientWorkspace = sectionView("clinical-workspace-patients-view")
-        XCTAssertTrue(patientWorkspace.waitForExistence(timeout: 20))
+        let sidebar = sectionView("clinical-workspace-sidebar")
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 20))
+        XCTAssertEqual(sidebar.frame.width, 192, accuracy: 1)
+        for area in ["patients", "agenda", "diary", "repertori", "analytics", "scales", "settings"] {
+            let button = app.buttons["clinical-workspace-section-\(area)-button"]
+            waitForUIReady(button, in: app)
+            XCTAssertGreaterThanOrEqual(button.frame.height, 44)
+        }
+        XCTAssertTrue(app.buttons["clinical-workspace-lock-button"].exists)
+        let workspace = sectionView("clinical-workspace-patients-view")
+        let width = workspace.frame.width
         let patient = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(patient.waitForExistence(timeout: 10))
         patient.tap()
         openPatientSection(.diary)
         let openEntry = app.buttons["homebase-open-new-entry-button"]
-        XCTAssertTrue(scrollDown(to: openEntry, requireHittable: true))
+        waitForUIReady(openEntry, in: app)
         openEntry.tap()
         let title = app.textFields["homebase-new-entry-title-field"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
-        let anchors = [patientWorkspace, patient, sectionView("patient-workspace-header"), title]
-        let framesBeforeOverlay = anchors.map(\.frame)
-
-        let sidebarToggle = app.buttons["clinical-workspace-project-menu-button"]
-        XCTAssertTrue(sidebarToggle.waitForExistence(timeout: 10), "Regular space should expose the project overlay")
-        sidebarToggle.tap()
-
-        let projectSidebar = sectionView("clinical-workspace-project-sidebar")
-        XCTAssertTrue(projectSidebar.waitForExistence(timeout: 10))
-        XCTAssertTrue(
-            sectionView("clinical-workspace-patients-view").exists,
-            "Opening the project sidebar must preserve the patient workspace behind the overlay"
-        )
-        for (anchor, before) in zip(anchors, framesBeforeOverlay) {
-            XCTAssertTrue(anchor.exists)
-            XCTAssertEqual(anchor.frame.minX, before.minX, accuracy: 2,
-                           "Opening navigation must not shift \(anchor.identifier)")
-            XCTAssertEqual(anchor.frame.width, before.width, accuracy: 2,
-                           "Opening navigation must not compress \(anchor.identifier)")
-        }
-        let overlayEvidence = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        overlayEvidence.name = "issue-142-project-sidebar-overlay"
-        overlayEvidence.lifetime = .keepAlways
-        add(overlayEvidence)
-
-        projectSidebar.buttons["clinical-workspace-section-agenda-button"].tap()
-        XCTAssertTrue(sectionView("clinical-workspace-agenda-view").waitForExistence(timeout: 10))
-        XCTAssertTrue(
-            projectSidebar.waitForNonExistence(timeout: 5),
-            "Selecting a destination should dismiss the project sidebar"
-        )
+        title.typeText("Bozza tra le aree")
+        XCTAssertTrue(openSection("Agenda"))
+        XCTAssertEqual(sidebar.frame.width, 192, accuracy: 1)
+        XCTAssertTrue(openSection("Pazienti"))
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        XCTAssertEqual(title.value as? String, "Bozza tra le aree")
+        XCTAssertEqual(workspace.frame.width, width, accuracy: 2)
     }
 
     func testPairedStatusIsVisibleAndReachableWithSyntheticPatients() throws {
@@ -887,6 +877,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(first.waitForExistence(timeout: 20))
         first.tap()
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 5))
+        if app.buttons["patient-back-to-worklist"].exists {
+            app.buttons["patient-back-to-worklist"].tap()
+        }
         app.buttons["patient-cell-uitest-2"].tap()
         let release = app.buttons["layout-test-release-patient-selection"]
         XCTAssertTrue(release.waitForExistence(timeout: 5))
@@ -1212,7 +1205,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
         app.terminate()
         launch(seedPatients: true, singlePatient: true)
-        let agendaTab = app.tabBars.buttons["Agenda"]
+        let agendaTab = tab("Agenda")
         waitForUIReady(agendaTab, in: app)
         agendaTab.tap()
         let agenda = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
@@ -3677,7 +3670,20 @@ final class MediFlowMobileAppUITests: XCTestCase {
     private func scrollDown(to element: XCUIElement, maxSwipes: Int = 12, requireHittable: Bool = false) -> Bool {
         var attempts = 0
         while (!element.exists || (requireHittable && !element.isHittable)) && attempts < maxSwipes {
-            app.swipeUp()
+            let pane = app.scrollViews["patient-chart-scroll-view"]
+            if pane.exists {
+                var visible = pane.frame.intersection(app.frame)
+                if app.keyboards.firstMatch.exists {
+                    visible.size.height = max(0, min(visible.maxY, app.keyboards.firstMatch.frame.minY) - visible.minY)
+                }
+                let start = app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: visible.midX, dy: visible.maxY - 20))
+                let end = app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: visible.midX, dy: visible.minY + 20))
+                start.press(forDuration: 0.1, thenDragTo: end)
+            } else {
+                app.swipeUp()
+            }
             attempts += 1
         }
         return element.waitForExistence(timeout: 5) && (!requireHittable || element.isHittable)

@@ -326,6 +326,41 @@ public extension View {
     func codice() -> some View { font(LumeTypography.code) }
 }
 
+public struct LumePrimaryButtonStyle: ButtonStyle {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isEnabled) private var isEnabled
+
+    public init() {}
+
+    public func makeBody(configuration: Configuration) -> some View {
+        let palette = LumePalette.palette(for: colorScheme, isGuardia: false)
+        configuration.label
+            .font(.body.weight(.semibold))
+            .padding(.horizontal, 16)
+            .frame(minHeight: LumeGeometry.rowHeight)
+            .foregroundStyle(palette.field)
+            .background(palette.minerale, in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius, style: .continuous))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.5)
+    }
+}
+
+struct PatientAllergyPill: View {
+    var allergies: [String] = []
+
+    var body: some View {
+        ForEach(allergies.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }, id: \.self) { allergy in
+            Label(allergy, systemImage: "exclamationmark.triangle.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(LumePalette.warning)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(LumePalette.warning.opacity(0.12), in: Capsule())
+                .accessibilityLabel("Allergia: \(allergy)")
+                .accessibilityIdentifier("patient-allergy-pill")
+        }
+    }
+}
+
 public struct LumeFiloContinuity {
     public let id: AnyHashable
     public let namespace: Namespace.ID

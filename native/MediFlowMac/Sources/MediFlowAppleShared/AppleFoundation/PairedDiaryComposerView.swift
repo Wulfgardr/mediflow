@@ -11,7 +11,7 @@ struct PairedDiaryComposerView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.lumeGuardia) private var isGuardia
     @Environment(\.colorSchemeContrast) private var contrast
-    @State private var isCreatingEntry = false
+    @Binding var isCreatingEntry: Bool
     @State private var hasOpenedVisitDraft = false
     @FocusState private var focusedTitle: TitleField?
 
@@ -33,7 +33,9 @@ struct PairedDiaryComposerView: View {
 
             if isCreatingEntry {
                 newEntryForm
-            } else {
+            }
+            #if os(macOS)
+            if !isCreatingEntry {
                 Button {
                     isCreatingEntry = true
                 } label: {
@@ -41,8 +43,10 @@ struct PairedDiaryComposerView: View {
                         .modifier(PairedDiaryControlLabel())
                 }
                 .disabled(model.isWorking)
+                .buttonStyle(LumePrimaryButtonStyle())
                 .accessibilityIdentifier("homebase-open-new-entry-button")
             }
+            #endif
         }
         .font(.body)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -63,13 +67,7 @@ struct PairedDiaryComposerView: View {
         #endif
     }
 
-    private var hasPendingNewEntry: Bool {
-        !model.newEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || model.newEntryType != .note
-            || !model.newEntryEditorDocument.isEffectivelyEmpty
-            || !model.newEntryAttachmentIds.isEmpty
-            || hasPendingVisitDraft
-    }
+    private var hasPendingNewEntry: Bool { model.hasNewEntryDraft || hasPendingVisitDraft }
 
     private var hasPendingVisitDraft: Bool {
         #if os(macOS)
@@ -264,6 +262,7 @@ struct PairedDiaryComposerView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            #if os(macOS)
             Button {
                 Task { await model.createEntryForSelectedPatient() }
             } label: {
@@ -277,6 +276,7 @@ struct PairedDiaryComposerView: View {
             if isListening {
                 Text("Ferma l’ascolto prima di registrare").font(.caption)
             }
+            #endif
             Text("Disponibile solo online: se il Mac non risponde, la voce non viene accodata.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)

@@ -480,20 +480,24 @@ struct SettingsWorkspaceView: View {
         Group {
             if usesSidebar {
                 HStack(spacing: 0) {
-                    List(selection: Binding<SettingsArea?>(
-                        get: { selectedArea },
-                        set: { if let area = $0 { selectedArea = area } }
-                    )) {
+                    List {
                         ForEach(SettingsArea.allCases) { area in
-                            Label {
-                                Text(area.title)
-                            } icon: {
-                                Image(systemName: area.symbol)
-                                    .foregroundStyle(PlatformColors.secondaryInk)
+                            Button { selectedArea = area } label: {
+                                Label(area.title, systemImage: area.symbol)
+                                    .fontWeight(selectedArea == area ? .semibold : .regular)
+                                    .foregroundStyle(PlatformColors.ink)
+                                    .frame(maxWidth: .infinity, minHeight: LumeGeometry.rowHeight, alignment: .leading)
+                                    .padding(.horizontal, 12)
+                                    .background(selectedArea == area ? PlatformColors.selection : .clear)
                             }
-                            .tag(area)
+                            .buttonStyle(.plain)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                            .accessibilityAddTraits(selectedArea == area ? .isSelected : [])
                         }
                     }
+                    .scrollContentBackground(.hidden)
+                    .background(PlatformColors.groupedBackground)
                     .listStyle(.sidebar)
                     .frame(width: sidebarWidth)
                     .accessibilityIdentifier("settings-area-navigation")

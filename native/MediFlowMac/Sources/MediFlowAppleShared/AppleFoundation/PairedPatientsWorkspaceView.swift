@@ -39,6 +39,10 @@ struct PairedPatientsWorkspaceView: View {
     @State private var entryTypeFilter: EntryTypeFilter = .all
     @State private var showsDeletedDiaryEntries = false
     @State private var confirmsReplacingEntryTemplate = false
+    private var isCreatingEntry: Bool {
+        get { model.isDiaryComposerOpen }
+        nonmutating set { model.isDiaryComposerOpen = newValue }
+    }
     @State private var confirmsFHIRExport = false
     @State private var presentingScale: ClinicalScaleDraft?
     @State private var icdQuery = ""
@@ -54,16 +58,33 @@ struct PairedPatientsWorkspaceView: View {
     @State private var isCompactPatientHeaderExpanded = false
     #if os(iOS)
     @State private var preferredPatientColumn: NavigationSplitViewColumn = .sidebar
-    @State private var patientDestinationID: String?
+    @State private var localPatientDestinationID: String?
+    private let destinationBinding: Binding<String?>?
+    private var patientDestinationID: String? {
+        get { destinationBinding?.wrappedValue ?? localPatientDestinationID }
+        nonmutating set {
+            if let destinationBinding { destinationBinding.wrappedValue = newValue }
+            else { localPatientDestinationID = newValue }
+        }
+    }
     #if DEBUG
-    @State private var heldSyntheticPatientSelection: HomeBasePatientSummary?
+    private var heldSyntheticPatientSelection: HomeBasePatientSummary? {
+        guard ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_HOLD_PATIENT_SELECTION"] == "1",
+              let current = model.selectedPatient, let destination = patientDestinationID,
+              current.id != destination else { return nil }
+        return model.patients.first { $0.id == destination }
+    }
     #endif
     #endif
 
-    init(model: PairedPatientsWorkspaceModel, capabilities: ClinicalWorkspaceCapabilitiesStore, onShowProject: (() -> Void)? = nil) {
+    init(model: PairedPatientsWorkspaceModel, capabilities: ClinicalWorkspaceCapabilitiesStore,
+         patientDestinationID: Binding<String?>? = nil, onShowProject: (() -> Void)? = nil) {
         self.model = model
         self.capabilities = capabilities
         self.onShowProject = onShowProject
+        #if os(iOS)
+        self.destinationBinding = patientDestinationID
+        #endif
     }
 
     var body: some View {
@@ -426,7 +447,11 @@ struct PairedPatientsWorkspaceView: View {
         #else
         GeometryReader { proxy in
             mobileWorkspace(containerWidth: proxy.size.width)
-                .onAppear { revealLinkedPatient() }
+                .onAppear {
+                    if patientDestinationID == nil { patientDestinationID = model.selectedPatientID }
+                    if patientDestinationID != nil { preferredPatientColumn = .detail }
+                    revealLinkedPatient()
+                }
                 .onChange(of: linkedPatient?.id) { _ in
                     revealLinkedPatient()
                 }
@@ -473,17 +498,18 @@ struct PairedPatientsWorkspaceView: View {
     private func mobileWorkspace(containerWidth: CGFloat) -> some View {
         let isWide = usesSplitLayout(containerWidth: containerWidth)
         return NavigationSplitView(
-            columnVisibility: .constant(.all),
+            columnVisibility: .constant(isWide && patientDestinationID != nil ? .detailOnly : .all),
             preferredCompactColumn: $preferredPatientColumn
         ) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     mobileWorklistStatus
-                    compactWorklist
+                    compactWorklist(isWide: isWide)
                 }
                 .padding(20)
             }
             .safeAreaPadding(.bottom, 16)
+            .background(PlatformColors.groupedBackground)
             .clipped()
             .inkWorkspaceTitle("Pazienti")
             .toolbar { mobileWorklistToolbar }
@@ -499,7 +525,6 @@ struct PairedPatientsWorkspaceView: View {
                     if let patient = heldSyntheticPatientSelection {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button("Complete synthetic selection") {
-                                heldSyntheticPatientSelection = nil
                                 Task { await model.loadPatient(patient) }
                             }
                             .accessibilityIdentifier("layout-test-release-patient-selection")
@@ -513,6 +538,7 @@ struct PairedPatientsWorkspaceView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .environment(\.horizontalSizeClass, isWide ? .regular : .compact)
+        .background(PlatformColors.groupedBackground)
         .toolbar(removing: .sidebarToggle)
         #if DEBUG
         .onAppear {
@@ -524,7 +550,7 @@ struct PairedPatientsWorkspaceView: View {
         #endif
     }
 
-    private var compactWorklist: some View {
+    private func compactWorklist(isWide: Bool) -> some View {
         PairedPatientsWorklistView(
             model: model,
             patientQuery: $patientQuery,
@@ -542,7 +568,6 @@ struct PairedPatientsWorkspaceView: View {
                     if model.selectedPatient != nil,
                        ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1",
                        ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_HOLD_PATIENT_SELECTION"] == "1" {
-                        heldSyntheticPatientSelection = patient
                         return
                     }
                     #endif
@@ -554,7 +579,8 @@ struct PairedPatientsWorkspaceView: View {
                 resetChartReturn()
                 patientDestinationID = patientID
                 preferredPatientColumn = .detail
-            }
+            },
+            isTabletList: isWide
         )
         .chartCard()
     }
@@ -573,6 +599,7 @@ struct PairedPatientsWorkspaceView: View {
             guard section != model.activePatientSection else { return }
             if model.activePatientSection == .overview { resetChartReturn() }
             chartScrollMemory.isRestoring = section == .overview
+            if section != .diary && section != .overview { isCreatingEntry = false }
             model.activePatientSection = section
         })
     }
@@ -612,6 +639,7 @@ struct PairedPatientsWorkspaceView: View {
                 }
             }
             .coordinateSpace(name: "patient-chart-scroll")
+            .accessibilityIdentifier("patient-chart-scroll-view")
             .onPreferenceChange(PatientChartHeaderHiddenKey.self) { patientChartHeaderHidden = $0 }
             .onChange(of: chartScrollMemory.resetGeneration) { _ in
                 scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
@@ -629,6 +657,12 @@ struct PairedPatientsWorkspaceView: View {
         }
         .environment(\.patientChartScrollMemory, chartScrollMemory)
         .environment(\.patientChartPatientID, presentedPatientID)
+        .onChange(of: model.selectedPatientID) { _ in isCreatingEntry = false }
+        .onChange(of: model.statusMessage) { status in
+            if let status, status.hasPrefix("Dettaglio ") {
+                UIAccessibility.post(notification: .announcement, argument: status)
+            }
+        }
         .background(PlatformColors.chartCardSurface)
         .navigationTitle(model.activePatientSection == .overview ? "" : model.activePatientSection.title)
         .toolbar {
@@ -646,6 +680,15 @@ struct PairedPatientsWorkspaceView: View {
                 }
             }
             #endif
+            if isWide, patientDestinationID != nil {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Pazienti", systemImage: "chevron.left") {
+                        patientDestinationID = nil
+                        preferredPatientColumn = .sidebar
+                    }
+                    .accessibilityIdentifier("patient-back-to-worklist")
+                }
+            }
             ToolbarItem(placement: .principal) {
                 if model.activePatientSection == .overview, patientChartHeaderHidden,
                    let detail = model.selectedPatient, detail.id == presentedPatientID {
@@ -657,6 +700,40 @@ struct PairedPatientsWorkspaceView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let detail = model.selectedPatient, detail.id == presentedPatientID {
+                if isCreatingEntry && (model.activePatientSection == .diary || model.activePatientSection == .overview) {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Registra nella scheda di \(detail.lastName) \(detail.firstName)")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Bozza non registrata").font(.caption)
+                        }
+                        Spacer(minLength: 0)
+                        Button("Registra") { Task { await model.createEntryForSelectedPatient() } }
+                            .buttonStyle(LumePrimaryButtonStyle())
+                            .disabled(!model.canCreateEntry)
+                            .accessibilityIdentifier("homebase-create-entry-button")
+                    }
+                    .padding(12)
+                    .background(PlatformColors.chartCardSurface)
+                    .overlay(alignment: .top) { Divider() }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("diary-writing-threshold")
+                } else if !isWide {
+                    newEntryAction
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .padding(12)
+                        .background(PlatformColors.chartCardSurface)
+                        .overlay(alignment: .top) { Divider() }
+                }
+            }
+        }
+        .toolbar {
+            if isWide, !isCreatingEntry, let detail = model.selectedPatient, detail.id == presentedPatientID {
+                ToolbarItem(placement: .primaryAction) { newEntryAction }
+            }
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             if let detail = model.selectedPatient, detail.id == presentedPatientID {
                 VStack(spacing: 0) {
@@ -678,6 +755,20 @@ struct PairedPatientsWorkspaceView: View {
                 .background(PlatformColors.chartCardSurface)
             }
         }
+    }
+
+    private var newEntryAction: some View {
+        Button {
+            model.activePatientSection = .diary
+            isCreatingEntry = true
+        } label: {
+            Label(model.hasNewEntryDraft ? "Riprendi nuova voce" : "Nuova voce", systemImage: "square.and.pencil")
+                .labelStyle(.titleAndIcon)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .buttonStyle(LumePrimaryButtonStyle())
+        .disabled(model.isWorking)
+        .accessibilityIdentifier("homebase-open-new-entry-button")
     }
 
     private func compactHeightPatientNavigation(_ detail: HomeBasePatientDetail) -> some View {
@@ -732,6 +823,7 @@ struct PairedPatientsWorkspaceView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .overlay(alignment: .bottomTrailing) { PatientAllergyPill() }
         .padding(.horizontal, 24)
         .padding(.top, 20)
         .padding(.bottom, 12)
@@ -741,9 +833,7 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     private var mobileCanvasColor: Color {
-        colorScheme == .dark
-            ? LumePalette.guardia.canvas
-            : PlatformColors.groupedBackground
+        LumePalette.palette(for: colorScheme, isGuardia: false).canvas
     }
 
     @ViewBuilder
@@ -1313,13 +1403,14 @@ struct PairedPatientsWorkspaceView: View {
     @ViewBuilder
     private func workspaceFeedbackLine(hidesDemo: Bool = false) -> some View {
         if let error = model.errorMessage {
-            Label(error, systemImage: "exclamationmark.triangle.fill")
-                .chartMetadata()
+            Label(error, systemImage: "xmark.circle.fill")
+                .font(.caption)
+                .monospacedDigit()
                 .foregroundStyle(LumePalette.critical)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("workspace-error-message")
-        } else if let status = model.statusMessage, (!hidesDemo || status != "Dati di test caricati.") {
+        } else if let status = model.statusMessage, (!hidesDemo || (status != "Dati di test caricati." && !status.hasPrefix("Dettaglio "))) {
             Text(status)
                 .font(.caption)
                 .lumeInchiostro(bozza: false)
@@ -1503,14 +1594,8 @@ struct PairedPatientsWorkspaceView: View {
         #endif
     }
 
-    @ViewBuilder
-    private func selectedPatientSections(_ detail: HomeBasePatientDetail) -> some View {
-        VStack(alignment: .leading, spacing: activePatientSectionSpacing) {
-            // Keep only the active clinical section in the reading pane.
-            // Drafts and existing action bindings remain owned by the workspace/model.
-            switch model.activePatientSection {
-            case .overview:
-            PairedPatientDetailSection(
+    private func patientOverview(_ detail: HomeBasePatientDetail) -> some View {
+        PairedPatientDetailSection(
                 model: model,
                 detail: detail,
                 patientLifecycleSheet: $patientLifecycleSheet,
@@ -1520,6 +1605,40 @@ struct PairedPatientsWorkspaceView: View {
                 summaryReturn: summaryReturn
             )
             .chartCard()
+    }
+
+    private var patientDiary: some View {
+        PairedPatientDiarySection(
+            model: model, capabilities: capabilities,
+            entryTypeFilter: $entryTypeFilter,
+            showsDeletedDiaryEntries: $showsDeletedDiaryEntries,
+            confirmsReplacingEntryTemplate: $confirmsReplacingEntryTemplate,
+            isCreatingEntry: $model.isDiaryComposerOpen,
+            entryDeletionCandidate: $entryDeletionCandidate,
+            presentingScale: $presentingScale,
+            attachmentDetailCandidate: $attachmentDetailCandidate
+        )
+        .chartCard()
+    }
+
+    @ViewBuilder
+    private func selectedPatientSections(_ detail: HomeBasePatientDetail) -> some View {
+        VStack(alignment: .leading, spacing: activePatientSectionSpacing) {
+            switch model.activePatientSection {
+            case .overview:
+            #if os(iOS)
+            let columns = horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(HStackLayout(alignment: .top, spacing: 28))
+                : AnyLayout(VStackLayout(alignment: .leading, spacing: 28))
+            columns {
+                patientOverview(detail).frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+                patientDiary.frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("patient-chart-columns")
+            #else
+            patientOverview(detail)
+            #endif
             #if os(macOS)
             NativePatientInsightView(workspaceModel: model).chartCard()
             NativeSmartImportView(workspaceModel: model).chartCard()
@@ -1559,17 +1678,7 @@ struct PairedPatientsWorkspaceView: View {
             }
             #endif
             case .diary:
-            PairedPatientDiarySection(
-                model: model,
-                capabilities: capabilities,
-                entryTypeFilter: $entryTypeFilter,
-                showsDeletedDiaryEntries: $showsDeletedDiaryEntries,
-                confirmsReplacingEntryTemplate: $confirmsReplacingEntryTemplate,
-                entryDeletionCandidate: $entryDeletionCandidate,
-                presentingScale: $presentingScale,
-                attachmentDetailCandidate: $attachmentDetailCandidate
-            )
-            .chartCard()
+            patientDiary
             case .scales:
             PairedPatientScalesSection(
                 model: model,
