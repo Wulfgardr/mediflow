@@ -35,6 +35,7 @@ enum Command {
     Switch(Arc<PreparedHostSetting>),
     Parameters(Arc<mediflow_runtime_client::PreparedInsightParameters>),
     Network(Arc<mediflow_runtime_client::PreparedNetworkMode>),
+    Territorial(Arc<mediflow_runtime_client::PreparedTerritorialPacks>),
 }
 enum Operation {
     Idle,
@@ -503,13 +504,14 @@ impl ClinicalApp {
         let deleting = matches!(command, Command::Delete(_));
         let parameters = matches!(command, Command::Parameters(_));
         let network = matches!(command, Command::Network(_));
+        let territorial = matches!(command, Command::Territorial(_));
         let retained = command.clone();
-        self.run_local_host(move ||match command {Command::Delete(command)=>access.delete_document(&command),Command::Switch(command)=>access.apply_switch(&command),Command::Parameters(command)=>access.apply_insight_parameters(&command),Command::Network(command)=>access.apply_network_mode(&command)},move |this,result,cx| {
+        self.run_local_host(move ||match command {Command::Delete(command)=>access.delete_document(&command),Command::Switch(command)=>access.apply_switch(&command),Command::Parameters(command)=>access.apply_insight_parameters(&command),Command::Network(command)=>access.apply_network_mode(&command),Command::Territorial(command)=>access.apply_territorial_packs(&command)},move |this,result,cx| {
             match result {
                 Ok(true)=>{
                     this.local_host.operation=Operation::Idle;
-                    this.verified=Some(if network {"Modo host aggiornato e riletto."}else if deleting {"Documento eliminato e assenza riletta dall’archivio."}else if parameters {"Parametri aggiornati e riletti dall’host."}else{"Funzione aggiornata e riletta dall’host."}.into());
-                    if network {this.read_network_mode(cx);}else if deleting {this.patient.document_details_id=None;this.load_sections(cx);}else if parameters {this.read_parameters(cx);}else{this.load_ai_status(cx);this.read_local_switches(cx);}
+                    this.verified=Some(if territorial {"Assetto territoriale aggiornato e riletto dall’host."}else if network {"Modo host aggiornato e riletto."}else if deleting {"Documento eliminato e assenza riletta dall’archivio."}else if parameters {"Parametri aggiornati e riletti dall’host."}else{"Funzione aggiornata e riletta dall’host."}.into());
+                    if network || territorial {this.read_network_mode(cx);}else if deleting {this.patient.document_details_id=None;this.load_sections(cx);}else if parameters {this.read_parameters(cx);}else{this.load_ai_status(cx);this.read_local_switches(cx);}
                 }
                 Ok(false)=>this.local_host.operation=Operation::Unconfirmed{command:retained,message:"L’esito non è confermato dalla rilettura. Verifica lo stato corrente prima di preparare una nuova operazione.".into()},
                 Err(error)=>this.local_host.operation=Operation::Unconfirmed{command:retained,message:format!("{} Nessun reinvio automatico. Rileggi prima di preparare una nuova operazione.",ui_error(error))},
@@ -692,6 +694,7 @@ impl ClinicalApp {
                     ),
                     Command::Parameters(command) => command.description(),
                     Command::Network(command) => format!("Passare a {}?", command.mode().title()),
+                    Command::Territorial(command) => format!("Passare a «{}»?", command.preset().title()),
                     Command::Switch(command) => format!(
                         "{} {}?",
                         if command.enabled() {
@@ -703,10 +706,11 @@ impl ClinicalApp {
                     ),
                 };
                 Some(threshold.child(confirmation_heading(crate::title::TitleText::from(question),theme))
+                    .when_some(match command {Command::Territorial(command) => Some(territorial_consequence(command)), _ => None}, |el, detail| el.child(text!(detail)))
                     .child(text!(if pending {"Operazione in corso. L’esito richiede la rilettura."}else{"Verifica la modifica. Verrà registrata dopo questa conferma e verificata con una nuova lettura."}))
                     .child(div().flex().flex_wrap().gap(px(8.))
                         .child(self.local_host.targets[0].attach(button("local-host-command-cancel","Annulla",theme,false,!pending)).when(!pending,|el|el.on_click(cx.listener(|this,_,window,cx|this.cancel_local_command(window,cx)))))
-                        .child(self.local_host.targets[1].attach(button("local-host-command-confirm",if matches!(command,Command::Delete(_)){"Elimina"}else{"Conferma"},theme,true,!pending).when(!pending && matches!(command,Command::Delete(_)),|el|el.bg(theme.critical).border_color(theme.critical).text_color(theme.paper))).when(!pending,|el|el.on_click(cx.listener(|this,_,_,cx|this.confirm_local_command(cx)))))))
+                        .child(self.local_host.targets[1].attach(button("local-host-command-confirm",match command {Command::Delete(_)=>"Elimina",Command::Territorial(_)=>"Cambia assetto",_=>"Conferma"},theme,true,!pending).when(!pending && (matches!(command,Command::Delete(_)) || matches!(command,Command::Territorial(c) if c.turns_off_lombardy())),|el|el.bg(theme.critical).border_color(theme.critical).text_color(theme.paper))).when(!pending,|el|el.on_click(cx.listener(|this,_,_,cx|this.confirm_local_command(cx)))))))
             }
             Operation::Failed(message) | Operation::Unconfirmed { message, .. } => Some(
                 threshold
@@ -728,6 +732,7 @@ impl ClinicalApp {
                                     command.document().name
                                 ),
                                 Command::Network(command) => format!("Scelta conservata: {}. Rileggi il modo host prima di ripreparare.", command.mode().title()),
+                                Command::Territorial(command) => format!("Scelta conservata: {}. Rileggi l’assetto prima di ripreparare.", command.preset().title()),
                                 Command::Parameters(_) => "Parametri conservati nella bozza. Rileggi prima di ripreparare.".into(),
                                 Command::Switch(command) => format!(
                                     "Scelta conservata: {} · {}",
@@ -764,6 +769,16 @@ impl ClinicalApp {
                     ),
             ),
         }
+    }
+}
+
+fn territorial_consequence(
+    command: &mediflow_runtime_client::PreparedTerritorialPacks,
+) -> &'static str {
+    if command.turns_off_lombardy() {
+        "SISS, portali e PRREG scompaiono dalle schermate e i loro writer si fermano. Lo storico resta conservato e torna visibile riattivando la Lombardia."
+    } else {
+        "Le funzioni del pacchetto compaiono nelle schermate. Attivare un pacchetto non concede accesso ai servizi regionali."
     }
 }
 
