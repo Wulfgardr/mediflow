@@ -243,5 +243,20 @@
     "path": "visual-qualification/playwright.config.ts",
     "reason": "Qualifica visiva 0.9.1 solo locale tramite npm run qualify:visual-091; esclusa dagli shard e2e CI.",
     "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/ui-identita/web-capture.spec.ts",
+    "reason": "Catture UI sintetiche locali: npx playwright test -c scripts/ui-identita/playwright.config.ts; fuori dagli shard CI.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/ui-identita/playwright.config.ts",
+    "reason": "Catture UI sintetiche locali: npx playwright test -c scripts/ui-identita/playwright.config.ts; fuori dagli shard CI.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/ui-identita/apple/CaptureTests.swift",
+    "reason": "XCUITest di cattura UI sintetica locale, copiato in un progetto sullo scratch da scripts/ui-identita/apple/capture.sh; fuori dalle suite native.",
+    "owner": "@Wulfgardr"
   }
 ]
