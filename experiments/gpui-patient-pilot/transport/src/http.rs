@@ -702,6 +702,55 @@ impl RuntimeClient {
         ))
     }
 
+    /// Catalogo farmaci di un'altra agenzia: anteprima e conferma in multipart. Le risposte
+    /// 400 e 409 tornano al chiamante, perché portano il messaggio del server o la conferma richiesta.
+    pub(crate) fn drug_catalog_import_raw(
+        &self,
+        headers: HeaderMap,
+        content_type: String,
+        body: Vec<u8>,
+        mutation: bool,
+    ) -> Result<RawResponse> {
+        if !self.is_local_bootstrap_origin() {
+            return Err(RuntimeError::Forbidden);
+        }
+        if body.len() > 101 * 1024 * 1024 {
+            return Err(RuntimeError::TooLarge);
+        }
+        http_runtime().block_on(self.context.run(
+            async {
+                let response = self
+                    .http
+                    .request(
+                        Method::POST,
+                        self.endpoint(&["api", "drugs", "catalog-import"], &[])?,
+                    )
+                    .headers(headers)
+                    .header("origin", self.origin.origin().ascii_serialization())
+                    .header("sec-fetch-site", "same-origin")
+                    .header("content-type", content_type)
+                    .body(body)
+                    .send()
+                    .await
+                    .map_err(|_| uncertain(mutation))?;
+                let raw = read_response_body(response, AUTH_LIMIT, mutation).await?;
+                if raw.status == 409
+                    && matches!(conflict_code(&raw.body), ConflictCode::ArchiveReplaced)
+                {
+                    return Err(RuntimeError::ArchiveReplaced);
+                }
+                if matches!(raw.status, 400 | 409) || (200..300).contains(&raw.status) {
+                    return Ok(raw);
+                }
+                if raw.status == 403 {
+                    return Err(classify_forbidden(&raw.body));
+                }
+                Err(classify_status(raw.status, mutation))
+            },
+            mutation,
+        ))
+    }
+
     pub(crate) fn is_local_bootstrap_origin(&self) -> bool {
         self.origin.host_str().is_some_and(|host| {
             host == "localhost"

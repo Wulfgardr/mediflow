@@ -1,0 +1,33 @@
+--mediflow-fixture
+Content-Disposition: form-data; name="mode"
+
+commit
+--mediflow-fixture
+Content-Disposition: form-data; name="mapping"
+
+{"columns":{"atc":3,"codice":0,"denominazione":1,"principio_attivo":2},"delimiter":";"}
+--mediflow-fixture
+Content-Disposition: form-data; name="source"
+
+{"agency":"Agenzia inventata","codeSystem":"Codice inventato","date":"2026-11-01","sourceUrl":"https://agency.example/catalogo.csv","version":"2026-11"}
+--mediflow-fixture
+Content-Disposition: form-data; name="previewSha256"
+
+f484b6bb8674ac27c6033881dc325369783868caaa19a567547dd359ba355ad5
+--mediflow-fixture
+Content-Disposition: form-data; name="expectedSnapshot"
+
+74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b
+--mediflow-fixture
+Content-Disposition: form-data; name="confirmed"
+
+true
+--mediflow-fixture
+Content-Disposition: form-data; name="file"; filename="catalogo.csv"
+Content-Type: text/csv
+
+code;name;active_ingredient;atc
+X0001;Farmaco inventato uno;Sostanza inventata;A01AA01
+X0002;Farmaco inventato due;Sostanza seconda;B01AC06
+
+--mediflow-fixture--

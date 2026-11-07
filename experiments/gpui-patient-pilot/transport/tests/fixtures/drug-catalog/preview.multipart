@@ -1,0 +1,13 @@
+--mediflow-fixture
+Content-Disposition: form-data; name="mode"
+
+preview
+--mediflow-fixture
+Content-Disposition: form-data; name="file"; filename="catalogo.csv"
+Content-Type: text/csv
+
+code;name;active_ingredient;atc
+X0001;Farmaco inventato uno;Sostanza inventata;A01AA01
+X0002;Farmaco inventato due;Sostanza seconda;B01AC06
+
+--mediflow-fixture--
