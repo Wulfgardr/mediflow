@@ -872,3 +872,12 @@ La riesecuzione ufficiale `npm run verify:therapy-status` passa sul manifest
 aggiornato: TLC, tre mutanti, sei testimoni, 188 test causali, due mutanti
 del controller, codice ripristinato e mutazioni della chat. Nessun file
 runtime o test viene modificato dopo questi esiti.
+
+## Riconciliazione del 7 novembre 2026: blocchi di conservazione sugli allegati
+
+`lib/db.ts` cambia solo nel percorso di eliminazione degli allegati: un 409
+`legal_hold` diventa `AttachmentLegalHoldError` (ADR 0178). Confronto con
+`syncCommit` fff8aefc3a6786d64e31019be3398cb6388ee55f: nessuna modifica a transizioni, guardie, await, CAS o
+audit delle terapie, e nessun codice delle terapie legge il testo degli errori di
+eliminazione. Aggiornate a mano l'impronta di `lib/db.ts` e `syncCommit`.
+Modello, configurazione, invarianti, limiti e mutanti TLC restano identici.
