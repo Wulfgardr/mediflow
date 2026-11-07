@@ -602,12 +602,14 @@ fn prose_lines(block: Block) -> Vec<Block> {
         };
         let mut line = Block {
             runs: Vec::new(),
+            heading: block.heading,
+            quote_depth: block.quote_depth,
+            list_depth: block.list_depth,
             marker: if start == 0 {
                 block.marker.clone()
             } else {
                 None
             },
-            ..block.clone()
         };
         for (text, style) in &graphemes[start..end] {
             for character in text.chars() {
