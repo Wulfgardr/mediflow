@@ -161,14 +161,14 @@ struct PairedPatientDiarySection: View {
         VStack(alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
             diaryHeader
 
-            PairedDiaryComposerView(
-                model: model,
-                capabilities: capabilities,
-                confirmsReplacingEntryTemplate: $confirmsReplacingEntryTemplate,
-                isCreatingEntry: $isCreatingEntry
-            )
-
-            Divider()
+            if isCreatingEntry || model.isEditingEntry || model.isWorking {
+                PairedDiaryComposerView(
+                    model: model,
+                    capabilities: capabilities,
+                    confirmsReplacingEntryTemplate: $confirmsReplacingEntryTemplate,
+                    isCreatingEntry: $isCreatingEntry
+                )
+            }
 
             if model.entries.isEmpty {
                 Text("Nessuna voce diario caricata.")
@@ -254,8 +254,7 @@ struct PairedPatientDiarySection: View {
                             .accessibilityIdentifier("entry-row-attachments-\(entry.id)")
                         }
                         HStack(spacing: 6) {
-                            Label("Registrata", systemImage: "circle.fill")
-                            if let registeredAt = entry.createdAt { Text(registeredAt, style: .time) }
+                            Label(PairedPatientsWorkspaceSupport.diaryRegistration(recordedBy: entry.recordedBy, createdAt: entry.createdAt), systemImage: "circle.fill")
                         }
                         .font(.caption)
                         .foregroundStyle(PlatformColors.ink)

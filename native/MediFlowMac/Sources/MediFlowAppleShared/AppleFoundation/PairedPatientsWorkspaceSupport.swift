@@ -1,6 +1,20 @@
 import SwiftUI
 
 enum PairedPatientsWorkspaceSupport {
+    static func diaryRegistration(recordedBy: String?, createdAt: Date?, timeZone: TimeZone = .current) -> String {
+        let author = recordedBy?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var text = "Registrata"
+        if let author, !author.isEmpty { text += " da \(author)" }
+        if let createdAt {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "it_IT")
+            formatter.timeZone = timeZone
+            formatter.dateFormat = "dd MMMM yyyy 'alle' HH:mm"
+            text += " il \(formatter.string(from: createdAt))"
+        }
+        return text
+    }
+
     static let clinicalPreviewCap = HomeBaseClinicalListLimit.boundaryMaximum
 
     static let birthDateFormatter = ClinicalDatePresentation.birthDate

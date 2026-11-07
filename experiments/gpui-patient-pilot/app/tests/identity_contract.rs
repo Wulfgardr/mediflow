@@ -46,7 +46,8 @@ fn diary_has_date_margin_place_and_dry_registration() {
         "entry_time(&entry.date)",
         "entry.setting",
         "TextRole::Strong",
-        "writing_status(",
+        "diary_registration(entry.recorded_by.as_deref(),entry.created_at.as_deref(),&chrono::Local)",
+        "writing_dot(WritingInk::Dry",
         "WritingInk::Dry",
         ".border_b_1()",
     ] {

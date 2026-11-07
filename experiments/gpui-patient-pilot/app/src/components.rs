@@ -689,7 +689,7 @@ fn writing_word(ink: WritingInk, surface: WritingSurface, theme: Theme) -> State
         })
 }
 
-fn writing_dot(ink: WritingInk, surface: WritingSurface, theme: Theme) -> Stateful<Div> {
+pub(crate) fn writing_dot(ink: WritingInk, surface: WritingSurface, theme: Theme) -> Stateful<Div> {
     let color = ink.color(surface, theme);
     let diameter = theme.role(TypeRole::Meta).size * 0.44;
     div()

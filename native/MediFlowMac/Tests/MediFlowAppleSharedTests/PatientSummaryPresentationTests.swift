@@ -5,6 +5,15 @@ import CryptoKit
 // G1 (ADR 0071 parity): the patient-list row now derives an age from the summary
 // birthDate. Lock the boundary logic of the age helper.
 final class PatientSummaryPresentationTests: XCTestCase {
+    func testDiaryRegistrationPreservesAuthorAndRegistrationTime() {
+        let date = ISO8601DateFormatter().date(from: "2026-11-07T09:05:00Z")!
+        let zone = TimeZone(secondsFromGMT: 3600)!
+        for (author, expected) in [("  Ada Sintetica  ", "Registrata da Ada Sintetica"), (nil, "Registrata"), (" ", "Registrata")] as [(String?, String)] {
+            XCTAssertEqual(PairedPatientsWorkspaceSupport.diaryRegistration(recordedBy: author, createdAt: date, timeZone: zone), expected + " il 07 novembre 2026 alle 10:05")
+            XCTAssertEqual(PairedPatientsWorkspaceSupport.diaryRegistration(recordedBy: author, createdAt: nil, timeZone: zone), expected)
+        }
+    }
+
     func testChartReadingAnchorsAreScopedToPatient() {
         var state = PatientChartReturnState()
         let first = PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 183.5)
