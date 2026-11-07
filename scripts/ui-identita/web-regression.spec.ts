@@ -31,10 +31,13 @@ test('errore di lettura critico nella colonna e ripetizione funzionante', async 
 
 test('formattazione compatta lascia almeno 200 px di testo sopra la soglia', async ({ page }) => {
   test.skip(test.info().project.name.endsWith('1440'));
+  page.on('dialog', dialog => dialog.type() === 'beforeunload' ? dialog.accept() : dialog.dismiss());
   for (const route of ['entries/new', 'modules?voce=nuova']) {
   await navigate(page, `/patients/${reference()}/${route}`);
   const editor = page.locator('[contenteditable="true"]').first();
   await expect(editor).toBeVisible();
+  await editor.fill('Nota sintetica in preparazione: controllo clinico programmato.');
+  await expect(page.getByTestId('local-draft-status')).toContainText(/conservati cifrati|Bozza recuperata/);
   await expect.poll(() => editor.evaluate(field => Math.ceil(field.getBoundingClientRect().right) - innerWidth)).toBeLessThanOrEqual(0);
   const geometry = await editor.evaluate(field => {
     const toolbar = document.querySelector('[data-lume-editor-surface="toolbar"]')!.getBoundingClientRect();
