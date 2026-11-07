@@ -2306,12 +2306,14 @@ impl RuntimeSession {
         scope: &str,
         draft: &PatientCreateDraft,
     ) -> Result<CreatedResource> {
-        for value in [
-            draft.first_name.as_str(),
-            draft.last_name.as_str(),
-            draft.tax_code.raw_for_editor(),
-        ] {
+        for value in [draft.first_name.as_str(), draft.last_name.as_str()] {
             validate_patient_name(value)?;
+        }
+        if let Some(kind) = &draft.identifier_type {
+            crate::patient_identity::validate_identifier(kind, draft.tax_code.raw_for_editor())
+                .map_err(|_| RuntimeError::InvalidInput)?;
+        } else {
+            validate_patient_name(draft.tax_code.raw_for_editor())?;
         }
         if let Some(date) = &draft.birth_date {
             parse_contract_date(date)?;
@@ -2343,11 +2345,16 @@ impl RuntimeSession {
         version: u64,
         patch: &PatientProfilePatch,
     ) -> Result<()> {
-        for value in [&patch.first_name, &patch.last_name, &patch.tax_code]
-            .into_iter()
-            .flatten()
-        {
+        for value in [&patch.first_name, &patch.last_name].into_iter().flatten() {
             validate_patient_name(value)?;
+        }
+        if let Some(code) = &patch.tax_code {
+            if let Some(kind) = &patch.identifier_type {
+                crate::patient_identity::validate_identifier(kind, code)
+                    .map_err(|_| RuntimeError::InvalidInput)?;
+            } else {
+                validate_patient_name(code)?;
+            }
         }
         if let NullableStringPatch::Set(date) = &patch.birth_date {
             parse_contract_date(date)?;
@@ -5934,6 +5941,35 @@ mod tests {
     }
 
     #[test]
+    fn adr0179_patient_creation_sends_empty_identifier_and_estimated_year_on_the_wire() {
+        let draft = PatientCreateDraft {
+            first_name: "Ada".into(),
+            last_name: "Sintetica".into(),
+            tax_code: "".into(),
+            identifier_type: Some("none".into()),
+            birth_date_precision: Some("estimated".into()),
+            birth_year: Some(1974),
+            ..Default::default()
+        };
+        let (url, seen, release, server) =
+            delayed_server(Some(r#"{"id":"new-synthetic","version":1}"#));
+        let session = session_at(&url);
+        admit_fixture_read(&session);
+        let worker = thread::spawn(move || session.create_patient("scope-a", &draft));
+        let request = seen.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(request.starts_with("POST /api/v1/network/patients "));
+        let body: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(body["taxCode"], "");
+        assert_eq!(body["identifierType"], "none");
+        assert_eq!(body["birthDatePrecision"], "estimated");
+        assert_eq!(body["birthYear"], 1974);
+        assert!(body.get("birthDate").is_none());
+        release.send(()).unwrap();
+        assert_eq!(worker.join().unwrap().unwrap().id, "new-synthetic");
+        server.join().unwrap();
+    }
+
+    #[test]
     fn patient_creation_seals_optional_fields_and_requires_a_version_one_ack() {
         let draft = PatientCreateDraft {
             first_name: " Èva ".into(),
@@ -5944,6 +5980,7 @@ mod tests {
             phone: Some(String::new()),
             caregiver: None,
             is_adi: true,
+            ..Default::default()
         };
         for ack in [
             json!({"id":"new patient.🩺", "version":1}),
