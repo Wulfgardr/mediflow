@@ -123,7 +123,7 @@ for (const area of ['turno', 'diario'] as const) test(`Agenda and global diary: 
     if (!baselineStatesOnly) {
     f.state.hold = new Promise<void>(resolve => release = resolve);
     const initialRead = page.waitForRequest(request => new URL(request.url()).pathname === '/api/' + endpoint);
-    await page.goto('/?area=' + area); await initialRead;
+    await page.goto('/?area=' + area); await unlockIfNeeded(page, '1234'); await initialRead;
     await expect(targetSurface.getByRole('heading', { level: 1 })).toBeVisible();
     observations.push({ initialLoadingText: await targetSurface.innerText() });
     if (!baseline) {
@@ -133,7 +133,7 @@ for (const area of ['turno', 'diario'] as const) test(`Agenda and global diary: 
     }
     await shot('initial-loading', baseline ? targetSurface.getByRole('heading', { level: 1 }) : surface.locator('[data-view-state="loading"]'));
     release(); f.state.hold = null; await ready();
-    } else { await page.goto('/?area=' + area); await ready(); }
+    } else { await page.goto('/?area=' + area); await unlockIfNeeded(page, '1234'); await ready(); }
     if (gallery) {
       const colors = new Map<string, string>();
       for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
@@ -190,7 +190,7 @@ for (const area of ['turno', 'diario'] as const) test(`Agenda and global diary: 
     }
     f.state[endpoint] = 503;
     const firstFailure = page.waitForResponse(response => new URL(response.url()).pathname === '/api/' + endpoint && response.status() === 503);
-    await page.reload(); await firstFailure;
+    await page.reload(); await unlockIfNeeded(page, '1234'); await firstFailure;
     if (baseline) {
       await shot('first-read-error', targetSurface.getByText(area === 'diario' ? 'Caricamento diario clinico.' : 'Caricamento appuntamenti…', { exact: true }));
       observations.push({ firstReadErrorText: await targetSurface.innerText() });
@@ -240,7 +240,7 @@ for (const area of ['turno', 'diario'] as const) test(`Agenda and global diary: 
     await expect(surface.getByText(content, { exact: true })).toHaveCount(0);
     await shot('page-restore-pending', surface.locator('[data-view-state="loading"]'));
     release(); f.state.hold = null; await ready();
-    await scope(null); await page.reload(); await ready();
+    await scope(null); await page.reload(); await unlockIfNeeded(page, '1234'); await ready();
     f.state[endpoint] = 503; await refresh.click(); await expect(surface.getByRole('alert')).toContainText(errorText);
     await expect(surface.getByText(content, { exact: true })).toHaveCount(0);
     await expect(surface).not.toContainText('Inventata Agenda');
