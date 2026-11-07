@@ -872,3 +872,12 @@ La riesecuzione ufficiale `npm run verify:therapy-status` passa sul manifest
 aggiornato: TLC, tre mutanti, sei testimoni, 188 test causali, due mutanti
 del controller, codice ripristinato e mutazioni della chat. Nessun file
 runtime o test viene modificato dopo questi esiti.
+
+## Riconciliazione del 7 novembre 2026: rifiuti 412 nella creazione
+
+`lib/db.ts` cambia solo nel testo dell'errore di creazione: un 412 con codice e
+messaggio (per esempio `PROSTHETICS_CATALOG_REQUIRED`) mostra il solo messaggio.
+Confronto con `syncCommit` 46dfd4274f2740930d5f266e13ec3a05348f20ad: nessuna modifica a transizioni, guardie, await,
+CAS o audit delle terapie, e nessun codice delle terapie legge il testo degli
+errori di creazione. Aggiornate a mano l'impronta di `lib/db.ts` e `syncCommit`.
+Modello, configurazione, invarianti, limiti e mutanti TLC restano identici.
