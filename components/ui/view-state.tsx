@@ -12,7 +12,7 @@ export function ViewState({ state, title, detail, action }: ViewStateProps) {
     return <div className="min-w-0 py-4 type-body" role={failed ? 'alert' : 'status'} data-view-state={state}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <p className={`${titleClassName} min-w-0`}>
-                {failed ? <span aria-hidden="true">{state === 'error' ? '◆ ' : '▲ '}</span> : null}{title}
+                {failed ? <span aria-hidden="true">{state === 'error' ? '✕ ' : '▲ '}</span> : null}{title}
             </p>
             {action ? <button type="button" className="mf-button-text" onClick={action.onClick}>{action.label}</button> : null}
         </div>

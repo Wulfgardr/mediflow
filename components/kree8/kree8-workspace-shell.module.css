@@ -1122,3 +1122,9 @@
   .chrome .headerActionCluster { flex: 1 1 100%; flex-direction: column; align-items: stretch; }
   .chrome .headerActionCluster > :is(a, button) { justify-content: flex-start; white-space: nowrap; }
 }
+
+@media (max-width: 700px) {
+  :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome { padding-inline: var(--ink-plane-inset); }
+  :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] > aside,
+  :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-testid='settings-subroute-content'] { padding-inline: 0; }
+}

@@ -29,7 +29,7 @@ export const ALLOWLIST = [
   { path: 'components/treatment-reasoning-panel.tsx', rule: 'rotazione continua', snippet: 'animate-spin', reason: 'Indicatore limitato alla generazione locale richiesta dall utente.' },
   { path: 'components/drug-autocomplete.tsx', rule: 'rotazione continua', snippet: 'animate-spin', reason: 'Indicatore limitato alla ricerca farmaco avviata dalla digitazione.' },
   { path: 'components/pdf-importer.tsx', rule: 'rotazione continua', snippet: 'animate-spin', reason: 'Indicatori limitati a importazione e archiviazione richieste dall utente.' },
-  { path: 'app/patients/[id]/entries/new/page.tsx', rule: 'rotazione continua', snippet: 'animate-spin', reason: 'Indicatori limitati a elaborazione della bozza e salvataggio richiesti dall utente.' },
+  { path: 'components/patient-entry-composer.tsx', rule: 'rotazione continua', snippet: 'animate-spin', reason: 'Indicatori limitati a elaborazione della bozza e salvataggio richiesti dall utente.' },
 ];
 
 const RULES = [
