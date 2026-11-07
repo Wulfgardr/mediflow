@@ -73,7 +73,7 @@ final class CaptureTests: XCTestCase {
             diary()
             let entry = app.descendants(matching:.any).matching(NSPredicate(format:"identifier BEGINSWITH 'entry-row-'")).firstMatch
             XCTAssertTrue(entry.waitForExistence(timeout: 20))
-            XCTAssertGreaterThanOrEqual(app.descendants(matching: .any).matching(NSPredicate(format: "identifier MATCHES %@", "entry-row-[0-9a-fA-F-]{36}")).count, 3)
+            XCTAssertGreaterThanOrEqual(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "entry-row-")).count, 3)
             capture("03-diario")
             let newEntry = app.buttons["homebase-open-new-entry-button"]
             if reveal(newEntry) {

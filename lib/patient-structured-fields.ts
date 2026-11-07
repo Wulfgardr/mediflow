@@ -37,6 +37,7 @@ export function revivePatientStructuredFields<T extends object>(item: T): T {
     const record = item as T & {
         exemptions?: unknown;
         diagnoses?: unknown;
+        allergies?: unknown;
         documentInsights?: unknown;
     };
 
@@ -44,6 +45,9 @@ export function revivePatientStructuredFields<T extends object>(item: T): T {
     if (parsedExemptions) {
         record.exemptions = parsePatientExemptions(parsedExemptions);
     }
+
+    const parsedAllergies = parseArrayField(record.allergies);
+    if (parsedAllergies) record.allergies = parsedAllergies;
 
     const parsedDiagnoses = parseArrayField(record.diagnoses);
     if (parsedDiagnoses) {

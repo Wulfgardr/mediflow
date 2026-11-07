@@ -190,3 +190,64 @@ directory, login, consenso clinico, voce e scritture sono fuori da questa unità
 L’entrypoint aggiuntivo, il consenso nella vista e i limiti di qualifica sono
 documentati in [CARD-READER.md](CARD-READER.md). Il demo descritto sopra conserva
 il suo entrypoint e la sua configurazione.
+
+## Installazione locale isolata e ricevute
+
+Per C-10b, `scripts/inline-package-lifecycle.mjs` registra un pacchetto già
+costruito senza copiarne directory dati, credenziali o configurazioni dell'host.
+Richiede Node 24, una radice assoluta esplicita e, per Codex, il binario assoluto.
+Il comando usa solo configurazioni sotto quella radice. Non pubblica in directory
+né store. Non avvia le app desktop.
+
+Dalla radice della repository:
+
+```sh
+node scripts/inline-package-lifecycle.mjs install codex /tmp/prova-mediflow /percorso/pacchetto /percorso/codex
+node scripts/inline-package-lifecycle.mjs revoke codex /tmp/prova-mediflow mediflow-chat-demo /percorso/codex
+```
+
+Gli host ammessi sono `codex`, `claude-code` e `claude-desktop`. Codex legge
+`<radice>/codex/config.toml` tramite `CODEX_HOME`. Claude Code legge
+`<radice>/claude/.claude.json` tramite `CLAUDE_CONFIG_DIR`. Per Claude Desktop
+si prepara soltanto `<radice>/desktop/claude_desktop_config.json`: il file non
+viene caricato automaticamente dall'app e non prova il supporto inline.
+`HOME` dei processi di verifica è `<radice>/home`, senza credenziali ereditate.
+
+Una nuova installazione dello stesso nome aggiorna il riferimento al pacchetto.
+Il percorso del pacchetto deve restare disponibile e contenere dipendenze e
+build locali. Le ricevute sono in `<radice>/receipts/<host>/<nome>/receipt.json`,
+lo storico append-only in `audit.jsonl`. Lo storico riguarda le operazioni di
+installazione, non sostituisce l'audit clinico. Ogni operazione registra prima
+`pending`, poi `complete`. Un'interruzione tra configurazione e ricevuta richiede
+riconciliazione dei file conservati: non viene dichiarata completata.
+Un server estraneo o modificato viene rifiutato. Il lock serializza le operazioni
+sullo stesso host. Dopo un crash va verificato il proprietario prima di togliere
+un lock rimasto.
+
+La rimozione toglie la registrazione, conserva pacchetto, ricevute e dati.
+Per una sessione dell'host già aperta occorre anche chiudere il relativo server
+MCP e riaprire la sessione. La revoca della capacità nella UI MediFlow è un
+passaggio distinto, descritto nella guida `mediflow-local-ui`.
+
+Prova ripetibile, dopo `npm ci`, `npm run prepare:dependencies`, installazione
+delle dipendenze e build di questo pacchetto:
+
+```sh
+MEDIFLOW_CODEX_BIN=/percorso/codex MEDIFLOW_CLAUDE_BIN=/percorso/claude \
+  node scripts/inline-package-acceptance.mjs
+```
+
+La prova conserva risultati e configurazioni in una directory temporanea nuova,
+crea due pazienti con il seed pubblico (PIN 314159), verifica MCP stdio e primo
+stato dimostrativo, upgrade, rimozione e reinstallazione. L'hash del database,
+la ricevuta MCP e lo storico devono restare uguali o conservati. Il demo resta
+separato dal database: questa prova non dimostra l'apertura inline di una cartella.
+L'upgrade usa due manifest di prova 0.1.0 e 0.1.1 sullo stesso payload e non
+qualifica migrazioni tra due release diverse.
+
+Il ciclo è ammesso anche per `mediflow-synthetic` già costruito e per
+`mediflow-local-ui` preparato con `scripts/package-local-ui-plugin.mjs`.
+La registrazione MCP non installa le skill o i metadati di un plugin nativo.
+Rendering inline nelle app desktop, account autenticato, abbinamento positivo
+e revoca di una capacità attiva restano da provare con Leonardo. Prima del GO
+non è prevista alcuna pubblicazione in directory o store (decisione D5).

@@ -461,3 +461,18 @@ test('la sessione di modifica si carica con Node senza loader, come nel confront
     const run = spawnSync(process.execPath, ['--input-type=module', '-e', `const m = await import(${JSON.stringify(source)}); if (typeof m.PatientEditSession !== 'function') process.exit(2);`], { encoding: 'utf8' });
     assert.equal(run.status, 0, run.stderr);
 });
+
+test('allergies: form preserves the structured list and records changes and removal on the patient version', async () => {
+    const allergies = [{ substance: 'Amoxicillina sintetica', reaction: 'Orticaria', severity: 'moderate' as const }];
+    const seed = { ...fixture(), allergies };
+    for (const next of [[{ substance: 'Lattice sintetico' }], []]) {
+        const session = new PatientEditSession(seed);
+        const draft = session.getDefaultValues();
+        assert.deepEqual(Reflect.get(draft, 'allergies'), allergies);
+        Object.assign(draft, { allergies: next });
+        const writes: unknown[] = [];
+        const port = { ...store(seed).port, updatePatient: async (id: string, changes: Record<string, unknown>) => { writes.push({ id, changes }); } };
+        assert.equal((await session.submit(draft, port, () => 'synthetic-new')).status, 'complete');
+        assert.deepEqual(writes, [{ id: seed.id, changes: { version: 3, allergies: next } }]);
+    }
+});

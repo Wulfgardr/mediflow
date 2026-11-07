@@ -43,6 +43,7 @@ export type PatientDetail = {
     exemptions: string | null;
     /* @Codex */
     diagnoses: string | null;
+    allergies?: string | null;
     /* @Codex */
     monitoringProfile: string | null;
     /* @Codex */

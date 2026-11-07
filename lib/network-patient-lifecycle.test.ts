@@ -17,6 +17,7 @@ test('validateNetworkPatientCreateBody accepts sealed sensitive fields and scope
             caregiver: undefined,
             exemptions: 'ENC:iv:exemptions',
             diagnoses: 'ENC:iv:diagnoses',
+            allergies: 'ENC:c3ludGhldGlj:YWxsZXJneQ==',
             statusReason: 'ENC:iv:status',
             notes: 'ENC:iv:notes',
             ambulatoryId: 'amb-1',

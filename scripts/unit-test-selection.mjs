@@ -19,6 +19,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/local-ui-pairing-authority.test.mjs',
   'scripts/local-ui-pairing-transport.test.mjs',
   'scripts/package-local-ui-plugin.test.mjs',
+  'scripts/inline-package-lifecycle.test.mjs',
   'scripts/check-static-routes.test.mjs',
   'scripts/portable-local-test-selection.test.mjs',
   'scripts/conditional-local-groups.test.mjs',

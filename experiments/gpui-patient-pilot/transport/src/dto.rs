@@ -212,6 +212,12 @@ pub struct PatientCreateDraft {
     pub last_name: String,
     pub tax_code: mediflow_patient_client::ClinicalCode,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub identifier_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub birth_date_precision: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub birth_year: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub birth_date: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<String>,
@@ -269,6 +275,12 @@ pub struct PatientProfilePatch {
     pub last_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tax_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identifier_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub birth_date_precision: Option<String>,
+    #[serde(default, skip_serializing_if = "NullableYearPatch::is_unchanged")]
+    pub birth_year: NullableYearPatch,
     #[serde(default, skip_serializing_if = "NullableStringPatch::is_unchanged")]
     pub birth_date: NullableStringPatch,
     #[serde(default, skip_serializing_if = "NullableStringPatch::is_unchanged")]
@@ -279,6 +291,33 @@ pub struct PatientProfilePatch {
     pub caregiver: NullableStringPatch,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_adi: Option<bool>,
+}
+
+#[derive(Clone, Default, PartialEq, Eq)]
+pub enum NullableYearPatch {
+    #[default]
+    Unchanged,
+    Clear,
+    Set(i32),
+}
+
+impl NullableYearPatch {
+    pub fn is_unchanged(&self) -> bool {
+        matches!(self, Self::Unchanged)
+    }
+}
+impl Serialize for NullableYearPatch {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Unchanged | Self::Clear => serializer.serialize_none(),
+            Self::Set(value) => serializer.serialize_i32(*value),
+        }
+    }
+}
+impl<'de> Deserialize<'de> for NullableYearPatch {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Option::<i32>::deserialize(deserializer)?.map_or(Self::Clear, Self::Set))
+    }
 }
 
 #[derive(Clone, Deserialize)]

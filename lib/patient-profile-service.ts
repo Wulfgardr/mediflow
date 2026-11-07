@@ -124,6 +124,7 @@ function projectDetail(patient: PatientRecord): PatientProfileView {
         caregiver: patient.caregiver ?? null,
         exemptions: patient.exemptions ?? null,
         diagnoses: patient.diagnoses ?? null,
+        allergies: patient.allergies ?? null,
         monitoringProfile: patient.monitoringProfile ?? null,
         statusReason: patient.statusReason ?? null,
         archiveReason: patient.archiveReason ?? null,
