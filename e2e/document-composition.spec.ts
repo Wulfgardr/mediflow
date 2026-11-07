@@ -28,11 +28,13 @@ async function documents(page: Page) {
     await page.goto(`/patients/${patientId}/modules`);
     await openPatientSection(page, 'documenti');
     const docs = page.getByTestId('patient-documents');
+    await expect(docs.locator('[data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
     const names = ['Originale sintetico A.txt', 'Originale sintetico B con un nome molto lungo da leggere senza tagli.txt'];
     await docs.locator('input[type="file"]').setInputFiles(names.map((name, index) => ({ name,
         mimeType: 'text/plain', buffer: Buffer.from(`Originale sintetico ${index === 0 ? 'A' : 'B'}. Nessun dato reale.`) })));
     await expect(docs.getByRole('status').filter({ hasText: '2 allegati salvati' })).toBeVisible();
     await page.reload(); await openPatientSection(page, 'documenti');
+    await expect(docs.locator('[data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
     return { docs, names, original: page.getByRole('complementary', { name: 'Originale del documento' }) };
 }
 
