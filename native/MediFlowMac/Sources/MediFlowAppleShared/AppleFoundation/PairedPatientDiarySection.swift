@@ -253,10 +253,14 @@ struct PairedPatientDiarySection: View {
                             }
                             .accessibilityIdentifier("entry-row-attachments-\(entry.id)")
                         }
-                        Label("Registrata", systemImage: "circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(PlatformColors.ink)
-                            .accessibilityIdentifier("entry-registration-\(entry.id)")
+                        HStack(spacing: 6) {
+                            Label("Registrata", systemImage: "circle.fill")
+                            if let registeredAt = entry.createdAt { Text(registeredAt, style: .time) }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(PlatformColors.ink)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("entry-registration-\(entry.id)")
                         if let deletedAt = entry.deletedAt {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Eliminata il \(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: deletedAt))")

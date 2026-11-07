@@ -110,7 +110,8 @@ public enum PatientFieldCrypto {
             // archive provenance is sealed JSON-string data, like notes.
             archiveReason: decryptStringField(detail.archiveReason, masterKey: masterKey),
             archiveNote: decryptStringField(detail.archiveNote, masterKey: masterKey),
-            identifierType: detail.identifierType, birthDatePrecision: detail.birthDatePrecision, birthYear: detail.birthYear
+            identifierType: detail.identifierType, birthDatePrecision: detail.birthDatePrecision, birthYear: detail.birthYear,
+            allergies: decryptStructuredField(detail.allergies, masterKey: masterKey)
         )
     }
 

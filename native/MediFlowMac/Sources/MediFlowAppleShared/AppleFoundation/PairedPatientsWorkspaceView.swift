@@ -137,56 +137,83 @@ struct PairedPatientsWorkspaceView: View {
                     .accessibilityIdentifier("clinical-workspace-project-menu-button")
             }
         }
-        ToolbarItemGroup(placement: .primaryAction) {
-            if dynamicTypeSize.isAccessibilitySize {
-                Button {
-                    showsConnectionSetup = true
-                } label: {
-                    Label("Collegamento", systemImage: mobilePairedStatusPresentation.symbolName)
-                }
-                .accessibilityValue(mobilePairedStatusPresentation.title)
-                .accessibilityIdentifier("patient-worklist-connection-button")
+        if horizontalSizeClass == .regular {
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .primaryAction) { mobileWorklistControlGroup }
+                    .sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .primaryAction) { mobileWorklistControlGroup }
             }
-            Button {
-                model.startCreatingPatient()
-            } label: {
-                Label("Nuovo paziente", systemImage: "person.badge.plus")
-            }
-            .disabled(model.isWorking)
-            .accessibilityLabel("Nuovo paziente")
-            .accessibilityIdentifier("new-patient-button")
-
-            // Sort is a list-wide setting, not content: as a toolbar menu it
-            // states the active order on its own face and stops competing
-            // with the patients for first-viewport height.
-            Picker("Ordina", selection: $patientSortMode) {
-                Text("Recenti").tag(PatientListSortMode.recent)
-                Text("Alfabetico").tag(PatientListSortMode.alpha)
-            }
-            .pickerStyle(.menu)
-            .accessibilityLabel("Ordina pazienti")
-            .accessibilityValue(patientSortMode == .recent ? "Recenti" : "Alfabetico")
-            .accessibilityIdentifier("patient-sort-menu")
-
-            // Renders only when the host has published ambulatories. Same
-            // identifier as before, because it is the same control.
-            if !model.availableAmbulatories.isEmpty {
-                Menu {
-                    ForEach(model.availableAmbulatories) { ambulatory in
-                        Button(ambulatory.name) {
-                            model.selectAmbulatory(ambulatory.id)
-                        }
-                    }
-                } label: {
-                    Label(activeAmbulatoryScopeLabel, systemImage: "building.2")
-                }
-                .accessibilityLabel("Ambulatorio attivo")
-                .accessibilityValue(activeAmbulatoryScopeLabel)
-                .accessibilityIdentifier("ambulatory-scope-picker")
-                .contentShape(.interaction, Rectangle().inset(by: -4))
-            }
+        } else {
+            ToolbarItemGroup(placement: .primaryAction) { mobileWorklistControlItems }
         }
     }
+
+    private var mobileWorklistControlGroup: some View {
+        HStack(spacing: 8) { mobileWorklistControlItems }
+            .buttonStyle(.plain)
+            .foregroundStyle(PlatformColors.ink)
+            .padding(4)
+            .background(PlatformColors.chartCardSurface,
+                        in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
+            .clipShape(RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("patient-worklist-control-group")
+    }
+
+    @ViewBuilder
+    private var mobileWorklistControlItems: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            Button {
+                showsConnectionSetup = true
+            } label: {
+                Label("Collegamento", systemImage: mobilePairedStatusPresentation.symbolName)
+            }
+            .accessibilityValue(mobilePairedStatusPresentation.title)
+            .accessibilityIdentifier("patient-worklist-connection-button")
+        }
+        Button {
+            model.startCreatingPatient()
+        } label: {
+            Label("Nuovo paziente", systemImage: "person.badge.plus").labelStyle(.iconOnly)
+        }
+        .disabled(model.isWorking)
+        .accessibilityLabel("Nuovo paziente")
+        .accessibilityIdentifier("new-patient-button")
+
+        // Sort is a list-wide setting, not content: as a toolbar menu it
+        // states the active order on its own face and stops competing
+        // with the patients for first-viewport height.
+        Picker("Ordina", selection: $patientSortMode) {
+            Text("Recenti").tag(PatientListSortMode.recent)
+            Text("Alfabetico").tag(PatientListSortMode.alpha)
+        }
+        .pickerStyle(.menu)
+        .background(horizontalSizeClass == .regular ? PlatformColors.selection : .clear,
+                    in: RoundedRectangle(cornerRadius: LumeGeometry.controlRadius))
+        .accessibilityLabel("Ordina pazienti")
+        .accessibilityValue(patientSortMode == .recent ? "Recenti" : "Alfabetico")
+        .accessibilityIdentifier("patient-sort-menu")
+
+        // Renders only when the host has published ambulatories. Same
+        // identifier as before, because it is the same control.
+        if !model.availableAmbulatories.isEmpty {
+            Menu {
+                ForEach(model.availableAmbulatories) { ambulatory in
+                    Button(ambulatory.name) {
+                        model.selectAmbulatory(ambulatory.id)
+                    }
+                }
+            } label: {
+                Label(activeAmbulatoryScopeLabel, systemImage: "building.2").labelStyle(.iconOnly)
+            }
+            .accessibilityLabel("Ambulatorio attivo")
+            .accessibilityValue(activeAmbulatoryScopeLabel)
+            .accessibilityIdentifier("ambulatory-scope-picker")
+            .contentShape(.interaction, Rectangle().inset(by: -4))
+        }
+    }
+
     #endif
 
     private var sheetWorkspace: some View {
@@ -605,55 +632,59 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     private func mobilePatientDestination(isWide: Bool) -> some View {
-        ScrollViewReader { scroll in
-            ScrollView {
-                VStack(alignment: .leading, spacing: ClinicalChartMetrics.sectionSpacing) {
-                    workspaceFeedbackLine(hidesDemo: true)
-                    if let detail = model.selectedPatient, detail.id == presentedPatientID {
-                        selectedPatientSections(detail)
-                    } else if let profile = model.cachedPatientProfile, profile.id == presentedPatientID {
-                        cachedPatientProfile(profile)
-                    } else if let patientID = presentedPatientID {
-                        pendingPatientDetail(patientID: patientID)
-                    } else {
-                        emptyDetailState.accessibilityIdentifier("patient-detail-empty")
+        VStack(spacing: 0) {
+            mobilePatientNavigation(isWide: isWide)
+            ScrollViewReader { scroll in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: ClinicalChartMetrics.sectionSpacing) {
+                        workspaceFeedbackLine(hidesDemo: true)
+                        if let detail = model.selectedPatient, detail.id == presentedPatientID {
+                            selectedPatientSections(detail)
+                        } else if let profile = model.cachedPatientProfile, profile.id == presentedPatientID {
+                            cachedPatientProfile(profile)
+                        } else if let patientID = presentedPatientID {
+                            pendingPatientDetail(patientID: patientID)
+                        } else {
+                            emptyDetailState.accessibilityIdentifier("patient-detail-empty")
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .id("mobile-patient-chart-top")
+                    .background {
+                        if let detail = model.selectedPatient, detail.id == presentedPatientID {
+                            let patientID = detail.id
+                            let generation = chartScrollMemory.resetGeneration
+                            PatientChartScrollRestoration(
+                                patientID: patientID, section: model.activePatientSection,
+                                memory: chartScrollMemory,
+                                isCurrent: { model.selectedPatientID == patientID && model.activePatientSection == .overview && chartScrollMemory.resetGeneration == generation },
+                                onRestore: {
+                                    guard presentedPatientID == patientID, model.activePatientSection == .overview else { return }
+                                    summaryReturn = chartScrollMemory.state.returnToChart(patientID: patientID)
+                                })
+                                .id(generation)
+                        }
                     }
                 }
-                .padding(20)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .id("mobile-patient-chart-top")
-                .background {
-                    if let detail = model.selectedPatient, detail.id == presentedPatientID {
-                        let patientID = detail.id
-                        let generation = chartScrollMemory.resetGeneration
-                        PatientChartScrollRestoration(
-                            patientID: patientID, section: model.activePatientSection,
-                            memory: chartScrollMemory,
-                            isCurrent: { model.selectedPatientID == patientID && model.activePatientSection == .overview && chartScrollMemory.resetGeneration == generation },
-                            onRestore: {
-                                guard presentedPatientID == patientID, model.activePatientSection == .overview else { return }
-                                summaryReturn = chartScrollMemory.state.returnToChart(patientID: patientID)
-                            })
-                            .id(generation)
-                    }
-                }
-            }
-            .coordinateSpace(name: "patient-chart-scroll")
-            .accessibilityIdentifier("patient-chart-scroll-view")
-            .onPreferenceChange(PatientChartHeaderHiddenKey.self) { patientChartHeaderHidden = $0 }
-            .onChange(of: chartScrollMemory.resetGeneration) { _ in
-                scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
-            }
-            .safeAreaPadding(.bottom, 16)
-            .clipped()
-            .onChange(of: model.activePatientSection) { _ in
-                if model.activePatientSection == .overview {
-                    chartScrollMemory.isRestoring = true
-                } else {
-                    summaryReturn = nil
+                .coordinateSpace(name: "patient-chart-scroll")
+                .accessibilityIdentifier("patient-chart-scroll-view")
+                .onPreferenceChange(PatientChartHeaderHiddenKey.self) { patientChartHeaderHidden = $0 }
+                .onChange(of: chartScrollMemory.resetGeneration) { _ in
                     scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
                 }
+                .safeAreaPadding(.bottom, 16)
+                .clipped()
+                .onChange(of: model.activePatientSection) { _ in
+                    if model.activePatientSection == .overview {
+                        chartScrollMemory.isRestoring = true
+                    } else {
+                        summaryReturn = nil
+                        scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
+                    }
+                }
             }
+            mobilePatientThreshold(isWide: isWide)
         }
         .environment(\.patientChartScrollMemory, chartScrollMemory)
         .environment(\.patientChartPatientID, presentedPatientID)
@@ -700,59 +731,65 @@ struct PairedPatientsWorkspaceView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let detail = model.selectedPatient, detail.id == presentedPatientID {
-                if isCreatingEntry && (model.activePatientSection == .diary || model.activePatientSection == .overview) {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Registra nella scheda di \(detail.lastName) \(detail.firstName)")
-                                .font(.subheadline.weight(.semibold))
-                            Text("Bozza non registrata").font(.caption)
-                        }
-                        Spacer(minLength: 0)
-                        Button("Registra") { Task { await model.createEntryForSelectedPatient() } }
-                            .buttonStyle(LumePrimaryButtonStyle())
-                            .disabled(!model.canCreateEntry)
-                            .accessibilityIdentifier("homebase-create-entry-button")
-                    }
-                    .padding(12)
-                    .background(PlatformColors.chartCardSurface)
-                    .overlay(alignment: .top) { Divider() }
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("diary-writing-threshold")
-                } else if !isWide {
-                    newEntryAction
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(12)
-                        .background(PlatformColors.chartCardSurface)
-                        .overlay(alignment: .top) { Divider() }
-                }
-            }
-        }
+
         .toolbar {
             if isWide, !isCreatingEntry, let detail = model.selectedPatient, detail.id == presentedPatientID {
                 ToolbarItem(placement: .primaryAction) { newEntryAction }
             }
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if let detail = model.selectedPatient, detail.id == presentedPatientID {
-                VStack(spacing: 0) {
-                    // One 44pt context row leaves clinical space above
-                    // the keyboard. Native compact toolbars cap controls at 36pt.
-                    if isWide {
-                        if model.activePatientSection != .overview { mobileWidePatientHeader(detail) }
-                        MobilePatientSectionNavigation(selection: mobilePatientSectionSelection, showsAllSections: true)
-                            .padding(.horizontal, 12)
-                    } else if verticalSizeClass == .compact && model.activePatientSection != .overview {
-                        compactHeightPatientNavigation(detail)
-                            .padding(.horizontal, 20)
-                    } else {
-                        if model.activePatientSection != .overview { compactPatientHeader(detail) }
-                        patientSectionPicker
-                    }
-                    Divider()
+
+    }
+
+    @ViewBuilder
+    private func mobilePatientNavigation(isWide: Bool) -> some View {
+        if let detail = model.selectedPatient, detail.id == presentedPatientID {
+            VStack(spacing: 0) {
+                // One 44pt context row leaves clinical space above
+                // the keyboard. Native compact toolbars cap controls at 36pt.
+                if isWide {
+                    if model.activePatientSection != .overview { mobileWidePatientHeader(detail) }
+                    MobilePatientSectionNavigation(selection: mobilePatientSectionSelection, showsAllSections: true)
+                        .padding(.horizontal, 12)
+                } else if verticalSizeClass == .compact && model.activePatientSection != .overview {
+                    compactHeightPatientNavigation(detail)
+                        .padding(.horizontal, 20)
+                } else {
+                    if model.activePatientSection != .overview { compactPatientHeader(detail) }
+                    patientSectionPicker
                 }
+                Divider()
+            }
+            .background(PlatformColors.chartCardSurface)
+        }
+    }
+
+    @ViewBuilder
+    private func mobilePatientThreshold(isWide: Bool) -> some View {
+        if let detail = model.selectedPatient, detail.id == presentedPatientID {
+            if isCreatingEntry && (model.activePatientSection == .diary || model.activePatientSection == .overview) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Registra nella scheda di \(detail.lastName) \(detail.firstName)")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Bozza non registrata").font(.caption)
+                    }
+                    Spacer(minLength: 0)
+                    Button("Registra") { Task { await model.createEntryForSelectedPatient() } }
+                        .buttonStyle(LumePrimaryButtonStyle())
+                        .disabled(!model.canCreateEntry)
+                        .accessibilityIdentifier("homebase-create-entry-button")
+                }
+                .padding(12)
                 .background(PlatformColors.chartCardSurface)
+                .overlay(alignment: .top) { Divider() }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("diary-writing-threshold")
+            } else if !isWide {
+                newEntryAction
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(12)
+                    .background(PlatformColors.chartCardSurface)
+                    .overlay(alignment: .top) { Divider() }
             }
         }
     }
@@ -1602,7 +1639,8 @@ struct PairedPatientsWorkspaceView: View {
                 icdQuery: $icdQuery,
                 confirmsFHIRExport: $confirmsFHIRExport,
                 onOpenSummary: { category in openPatientSummary(category, patientID: detail.id) },
-                summaryReturn: summaryReturn
+                summaryReturn: summaryReturn,
+                allergies: PatientAllergiesCodec.decodeResult(detail.allergies).values?.map(\.substance) ?? []
             )
             .chartCard()
     }

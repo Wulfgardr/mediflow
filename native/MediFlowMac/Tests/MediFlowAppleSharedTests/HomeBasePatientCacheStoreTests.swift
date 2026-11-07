@@ -18,11 +18,13 @@ final class HomeBasePatientCacheStoreTests: XCTestCase {
         let store = makeStore()
         let context = OfflineCacheFixture.context()
         let notes = try XCTUnwrap(CryptoService.encryptField("Nota solo sintetica", masterKey: OfflineCacheFixture.key))
-        let patient = OfflineCacheFixture.detail(notes: notes)
+        let allergies = try XCTUnwrap(CryptoService.encryptField(#"[{"substance":"Amoxicillina"}]"#, masterKey: OfflineCacheFixture.key))
+        let patient = OfflineCacheFixture.detail(notes: notes, allergies: allergies)
         try store.savePatientList([OfflineCacheFixture.summary()], context: context)
         try store.savePatientDetail(patient, context: context)
         let snapshot = try XCTUnwrap(store.loadPatientDetail(patientID: patient.id, context: context))
         XCTAssertEqual(snapshot.patient?.notes, notes)
+        XCTAssertEqual(snapshot.patient?.allergies, allergies)
         XCTAssertNil(snapshot.patient?.aiSummary)
         XCTAssertNil(snapshot.patient?.documentInsights)
         XCTAssertEqual(try store.loadPatientList(context: context)?.patients, [OfflineCacheFixture.summary()])
@@ -36,10 +38,10 @@ final class HomeBasePatientCacheStoreTests: XCTestCase {
         let plaintext = try AES.GCM.open(box, using: OfflineCacheFixture.key)
         let persisted = String(decoding: data, as: UTF8.self)
         let payload = String(decoding: plaintext, as: UTF8.self)
-        for sensitive in ["Paziente", "SYNTHETIC-P1", "Nota solo sintetica", "paired-token-fixture", "sid=fixture"] {
+        for sensitive in ["Paziente", "SYNTHETIC-P1", "Nota solo sintetica", "Amoxicillina", "paired-token-fixture", "sid=fixture"] {
             XCTAssertFalse(persisted.contains(sensitive))
         }
-        for excluded in ["artifact-fixture", "ai-fixture", "Nota solo sintetica", "paired-token-fixture", "sid=fixture"] {
+        for excluded in ["artifact-fixture", "ai-fixture", "Nota solo sintetica", "Amoxicillina", "paired-token-fixture", "sid=fixture"] {
             XCTAssertFalse(payload.contains(excluded))
         }
     }
@@ -190,11 +192,11 @@ enum OfflineCacheFixture {
             taxCode: "SYNTHETIC-P1", isAdi: false, isArchived: false, version: version, updatedAt: updatedAt,
             deletedAt: deleted ? Date(timeIntervalSince1970: 1) : nil)
     }
-    static func detail(id: String = "p1", version: Int = 1, scope: String? = "scope-a", notes: String? = nil, updatedAt: Date? = nil) -> HomeBasePatientDetail {
+    static func detail(id: String = "p1", version: Int = 1, scope: String? = "scope-a", notes: String? = nil, updatedAt: Date? = nil, allergies: String? = nil) -> HomeBasePatientDetail {
         HomeBasePatientDetail(id: id, firstName: "Paziente", lastName: "Sintetico", birthDate: nil,
             taxCode: "SYNTHETIC-P1", address: nil, phone: nil, caregiver: nil, exemptions: nil,
             diagnoses: nil, monitoringProfile: nil, statusReason: nil, notes: notes,
             aiSummary: "ai-fixture", documentInsights: "artifact-fixture", isAdi: false, isArchived: false,
-            version: version, ambulatoryId: scope, createdAt: nil, updatedAt: updatedAt)
+            version: version, ambulatoryId: scope, createdAt: nil, updatedAt: updatedAt, allergies: allergies)
     }
 }
