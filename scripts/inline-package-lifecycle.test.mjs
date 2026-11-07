@@ -70,3 +70,29 @@ test('host lock prevents concurrent configuration writers before any audit mutat
   assert.equal(fs.existsSync(target.config), false);
   assert.equal(fs.existsSync(path.join(root, 'receipts/claude-desktop/mediflow-chat-demo/audit.jsonl')), false);
 });
+
+test('codex registration with environment changed after install is refused, not overwritten', t => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-inline-codex-env-')));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const server = { type: 'stdio', command: '/synthetic/node', args: ['/synthetic/stdio.mjs'] };
+  const listing = path.join(root, 'listing.json'), calls = path.join(root, 'calls.log');
+  const list = env => fs.writeFileSync(listing, JSON.stringify([{ name: 'mediflow-chat-demo', enabled: true,
+    disabled_reason: null, transport: { ...server, env, env_vars: [], cwd: null },
+    startup_timeout_sec: null, tool_timeout_sec: null, auth_status: 'unsupported' }]));
+  const stub = path.join(root, 'codex-stub.mjs');
+  fs.writeFileSync(stub, `#!${process.execPath}
+import fs from 'node:fs';
+fs.appendFileSync(${JSON.stringify(calls)}, process.argv.slice(2).join(' ') + '\\n');
+if (process.argv[3] === 'list') process.stdout.write(fs.readFileSync(${JSON.stringify(listing)}, 'utf8'));
+`, { mode: 0o755 });
+  const target = isolatedHost(root, 'codex', stub);
+  const state = path.join(root, 'receipts', 'codex', 'mediflow-chat-demo');
+  fs.mkdirSync(state, { recursive: true });
+  fs.writeFileSync(path.join(state, 'receipt.json'), JSON.stringify({ name: 'mediflow-chat-demo', version: '0.1.0', active: true, server }));
+  list({ CUSTOM_SETTING: '1' });
+  assert.throws(() => changeInlinePackage(target, 'revoke', undefined, 'mediflow-chat-demo'), /changed/);
+  assert.deepEqual(fs.readFileSync(calls, 'utf8').trim().split('\n'), ['mcp list --json']);
+  list(null);
+  changeInlinePackage(target, 'revoke', undefined, 'mediflow-chat-demo');
+  assert.match(fs.readFileSync(calls, 'utf8'), /mcp remove mediflow-chat-demo/);
+});
