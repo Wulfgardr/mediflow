@@ -250,6 +250,29 @@ final class ClinicalCardStyleTests: XCTestCase {
         )
     }
 
+    func testAllPatientHeadersKeepAllergyOutsideDisclosure() throws {
+        let source = try appleSource("AppleFoundation/PairedPatientsWorkspaceView.swift")
+        for name in ["compactHeightPatientNavigation", "mobileWidePatientHeader", "patientWorkspaceHeader", "compactPatientHeader"] {
+            let start = try XCTUnwrap(source.range(of: "private func \(name)("))
+            let tail = source[start.upperBound...]
+            let end = tail.range(of: "\n    private ")?.lowerBound ?? tail.endIndex
+            let body = String(tail[..<end])
+            XCTAssertTrue(body.contains("patientAllergyStatus(detail)"), name)
+            if name == "compactPatientHeader" {
+                XCTAssertLessThan(try XCTUnwrap(body.range(of: "patientAllergyStatus(detail)")).lowerBound,
+                                  try XCTUnwrap(body.range(of: "DisclosureGroup(")).lowerBound)
+            }
+        }
+        XCTAssertTrue(source.contains("model.isPatientFieldLocked(.allergies) || result.isUnreadable"))
+        XCTAssertTrue(source.contains("Allergie non disponibili"))
+    }
+
+    func testClosedDiaryComposerOccupiesNoLayoutSpace() throws {
+        let source = try appleSource("AppleFoundation/PairedPatientDiarySection.swift")
+        XCTAssertTrue(source.contains("if isCreatingEntry || model.isEditingEntry || model.isWorking {\n                PairedDiaryComposerView("))
+        XCTAssertFalse(source.contains("\n            Divider()\n\n            if model.entries.isEmpty"))
+    }
+
     /// Ogni raggio delle viste Apple viene dalla scala di `LumeGeometry`
     /// (Punto d'inchiostro: righe 0, controlli, piano, voce in scrittura). Un
     /// numero scritto a mano accanto alla scala è come le due bande d'avviso a
