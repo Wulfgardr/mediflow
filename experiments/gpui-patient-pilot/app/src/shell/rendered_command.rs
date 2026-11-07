@@ -137,6 +137,7 @@ pub(crate) fn observe_ink(text: gpui::Text) -> ObservedText<gpui::Text> {
 }
 
 thread_local! {
+    static CAPTURE_ALL_TEXTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static TEXT_NODES: std::cell::RefCell<Vec<(gpui::GlobalElementId, gpui::accesskit::Node)>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
@@ -195,7 +196,7 @@ impl<E: gpui::Element> gpui::Element for ObservedText<E> {
     ) -> Self::PrepaintState {
         let mut node = gpui::accesskit::Node::new(self.0.a11y_role().expect("accessible text"));
         self.0.write_a11y_info(&mut node);
-        if self.1 {
+        if self.1 || CAPTURE_ALL_TEXTS.with(|capture| capture.get()) {
             TEXT_NODES.with(|nodes| {
                 nodes
                     .borrow_mut()
@@ -250,7 +251,9 @@ pub(crate) fn assert_unique_texts(
         let mut ids = HashSet::new();
         for (id, node) in &nodes {
             assert_eq!(node.role(), Role::Label);
-            assert!(node.value().is_some_and(|value| !value.is_empty()));
+            assert!(node.value().is_some_and(
+                |value| !value.is_empty() || CAPTURE_ALL_TEXTS.with(|capture| capture.get())
+            ));
             assert!(
                 ids.insert(id.clone()),
                 "duplicate accessible text ID: {id:?}, {node:?}"
@@ -396,4 +399,16 @@ pub(crate) fn painted_contrasts(
             (sample.label.clone(), contrast(fg, bg))
         })
         .collect()
+}
+
+pub(crate) fn capture_all_texts(run: impl FnOnce()) {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            CAPTURE_ALL_TEXTS.with(|capture| capture.set(false));
+        }
+    }
+    CAPTURE_ALL_TEXTS.with(|capture| capture.set(true));
+    let _reset = Reset;
+    run();
 }

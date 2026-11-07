@@ -7308,6 +7308,46 @@ mod tests {
         overview_accessible_rows(cx, 2);
     }
 
+    #[gpui::test]
+    fn overview_counts_have_unique_stable_accessible_ids(cx: &mut gpui::TestAppContext) {
+        rendered_command::capture_all_texts(|| {
+            rendered_command::assert_unique_texts(
+                cx,
+                move |_, _| {
+                    div()
+                        .children([
+                            overview_heading(
+                                "problems",
+                                "Problemi",
+                                Some(1),
+                                Theme::for_dark(false),
+                            ),
+                            overview_heading(
+                                "therapies",
+                                "Terapie",
+                                Some(2),
+                                Theme::for_dark(false),
+                            ),
+                            overview_heading(
+                                "checkups",
+                                "Controlli",
+                                Some(3),
+                                Theme::for_dark(false),
+                            ),
+                            overview_heading(
+                                "observations",
+                                "Misure",
+                                Some(4),
+                                Theme::for_dark(false),
+                            ),
+                        ])
+                        .into_any_element()
+                },
+                4,
+            );
+        });
+    }
+
     fn bindings_for_key(key: &str, contexts: &[&str]) -> Vec<KeyBinding> {
         let contexts: Vec<_> = contexts
             .iter()
@@ -8939,8 +8979,9 @@ fn overview_heading(
     label: &str,
     count: Option<usize>,
     theme: crate::theme::Theme,
-) -> Div {
+) -> Stateful<Div> {
     div()
+        .id(id)
         .flex()
         .items_center()
         .justify_between()

@@ -5,11 +5,18 @@
 use crate::components::{WritingInk, WritingStyle, WritingSurface};
 use crate::theme::Theme;
 use crate::theme::TypeStyle;
+#[cfg(not(test))]
+use gpui::text;
 use gpui::{
     AnyElement, FontStyle, FontWeight, HighlightStyle, Role, SharedString, StrikethroughStyle,
-    StyledText, UnderlineStyle, div, prelude::*, px, text,
+    StyledText, UnderlineStyle, div, prelude::*, px,
 };
 use std::ops::Range;
+
+#[cfg(test)]
+macro_rules! text {
+    ($($args:tt)*) => { crate::shell::rendered_command::observe_ink(gpui::text!($($args)*)) };
+}
 
 const MAX_DEPTH: usize = 128;
 const MAX_BLOCKS: usize = 4096;
@@ -638,11 +645,11 @@ pub fn render(source: &str, ink: WritingInk, theme: Theme) -> AnyElement {
             let accessible = block.plain(true);
             div().id(("clinical-rich-block", index)).role(Role::Paragraph).aria_label(SharedString::from(accessible))
                 .min_w_0().flex().flex_col()
-                .children(prose_lines(block).into_iter().map(|block| {
+                .children(prose_lines(block).into_iter().enumerate().map(|(line_index, block)| {
             let (content, highlights) = block.styled(content_theme);
             let heading = block.heading;
             let marker = block.marker.clone();
-            div().min_w_0().flex().items_start().gap(px(8. * theme.scale))
+            div().id(("clinical-rich-line", line_index)).min_w_0().flex().items_start().gap(px(8. * theme.scale))
                 .pl(px((block.list_depth.saturating_sub(1) as f32 * 18.).min(36.)))
                 .when(block.quote_depth > 0, |element| element
                     .border_l_2().border_color(theme.rule).pl(px(14.)))
@@ -681,6 +688,27 @@ fn block_text(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn long_diary_lists_have_unique_stable_accessible_ids(cx: &mut gpui::TestAppContext) {
+        crate::shell::rendered_command::capture_all_texts(|| {
+            crate::shell::rendered_command::assert_unique_texts(
+                cx,
+                move |_, _| {
+                    div()
+                        .children(["entry-one", "entry-two"].map(|id| {
+                            div().id(id).child(render(
+                                &format!("<ul><li>{}</li></ul>", "a".repeat(150)),
+                                WritingInk::Dry,
+                                Theme::for_dark(false),
+                            ))
+                        }))
+                        .into_any_element()
+                },
+                6,
+            );
+        });
+    }
 
     #[test]
     fn prose_measure_preserves_text_and_emphasis() {
