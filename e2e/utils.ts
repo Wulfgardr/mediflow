@@ -148,7 +148,10 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   /* a tab without its local key first offers explicit session renewal.
      Observe that real UI state and its receipt before entering the PIN. */
   const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
-  if (await renew.isVisible() && await renew.isEnabled()) await renew.click();
+  if (await renew.isVisible()) {
+    try { await renew.click({ timeout: 1000 }); }
+    catch (error) { if (await renew.isVisible()) throw error; }
+  }
   await expect(pinInput).toBeEnabled();
   await pinInput.fill(pin);
   await expect(pinInput).toHaveValue(pin);
