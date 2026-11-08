@@ -19,7 +19,9 @@ export function buildExtractionPrompt(
         '{',
         `  "schemaVersion": "${AI_TASK_EXTRACTION_SCHEMA_VERSION}",`,
         `  "task": "${task}",`,
-        '  "summary": "stringa breve in plain text, oppure vuota",',
+        task === 'patient_insight'
+            ? '  "summary": "stringa breve in plain text con [Sx] o [DATI-INCOMPLETI]",'
+            : '  "summary": "stringa breve in plain text, oppure vuota",',
         `  "data": ${dataShape}`,
         '}',
         '',
