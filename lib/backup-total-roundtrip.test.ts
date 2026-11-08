@@ -140,7 +140,6 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         actor_ref: actorRef, patient_id: 'synthetic-historical-patient', therapy_id: 'synthetic-unreceived-therapy', expected_version: 1,
         target: null, outcome: 'closed', reason: null, committed_at: now, result_version: null, result_end_date: null, audit_event_id: null, audit_snapshot: null });
 
-
     insertRow(db, 'ambulatories', { id: 'w7-amb-primary', name: 'Ambulatorio sintetico W7', address: 'fixture locale', type: 'synthetic', is_default: 1, version: 3, created_at: now });
     insertRow(db, 'ambulatories', { id: 'w7-amb-secondary', name: 'Ambulatorio sintetico secondario', type: 'synthetic', is_default: 0, version: 2, created_at: now + 1 });
     const allergyCipher = await encryptData([{ substance: 'Amoxicillina sintetica', reaction: 'Orticaria sintetica', severity: 'moderate' }], masterKey);
@@ -442,8 +441,6 @@ test('retires a pending Checkup proposal before a same-ID/version restore ABA sw
             );
         } finally { restored.close(); }
 
-        const routeSource = fs.readFileSync(path.join(ROOT, 'app/api/system/backup-restore/route.ts'), 'utf8');
-        assert.match(routeSource, /restoreBackupArtifact\(artifact,\s*\(\) => \{\s*assertArchiveGeneration\(dbServer, archiveGeneration\);\s*return disposeCheckupStatusTransitionForHostV1\(\);/u);
     } finally { fs.rmSync(workDir, { recursive: true, force: true }); }
 });
 
@@ -525,7 +522,6 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
 
             restoreArtifact(targetDataDir, runner.artifactPath);
 
-
             let encryptedFieldCount = 0;
             for (const table of clinicalTables) {
                 const sourceRows = readOrderedRows(sourceDb, table);
@@ -579,7 +575,6 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
         fs.rmSync(workDir, { recursive: true, force: true });
     }
 });
-
 
 test('patient identity ledgers are present and explicitly classified as local-only', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-duplicate-classification-'));

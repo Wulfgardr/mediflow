@@ -131,7 +131,6 @@ test('keeps revoke reasons and denial codes closed-world', () => {
 test('the portable contract contains no Web, database, listener, secret or clinical-content authority', () => {
   const source = readFileSync(new URL('./portable-supervisor-web-ipc-contract.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /(?:next\/headers|server-auth|db-server|\.\.\/schema|listen\s*\(|createServer|cookie|password|pin|proof|permit|clinicalText|noteText)/iu);
-  assert.match(source, /MAX_FRAME_BYTES_V1\s*=\s*4\s*\*\s*1024/u);
 });
 
 test('profile admission is an exact optional top-level grant, never part of the eight-field capture', () => {

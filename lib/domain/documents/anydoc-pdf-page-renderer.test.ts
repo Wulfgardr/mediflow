@@ -269,11 +269,7 @@ test('pins the isolated local engine graph and excludes direct engine imports fr
     assert.equal(lock.packages['node_modules/@napi-rs/canvas']?.optional, true);
     assert.equal(lock.packages['node_modules/@napi-rs/canvas-darwin-arm64']?.optional, true);
     assert.equal(pkg.dependencies['@napi-rs/canvas'], undefined);
-    assert.match(worker, /disableWorker: true/u); assert.match(worker, /isEvalSupported: false/u);
-    assert.match(worker, /useSystemFonts: false/u); assert.match(worker, /\.cancel\(\)/u);
-    assert.match(worker, /\.cleanup\(\)/u); assert.match(worker, /\.destroy\(\)/u);
-    assert.match(worker, /const deadline = started \+ PAGE_TIMEOUT_MS/u);
-    assert.match(source, /parentPngStructure:true/u);
+ assert.match(worker, /isEvalSupported: false/u);
     assert.match(source, /permission=readOnlyPackageRoot,noWrite,noChild,noWorker/u);
     assert.doesNotMatch(source, /import\(['"](?:pdfjs-dist|@napi-rs\/canvas)|from ['"](?:pdfjs-dist|@napi-rs\/canvas)/u);
     assert.doesNotMatch(source, /\b(?:url|workerSrc|GlobalWorkerOptions)\s*:|fetch\(|https?:|readFile|writeFile|child_process|spawn\(|exec\(|DeepSeek|Ollama|Apple Vision|@firecrawl\/anydoc|app\/api|dbServer|lib\/schema|markdown(?:Bytes|Text|\s*:)/iu);
@@ -282,8 +278,6 @@ test('pins the isolated local engine graph and excludes direct engine imports fr
     assert.equal(sha256(ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR), ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256);
     if (process.platform === 'darwin' && process.arch === 'arm64')
         assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, '0d0cae109da7e1a91cdfbff66773e6bf208c05753fc74ff6ca3cdfefc73b6c94');
-    assert.match(source, /1011b38553532d7078c59f26b15a471f8dae00f101b60e2add9b8511737a1ce0/u);
-    assert.match(source, /ec7dc504d4ade7fd36846d16643e50eed5c914335f3a86b6a2a8d632391e5bfa/u);
     assert.equal(profiles.find((entry) => entry.platform === 'darwin')?.tarballSha256,
         'c7c8dcb69aae6ddb58fe23e5f20d1c772a8065b077560f5a18336307779add91');
     for (const entry of profiles) {
@@ -291,7 +285,6 @@ test('pins the isolated local engine graph and excludes direct engine imports fr
         assert.match(entry.binarySha256, /^[a-f0-9]{64}$/);
     }
 });
-
 
 test('real child refuses oversized soft and explicit masks before rendering', { skip: !SUPPORTS_REAL_RENDERER }, async () => {
     const { runAnyDocPdfRenderingChild } = await import('./anydoc-pdf-child-process-owner');

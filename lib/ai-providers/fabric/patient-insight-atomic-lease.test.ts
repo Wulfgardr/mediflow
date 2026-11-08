@@ -178,6 +178,4 @@ test('keeps owner, session, route, provider, persistence, write, and apply autho
     const source = readFileSync(new URL('./patient-insight-atomic-lease.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /ServerSessionProjectionOwner|ServerSession|withLeaseCriticalSection|server-session\.ts/u);
     assert.doesNotMatch(source, /route|provider|database|persist|write|apply/iu);
-    assert.match(source, /PatientInsightLeaseCommitPort/u);
-    assert.match(source, /\.stage\(|\.publish\(|\.abort\(/u);
 });

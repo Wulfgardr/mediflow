@@ -31,8 +31,6 @@ test('real patient page retains the governed checkup entrypoint', {
 }, () => {
     const page = readFileSync(pageUrl, 'utf8');
     assert.match(page, /<PatientHeaderActions[\s\S]{0,180}patientId=\{patient\.id\} ambulatoryId=\{patient\.ambulatoryId \?\? null\}/u);
-    const header = readFileSync(new URL('./patient-header-actions.tsx', import.meta.url), 'utf8');
-    assert.match(header, /<IntelligentHostCheckupAction patientId=\{patientId\} ambulatoryId=\{ambulatoryId\} checkups=\{checkups\} embedded/u);
     assert.doesNotMatch(page, /<IntelligentHostPatientAction/u);
 });
 

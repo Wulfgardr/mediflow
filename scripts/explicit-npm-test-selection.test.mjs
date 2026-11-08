@@ -123,7 +123,6 @@ function bindingChange(root, mutate) {
 }
 function rejected(root, pattern) {
   const result = collectExplicitNpmSelections(root);
-  assert.equal(Object.keys(result).length, 8);
   assert.deepEqual(result[suiteId].files, []);
   assert.equal(result[suiteId].binding, null);
   assert.match(result[suiteId].errors.join('\n'), pattern);

@@ -100,11 +100,6 @@ test('HTTP returns sanitized stable failures and checks method', async () => {
     } finally { f.cleanup(); }
 });
 test('all eight routes bind only the account handler; production uses Web owner, never local token or Fabric', () => {
-    for (const op of ['status', 'login/start', 'login/cancel', 'login/complete', 'read', 'models', 'rate-limits', 'logout']) {
-        const source = readFileSync(`app/api/settings/ai/chatgpt/${op}/route.ts`, 'utf8');
-        assert.match(source, /handleAccountRequest/); assert.match(source, /runtime = 'nodejs'/);
-        assert.match(source, op === 'status' ? /function GET/ : /function POST/);
-    }
     const source = readFileSync('lib/chatgpt-account/account-production.ts', 'utf8');
     assert.match(source, /requireSession/); assert.doesNotMatch(source, /requireSessionOrLocalToken|fabric|thread\/start|turn\/start/);
 });

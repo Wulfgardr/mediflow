@@ -1,6 +1,6 @@
 # ADR 0184: Prove sul comportamento e vincoli sul testo dei sorgenti
 
-Data: 2026-11-08. Stato: Proposta.
+Data: 2026-11-08. Stato: Accepted (approvata da Leonardo l'8 novembre 2026).
 
 Related: regola "Verifica, non review" del 3 novembre 2026,
 [ADR 0080](./0080-serialize-sqlite-schema-guards-at-bootstrap.md) per le impronte immutabili dei
@@ -69,7 +69,12 @@ sorgente non è né l'una né l'altra.
 Ogni tranche è una PR con la suite completa e il confronto dei nomi dei test
 prima e dopo.
 
-## Punto aperto
+## Applicazione
 
-La scelta dei tre casi ammessi e l'ordine delle tranche restano da approvare.
-Fino all'approvazione l'ADR non cambia nessun test esistente.
+La regola operativa distingue due forme di asserzione sul testo. `assert.match`
+su un sorgente fissa come il codice è scritto e fallisce a ogni refactoring:
+esce, salvo che riguardi sandbox, permessi, egress, segreti o sessioni.
+`assert.doesNotMatch` vieta un pattern (un import, una rotta ritirata, un
+canale di uscita) e fallisce solo se qualcuno lo reintroduce: funziona come un
+confine e resta. Le asserzioni si individuano con il type checker, risalendo
+dalla variabile alla lettura di un file sorgente con percorso letterale.

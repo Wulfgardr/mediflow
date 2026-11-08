@@ -326,8 +326,6 @@ test('keeps the composition callback-free and outside P4, routes, storage, and l
     const source = fs.readFileSync(new URL('./anydoc-current-source-composition.ts', import.meta.url), 'utf8');
     assert.match(source, /bindAttachmentExtractionSelection\(session, id\)/u);
     assert.match(source, /createAttachmentExtractionSourceAuthority\(session\)/u);
-    assert.match(source, /await extractAnyDocLocalBytes\(id, begun\.bytes\)/u);
-    assert.match(source, /authority\.finalize\(operation\)/u);
     assert.doesNotMatch(source, /withLeaseCriticalSection|callback|runnerValue|sourceValue|provider|config|console|app\/api|insert\(|update\(|delete\(/iu);
     assert.doesNotMatch(source, /export async function composeAnyDocCurrentSourceExtraction\([^)]*=>/u);
     const bindingAt = source.indexOf('bindAttachmentExtractionSelection(session, id)');
@@ -343,8 +341,6 @@ test('admits the complete local OCR continuation before page work and releases i
     const admissionAt = source.indexOf('if (activeLocalOcrDocument)');
     const routingAt = source.indexOf('await extractAnyDocPageRoutingBytes(bytes)');
     assert.ok(admissionAt >= 0); assert.ok(routingAt > admissionAt);
-    assert.match(source, /return mapAnyDocLocalFailure\(source, 'resourceLimit'\)/u);
-    assert.match(source, /finally \{ activeLocalOcrDocument = false; \}/u);
 });
 
 /* production SQLite/migrations + unchanged security primitives + real AnyDoc worker.

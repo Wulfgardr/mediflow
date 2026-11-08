@@ -65,6 +65,5 @@ test('does not observe hostile request, body, query, or params and performs no r
 
 test('route source contains only the authenticated deny boundary', () => {
     const source = fs.readFileSync(path.join(root, 'app/api/attachments/[id]/ocr-replay/route.ts'), 'utf8');
-    assert.match(source, /requireSession\(\)/u); assert.match(source, /status:\s*410/u); assert.match(source, /OCR_REPLAY_RETIRED/u);
-    assert.doesNotMatch(source, /dbServer|attachments|document-ocr|attachmentOcrReplaySchema|request\.json|await params|fetch\(|provider|fallback|console\.|\.update\(|\.insert\(|\.delete\(/iu);
+    assert.match(source, /requireSession\(\)/u);    assert.doesNotMatch(source, /dbServer|attachments|document-ocr|attachmentOcrReplaySchema|request\.json|await params|fetch\(|provider|fallback|console\.|\.update\(|\.insert\(|\.delete\(/iu);
 });

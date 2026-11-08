@@ -251,15 +251,10 @@ test('all patient PUT adapters wire one transactional set-primary operation with
         assert.throws(() => assertDispatchWiring(source === 'service' ? changed : profile,
             source === 'executor' ? changed : dispatch), `${source}: ${before}`);
     }
-    assert.match(profile, /setPrimaryAmbulatory:\s*Object\.prototype\.hasOwnProperty\.call\(body, 'ambulatoryId'\)/);
-    assert.match(profile, /values:\s*normalized\.values/);
-    assert.match(profile, /audit:\s*context\.audit\(\),\s*\}\);/);
     assert.doesNotMatch(profile, /\bupsertPrimaryAmbulatoryMembership\s*\(/);
     assert.doesNotMatch(profile, deleteMemberships);
 
     const operation = fs.readFileSync(path.join(process.cwd(), 'lib/patient-update-operation.ts'), 'utf8');
-    assert.match(operation, /return dbServer\.transaction\(\(tx\)/);
-    assert.match(operation, /behavior:\s*'immediate'/);
     assert.match(operation, /import\s*\{\s*upsertPrimaryAmbulatoryMembership\s*\}\s*from\s*'\.\/patient-ambulatory-membership'/);
     assert.equal(operation.match(/\bupsertPrimaryAmbulatoryMembership\s*\(/g)?.length, 1);
     const assertTransactionWiring = (source: string) => {

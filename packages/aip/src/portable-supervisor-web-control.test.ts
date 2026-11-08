@@ -221,7 +221,6 @@ test('malformed or noncanonical input throws protocol_invalid and terminalizes o
 test('control remains portable and owns no child, Web, database, listener or log authority', () => {
   const source = readFileSync(new URL('./portable-supervisor-web-control.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /(?:child_process|next\/|server-auth|db-server|sqlite|net|http|listen\s*\(|process\.|console\.|cookie|password|pin)/iu);
-  assert.match(source, /PREPARE_TTL_MS\s*=\s*5_000/u);
 });
 
 test('forwards a host profile grant separately from the unchanged activation capture', async () => {
