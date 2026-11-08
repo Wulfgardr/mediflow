@@ -1,0 +1,66 @@
+## Pagina 1
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+REFERTO CARDIOLOGICO
+Protocollo test-cardiologia-00 | Pagina 1 di 2
+Paziente: Sintetico047 Persona047 - Nato il 1952-03-12
+Codice fiscale paziente: ZZZXXX47A21Z999D
+Data referto: 07/10/2026
+
+MOTIVO DELL’ACCESSO
+Motivo: controllo per palpitazioni episodiche. I sintomi sono riferiti da circa tre settimane; il paziente viene ascoltato prima del colloquio con il familiare accompagnatore.
+
+INQUADRAMENTO CLINICO
+La valutazione complessiva conferma ipertensione arteriosa tra le condizioni personali rilevanti.
+
+INQUADRAMENTO CLINICO
+La valutazione complessiva conferma dislipidemia tra le condizioni personali rilevanti.
+
+ANAMNESI FAMILIARE
+Per il familiare indicato come madre viene riferita ipertensione arteriosa; questa informazione appartiene all’anamnesi familiare.
+
+TERAPIA FARMACOLOGICA
+Alla visita risulta in uso Triatec (ramipril) 5 mg, 1 cp alla sera per os.
+
+TERAPIA FARMACOLOGICA
+È stata sospesa la somministrazione di Norvasc (amlodipina) 5 mg, 1 cp al giorno. La sospensione è stata confermata durante il colloquio odierno.
+
+RICOGNIZIONE TERAPEUTICA
+Il paziente non assume Coumadin (warfarin); il nome compare soltanto nel questionario di riconciliazione.
+
+IPOTESI NON ATTUATA
+Si propone eventualmente Lyrica (pregabalin) 25 mg alla sera, ma la terapia non è stata iniziata e resta da discutere.
+
+DATI DEL CAREGIVER
+Il coniuge assume Eutirox (levotiroxina) 50 microgrammi al giorno; questa terapia non riguarda il paziente.
+
+ESCLUSIONI
+Non vi sono elementi per porre diagnosi di polmonite batterica in questa visita.
+
+INQUADRAMENTO CLINICO
+Resta il sospetto di neuropatia periferica, da confermare con gli accertamenti successivi.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-cardiologia-00 - Pagina 1/2 - nessun dato reale.
+
+## Pagina 2
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+REFERTO CARDIOLOGICO
+Protocollo test-cardiologia-00 | Pagina 2 di 2
+Paziente: Sintetico047 Persona047 - Nato il 1952-03-12
+Codice fiscale paziente: ZZZXXX47A21Z999D
+Data referto: 07/10/2026
+
+CONTESTO ASSISTENZIALE
+La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente.
+
+CONCLUSIONI E INDICAZIONI
+È richiesto un controllo ambulatoriale tra due settimane, con diario dei sintomi e confezioni dei farmaci. La data del prossimo appuntamento non è ancora fissata.
+
+MODALITÀ DELLA RACCOLTA DOCUMENTALE
+Il colloquio è stato svolto in un ambiente tranquillo, lasciando inizialmente spazio al racconto spontaneo e successivamente verificando gli elementi della documentazione. Quando il racconto e la lista dei medicinali non coincidevano, la discrepanza è stata mantenuta visibile nella sezione della ricognizione. Il documento distingue le condizioni già note dalle ipotesi che richiedono ulteriori accertamenti. I dati forniti dall’accompagnatore sono identificati come tali e non vengono assunti come storia patologica del paziente. Le abbreviazioni cp, os e MMG sono utilizzate rispettivamente per compressa, via orale e medico di medicina generale. Il resoconto deve essere letto insieme alle indicazioni poste nelle conclusioni e alle date degli eventi, senza attribuire a oggi ogni notizia riportata in anamnesi.
+
+RIFERIMENTO DI EMISSIONE
+Emissione sintetica 148971. Copia per il medico curante; conservare tutte le pagine del documento.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-cardiologia-00 - Pagina 2/2 - nessun dato reale.

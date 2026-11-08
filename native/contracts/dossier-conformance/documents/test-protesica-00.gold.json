@@ -1,0 +1,69 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "76d15697552e44b9da205f1d1c013162437305e590866b27ec37886b4ccdc9f7",
+      "fileName": "test-protesica-00.pdf",
+      "patient": {
+        "lastName": "Sintetico089",
+        "firstName": "Persona089",
+        "birthDate": "1959-03-12",
+        "taxCode": "ZZZXXX89A09Z999I"
+      },
+      "documentDate": "2026-10-14",
+      "documentType": "protesica",
+      "summary": null,
+      "coverage": {
+        "pages": 2,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "paraparesi degli arti inferiori",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma paraparesi degli arti inferiori tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "prosthetic",
+          "values": {
+            "description": "carrozzina manuale",
+            "category": "standard",
+            "status": "prescribed"
+          },
+          "quote": "Ausilio prescritto: carrozzina manuale. Categoria: standard. Stato: prescritto; non ancora consegnato."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "Obiettivo funzionale: facilitare gli spostamenti e le attività assistite al domicilio. È previsto un controllo dopo la prova d’uso; la famiglia deve poter riferire le difficoltà nell’utilizzo. Il programma non attesta che il collaudo sia già avvenuto.",
+            "subject": "paziente"
+          },
+          "quote": "Obiettivo funzionale: facilitare gli spostamenti e le attività assistite al domicilio. È previsto un controllo dopo la prova d’uso; la famiglia deve poter riferire le difficoltà nell’utilizzo. Il programma non attesta che il collaudo sia già avvenuto."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente.",
+            "subject": "paziente"
+          },
+          "quote": "La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente."
+        },
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Per il familiare indicato come madre viene riferita ipertensione arteriosa; questa informazione appartiene all’anamnesi familiare.",
+            "subject": "familiare"
+          },
+          "quote": "Per il familiare indicato come madre viene riferita ipertensione arteriosa; questa informazione appartiene all’anamnesi familiare."
+        }
+      ]
+    }
+  ]
+}

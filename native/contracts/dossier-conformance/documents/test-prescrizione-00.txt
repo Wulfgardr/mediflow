@@ -1,0 +1,31 @@
+## Pagina 1
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+PRESCRIZIONE AMBULATORIALE
+Protocollo test-prescrizione-00 | Pagina 1 di 1
+Paziente: Sintetico077 Persona077 - Nato il 1947-03-12
+Codice fiscale paziente: ZZZXXX77A24Z999U
+Data referto: 12/10/2026
+
+PROMEMORIA SSN
+Prescrizione specialistica - NRE sintetico: 999990000000077. Priorità: D. Tipologia: primo accesso. Esenzione: non indicata. Quesito clinico: palpitazioni episodiche.
+
+PRESTAZIONI
+Prestazione richiesta: Visita cardiologica; priorità D; NRE 999990000000077; quesito: palpitazioni episodiche.
+
+PRESTAZIONI
+Prestazione richiesta: Elettrocardiogramma; priorità D; NRE 999990000000077; quesito: palpitazioni episodiche.
+
+INQUADRAMENTO CLINICO
+Resta il sospetto di palpitazioni episodiche, da confermare con gli accertamenti successivi.
+
+CONCLUSIONI E INDICAZIONI
+La richiesta è destinata alla prenotazione; la prestazione non risulta ancora eseguita. L’eventuale confronto con esami precedenti sarà effettuato dallo specialista al momento della visita.
+
+CONTESTO ASSISTENZIALE
+La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente.
+
+RIFERIMENTO DI EMISSIONE
+Emissione sintetica 854352. Copia per il medico curante; conservare tutte le pagine del documento.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-prescrizione-00 - Pagina 1/1 - nessun dato reale.

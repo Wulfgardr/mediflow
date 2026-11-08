@@ -1,0 +1,311 @@
+{
+  "synthetic": true,
+  "selection": "Due documenti (-00 e -01) per ciascuna delle dieci famiglie; una risposta con fatti per documento, in ordine lessicale dei run e indice modulo numero risposte valide. Parser repetition=0.",
+  "copies": [
+    {
+      "source": "corpus/test/test-dimissione-00.pdf",
+      "copy": "documents/test-dimissione-00.pdf",
+      "sha256": "a4f0db0a2f8dfbfd70d2fceb5d3e0beec6397f0d6886f76f8d684912a0000edf"
+    },
+    {
+      "source": "corpus/test/test-dimissione-00.txt",
+      "copy": "documents/test-dimissione-00.txt",
+      "sha256": "78aece8f9a7ed740f32bf3f3c75b2eb8dea43d798d924bd41db670ddfa3018f2"
+    },
+    {
+      "source": "corpus/test/test-dimissione-00.gold.json",
+      "copy": "documents/test-dimissione-00.gold.json",
+      "sha256": "ce977f7ad0f402eff792ea0a3abea409ee5fe582aa6f098eea4f1526fcd67f74"
+    },
+    {
+      "source": "corpus/test/test-dimissione-01.pdf",
+      "copy": "documents/test-dimissione-01.pdf",
+      "sha256": "a9d458d8883c01bdcb271d0c0403d477d4187c25668da48b107d3845f3e593a7"
+    },
+    {
+      "source": "corpus/test/test-dimissione-01.txt",
+      "copy": "documents/test-dimissione-01.txt",
+      "sha256": "2fadbc165f41975021e96dfe6f03002ab98f04b35a0b1a2d4c456c924b8e5ebf"
+    },
+    {
+      "source": "corpus/test/test-dimissione-01.gold.json",
+      "copy": "documents/test-dimissione-01.gold.json",
+      "sha256": "8c771b9ad2f8c261d92822165ab790b9a2639fa2b182eb919565ff8758e67d70"
+    },
+    {
+      "source": "corpus/test/test-cardiologia-00.pdf",
+      "copy": "documents/test-cardiologia-00.pdf",
+      "sha256": "6716b80d4ae18de0f06d51868dbdca489f4fb0cb0ba5a9e5883c5075f767d442"
+    },
+    {
+      "source": "corpus/test/test-cardiologia-00.txt",
+      "copy": "documents/test-cardiologia-00.txt",
+      "sha256": "e4c83e4d3320d4b769c0a4104f423ce0dfbe1ef99c222ccb96901f3cb31911dd"
+    },
+    {
+      "source": "corpus/test/test-cardiologia-00.gold.json",
+      "copy": "documents/test-cardiologia-00.gold.json",
+      "sha256": "56d189d3b32613758580308d19878025f0e1ede1045186e4a60ca0def4f987d8"
+    },
+    {
+      "source": "corpus/test/test-cardiologia-01.pdf",
+      "copy": "documents/test-cardiologia-01.pdf",
+      "sha256": "11443b8c9992d6fcc34dd837ca84d4e65cc1ddc5906ba9a9dec50485c6767617"
+    },
+    {
+      "source": "corpus/test/test-cardiologia-01.txt",
+      "copy": "documents/test-cardiologia-01.txt",
+      "sha256": "9ba5af7c9aaf6810572360703d47ece5d91df0c5edfdec5fc0be18b12882ce3c"
+    },
+    {
+      "source": "corpus/test/test-cardiologia-01.gold.json",
+      "copy": "documents/test-cardiologia-01.gold.json",
+      "sha256": "4ea6b6378bf10fbce0970a65ce9bea098b511dc8252308653a11681c8e58c400"
+    },
+    {
+      "source": "corpus/test/test-diabetologia-00.pdf",
+      "copy": "documents/test-diabetologia-00.pdf",
+      "sha256": "bdeb390408d91c1b9d5d580d9cdbfa4c53d9e05e52304fdeaeb97c27adeb1240"
+    },
+    {
+      "source": "corpus/test/test-diabetologia-00.txt",
+      "copy": "documents/test-diabetologia-00.txt",
+      "sha256": "41cf9aca6e2365f315eddb5db16ab8cffbd47ebd8adc694fa349e696029f8348"
+    },
+    {
+      "source": "corpus/test/test-diabetologia-00.gold.json",
+      "copy": "documents/test-diabetologia-00.gold.json",
+      "sha256": "eb31e60168e081f5f76888119f23593c3e0b3ba3a743c0481775c3b73cb69809"
+    },
+    {
+      "source": "corpus/test/test-diabetologia-01.pdf",
+      "copy": "documents/test-diabetologia-01.pdf",
+      "sha256": "4c56f05f2a21d20d2e06c4e0e9a7a959cc99ae2e429c4bb1e4237f110439ccca"
+    },
+    {
+      "source": "corpus/test/test-diabetologia-01.txt",
+      "copy": "documents/test-diabetologia-01.txt",
+      "sha256": "4e1b33b90b87d6ac47af1765d5814037663b1dbd6b28eeeaeeb46a4daca61878"
+    },
+    {
+      "source": "corpus/test/test-diabetologia-01.gold.json",
+      "copy": "documents/test-diabetologia-01.gold.json",
+      "sha256": "ab1651030f03c55f3c4329d94d59b6751f324604d13fe44c071e8a5e25015abf"
+    },
+    {
+      "source": "corpus/test/test-neurologia-00.pdf",
+      "copy": "documents/test-neurologia-00.pdf",
+      "sha256": "7672c32e3518edc305825522df21a1ae984207c2b4779d7fa4cbdc1749a7d938"
+    },
+    {
+      "source": "corpus/test/test-neurologia-00.txt",
+      "copy": "documents/test-neurologia-00.txt",
+      "sha256": "660db2eb872eadec9ae4e2194ed8180a0a3750831453fb84cbb03bc242c51776"
+    },
+    {
+      "source": "corpus/test/test-neurologia-00.gold.json",
+      "copy": "documents/test-neurologia-00.gold.json",
+      "sha256": "6662fc9d584b6cbf5b88e44b8ab1d5defba7037081c6e99d473fdeff42e0c57b"
+    },
+    {
+      "source": "corpus/test/test-neurologia-01.pdf",
+      "copy": "documents/test-neurologia-01.pdf",
+      "sha256": "b9e45483de7490bfc3a125c8600dec84ac89628b3b800c2bf3867be6834f9298"
+    },
+    {
+      "source": "corpus/test/test-neurologia-01.txt",
+      "copy": "documents/test-neurologia-01.txt",
+      "sha256": "62f86258f246b1f315fa9aeda4504e63db335fc3bd96194c457219490e4095b5"
+    },
+    {
+      "source": "corpus/test/test-neurologia-01.gold.json",
+      "copy": "documents/test-neurologia-01.gold.json",
+      "sha256": "533db8e8ca3ba733b62844dca583d6aee9df8fce533ac99c47a6c6fdf396abb5"
+    },
+    {
+      "source": "corpus/test/test-geriatria-00.pdf",
+      "copy": "documents/test-geriatria-00.pdf",
+      "sha256": "69b1c56d17fe1953bed6f8576ddefafbcad34fe7284e2f21b6d0361b7b40f350"
+    },
+    {
+      "source": "corpus/test/test-geriatria-00.txt",
+      "copy": "documents/test-geriatria-00.txt",
+      "sha256": "41cfe49deca0218392f0f4319506af6936cfe85ca9e330aabb5c0d9f4cd6bb3a"
+    },
+    {
+      "source": "corpus/test/test-geriatria-00.gold.json",
+      "copy": "documents/test-geriatria-00.gold.json",
+      "sha256": "ac23f165e4db8fab4d415c46ed2130ed0c9e277fad3be0bc274884a97a56ba84"
+    },
+    {
+      "source": "corpus/test/test-geriatria-01.pdf",
+      "copy": "documents/test-geriatria-01.pdf",
+      "sha256": "a0fce43bf1d4ec36f1d4d6f17232a147ce5975e7e100a826ce98e07fee6803df"
+    },
+    {
+      "source": "corpus/test/test-geriatria-01.txt",
+      "copy": "documents/test-geriatria-01.txt",
+      "sha256": "5b16bdbca92ea730daaa2ae3977930221b545fa6e96cebd99ecd70d035221200"
+    },
+    {
+      "source": "corpus/test/test-geriatria-01.gold.json",
+      "copy": "documents/test-geriatria-01.gold.json",
+      "sha256": "aaacaea2ae5ddc29a04d5cbbd2ab9aad4e87954956d01e91ec8ae34d68c81973"
+    },
+    {
+      "source": "corpus/test/test-laboratorio-00.pdf",
+      "copy": "documents/test-laboratorio-00.pdf",
+      "sha256": "cfea1d0ff58f2e23b5f2b3ffb758ddcc027377281330d7ed97949f43f2e3a1f2"
+    },
+    {
+      "source": "corpus/test/test-laboratorio-00.txt",
+      "copy": "documents/test-laboratorio-00.txt",
+      "sha256": "464fde3b576c10ce9ea36576904a832d9e8732d3e90a8091382985d8838e5073"
+    },
+    {
+      "source": "corpus/test/test-laboratorio-00.gold.json",
+      "copy": "documents/test-laboratorio-00.gold.json",
+      "sha256": "4220805c792ae883eabac5f34a2eb1f85a66d6d49d5882761ae7cbd8b4d1b082"
+    },
+    {
+      "source": "corpus/test/test-laboratorio-01.pdf",
+      "copy": "documents/test-laboratorio-01.pdf",
+      "sha256": "a3958fe3b2b492d1483c4650fc4449f505b3ea16193ad1b2d128ec67fd1ae416"
+    },
+    {
+      "source": "corpus/test/test-laboratorio-01.txt",
+      "copy": "documents/test-laboratorio-01.txt",
+      "sha256": "6cbb0fcb652db4ed071e5d56a723f7c5b61a5edb5721524e9c860e4d3c4aea03"
+    },
+    {
+      "source": "corpus/test/test-laboratorio-01.gold.json",
+      "copy": "documents/test-laboratorio-01.gold.json",
+      "sha256": "d5a45b00790abfc98f4d1f2956371d29862d270f29767b9d719b15241580e494"
+    },
+    {
+      "source": "corpus/test/test-prescrizione-00.pdf",
+      "copy": "documents/test-prescrizione-00.pdf",
+      "sha256": "dfd636c64d633f7b708a90a32e40985747daa867b5c2e3f8fb2d3119f9e5b6f0"
+    },
+    {
+      "source": "corpus/test/test-prescrizione-00.txt",
+      "copy": "documents/test-prescrizione-00.txt",
+      "sha256": "aff201e36d67238b1a8d60ff57757d49ef31088b96bc54119f40a5de73f8e215"
+    },
+    {
+      "source": "corpus/test/test-prescrizione-00.gold.json",
+      "copy": "documents/test-prescrizione-00.gold.json",
+      "sha256": "0e14612b120d0ee2b9603013124285b51adef5150d0ddb22b90c7ffbaef5424a"
+    },
+    {
+      "source": "corpus/test/test-prescrizione-01.pdf",
+      "copy": "documents/test-prescrizione-01.pdf",
+      "sha256": "6c4d6e5244fe1d33c75013067be5daaed3c3ce7f5a9ae3ffc6ea71a1602c4a2f"
+    },
+    {
+      "source": "corpus/test/test-prescrizione-01.txt",
+      "copy": "documents/test-prescrizione-01.txt",
+      "sha256": "a1c066a5f688dbdf0902df8355d77b0128074332b9f9d7b65127323bc15698a2"
+    },
+    {
+      "source": "corpus/test/test-prescrizione-01.gold.json",
+      "copy": "documents/test-prescrizione-01.gold.json",
+      "sha256": "b7b6aacb2a1d4583b0e6510099d747ad7c22b439b32cc519a8da6af4272da29d"
+    },
+    {
+      "source": "corpus/test/test-invalidita-00.pdf",
+      "copy": "documents/test-invalidita-00.pdf",
+      "sha256": "3d08cea544a702f8a3e90e288b4bcd859bf1130defba53a198400fb56097f158"
+    },
+    {
+      "source": "corpus/test/test-invalidita-00.txt",
+      "copy": "documents/test-invalidita-00.txt",
+      "sha256": "857c4b152a72d27150b8002e0c01ec1f5ee2d48c1ac7b24e183ef233fcc9612c"
+    },
+    {
+      "source": "corpus/test/test-invalidita-00.gold.json",
+      "copy": "documents/test-invalidita-00.gold.json",
+      "sha256": "00a742e94fe531477957d7879adfc32ef5e9d5b584758185a834c6646f02d05e"
+    },
+    {
+      "source": "corpus/test/test-invalidita-01.pdf",
+      "copy": "documents/test-invalidita-01.pdf",
+      "sha256": "6d65111d2d30ea60c7ec6575d61c1a7b243e21a77084f22a0818f5a7ff49e6d5"
+    },
+    {
+      "source": "corpus/test/test-invalidita-01.txt",
+      "copy": "documents/test-invalidita-01.txt",
+      "sha256": "527d1b1857007f7ce13aa81a81ada4b33d42826e5c0cd86a2d0aa9dbcd8d978a"
+    },
+    {
+      "source": "corpus/test/test-invalidita-01.gold.json",
+      "copy": "documents/test-invalidita-01.gold.json",
+      "sha256": "02b9852cc2fab773d4a59db5f6b7589a1d8667c075279fb680ea13903f45b655"
+    },
+    {
+      "source": "corpus/test/test-protesica-00.pdf",
+      "copy": "documents/test-protesica-00.pdf",
+      "sha256": "76d15697552e44b9da205f1d1c013162437305e590866b27ec37886b4ccdc9f7"
+    },
+    {
+      "source": "corpus/test/test-protesica-00.txt",
+      "copy": "documents/test-protesica-00.txt",
+      "sha256": "2e9700f6a4b4dcbcc265563340b34119500bda44c585ff2870d4c181eaab5732"
+    },
+    {
+      "source": "corpus/test/test-protesica-00.gold.json",
+      "copy": "documents/test-protesica-00.gold.json",
+      "sha256": "0d5d1c8448cbaca1ceafa84ecd986b4aa383875d57453313123c8e4958e0c951"
+    },
+    {
+      "source": "corpus/test/test-protesica-01.pdf",
+      "copy": "documents/test-protesica-01.pdf",
+      "sha256": "07a723d65956e9a94b103188690a3013909e64e4cd1a2c5345006dbac43ad93d"
+    },
+    {
+      "source": "corpus/test/test-protesica-01.txt",
+      "copy": "documents/test-protesica-01.txt",
+      "sha256": "c053a1ac98760a34b1dbc1d7be6703c9d02277d601582f041270ff5ec4d58df5"
+    },
+    {
+      "source": "corpus/test/test-protesica-01.gold.json",
+      "copy": "documents/test-protesica-01.gold.json",
+      "sha256": "9b41ae86f67254652a25d8757ba6a6a58e88197e55914a3dbdde572bb5290094"
+    },
+    {
+      "source": "corpus/test/test-scale-00.pdf",
+      "copy": "documents/test-scale-00.pdf",
+      "sha256": "0553d91984a1125a5dd9acf798a76a492f1ba9d0d136f9b138fe1ad5b5a9cc69"
+    },
+    {
+      "source": "corpus/test/test-scale-00.txt",
+      "copy": "documents/test-scale-00.txt",
+      "sha256": "d304d7f2a3177353818d5de04998e76a644256d4f8516cdb09407ec52eaa6f26"
+    },
+    {
+      "source": "corpus/test/test-scale-00.gold.json",
+      "copy": "documents/test-scale-00.gold.json",
+      "sha256": "0d118991c8b94b3081f5a635531c225b4d8a74dbbf7fccba1d9d307dc479ec38"
+    },
+    {
+      "source": "corpus/test/test-scale-01.pdf",
+      "copy": "documents/test-scale-01.pdf",
+      "sha256": "6f65a1f1fb25e02516835ac8e098b869a63fdb8f9431f64c655a66e8bce3f113"
+    },
+    {
+      "source": "corpus/test/test-scale-01.txt",
+      "copy": "documents/test-scale-01.txt",
+      "sha256": "e8dac24c6f1ff5486cc7a8992849857ca991b5afc80b42956fd5bbcf13b7785b"
+    },
+    {
+      "source": "corpus/test/test-scale-01.gold.json",
+      "copy": "documents/test-scale-01.gold.json",
+      "sha256": "73b4ff833ec8c1ffea77c81ddc4608538dfed2620b6394025ca1940edcc86f45"
+    },
+    {
+      "source": "artifacts/mutations.json",
+      "copy": "mutations.json",
+      "sha256": "49bafa0169ceba304cacaf7e187051cd99b24ab1eba23ceeccfce0e9d390ea5d"
+    }
+  ]
+}

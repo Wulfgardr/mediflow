@@ -176,6 +176,10 @@ impl LocalAdministration {
             _ => None,
         }
     }
+    #[cfg(all(test, target_os = "macos"))]
+    pub(super) fn dossier_test_access(&mut self, access: Arc<LocalHostAccess>) {
+        self.authority = Authority::Open(access);
+    }
     pub(super) fn withdraw(&mut self, cx: &mut App) -> Option<RetiringAccess> {
         self.generation = self
             .generation
@@ -253,6 +257,7 @@ impl ClinicalApp {
         cx.notify();
     }
     pub(super) fn withdraw_local_host(&mut self, cx: &mut Context<Self>) {
+        self.cancel_dossier(cx);
         if let Some(access) = self.local_host.withdraw(cx) {
             let task = cx
                 .background_executor()
@@ -373,6 +378,7 @@ impl ClinicalApp {
         cx.notify();
     }
     fn close_local_host(&mut self, cx: &mut Context<Self>) {
+        self.cancel_dossier(cx);
         if self.local_host.has_work() {
             return;
         }

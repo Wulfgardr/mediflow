@@ -516,6 +516,66 @@ impl RuntimeClient {
         )
     }
 
+    pub(crate) fn dossier_web_json(
+        &self,
+        method: Method,
+        path: &[&str],
+        headers: HeaderMap,
+        body: Option<&Value>,
+        mutation: bool,
+        query: &[(&str, &str)],
+    ) -> Result<RawResponse> {
+        self.dedicated_web_raw_observing_headers(
+            method,
+            path,
+            headers,
+            body,
+            mutation,
+            query,
+            &mut |_, _| {},
+        )
+    }
+
+    pub(crate) fn dossier_extract(
+        &self,
+        headers: HeaderMap,
+        bytes: Vec<u8>,
+    ) -> Result<RawResponse> {
+        if !self.is_local_bootstrap_origin() {
+            return Err(RuntimeError::Forbidden);
+        }
+        if bytes.len() > 25 * 1024 * 1024 {
+            return Err(RuntimeError::TooLarge);
+        }
+        http_runtime().block_on(self.context.run(
+            async {
+                let response = self
+                    .http
+                    .post(self.endpoint(&["api", "documents", "dossier-extraction"], &[])?)
+                    .headers(headers)
+                    .header("origin", self.origin.origin().ascii_serialization())
+                    .header("sec-fetch-site", "same-origin")
+                    .header("content-type", "application/octet-stream")
+                    .body(bytes::Bytes::from_owner(Zeroizing::new(bytes)))
+                    .timeout(Duration::from_secs(180))
+                    .send()
+                    .await
+                    .map_err(|_| RuntimeError::Transport)?;
+                let raw = read_response_body(response, 25 * 1024 * 1024, false).await?;
+                match raw.status {
+                    200 | 503 => Ok(raw),
+                    401 => Err(RuntimeError::Rejected(401)),
+                    403 => Err(classify_forbidden(&raw.body)),
+                    409 if matches!(conflict_code(&raw.body), ConflictCode::ArchiveReplaced) => {
+                        Err(RuntimeError::ArchiveReplaced)
+                    }
+                    n => Err(RuntimeError::Rejected(n)),
+                }
+            },
+            false,
+        ))
+    }
+
     pub(crate) fn who_administration_read(
         &self,
         code_check: bool,
@@ -589,7 +649,25 @@ impl RuntimeClient {
         let archive = path.starts_with(&["api", "system", "backup-restore"]);
         let request_limit = if path == ["api", "prosthetics", "catalog", "documents"] {
             36 * 1024 * 1024
-        } else if archive || reference_json_path(path) || matches!(path, ["api", "patients", _]) {
+        } else if path == ["api", "attachments"] {
+            25 * 1024 * 1024
+        } else if archive
+            || reference_json_path(path)
+            || matches!(
+                path,
+                ["api", "patients", _]
+                    | ["api", "attachments", _]
+                    | [
+                        "api",
+                        "entries"
+                            | "therapies"
+                            | "observations"
+                            | "service-prescriptions"
+                            | "service-prescription-items"
+                            | "prosthetic-prescriptions"
+                    ]
+            )
+        {
             JSON_LIMIT
         } else {
             4096
@@ -1379,6 +1457,17 @@ fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
         _ if archive => JSON_LIMIT,
         ["api", "attachments", _] => DOCUMENT_LIMIT,
         ["api", "patients", _] => JSON_LIMIT,
+        [
+            "api",
+            "attachments"
+            | "entries"
+            | "therapies"
+            | "observations"
+            | "service-prescriptions"
+            | "service-prescription-items"
+            | "prosthetic-prescriptions"
+            | "exemptions",
+        ] => JSON_LIMIT,
         _ if reference_json_path(path) => JSON_LIMIT,
         _ => AUTH_LIMIT,
     }

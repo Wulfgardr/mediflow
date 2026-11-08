@@ -1,0 +1,66 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "6c4d6e5244fe1d33c75013067be5daaed3c3ce7f5a9ae3ffc6ea71a1602c4a2f",
+      "fileName": "test-prescrizione-01.pdf",
+      "patient": {
+        "lastName": "Sintetico078",
+        "firstName": "Persona078",
+        "birthDate": "1948-03-12",
+        "taxCode": "ZZZXXX78A25Z999Z"
+      },
+      "documentDate": "2026-10-15",
+      "documentType": "prescrizione",
+      "summary": null,
+      "coverage": {
+        "pages": 1,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "therapy",
+          "values": {
+            "drugName": "Augmentin",
+            "activePrinciple": "amoxicillina e acido clavulanico",
+            "dosage": "875 mg/125 mg, 1 compressa ogni 12 ore per 6 giorni per os",
+            "status": "active",
+            "subject": "paziente"
+          },
+          "quote": "Alla visita risulta in uso Augmentin (amoxicillina e acido clavulanico) 875 mg/125 mg, 1 compressa ogni 12 ore per 6 giorni per os."
+        },
+        {
+          "kind": "therapy",
+          "values": {
+            "drugName": "Tachipirina",
+            "activePrinciple": "paracetamolo",
+            "dosage": "500 mg, 1 cp al bisogno per dolore, massimo 3 cp al giorno",
+            "status": "active",
+            "subject": "paziente"
+          },
+          "quote": "Alla visita risulta in uso Tachipirina (paracetamolo) 500 mg, 1 cp al bisogno per dolore, massimo 3 cp al giorno."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "L’avvio della somministrazione è previsto oggi. La confezione deve essere confrontata con il principio attivo e il dosaggio indicati, senza desumere ulteriori farmaci dal quesito clinico.",
+            "subject": "paziente"
+          },
+          "quote": "L’avvio della somministrazione è previsto oggi. La confezione deve essere confrontata con il principio attivo e il dosaggio indicati, senza desumere ulteriori farmaci dal quesito clinico."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.",
+            "subject": "paziente"
+          },
+          "quote": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+## Pagina 1
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+VALUTAZIONE GERIATRICA
+Protocollo test-geriatria-01 | Pagina 1 di 3
+Paziente: Sintetico066 Persona066 - Nato il 1971-03-12
+Codice fiscale paziente: ZZZXXX66A13Z999O
+Data referto: 13.10.2026
+
+MOTIVO DELL’ACCESSO
+Motivo: riduzione dell’autonomia nelle attività strumentali. I sintomi sono riferiti da circa tre settimane; il paziente viene ascoltato prima del colloquio con il familiare accompagnatore.
+
+INQUADRAMENTO CLINICO
+La valutazione complessiva conferma gonartrosi bilaterale tra le condizioni personali rilevanti.
+
+INQUADRAMENTO CLINICO
+La valutazione complessiva conferma osteoporosi tra le condizioni personali rilevanti.
+
+ANAMNESI FAMILIARE
+Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare.
+
+TERAPIA FARMACOLOGICA
+Alla visita risulta in uso Dibase (colecalciferolo) 25.000 UI, 1 flaconcino per os ogni mese.
+
+TERAPIA FARMACOLOGICA
+È stata sospesa la somministrazione di Norvasc (amlodipina) 5 mg, 1 cp al giorno. La sospensione è stata confermata durante il colloquio odierno.
+
+RICOGNIZIONE TERAPEUTICA
+Il paziente non assume Coumadin (warfarin); il nome compare soltanto nel questionario di riconciliazione.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-geriatria-01 - Pagina 1/3 - nessun dato reale.
+
+## Pagina 2
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+VALUTAZIONE GERIATRICA
+Protocollo test-geriatria-01 | Pagina 2 di 3
+Paziente: Sintetico066 Persona066 - Nato il 1971-03-12
+Codice fiscale paziente: ZZZXXX66A13Z999O
+Data referto: 13.10.2026
+
+IPOTESI NON ATTUATA
+Si propone eventualmente Lyrica (pregabalin) 25 mg alla sera, ma la terapia non è stata iniziata e resta da discutere.
+
+DATI DEL CAREGIVER
+Il coniuge assume Eutirox (levotiroxina) 50 microgrammi al giorno; questa terapia non riguarda il paziente.
+
+ESCLUSIONI
+Non vi sono elementi per porre diagnosi di polmonite batterica in questa visita.
+
+INQUADRAMENTO CLINICO
+Resta il sospetto di ipotensione ortostatica, da confermare con gli accertamenti successivi.
+
+CONTESTO ASSISTENZIALE
+La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.
+
+CONCLUSIONI E INDICAZIONI
+È richiesto un controllo ambulatoriale tra due settimane, con diario dei sintomi e confezioni dei farmaci. La data del prossimo appuntamento non è ancora fissata.
+
+SCALE RIPORTATE
+Alla valutazione odierna MMSE 22/30; il totale viene trascritto dal referto, senza ricostruzione dei singoli item.
+
+MODALITÀ DELLA RACCOLTA DOCUMENTALE
+Il colloquio è stato svolto in un ambiente tranquillo, lasciando inizialmente spazio al racconto spontaneo e successivamente verificando gli elementi della documentazione. Quando il racconto e la lista dei medicinali non coincidevano, la discrepanza è stata mantenuta visibile nella sezione della ricognizione. Il documento distingue le condizioni già note dalle ipotesi che richiedono ulteriori accertamenti. I dati forniti dall’accompagnatore sono identificati come tali e non vengono assunti come storia patologica del paziente. Le abbreviazioni cp, os e MMG sono utilizzate rispettivamente per compressa, via orale e medico di medicina generale. Il resoconto deve essere letto insieme alle indicazioni poste nelle conclusioni e alle date degli eventi, senza attribuire a oggi ogni notizia riportata in anamnesi.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-geriatria-01 - Pagina 2/3 - nessun dato reale.
+
+## Pagina 3
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+VALUTAZIONE GERIATRICA
+Protocollo test-geriatria-01 | Pagina 3 di 3
+Paziente: Sintetico066 Persona066 - Nato il 1971-03-12
+Codice fiscale paziente: ZZZXXX66A13Z999O
+Data referto: 13.10.2026
+
+RIFERIMENTO DI EMISSIONE
+Emissione sintetica 340867. Copia per il medico curante; conservare tutte le pagine del documento.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-geriatria-01 - Pagina 3/3 - nessun dato reale.

@@ -1,0 +1,42 @@
+{
+  "synthetic": true,
+  "renderer": "GPUI HeadlessAppContext, Metal, component dossier_import_view",
+  "scope": "Presentazione di stati sintetici. Le scritture sono provate separatamente dal transport, non dalle immagini.",
+  "images": [
+    {
+      "state": "applicato",
+      "file": "applicato.png",
+      "sha256": "7fcc3ffd7823fcb4fe539c0c2b5658d5bbaa737e4f466efaccf6f0d6bf31b529",
+      "width": 2200,
+      "height": 3000
+    },
+    {
+      "state": "falsificazione-fermata",
+      "file": "falsificazione-fermata.png",
+      "sha256": "74ead8c2608e3a49755a1e5fefeadbb02480f3ba469f9477d7f2fb098fea4341",
+      "width": 2200,
+      "height": 3000
+    },
+    {
+      "state": "host-locale-chiuso",
+      "file": "host-locale-chiuso.png",
+      "sha256": "2e42264f23ac4a74d550a303ce381e131176d3ad8612cc469e03ec69a1fcf067",
+      "width": 2200,
+      "height": 3000
+    },
+    {
+      "state": "identita-bloccata",
+      "file": "identita-bloccata.png",
+      "sha256": "e0ef829c7ebd5e6edfcc7c0c252b479b822879628587af8c6e0fb44a277a131a",
+      "width": 2200,
+      "height": 3000
+    },
+    {
+      "state": "pronto",
+      "file": "pronto.png",
+      "sha256": "888473ebb9152d70a4c8be983a23bfcea0713663b63a8cf8dfb94e5c21afe7c2",
+      "width": 2200,
+      "height": 3000
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "69b1c56d17fe1953bed6f8576ddefafbcad34fe7284e2f21b6d0361b7b40f350",
+      "fileName": "test-geriatria-00.pdf",
+      "patient": {
+        "lastName": "Sintetico065",
+        "firstName": "Persona065",
+        "birthDate": "1970-03-12",
+        "taxCode": "ZZZXXX65A12Z999L"
+      },
+      "documentDate": "2026-10-10",
+      "documentType": "geriatria",
+      "summary": null,
+      "coverage": {
+        "pages": 3,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Motivo: riduzione dell’autonomia nelle attività strumentali. I sintomi sono riferiti da circa tre settimane; il paziente viene ascoltato prima del colloquio con il familiare accompagnatore.",
+            "subject": "paziente"
+          },
+          "quote": "Motivo: riduzione dell’autonomia nelle attività strumentali. I sintomi sono riferiti da circa tre settimane; il paziente viene ascoltato prima del colloquio con il familiare accompagnatore."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "gonartrosi bilaterale",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma gonartrosi bilaterale tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "osteoporosi",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma osteoporosi tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Per il familiare indicato come madre viene riferita ipertensione arteriosa; questa informazione appartiene all’anamnesi familiare.",
+            "subject": "familiare"
+          },
+          "quote": "Per il familiare indicato come madre viene riferita ipertensione arteriosa; questa informazione appartiene all’anamnesi familiare."
+        },
+        {
+          "kind": "therapy",
+          "values": {
+            "drugName": "Dibase",
+            "activePrinciple": "colecalciferolo",
+            "dosage": "25.000 UI, 1 flaconcino per os ogni mese",
+            "status": "active",
+            "subject": "paziente"
+          },
+          "quote": "Alla visita risulta in uso Dibase (colecalciferolo) 25.000 UI, 1 flaconcino per os ogni mese."
+        },
+        {
+          "kind": "therapy",
+          "values": {
+            "drugName": "Norvasc",
+            "activePrinciple": "amlodipina",
+            "dosage": "5 mg, 1 cp al giorno",
+            "status": "suspended",
+            "subject": "paziente"
+          },
+          "quote": "È stata sospesa la somministrazione di Norvasc (amlodipina) 5 mg, 1 cp al giorno. La sospensione è stata confermata durante il colloquio odierno."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "neuropatia periferica",
+            "subject": "paziente",
+            "certainty": "incerta"
+          },
+          "quote": "Resta il sospetto di neuropatia periferica, da confermare con gli accertamenti successivi."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente.",
+            "subject": "paziente"
+          },
+          "quote": "La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "È richiesto un controllo ambulatoriale tra due settimane, con diario dei sintomi e confezioni dei farmaci. La data del prossimo appuntamento non è ancora fissata.",
+            "subject": "paziente"
+          },
+          "quote": "È richiesto un controllo ambulatoriale tra due settimane, con diario dei sintomi e confezioni dei farmaci. La data del prossimo appuntamento non è ancora fissata."
+        },
+        {
+          "kind": "reported_scale",
+          "values": {
+            "scaleName": "MMSE",
+            "scaleTotal": "21",
+            "scaleMax": "30"
+          },
+          "quote": "Alla valutazione odierna MMSE 21/30; il totale viene trascritto dal referto, senza ricostruzione dei singoli item."
+        }
+      ]
+    }
+  ]
+}
