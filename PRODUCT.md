@@ -32,6 +32,24 @@ soglia hardware verificata. Il progetto intende rimanere aperto e gratuito,
 così che altri possano studiarlo, discuterlo e contribuire; hardware e servizi
 opzionali di terzi mantengono costi e condizioni propri.
 
+<a id="center-and-laboratory"></a>
+## Il centro ed il laboratorio
+
+Dall'8 novembre 2026 ([ADR 0185](./docs/adr/0185-rotta-di-mediflow.md)) MediFlow è anzitutto **la
+cartella dei pazienti che il sistema non vede**. Il riferimento è la medicina territoriale nelle Case di
+Comunità e a domicilio, con due tipi di pazienti:
+
+- persone senza documenti o senza codice fiscale, a volte senza STP o ENI;
+- persone senza medico di famiglia, incontrate spesso in una fase acuta su cronica.
+
+Sono pazienti che tornano. La loro storia clinica deve essere durevole, tracciabile, ben codificata
+ed esportabile in un formato comune. Il prodotto è fatto prima di tutto per questo lavoro ed è aperto a
+chiunque faccia lo stesso lavoro altrove.
+
+MediFlow resta anche un laboratorio intelligente. La codifica dei dati e i percorsi dell'app devono
+permettere sempre un'ampia operabilità automatizzata da parte di agenti e di strumenti futuri. L'app
+funziona anche senza alcun modello. L'intelligenza la porta chi la usa.
+
 <a id="audience-and-setting"></a>
 ## A chi si rivolge e in quale lavoro
 
