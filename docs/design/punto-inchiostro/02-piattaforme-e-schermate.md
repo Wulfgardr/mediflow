@@ -226,7 +226,7 @@ Seguono la schermata indicata, con gli stessi componenti.
 | Importazione di pazienti (`app/patients/import`) | Documenti e proposte | Ogni riga importata è una proposta a matita finché non è accettata |
 | Prescrizioni di prestazioni e protesica | Terapie | Stessa tabella, stessi comandi di riga |
 | Ragionamento terapeutico, riepilogo assistito | Terapie, sezione Proposte | Risultato sempre a matita, con fonti |
-| Revisione di una proposta di un agente (`headless-soap-approval-dialog.tsx`) | Scrittura con conferma | La proposta è la voce a matita; accettarla la rende bozza |
+| Revisione di una proposta di un agente | Scrittura con conferma | La proposta è la voce a matita; accettarla la rende bozza |
 | Spazio di lavoro SISS | Documenti e proposte | Fuori dal perimetro di questa direzione finché il filone SISS non lo richiede |
 | Sezioni delle impostazioni (Profilo, Accesso, Ambulatori, Aspetto, Backup, Repertori, Funzioni AI, Modelli, Governo dei dati, Diagnostica, Zona pericolo) | Impostazioni | Zona pericolo usa la soglia in due tempi |
 | Backup e ripristino | Impostazioni, con soglia | Il ripristino è una scrittura: conferma con ciò che verrà sostituito |

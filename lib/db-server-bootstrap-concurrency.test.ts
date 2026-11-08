@@ -51,8 +51,6 @@ function runBootstrapWorker(dataDir: string, importOnly = false): Promise<{ code
                 path.join(ROOT_DIR, 'scripts/run-strip-types.mjs'),
                 ...(importOnly ? ['--input-type=module', '--eval', `
                     await import('@/lib/db-server');
-                    await import('@/lib/security/headless-soap-active-role-attestation-store');
-                    await import('@/lib/security/headless-soap-entry-commit-owner');
                 `] : [path.join(ROOT_DIR, 'scripts/db-server-bootstrap-worker.mjs')]),
             ],
             {

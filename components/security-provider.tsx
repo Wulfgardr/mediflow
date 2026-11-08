@@ -50,14 +50,6 @@ import {
 import { createUnlockWrapping, createRecoveryWrapping, openRecoveryWrapping, deriveUnlockMaterial, openUnlockWrapping } from '@/lib/security/unlock-credential';
 import { planUnlock } from '@/lib/security/unlock-plan';
 import { MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT } from '@/lib/api-table-response';
-import {
-    createClinicianSoapEntrySealOwner,
-    type ClinicianSoapEntryReopenResult,
-    type ClinicianSoapEntrySealOwner,
-    type ClinicianSoapEntrySealResult,
-    type ClinicianSoapEntrySealV1,
-} from '@/lib/headless/clinician-soap-entry-seal';
-import type { ClinicianSoapEntryFieldSetV1 } from '@/lib/headless/clinician-soap-entry-field-set';
 
 export interface User {
     id: string;
@@ -92,11 +84,6 @@ interface SecurityContextType {
     preparePassphraseChange: (secret: string, passphrase: string) => Promise<AccessResult>;
     preparePassphraseRecovery: (secret: string, passphrase: string, kit?: RecoveryKit) => Promise<AccessResult>;
     changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
-    sealClinicianSoapEntry: (fieldSet: ClinicianSoapEntryFieldSetV1) => Promise<ClinicianSoapEntrySealResult>;
-    reopenClinicianSoapEntry: (
-        bundle: ClinicianSoapEntrySealV1,
-        expectedFieldSet: ClinicianSoapEntryFieldSetV1,
-    ) => Promise<ClinicianSoapEntryReopenResult>;
     lock: () => void;
     updateUser: (data: Pick<User, 'id' | 'displayName' | 'ambulatoryName'>, isCurrent: () => boolean) => void;
 }
@@ -181,20 +168,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const accessCommitPending = useRef(false);
     const accessPreparePending = useRef(false);
     const authorityAttemptGenerationRef = useRef(0);
-    const clinicianSoapEntrySealOwnerRef = useRef<ClinicianSoapEntrySealOwner | null>(null);
-    if (clinicianSoapEntrySealOwnerRef.current === null) {
-        const browserCrypto = globalThis.crypto;
-        clinicianSoapEntrySealOwnerRef.current = createClinicianSoapEntrySealOwner({
-            readAuthority: () => {
-                const key = masterKeyRef.current;
-                return key ? { key, generation: authorityAttemptGenerationRef.current } : null;
-            },
-            crypto: {
-                subtle: browserCrypto.subtle,
-                getRandomValues: (target) => browserCrypto.getRandomValues(target),
-            },
-        });
-    }
     const authorityNetworkBarrierRef = useRef<ReturnType<typeof createClientAuthorityNetworkBarrier> | null>(null);
     if (authorityNetworkBarrierRef.current === null) {
         authorityNetworkBarrierRef.current = createClientAuthorityNetworkBarrier();
@@ -236,14 +209,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         const barrier = authorityNetworkBarrierRef.current;
         return barrier ? barrier.run(request) : request();
     };
-
-    const sealClinicianSoapEntry = (fieldSet: ClinicianSoapEntryFieldSetV1) =>
-        clinicianSoapEntrySealOwnerRef.current!.seal(fieldSet);
-
-    const reopenClinicianSoapEntry = (
-        bundle: ClinicianSoapEntrySealV1,
-        expectedFieldSet: ClinicianSoapEntryFieldSetV1,
-    ) => clinicianSoapEntrySealOwnerRef.current!.reopen(bundle, expectedFieldSet);
 
     const lock = () => {
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
@@ -861,8 +826,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 preparePassphraseChange,
                 preparePassphraseRecovery,
                 changePin,
-                sealClinicianSoapEntry,
-                reopenClinicianSoapEntry,
                 lock,
                 updateUser: (data, isCurrent) => setUser(prev => isCurrent() && prev?.id === data.id ? { ...prev, ...data } : prev)
             }}>
@@ -888,8 +851,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             preparePassphraseChange,
             preparePassphraseRecovery,
             changePin,
-            sealClinicianSoapEntry,
-            reopenClinicianSoapEntry,
             lock,
             updateUser: (data, isCurrent) => setUser(prev => isCurrent() && prev?.id === data.id ? { ...prev, ...data } : prev)
         }}>
