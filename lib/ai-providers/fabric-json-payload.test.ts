@@ -38,7 +38,7 @@ test('la validazione usa lo schema trasmesso e rifiuta campi o tipi errati', () 
     for (const task of ['patient_insight', 'smart_import'] as const) {
         const data = task === 'patient_insight' ? { currentState: [], alerts: [], nextSteps: [], gaps: [] }
             : { diagnoses: [], therapies: [], servicePrescriptions: [] };
-        const valid = { schemaVersion: 'mediflow.ai.extract.v1', task, summary: 'Prova sintetica', data };
+        const valid = { schemaVersion: 'mediflow.ai.extract.v1', task, summary: task === 'patient_insight' ? 'Prova sintetica [S1]' : 'Prova sintetica', data };
         assert.doesNotThrow(() => validateGenerativeJson(task, JSON.stringify(valid)));
         for (const invalid of [{ ...valid, task: 'wrong' }, { ...valid, data: [] }, { ...valid, extra: true }]) {
             assert.throws(() => validateGenerativeJson(task, JSON.stringify(invalid)));
