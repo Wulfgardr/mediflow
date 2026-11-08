@@ -14,6 +14,7 @@ mod clinical_forms;
 mod document_curation;
 mod document_details;
 mod document_library;
+mod dossier_import;
 mod local_host;
 pub(crate) mod local_preferences;
 mod local_settings;
@@ -366,6 +367,7 @@ struct PatientData {
     checkups: ReadLoad<Vec<Checkup>>,
     attachments: ReadLoad<Vec<Attachment>>,
     document_curation: document_curation::DocumentCuration,
+    dossier: dossier_import::DossierArea,
     document_details_id: Option<String>,
     document_original: Option<document_details::DocumentOriginal>,
 }
@@ -379,6 +381,7 @@ impl Default for PatientData {
             checkups: ReadLoad::Idle,
             attachments: ReadLoad::Idle,
             document_curation: document_curation::DocumentCuration::default(),
+            dossier: dossier_import::DossierArea::default(),
             document_details_id: None,
             document_original: None,
         }
@@ -906,6 +909,7 @@ impl ClinicalApp {
     }
 
     fn next_presentation_epoch(&mut self) {
+        self.patient.dossier = dossier_import::DossierArea::default();
         if matches!(self.ambulatories, Load::Loading) {
             self.ambulatories = Load::Idle;
         }

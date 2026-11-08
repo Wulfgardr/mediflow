@@ -1,0 +1,102 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "cfea1d0ff58f2e23b5f2b3ffb758ddcc027377281330d7ed97949f43f2e3a1f2",
+      "fileName": "test-laboratorio-00.pdf",
+      "patient": {
+        "lastName": "Sintetico071",
+        "firstName": "Persona071",
+        "birthDate": "1941-03-12",
+        "taxCode": "ZZZXXX71A18Z999X"
+      },
+      "documentDate": "2026-10-11",
+      "documentType": "laboratorio",
+      "summary": null,
+      "coverage": {
+        "pages": 1,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "observation",
+          "values": {
+            "display": "Glucosio",
+            "value": "93",
+            "unit": "mg/dL",
+            "refText": "70-100",
+            "observedAt": "2026-10-11"
+          },
+          "quote": "Glucosio | 93 | mg/dL | 70-100"
+        },
+        {
+          "kind": "observation",
+          "values": {
+            "display": "Creatinina",
+            "value": "1,1",
+            "unit": "mg/dL",
+            "refText": "0,7-1,2",
+            "observedAt": "2026-10-11"
+          },
+          "quote": "Creatinina | 1,1 | mg/dL | 0,7-1,2"
+        },
+        {
+          "kind": "observation",
+          "values": {
+            "display": "Sodio",
+            "value": "136",
+            "unit": "mmol/L",
+            "refText": "136-145",
+            "observedAt": "2026-10-11"
+          },
+          "quote": "Sodio | 136 | mmol/L | 136-145"
+        },
+        {
+          "kind": "observation",
+          "values": {
+            "display": "Potassio",
+            "value": "4,0",
+            "unit": "mmol/L",
+            "refText": "3,5-5,1",
+            "observedAt": "2026-10-11"
+          },
+          "quote": "Potassio | 4,0 | mmol/L | 3,5-5,1"
+        },
+        {
+          "kind": "observation",
+          "values": {
+            "display": "Emoglobina",
+            "value": "12,0",
+            "unit": "g/dL",
+            "refText": "12,0-16,0",
+            "observedAt": "2026-10-11"
+          },
+          "quote": "Emoglobina | 12,0 | g/dL | 12,0-16,0"
+        },
+        {
+          "kind": "observation",
+          "values": {
+            "display": "HbA1c",
+            "value": "43",
+            "unit": "mmol/mol",
+            "refText": "20-42",
+            "observedAt": "2026-10-11"
+          },
+          "quote": "HbA1c | 43 | mmol/mol | 20-42"
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "Campione lievemente emolizzato; il risultato del potassio richiede valutazione nel contesto del prelievo. Il laboratorio non formula in questo referto una diagnosi clinica e segnala il limite preanalitico al richiedente.",
+            "subject": "paziente"
+          },
+          "quote": "Campione lievemente emolizzato; il risultato del potassio richiede valutazione nel contesto del prelievo. Il laboratorio non formula in questo referto una diagnosi clinica e segnala il limite preanalitico al richiedente."
+        }
+      ]
+    }
+  ]
+}

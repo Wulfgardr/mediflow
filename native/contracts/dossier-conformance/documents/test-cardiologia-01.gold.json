@@ -1,0 +1,107 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "11443b8c9992d6fcc34dd837ca84d4e65cc1ddc5906ba9a9dec50485c6767617",
+      "fileName": "test-cardiologia-01.pdf",
+      "patient": {
+        "lastName": "Sintetico048",
+        "firstName": "Persona048",
+        "birthDate": "1953-03-12",
+        "taxCode": "ZZZXXX48A22Z999J"
+      },
+      "documentDate": "2026-10-10",
+      "documentType": "cardiologia",
+      "summary": null,
+      "coverage": {
+        "pages": 2,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Motivo: controllo per palpitazioni episodiche. I sintomi sono riferiti da circa tre settimane; il paziente viene ascoltato prima del colloquio con il familiare accompagnatore.",
+            "subject": "paziente"
+          },
+          "quote": "Motivo: controllo per palpitazioni episodiche. I sintomi sono riferiti da circa tre settimane; il paziente viene ascoltato prima del colloquio con il familiare accompagnatore."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "ipertensione arteriosa",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma ipertensione arteriosa tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "dislipidemia",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma dislipidemia tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare.",
+            "subject": "familiare"
+          },
+          "quote": "Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare."
+        },
+        {
+          "kind": "therapy",
+          "values": {
+            "drugName": "Triatec",
+            "activePrinciple": "ramipril",
+            "dosage": "5 mg, 1 cp alla sera per os",
+            "status": "active",
+            "subject": "paziente"
+          },
+          "quote": "Alla visita risulta in uso Triatec (ramipril) 5 mg, 1 cp alla sera per os."
+        },
+        {
+          "kind": "therapy",
+          "values": {
+            "drugName": "Norvasc",
+            "activePrinciple": "amlodipina",
+            "dosage": "5 mg, 1 cp al giorno",
+            "status": "suspended",
+            "subject": "paziente"
+          },
+          "quote": "È stata sospesa la somministrazione di Norvasc (amlodipina) 5 mg, 1 cp al giorno. La sospensione è stata confermata durante il colloquio odierno."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "ipotensione ortostatica",
+            "subject": "paziente",
+            "certainty": "incerta"
+          },
+          "quote": "Resta il sospetto di ipotensione ortostatica, da confermare con gli accertamenti successivi."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.",
+            "subject": "paziente"
+          },
+          "quote": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "È richiesto un controllo ambulatoriale tra due settimane, con diario dei sintomi e confezioni dei farmaci. La data del prossimo appuntamento non è ancora fissata.",
+            "subject": "paziente"
+          },
+          "quote": "È richiesto un controllo ambulatoriale tra due settimane, con diario dei sintomi e confezioni dei farmaci. La data del prossimo appuntamento non è ancora fissata."
+        }
+      ]
+    }
+  ]
+}

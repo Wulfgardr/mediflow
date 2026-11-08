@@ -23,6 +23,29 @@ Il flusso vive nella Web locale, dove il client possiede la chiave
 sezione Documenti della scheda). Non usa modelli, né locali né remoti: funziona con
 le funzioni AI spente.
 
+Aggiornamento 8 novembre 2026, [PR #883](https://github.com/Wulfgardr/mediflow/pull/883):
+anche il client GPUI sul Mac host consuma questo flusso. Usa `LocalHostAccess`,
+con origine loopback e seconda autenticazione Web P3 già aperta. Senza questo
+accesso non avvia la revisione né scrive e mostra il requisito nella sezione
+Documenti. Non rimanda al browser.
+
+Il client mantiene in Rust chiavi, cifratura e porte HTTP. Un processo Node 24
+locale, senza chiavi, cookie o accesso ai file clinici, esegue la stessa sessione
+TS del Web: inventario, parser, claim CAS, applicazione e rilettura. Il bundle è
+incorporato nell'eseguibile GPUI e viene rigenerato con
+`node scripts/build-dossier-worker.mjs`. Il processo riceve i soli byte selezionati
+sul canale privato del padre. Il verificatore Rust confronta integralmente i
+risultati del verificatore TS prima che la sessione possa proseguire.
+Le porte di scrittura restano chiuse durante la revisione e si aprono solo per
+la scheda confermata dal gesto del medico. Il ritiro interrompe il processo
+locale, il contesto ed ogni invio successivo. Il piccolo file temporaneo contiene
+solo il codice del bundle, mai documenti, chiavi o stato del dossier.
+
+Questa aggiunta non modifica `/api/v1`, OpenAPI, schema, formato ENC/ENC2 o il
+confine di Classe C di ADR 0076. I writer sono sempre quelli Web elencati qui.
+La revisione GPUI mantiene le proposte dubbie visibili, accetta il verificato per
+scheda ed include le sintesi solo dopo la scelta «Ho letto le sintesi».
+
 1. **Inventario.** I file selezionati si leggono nel browser; ogni file ha uno stato.
    I byte vanno a `POST /api/documents/dossier-extraction`, in sola lettura: sessione
    Web, richiesta loopback same-origin, limite di 25 MiB, una richiesta alla volta.

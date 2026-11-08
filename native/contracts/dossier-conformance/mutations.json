@@ -1,0 +1,881 @@
+[
+  {
+    "name": "01-dose-numerica-cambiata",
+    "text": "Data referto: 20/10/2026\nIl paziente assume Ramipril 5 mg 1 cp al mattino.",
+    "extraction": {
+      "schema": "mediflow.dossier_prepared_extraction.v1",
+      "preparedAt": "2026-11-05T12:00:00Z",
+      "preparedBy": "deterministic-generator",
+      "sources": [
+        {
+          "sha256": "a0022c26625008b8cc6c14a2601e6c2504d1ad0ff82b43407a5b14bfd809ec45",
+          "fileName": "dev-dimissione-00.pdf",
+          "patient": null,
+          "documentDate": "2026-10-06",
+          "documentType": "dimissione",
+          "summary": null,
+          "coverage": {
+            "pages": 3,
+            "unreadablePages": [],
+            "complete": true,
+            "note": ""
+          },
+          "facts": [
+            {
+              "kind": "therapy",
+              "quote": "Il paziente assume Ramipril 5 mg 1 cp al mattino.",
+              "values": {
+                "drugName": "Ramipril",
+                "dosage": "10 mg 1 cp al mattino",
+                "status": "active"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "result": {
+      "ok": true,
+      "facts": [
+        {
+          "factId": "p-f-therapy-0-0-a7f900f7",
+          "kind": "therapy",
+          "origin": "prepared",
+          "evidence": {
+            "unit": 1,
+            "start": 25,
+            "end": 73,
+            "excerpt": "Il paziente assume Ramipril 5 mg 1 cp al mattino"
+          },
+          "negated": false,
+          "values": {
+            "drugName": "Ramipril",
+            "dosage": "10 mg 1 cp al mattino",
+            "status": "active",
+            "startDate": "2026-10-20",
+            "preparedCheck": "value_missing"
+          },
+          "decision": "pending",
+          "fieldVerified": false,
+          "eligible": false,
+          "accepted": false,
+          "blockers": []
+        }
+      ],
+      "notes": [
+        "L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo."
+      ],
+      "documentDate": "2026-10-20",
+      "identity": {
+        "status": "no_document_cf",
+        "blocking": false,
+        "confirmationRequired": true,
+        "documentPatientCodes": [],
+        "candidatePatientIds": [],
+        "message": "Nessun codice fiscale paziente leggibile: scegli la scheda dopo aver controllato i documenti."
+      },
+      "appDate": "2026-10-20",
+      "warnings": [],
+      "units": [
+        {
+          "index": 1,
+          "kind": "page",
+          "start": 0,
+          "end": 74
+        }
+      ]
+    },
+    "rejected": true
+  },
+  {
+    "name": "02-frequenza-numerica-cambiata",
+    "text": "Data referto: 20/10/2026\nIl paziente assume Ramipril 5 mg 1 cp al mattino.",
+    "extraction": {
+      "schema": "mediflow.dossier_prepared_extraction.v1",
+      "preparedAt": "2026-11-05T12:00:00Z",
+      "preparedBy": "deterministic-generator",
+      "sources": [
+        {
+          "sha256": "a0022c26625008b8cc6c14a2601e6c2504d1ad0ff82b43407a5b14bfd809ec45",
+          "fileName": "dev-dimissione-00.pdf",
+          "patient": null,
+          "documentDate": "2026-10-06",
+          "documentType": "dimissione",
+          "summary": null,
+          "coverage": {
+            "pages": 3,
+            "unreadablePages": [],
+            "complete": true,
+            "note": ""
+          },
+          "facts": [
+            {
+              "kind": "therapy",
+              "quote": "Il paziente assume Ramipril 5 mg 1 cp al mattino.",
+              "values": {
+                "drugName": "Ramipril",
+                "dosage": "5 mg 2 cp al mattino",
+                "status": "active"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "result": {
+      "ok": true,
+      "facts": [
+        {
+          "factId": "p-f-therapy-0-0-62047dae",
+          "kind": "therapy",
+          "origin": "prepared",
+          "evidence": {
+            "unit": 1,
+            "start": 25,
+            "end": 73,
+            "excerpt": "Il paziente assume Ramipril 5 mg 1 cp al mattino"
+          },
+          "negated": false,
+          "values": {
+            "drugName": "Ramipril",
+            "dosage": "5 mg 2 cp al mattino",
+            "status": "active",
+            "startDate": "2026-10-20",
+            "preparedCheck": "value_missing"
+          },
+          "decision": "pending",
+          "fieldVerified": false,
+          "eligible": false,
+          "accepted": false,
+          "blockers": []
+        }
+      ],
+      "notes": [
+        "L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo."
+      ],
+      "documentDate": "2026-10-20",
+      "identity": {
+        "status": "no_document_cf",
+        "blocking": false,
+        "confirmationRequired": true,
+        "documentPatientCodes": [],
+        "candidatePatientIds": [],
+        "message": "Nessun codice fiscale paziente leggibile: scegli la scheda dopo aver controllato i documenti."
+      },
+      "appDate": "2026-10-20",
+      "warnings": [],
+      "units": [
+        {
+          "index": 1,
+          "kind": "page",
+          "start": 0,
+          "end": 74
+        }
+      ]
+    },
+    "rejected": true
+  },
+  {
+    "name": "03-negazione-preservata-nella-citazione",
+    "text": "Data referto: 20/10/2026\nIl paziente non assume Ramipril 5 mg 1 cp al mattino.",
+    "extraction": {
+      "schema": "mediflow.dossier_prepared_extraction.v1",
+      "preparedAt": "2026-11-05T12:00:00Z",
+      "preparedBy": "deterministic-generator",
+      "sources": [
+        {
+          "sha256": "a0022c26625008b8cc6c14a2601e6c2504d1ad0ff82b43407a5b14bfd809ec45",
+          "fileName": "dev-dimissione-00.pdf",
+          "patient": null,
+          "documentDate": "2026-10-06",
+          "documentType": "dimissione",
+          "summary": null,
+          "coverage": {
+            "pages": 3,
+            "unreadablePages": [],
+            "complete": true,
+            "note": ""
+          },
+          "facts": [
+            {
+              "kind": "therapy",
+              "quote": "Il paziente non assume Ramipril 5 mg 1 cp al mattino.",
+              "values": {
+                "drugName": "Ramipril",
+                "dosage": "5 mg 1 cp al mattino",
+                "status": "active"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "result": {
+      "ok": true,
+      "facts": [
+        {
+          "factId": "p-f-therapy-0-0-0e694ba4",
+          "kind": "therapy",
+          "origin": "prepared",
+          "evidence": {
+            "unit": 1,
+            "start": 25,
+            "end": 77,
+            "excerpt": "Il paziente non assume Ramipril 5 mg 1 cp al mattino"
+          },
+          "negated": true,
+          "values": {
+            "drugName": "Ramipril",
+            "dosage": "5 mg 1 cp al mattino",
+            "status": "active",
+            "startDate": "2026-10-20",
+            "preparedCheck": "verified"
+          },
+          "decision": "pending",
+          "fieldVerified": true,
+          "eligible": false,
+          "accepted": false,
+          "blockers": [
+            "Il testo nega questa informazione: correggi il fatto o rifiutalo."
+          ]
+        }
+      ],
+      "notes": [
+        "L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo."
+      ],
+      "documentDate": "2026-10-20",
+      "identity": {
+        "status": "no_document_cf",
+        "blocking": false,
+        "confirmationRequired": true,
+        "documentPatientCodes": [],
+        "candidatePatientIds": [],
+        "message": "Nessun codice fiscale paziente leggibile: scegli la scheda dopo aver controllato i documenti."
+      },
+      "appDate": "2026-10-20",
+      "warnings": [],
+      "units": [
+        {
+          "index": 1,
+          "kind": "page",
+          "start": 0,
+          "end": 78
+        }
+      ]
+    },
+    "rejected": true
+  },
+  {
+    "name": "04-negazione-tagliata-dalla-citazione",
+    "text": "Data referto: 20/10/2026\nIl paziente non assume Ramipril 5 mg 1 cp al mattino.",
+    "extraction": {
+      "schema": "mediflow.dossier_prepared_extraction.v1",
+      "preparedAt": "2026-11-05T12:00:00Z",
+      "preparedBy": "deterministic-generator",
+      "sources": [
+        {
+          "sha256": "a0022c26625008b8cc6c14a2601e6c2504d1ad0ff82b43407a5b14bfd809ec45",
+          "fileName": "dev-dimissione-00.pdf",
+          "patient": null,
+          "documentDate": "2026-10-06",
+          "documentType": "dimissione",
+          "summary": null,
+          "coverage": {
+            "pages": 3,
+            "unreadablePages": [],
+            "complete": true,
+            "note": ""
+          },
+          "facts": [
+            {
+              "kind": "therapy",
+              "quote": "Ramipril 5 mg 1 cp al mattino.",
+              "values": {
+                "drugName": "Ramipril",
+                "dosage": "5 mg 1 cp al mattino",
+                "status": "active"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "result": {
+      "ok": true,
+      "facts": [
+        {
+          "factId": "p-f-therapy-0-0-ccc21214",
+          "kind": "therapy",
+          "origin": "prepared",
+          "evidence": {
+            "unit": 1,
+            "start": 48,
+            "end": 77,
+            "excerpt": "Ramipril 5 mg 1 cp al mattino"
+          },
+          "negated": false,
+          "values": {
+            "drugName": "Ramipril",
+            "dosage": "5 mg 1 cp al mattino",
+            "status": "active",
+            "startDate": "2026-10-20",
+            "preparedCheck": "verified"
+          },
+          "decision": "pending",
+          "fieldVerified": true,
+          "eligible": true,
+          "accepted": true,
+          "blockers": []
+        }
+      ],
+      "notes": [
+        "L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo."
+      ],
+      "documentDate": "2026-10-20",
+      "identity": {
+        "status": "no_document_cf",
+        "blocking": false,
+        "confirmationRequired": true,
+        "documentPatientCodes": [],
+        "candidatePatientIds": [],
+        "message": "Nessun codice fiscale paziente leggibile: scegli la scheda dopo aver controllato i documenti."
+      },
+      "appDate": "2026-10-20",
+      "warnings": [],
+      "units": [
+        {
+          "index": 1,
+          "kind": "page",
+          "start": 0,
+          "end": 78
+        }
+      ]
+    },
+    "rejected": false
+  },
+  {
+    "name": "05-diagnosi-madre-attribuita-paziente",
+    "text": "Data referto: 20/10/2026\nLa madre presenta diabete mellito di tipo 2.",
+    "extraction": {
+      "schema": "mediflow.dossier_prepared_extraction.v1",
+      "preparedAt": "2026-11-05T12:00:00Z",
+      "preparedBy": "deterministic-generator",
+      "sources": [
+        {
+          "sha256": "a0022c26625008b8cc6c14a2601e6c2504d1ad0ff82b43407a5b14bfd809ec45",
+          "fileName": "dev-dimissione-00.pdf",
+          "patient": null,
+          "documentDate": "2026-10-06",
+          "documentType": "dimissione",
+          "summary": null,
+          "coverage": {
+            "pages": 3,
+            "unreadablePages": [],
+            "complete": true,
+            "note": ""
+          },
+          "facts": [
+            {
+              "kind": "diagnosis",
+              "quote": "La madre presenta diabete mellito di tipo 2.",
+              "values": {
+                "description": "diabete mellito di tipo 2",
+                "subject": "paziente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "result": {
+      "ok": true,
+      "facts": [
+        {
+          "factId": "p-f-diagnosis-0-0-d8fd8645",
+          "kind": "diagnosis",
+          "origin": "prepared",
+          "evidence": {
+            "unit": 1,
+            "start": 25,
+            "end": 68,
+            "excerpt": "La madre presenta diabete mellito di tipo 2"
+          },
+          "negated": false,
+          "values": {
+            "description": "diabete mellito di tipo 2",
+            "subject": "paziente",
+            "date": "2026-10-20",
+            "preparedCheck": "subject_conflict"
+          },
+          "decision": "pending",
+          "fieldVerified": false,
+          "eligible": false,
+          "accepted": false,
+          "blockers": []
+        }
+      ],
+      "notes": [
+        "L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo."
+      ],
+      "documentDate": "2026-10-20",
+      "identity": {
+        "status": "no_document_cf",
+        "blocking": false,
+        "confirmationRequired": true,
+        "documentPatientCodes": [],
+        "candidatePatientIds": [],
+        "message": "Nessun codice fiscale paziente leggibile: scegli la scheda dopo aver controllato i documenti."
+      },
+      "appDate": "2026-10-20",
+      "warnings": [],
+      "units": [
+        {
+          "index": 1,
+          "kind": "page",
+          "start": 0,
+          "end": 69
+        }
+      ]
+    },
+    "rejected": true
+  },
+  {
+    "name": "06-terapia-coniuge-attribuita-paziente",
+    "text": "Data referto: 20/10/2026\nIl coniuge assume Ramipril 5 mg 1 cp al mattino.",
+    "extraction": {
+      "schema": "mediflow.dossier_prepared_extraction.v1",
+      "preparedAt": "2026-11-05T12:00:00Z",
+      "preparedBy": "deterministic-generator",
+      "sources": [
+        {
+          "sha256": "a0022c26625008b8cc6c14a2601e6c2504d1ad0ff82b43407a5b14bfd809ec45",
+          "fileName": "dev-dimissione-00.pdf",
+          "patient": null,
+          "documentDate": "2026-10-06",
+          "documentType": "dimissione",
+          "summary": null,
+          "coverage": {
+            "pages": 3,
+            "unreadablePages": [],
+            "complete": true,
+            "note": ""
+          },
+          "facts": [
+            {
+              "kind": "therapy",
+              "quote": "Il coniuge assume Ramipril 5 mg 1 cp al mattino.",
+              "values": {
+                "drugName": "Ramipril",
+                "dosage": "5 mg 1 cp al mattino",
+                "status": "active",
+                "subject": "paziente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "result": {
+      "ok": true,
+      "facts": [
+        {
+          "factId": "p-f-therapy-0-0-f46eeb2e",
+          "kind": "therapy",
+          "origin": "prepared",
+          "evidence": {
+            "unit": 1,
+            "start": 25,
+            "end": 72,
+            "excerpt": "Il coniuge assume Ramipril 5 mg 1 cp al mattino"
+          },
+          "negated": false,
+          "values": {
+            "drugName": "Ramipril",
+            "dosage": "5 mg 1 cp al mattino",
+            "status": "active",
+            "subject": "paziente",
+            "startDate": "2026-10-20",
+            "preparedCheck": "verified"
+          },
+          "decision": "pending",
+          "fieldVerified": true,
+          "eligible": true,
+          "accepted": true,
+          "blockers": []
+        }
+      ],
+      "notes": [
+        "L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo."
+      ],
+      "documentDate": "2026-10-20",
+      "identity": {
+        "status": "no_document_cf",
+        "blocking": false,
+        "confirmationRequired": true,
+        "documentPatientCodes": [],
+        "candidatePatientIds": [],
+        "message": "Nessun codice fiscale paziente leggibile: scegli la scheda dopo aver controllato i documenti."
+      },
+      "appDate": "2026-10-20",
+      "warnings": [],
+      "units": [
+        {
+          "index": 1,
+          "kind": "page",
+          "start": 0,
+          "end": 73
+        }
+      ]
+    },
+    "rejected": false
+  },
+  {
+    "name": "07-citazione-interamente-inventata",
+    "text": "Data referto: 20/10/2026\nIl paziente assume soltanto bisoprololo.",
+    "extraction": {
+      "schema": "mediflow.dossier_prepared_extraction.v1",
+      "preparedAt": "2026-11-05T12:00:00Z",
+      "preparedBy": "deterministic-generator",
+      "sources": [
+        {
+          "sha256": "a0022c26625008b8cc6c14a2601e6c2504d1ad0ff82b43407a5b14bfd809ec45",
+          "fileName": "dev-dimissione-00.pdf",
+          "patient": null,
+          "documentDate": "2026-10-06",
+          "documentType": "dimissione",
+          "summary": null,
+          "coverage": {
+            "pages": 3,
+            "unreadablePages": [],
+            "complete": true,
+            "note": ""
+          },
+          "facts": [
+            {
+              "kind": "therapy",
+              "quote": "Il paziente assume Ramipril 5 mg 1 cp al mattino.",
+              "values": {
+                "drugName": "Ramipril",
+                "dosage": "5 mg 1 cp al mattino",
+                "status": "active"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "result": {
+      "ok": true,
+      "facts": [
+        {
+          "factId": "p-f-therapy-0-0-16e3d8a7",
+          "kind": "therapy",
+          "origin": "prepared",
+          "evidence": null,
+          "negated": false,
+          "values": {
+            "drugName": "Ramipril",
+            "dosage": "5 mg 1 cp al mattino",
+            "status": "active",
+            "startDate": "2026-10-20",
+            "preparedCheck": "not_found"
+          },
+          "decision": "pending",
+          "fieldVerified": false,
+          "eligible": false,
+          "accepted": false,
+          "blockers": []
+        }
+      ],
+      "notes": [
+        "L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo."
+      ],
+      "documentDate": "2026-10-20",
+      "identity": {
+        "status": "no_document_cf",
+        "blocking": false,
+        "confirmationRequired": true,
+        "documentPatientCodes": [],
+        "candidatePatientIds": [],
+        "message": "Nessun codice fiscale paziente leggibile: scegli la scheda dopo aver controllato i documenti."
+      },
+      "appDate": "2026-10-20",
+      "warnings": [],
+      "units": [
+        {
+          "index": 1,
+          "kind": "page",
+          "start": 0,
+          "end": 65
+        }
+      ]
+    },
+    "rejected": true
+  },
+  {
+    "name": "08-citazione-con-numero-inventato",
+    "text": "Data referto: 20/10/2026\nIl paziente assume Ramipril 5 mg 1 cp al mattino.",
+    "extraction": {
+      "schema": "mediflow.dossier_prepared_extraction.v1",
+      "preparedAt": "2026-11-05T12:00:00Z",
+      "preparedBy": "deterministic-generator",
+      "sources": [
+        {
+          "sha256": "a0022c26625008b8cc6c14a2601e6c2504d1ad0ff82b43407a5b14bfd809ec45",
+          "fileName": "dev-dimissione-00.pdf",
+          "patient": null,
+          "documentDate": "2026-10-06",
+          "documentType": "dimissione",
+          "summary": null,
+          "coverage": {
+            "pages": 3,
+            "unreadablePages": [],
+            "complete": true,
+            "note": ""
+          },
+          "facts": [
+            {
+              "kind": "therapy",
+              "quote": "Il paziente assume Ramipril 10 mg 1 cp al mattino.",
+              "values": {
+                "drugName": "Ramipril",
+                "dosage": "10 mg 1 cp al mattino",
+                "status": "active"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "result": {
+      "ok": true,
+      "facts": [
+        {
+          "factId": "p-f-therapy-0-0-d068c5f7",
+          "kind": "therapy",
+          "origin": "prepared",
+          "evidence": null,
+          "negated": false,
+          "values": {
+            "drugName": "Ramipril",
+            "dosage": "10 mg 1 cp al mattino",
+            "status": "active",
+            "startDate": "2026-10-20",
+            "preparedCheck": "not_found"
+          },
+          "decision": "pending",
+          "fieldVerified": false,
+          "eligible": false,
+          "accepted": false,
+          "blockers": []
+        }
+      ],
+      "notes": [
+        "L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo."
+      ],
+      "documentDate": "2026-10-20",
+      "identity": {
+        "status": "no_document_cf",
+        "blocking": false,
+        "confirmationRequired": true,
+        "documentPatientCodes": [],
+        "candidatePatientIds": [],
+        "message": "Nessun codice fiscale paziente leggibile: scegli la scheda dopo aver controllato i documenti."
+      },
+      "appDate": "2026-10-20",
+      "warnings": [],
+      "units": [
+        {
+          "index": 1,
+          "kind": "page",
+          "start": 0,
+          "end": 74
+        }
+      ]
+    },
+    "rejected": true
+  },
+  {
+    "name": "09-paziente-scambiato-con-CF",
+    "text": "Data referto: 20/10/2026\nCodice fiscale paziente: ZZZXXX01A05Z999A.\nIl paziente assume Ramipril 5 mg 1 cp al mattino.",
+    "extraction": {
+      "schema": "mediflow.dossier_prepared_extraction.v1",
+      "preparedAt": "2026-11-05T12:00:00Z",
+      "preparedBy": "deterministic-generator",
+      "sources": [
+        {
+          "sha256": "a0022c26625008b8cc6c14a2601e6c2504d1ad0ff82b43407a5b14bfd809ec45",
+          "fileName": "dev-dimissione-00.pdf",
+          "patient": {
+            "taxCode": "ZZZXXX02A06Z999D"
+          },
+          "documentDate": "2026-10-06",
+          "documentType": "dimissione",
+          "summary": null,
+          "coverage": {
+            "pages": 3,
+            "unreadablePages": [],
+            "complete": true,
+            "note": ""
+          },
+          "facts": [
+            {
+              "kind": "therapy",
+              "quote": "Il paziente assume Ramipril 5 mg 1 cp al mattino.",
+              "values": {
+                "drugName": "Ramipril",
+                "dosage": "5 mg 1 cp al mattino",
+                "status": "active"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "result": {
+      "ok": true,
+      "facts": [
+        {
+          "factId": "p-f-therapy-0-0-16e3d8a7",
+          "kind": "therapy",
+          "origin": "prepared",
+          "evidence": {
+            "unit": 1,
+            "start": 68,
+            "end": 116,
+            "excerpt": "Il paziente assume Ramipril 5 mg 1 cp al mattino"
+          },
+          "negated": false,
+          "values": {
+            "drugName": "Ramipril",
+            "dosage": "5 mg 1 cp al mattino",
+            "status": "active",
+            "startDate": "2026-10-20",
+            "preparedCheck": "verified"
+          },
+          "decision": "pending",
+          "fieldVerified": true,
+          "eligible": true,
+          "accepted": false,
+          "blockers": []
+        }
+      ],
+      "notes": [
+        "L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo."
+      ],
+      "documentDate": "2026-10-20",
+      "identity": {
+        "status": "discordant",
+        "blocking": true,
+        "confirmationRequired": true,
+        "documentPatientCodes": [
+          "ZZZXXX01A05Z999A"
+        ],
+        "candidatePatientIds": [],
+        "message": "Il codice fiscale nei documenti non corrisponde alla scheda scelta. Nessuna fonte verrà salvata su questa scheda."
+      },
+      "appDate": "2026-10-20",
+      "warnings": [],
+      "units": [
+        {
+          "index": 1,
+          "kind": "page",
+          "start": 0,
+          "end": 117
+        }
+      ]
+    },
+    "rejected": true
+  },
+  {
+    "name": "10-paziente-scambiato-senza-CF",
+    "text": "Data referto: 20/10/2026\nPaziente: PersonaUno SinteticoUno.\nIl paziente assume Ramipril 5 mg 1 cp al mattino.",
+    "extraction": {
+      "schema": "mediflow.dossier_prepared_extraction.v1",
+      "preparedAt": "2026-11-05T12:00:00Z",
+      "preparedBy": "deterministic-generator",
+      "sources": [
+        {
+          "sha256": "a0022c26625008b8cc6c14a2601e6c2504d1ad0ff82b43407a5b14bfd809ec45",
+          "fileName": "dev-dimissione-00.pdf",
+          "patient": {
+            "firstName": "PersonaDue",
+            "lastName": "SinteticoDue"
+          },
+          "documentDate": "2026-10-06",
+          "documentType": "dimissione",
+          "summary": null,
+          "coverage": {
+            "pages": 3,
+            "unreadablePages": [],
+            "complete": true,
+            "note": ""
+          },
+          "facts": [
+            {
+              "kind": "therapy",
+              "quote": "Il paziente assume Ramipril 5 mg 1 cp al mattino.",
+              "values": {
+                "drugName": "Ramipril",
+                "dosage": "5 mg 1 cp al mattino",
+                "status": "active"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "result": {
+      "ok": true,
+      "facts": [
+        {
+          "factId": "p-f-therapy-0-0-16e3d8a7",
+          "kind": "therapy",
+          "origin": "prepared",
+          "evidence": {
+            "unit": 1,
+            "start": 60,
+            "end": 108,
+            "excerpt": "Il paziente assume Ramipril 5 mg 1 cp al mattino"
+          },
+          "negated": false,
+          "values": {
+            "drugName": "Ramipril",
+            "dosage": "5 mg 1 cp al mattino",
+            "status": "active",
+            "startDate": "2026-10-20",
+            "preparedCheck": "verified"
+          },
+          "decision": "pending",
+          "fieldVerified": true,
+          "eligible": true,
+          "accepted": true,
+          "blockers": []
+        }
+      ],
+      "notes": [
+        "L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo."
+      ],
+      "documentDate": "2026-10-20",
+      "identity": {
+        "status": "no_document_cf",
+        "blocking": false,
+        "confirmationRequired": true,
+        "documentPatientCodes": [],
+        "candidatePatientIds": [],
+        "message": "Nessun codice fiscale paziente leggibile: scegli la scheda dopo aver controllato i documenti."
+      },
+      "appDate": "2026-10-20",
+      "warnings": [],
+      "units": [
+        {
+          "index": 1,
+          "kind": "page",
+          "start": 0,
+          "end": 109
+        }
+      ]
+    },
+    "rejected": false
+  }
+]

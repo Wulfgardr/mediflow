@@ -1,0 +1,131 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "a9d458d8883c01bdcb271d0c0403d477d4187c25668da48b107d3845f3e593a7",
+      "fileName": "test-dimissione-01.pdf",
+      "patient": {
+        "lastName": "Sintetico042",
+        "firstName": "Persona042",
+        "birthDate": "1947-03-12",
+        "taxCode": "ZZZXXX42A16Z999M"
+      },
+      "documentDate": "2026-10-09",
+      "documentType": "dimissione",
+      "summary": null,
+      "coverage": {
+        "pages": 4,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Motivo: ricovero per riacutizzazione di dispnea e riduzione della tolleranza allo sforzo. I sintomi sono riferiti da circa tre settimane; il paziente viene ascoltato prima del colloquio con il familiare accompagnatore.",
+            "subject": "paziente"
+          },
+          "quote": "Motivo: ricovero per riacutizzazione di dispnea e riduzione della tolleranza allo sforzo. I sintomi sono riferiti da circa tre settimane; il paziente viene ascoltato prima del colloquio con il familiare accompagnatore."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "scompenso cardiaco cronico",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma scompenso cardiaco cronico tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "insufficienza renale cronica",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma insufficienza renale cronica tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare.",
+            "subject": "familiare"
+          },
+          "quote": "Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare."
+        },
+        {
+          "kind": "therapy",
+          "values": {
+            "drugName": "Lasix",
+            "activePrinciple": "furosemide",
+            "dosage": "25 mg, 1 cp al mattino per os",
+            "status": "active",
+            "subject": "paziente"
+          },
+          "quote": "Alla visita risulta in uso Lasix (furosemide) 25 mg, 1 cp al mattino per os."
+        },
+        {
+          "kind": "therapy",
+          "values": {
+            "drugName": "Norvasc",
+            "activePrinciple": "amlodipina",
+            "dosage": "5 mg, 1 cp al giorno",
+            "status": "suspended",
+            "subject": "paziente"
+          },
+          "quote": "È stata sospesa la somministrazione di Norvasc (amlodipina) 5 mg, 1 cp al giorno. La sospensione è stata confermata durante il colloquio odierno."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "ipotensione ortostatica",
+            "subject": "paziente",
+            "certainty": "incerta"
+          },
+          "quote": "Resta il sospetto di ipotensione ortostatica, da confermare con gli accertamenti successivi."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.",
+            "subject": "paziente"
+          },
+          "quote": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "È richiesto un controllo ambulatoriale tra due settimane, con diario dei sintomi e confezioni dei farmaci. La data del prossimo appuntamento non è ancora fissata.",
+            "subject": "paziente"
+          },
+          "quote": "È richiesto un controllo ambulatoriale tra due settimane, con diario dei sintomi e confezioni dei farmaci. La data del prossimo appuntamento non è ancora fissata."
+        },
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "All’ingresso del 04.10.2026 il paziente riferiva un progressivo affaticamento nei tragitti abituali. Nel corso della degenza è stato rivalutato il quadro funzionale; alla dimissione il rientro al domicilio avviene con il supporto familiare già presente.",
+            "subject": "paziente"
+          },
+          "quote": "All’ingresso del 04.10.2026 il paziente riferiva un progressivo affaticamento nei tragitti abituali. Nel corso della degenza è stato rivalutato il quadro funzionale; alla dimissione il rientro al domicilio avviene con il supporto familiare già presente."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "La riconciliazione è stata svolta confrontando le confezioni portate dalla famiglia con la lista domiciliare. I medicinali sospesi sono mantenuti nella documentazione come storia terapeutica. Il MMG riceve la copia della lettera e può verificare con il paziente le discrepanze residue.",
+            "subject": "paziente"
+          },
+          "quote": "La riconciliazione è stata svolta confrontando le confezioni portate dalla famiglia con la lista domiciliare. I medicinali sospesi sono mantenuti nella documentazione come storia terapeutica. Il MMG riceve la copia della lettera e può verificare con il paziente le discrepanze residue."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "Il colloquio conclusivo ha riguardato gli orari di assunzione e l’organizzazione dei controlli già indicati. Il paziente ha ripetuto verbalmente le istruzioni ricevute; la documentazione viene consegnata insieme al riepilogo degli accertamenti. Non sono state definite ulteriori modifiche farmacologiche oltre a quelle riportate nella sezione dedicata.",
+            "subject": "paziente"
+          },
+          "quote": "Il colloquio conclusivo ha riguardato gli orari di assunzione e l’organizzazione dei controlli già indicati. Il paziente ha ripetuto verbalmente le istruzioni ricevute; la documentazione viene consegnata insieme al riepilogo degli accertamenti. Non sono state definite ulteriori modifiche farmacologiche oltre a quelle riportate nella sezione dedicata."
+        }
+      ]
+    }
+  ]
+}

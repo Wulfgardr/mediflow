@@ -97,6 +97,23 @@ non fidata. L'app non chiama modelli: legge un file scelto dal medico.
 `applyDossierDocument`: nessun nuovo writer. Il file dell'estrazione vive solo nella
 memoria della pagina, mai nello storage del browser né nell'URL.
 
+## Consumer GPUI sul Mac host
+
+Dall'8 novembre 2026 ([PR #883](https://github.com/Wulfgardr/mediflow/pull/883)),
+GPUI usa il percorso host locale di ADR 0175. La seconda autenticazione precede
+la revisione. Il processo locale riusa il modulo TS, mentre
+`transport/src/dossier.rs` esegue la verifica Rust indipendente: identità,
+citazioni, campi, date, codifica di laboratorio, identificativi e decisioni in
+blocco. Una differenza interrompe il processo prima della scrittura.
+
+`native/contracts/dossier-conformance/` contiene soli dati sintetici: venti
+documenti del banco, relative estrazioni del parser e candidati, le dieci
+falsificazioni ed ingressi raccolti dai test TS, compreso #872. Le attese si
+rigenerano con `scripts/update-dossier-conformance.ts` dal verificatore Web
+corrente. Le suite Web e Rust confrontano l'intero risultato JSON, senza campi
+esclusi. I tempi storici del banco non sono uscite del verificatore.
+I test Rust girano nel job GPUI esistente, quelli TS nella suite Web.
+
 ## Lettura dei documenti fuori dall'app
 
 La skill legge i documenti con l'agente che la esegue, quindi il testo dei documenti va

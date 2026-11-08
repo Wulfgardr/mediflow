@@ -1,0 +1,37 @@
+## Pagina 1
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+VALUTAZIONE MULTIDIMENSIONALE
+Protocollo test-scale-01 | Pagina 1 di 1
+Paziente: Sintetico096 Persona096 - Nato il 1966-03-12
+Codice fiscale paziente: ZZZXXX96A16Z999C
+Data referto: 18.10.2026
+
+MODALITÀ DI VALUTAZIONE
+Valutazione ambulatoriale multidimensionale. Sono riportati soltanto i punteggi complessivi ricevuti dall’équipe; il documento non contiene risposte ai singoli item. La trascrizione del totale non equivale a una nuova somministrazione del test.
+
+SCALE E PUNTEGGI
+MMSE: totale 22/30, valutazione del 18.10.2026.
+
+SCALE E PUNTEGGI
+Barthel: totale 50/100, valutazione del 18.10.2026.
+
+SCALE E PUNTEGGI
+ADL: totale 3/6, valutazione del 18.10.2026.
+
+SCALE E PUNTEGGI
+IADL: totale 3/8, valutazione del 18.10.2026.
+
+CONTESTO ASSISTENZIALE
+La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.
+
+CONCLUSIONI E INDICAZIONI
+I punteggi vanno letti insieme all’osservazione funzionale: l’aiuto disponibile al domicilio modifica la prestazione quotidiana ma non riscrive il totale annotato. Non viene formulata una nuova diagnosi sulla sola base delle scale.
+
+CONTROLLO PROGRAMMATO
+Ripetere Barthel tra 12 mesi; il numero indica l’intervallo futuro, non un punteggio ottenuto.
+
+RIFERIMENTO DI EMISSIONE
+Emissione sintetica 806749. Copia per il medico curante; conservare tutte le pagine del documento.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-scale-01 - Pagina 1/1 - nessun dato reale.
