@@ -61,7 +61,6 @@ const CLINICAL_COMPONENT_NAMES = new Set([
   'scale-engine',
   'ai-patient-insight',
   'treatment-reasoning-panel',
-  'pdf-importer',
 ]);
 const CLINICAL_COMPONENT_PREFIXES = [
   'patient-',

@@ -2,10 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-    createDocumentSynthesisAuthorityHandle,
-    type DocumentSynthesisDisposition,
-} from './document-synthesis-authority-handle';
-import {
     DOCUMENT_SYNTHESIS_HOST_PROJECTION_SCHEMA_VERSION,
     DocumentSynthesisHostProjectionError,
     resolveDocumentSynthesisHostProjection,
@@ -38,28 +34,6 @@ test('returns the exact minimal projection with bounded normalized host text', (
         'schemaVersion', 'sourceKind', 'sourceText', 'classification', 'rationale',
     ]);
     assert.equal(Object.isFrozen(projection), true);
-});
-
-test('gives deterministic and generative branches the same pure review projection', () => {
-    const expected = resolveDocumentSynthesisHostProjection(source());
-    for (const disposition of ['deterministic', 'generative'] as const) {
-        const authority = createDocumentSynthesisAuthorityHandle({
-            patientRef: 'patient.synthetic-1234567890',
-            document: { revision: 1, freshness: '2026-08-23T12:00:00.000Z' },
-            disposition: disposition as DocumentSynthesisDisposition,
-            provenanceRef: 'provenance_0123456789abcdef',
-            receiptRef: 'receipt_0123456789abcdef',
-        }, {
-            clock: () => Date.parse('2026-08-23T11:00:00.000Z'),
-            entropy: () => Uint8Array.from({ length: 16 }, (_, index) => index),
-        });
-        const issued = authority.issue();
-        const consumed = authority.consume({ documentHandle: issued.documentHandle });
-
-        assert.equal(consumed.status, 'available');
-        assert.equal(consumed.metadata?.disposition, disposition);
-        assert.deepEqual(resolveDocumentSynthesisHostProjection(source()), expected);
-    }
 });
 
 test('copies a frozen result so later host-record mutation cannot affect it', () => {

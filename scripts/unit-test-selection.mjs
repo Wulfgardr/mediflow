@@ -6,6 +6,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/chat-card-native-owner.test.mjs',
   'scripts/check-command-roles.test.mjs',
   'scripts/fhir-r4-gate.test.mjs',
+  'scripts/verify-fhir-validator-cache.test.mjs',
   'scripts/fhir-r4-corpus.test.ts',
   'scripts/fhir-scale-export-falsification.test.mjs',
   'scripts/owned-synthetic-http-suite.test.mjs',
