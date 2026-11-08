@@ -17,9 +17,7 @@ import {
     rememberLockedCiphertext,
     takeLockedCiphertext,
 } from './locked-field-guard';
-import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } from './patient-concurrency';
-import type { EntryVersionConflictPayload } from './entry-concurrency';
-import type { CheckupVersionConflictPayload } from './checkup-concurrency';
+import type { PatientVersionConflictPayload } from './patient-concurrency';
 import { isVersionConflictPayload, type VersionConflictPayload } from './version-concurrency';
 import { revivePatientStructuredFields } from './patient-structured-fields';
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
@@ -40,19 +38,10 @@ export class ApiWriteRejectedError extends Error {
 
 export type ApiVersionConflictPayload =
     | PatientVersionConflictPayload
-    | EntryVersionConflictPayload
-    | CheckupVersionConflictPayload
     | VersionConflictPayload;
 
 function isApiVersionConflictPayload(value: unknown): value is ApiVersionConflictPayload {
-    if (isPatientVersionConflictPayload(value)) return true;
-    if (isVersionConflictPayload(value)) return true;
-    if (!value || typeof value !== 'object') return false;
-
-    const payload = value as Record<string, unknown>;
-    return payload.code === 'VERSION_CONFLICT'
-        && (payload.entity === 'entry' || payload.entity === 'checkup')
-        && typeof payload.recordId === 'string';
+    return isVersionConflictPayload(value);
 }
 // Historical document insight persisted from local extraction and review-only synthesis
 export type DocumentQualityLevel = 'green' | 'yellow' | 'red';

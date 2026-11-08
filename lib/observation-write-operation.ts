@@ -5,7 +5,7 @@ import { dbServer } from './db-server';
 import { activePatients } from './patient-lifecycle';
 import { writeAuditEventInTransaction, type RequiredAuditContext } from './security/audit';
 import { observations, patients, patientsToAmbulatories, servicePrescriptionItems } from './schema';
-import { buildObservationVersionConflictPayload } from './observation-concurrency';
+import { buildVersionConflictPayload } from './version-concurrency';
 
 type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 type Mode = 'web' | 'v1' | 'network';
@@ -90,7 +90,7 @@ export function updateObservationOperation(input: UpdateInput): Result {
             if (linkError) return linkError;
         }
         if (existing.version !== input.expectedVersion) return { status: 409,
-            value: buildObservationVersionConflictPayload(input.expectedVersion, input.observationId, existing) as unknown as Record<string, unknown> };
+            value: buildVersionConflictPayload('observation', input.expectedVersion, input.observationId, existing) as unknown as Record<string, unknown> };
 
         const changed = tx.update(observations).set({ ...input.values, version: input.expectedVersion + 1 })
             .where(and(eq(observations.id, input.observationId), eq(observations.patientId, existing.patientId),
