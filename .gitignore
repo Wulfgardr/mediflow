@@ -103,3 +103,7 @@ docs/private/
 
 # Build effimera della qualifica visiva locale
 .next-visual-*/
+
+# Le catture PNG di docs/analysis pesavano 54 MB in ogni checkout e worktree.
+# Restano nella storia (docs/analysis/CATTURE.md); le nuove vanno nella PR.
+docs/analysis/**/*.png
