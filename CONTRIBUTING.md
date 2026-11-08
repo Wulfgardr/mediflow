@@ -261,9 +261,7 @@ devono rispettare i limiti previsti e arrestarsi quando i requisiti mancano,
 senza percorsi alternativi impliciti; le route legacy autenticate restano
 `410`. AnyDoc non è un provider né una sede di esecuzione Fabric.
 
-Il controllo preliminare DeepSeek-OCR 2 usa un raccordo simulato e non va
-presentato come adapter runtime, esecuzione reale o prova di disponibilità.
-Per una futura promozione servono adapter, benchmark sintetico italiano,
+DeepSeek-OCR 2 non è nel codice. Per una futura promozione servono adapter, benchmark sintetico italiano,
 soglie dichiarate ed E2E, con provenienza, hash e qualità per pagina,
 senza alcun invio implicito all'esterno.
 

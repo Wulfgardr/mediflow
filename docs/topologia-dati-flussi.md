@@ -369,9 +369,8 @@ cambia il limite di Document Synthesis, la cui publication dichiara
 `writesPerformed=0` e `applyPolicy=none`.
 
 Le route legacy `/api/ocr/extract` e `/api/pdf-extract` acquisiscono la sessione
-prima di restituire `410`. Il runtime adapter DeepSeek-OCR 2 non è integrato:
-per quel percorso il tree non contiene esecuzioni live, prove E2E o benchmark
-di promozione. Un'eventuale promozione deve conservare provenienza, hash e
+prima di restituire `410`. DeepSeek-OCR 2 non è nel codice: adapter e preflight
+simulati sono stati rimossi senza essere mai stati integrati. Un'eventuale promozione deve conservare provenienza, hash e
 qualità per pagina e superare un benchmark sintetico italiano con soglie
 fissate. Restano vietati uscita implicita verso il cloud e scritture.
 
@@ -620,9 +619,8 @@ documentati in [SECURITY.md](../SECURITY.md).
 - Controllo token locale: `lib/local-api-auth.ts`, `lib/local-api-token.ts`
 - Proxy TLS locale: `scripts/local-api-tls-proxy.mjs`
 - AnyDoc e source authority: `lib/domain/documents/anydoc-current-source-composition.ts`, `lib/domain/documents/anydoc-local-extraction-runner.ts`
-- Core OCR selettivo: `lib/domain/documents/anydoc-page-manifest.ts`, `lib/domain/documents/anydoc-pdf-page-materializer.ts`, `lib/domain/documents/anydoc-pdf-page-renderer.ts`, `lib/domain/documents/deepseek-ocr2-runtime-preflight.ts`
+- Core OCR selettivo: `lib/domain/documents/anydoc-page-manifest.ts`, `lib/domain/documents/anydoc-pdf-page-materializer.ts`, `lib/domain/documents/anydoc-pdf-page-renderer.ts`
 - Catalogo e production root Fabric: `lib/ai-providers/fabric/generative-catalog.ts`, `lib/ai-providers/fabric/*production*`
-- Selector Fabric: `lib/ai-providers/fabric/guided-setup.ts`, `lib/ai-providers/fabric/capability-binding-store.ts`
 - Provider ufficiali default OFF: `lib/ai-providers/v2/*official-transport.ts`, `lib/ai-providers/v2/document-synthesis-cloud-probe-composition.ts`
 - Headless/AIP/MCP/Mini: `packages/aip/`, `packages/mcp/`, `packages/mini/`, `scripts/intelligent-host-mcp-stdio.mjs`
 - Crosswalk dei quattro percorsi: `docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json`
@@ -645,8 +643,6 @@ documentati in [SECURITY.md](../SECURITY.md).
   `writesPerformed=0`; receipt e provenienza non concedono authority.
 - AnyDoc legge soltanto l'allegato corrente. Solo le pagine `needsOcr`
   raggiungono la pipeline bounded; le route OCR legacy restano terminali `410`.
-- Il preflight DeepSeek usa un fake seam. Non deve apparire come runtime
-  adapter, fallback pronto o prova di qualifica.
 - Gli adapter OpenAI/Anthropic restano `default OFF`. Registry e probe non sono
   credenziali, consenso egress o readiness cloud.
 - MCP raggiunge soltanto Application Services nominati tramite RPC AIP
