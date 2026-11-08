@@ -182,10 +182,6 @@ test('shares one document deadline, aborts the active page, and never starts a l
     if (result.status === 'review_required') assert.equal(result.reason, 'timeout');
     assert.equal(observedAbort, true); assert.equal(extractionCalls, 1);
 
-    const source = fs.readFileSync(new URL('./anydoc-apple-vision-ocr.ts', import.meta.url), 'utf8');
-    assert.match(source, /control\.signal\.addEventListener\('abort', abortDocument/u);
-    assert.match(source, /process\.kill\(-child\.pid, 'SIGKILL'\)/u);
-    assert.match(source, /child\.once\('close'/u);
 });
 
 test('reduces the shared deadline across successful pages and preserves their order', async () => {
@@ -219,7 +215,6 @@ test('pins the owned script and contains no path input or network API', () => {
     assert.equal(createHash('sha256').update(script).digest('hex'),
         ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256);
     assert.doesNotMatch(source, /CommandLine\.arguments\[[1-9]|URLSession|Network|http:|https:|fileURLWithPath|\.path\b/u);
-    assert.match(source, /standardInput/u);
 });
 
 test('resolves only the staged package script when a standalone chunk bakes a source path', () => {

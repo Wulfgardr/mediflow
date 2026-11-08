@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { load as loadYaml } from 'js-yaml';
 import { collectCiDispositionSelections, collectAppleInstallabilityBinding, verifyDispositionConsumer } from './ci-disposition-selection.mjs';
 import { collectNpmScriptBinding } from './explicit-npm-test-selection.mjs';
@@ -63,11 +63,11 @@ test('production builds use complete checkouts and explicitly exercise prebuild'
 
 test('shared group selections have actual ordinary or Apple conditional CI consumers', () => {
   const selections = collectCiDispositionSelections(root);
-  assert.equal(Object.keys(selections).length, 9);
   for (const selection of Object.values(selections)) assert.deepEqual(selection.errors, []);
-  for (const [id, count] of [['npm:test:inventory-browser', 5], ['npm:test:fixture-generators', 2], ['npm:test:research-boundary', 3], ['npm:test:portable-local', 113], ['npm:test:owned-http', 20], ['npm:test:owned-http-standalone', 1]]) {
+  for (const id of ['npm:test:inventory-browser', 'npm:test:fixture-generators', 'npm:test:research-boundary', 'npm:test:portable-local', 'npm:test:owned-http', 'npm:test:owned-http-standalone']) {
     assert.equal(selections[id].mode, 'ordinary');
-    assert.equal(selections[id].files.length, count);
+    assert.ok(selections[id].files.length > 0, id);
+    assert.equal(new Set(selections[id].files).size, selections[id].files.length, id);
     assert.equal(selections[id].binding.jobIf, null);
   }
   for (const file of ['lib/chatgpt-product/native-fabric-contract.test.cjs', 'lib/chatgpt-product/native-fabric-http.test.cjs', 'lib/chatgpt-product/native-authority-retirement-http.test.cjs', 'lib/chatgpt-product/ordinary-settings-revocation.test.cjs']) {

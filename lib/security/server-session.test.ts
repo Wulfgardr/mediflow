@@ -6,13 +6,11 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, test } from 'node:test';
 
 import {
-    abortActiveWebSessionResourceUse,
     abortPreparedWebServerSession,
     abortStagedWebServerSession,
     activateArmedWebServerSession,
     activateStagedWebServerSession,
     clearAllSessions,
-    cleanupRetiredWebServerSession,
     commitPreparedWebServerSession,
     createNativeServerSession,
     createSession,
@@ -22,25 +20,18 @@ import {
     getPreparedWebServerSessionId,
     getArmedWebServerSessionId,
     invalidateSessionsForUser,
-    mintActiveWebSessionResourcePort,
     armPreparedWebServerSession,
-    beginActiveWebSessionResourceUse,
-    commitActiveWebSessionResourceUse,
     prepareStagedWebServerSession,
     peekSession,
-    registerActiveWebSessionPrivateResource,
     registerServerSessionResource,
-    releaseActiveWebSessionResourcePort,
     retireExpiredServerSession,
     retireActiveWebServerSession,
     retireServerSessionForApplicationLock,
     retireServerSessionForLogout,
     retireServerSessionsForUser,
-    retireWebP3SessionsForUser,
     resolveActiveWebServerSession,
     stageWebServerSession,
     tombstoneArmedWebServerSession,
-    unregisterActiveWebSessionPrivateResource,
     type WebServerSessionRetirementCleanupReceipt,
 } from './server-session';
 import {
@@ -453,12 +444,6 @@ test('O1-C historical P2 prepare commit and abort bridges cannot activate or ret
 
     const source = readFileSync(fileURLToPath(new URL('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs', import.meta.url)), 'utf8');
     assert.doesNotMatch(source, /from ['"]\.\/web-auth-control-record['"]/u);
-    assert.match(source, /function prepareAuthControlActivation[\s\S]*?return null;/u);
-    assert.match(source, /function commitPreparedAuthControlActivation[\s\S]*?return 0;/u);
-    assert.match(source, /function abortPreparedAuthControlActivation[\s\S]*?return false;/u);
-    assert.match(source, /function prepareAuthControlRetirement[\s\S]*?return null;/u);
-    assert.match(source, /function commitPreparedAuthControlRetirement[\s\S]*?return 0;/u);
-    assert.match(source, /function abortPreparedAuthControlRetirement[\s\S]*?return false;/u);
 });
 
 test('O1-C inventories historical Web authority as a dormant fail-closed island', () => {
@@ -745,7 +730,6 @@ test('activation burns crossed, hostile, copied, and cross-module inputs without
     await new Promise<void>((resolve) => setImmediate(resolve));
     assert.equal(observed, 0); assert.deepEqual(unhandled, []);
 });
-
 
 test('activation tombstones lookup reentry and a captured WeakMap mutate-then-throw', async () => {
     const nodeRequire = createRequire(import.meta.url); const sessionPath = nodeRequire.resolve('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs');

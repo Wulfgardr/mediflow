@@ -35,6 +35,21 @@ il commit di implementazione d72bea412. Il gate completo riesegue anche TLC,
 che non dimostra la correttezza della nuova attribuzione del diario: questa
 è verificata dai test API, del componente e dello standalone Web.
 
+## Raccordo dell'8 novembre 2026: conflitti di versione e import inutilizzati
+
+`lib/therapy-write-operation.ts` costruisce la risposta 409 con il
+costruttore generico di `lib/version-concurrency.ts`, che produce la stessa
+istantanea (id, paziente, versione, aggiornamento, eliminazione) della copia
+per le terapie, ora rimossa. `lib/db.ts` riconosce i conflitti di versione con
+il solo controllo generico, che copre già paziente, voci e controlli.
+`components/therapy-manager.tsx` perde un import di tipo inutilizzato.
+
+Le transizioni delle terapie, le autorità di commit, i comandi e le ricevute
+non cambiano. Modello, statechart, invarianti, testimoni e mutanti restano
+invariati. I digest sono aggiornati dopo i test delle terapie, del client API
+e delle scritture HTTP con conflitto; `syncCommit` indica il commit di
+implementazione 1c582ba21 e il gate completo riesegue TLC.
+
 ## Raccordo dell'8 novembre 2026: tabelle di review durevole e SOAP headless
 
 Lo schema corrente passa da 10 a 11 in `lib/sqlite-schema-open.ts`.

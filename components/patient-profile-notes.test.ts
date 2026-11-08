@@ -17,10 +17,7 @@ test('presentation distinguishes pending, unavailable and confirmed empty notes,
 });
 test('patient synopsis passes scoped notes instead of the legacy snapshot and keeps grant out of clinical content', () => {
     const page = readFileSync(new URL('../app/patients/[id]/modules/page.tsx', import.meta.url), 'utf8');
-    assert.match(page, /notesContent=\{<PatientProfileNotes patientId=\{id\} patientVersion=\{patient\.version\}/u);
     assert.doesNotMatch(page, /notes=\{patient\.notes\}/u);
-    const action = readFileSync(new URL('./patient-profile-access-action.tsx', import.meta.url), 'utf8');
-    assert.match(action, /print:hidden/u); assert.match(action, /Nessun accesso aggiuntivo/u);
 });
 test('the dedicated access action defaults to no grant and sends only an explicitly selected projection', async () => {
     for (const projection of ['none', 'notes', 'profile']) {

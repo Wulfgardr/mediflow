@@ -30,12 +30,6 @@ export function parseExpectedVersion(value: unknown): number | null {
     return parseCanonicalExpectedVersion(value);
 }
 
-export function isPatientVersionConflictPayload(value: unknown): value is PatientVersionConflictPayload {
-    if (!value || typeof value !== 'object') return false;
-    const payload = value as Partial<PatientVersionConflictPayload>;
-    return payload.code === 'VERSION_CONFLICT' && payload.entity === 'patient' && typeof payload.recordId === 'string';
-}
-
 export function buildPatientVersionConflictPayload(
     expectedVersion: number,
     recordId: string,

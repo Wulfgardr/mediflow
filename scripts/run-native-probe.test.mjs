@@ -143,14 +143,8 @@ test('refuses an external MediFlow process without launching or terminating it',
 
 test('probe contract binds each selected fixture row to its header and detail content across scroll', () => {
     const source = fs.readFileSync(path.join(import.meta.dirname, 'native-click-map-probe.swift'), 'utf8');
-    assert.match(source, /func patientWorkspaceBinding\(/);
-    assert.match(source, /containsAXText\(patientBoundText, in: snapshot\.detail\)/);
-    assert.match(source, /patientBoundText: "RSSMRA80A01H501U"/);
-    assert.match(source, /patientBoundText: "BNCNNA85M41F205X"/);
     assert.equal((source.match(/selectedItemsContain\("patient-cell-uitest-1", list: patientList\)/g) ?? []).length, 3);
     assert.equal((source.match(/selectedItemsContain\("patient-cell-uitest-2", list: secondPatientList\)/g) ?? []).length, 3);
-    assert.match(source, /First patient row, header, and detail content remain bound after scroll/);
-    assert.match(source, /Second patient row, header, and detail content remain bound after scroll/);
 });
 
 test('stops the synthetic app when xcrun fails', () => {

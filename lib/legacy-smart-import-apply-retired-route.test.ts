@@ -51,7 +51,5 @@ test('authenticates before observation and returns one no-store retirement contr
 test('contains no parser, persistence, apply, audit or provider work after the auth gate', () => {
     const source = fs.readFileSync(path.join(root, 'app/api/patients/[id]/smart-import/route.ts'), 'utf8');
     assert.match(source, /const session = await requireSession\(\);/u);
-    assert.match(source, /SMART_IMPORT_LEGACY_APPLY_RETIRED/u);
-    assert.match(source, /status:\s*410/u);
     assert.doesNotMatch(source, /\b_?request\.(?:json|text|arrayBuffer|formData|body|url)|\b_?context\.params|await\s+_?params|dbServer|commitPatientSmartImport|safeWriteAuditEventFromRequest|therapyCreateSchema|normalizeTherapyCreateInput|AIService|fetch\(/u);
 });

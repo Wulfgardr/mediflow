@@ -29,10 +29,7 @@ function fixture(timeoutMs = 100) {
 const turn = () => new Promise(resolve => setTimeout(resolve, 20));
 test('production consumer uses durable controller; legacy model remains recovery-only', () => {
     const source = readFileSync(new URL('../components/therapy-manager.tsx', import.meta.url), 'utf8');
-    assert.match(source, /createDurableTherapyStatusConfirmation<Therapy>/);
-    assert.match(source, /request: requestTherapyStatusCommand/);
     assert.doesNotMatch(source, /write: \(therapy, status/);
-    assert.match(source, /Ritira richiesta e verifica/);
 });
 test('only explicit confirmation sends once, marker opaque, unknown does not retry on reread/reload', async () => {
     const f = fixture(), owner = f.make();

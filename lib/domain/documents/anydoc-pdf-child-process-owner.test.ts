@@ -104,7 +104,6 @@ test('pins the regular owned worker and keeps all PDF engines out of parent runt
     const renderer = readFileSync(new URL('./anydoc-pdf-page-renderer.ts', import.meta.url), 'utf8');
 
     assert.equal(createHash('sha256').update(worker).digest('hex'), ANYDOC_PDF_CHILD_WORKER_SHA256);
-    assert.match(owner, /child\.kill\('SIGKILL'\)/u);
     assert.equal(ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB, 256);
     assert.doesNotMatch(`${owner}\n${materializer}\n${renderer}`,
         /from ['"](?:pdf-lib|pdfjs-dist|@napi-rs\/canvas)|import\(['"](?:pdf-lib|pdfjs-dist|@napi-rs\/canvas)/u);

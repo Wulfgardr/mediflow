@@ -1,6 +1,5 @@
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { readServiceCatalog } from '@/lib/service-prescription-write';
 import { serviceCatalogEntries } from '@/lib/schema';

@@ -548,7 +548,3 @@ export function applyPatientImportDecision(
 
     return nextDefaults;
 }
-
-export function serializePatientImportDecision(decision: PatientImportDecision): string {
-    return JSON.stringify(decision);
-}

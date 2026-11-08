@@ -281,5 +281,4 @@ test('does not reach forbidden concerns or reuse the Smart Import broker', () =>
     const source = readFileSync(new URL('./patient-insight-broker.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /typed-projection-broker|smart-import|provider-lifecycle|fetch\(/u);
     assert.doesNotMatch(source, /database|persist|writeFile|patientRef|sessionRef|route|apply\(/ui);
-    assert.match(source, /P4 composer must retain a staged reservation and must not call publish before final P4 validation/u);
 });

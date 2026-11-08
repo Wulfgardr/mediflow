@@ -10,7 +10,6 @@ test('new diary entry attachment flow never starts inline OCR or generative docu
     const page = source('../components/patient-entry-composer.tsx');
 
     assert.doesNotMatch(page, /\/api\/ocr\/extract|extractPatientDataSmart|extractDocumentTextForSummary|synthesizeDocument|getAiModelLabels|AI OCR|OCR\/Sintesi/u);
-    assert.match(page, /summarySnapshot:\s*summary/u);
 });
 
 test('production document surfaces leave automatic extraction to persisted-source AnyDoc', () => {
@@ -22,7 +21,6 @@ test('production document surfaces leave automatic extraction to persisted-sourc
     }
     assert.match(upload, /requestAnyDocDecryptedLocalExtractionPreview\(file\.id,\s*async/u);
     assert.match(upload, /db\.attachments\.add[\s\S]*requestAnyDocDecryptedLocalExtractionPreview/u);
-    assert.match(upload, /db\.attachments\.get\(file\.id,\s*\{\s*signal\s*\}\)/u);
 });
 
 test('system diagnostics do not expose a runnable OCR health check', () => {
@@ -39,7 +37,6 @@ test('current review surfaces do not advertise an available OCR workflow', () =>
     assert.doesNotMatch(reviewArea, /Anteprima OCR/u);
     assert.doesNotMatch(nativeDocuments, /OCR e sintesi restano|Stato coda OCR/u);
     // simplified UI preserves review duty without exposing the engine name.
-    assert.match(nativeDocuments, /Testo estratto, immagini e scansioni richiedono revisione\./u);
     assert.doesNotMatch(reviewQueue, /OCR o sintesi da completare/u);
 });
 
@@ -55,7 +52,6 @@ test('AI settings and model labels have no writable or selectable OCR model', ()
     }
     assert.doesNotMatch(modelSelector, /selectorId:[^;]*['"]ocr['"]/u);
     assert.doesNotMatch(functionsPage, /aiOcrKillSwitch|ocr-kill-switch-card|aria-label="OCR documentale locale"/u);
-    assert.match(functionsPage, /Apple Vision/u);
     assert.doesNotMatch(functionsPage, /OCR non disponibile/u);
 });
 

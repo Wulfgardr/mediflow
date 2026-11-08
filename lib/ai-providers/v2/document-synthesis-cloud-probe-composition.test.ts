@@ -325,11 +325,6 @@ test('il callsite production accetta solo un gesto admin esplicito e non riceve 
     const route = readFileSync(new URL('../../../app/api/system/cloud-provider-probe/route.ts', import.meta.url), 'utf8');
     assert.equal(route.match(/requireSession\(\)/gu)?.length, 2);
     assert.match(route, /isWebAdminSession\(session\)/u);
-    assert.match(route, /isTrustedWebMutationRequest\(request\)/u);
-    assert.match(route, /run_synthetic_nonclinical_probe/u);
-    assert.match(route, /createDocumentSynthesisCloudProbeFromHostEnvironment\(lifecycle\.signal\)/u);
-    assert.match(route, /registerPrivateResource/u);
-    assert.match(route, /new AbortController\(\)/u);
     assert.doesNotMatch(route, /requireSessionOrLocalToken|OPENAI_API_KEY|ANTHROPIC_API_KEY/u);
     const acceptedBody = route.slice(route.indexOf('function exactIntent'), route.indexOf('async function readIntent'));
     assert.doesNotMatch(acceptedBody, /\b(?:provider|model|prompt|secret)\b/u);

@@ -5,7 +5,7 @@ import { dbServer } from './db-server';
 import { activePatients } from './patient-lifecycle';
 import { writeAuditEventInTransaction, type RequiredAuditContext } from './security/audit';
 import { checkups, patients, patientsToAmbulatories } from './schema';
-import { buildCheckupVersionConflictPayload } from './checkup-concurrency';
+import { buildVersionConflictPayload } from './version-concurrency';
 import { isCheckupTransitionAllowed, statusTransitionDenial } from './clinical-status-transitions';
 import { parseCheckupStatus } from './status-normalization';
 
@@ -79,10 +79,10 @@ export function updateCheckupOperation(input: UpdateInput): Result {
         if (!existing) return { status: 404, value: { error: 'Not found' } };
         if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
         if (existing.version !== input.expectedVersion) return { status: 409,
-            value: buildCheckupVersionConflictPayload(input.expectedVersion, input.checkupId, existing) as unknown as Record<string, unknown> };
+            value: buildVersionConflictPayload('checkup', input.expectedVersion, input.checkupId, existing) as unknown as Record<string, unknown> };
 
         if (existing.version >= Number.MAX_SAFE_INTEGER) return { status: 409,
-            value: buildCheckupVersionConflictPayload(input.expectedVersion, input.checkupId, existing) as unknown as Record<string, unknown> };
+            value: buildVersionConflictPayload('checkup', input.expectedVersion, input.checkupId, existing) as unknown as Record<string, unknown> };
         // Gli alias salvati (done, canceled) valgono come il loro stato canonico.
         const savedStatus = parseCheckupStatus(existing.status) ?? existing.status ?? '';
         if (typeof input.values.status === 'string' && !isCheckupTransitionAllowed(savedStatus, input.values.status)) {

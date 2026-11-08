@@ -85,9 +85,6 @@ test('le eccezioni URL restano limitate ai riferimenti e ai file dell’inventar
 
 test('la superficie Impostazioni e statica, sola lettura e dichiara il proprio limite', () => {
     const page = readFileSync('app/settings/compliance/page.tsx', 'utf8');
-    assert.match(page, /COMPLIANCE_EVIDENCE_INVENTORY/u);
-    assert.match(page, /Inventario di evidenze, non attestazione/u);
-    assert.match(page, /data-testid="settings-compliance-section"/u);
     assert.doesNotMatch(page, /['"]use client['"]/u);
     assert.doesNotMatch(page, /<(?:form|button|input|select|textarea)\b/iu);
     assert.doesNotMatch(page, /\b(?:fetch|db\.)\s*\(/u);

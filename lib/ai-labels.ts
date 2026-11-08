@@ -35,17 +35,6 @@ export function qualityLabel(value: string | undefined | null): string {
         default: return fallbackLabel(value);
     }
 }
-
-/** Tipo di aggancio di una terapia al catalogo AIFA: catalog | manual | none. */
-export function matchTypeLabel(value: string | undefined | null): string {
-    switch (fallbackLabel(value).toLowerCase()) {
-        case 'catalog': return 'match AIFA';
-        case 'manual': return 'manuale';
-        case 'none': return 'senza match';
-        default: return fallbackLabel(value);
-    }
-}
-
 const DOCUMENT_CLASS_LABELS: Record<string, string> = {
     identity_document: 'Documento di identita',
     medication_prescription: 'Prescrizione farmaco',

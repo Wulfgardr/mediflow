@@ -1,4 +1,4 @@
-import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -154,7 +154,6 @@ test('duplicate: malformed envelope, invalid identifiers and oversized body fail
     assert.deepEqual(snapshot(), before);
 });
 
-
 test('duplicate: consumed intent rejects exact replay without effects', async () => {
     reset();
     const body = JSON.stringify(payload());
@@ -163,7 +162,6 @@ test('duplicate: consumed intent rejects exact replay without effects', async ()
     assert.equal((await request(body)).status, 409);
     assert.deepEqual(snapshot(), before);
 });
-
 
 test('duplicate: stale member and wrong source reject the entire batch without consuming intent', async () => {
     reset();

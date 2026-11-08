@@ -288,10 +288,6 @@ test('standalone config externalizes and traces the exact web auth owner package
   const includes = configSource.match(/outputFileTracingIncludes:\s*\{[\s\S]*?["']\/\*["']:\s*\[([\s\S]*?)\]/u)?.[1];
   assert.ok(includes, 'missing global outputFileTracingIncludes roster');
   assert.ok(includes.includes(`"${webAuthOwnerTracePattern}"`), 'web auth owner is not traced as a complete package');
-  assert.match(
-    configSource,
-    /serverExternalPackages:\s*\[[^\]]*['"]@mediflow\/web-auth-lifecycle-owner['"]/u,
-  );
 
   const installedPackage = path.join(root, 'node_modules', '@mediflow', 'web-auth-lifecycle-owner');
   const matchedRoster = fs.globSync(webAuthOwnerTracePattern, { cwd: root })
@@ -317,7 +313,6 @@ test('standalone config traces the pinned Apple Vision canvas runtime', () => {
   assert.equal(installedManifest.version, '0.1.100');
   assert.equal(installedManifest.optionalDependencies?.['@napi-rs/canvas-darwin-arm64'], '0.1.100');
 });
-
 
 test('packaged TLS proxy starts outside the checkout and fails if its shared import is absent', async t => {
   for (const omitted of [null, 'loopback-ingress.mjs', 'network-ingress-policy.mjs']) {

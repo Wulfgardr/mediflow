@@ -12,7 +12,6 @@ import { PrivacyProvider } from '@/components/privacy-provider';
 import { SecurityProvider } from '@/components/security-provider';
 import { ThemeProvider } from '@/components/theme-provider';
 import { UIAccessibilityProvider } from '@/components/ui-accessibility-provider';
-import { UIStyleProvider } from '@/components/ui-style-provider';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { ToastProvider } from '@/components/ui/toast-provider';
 
@@ -45,15 +44,13 @@ export function RootRuntimeShell({
           <LocalUiRuntimeLease />
           <PluginLocalUiPairing />
           <UIAccessibilityProvider>
-            <UIStyleProvider>
-              <PrivacyProvider>
-                <ToastProvider>
-                  <ConfirmProvider>
-                    <main className="relative z-10 min-h-screen"><RuntimeTwinWorkspace>{children}</RuntimeTwinWorkspace></main>
-                  </ConfirmProvider>
-                </ToastProvider>
-              </PrivacyProvider>
-            </UIStyleProvider>
+            <PrivacyProvider>
+              <ToastProvider>
+                <ConfirmProvider>
+                  <main className="relative z-10 min-h-screen"><RuntimeTwinWorkspace>{children}</RuntimeTwinWorkspace></main>
+                </ConfirmProvider>
+              </ToastProvider>
+            </PrivacyProvider>
           </UIAccessibilityProvider>
         </SecurityProvider>
       </ThemeProvider>

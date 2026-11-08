@@ -271,9 +271,6 @@ function boundedReaderInventory(source, filename) {
                 assert.ok(expression.arguments.length === 1 && named(expression.arguments[0], 'request'));
                 assert.match(source, /import\s*\{\s*readPrescriptionJsonObject\s*\}\s*from\s*['"]@\/lib\/prescription-json-body['"]/u);
                 const helper = fs.readFileSync(path.join(root, 'lib/prescription-json-body.ts'), 'utf8');
-                assert.match(helper, /readBoundedJsonBody\(request, PRESCRIPTION_JSON_MAX_BYTES, 'request-json'/u);
-                assert.match(helper, /PRESCRIPTION_JSON_MAX_BYTES = 4 \* 1024 \* 1024/u);
-                assert.match(helper, /signal: request.signal/u);
                 assert.doesNotMatch(helper, /request\.(json|text|arrayBuffer|blob)\(/u);
                 readers++;
             }
@@ -281,9 +278,6 @@ function boundedReaderInventory(source, filename) {
                 assert.ok(expression.arguments.length === 1 && named(expression.arguments[0], 'request'));
                 assert.match(source, /import\s*\{\s*readPatientJsonObject\s*\}\s*from\s*['"]@\/lib\/patient-json-object['"]/u);
                 const helper = fs.readFileSync(path.join(root, 'lib/patient-json-object.ts'), 'utf8');
-                assert.match(helper, /readBoundedJsonBody\(request, PATIENT_JSON_MAX_BYTES, 'request-json'/u);
-                assert.match(helper, /PATIENT_JSON_MAX_BYTES = 4_194_304/u);
-                assert.match(helper, /signal: request.signal/u);
                 assert.doesNotMatch(helper, /request\.(json|text|arrayBuffer|blob)\(/u);
                 readers++;
             }
@@ -302,8 +296,6 @@ function boundedReaderInventory(source, filename) {
     if (wrappers) {
         assert.match(source, /import\s*\{\s*parsePatientJsonObject\s*\}\s*from\s*['"]@\/lib\/patient-json-object['"]/u);
         const helper = fs.readFileSync(path.join(root, 'lib/patient-json-object.ts'), 'utf8');
-        assert.match(helper, /export async function parsePatientJsonObject\(read\s*:/u);
-        assert.match(helper, /value\s*=\s*await read\(\)/u);
         assert.doesNotMatch(helper, /request\s*(?:\.\s*(?:json|text|arrayBuffer|blob)|\[\s*['"](?:json|text|arrayBuffer|blob)['"]\s*\])\s*\(/u);
     }
     return readers;

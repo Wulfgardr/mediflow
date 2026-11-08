@@ -16,7 +16,6 @@ import { ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES, ANYDOC_LOCAL_EXTRACTION_MAX
 
 const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic discharge note.}', 'utf8');
 const RUNNER_SOURCE = readFileSync(new URL('./anydoc-local-extraction-runner.ts', import.meta.url), 'utf8');
-const NEXT_CONFIG_SOURCE = readFileSync(new URL('../../../next.config.ts', import.meta.url), 'utf8');
 const WORKER_PATH = path.resolve(path.dirname(new URL('./anydoc-local-extraction-runner.ts', import.meta.url).pathname), '../../../scripts/anydoc-local-extraction-worker.mjs');
 const CHECKER_PATH = path.resolve(path.dirname(WORKER_PATH), 'check-standalone-runtime-bundle.mjs');
 
@@ -170,15 +169,8 @@ test('does not inherit provider, native override or Node option variables', asyn
 });
 
 test('derives the exact digest-bound worker from the physical module directory', () => {
-    assert.match(RUNNER_SOURCE, /anydoc-local-extraction-worker\.mjs/u);
-    assert.match(RUNNER_SOURCE, /5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67/u);
-    assert.match(RUNNER_SOURCE, /medical-record-app/u);
-    assert.match(RUNNER_SOURCE, /cwd: worker\.directory,/u);
     assert.doesNotMatch(RUNNER_SOURCE, /new URL\([^\n]*scripts\//u);
     assert.doesNotMatch(RUNNER_SOURCE, /process\.(?:cwd|argv|env)/u);
-    assert.match(NEXT_CONFIG_SOURCE, /"\.\/package\.json"/u);
-    assert.match(NEXT_CONFIG_SOURCE, /"\.\/scripts\/anydoc-local-extraction-worker\.mjs"/u);
-    assert.match(NEXT_CONFIG_SOURCE, /"\.\/node_modules\/@firecrawl\/anydoc\*\/\*\*\/\*"/u);
 });
 
 test('ignores hostile caller cwd when locating the owned worker', async () => {

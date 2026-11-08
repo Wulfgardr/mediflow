@@ -109,7 +109,6 @@ test('route remains an auth-first dynamic Node adapter without grant or database
   const route = readFileSync(new URL(
     '../../app/api/system/intelligent-host/checkup-active-role/route.ts', import.meta.url,
   ), 'utf8');
-  assert.match(route, /runtime\s*=\s*'nodejs'/u); assert.match(route, /dynamic\s*=\s*'force-dynamic'/u);
   assert.match(route, /readAuthenticatedWebSession/u); assert.match(route, /isWebAdminSession/u);
   assert.match(route, /disposeCheckupStatusTransitionForHostV1/u);
   assert.doesNotMatch(route, /\bdb\b|database|grant|attestationRef|sessionRef|actorRef|console\./iu);

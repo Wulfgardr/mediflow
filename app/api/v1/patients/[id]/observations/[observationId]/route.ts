@@ -17,22 +17,6 @@ function toIsoString(value: unknown): string | null {
     const date = value instanceof Date ? value : new Date(value as string | number);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
-
-// WUL-308: PHI-safe snapshot for the 409 version-conflict payload.
-async function selectObservationConflictSnapshot(patientId: string, observationId: string) {
-    return await dbServer
-        .select({
-            id: observations.id,
-            patientId: observations.patientId,
-            version: observations.version,
-            updatedAt: observations.updatedAt,
-            deletedAt: observations.deletedAt,
-        })
-        .from(observations)
-        .where(and(eq(observations.id, observationId), eq(observations.patientId, patientId)))
-        .get() ?? null;
-}
-
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string; observationId: string }> },

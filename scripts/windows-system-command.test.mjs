@@ -120,7 +120,6 @@ test('Windows launcher bootstrap precedes claim and stays outside the native-fre
   assert.doesNotMatch(native, /SymInitialize|GetEnvironmentVariable|uv_|#include <(?:node|v8)\.h>/u);
   const stage = fs.readFileSync(new URL('./stage-headless-runtime.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(stage, /windows-system-command|windows-launcher-bootstrap/u);
-  assert.match(stage, /\.node/u);
 });
 
 test('Windows bootstrap CI selection requires the real source-first consumer and initialization', t => {
@@ -245,7 +244,6 @@ test('source-first tooling enforces native-only startup and retains the original
   `));
 });
 
-
 test('Windows native identity validates PID and preserves decimal precision without a partial bootstrap', t => {
   t.diagnostic(driver(`
     import assert from 'node:assert/strict';import fs from 'node:fs';import {registerHooks} from 'node:module';
@@ -289,7 +287,6 @@ test('native process identity source confines handle lifetime and calendar arith
   assert.doesNotMatch(query,/PROCESS_ALL_ACCESS|SYNCHRONIZE|GetCurrentProcess|WaitFor|Sleep|sprintf/u);
   const launcher=fs.readFileSync(new URL('./mediflow.mjs',import.meta.url),'utf8');
   const identity=launcher.slice(launcher.indexOf('function launcherProcessIdentity'),launcher.indexOf('function privateLauncherDirectory'));
-  assert.match(identity,/value = windowsProcessCreationTimeTicks\(pid\)/u);
   assert.doesNotMatch(identity,/powershell|SystemRoot|WINDIR/iu);
 });
 

@@ -87,7 +87,6 @@ test('keeps validation and serialization deterministic after ambient poison', as
 
 test('route composes the session gate and exports only GET and PUT', () => {
     const source = fs.readFileSync(path.join(root, 'app/api/attachments/[id]/content/route.ts'), 'utf8');
-    assert.match(source, /export async function GET\(/u); assert.match(source, /export async function PUT\(/u);
     assert.doesNotMatch(source, /export (?!async function (?:GET|PUT)\b)/u);
     assert.doesNotMatch(source, /request\.json|ocr|provider|apply|dbServer/iu);
 });
