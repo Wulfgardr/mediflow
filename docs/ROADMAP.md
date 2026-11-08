@@ -15,6 +15,33 @@ read_when:
 
 > [!NOTE]
 
+## Rotta vigente, 8 novembre 2026
+
+[ADR 0185](./adr/0185-rotta-di-mediflow.md) sostituisce la sequenza di tappe del 21 settembre come piano
+di consegna. In breve:
+
+- **Il centro.** MediFlow è la cartella dei pazienti che il sistema non vede, fatta per il lavoro
+  territoriale del suo autore ed aperta a chi fa lo stesso lavoro altrove. Resta un laboratorio
+  intelligente: dati e percorsi sempre operabili da agenti.
+- **La 0.9.1 si chiude a contratto intero** ([emendamento dell'8 novembre](./releases/0.9.1-contract.md)).
+- **Poi giri di due settimane**, ciascuno con un solo risultato d'uso e una sessione fissa di
+  accettazione. Il numero di versione si assegna all'uscita.
+- **Primo giro: registrare in fretta,** con l'import dossier (lazy import) al centro. I giri successivi
+  candidati sono:
+  1. paziente senza codici;
+  2. presa in carico e passaggio al medico di famiglia;
+  3. traccia delle vaccinazioni;
+  4. condizioni sociali, presenti e lingua;
+  5. documenti senza fatica;
+  6. terapia, cosa è cambiato;
+  7. installazione per altri.
+- **Superfici principali:** Web sul Mac ed app Apple. GPUI, Rust, distribuzione completa, FHIR avanzato
+  e piloti regionali stanno all'orizzonte, senza data.
+- **Linear** è la casa delle idee e dello sviluppo: un quaderno delle idee senza versione, l'orizzonte in
+  ordine, il giro in corso.
+
+La tabella che segue resta come cronologia della decisione del 21 settembre.
+
 ## Roadmap vigente — 21 settembre 2026
 
 Il [registro incrementale su Linear](https://linear.app/wulfgardr/document/mediflow-incremental-release-ledger-090-to-10-ee0392f27b72)
