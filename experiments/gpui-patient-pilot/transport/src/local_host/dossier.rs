@@ -54,6 +54,7 @@ impl DossierImport {
         let version = Command::new(&node)
             .arg("--version")
             .env_clear()
+            .envs(worker_environment())
             .output()
             .map_err(|_| RuntimeError::Transport)?;
         if !version.status.success() || !version.stdout.starts_with(b"v24.") {
@@ -80,6 +81,7 @@ impl DossierImport {
             ))
             .arg(&script)
             .env_clear()
+            .envs(worker_environment())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -535,6 +537,22 @@ fn read_channel_line(output: &mut impl BufRead) -> Result<Zeroizing<String>> {
     Ok(line)
 }
 
+/// The worker starts with an empty environment. Windows is the one exception:
+/// Node seeds its CSPRNG through the system crypto provider, which needs
+/// `SystemRoot`; without it Node aborts on `ncrypto::CSPRNG` before running.
+fn worker_environment() -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
+    #[cfg(windows)]
+    {
+        std::env::var_os("SystemRoot")
+            .map(|value| vec![(std::ffi::OsString::from("SystemRoot"), value)])
+            .unwrap_or_default()
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
 fn worker_read_permission(path: &str) -> String {
     if let Some(unc) = path.strip_prefix(r"\\?\UNC\") {
         format!(r"--allow-fs-read=\\{unc}")
@@ -611,6 +629,7 @@ mod tests {
                 .arg(permission)
                 .arg(&canonical)
                 .env_clear()
+                .envs(worker_environment())
                 .output()
                 .unwrap()
         };
