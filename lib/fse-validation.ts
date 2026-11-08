@@ -105,11 +105,6 @@ export async function validateTherapyDocumentWithLookup(
 
     return { errors, warnings };
 }
-
-export async function validateTherapyDocument(payload: TherapyDocumentPayload): Promise<{ errors: FseValidationIssue[]; warnings: FseValidationIssue[] }> {
-    return validateTherapyDocumentWithLookup(payload, hasAtcInCatalog);
-}
-
 export function validateObservationDocument(payload: ObservationDocumentPayload): { errors: FseValidationIssue[]; warnings: FseValidationIssue[] } {
     const errors: FseValidationIssue[] = [];
     const warnings: FseValidationIssue[] = [];

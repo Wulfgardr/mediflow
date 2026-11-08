@@ -296,7 +296,3 @@ export function buildTreatmentReasoningContextBundle(input: TreatmentReasoningCo
         sourceSummary: countByKind(sources),
     };
 }
-
-export function countTreatmentReasoningSources(input: TreatmentReasoningContextInput): TreatmentReasoningSourceSummary {
-    return buildTreatmentReasoningContextBundle(input).sourceSummary;
-}

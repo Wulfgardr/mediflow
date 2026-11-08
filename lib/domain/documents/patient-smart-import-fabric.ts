@@ -163,11 +163,3 @@ export async function executePatientSmartImportFabricPreview<T>(
     const output = await invokeProvider();
     return Object.freeze({ output, metadata });
 }
-
-export function getPatientSmartImportFabricMetadata(
-    result: object,
-): PatientSmartImportFabricMetadata | undefined {
-    return (result as { [PATIENT_SMART_IMPORT_FABRIC_METADATA]?: PatientSmartImportFabricMetadata })[
-        PATIENT_SMART_IMPORT_FABRIC_METADATA
-    ];
-}
