@@ -3,19 +3,20 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema, initializeSqliteSchema } from './sqlite-schema';
+import { initializeSqliteSchema } from './sqlite-schema';
 import { schemaSnapshot, schemaDifferences } from './sqlite-schema-shape';
 import { createVerifiedSqliteSnapshotSync } from './sqlite-repair';
 import { initSqlitePragmas } from './sqlite-pragmas';
-import { upgradeObservationTimestampDefault, upgradeReviewPatientReferenceDefault } from './sqlite-observation-schema-upgrade';
+import { upgradeObservationTimestampDefault } from './sqlite-observation-schema-upgrade';
 import { readSqliteArchiveGeneration } from './archive-generation';
 import { initializeTerritorialPacks } from './territorial-pack-store';
 
 // 1: the first versioned schema (C09). 2: ADR 0143 credentials. 3: archive generation (ADR 0144).
 // 4: fonti protesica, originali e snapshot di provenienza.
+// 11: drop of the durable review and headless SOAP tables, never written by the product.
 // A version is validated without DDL at every start: any change to the canonical
 // schema needs a new number, or the archives already stamped are refused.
-export const CURRENT_SQLITE_SCHEMA_VERSION = 10;
+export const CURRENT_SQLITE_SCHEMA_VERSION = 11;
 // Same values as scripts/native-first-install-contract.json, which the native
 // helper writes; sqlite-schema-open.test.ts reserves with the JSON and opens here.
 const reservation = { applicationId: 1296451154, userVersion: 0 };
@@ -138,8 +139,6 @@ export function openVersionedSqliteDatabase(databasePath: string, openConnection
                 if (version === CURRENT_SQLITE_SCHEMA_VERSION) {
                     // Repeated starts validate without DDL, backfill or another snapshot.
                     assertCanonical(connection, canonical);
-                    // Clinical orphans are tolerated; a role attestation without its actor never is.
-                    if (!checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema(connection)) deny('role attestation without its actor');
                     if (!options.prepareReplacement) initializeTerritorialPacks(connection, 'existing');
                     return;
                 }
@@ -153,7 +152,6 @@ export function openVersionedSqliteDatabase(databasePath: string, openConnection
                 initializeSqliteSchema(connection);
                 if (!fresh) freezeUnattestedBackupHistory(connection);
                 upgradeObservationTimestampDefault(connection, canonical);
-                upgradeReviewPatientReferenceDefault(connection, canonical);
                 assertCanonical(connection, canonical);
                 assertIntegrity(connection);
                 if (foreignKeyViolations(connection) !== violationsBefore) deny('migration changed foreign key violations');

@@ -1,13 +1,8 @@
 import {
     checkHasCanonicalPhysicianReviewAttestationSchema,
-    checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema,
     checkHasCanonicalHeadlessCheckupActiveRoleAttestationSchema,
-    checkHasCanonicalHeadlessSoapEntryCommitSchema,
-    checkHasCanonicalDurableReviewPatientLinkSchema,
     validateRecoveryAuditSchema,
 } from '@/lib/sqlite-schema';
-export { HeadlessSoapActiveRoleAttestationSchemaError, HeadlessSoapEntryCommitSchemaError } from '@/lib/sqlite-schema';
-export type { HeadlessSoapActiveRoleAttestationSchemaErrorCode, HeadlessSoapEntryCommitSchemaErrorCode } from '@/lib/sqlite-schema';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
 import fs from 'fs';
@@ -150,22 +145,8 @@ export function hasCanonicalPhysicianReviewAttestationSchema(): boolean {
     return checkHasCanonicalPhysicianReviewAttestationSchema(sqlite);
 }
 
-export function hasCanonicalHeadlessSoapActiveRoleAttestationSchema(): boolean {
-    openDbServer();
-    return checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema(sqlite);
-}
-
 export function hasCanonicalHeadlessCheckupActiveRoleAttestationSchema(): boolean {
     openDbServer();
     return checkHasCanonicalHeadlessCheckupActiveRoleAttestationSchema(sqlite);
 }
 
-export function hasCanonicalHeadlessSoapEntryCommitSchema(): boolean {
-    openDbServer();
-    return checkHasCanonicalHeadlessSoapEntryCommitSchema(sqlite);
-}
-
-export function hasCanonicalDurableReviewPatientLinkSchema(): boolean {
-    openDbServer();
-    return checkHasCanonicalDurableReviewPatientLinkSchema(sqlite);
-}

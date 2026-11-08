@@ -19,11 +19,6 @@ import {
     checkups,
     conversations,
     documentDiagnosisProposals,
-    durableReviewCommandOperations,
-    durableReviewCommandStates,
-    durableReviewOperations,
-    durableReviewPatientLinks,
-    durableReviewRecords,
     drugs,
     entries,
     exemptions,
@@ -32,8 +27,6 @@ import {
     prostheticsCatalogReceipts,
     prostheticsCatalogSources,
     prostheticsCatalogDocuments,
-    headlessSoapActiveRoleAttestations,
-    headlessSoapEntryCommits,
     messages,
     observations,
     patients,
@@ -47,7 +40,7 @@ import {
     therapies,
 } from './schema';
 import { backupArtifactInputChecksum, type BackupArtifact, type BackupCollectionName } from './backup-artifact';
-import { assertBackupAuditSnapshots, backupAuditCoverage, backupAuditsEqual, canonicalizeBackupAuditRows, snapshotBackupAudit,
+import { backupAuditCoverage, backupAuditsEqual, canonicalizeBackupAuditRows, snapshotBackupAudit,
     type BackupAuditCoverage, type BackupAuditRow } from './backup-audit';
 import { derivePatientAmbulatoryLinks } from './backup-patient-ambulatory-links';
 import { revokeAttachmentExtractionLocatorGeneration } from './domain/documents/attachment-extraction-locator-revocation';
@@ -56,17 +49,10 @@ import { DATE_FIELDS } from '../scripts/scheduled-backup-date-fields.mjs';
 export { DATE_FIELDS };
 
 const CLEAR_ORDER: BackupCollectionName[] = [
-    'headlessSoapEntryCommits',
     'messages',
     'attachments',
     'documentDiagnosisProposals',
-    'durableReviewCommandOperations',
-    'durableReviewCommandStates',
-    'durableReviewPatientLinks',
-    'durableReviewOperations',
-    'durableReviewRecords',
     'physicianReviewAttestations',
-    'headlessSoapActiveRoleAttestations',
     'observations',
     'prostheticPrescriptions',
     'servicePrescriptionItems',
@@ -100,13 +86,7 @@ const INSERT_ORDER: BackupCollectionName[] = [
     'conversations',
     'patients',
     'physicianReviewAttestations',
-    'headlessSoapActiveRoleAttestations',
     'documentDiagnosisProposals',
-    'durableReviewRecords',
-    'durableReviewOperations',
-    'durableReviewPatientLinks',
-    'durableReviewCommandStates',
-    'durableReviewCommandOperations',
     'entries',
     'therapies',
     'checkups',
@@ -125,16 +105,10 @@ const TABLE_LOOKUP = {
     therapyStatusCommands,
     ambulatoryDestructiveCommands,
     ambulatories,
-    headlessSoapEntryCommits,
     attachments,
     checkups,
     conversations,
     documentDiagnosisProposals,
-    durableReviewCommandOperations,
-    durableReviewCommandStates,
-    durableReviewOperations,
-    durableReviewPatientLinks,
-    durableReviewRecords,
     drugs,
     entries,
     exemptions,
@@ -147,7 +121,6 @@ const TABLE_LOOKUP = {
     observations,
     patients,
     physicianReviewAttestations,
-    headlessSoapActiveRoleAttestations,
     prostheticPrescriptions,
     serviceCatalogEntries,
     servicePrescriptionItems,
@@ -160,22 +133,13 @@ type InsertRunner = Pick<typeof dbServer, 'insert'>;
 type InsertableTable = (typeof TABLE_LOOKUP)[BackupCollectionName] | typeof patientsToAmbulatories;
 export type BackupRestoreMutationFence = () => boolean;
 
-export type BackupRestoreBlockedReason = 'durable_review_commands' | 'audit' | 'runtime_fence' | 'therapy_status_commands' | 'ambulatory_destructive_commands' | 'snapshot';
+export type BackupRestoreBlockedReason = 'audit' | 'runtime_fence' | 'therapy_status_commands' | 'ambulatory_destructive_commands' | 'snapshot';
 
 /* The restore stopped inside its transaction: the target archive is unchanged. Callers report it as blocked, not as failed. */
 export class BackupRestoreBlockedError extends Error {
     constructor(readonly reason: BackupRestoreBlockedReason, detail: string) {
         super(`Restore blocked: ${detail}`);
         this.name = 'BackupRestoreBlockedError';
-    }
-}
-
-/* v1 cannot restore command replay receipts without their append-only audit ledger. */
-function assertCommandRecoveryIsRepresentable(): void {
-    const state = dbServer.select({ reviewId: durableReviewCommandStates.reviewId }).from(durableReviewCommandStates).get();
-    const operation = dbServer.select({ id: durableReviewCommandOperations.id }).from(durableReviewCommandOperations).get();
-    if (state || operation) {
-        throw new BackupRestoreBlockedError('durable_review_commands', 'durable review commands require the append-only audit ledger.');
     }
 }
 
@@ -240,56 +204,6 @@ function insertRows<T extends Record<string, unknown>>(
     }
 }
 
-const HEADLESS_SOAP_AUDIT_KEYS = [
-    'eventId', 'schemaVersion', 'eventType', 'occurredAt', 'outcome', 'actorType', 'actorRef',
-    'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata', 'createdAt',
-] as const;
-
-function parseHeadlessSoapAuditSnapshot(value: unknown): Record<string, unknown> {
-    if (typeof value !== 'string') throw new BackupRestoreBlockedError('audit', 'invalid H7b audit snapshot.');
-    try {
-        const parsed = JSON.parse(value) as unknown;
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
-            || JSON.stringify(parsed) !== value
-            || Object.keys(parsed).length !== HEADLESS_SOAP_AUDIT_KEYS.length
-            || HEADLESS_SOAP_AUDIT_KEYS.some((key, index) => Object.keys(parsed)[index] !== key)) {
-            throw new Error('invalid');
-        }
-        return parsed as Record<string, unknown>;
-    } catch {
-        throw new BackupRestoreBlockedError('audit', 'invalid H7b audit snapshot.');
-    }
-}
-
-function dateSeconds(value: Date | null): number | null {
-    return value instanceof Date && Number.isFinite(value.getTime()) && value.getTime() % 1000 === 0
-        ? value.getTime() / 1000
-        : null;
-}
-
-function snapshotStoredAudit(row: typeof auditEvents.$inferSelect): Record<string, unknown> {
-    return {
-        eventId: row.eventId, schemaVersion: row.schemaVersion, eventType: row.eventType,
-        occurredAt: dateSeconds(row.occurredAt), outcome: row.outcome, actorType: row.actorType,
-        actorRef: row.actorRef, subjectType: row.subjectType, subjectRef: row.subjectRef,
-        sourceSurface: row.sourceSurface, requestId: row.requestId, redactedMetadata: row.redactedMetadata,
-        createdAt: dateSeconds(row.createdAt),
-    };
-}
-
-/* Audit collision checks run under the writer lock and before any target collection is cleared. */
-function preflightHeadlessSoapAuditCollisions(rows: Record<string, unknown>[]): void {
-    for (const row of rows) {
-        const audit = parseHeadlessSoapAuditSnapshot(row.auditSnapshot);
-        const eventId = audit.eventId;
-        if (typeof eventId !== 'string') throw new BackupRestoreBlockedError('audit', 'invalid H7b audit snapshot.');
-        const existing = dbServer.select().from(auditEvents).where(eq(auditEvents.eventId, eventId)).get();
-        if (existing && JSON.stringify(snapshotStoredAudit(existing)) !== row.auditSnapshot) {
-            throw new BackupRestoreBlockedError('audit', 'H7b audit collision.');
-        }
-    }
-}
-
 /* Restore must synchronously retire volatile authority before the first destructive write. */
 function runMutationFence(fence: BackupRestoreMutationFence): void {
     if (typeof fence !== 'function') {
@@ -303,53 +217,6 @@ function runMutationFence(fence: BackupRestoreMutationFence): void {
         if (error instanceof ArchiveReplacedError) throw error;
         throw new BackupRestoreBlockedError('runtime_fence', 'runtime mutation fence unavailable.');
     }
-}
-
-/* Entries already exist at this point; audits are inserted/reused field-exactly before the ledger. */
-function restoreHeadlessSoapEntryCommits(rows: Record<string, unknown>[]): void {
-    for (const row of rows) {
-        const audit = parseHeadlessSoapAuditSnapshot(row.auditSnapshot);
-        const eventId = audit.eventId as string;
-        const existing = dbServer.select().from(auditEvents).where(eq(auditEvents.eventId, eventId)).get();
-        if (existing) {
-            if (JSON.stringify(snapshotStoredAudit(existing)) !== row.auditSnapshot) {
-                throw new BackupRestoreBlockedError('audit', 'H7b audit collision.');
-            }
-        } else {
-            dbServer.insert(auditEvents).values({
-                eventId,
-                schemaVersion: audit.schemaVersion as number,
-                eventType: audit.eventType as string,
-                occurredAt: new Date((audit.occurredAt as number) * 1000),
-                outcome: audit.outcome as string,
-                actorType: audit.actorType as string,
-                actorRef: audit.actorRef as string,
-                subjectType: audit.subjectType as string,
-                subjectRef: audit.subjectRef as string | null,
-                sourceSurface: audit.sourceSurface as string,
-                requestId: audit.requestId as string | null,
-                redactedMetadata: audit.redactedMetadata as string | null,
-                createdAt: new Date((audit.createdAt as number) * 1000),
-            }).run();
-        }
-    }
-    insertRows(dbServer, headlessSoapEntryCommits, rows);
-}
-
-/* A restore must not hand authority back (ADR 0097): an activation is a time-boxed grant of this host
-   and returns inactive, pending a new enrollment; a revocation recorded here is terminal and outlives the backup. */
-function soapAttestationsWithoutRestoredAuthority(rows: Record<string, unknown>[]): Record<string, unknown>[] {
-    const revokedHere = dbServer.select().from(headlessSoapActiveRoleAttestations)
-        .where(eq(headlessSoapActiveRoleAttestations.status, 'revoked')).all();
-    const actors = new Set<unknown>(revokedHere.map(row => row.actorRef));
-    const refs = new Set<unknown>(revokedHere.map(row => row.attestationRef));
-    return [
-        ...revokedHere,
-        ...rows.filter(row => !actors.has(row.actorRef) && !refs.has(row.attestationRef))
-            .map(row => row.status === 'active'
-                ? { ...row, status: 'inactive', issuerRef: null, expiresAt: null, activatedAt: null }
-                : row),
-    ];
 }
 
 function physicianAttestationsWithoutRestoredAuthority(rows: Record<string, unknown>[]): Record<string, unknown>[] {
@@ -432,12 +299,7 @@ export function restoreBackupArtifact(
         if (intent && restoreSnapshot(openDbServer()) !== intent.expectedSnapshot) {
             throw new BackupRestoreBlockedError('snapshot', 'archive changed after preview.');
         }
-        assertCommandRecoveryIsRepresentable();
-        const headlessSoapRows = artifact.payload.headlessSoapEntryCommits ?? [];
-        preflightHeadlessSoapAuditCollisions(headlessSoapRows);
-        const rows = canonicalizeBackupAuditRows(coverage === 'included' ? artifact.payload.auditEvents
-            : headlessSoapRows.map(row => parseHeadlessSoapAuditSnapshot(row.auditSnapshot)));
-        if (coverage === 'included') assertBackupAuditSnapshots(rows, headlessSoapRows.map(row => row.auditSnapshot));
+        const rows = canonicalizeBackupAuditRows(coverage === 'included' ? artifact.payload.auditEvents : []);
         let therapyCommands;
         try { therapyCommands = planTherapyStatusCommandUnion(openDbServer(), artifact.payload.therapyStatusCommands ?? [], rows); }
         catch { throw new BackupRestoreBlockedError('therapy_status_commands', 'therapy status command or audit collision.'); }
@@ -446,7 +308,6 @@ export function restoreBackupArtifact(
         catch { throw new BackupRestoreBlockedError('ambulatory_destructive_commands', 'ambulatory command or audit collision.'); }
         const importedCommands = therapyCommands.filter(row => !openDbServer().prepare('SELECT 1 FROM therapy_status_commands WHERE command_id=?').get(row.commandId)).map(row => row.commandId as string);
         const plan = planBackupAuditRestore(rows);
-        const soapAttestations = soapAttestationsWithoutRestoredAuthority(artifact.payload.headlessSoapActiveRoleAttestations ?? []);
         const physicianAttestations = physicianAttestationsWithoutRestoredAuthority(artifact.payload.physicianReviewAttestations ?? []);
         runMutationFence(beforeMutation);
         rotateSqliteArchiveGeneration(openDbServer());
@@ -457,14 +318,13 @@ export function restoreBackupArtifact(
         clearRows(patientsToAmbulatories);
 
         for (const collection of INSERT_ORDER) {
-            insertRows(dbServer, TABLE_LOOKUP[collection], collection === 'headlessSoapActiveRoleAttestations'
-                ? soapAttestations : collection === 'physicianReviewAttestations' ? physicianAttestations : artifact.payload[collection] ?? []);
+            insertRows(dbServer, TABLE_LOOKUP[collection], collection === 'physicianReviewAttestations'
+                ? physicianAttestations : artifact.payload[collection] ?? []);
         }
 
         migrateProstheticsSources(dbServer.$client);
         insertRows(dbServer, patientsToAmbulatories, derivePatientAmbulatoryLinks(artifact.payload.patients));
         if (coverage === 'included') insertBackupAudits(plan);
-        restoreHeadlessSoapEntryCommits(headlessSoapRows);
         insertTherapyStatusCommandUnion(openDbServer(), therapyCommands);
         insertAmbulatoryCommandUnion(openDbServer(), ambulatoryCommands);
         recordPortableImport(plan, backupArtifactInputChecksum(artifact), importedCommands, actorRef);

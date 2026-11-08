@@ -184,7 +184,6 @@ un audit al meglio.
 
 | Punto di scrittura | Motivo e confine corrente |
 | --- | --- |
-| [physician-review-command.ts:105](../lib/ai-providers/fabric/physician-review-command.ts#L105) | Accettazione/rifiuto medico persistiti: stato, evento e registro idempotenza nella stessa transazione immediata. |
 | [headless-checkup-status-transition-storage.ts:289](../lib/security/headless-checkup-status-transition-storage.ts#L289) | Transizione checkup: evento e CAS dentro transazione, con verifica della ricevuta/replay. |
 | [headless-checkup-active-role-attestation-store.ts:160](../lib/security/headless-checkup-active-role-attestation-store.ts#L160) | Attivazione ruolo checkup e audit nella stessa transazione. |
 | [headless-checkup-active-role-attestation-store.ts:181](../lib/security/headless-checkup-active-role-attestation-store.ts#L181) | Revoca ruolo checkup e audit nella stessa transazione. |
