@@ -8,7 +8,6 @@
     "local:mac-login",
     "local:lib/chatgpt-execution/execution-mac-readback.test.mjs",
     "chatgpt:local",
-    "prototype:local",
     "local:native/MediFlowMac/ExecutionCustodian/descriptor-close.test.mjs",
     "local:test:api-v1-contract-negative",
     "local:test:audit",

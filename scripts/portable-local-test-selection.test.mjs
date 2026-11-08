@@ -8,7 +8,7 @@ import { collectChatgptFocusedTests } from './additional-test-selection.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 test('profile consumes existing recipes and selectors without duplicate wrappers/children', () => {
   const commands = portableLocalTestCommands(root);
-  assert.equal(commands.length, 45);
+  assert.equal(commands.length, 44);
   assert.equal(commands.some(command => command.id === 'local:test:installability-v0'), false);
   const files = commands.flatMap(command => command.files);
   assert.equal(new Set(files).size, files.length);

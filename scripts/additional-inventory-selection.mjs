@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { collectChatgptFocusedTests, SOAP_CHILD_FILES, soapChildArguments, PROTOTYPE_TEST_FILES, SOFT_DELETE_TS_FILES, SOFT_DELETE_ROUTE_FILES, UI06_DOMAIN_FILES } from './additional-test-selection.mjs';
+import { collectChatgptFocusedTests, SOAP_CHILD_FILES, soapChildArguments, SOFT_DELETE_TS_FILES, SOFT_DELETE_ROUTE_FILES, UI06_DOMAIN_FILES } from './additional-test-selection.mjs';
 import { collectNpmScriptBinding, collectLiteralCiBinding } from './explicit-npm-test-selection.mjs';
 import { CLINICAL_HTTP_TEST_FILES } from './run-clinical-http-suite.mjs';
 
@@ -77,7 +77,6 @@ export function collectAdditionalInventorySelections(root) {
     chatgpt(); return { files: collectChatgptFocusedTests(root), binding: { command: 'node scripts/chatgpt-product-focused-tests.mjs', prerequisites: 'Explicit fresh synthetic data, exact installed owner; no live provider or OS qualification.' } };
   });
   for (const item of [
-    ['prototype:local', 'scripts/check-09x-prototypes.mjs', 'PROTOTYPE_TEST_FILES', 'tests', PROTOTYPE_TEST_FILES, "spawnSync(process.execPath, ['--test', ...tests],"],
     ['soft-delete:local', 'scripts/run-patient-soft-delete-suite.mjs', 'SOFT_DELETE_ROUTE_FILES', 'routeWiringTests', [...SOFT_DELETE_TS_FILES, ...SOFT_DELETE_ROUTE_FILES], "run(['--test', ...routeWiringTests], env)"],
     ['ui06:domain:local', 'tests/ui06/run-domain-tests.mjs', 'UI06_DOMAIN_FILES', 'entries', UI06_DOMAIN_FILES, "spawnSync(process.execPath, ['--test', ...entries.map(file => path.join(temporary, file.replace(/\\.ts$/, '.js')))],"],
   ]) {
@@ -86,7 +85,7 @@ export function collectAdditionalInventorySelections(root) {
       const selectorModule = consumer.startsWith('scripts/') ? './additional-test-selection.mjs' : '../../scripts/additional-test-selection.mjs';
       source(root, consumer, [`import { ${symbol} } from '${selectorModule}';`, `const ${variable} = ${symbol};`, call]);
       if (id === 'soft-delete:local') source(root, consumer, ["import { SOFT_DELETE_TS_FILES } from './additional-test-selection.mjs';", 'const typeScriptTests = SOFT_DELETE_TS_FILES;', "run(['scripts/run-strip-types.mjs', '--test', ...typeScriptTests], env)"]);
-      return { files, binding: { command: `node ${consumer}`, prerequisites: id.startsWith('prototype:') ? 'Synthetic research suite; not release qualification.' : 'Existing owned synthetic fixture/bootstrap and loader retained.' } };
+      return { files, binding: { command: `node ${consumer}`, prerequisites: 'Existing owned synthetic fixture/bootstrap and loader retained.' } };
     });
   }
   const parent = 'lib/security/headless-soap-active-role-session-grant.test.ts';

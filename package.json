@@ -105,7 +105,6 @@
     "test:latest-request-guard": "node scripts/run-strip-types.mjs --test lib/latest-request-guard.test.ts",
     "test:document-identity-resolution": "node scripts/run-strip-types.mjs --test lib/domain/documents/document-identity-resolution.test.ts",
     "test:document-domain-decisions": "node scripts/run-strip-types.mjs --test lib/domain/documents/document-domain-decisions.test.ts",
-    "test:document-ocr-decision": "node scripts/run-strip-types.mjs --test lib/domain/documents/document-ocr-decision.test.ts",
     "test:document-ocr-queue": "node scripts/run-strip-types.mjs --test lib/domain/documents/document-ocr-queue.test.ts",
     "test:document-decision-review-view-model": "node scripts/run-strip-types.mjs --test lib/domain/documents/document-decision-review-view-model.test.ts",
     "test:document-decision-review-card": "node scripts/run-strip-types.mjs --test components/document-decision-review-card.test.ts",

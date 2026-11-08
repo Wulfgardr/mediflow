@@ -225,7 +225,6 @@ npm run test:patient-document-import
 ```
 
 Usalo quando tocchi:
-- `components/pdf-importer.tsx`
 - `components/patient-document-import-review.tsx`
 - `lib/domain/documents/patient-import-decision.ts`
 - `lib/domain/documents/patient-document-review.ts`

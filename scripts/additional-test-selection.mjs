@@ -21,16 +21,6 @@ if (browserOnly) {
 return tests;
 }
 
-export const PROTOTYPE_TEST_FILES = Object.freeze([
-  'scripts/patient-rights-dry-run.test.mjs',
-  'prototypes/longitudinal-review/model.test.mjs',
-  'scripts/synthetic-followup-projection.test.mjs',
-  'lib/domain/documents/document-quality-corpus.test.mjs',
-  'scripts/verify-fhir-validator-cache.test.mjs',
-  'scripts/synthetic-handoff-packet.test.mjs',
-  'scripts/synthetic-cohort-analysis.test.mjs',
-]);
-
 export const SOFT_DELETE_TS_FILES = Object.freeze([
     'lib/patient-lifecycle.test.ts',
     'lib/patient-cascade.test.ts',

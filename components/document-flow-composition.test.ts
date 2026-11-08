@@ -95,14 +95,6 @@ test('delete confirmation is fenced and failures remain visible; only successful
     assert.doesNotMatch(source, /console\.(log|error)|showToast/u);
 });
 
-test('legacy importer cannot consume and silently discard an unpersisted file', async () => {
-    const source = await readFile('components/pdf-importer.tsx', 'utf8');
-    assert.doesNotMatch(source, /useDropzone|<input|FileReader|fetch\(|\.add\(|onDataExtracted\(/u);
-    assert.match(source, /Salva prima il paziente/u);
-    assert.match(source, /Carica documenti/u);
-    assert.match(source, /nessun|non viene/u);
-});
-
 test('terminal model display is the existing host receipt, while retry resets rather than generating', async () => {
     const source = await readFile('components/document-synthesis-fabric-review-card.tsx', 'utf8');
     assert.match(source, /\(phase !== 'terminal' \|\| picker\.view\.remote\) && <FunctionModelPicker picker=\{picker\}/u);
