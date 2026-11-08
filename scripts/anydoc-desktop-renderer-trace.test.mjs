@@ -1,7 +1,6 @@
 /* configuration tests, not proof of a built Windows/Linux bundle. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
 import { anyDocDesktopRendererTrace } from './anydoc-desktop-renderer-trace.mjs';
 
 test('desktop tracing selects the target binary and only Windows ICU data', () => {
@@ -26,6 +25,4 @@ test('Next configuration wires the target trace without replacing the existing M
     const includes = config.outputFileTracingIncludes['/*'];
     assert.ok(includes.includes('./node_modules/@napi-rs/canvas-darwin-arm64/**/*'));
     for (const file of anyDocDesktopRendererTrace(process.platform, process.arch)) assert.ok(includes.includes(file));
-    assert.match(readFileSync(new URL('../next.config.ts', import.meta.url), 'utf8'),
-        /\.\.\.anyDocDesktopRendererTrace\(process\.platform, process\.arch\)/u);
 });

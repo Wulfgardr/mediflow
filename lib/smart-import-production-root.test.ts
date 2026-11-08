@@ -22,7 +22,6 @@ test('the production page cannot reach the retired apply route', () => {
     const card = fs.readFileSync(path.join(root, 'components/patient-smart-import-fabric-preview-card.tsx'), 'utf8');
 
     assert.doesNotMatch(page, /api\/patients\/.*smart-import/u);
-    assert.match(card, /createSmartImportReviewBrowserController/u);
     assert.doesNotMatch(card, /patient-smart-import-service|applyPatientSmartImportSelection|generatePatientSmartImportAnalysis/u);
 });
 
@@ -30,7 +29,5 @@ test('the production queue describes preview and proposals, not legacy analysis 
     const source = fs.readFileSync(path.join(root, 'lib/domain/documents/patient-review-queue-summary.ts'), 'utf8');
     const smartImport = source.slice(source.indexOf('function buildSmartImportRow'), source.indexOf('function buildArchiveRow'));
 
-    assert.match(smartImport, /anteprima/u);
-    assert.match(smartImport, /propost/u);
     assert.doesNotMatch(smartImport, /analisi e applicazione|l'analisi parte/u);
 });

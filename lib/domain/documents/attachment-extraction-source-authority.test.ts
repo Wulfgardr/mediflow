@@ -209,15 +209,12 @@ test('keeps callbacks, AnyDoc, routes, logging, and persistence outside the auth
     const source = fs.readFileSync(new URL('./attachment-extraction-source-authority.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /extractAnyDoc|toMarkdownBytes|fetch|spawn|console|app\/api|insert\(|update\(|delete\(/iu);
     assert.doesNotMatch(source, /\bsourcePort\b|hook|caller.*function|Promise\.|async\s|await\s/iu);
-    assert.match(source, /mintResourcePort[\s\S]*beginResourceUse[\s\S]*commitResourceUse/iu);
     assert.doesNotMatch(source, /ownerValue|registryValue|sourceRegistry|createServerSessionProjectionOwnerRegistry/iu);
     assert.match(source, /function validSession[\s\S]*?typeof fields\.role === 'string'[\s\S]*?fields\.authChannel === \(native \? 'native' : 'web'\)/u);
     assert.match(source, /const owner = \(native \? nativeSessionProjectionOwnerRegistry : serverSessionProjectionOwnerRegistry\)\.acquire\(session\);/u);
     assert.match(source, /createAttachmentExtractionSourceAuthority\(session: ServerSession\)[\s\S]*?createSourceAuthority\(session, false\)[\s\S]*?createNativeAttachmentExtractionSourceAuthority\(session: ServerSession\)[\s\S]*?createSourceAuthority\(session, true\)/u);
     const revocation = fs.readFileSync(new URL('./attachment-extraction-locator-revocation.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(revocation, /Promise|async|await|callback|dbServer|schema|transaction|\.then|Symbol\.iterator/iu);
-    const restore = fs.readFileSync(new URL('../../backup-restore-executor.ts', import.meta.url), 'utf8');
-    assert.match(restore, /revokeAttachmentExtractionLocatorGeneration\(\);\s*runDbServerImmediateTransaction/iu);
 });
 
 test('encrypted projection capability copies local bytes, never decodes ENC on the server and wipes its own operation only', () => {

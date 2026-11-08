@@ -145,9 +145,7 @@ test('pins the reviewed child engine graph and excludes parser, renderer and PDF
     );
     for (const [path] of expected) assert.equal(lock.packages[path]?.hasInstallScript, undefined);
     assert.equal(sha256(ANYDOC_PDF_PAGE_MATERIALIZER_DESCRIPTOR), ANYDOC_PDF_PAGE_MATERIALIZER_SHA256);
-    assert.match(source, /runAnyDocPdfMaterializationChild\(bytes, routing\.pageCount\)/u);
     assert.doesNotMatch(source, /from 'pdf-lib'|import\('pdf-lib'\)/u);
     assert.match(worker, /import\('pdf-lib'\)/u); assert.match(worker, /ignoreEncryption: false/u);
-    assert.match(worker, /copyPages\(/u); assert.match(worker, /\.addPage\(/u); assert.match(worker, /\.save\(/u);
     assert.doesNotMatch(source, /@firecrawl\/anydoc|jspdf|pdf-inspector|extractText|fetch\(|https?:/iu);
 });

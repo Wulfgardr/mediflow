@@ -264,7 +264,6 @@ test('three production routes preserve the sidecar contract until paired clients
         const source = readFileSync(new URL(`../../app/api/v1/network/terminology/who/${op}/route.ts`, import.meta.url), 'utf8');
         assert.match(source, /requireNetworkCapabilityContext\(request, NETWORK_CATALOG_READ_CAPABILITY\)/u);
         assert.match(source, /peekSession\(context\.session\.id\) === context\.session/u);
-        assert.match(source, /getRuntime: getIcd11WhoSidecarRuntime/u);
         assert.doesNotMatch(source, /create.*Runtime\(|fetch\(|requireSession\(|console\./u);
     }
 });

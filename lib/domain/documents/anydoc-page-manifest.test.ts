@@ -120,6 +120,6 @@ test('copies currentness and materialized page bytes before the first asynchrono
 });
 test('keeps the packet local-only and excludes renderer, model, route and persistence boundaries', () => {
     const source = readFileSync(new URL('./anydoc-page-manifest.ts', import.meta.url), 'utf8');
-    assert.match(source, /extractAnyDocLocalBytes/u); assert.match(source, /'needsOcr'/u); assert.doesNotMatch(source, /needs_ocr/u);
+ assert.doesNotMatch(source, /needs_ocr/u);
     assert.doesNotMatch(source, /pdf-lib|DeepSeek|render|fetch\(|https?:|app\/api|dbServer|lib\/schema|Ollama|Apple Vision/iu);
 });

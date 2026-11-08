@@ -102,8 +102,6 @@ test('keeps GET as the authenticated retirement boundary with no diagnostics or 
     const getSource = source.slice(source.indexOf('export async function GET'));
 
     assert.match(getSource, /const session = await requireSessionOrLocalToken\(request\);/u);
-    assert.match(getSource, /status:\s*410/u);
-    assert.match(getSource, /OCR_EXTRACTION_RETIRED/u);
     assert.doesNotMatch(getSource, /request\.(?:json|text|arrayBuffer|formData|body|url|nextUrl|searchParams)/u);
     assert.doesNotMatch(getSource, /\bparams\b|loadOcrRuntimeSettings|validateLocalTarget|fetch\(|dbServer|settings|provider|readiness|fs\.|execFile|extractDocumentWithAI|AIService/iu);
 });

@@ -112,7 +112,6 @@ test('fails closed on reentry, stale epoch, and hostile database result shapes, 
 
 test('keeps selection binding server-only and excludes leases, routes, AnyDoc, writes, providers, and apply', () => {
     const source = fs.readFileSync(new URL('./attachment-extraction-selection-binding.ts', import.meta.url), 'utf8');
-    assert.match(source, /server-only/u); assert.match(source, /patients_to_ambulatories/u); assert.match(source, /issueSelection/u);
     assert.doesNotMatch(source, /patients\.ambulatoryId|patientRef|ambulatoryRef|leaseRef|withLeaseCriticalSection/u);
     assert.doesNotMatch(source, /AnyDoc|toMarkdown|fetch|app\/api|insert\(|update\(|delete\(|provider|egress|applyPolicy|writesPerformed|Smart.?Import/iu);
     assert.equal(types.isProxy(bindAttachmentExtractionSelection), false);

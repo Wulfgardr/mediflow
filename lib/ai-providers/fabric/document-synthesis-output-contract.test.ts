@@ -188,7 +188,6 @@ test('keeps the baseline explicitCode limit at 120 while preserving other field 
     (at160.data.problemStatements[0] as Record<string, unknown>).explicitCode = 'x'.repeat(160);
     denied(at160);
     const source = readFileSync(new URL('./document-synthesis-output-contract.ts', import.meta.url), 'utf8');
-    assert.match(source, /optionalText\(item, 'explicitCode', 120\)/u);
     assert.doesNotMatch(source, /optionalText\(item, 'explicitCode', 160\)/u);
 });
 

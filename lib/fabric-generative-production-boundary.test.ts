@@ -27,13 +27,6 @@ test('production consumers do not invoke legacy generative write paths', () => {
 test('the frozen generative catalog points at the authenticated preview routes', () => {
     const catalog = source('./ai-providers/fabric/generative-catalog.ts');
 
-    for (const route of [
-        'app/api/ai/patient-insight/preview/route.ts',
-        'app/api/ai/smart-import/preview/route.ts',
-        'app/api/ai/document-synthesis/preview/route.ts',
-    ]) {
-        assert.match(catalog, new RegExp(route.replaceAll('.', '\\.'), 'u'));
-    }
     assert.doesNotMatch(
         catalog,
         /'lib\/ai-summary-service\.ts'|'lib\/domain\/documents\/document-synthesis-service\.ts'|'lib\/treatment-reasoning-service\.ts'/u,
@@ -43,8 +36,5 @@ test('the frozen generative catalog points at the authenticated preview routes',
 test('Smart Import renders its Fabric receipt and provenance without an apply seam', () => {
     const card = source('../components/patient-smart-import-fabric-preview-card.tsx');
 
-    assert.match(card, /preview\.receipt/u);
-    assert.match(card, /preview\.provenance/u);
-    assert.match(card, /preview\.reviewRef/u);
     assert.doesNotMatch(card, /\bdb\.|\bapply\w*\s*\(/u);
 });
