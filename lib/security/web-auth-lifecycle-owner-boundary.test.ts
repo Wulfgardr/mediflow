@@ -472,9 +472,7 @@ test('leaves the historical owner cluster without production consumers', () => {
         .filter((path) => /\.(?:cjs|mjs|js|jsx|ts|tsx)$/u.test(path))
         .filter((path) => !/\.(?:test|spec)\.[^.]+$/u.test(path));
     const historicalCluster = new Set([
-        'lib/security/web-auth-control-owner.ts',
         'lib/security/web-auth-control-record.ts',
-        'lib/security/web-auth-session-issuer.ts',
     ]);
     const forbiddenHistoricalImport = /(?:from\s+|require\(\s*)['"][^'"]*web-auth-(?:lifecycle-owner-legacy|session-issuer|control-owner|control-record)(?:\.[cm]?[jt]s)?['"]/u;
     const deepPackageImport = /@mediflow\/web-auth-lifecycle-owner\//u;

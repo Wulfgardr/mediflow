@@ -54,16 +54,8 @@ const TARGET_USERNAME = ['synthetic', 'target'].join('-');
 const OTHER_USERNAME = ['synthetic', 'other'].join('-');
 const AUTH_CONTROL_MODULE_PATH = './web-auth-control-record.ts';
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const HISTORICAL_WEB_RUNTIME_IMPORTS = new Map<string, ReadonlySet<string>>([
-    ['lib/security/web-auth-control-owner.ts', new Set([
-        'activateArmedWebServerSession', 'getArmedWebServerSessionId', 'tombstoneArmedWebServerSession',
-    ])],
-    ['lib/security/web-auth-session-issuer.ts', new Set([
-        'abortPreparedWebServerSession', 'abortStagedWebServerSession', 'armPreparedWebServerSession',
-        'getPreparedWebServerSessionId', 'prepareStagedWebServerSession', 'stageWebServerSession',
-        'tombstoneArmedWebServerSession',
-    ])],
-]);
+// The historical Web owner and issuer modules are gone: no file may import these symbols.
+const HISTORICAL_WEB_RUNTIME_IMPORTS = new Map<string, ReadonlySet<string>>();
 const HISTORICAL_WEB_RUNTIME_SYMBOLS = new Set([
     'abortActiveWebSessionResourceUse', 'abortPreparedWebServerSession', 'abortStagedWebServerSession',
     'activateArmedWebServerSession', 'activateStagedWebServerSession', 'armPreparedWebServerSession',
@@ -85,11 +77,7 @@ const NATIVE_CAPABILITY_IMPORTS = new Map<string, ReadonlySet<string>>([
 ]);
 const NATIVE_CAPABILITY_SYMBOLS = new Set([...NATIVE_CAPABILITY_IMPORTS.values()].flatMap((symbols) => [...symbols]));
 const DORMANT_WEB_OWNER_MODULE_IMPORTS = new Map<string, ReadonlyMap<string, ReadonlySet<string>>>([
-    ['lib/security/web-auth-control-owner', new Map([
-        ['lib/security/web-auth-session-issuer.ts', new Set([
-            'activatePreparedWebAuthSession', 'beginWebAuth', 'cancelWebAuth', 'prepareWebAuthActivation',
-        ])],
-    ])],
+    ['lib/security/web-auth-control-owner', new Map()],
     ['lib/security/web-auth-session-issuer', new Map()],
 ]);
 

@@ -46,9 +46,8 @@ const validateControlImports = (sources: Readonly<Record<string, string>>) => {
     const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
         file, source, target: 'lib/security/web-auth-control-record', repositoryRoot: ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
     })); const errors: string[] = [];
-    const historicalProduction = new Map([
-        ['lib/security/web-auth-control-owner.ts', { runtime: new Set(['abortPreparedAuthControlTicket', 'createWebAuthControlRecord']), types: new Set(['AuthControlTicket']) }],
-    ]);
+    // The historical owner and issuer are removed: no production file may import the record.
+    const historicalProduction = new Map<string, { runtime: Set<string>; types: Set<string> }>();
     const ownTest = new Set(['abortPreparedAuthControlTicket', 'abortPreparedAuthControlActivation', 'abortPreparedAuthControlRetirement', 'commitAuthControlTicket', 'commitPreparedAuthControlActivation', 'commitPreparedAuthControlRetirement', 'createWebAuthControlRecord', 'isCurrentAuthControlSessionBinding', 'prepareAuthControlActivation', 'prepareAuthControlRetirement', 'retireAuthControlTicket']);
     for (const use of uses) {
         if (use.file === 'lib/security/server-session.test.ts'
@@ -727,15 +726,15 @@ test('keeps current-binding lookup read-only through captured intrinsic poison a
     await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(record.snapshot(), before);
 });
 
-test('keeps the current-binding predicate inside the historical owner island and its exact test seam', () => {
+test('keeps the current-binding predicate inside its exact test seam, with no production importer', () => {
     assert.deepEqual(repositoryControlImportErrors(), []);
     const positive = validateControlImports({
-        'lib/security/web-auth-control-owner.ts': "import { abortPreparedAuthControlTicket, createWebAuthControlRecord, type AuthControlTicket } from './web-auth-control-record';",
         'lib/security/literal.ts': "// import control from './web-auth-control-record'; const value = 'createWebAuthControlRecord'; const regex = /commitAuthControlTicket/u;",
     });
-    assert.deepEqual(positive.errors, []); assert.deepEqual(positive.uses.map((use) => use.symbol), [
-        'abortPreparedAuthControlTicket', 'createWebAuthControlRecord', 'AuthControlTicket',
-    ]);
+    assert.deepEqual(positive.errors, []); assert.deepEqual(positive.uses, []);
+    assert.notDeepEqual(validateControlImports({
+        'lib/security/web-auth-control-owner.ts': "import { abortPreparedAuthControlTicket, createWebAuthControlRecord, type AuthControlTicket } from './web-auth-control-record';",
+    }).errors, []);
     const rejected = [
         "import { commitAuthControlTicket as createWebAuthControlRecord } from './web-auth-control-record';",
         "import control from './web-auth-control-record';",
