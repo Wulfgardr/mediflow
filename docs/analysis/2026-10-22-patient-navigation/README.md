@@ -8,14 +8,14 @@ La fixture contiene 12 terapie attive, 12 misure e 12 documenti sintetici. La st
 
 | Registro e vista | Prima | Dopo |
 | --- | --- | --- |
-| Giorno, 1440 × 960 | [PNG](before/giorno-1440.png) | [PNG](after/giorno-1440.png) |
-| Grafite, 1440 × 960 | [PNG](before/grafite-1440.png) | [PNG](after/grafite-1440.png) |
-| Giorno, 768 × 960 | [PNG](before/giorno-768.png) | [PNG](after/giorno-768.png) |
-| Grafite, 768 × 960 | [PNG](before/grafite-768.png) | [PNG](after/grafite-768.png) |
-| Giorno, 390 × 960 | [PNG](before/giorno-390.png) | [PNG](after/giorno-390.png) |
-| Grafite, 390 × 960 | [PNG](before/grafite-390.png) | [PNG](after/grafite-390.png) |
-| Giorno, browser 200%, finestra 1440 × 960 | [PNG](before/giorno-1440-zoom-200.png) | [PNG](after/giorno-1440-zoom-200.png) |
-| Grafite, browser 200%, finestra 1440 × 960 | [PNG](before/grafite-1440-zoom-200.png) | [PNG](after/grafite-1440-zoom-200.png) |
+| Giorno, 1440 × 960 | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/before/giorno-1440.png) | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/after/giorno-1440.png) |
+| Grafite, 1440 × 960 | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/before/grafite-1440.png) | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/after/grafite-1440.png) |
+| Giorno, 768 × 960 | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/before/giorno-768.png) | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/after/giorno-768.png) |
+| Grafite, 768 × 960 | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/before/grafite-768.png) | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/after/grafite-768.png) |
+| Giorno, 390 × 960 | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/before/giorno-390.png) | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/after/giorno-390.png) |
+| Grafite, 390 × 960 | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/before/grafite-390.png) | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/after/grafite-390.png) |
+| Giorno, browser 200%, finestra 1440 × 960 | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/before/giorno-1440-zoom-200.png) | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/after/giorno-1440-zoom-200.png) |
+| Grafite, browser 200%, finestra 1440 × 960 | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/before/grafite-1440-zoom-200.png) | [PNG](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-22-patient-navigation/after/grafite-1440-zoom-200.png) |
 
 Lo zoom è quello nativo di Chromium, impostato con `chrome.tabs.setZoom(2)` da un’estensione temporanea nel test Playwright. Le asserzioni verificano il fattore 2, il passaggio da 1440 a 720 CSS px e da devicePixelRatio 1 a 2. Non è uno zoom CSS né un semplice cambio di viewport. Le misure del menu sono in [before/measurements.json](before/measurements.json), [after/measurements.json](after/measurements.json) e nei JSON dello zoom [Giorno](after/giorno-1440-zoom-200.json) e [Grafite](after/grafite-1440-zoom-200.json). [sha256.json](sha256.json) identifica i file fotografici e metrici.
 

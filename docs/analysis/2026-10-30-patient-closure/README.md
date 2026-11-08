@@ -102,9 +102,9 @@ selezione dei test, never-regress e claims sono passati. Il test del contenitore
 con bozza è passato. Nessuna suite già valida di scritture cliniche è stata
 ripetuta per conferma.
 
-Esempi: Terapie 320 [prima](esempi/terapie-320-prima.png) e
-[dopo](esempi/terapie-320.png), [aggregazione Quadro 768](esempi/quadro-768.png),
-[errore Follow-up leggibile al 400%](esempi/followup-400.png).
+Esempi: Terapie 320 [prima](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-30-patient-closure/esempi/terapie-320-prima.png) e
+[dopo](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-30-patient-closure/esempi/terapie-320.png), [aggregazione Quadro 768](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-30-patient-closure/esempi/quadro-768.png),
+[errore Follow-up leggibile al 400%](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-30-patient-closure/esempi/followup-400.png).
 
 W-7, W-9, W-10 e W-21c sono chiuse nelle prove Web sintetiche descritte.
 L'esito CI della head corrente è un requisito di consegna distinto, consultabile

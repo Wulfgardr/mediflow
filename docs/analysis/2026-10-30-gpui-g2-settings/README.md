@@ -94,9 +94,9 @@ implementabili, invece di approvare una riduzione tacita del requisito.
 
 Le catture usano finestre e renderer GPUI reali su macOS, con stato sintetico
 predisposto in una copia esterna temporanea del sorgente. Quattro esempi sono
-nel [manifest con hash](captures.json): [Accesso Grafite](grafite-390-access.png),
-[soglia Grafite](grafite-390-review.png), [modelli Giorno](giorno-1200-models.png)
-e [modelli Grafite](grafite-390-models.png). La serie completa comprende dodici
+nel [manifest con hash](captures.json): [Accesso Grafite](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-30-gpui-g2-settings/grafite-390-access.png),
+[soglia Grafite](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-30-gpui-g2-settings/grafite-390-review.png), [modelli Giorno](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-30-gpui-g2-settings/giorno-1200-models.png)
+e [modelli Grafite](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-30-gpui-g2-settings/grafite-390-models.png). La serie completa comprende dodici
 immagini, Giorno/Grafite e 1200/390 punti; resta fuori dalla repository.
 Non prova picker, VoiceOver, collegamento a un'installazione reale o tutta la
 matrice G-7. Il codice temporaneo di predisposizione non è nell'app consegnata.

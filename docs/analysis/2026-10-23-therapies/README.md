@@ -89,10 +89,10 @@ Il test iniziale con `fullPage` ritagliava le immagini a zoom 200%. Le catture
 zoom sono state rigenerate sui rispettivi SHA con screenshot del viewport fisico,
 verificando PNG 1440×1000, `tabs.getZoom=2` e `innerWidth=720`.
 
-- Giorno 1440: [prima](./captures/prima-giorno-1440-registro.png), [dopo](./captures/dopo-giorno-1440-registro.png).
-- Grafite 768: [prima](./captures/prima-grafite-768-registro.png), [dopo](./captures/dopo-grafite-768-registro.png).
-- Giorno 390: [prima](./captures/prima-giorno-390-registro.png), [dopo](./captures/dopo-giorno-390-registro.png).
-- Zoom reale 200%: [prima](./captures/prima-giorno-zoom-200-registro.png), [dopo](./captures/dopo-giorno-zoom-200-registro.png), [menu Grafite](./captures/dopo-grafite-zoom-200-menu.png).
+- Giorno 1440: [prima](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-therapies/captures/prima-giorno-1440-registro.png), [dopo](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-therapies/captures/dopo-giorno-1440-registro.png).
+- Grafite 768: [prima](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-therapies/captures/prima-grafite-768-registro.png), [dopo](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-therapies/captures/dopo-grafite-768-registro.png).
+- Giorno 390: [prima](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-therapies/captures/prima-giorno-390-registro.png), [dopo](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-therapies/captures/dopo-giorno-390-registro.png).
+- Zoom reale 200%: [prima](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-therapies/captures/prima-giorno-zoom-200-registro.png), [dopo](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-therapies/captures/dopo-giorno-zoom-200-registro.png), [menu Grafite](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-therapies/captures/dopo-grafite-zoom-200-menu.png).
 
 ## Scelte di design da valutare in review
 
