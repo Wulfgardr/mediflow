@@ -9,13 +9,6 @@ import { dbServer } from '../../db-server';
 import type { ServerSession } from '../../security/server-session';
 import { serverSessionProjectionOwnerRegistry } from '../../security/server-session-projection-owner-production';
 import {
-    abortResourceUse,
-    beginResourceUse,
-    commitResourceUse,
-    mintResourcePort,
-    registerPrivateResource,
-    releaseResourcePort,
-    unregisterPrivateResource,
     type ResourcePort as WebResourcePort,
     type ResourceRegistration as WebResourceRegistration,
     type ResourceUse as WebResourceUse,

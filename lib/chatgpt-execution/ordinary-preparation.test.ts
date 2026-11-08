@@ -4,8 +4,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mockOrdinaryModule } from './ordinary-module.test-support.ts';
 import { createHash } from 'node:crypto';
-import { createPatientInsightOrdinaryTaskProfile, createSmartImportOrdinaryTaskProfile, createDocumentSynthesisOrdinaryTaskProfile,
-    createTreatmentReasoningOrdinaryTaskProfile, readOrdinaryTaskProfile } from './ordinary-task-profile';
+import {
+    createPatientInsightOrdinaryTaskProfile,
+    createSmartImportOrdinaryTaskProfile,
+    createDocumentSynthesisOrdinaryTaskProfile,
+    readOrdinaryTaskProfile,
+} from './ordinary-task-profile';
 import { captureDocumentSynthesisSourceSet } from '../ai-providers/fabric/document-synthesis-source-set-contract';
 import { renderEmissionPlan } from '../ai-preparation/emission-plan';
 import { buildPatientInsightExtractionPrompt } from '../ai-task-contracts';
@@ -197,7 +201,6 @@ test('deterministic Layer1 crossing unit boundaries is rejected as well', async 
     const job = createOrdinaryPreparation(profiles()[0], configuration, undefined, { names: ['Bea Riva in controllo\n␞\nCondizione di Bea Riva'] });
     await assert.rejects(job.ready); await job.close();
 });
-
 
 test('4096 distinct values across all emitted batches succeed; value 4097 denies without reset', async () => {
     const dataset = (count: number) => {
