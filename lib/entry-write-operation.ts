@@ -1,7 +1,7 @@
 /* one ordinary diary create/update authority; no headless receipt or generic CRUD path. */
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
-import { buildEntryVersionConflictPayload } from './entry-concurrency';
+import { buildVersionConflictPayload } from './version-concurrency';
 import { activePatients } from './patient-lifecycle';
 import { writeAuditEventInTransaction, type RequiredAuditContext } from './security/audit';
 import { entries, patients, patientsToAmbulatories, users } from './schema';
@@ -127,8 +127,8 @@ export function updateEntryOperation(input: UpdateInput): Result {
         }
         if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
         if (existing.version !== input.expectedVersion) {
-            return { status: 409, value: buildEntryVersionConflictPayload(
-                input.expectedVersion, input.entryId, existing) as unknown as Record<string, unknown> };
+            return { status: 409, value: buildVersionConflictPayload(
+                'entry', input.expectedVersion, input.entryId, existing) as unknown as Record<string, unknown> };
         }
         const changed = tx.update(entries).set({ ...input.values, version: input.expectedVersion + 1 })
             .where(and(eq(entries.id, input.entryId), eq(entries.patientId, existing.patientId),

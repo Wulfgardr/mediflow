@@ -10,7 +10,7 @@ import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth
 import { auditContextFromSession, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
 import { updateCheckupOperation } from '@/lib/checkup-write-operation';
 import { normalizeCheckupUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
-import { parseCheckupExpectedVersion } from '@/lib/checkup-concurrency';
+import { parseExpectedVersion } from '@/lib/version-concurrency';
 import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
 
 /* preserve the preflight 404-before-field-validation ordering; the
@@ -34,7 +34,7 @@ export async function PUT(
         const envelope = await readCheckupJsonObject(request);
         if (!envelope.ok) return envelope.response;
         const body = envelope.body;
-        const expectedVersion = parseCheckupExpectedVersion(body.version);
+        const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
@@ -82,7 +82,7 @@ export async function DELETE(
             return NextResponse.json({ error: parsedBody.error,
                 ...(parsedBody.code ? { code: parsedBody.code } : {}) }, { status: parsedBody.status ?? 400 });
         }
-        const expectedVersion = parseCheckupExpectedVersion(parsedBody.values.version);
+        const expectedVersion = parseExpectedVersion(parsedBody.values.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }

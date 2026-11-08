@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { listChangedFields, requestIdFromRequest } from './security/audit';
 import { normalizeCheckupCreateInput, normalizeCheckupUpdateInput } from './api-v1-clinical-write-normalization';
 import type { NetworkWriteContext } from './network-write-context';
-import { parseCheckupExpectedVersion } from './checkup-concurrency';
+import { parseExpectedVersion } from './version-concurrency';
 import { isSealedValue, validateNetworkDeletionReason } from './network-patient-lifecycle';
 import { createCheckupOperation, updateCheckupOperation } from './checkup-write-operation';
 
@@ -105,7 +105,7 @@ export async function createNetworkScopedCheckup(
 export async function updateNetworkScopedCheckup(
     context: NetworkCheckupUpdateContext, body: Record<string, unknown>
 ): Promise<NetworkCheckupMutationResponse> {
-    const expectedVersion = parseCheckupExpectedVersion(body.version);
+    const expectedVersion = parseExpectedVersion(body.version);
     if (expectedVersion === null) return { status: 400, value: { error: 'Version is required' } };
     const boundaryError = validateNetworkCheckupMutationBoundary(body, NETWORK_FORBIDDEN_CHECKUP_UPDATE_FIELDS);
     if (boundaryError) return boundaryError;
