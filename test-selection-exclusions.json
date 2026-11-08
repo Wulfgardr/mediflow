@@ -115,11 +115,6 @@
     "owner": "@Wulfgardr"
   },
   {
-    "path": "lib/security/headless-soap-command-binding-test-fixture.ts",
-    "reason": "WUL-729: Synthetic binding and proof factories used by lifecycle tests; no standalone test registration.",
-    "owner": "@Wulfgardr"
-  },
-  {
     "path": "lib/security/native-ordinary.test-support.cjs",
     "reason": "WUL-729: Shared synthetic security fixture required by the selected inference harness.",
     "owner": "@Wulfgardr"

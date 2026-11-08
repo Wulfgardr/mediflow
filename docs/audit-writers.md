@@ -185,9 +185,7 @@ un audit al meglio.
 | Punto di scrittura | Motivo e confine corrente |
 | --- | --- |
 | [physician-review-command.ts:105](../lib/ai-providers/fabric/physician-review-command.ts#L105) | Accettazione/rifiuto medico persistiti: stato, evento e registro idempotenza nella stessa transazione immediata. |
-| [headless-soap-entry-commit-owner.ts:525](../lib/security/headless-soap-entry-commit-owner.ts#L525) | Commit SOAP: insert SQL sul nome tabella derivato da `auditEvents`; transazione con entry, ledger e ricevuta, replay durevole. |
 | [headless-checkup-status-transition-storage.ts:289](../lib/security/headless-checkup-status-transition-storage.ts#L289) | Transizione checkup: evento e CAS dentro transazione, con verifica della ricevuta/replay. |
-| [headless-soap-active-role-attestation-store.ts:47](../lib/security/headless-soap-active-role-attestation-store.ts#L47) | `INSERT_ACTIVATION_AUDIT`, eseguito da `activate`: attivazione ruolo SOAP e audit nella stessa transazione. |
 | [headless-checkup-active-role-attestation-store.ts:160](../lib/security/headless-checkup-active-role-attestation-store.ts#L160) | Attivazione ruolo checkup e audit nella stessa transazione. |
 | [headless-checkup-active-role-attestation-store.ts:181](../lib/security/headless-checkup-active-role-attestation-store.ts#L181) | Revoca ruolo checkup e audit nella stessa transazione. |
 | [portable-supervisor-aip-audit-port.ts:278](../lib/security/portable-supervisor-aip-audit-port.ts#L278) | Tentativo AIP: transazione e rilettura del contesto/record richieste dal port, anche senza mutazione clinica. |

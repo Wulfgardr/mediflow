@@ -1487,55 +1487,6 @@
       "classification": "legacy-node-service"
     },
     {
-      "file": "lib/security/headless-soap-active-role-attestation-store.ts",
-      "target": "better-sqlite3",
-      "capability": "driver:better-sqlite3",
-      "form": "import",
-      "symbols": [
-        "default"
-      ],
-      "count": 1,
-      "classification": "legacy-node-service"
-    },
-    {
-      "file": "lib/security/headless-soap-active-role-attestation-store.ts",
-      "target": "lib/db-server.ts",
-      "capability": "server:lib/db-server.ts",
-      "form": "import",
-      "symbols": [
-        "getInitialDbServerHandle",
-        "hasCanonicalHeadlessSoapActiveRoleAttestationSchema",
-        "runDbServerImmediateTransaction"
-      ],
-      "count": 1,
-      "classification": "legacy-node-service"
-    },
-    {
-      "file": "lib/security/headless-soap-entry-commit-owner.ts",
-      "target": "better-sqlite3",
-      "capability": "driver:better-sqlite3",
-      "form": "import",
-      "symbols": [
-        "default"
-      ],
-      "count": 1,
-      "classification": "legacy-node-service"
-    },
-    {
-      "file": "lib/security/headless-soap-entry-commit-owner.ts",
-      "target": "lib/db-server.ts",
-      "capability": "server:lib/db-server.ts",
-      "form": "import",
-      "symbols": [
-        "dbServer",
-        "getInitialDbServerHandle",
-        "hasCanonicalHeadlessSoapEntryCommitSchema",
-        "runDbServerImmediateTransaction"
-      ],
-      "count": 1,
-      "classification": "legacy-node-service"
-    },
-    {
       "file": "lib/security/host-credential-verification.ts",
       "target": "lib/db-server.ts",
       "capability": "server:lib/db-server.ts",

@@ -18,6 +18,22 @@ Candidate evidence only, non-ancestor: commit
 ADR 0097, che non e presente in questa base e non viene collegata, importata o
 presentata come decisione accettata.
 
+## Emendamento dell'8 novembre 2026: runtime rimosso
+
+Il runtime di questa decisione (proposta, field set, presentazione, prova di
+autorizzazione, binding del comando, commit, ruolo attivo, lease della sessione
+figlia, dialogo di approvazione e seal nel provider di sicurezza) non è mai
+stato collegato a una rotta, a una schermata o a un processo del prodotto:
+lo raggiungevano soltanto i suoi test. È stato rimosso.
+
+Restano, perché toccano i dati a riposo o i client nativi: il contratto della
+bozza e della ricevuta (`lib/headless/clinician-soap-write-contract.ts`,
+`clinician-soap-entry-commit-receipt.ts`), field set e codec del seal con i
+golden Swift, le tabelle `headless_soap_entry_commits` e
+`headless_soap_active_role_attestations` con le migrazioni, e la validazione
+del ledger in backup e ripristino. Chi riprende la funzione parte da questa
+decisione e dal codice nella storia git, prima del commit che lo rimuove.
+
 ## Problema
 
 ADR 0100 nega ogni write Headless. Un assistente puo raccogliere una bozza
