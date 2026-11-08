@@ -321,58 +321,6 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
     return durableReviewCommand;
 }
 
-type HeadlessSoapReplayFixture = {
-    key: { approvalRef: string; idempotencyKey: string; authorizationProofDigest: string };
-    receipt: Record<string, unknown>;
-};
-
-/* The roundtrip source uses the real H7b owner so replay integrity, not a handcrafted ledger, is preserved. */
-function seedHeadlessSoapCommit(dataDir: string): HeadlessSoapReplayFixture {
-    const fixtureUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-command-binding-test-fixture.ts')).href;
-    const ownerUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-entry-commit-owner.ts')).href;
-    const source = `
-        const { commandBindingFixture, syntheticBinding, syntheticProof, syntheticRecord } = await import(${JSON.stringify(fixtureUrl)});
-        const { createHeadlessSoapEntryCommitOwner } = await import(${JSON.stringify(ownerUrl)});
-        const fixture = commandBindingFixture(0x6e);
-        fixture.setCurrent(syntheticBinding(7));
-        const proof = syntheticProof(0x6e);
-        const bound = await fixture.owner.service.bind(proof);
-        let command = null;
-        const accepted = await fixture.owner.approvalController.withSingleUseApproval(syntheticRecord({
-            approvalRef: bound.approvalRef, idempotencyKey: bound.idempotencyKey, authorizationProof: proof,
-        }), (candidate) => { command = candidate; });
-        if (!accepted || !command) throw new Error('synthetic H7b command unavailable');
-        const result = createHeadlessSoapEntryCommitOwner().commit(command, syntheticRecord({
-            patientId: 'w7-h7b-patient', ambulatoryId: 'w7-amb-primary', patientVersion: 7,
-        }));
-        if (result.status !== 'committed') throw new Error('synthetic H7b commit denied: ' + JSON.stringify(result));
-        process.stdout.write(JSON.stringify({
-            key: { approvalRef: command.approvalRef, idempotencyKey: command.idempotencyKey,
-                authorizationProofDigest: command.authorizationProofDigest },
-            receipt: result.receipt,
-        }));
-    `;
-    return JSON.parse(runNode(
-        ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', source],
-        { MEDIFLOW_DATA_DIR: dataDir },
-    )) as HeadlessSoapReplayFixture;
-}
-
-function replayHeadlessSoapCommit(dataDir: string, fixture: HeadlessSoapReplayFixture): Record<string, unknown> {
-    const fixtureUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-command-binding-test-fixture.ts')).href;
-    const ownerUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-entry-commit-owner.ts')).href;
-    const source = `
-        const { syntheticRecord } = await import(${JSON.stringify(fixtureUrl)});
-        const { createHeadlessSoapEntryCommitOwner } = await import(${JSON.stringify(ownerUrl)});
-        const key = JSON.parse(process.env.W7_HEADLESS_REPLAY_KEY);
-        process.stdout.write(JSON.stringify(createHeadlessSoapEntryCommitOwner().lookup(syntheticRecord(key))));
-    `;
-    return JSON.parse(runNode(
-        ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', source],
-        { MEDIFLOW_DATA_DIR: dataDir, W7_HEADLESS_REPLAY_KEY: JSON.stringify(fixture.key) },
-    )) as Record<string, unknown>;
-}
-
 function primaryKeyColumns(db: Database.Database, table: string): string[] {
     return (db.prepare(`PRAGMA table_info(${quoteIdentifier(table)})`).all() as Array<{ name: string; pk: number }>)
         .filter((column) => column.pk > 0)
@@ -592,6 +540,25 @@ function headlessSoapRestoreFixture(): {
     }];
     payload.auditEvents = [audit];
     return { payload, audit };
+}
+
+/* Moves the hand-built H7b ledger into the source archive through a real restore, so export and restore both validate a non-empty chain. */
+async function seedHeadlessSoapLedger(workDir: string, sourceDb: Database.Database): Promise<void> {
+    const scratchDataDir = path.join(workDir, 'h7b-scratch'); const artifactPath = path.join(workDir, 'h7b-seed.mediflow');
+    prepareDatabase(scratchDataDir);
+    fs.writeFileSync(artifactPath, await serializeBackupArtifact(headlessSoapRestoreFixture().payload));
+    restoreArtifact(scratchDataDir, artifactPath);
+    sourceDb.prepare('ATTACH DATABASE ? AS h7b').run(path.join(scratchDataDir, 'medical.db'));
+    try {
+        for (const [table, where] of [
+            ['ambulatories', "id = 'h7b-amb'"],
+            ['patients', "id = 'h7b-patient'"],
+            [MEMBERSHIP_TABLE, "patient_id = 'h7b-patient'"],
+            ['entries', "patient_id = 'h7b-patient'"],
+            ['audit_events', 'event_id IN (SELECT audit_event_id FROM h7b.headless_soap_entry_commits)'],
+            ['headless_soap_entry_commits', '1 = 1'],
+        ]) sourceDb.exec(`INSERT INTO main.${quoteIdentifier(table)} SELECT * FROM h7b.${quoteIdentifier(table)} WHERE ${where}`);
+    } finally { sourceDb.exec('DETACH DATABASE h7b'); }
 }
 
 function insertAuditSnapshot(db: Database.Database, audit: Record<string, unknown>): void {
@@ -825,29 +792,6 @@ test('rolls back a SOAP attestation restore when its local actor is absent', asy
     }
 });
 
-/* Drives the real attestation owner on the restored archive, so the row is judged by its only reader. */
-function exerciseSoapAttestationStore(dataDir: string, actorRef: string, steps: Array<'read' | 'activate' | 'revoke'>): string[] {
-    const storeUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-active-role-attestation-store.ts')).href;
-    const source = `
-        const { createHeadlessSoapActiveRoleAttestationStore } = await import(${JSON.stringify(storeUrl)});
-        const store = createHeadlessSoapActiveRoleAttestationStore(), actorRef = process.env.W7_ACTOR_REF;
-        const outcomes = JSON.parse(process.env.W7_ATTESTATION_STEPS).map((step) => {
-            try {
-                if (step === 'revoke') {
-                    const { attestationRef } = store.read(actorRef);
-                    return store.revoke(actorRef, { attestationRef, attestationVersion: 1, revocationGeneration: 0 }).status;
-                }
-                return store[step](actorRef).status;
-            } catch (error) { return error?.code ?? 'failed'; }
-        });
-        process.stdout.write(JSON.stringify(outcomes));
-    `;
-    return JSON.parse(runNode(
-        ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', source],
-        { MEDIFLOW_DATA_DIR: dataDir, W7_ACTOR_REF: actorRef, W7_ATTESTATION_STEPS: JSON.stringify(steps) },
-    )) as string[];
-}
-
 test('restores a SOAP role attestation without its activation and keeps a later revocation', async () => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-soap-attestation-authority-'));
     const targetDataDir = path.join(workDir, 'target');
@@ -880,15 +824,13 @@ test('restores a SOAP role attestation without its activation and keeps a later 
                 status: 'inactive', attestation_version: 1, issuer_ref: null, expires_at: null, activated_at: null,
                 revocation_generation: 0, revoked_at: null, created_at: activatedAt, updated_at: activatedAt,
             }]);
-            // A new enrollment still works on the restored row, and the physician can then revoke it.
-            assert.deepEqual(exerciseSoapAttestationStore(targetDataDir, actorRef, ['read', 'activate', 'revoke']),
-                ['inactive', 'active', 'revoked']);
-
+            // A later local revocation survives a second restore of the same archive.
+            const revokedAt = activatedAt + 30;
+            targetDb.prepare("UPDATE headless_soap_active_role_attestations SET status = 'revoked', revocation_generation = 1, revoked_at = ?, updated_at = ? WHERE attestation_ref = ?")
+                .run(revokedAt, revokedAt, attestationRef);
             const revoked = readOrderedRows(targetDb, 'headless_soap_active_role_attestations');
             restoreArtifact(targetDataDir, artifactPath);
             assert.deepEqual(readOrderedRows(targetDb, 'headless_soap_active_role_attestations'), revoked);
-            assert.deepEqual(exerciseSoapAttestationStore(targetDataDir, actorRef, ['read', 'activate']),
-                ['revoked', 'attestation_conflict']);
         } finally {
             targetDb.close();
         }
@@ -947,7 +889,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                 base64: Buffer.from('%PDF-1.4 Originale sintetico').toString('base64'), page: '2' }, () => {});
             const selection = { entryId: prosthetics.search('').entries[0].id, revision: prosthetics.status().revision };
             sourceDb.prepare('UPDATE prosthetic_prescriptions SET catalog_snapshot=? WHERE id=?').run(JSON.stringify(prosthetics.snapshot(selection)), 'w7-prosthetic');
-            const headlessSoapReplay = seedHeadlessSoapCommit(sourceDataDir);
+            await seedHeadlessSoapLedger(workDir, sourceDb);
 
             for (const table of clinicalTables) {
                 assert.deepEqual(readOrderedRows(targetDb, table), table === 'audit_events' ? targetInitialAudits : [], `target ${table} retains only its initial host audit before restore`);
@@ -981,9 +923,6 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                 { MEDIFLOW_DATA_DIR: targetDataDir, MEDIFLOW_DURABLE_REVIEW_RECORD: JSON.stringify(durableReviewCommand) },
             ));
             assert.deepEqual(replayed, { recordId: durableReviewCommand.record.reviewId, ...durableReviewCommand.record });
-            assert.deepEqual(replayHeadlessSoapCommit(targetDataDir, headlessSoapReplay), {
-                status: 'exact', receipt: headlessSoapReplay.receipt,
-            });
 
             let encryptedFieldCount = 0;
             for (const table of clinicalTables) {

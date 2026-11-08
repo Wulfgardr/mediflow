@@ -34,7 +34,8 @@ P/E/T/O/C/PR/SP/A/B/D/S/M sono gli ingressi HTTP; `X-*` sono caller composti,
 non nuove autorità né un'altra copia degli endpoint. Un PUT può comprendere
 più transizioni lifecycle del profilo. I percorsi assenti restano assenti.
 
-- `H-*` distingue append SOAP esportato e commit checkup trusted Web. MCP/Mini
+- `H-*` riguarda il commit checkup trusted Web; l'append SOAP non ha più un
+  runtime (ADR 0103). MCP/Mini
   possono preparare proposte, non ottenere proof o commit. Il catalogo
   [headless canonico](../lib/headless/canonical-capability-catalog.ts) descrive
   ancore manuali non concedibili: non prova la raggiungibilità di un writer.

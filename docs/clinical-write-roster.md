@@ -274,9 +274,10 @@ roster non li promuove a un nuovo dominio di commit clinico.
   manutenzione admin non hanno equivalenti v1/paired nella base.
 - Allegati API v1 locale: nessun writer dedicato; paired ha upload, non PUT/DELETE
   del dettaglio. Policy document-derived: [ADR 0076](./adr/0076-paired-document-domain-write-policy.md).
-- SOAP/headless, transizione checkup trusted e attestazioni di ruolo hanno i
-  propri owner, receipt e replay: [ADR 0103](./adr/0103-headless-clinician-authorized-soap-entry-write.md)
-  e [ADR 0116](./adr/0116-agentic-checkup-status-transition.md). Non sono migrazioni
+- Transizione checkup trusted e attestazioni di ruolo hanno i propri owner,
+  receipt e replay: [ADR 0116](./adr/0116-agentic-checkup-status-transition.md).
+  La scrittura SOAP di [ADR 0103](./adr/0103-headless-clinician-authorized-soap-entry-write.md)
+  non ha più un runtime: restano solo contratto, ledger e backup. Non sono migrazioni
   al writer ordinario C05 e nessuna capacità nuova viene concessa agli agenti.
 - Backup restore, swap/repair DB e scheduler operano su custodia/storia e autorità
   differenti: [repair route](../app/api/system/repair-db/route.ts),

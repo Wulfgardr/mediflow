@@ -124,31 +124,6 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Client lock tests use fixed local-only credentials to exercise synthetic lock, unlock and password-rejection paths.',
         },
         {
-            path: 'lib/security/headless-soap-active-role-enrollment.test.ts',
-            pattern: "username:\\s*'other'",
-            reason: 'Active-role enrollment tests use a synthetic alternate username to verify identity mismatch rejection.',
-        },
-        {
-            path: 'lib/security/headless-soap-active-role-session-grant-attach-failure-fixture.ts',
-            pattern: "username:\\s*'synthetic-soap-admin'",
-            reason: 'The attach-failure fixture carries a synthetic SOAP administrator identity for an isolated failure process.',
-        },
-        {
-            path: 'lib/security/headless-soap-active-role-session-grant-binding.test.ts',
-            pattern: "username:\\s*'synthetic-h6-admin'",
-            reason: 'The H6 session-grant binding test uses a synthetic administrator identity for exact subject binding.',
-        },
-        {
-            path: 'lib/security/headless-soap-active-role-session-grant-rejection-fixture.ts',
-            pattern: "username:\\s*'synthetic-soap-admin'",
-            reason: 'The rejection fixture carries a synthetic SOAP administrator identity for an isolated failure process.',
-        },
-        {
-            path: 'lib/security/headless-soap-active-role-session-grant.test.ts',
-            pattern: "username:\\s*'synthetic-soap-admin'",
-            reason: 'Session-grant tests reuse one synthetic SOAP administrator identity across local lifecycle cases.',
-        },
-        {
             path: 'lib/security/headless-checkup-active-role-session-grant-production.test.ts',
             pattern: "username:\\s*'synthetic-checkup-production-(?:enrolled|not-enrolled)-user'",
             reason: 'Checkup production grant tests bind two explicit synthetic administrators to isolated local enrollment states.',
@@ -157,36 +132,6 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'lib/security/headless-checkup-active-role-session-grant.test.ts',
             pattern: "username:\\s*'synthetic-checkup-admin'",
             reason: 'Checkup grant lifecycle tests reuse one synthetic administrator identity in an isolated in-process owner.',
-        },
-        {
-            path: 'lib/security/headless-soap-authorization-lineage.test.ts',
-            pattern: "username:\\s*'synthetic\\.clinician'",
-            reason: 'Authorization-lineage tests bind receipts to an explicit synthetic clinician identity.',
-        },
-        {
-            path: 'lib/security/headless-soap-authorization-proof-binding.test.ts',
-            pattern: "username\\s*[:=]\\s*'(?:synthetic\\.clinician|synthetic-h6-exact-session(?:-positive)?)'",
-            reason: 'Authorization-proof binding tests use named synthetic identities to distinguish positive and adversarial sessions.',
-        },
-        {
-            path: 'lib/security/headless-soap-authorization-proof-lifecycle-adversarial.test.ts',
-            pattern: "username:\\s*'synthetic-admin'",
-            reason: 'Adversarial authorization-proof tests use a synthetic administrator identity and isolated stores.',
-        },
-        {
-            path: 'lib/security/headless-soap-authorization-proof-lifecycle.test.ts',
-            pattern: "username:\\s*'synthetic-admin'",
-            reason: 'Authorization-proof lifecycle tests use a synthetic administrator identity and isolated stores.',
-        },
-        {
-            path: 'lib/security/headless-soap-command-binding-test-fixture.ts',
-            pattern: "username:\\s*'synthetic\\.clinician'",
-            reason: 'The command-binding fixture exposes a synthetic clinician identity only to local contract tests.',
-        },
-        {
-            path: 'lib/security/headless-soap-fresh-pin-verification.test.ts',
-            pattern: "username:\\s*(?:`\\$\\{USERNAME\\} `|'other'|'synthetic-other-admin')",
-            reason: 'Fresh-PIN verification tests use explicit synthetic current, alternate and whitespace-variant identities.',
         },
         {
             path: 'lib/security/pin-change-service.test.ts',

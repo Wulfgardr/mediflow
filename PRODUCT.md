@@ -152,8 +152,9 @@ Il catalogo comprende letture circoscritte, proposta di follow-up, pianificatore
 semantico in sola lettura e preview F10 del checkup. F10 scrive soltanto nella
 UI Web fidata, dopo nuovi controlli di ruolo, autenticazione rafforzata
 (*step-up*), gesto pertinente, validità del contesto, CAS, audit e ricevuta.
-L’aggiunta SOAP confermata dal clinico è un’operazione separata, con politica,
-prova e ricevuta proprie: l’autorità non passa da una scrittura all’altra.
+L’aggiunta SOAP confermata dal clinico ha un contratto separato (ADR 0103), ma
+non ha un percorso eseguibile: il runtime, mai collegato a una rotta o a una
+schermata, è stato rimosso l’8 novembre 2026.
 
 Su macOS 26 o successivo, il percorso di registrazione visita usa acquisizione
 e trascrizione Apple sul dispositivo, consenso esplicito, audio limitato in
