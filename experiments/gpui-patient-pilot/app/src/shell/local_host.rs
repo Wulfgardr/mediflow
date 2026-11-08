@@ -176,7 +176,7 @@ impl LocalAdministration {
             _ => None,
         }
     }
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "macos"))]
     pub(super) fn dossier_test_access(&mut self, access: Arc<LocalHostAccess>) {
         self.authority = Authority::Open(access);
     }
