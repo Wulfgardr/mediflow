@@ -7906,14 +7906,25 @@ mod tests {
         worker.join().unwrap();
     }
     pub(super) fn local_host_reply(
-        stream: &mut std::net::TcpStream,
+        stream: &mut impl std::io::Write,
         status: u16,
         body: serde_json::Value,
         extra: &str,
     ) {
-        use std::io::Write;
+        try_local_host_reply(stream, status, body, extra).unwrap();
+    }
+    pub(super) fn try_local_host_reply(
+        stream: &mut impl std::io::Write,
+        status: u16,
+        body: serde_json::Value,
+        extra: &str,
+    ) -> std::io::Result<()> {
         let body = body.to_string();
-        write!(stream,"HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n{body}",body.len()).unwrap();
+        write!(
+            stream,
+            "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n{body}",
+            body.len()
+        )
     }
     pub(super) fn local_host_login(listener: &std::net::TcpListener) {
         local_host_login_as(listener, "synthetic-user", "admin", "synthetic-generation");

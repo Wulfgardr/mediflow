@@ -75,7 +75,9 @@ impl DossierImport {
         let script = std::fs::canonicalize(script).map_err(|_| RuntimeError::Transport)?;
         let launched = Command::new(node)
             .arg("--permission")
-            .arg(format!("--allow-fs-read={}", script.display()))
+            .arg(worker_read_permission(
+                script.to_str().ok_or(RuntimeError::InvalidInput)?,
+            ))
             .arg(&script)
             .env_clear()
             .stdin(Stdio::piped())
@@ -159,16 +161,7 @@ impl DossierImport {
         send(&mut channel.input, &command)?;
         loop {
             self.live()?;
-            let mut line = Zeroizing::new(String::new());
-            let read = channel
-                .output
-                .by_ref()
-                .take(MAX_CHANNEL_BYTES + 1)
-                .read_line(&mut line)
-                .map_err(|_| RuntimeError::Transport)?;
-            if read == 0 || read as u64 > MAX_CHANNEL_BYTES {
-                return Err(RuntimeError::TooLarge);
-            }
+            let line = read_channel_line(&mut channel.output)?;
             let value = InsightsValue(
                 serde_json::from_str(&line).map_err(|_| RuntimeError::InvalidResponse)?,
             );
@@ -525,4 +518,117 @@ fn send(input: &mut ChildStdin, value: &Value) -> Result<()> {
         .write_all(&line)
         .map_err(|_| RuntimeError::Transport)?;
     input.flush().map_err(|_| RuntimeError::Transport)
+}
+
+fn read_channel_line(output: &mut impl BufRead) -> Result<Zeroizing<String>> {
+    let mut line = Zeroizing::new(String::new());
+    let read = output
+        .take(MAX_CHANNEL_BYTES + 1)
+        .read_line(&mut line)
+        .map_err(|_| RuntimeError::Transport)?;
+    if read == 0 {
+        return Err(RuntimeError::Transport);
+    }
+    if read as u64 > MAX_CHANNEL_BYTES {
+        return Err(RuntimeError::TooLarge);
+    }
+    Ok(line)
+}
+
+fn worker_read_permission(path: &str) -> String {
+    if let Some(unc) = path.strip_prefix(r"\\?\UNC\") {
+        format!(r"--allow-fs-read=\\{unc}")
+    } else {
+        let path = path
+            .strip_prefix(r"\\?\")
+            .filter(|path| {
+                let bytes = path.as_bytes();
+                bytes.first().is_some_and(u8::is_ascii_alphabetic)
+                    && bytes.get(1) == Some(&b':')
+                    && bytes.get(2) == Some(&b'\\')
+            })
+            .unwrap_or(path);
+        format!("--allow-fs-read={path}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn worker_eof_is_transport_failure_and_channel_limit_stays_enforced() {
+        assert_eq!(
+            read_channel_line(&mut std::io::Cursor::new([])).unwrap_err(),
+            RuntimeError::Transport
+        );
+        assert_eq!(
+            read_channel_line(&mut BufReader::new(std::io::repeat(b'x'))).unwrap_err(),
+            RuntimeError::TooLarge
+        );
+        assert_eq!(
+            &**read_channel_line(&mut std::io::Cursor::new(b"{}\n")).unwrap(),
+            "{}\n"
+        );
+    }
+
+    #[test]
+    fn worker_read_grant_matches_nodes_windows_lookup_path() {
+        for (path, expected) in [
+            (r"\\?\C:\Temp\dossier.mjs", r"C:\Temp\dossier.mjs"),
+            (
+                r"\\?\UNC\server\share\dossier.mjs",
+                r"\\server\share\dossier.mjs",
+            ),
+            (r"C:\Temp\à dossier.mjs", r"C:\Temp\à dossier.mjs"),
+            ("/private/tmp/à dossier.mjs", "/private/tmp/à dossier.mjs"),
+        ] {
+            assert_eq!(
+                worker_read_permission(path),
+                format!("--allow-fs-read={expected}")
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn worker_windows_verbatim_grant_reproduces_denial_and_normalized_grant_starts() {
+        let node = std::env::split_paths(&std::env::var_os("PATH").unwrap())
+            .map(|path| path.join("node.exe"))
+            .find(|path| path.is_absolute() && path.is_file())
+            .unwrap();
+        let script = std::env::temp_dir().join(format!(
+            "mediflow-dossier-path-{}.mjs",
+            operation_uuid().unwrap()
+        ));
+        std::fs::write(&script, "process.stdout.write('synthetic worker ready')").unwrap();
+        let canonical = std::fs::canonicalize(&script).unwrap();
+        let path = canonical.to_str().unwrap();
+        assert!(path.starts_with(r"\\?\"));
+        let run = |permission: String| {
+            Command::new(&node)
+                .arg("--permission")
+                .arg(permission)
+                .arg(&canonical)
+                .env_clear()
+                .output()
+                .unwrap()
+        };
+        let before = run(format!("--allow-fs-read={path}"));
+        assert!(!before.status.success());
+        let error = String::from_utf8_lossy(&before.stderr);
+        assert!(error.contains("ERR_ACCESS_DENIED"), "{error}");
+        assert!(error.contains("FileSystemRead"), "{error}");
+        let after = run(worker_read_permission(path));
+        std::fs::remove_file(script).unwrap();
+        assert!(
+            after.status.success(),
+            "{}",
+            String::from_utf8_lossy(&after.stderr)
+        );
+        assert_eq!(after.stdout, b"synthetic worker ready");
+        eprintln!(
+            "Windows Node 24: verbatim grant = ERR_ACCESS_DENIED/FileSystemRead; normalized grant = ready"
+        );
+    }
 }
