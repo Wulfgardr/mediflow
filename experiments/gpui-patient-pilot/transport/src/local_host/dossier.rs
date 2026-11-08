@@ -641,11 +641,19 @@ mod tests {
                 .output()
                 .unwrap()
         };
+        // The original invocation, verbatim grant and verbatim entry: Node 24
+        // cannot resolve the entry (`EISDIR, lstat 'C:'`) and never starts it.
         let before = run(format!("--allow-fs-read={path}"), path.to_owned());
         assert!(!before.status.success());
         let error = String::from_utf8_lossy(&before.stderr);
-        assert!(error.contains("ERR_ACCESS_DENIED"), "{error}");
-        assert!(error.contains("FileSystemRead"), "{error}");
+        assert!(
+            !before.stdout.starts_with(b"synthetic worker ready"),
+            "{error}"
+        );
+        assert!(
+            error.contains("EISDIR") || error.contains("ERR_ACCESS_DENIED"),
+            "{error}"
+        );
         let after = run(worker_read_permission(path), node_visible_path(path));
         std::fs::remove_file(script).unwrap();
         assert!(
@@ -655,7 +663,7 @@ mod tests {
         );
         assert_eq!(after.stdout, b"synthetic worker ready");
         eprintln!(
-            "Windows Node 24: verbatim grant = ERR_ACCESS_DENIED/FileSystemRead; normalized grant = ready"
+            "Windows Node 24: verbatim grant and entry = refused before start; ordinary grant and entry = ready"
         );
     }
 }
