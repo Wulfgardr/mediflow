@@ -5,9 +5,11 @@ import Database from 'better-sqlite3';
 import { initializeSqliteSchema } from './sqlite-schema';
 import { schemaSnapshot } from './sqlite-schema-shape';
 import { assertTherapyCommandPredecessorRecoverySchema } from './therapy-status-command-recovery-schema';
+import { RETIRED_FEATURE_TABLES_SQL } from './ambulatory-destructive-command-recovery-schema';
 
 function predecessor() {
     const db = new Database(':memory:'); initializeSqliteSchema(db);
+    for (const sql of RETIRED_FEATURE_TABLES_SQL) db.exec(sql);
     for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) db.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
     db.exec('ALTER TABLE entries DROP COLUMN recorded_by');
     db.exec('DROP TABLE portable_import_origins; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;'); return db;
