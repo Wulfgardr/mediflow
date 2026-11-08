@@ -17,11 +17,11 @@ App Debug sul banco sintetico. Codice iOS delle catture: `59e54ac8515534aed9579a
 
 | Schermata | Evidenza |
 | --- | --- |
-| [Elenco iPad](ipad-elenco-giorno.png) | Barra laterale, righe da 44 punti, contenitore e selezione dei filtri con il raggio dei controlli. |
-| [Scheda iPad](ipad-scheda-giorno.png) | Quattro tabelle nel quadro e diario affiancato. |
-| [Impostazioni Grafite](ipad-impostazioni-grafite.png) | Inchiostro sul fondo selezionato, senza blu pieno. |
-| [Scrittura iPhone](iphone-scrittura-grafite.png) | Soglia di registrazione sopra la tastiera. |
-| [Errore PIN Grafite](iphone-errore-grafite.png) | Croce e critico pieno. |
+| [Elenco iPad](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-11-07-apple-identita/ipad-elenco-giorno.png) | Barra laterale, righe da 44 punti, contenitore e selezione dei filtri con il raggio dei controlli. |
+| [Scheda iPad](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-11-07-apple-identita/ipad-scheda-giorno.png) | Quattro tabelle nel quadro e diario affiancato. |
+| [Impostazioni Grafite](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-11-07-apple-identita/ipad-impostazioni-grafite.png) | Inchiostro sul fondo selezionato, senza blu pieno. |
+| [Scrittura iPhone](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-11-07-apple-identita/iphone-scrittura-grafite.png) | Soglia di registrazione sopra la tastiera. |
+| [Errore PIN Grafite](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-11-07-apple-identita/iphone-errore-grafite.png) | Croce e critico pieno. |
 
 Il banco condiviso è passato da 42 a 43 pazienti sintetici. Le scene di scheda e diario conservano Rossi Sintetica Maria e Vuoto Sintetico Paolo. Dispositivo, orientamento, temi e sequenza sono invariati. Nessun salvataggio della bozza.
 

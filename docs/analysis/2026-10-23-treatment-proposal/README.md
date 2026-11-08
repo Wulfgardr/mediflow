@@ -89,11 +89,11 @@ verifica `innerWidth` e produce PNG del viewport fisico 1440×1000, verificati.
 Le catture zoom mostrano la porzione di pagina raggiunta tramite scorrimento;
 non sono una riduzione artificiale dell’immagine.
 
-- Spenta, Grafite 390: [prima](./captures/prima-grafite-390-spenta.png), [dopo](./captures/dopo-grafite-390-spenta.png).
-- Pronta, Giorno 1440: [prima](./captures/prima-giorno-1440-pronta.png), [dopo](./captures/dopo-giorno-1440-pronta.png).
-- In corso, Grafite 768: [prima](./captures/prima-grafite-768-in-corso.png), [dopo](./captures/dopo-grafite-768-in-corso.png).
-- Proposta, Giorno 1440: [prima](./captures/prima-giorno-1440-proposta.png), [dopo](./captures/dopo-giorno-1440-proposta.png).
-- Errore, Giorno zoom 200%: [prima](./captures/prima-giorno-zoom-200-errore.png), [dopo](./captures/dopo-giorno-zoom-200-errore.png).
+- Spenta, Grafite 390: [prima](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-treatment-proposal/captures/prima-grafite-390-spenta.png), [dopo](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-treatment-proposal/captures/dopo-grafite-390-spenta.png).
+- Pronta, Giorno 1440: [prima](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-treatment-proposal/captures/prima-giorno-1440-pronta.png), [dopo](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-treatment-proposal/captures/dopo-giorno-1440-pronta.png).
+- In corso, Grafite 768: [prima](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-treatment-proposal/captures/prima-grafite-768-in-corso.png), [dopo](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-treatment-proposal/captures/dopo-grafite-768-in-corso.png).
+- Proposta, Giorno 1440: [prima](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-treatment-proposal/captures/prima-giorno-1440-proposta.png), [dopo](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-treatment-proposal/captures/dopo-giorno-1440-proposta.png).
+- Errore, Giorno zoom 200%: [prima](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-treatment-proposal/captures/prima-giorno-zoom-200-errore.png), [dopo](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-23-treatment-proposal/captures/dopo-giorno-zoom-200-errore.png).
 
 ## Scelte di design e limiti
 
