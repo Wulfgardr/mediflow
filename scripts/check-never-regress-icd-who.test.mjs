@@ -60,31 +60,6 @@ test('keeps external URL exceptions exact to their production or synthetic-test 
         "new Request('https://mediflow.local/api/icd/other')",
     ), false);
 
-    const tokenEndpoint = 'https://icdaccessmanagement.who.int/connect/token';
-    assert.equal(isExternalUrlLiteralAllowed(
-        'lib/reference-data/icd11-who-node-https-client.ts',
-        tokenEndpoint,
-        `const endpoint = '${tokenEndpoint}'`,
-    ), true);
-    assert.equal(isExternalUrlLiteralAllowed('lib/unrelated.ts', tokenEndpoint, tokenEndpoint), false);
-    assert.equal(isExternalUrlLiteralAllowed(
-        'lib/reference-data/icd11-who-node-https-client.ts',
-        `${tokenEndpoint}?redirect=caller`,
-        `const endpoint = '${tokenEndpoint}?redirect=caller'`,
-    ), false);
-
-    const hostileEndpoint = 'https://caller.invalid';
-    assert.equal(isExternalUrlLiteralAllowed(
-        'lib/reference-data/icd11-who-server-owner.test.ts',
-        hostileEndpoint,
-        `{ endpoint: '${hostileEndpoint}' }`,
-    ), true);
-    assert.equal(isExternalUrlLiteralAllowed('lib/reference-data/icd11-who-server-owner.ts', hostileEndpoint, hostileEndpoint), false);
-    assert.equal(isExternalUrlLiteralAllowed(
-        'lib/reference-data/icd11-who-server-owner.test.ts',
-        'https://caller.invalid.evil',
-        "{ endpoint: 'https://caller.invalid.evil' }",
-    ), false);
 });
 
 test('canonical URI data exception is confined to the exact native codec fixture', () => {
@@ -144,26 +119,6 @@ test('paired WHO exceptions reject changed URLs, extra URLs and other paths', ()
         assert.equal(isExternalUrlLiteralAllowed('lib/unrelated.ts', url, line), false);
         assert.equal(isExternalUrlLiteralAllowed(path, url + '?changed', line.replace(url, url + '?changed')), false);
         assert.equal(isExternalUrlLiteralAllowed(path, url, line + ' https://unapproved.invalid'), false);
-    }
-});
-
-const cloudCodeInfoFixturePath = "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts";
-const cloudCodeInfoFixtureLines = [
-    "const stemUri = 'http://id.who.int/icd/release/11/2026-01/mms/123456789';",
-    "            codeInfoResourceUri: `http://id.who.int/icd/release/11/2026-01/mms/codeinfo/${encodeURIComponent(code)}`,",
-    "    ['foundation namespace', { stemId: 'http://id.who.int/icd/entity/123456789' }],",
-    "    ['fabricated CodeInfo @id', { '@id': 'http://id.who.int/icd/release/11/2026-01/mms/codeinfo/AA00%26XY01' }],",
-    "    ['request URI mismatch', { codeInfoResourceUri: 'http://id.who.int/icd/release/11/2026-01/mms/codeinfo/BB01' }],"
-];
-
-test('cloud CodeInfo fixture URL exceptions are exact to file and inert source line', () => {
-    for (const line of cloudCodeInfoFixtureLines) {
-        const url = line.match(/https?:\/\/[^\s"'`)>]+/u)[0];
-        assert.equal(isExternalUrlLiteralAllowed(cloudCodeInfoFixturePath, url, line), true);
-        assert.equal(isExternalUrlLiteralAllowed('lib/reference-data/icd11-who-cloud-code-check-contract.ts', url, line), false);
-        const changed = url.replace('id.who.int', 'other.invalid');
-        assert.equal(isExternalUrlLiteralAllowed(cloudCodeInfoFixturePath, changed, line.replace(url, changed)), false);
-        assert.equal(isExternalUrlLiteralAllowed(cloudCodeInfoFixturePath, url, line + ' https://unapproved.invalid'), false);
     }
 });
 

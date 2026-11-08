@@ -498,9 +498,6 @@ qualunque compito.
   host-owned dei quattro percorsi generativi.
 - `lib/ai-providers/fabric/provider-disclosure.ts`: disclosure read-only dei
   provider, distinta dall'osservazione di una singola operazione.
-- `lib/ai-providers/fabric/guided-setup.ts` e
-  `lib/ai-providers/fabric/capability-binding-store.ts`: discovery compatibile,
-  smoke sintetico e attivazione atomica dei binding per capability.
 - `lib/ai-providers/v2/*official-transport.ts`: transport ufficiali OpenAI e
   Anthropic, composti soltanto dopo policy e lifecycle host-owned.
 - `docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json`:

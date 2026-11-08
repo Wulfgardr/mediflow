@@ -29,16 +29,6 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Audit tests use a synthetic native admin actor to verify attribution without relying on live credentials.',
         },
         {
-            path: 'native/MediFlowMac/Sources/MediFlowMac/Services/LocalAPIClient.swift',
-            pattern: 'username:\\s*"admin"',
-            reason: 'Native bootstrap still targets the first local admin account until auth identity becomes configurable.',
-        },
-        {
-            path: 'native/MediFlowMac/Tests/MediFlowMacTests/LocalAPIClientAuthTests.swift',
-            pattern: 'pin:\\s*"0000"',
-            reason: 'Native auth tests use a synthetic PIN literal to validate typed error mapping without hitting a live backend.',
-        },
-        {
             path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/CryptoServiceTests.swift',
             pattern: 'pin:\\s*"1234"',
             reason: 'Crypto compatibility tests use a synthetic PIN fixture to verify PBKDF2 parity with the web implementation.',
@@ -122,11 +112,6 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'lib/ai-providers/fabric/patient-insight-authenticated-preview.test.ts',
             pattern: "username:\\s*'synthetic'",
             reason: 'Patient Insight preview tests use a synthetic authenticated session fixture and no live credential.',
-        },
-        {
-            path: 'lib/ai-providers/fabric/treatment-reasoning-authenticated-projection.test.ts',
-            pattern: "username:\\s*'synthetic'",
-            reason: 'Treatment Reasoning projection tests use a synthetic authenticated session fixture and no live credential.',
         },
         {
             path: 'lib/legacy-smart-import-apply-retired-route.test.ts',
@@ -286,11 +271,6 @@ export const NEVER_REGRESS_ALLOWLIST = {
             pattern: 'https://example\\.invalid/catalog(?=["\\x27`])',
             reason: 'Synthetic off-host redirect response for AIFA HEAD rejection tests; no request to the reserved invalid host.',
         },
-        {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^const stemUri = 'http://id\\.who\\.int/icd/release/11/2026-01/mms/123456789';$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
-        {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^            codeInfoResourceUri: `http://id\\.who\\.int/icd/release/11/2026-01/mms/codeinfo/\\$\\{encodeURIComponent\\(code\\)\\}`,$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
-        {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^    \\['foundation namespace', \\{ stemId: 'http://id\\.who\\.int/icd/entity/123456789' \\}\\],$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
-        {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^    \\['fabricated CodeInfo @id', \\{ '@id': 'http://id\\.who\\.int/icd/release/11/2026-01/mms/codeinfo/AA00%26XY01' \\}\\],$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
-        {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^    \\['request URI mismatch', \\{ codeInfoResourceUri: 'http://id\\.who\\.int/icd/release/11/2026-01/mms/codeinfo/BB01' \\}\\],$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
         /* scoped ordinary integration test peer. */
         {"path": "lib/chatgpt-execution/ordinary-integration.test.ts", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ if\\ \\(method\\ ===\\ 'account/login/start'\\)\\ return\\ \\{\\ type:\\ 'chatgptDeviceCode',\\ loginId:\\ 'fixture\\-login',\\ userCode:\\ 'FAKE\\-ONLY',\\ verificationUrl:\\ 'https://auth\\.openai\\.com/fixture\\-never\\-navigate'\\ \\};$", "reason": "WUL-689/691: exact inert device-login response in the synthetic ordinary integration peer; never navigated or fetched."},
         /* exact WUL-673 reference and fixture lines. */
@@ -381,64 +361,9 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'The lifecycle test supplies an endpoint-shaped forbidden field to prove that the strict provider binding rejects caller-selected destinations without network access.',
         },
         {
-            path: 'lib/reference-data/icd11-who-host-composition.test.ts',
-            pattern: 'https://icdaccessmanagement\\.who\\.int/connect/token(?=["\\x27`])',
-            reason: 'WHO host-composition tests assert the exact token binding through injected fake clients without network access.',
-        },
-        {
-            path: 'lib/reference-data/icd11-who-host-composition.test.ts',
-            pattern: 'https://id\\.who\\.int/icd/release/11/2026-01/mms/search(?=\\?)',
-            reason: 'WHO host-composition tests assert the immutable Search binding through injected fake clients without network access.',
-        },
-        {
-            path: 'lib/reference-data/icd11-who-host-composition.test.ts',
-            pattern: 'https://caller\\.invalid(?=["\\x27`])',
-            reason: 'WHO host-composition tests use a reserved invalid caller endpoint to prove caller-supplied URLs are rejected.',
-        },
-        {
             path: 'lib/reference-data/icd11-who-http-route.test.ts',
             pattern: 'https://mediflow\\.local/api/icd/proxy(?=\\?|["\\x27`])',
             reason: 'The WHO HTTP route test uses one synthetic origin only to construct Request objects for the exact route under test.',
-        },
-        {
-            path: 'lib/reference-data/icd11-who-node-https-client.test.ts',
-            pattern: 'https://icdaccessmanagement\\.who\\.int/connect/token(?=["\\x27`])',
-            reason: 'The Node HTTPS client test observes the exact token request through a fake HTTPS seam and performs no network access.',
-        },
-        {
-            path: 'lib/reference-data/icd11-who-node-https-client.test.ts',
-            pattern: 'https://id\\.who\\.int/icd/release/11/2026-01/mms/search(?=\\?)',
-            reason: 'The Node HTTPS client test observes the exact Search request through a fake HTTPS seam and performs no network access.',
-        },
-        {
-            path: 'lib/reference-data/icd11-who-node-https-client.ts',
-            pattern: 'https://icdaccessmanagement\\.who\\.int/connect/token(?=["\\x27`])',
-            reason: 'The server-only WHO HTTPS client permits only the immutable official OAuth endpoint selected by the host composition.',
-        },
-        {
-            path: 'lib/reference-data/icd11-who-node-https-client.ts',
-            pattern: 'https://id\\.who\\.int\\$\\{path\\}(?=["\\x27`])',
-            reason: 'The server-only WHO HTTPS client combines the fixed official ICD host with a path already validated by its transport contract.',
-        },
-        {
-            path: 'lib/reference-data/icd11-who-official-token-issuer.test.ts',
-            pattern: 'https://id\\.who\\.int/connect/token(?=["\\x27`])',
-            reason: 'The token issuer test uses the wrong WHO host as an inert hostile fixture to prove exact-host rejection.',
-        },
-        {
-            path: 'lib/reference-data/icd11-who-official-token-issuer.test.ts',
-            pattern: 'http://icdaccessmanagement\\.who\\.int/connect/token(?=["\\x27`])',
-            reason: 'The token issuer test uses plaintext HTTP as an inert hostile fixture to prove HTTPS-only rejection.',
-        },
-        {
-            path: 'lib/reference-data/icd11-who-official-token-issuer.ts',
-            pattern: 'https://icdaccessmanagement\\.who\\.int/connect/token(?=["\\x27`])',
-            reason: 'The server-only token issuer binds to the immutable official WHO OAuth endpoint and accepts no caller URL.',
-        },
-        {
-            path: 'lib/reference-data/icd11-who-server-owner.test.ts',
-            pattern: 'https://caller\\.invalid(?=["\\x27`])',
-            reason: 'The WHO owner test uses a reserved invalid endpoint to prove caller-supplied URL fields are denied.',
         },
         {
             path: 'lib/aifa-catalog.ts',
@@ -629,21 +554,6 @@ export const NEVER_REGRESS_ALLOWLIST = {
             path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/PatientReportDocumentTests.swift',
             pattern: 'http://unitsofmeasure\\.org',
             reason: 'UCUM appears as a terminology system identifier in synthetic patient report fixtures and does not initiate network access.',
-        },
-        {
-            path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',
-            pattern: 'https://www.aiom.it/linee-guida-aiom/',
-            reason: 'The oncology prototype exposes clinician-invoked guidance links and does not perform background egress or runtime API calls.',
-        },
-        {
-            path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',
-            pattern: 'https://easl.eu/news/easl-cpgs-hcc/',
-            reason: 'The oncology prototype exposes clinician-invoked guidance links and does not perform background egress or runtime API calls.',
-        },
-        {
-            path: 'native/MediFlowMac/Sources/MediFlowMac/Models/OncologyPrototype.swift',
-            pattern: 'https://interactiveguidelines.esmo.org/esmo-web-app/home/',
-            reason: 'The oncology prototype exposes clinician-invoked guidance links and does not perform background egress or runtime API calls.',
         },
         {
             path: 'app/api/patients/route.test.ts',

@@ -15,10 +15,9 @@ test('new diary entry attachment flow never starts inline OCR or generative docu
 
 test('production document surfaces leave automatic extraction to persisted-source AnyDoc', () => {
     const upload = source('../components/document-upload.tsx');
-    const importer = source('../components/pdf-importer.tsx');
     const context = source('./ai-context.ts');
 
-    for (const activeSource of [upload, importer, context]) {
+    for (const activeSource of [upload, context]) {
         assert.doesNotMatch(activeSource, /extractPatientDataSmart|extractDocumentTextForSummary|extractTextFromPdf|\/api\/ocr\/extract/u);
     }
     assert.match(upload, /requestAnyDocDecryptedLocalExtractionPreview\(file\.id,\s*async/u);
