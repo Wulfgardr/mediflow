@@ -103,7 +103,7 @@ test('scheduled serialization preserves audit seconds, NULL, text and determinis
   assert.deepEqual(forward, reverse);
   assert.equal(forward.manifest.recordCounts.auditEvents, 2);
   assert.ok(forward.manifest.collections.includes('auditEvents'));
-  await assert.rejects(() => serializeBackupArtifact({ ...empty, auditEvents: [first, first] }), /duplicate/i);
+  await assert.rejects(() => serializeBackupArtifact({ ...empty, auditEvents: [first, first] }), /duplicate|invalid/i);
 });
 
 

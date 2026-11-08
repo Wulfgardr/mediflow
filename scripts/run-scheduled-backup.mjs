@@ -1,13 +1,9 @@
 #!/usr/bin/env node
 import { assertPrivateDirectory } from './windows-private-directory.mjs';
-import { validateAmbulatoryCommandRows } from '../lib/ambulatory-destructive-command-backup.ts';
-import { validateTherapyStatusCommandRows } from '../lib/therapy-status-command-backup.ts';
 /* @Codex */
-import { assertExemptionImportReceiptRows } from '../lib/exemption-import-receipt.ts';
-/* @Codex */
-import { assertProstheticsCatalogBackup, serializeProstheticsDocument } from '../lib/reference-data/prosthetics-catalog-backup.ts';
+import { serializeProstheticsDocument } from '../lib/reference-data/prosthetics-catalog-backup.ts';
+import { serializeBackupArtifact as serializeCanonicalBackupArtifact } from '../lib/backup-artifact.ts';
 
-import { canonicalizeBackupAuditRows } from '../lib/backup-audit.ts';
 import fs from 'fs';
 import { backupStorageDirectory, validateBackupDestination } from './backup-destination-policy.mjs';
 import os from 'os';
@@ -18,9 +14,6 @@ import { openAdmittedSqlite } from '../lib/sqlite-maintenance-admission.mjs';
 import { normalizeRowDates } from './scheduled-backup-date-fields.mjs';
 
 const SETTINGS_KEY = 'backupScheduler';
-const BACKUP_ARTIFACT_FORMAT = 'mediflow-backup';
-const BACKUP_ARTIFACT_VERSION = 1;
-const BACKUP_ARTIFACT_SCOPE = 'mediflow-web-local-backup';
 const BACKUP_ARTIFACT_FILE_PREFIX = 'mediflow-backup-v1-';
 const BACKUP_ARTIFACT_FILE_SUFFIX = '.mediflow';
 const BACKUP_ARTIFACT_TEMP_SUFFIX = '.mediflow.tmp';
@@ -112,71 +105,9 @@ function readState(db) {
   }
 }
 
-function normalizeJson(value) {
-  if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) return value.map((entry) => normalizeJson(entry));
-  if (value && typeof value === 'object') {
-    const normalized = {};
-    for (const key of Object.keys(value).sort()) {
-      const entry = normalizeJson(value[key]);
-      if (entry !== undefined) normalized[key] = entry;
-    }
-    return normalized;
-  }
-  if (typeof value === 'bigint') return value.toString();
-  if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean' || value === null) {
-    return value;
-  }
-  return undefined;
-}
-
-function stableStringify(value) {
-  return JSON.stringify(normalizeJson(value));
-}
-
-async function sha256Hex(value) {
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
+/* One serializer for Web and scheduled exports: the canonical artifact lives in lib/backup-artifact. */
 export async function serializeBackupArtifact(payload, createdAt = new Date()) {
-  /* @Codex Same receipt validation and ordering as the web export. */
-  assertExemptionImportReceiptRows(payload.exemptionImportReceipts ?? []);
-  assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? [], payload.prostheticsCatalogSources ?? [], payload.prostheticsCatalogDocuments ?? [], payload.prostheticPrescriptions ?? []);
-
-  const canonicalPayload = {
-    ...payload,
-    prostheticsCatalogEntries: payload.prostheticsCatalogEntries ?? [],
-    prostheticsCatalogReceipts: payload.prostheticsCatalogReceipts ?? [],
-    prostheticsCatalogSources: payload.prostheticsCatalogSources ?? [],
-    prostheticsCatalogDocuments: payload.prostheticsCatalogDocuments ?? [],
-    exemptionImportReceipts: [...(payload.exemptionImportReceipts ?? [])].sort((a, b) => a.id - b.id),
-  };
-  if (Object.hasOwn(payload, 'auditEvents')) {
-    canonicalPayload.auditEvents = canonicalizeBackupAuditRows(payload.auditEvents);
-  }
-  canonicalPayload.ambulatoryDestructiveCommands = validateAmbulatoryCommandRows(payload.ambulatoryDestructiveCommands ?? [], canonicalPayload.auditEvents ?? []);
-  canonicalPayload.therapyStatusCommands = validateTherapyStatusCommandRows(payload.therapyStatusCommands ?? [], canonicalPayload.auditEvents ?? []);
-  const collections = Object.keys(BACKUP_TABLES).filter(collection => collection !== 'auditEvents' || Object.hasOwn(payload, 'auditEvents'));
-  const payloadSnapshot = normalizeJson(canonicalPayload);
-  const checksum = await sha256Hex(stableStringify(payloadSnapshot));
-  const recordCounts = Object.fromEntries(
-    collections.map((collection) => [collection, canonicalPayload[collection]?.length ?? 0]),
-  );
-  const artifact = {
-    format: BACKUP_ARTIFACT_FORMAT,
-    version: BACKUP_ARTIFACT_VERSION,
-    manifest: {
-      scope: BACKUP_ARTIFACT_SCOPE,
-      createdAt: createdAt.toISOString(),
-      checksumAlgorithm: 'sha256',
-      checksum,
-      collections,
-      recordCounts,
-    },
-    payload: canonicalPayload,
-  };
-  return JSON.stringify(normalizeJson(artifact), null, 2);
+  return serializeCanonicalBackupArtifact(payload, createdAt);
 }
 
 function classifyManagedBackupFile(name) {
