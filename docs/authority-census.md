@@ -36,9 +36,7 @@ più transizioni lifecycle del profilo. I percorsi assenti restano assenti.
 
 - `H-*` riguarda il commit checkup trusted Web; l'append SOAP non ha più un
   runtime (ADR 0103). MCP/Mini
-  possono preparare proposte, non ottenere proof o commit. Il catalogo
-  [headless canonico](../lib/headless/canonical-capability-catalog.ts) descrive
-  ancore manuali non concedibili: non prova la raggiungibilità di un writer.
+  possono preparare proposte, non ottenere proof o commit.
 - `R-*` (record, link paziente e decisione della review durevole) è ritirato
   l'8 novembre 2026: nessun caller di prodotto, tabelle eliminate dallo schema 11.
 - `L-01` e `X-13` sono ritirati in WUL-774 dopo la verifica dell'assenza di
@@ -176,10 +174,9 @@ assegna il discriminatore interno e `updatePatientOperation` ne verifica identit
 versione prima di aprire la transazione esistente. Il body non sceglie il
 dispatch. Questi contratti operativi coprono lettura e UPDATE della verticale;
 non concedono capacità, non registrano un nuovo writer e non sono il registro
-completo delle future operazioni del pilota. Il catalogo [application-operation-registry](../lib/headless/application-operation-registry.ts)
-resta statico `denied/unavailable`, con riferimenti operativi null; i cataloghi
-intelligenti/Fabric conservano i propri owner. Nessun agente ottiene un
-commit dalla presenza del descrittore di lettura.
+completo delle future operazioni del pilota. I cataloghi intelligenti/Fabric
+conservano i propri owner. Nessun agente ottiene un commit dalla presenza del
+descrittore di lettura.
 
 Le prove di comportamento sono in [patient-profile-service.test](../lib/patient-profile-service.test.ts),
 [patient-update-operation.test](../lib/patient-update-operation.test.ts) e
@@ -261,7 +258,7 @@ senza introdurre candidati aggiuntivi.
 | A05 | KEEP di definizioni e significati storici: [scale-definitions](../lib/scale-definitions.ts), [Tinetti versionata](../lib/scales/tinetti-poma28-v1.ts); interpretazione e diritti restano C08. | [WUL-723](https://linear.app/wulfgardr/issue/WUL-723). |
 | A06 | KEEP dei negativi [admin-route-auth-boundary](../scripts/admin-route-auth-boundary.test.mjs); fixture e selezione sono responsabilità C14, non parità clinica. | [WUL-729](https://linear.app/wulfgardr/issue/WUL-729). |
 | NULL_JSON | CONSOLIDATO: reader/normalizzazione e profili del [roster](./clinical-write-roster.md) distinguono malformed/null/versioni; il debito della baseline non descrive i writer migrati. | [WUL-720](https://linear.app/wulfgardr/issue/WUL-720). |
-| A07 | KEEP: [canonical-read-plan](../lib/headless/canonical-read-plan.ts) e catalogo concedono soltanto operazioni nominate; nessun update paziente dedotto dalla presenza di MCP. | [WUL-731](https://linear.app/wulfgardr/issue/WUL-731). |
+| A07 | KEEP: il piano canonico e il catalogo statico, mai collegati, sono rimossi l'8 novembre 2026; MCP concede soltanto le operazioni nominate dal proprio catalogo, nessun update paziente dedotto dalla sua presenza. | [WUL-731](https://linear.app/wulfgardr/issue/WUL-731). |
 | A08 | KEEP: [gate locale](../lib/ai-egress-gate.ts) chiuso; le composizioni provider esplicite sono autorità separate nella tabella sopra. | [WUL-725](https://linear.app/wulfgardr/issue/WUL-725). |
 | A09 | KEEP della distinzione sorgente/installazione/uso clinico nello [stato del sistema](./STATE_OF_THE_SYSTEM.md); non convertire inventario in qualifica. | [WUL-734](https://linear.app/wulfgardr/issue/WUL-734). |
 | SERVICE_AUDIT | CONSOLIDATO: [service-prescription-write](../lib/service-prescription-write.ts) scrive audit required con prescrizione/item nel commit. | [WUL-720](https://linear.app/wulfgardr/issue/WUL-720). |

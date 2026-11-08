@@ -8,10 +8,8 @@ import {
     createLegacyProjectionOwnerFactory,
     createServerSessionProjectionOwnerRegistry,
     createPortProjectionOwnerFactory,
-    disposeDurableReviewCommitPort,
     isServerSessionProjectionOwner,
     ServerSessionProjectionOwnerError,
-    spendDurableReviewCommitPort,
 } from './server-session-projection-owner.ts';
 import { clearAllSessions, createSession, deleteSession, type ServerSession } from './server-session.ts';
 import {
@@ -78,8 +76,7 @@ test('port owner surface cannot recover legacy callback or broker authority', ()
     assert.equal(isServerSessionProjectionOwner(owner), false);
     assert.deepEqual(Reflect.ownKeys(owner), [
         'snapshotSelectionEpoch', 'snapshotReviewContextEpoch', 'issueSelection', 'dereferenceSelection',
-        'mintPatientInsightLeaseCommitPort', 'mintOcrLeaseCommitPort', 'mintDocumentSynthesisLeaseCommitPort',
-        'mintTreatmentReasoningLeaseCommitPort', 'mintDurableReviewCommitPort', 'dispose',
+        'mintPatientInsightLeaseCommitPort', 'mintDocumentSynthesisLeaseCommitPort', 'dispose',
     ]);
     for (const key of forbidden) {
         assert.equal(Reflect.has(owner, key), false);
@@ -153,10 +150,7 @@ test('port factory keeps every lease commit port on exact final-owner authority'
     const owner = createPortProjectionOwnerFactory({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }) }).acquire(value);
     owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     assert.ok(owner.mintPatientInsightLeaseCommitPort(value).snapshot());
-    assert.ok(owner.mintOcrLeaseCommitPort(value).snapshot());
     assert.ok(owner.mintDocumentSynthesisLeaseCommitPort(value).snapshot());
-    assert.ok(owner.mintTreatmentReasoningLeaseCommitPort(value).snapshot());
-    assert.equal(spendDurableReviewCommitPort(owner.mintDurableReviewCommitPort(value)), true);
     retirePortSession(value);
 });
 
@@ -184,15 +178,12 @@ test('final-owner retirement terminally removes its facade and every commit port
     const registry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }) });
     const owner = registry.acquire(value);
     owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-    const ports = [owner.mintPatientInsightLeaseCommitPort(value), owner.mintOcrLeaseCommitPort(value),
-        owner.mintDocumentSynthesisLeaseCommitPort(value), owner.mintTreatmentReasoningLeaseCommitPort(value)];
-    const durable = owner.mintDurableReviewCommitPort(value);
+    const ports = [owner.mintPatientInsightLeaseCommitPort(value), owner.mintDocumentSynthesisLeaseCommitPort(value)];
 
     retirePortSession(value);
     assert.equal(registry.lookup(value.id), null);
     assert.equal(registry.isAuthenticOwner(owner), false);
     for (const port of ports) assert.equal(port.snapshot(), null);
-    assert.equal(spendDurableReviewCommitPort(durable), false);
     assert.throws(() => owner.issueSelection({ expectedEpoch: 1, ...PAIR }),
         (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
     assert.equal(registry.lookup(value.id), null);
@@ -207,7 +198,7 @@ test('historical deletion cannot replace final-owner retirement across registrie
     firstOwner.issueSelection({ expectedEpoch: 0, ...PAIR });
     secondOwner.issueSelection({ expectedEpoch: 0, ...PAIR });
     const firstPort = firstOwner.mintPatientInsightLeaseCommitPort(value);
-    const secondPort = secondOwner.mintOcrLeaseCommitPort(value);
+    const secondPort = secondOwner.mintDocumentSynthesisLeaseCommitPort(value);
 
     deleteSession(value.id);
     assert.equal(first.lookup(value.id), firstOwner);
@@ -231,7 +222,7 @@ test('historical global clear cannot replace final-owner retirement', () => {
     const registry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }) });
     const owner = registry.acquire(value);
     owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-    const port = owner.mintTreatmentReasoningLeaseCommitPort(value);
+    const port = owner.mintPatientInsightLeaseCommitPort(value);
     clearAllSessions();
     assert.equal(registry.lookup(value.id), owner);
     assert.equal(registry.isAuthenticOwner(owner), true);
@@ -249,13 +240,11 @@ test('final-owner port currentness expiry terminally cleans the facade before re
     const owner = registry.acquire(value);
     owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     const port = owner.mintDocumentSynthesisLeaseCommitPort(value);
-    const durable = owner.mintDurableReviewCommitPort(value);
 
     now = value.expiresAt;
     assert.equal(port.snapshot(), null);
     assert.equal(registry.lookup(value.id), null);
     assert.equal(registry.isAuthenticOwner(owner), false);
-    assert.equal(spendDurableReviewCommitPort(durable), false);
     owner.dispose(); owner.dispose();
     assert.equal(registry.lookup(value.id), null);
     retirePortSession(value);
@@ -275,7 +264,7 @@ test('first final-owner selection at or after finite expiry cleans before typed 
             assert.equal(registry.isAuthenticOwner(owner), false);
             assert.throws(() => owner.issueSelection({ expectedEpoch: 0, ...PAIR }),
                 (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
-            assert.throws(() => owner.mintOcrLeaseCommitPort(value),
+            assert.throws(() => owner.mintPatientInsightLeaseCommitPort(value),
                 (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
         }
         await new Promise<void>((resolve) => setImmediate(resolve));
@@ -297,10 +286,7 @@ test('every callback-free facade operation terminally cleans failed final-owner 
             ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef,
         }),
         (owner: PortOwner) => owner.mintPatientInsightLeaseCommitPort(value),
-        (owner: PortOwner) => owner.mintOcrLeaseCommitPort(value),
         (owner: PortOwner) => owner.mintDocumentSynthesisLeaseCommitPort(value),
-        (owner: PortOwner) => owner.mintTreatmentReasoningLeaseCommitPort(value),
-        (owner: PortOwner) => owner.mintDurableReviewCommitPort(value),
     ];
     const records = operations.map((operation) => {
         const registry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }) });
@@ -348,8 +334,7 @@ test('full port factory exposes its complete broker and critical-section surface
         'snapshotSelectionEpoch', 'snapshotReviewContextEpoch', 'acquireProjectionIngest',
         'resolveProjectionService', 'issueSelection', 'dereferenceSelection',
         'withLeaseCriticalSection', 'dispose', 'mintPatientInsightLeaseCommitPort',
-        'mintOcrLeaseCommitPort', 'mintDocumentSynthesisLeaseCommitPort',
-        'mintTreatmentReasoningLeaseCommitPort', 'mintDurableReviewCommitPort',
+        'mintDocumentSynthesisLeaseCommitPort',
     ]);
     const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     const tuple = {
@@ -443,20 +428,12 @@ test('removes the generic commit turn surface and mints separated closed ports',
     const { value, owner } = ownerWithSelection();
     const patientInsight = owner.mintPatientInsightLeaseCommitPort(value);
     const secondPatientInsight = owner.mintPatientInsightLeaseCommitPort(value);
-    const ocr = owner.mintOcrLeaseCommitPort(value);
     const documentSynthesis = owner.mintDocumentSynthesisLeaseCommitPort(value);
-    const treatmentReasoning = owner.mintTreatmentReasoningLeaseCommitPort(value);
     const patientSnapshot = patientInsight.snapshot();
-    const ocrSnapshot = ocr.snapshot();
     const documentSnapshot = documentSynthesis.snapshot();
-    assert.ok(patientSnapshot); assert.ok(ocrSnapshot); assert.ok(documentSnapshot);
+    assert.ok(patientSnapshot); assert.ok(documentSnapshot);
     assert.notEqual(patientInsight, secondPatientInsight);
-    assert.notEqual(patientInsight, ocr);
     assert.notEqual(patientInsight, documentSynthesis);
-    assert.notEqual(ocr, documentSynthesis);
-    assert.notEqual(patientInsight, treatmentReasoning);
-    assert.notEqual(ocr, treatmentReasoning);
-    assert.notEqual(documentSynthesis, treatmentReasoning);
     assert.deepEqual(Object.keys(patientInsight), ['snapshot', 'prepare', 'commit', 'abort', 'dispose']);
     assert.equal(Object.isFrozen(patientInsight), true);
     assert.equal(Object.getPrototypeOf(patientSnapshot.currentRef), null);
@@ -466,9 +443,7 @@ test('removes the generic commit turn surface and mints separated closed ports',
     assert.equal(secondPatientInsight.commit(Object.freeze({
         expected: secondPatientInsight.snapshot()!.currentRef, replacement,
     } as never)), false);
-    assert.equal(ocr.commit(Object.freeze({ expected: ocrSnapshot.currentRef, replacement } as never)), false);
     assert.equal(documentSynthesis.commit(Object.freeze({ expected: documentSnapshot.currentRef, replacement } as never)), false);
-    assert.equal(treatmentReasoning.commit(Object.freeze({ expected: treatmentReasoning.snapshot()!.currentRef, replacement } as never)), false);
     assert.equal(patientInsight.commit(Object.freeze({ expected: patientSnapshot.currentRef, replacement })), true);
     assert.equal(patientInsight.snapshot()!.terminal, true);
     assert.equal(patientInsight.commit(Object.freeze({ expected: patientSnapshot.currentRef, replacement })), false);
@@ -494,171 +469,23 @@ test('lease commit ports deny patient version drift at mint and every authority-
         assert.equal(result, operation === 'snapshot' || operation === 'prepare' ? null : false);
     }
 
-    const durableMintDrift = ownerWithSelection(); durableMintDrift.setPatientVersion(2);
-    assert.throws(() => durableMintDrift.owner.mintDurableReviewCommitPort(durableMintDrift.value),
-        (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'stale_selection');
-    const durableUseDrift = ownerWithSelection();
-    const durable = durableUseDrift.owner.mintDurableReviewCommitPort(durableUseDrift.value);
-    durableUseDrift.setPatientVersion(2);
-    assert.equal(spendDurableReviewCommitPort(durable), false);
 });
 
-test('mints a data-only durable review commit port that remains owner-locked until disposal', () => {
-    const { value, owner } = ownerWithSelection();
-    const port = owner.mintDurableReviewCommitPort(value);
-    assert.equal(Object.getPrototypeOf(port), null);
-    assert.equal(Object.isFrozen(port), true);
-    assert.deepEqual(Object.keys(port), []);
-    assert.equal(spendDurableReviewCommitPort(port), true);
-    assert.equal(spendDurableReviewCommitPort(port), false);
-    assert.throws(() => owner.mintDurableReviewCommitPort(value),
-        (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'stale_selection');
-    disposeDurableReviewCommitPort(port);
-    assert.doesNotThrow(() => owner.mintDurableReviewCommitPort(value));
-});
-
-test('durable review commit port rejects forged, cloned, proxied, foreign, expired, stale, logged-out, and disposed values', () => {
+test('a lease port has a private brand and fails closed for stale, expired, replayed, disposed, and foreign authority', () => {
     const first = ownerWithSelection();
-    const port = first.owner.mintDurableReviewCommitPort(first.value);
-    let traps = 0; let thenReads = 0;
-    const proxy = new Proxy(port, { get() { traps += 1; throw new Error('synthetic trap'); } });
-    const thenable = Object.freeze(Object.defineProperty({}, 'then', { enumerable: true, get() { thenReads += 1; return () => undefined; } }));
-    for (const value of [null, Object.freeze(Object.create(null)), Object.freeze({ ...port }), proxy, thenable]) {
-        assert.equal(spendDurableReviewCommitPort(value), false);
-        disposeDurableReviewCommitPort(value);
-    }
-    assert.equal(traps, 0);
-    assert.equal(thenReads, 0);
-    const second = ownerWithSelection();
-    assert.equal(spendDurableReviewCommitPort(second.owner.mintDurableReviewCommitPort(second.value)), true);
-    first.owner.issueSelection({ expectedEpoch: 1, ...PAIR });
-    assert.equal(spendDurableReviewCommitPort(port), false);
-    disposeDurableReviewCommitPort(port);
-
-    const expired = ownerWithSelection(); const expiryPort = expired.owner.mintDurableReviewCommitPort(expired.value);
-    expired.setClock(expired.value.expiresAt);
-    assert.equal(spendDurableReviewCommitPort(expiryPort), false);
-    const loggedOut = ownerWithSelection(); const logoutPort = loggedOut.owner.mintDurableReviewCommitPort(loggedOut.value);
-    deleteSession(loggedOut.value.id);
-    assert.equal(spendDurableReviewCommitPort(logoutPort), false);
-    const disposed = ownerWithSelection(); const disposedPort = disposed.owner.mintDurableReviewCommitPort(disposed.value);
-    disposed.owner.dispose();
-    assert.equal(spendDurableReviewCommitPort(disposedPort), false);
-    const restarted = ownerWithSelection(); const restartedPort = restarted.owner.mintDurableReviewCommitPort(restarted.value);
-    clearAllSessions();
-    assert.equal(spendDurableReviewCommitPort(restartedPort), false);
-});
-
-test('durable review commit port poisons hostile-clock reentry into generic and H1f mint paths', () => {
-    for (const reenter of ['durable', 'patient', 'ocr', 'document', 'treatment', 'dispose'] as const) {
-        let armed = false;
-        const registry = createServerSessionProjectionOwnerRegistry({
-            resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }), entropy: () => new Uint8Array(16),
-            clock: () => { if (armed) {
-                armed = false;
-                if (reenter === 'durable') spendDurableReviewCommitPort(port);
-                else if (reenter === 'patient') owner.mintPatientInsightLeaseCommitPort(value);
-                else if (reenter === 'ocr') owner.mintOcrLeaseCommitPort(value);
-                else if (reenter === 'document') owner.mintDocumentSynthesisLeaseCommitPort(value);
-                else if (reenter === 'treatment') owner.mintTreatmentReasoningLeaseCommitPort(value);
-                else owner.dispose();
-            } return 1_000; },
-        });
-        const value = session(); const owner = registry.acquire(value);
-        owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-        const port = owner.mintDurableReviewCommitPort(value);
-        armed = true;
-        assert.equal(spendDurableReviewCommitPort(port), false);
-        assert.equal(spendDurableReviewCommitPort(port), false);
-        disposeDurableReviewCommitPort(port);
-        if (reenter !== 'dispose') assert.doesNotThrow(() => owner.mintDurableReviewCommitPort(value));
-    }
-});
-
-test('owner-wide lease-port isolation denies every H1f outer operation against durable mint, spend, and dispose', () => {
-    for (const kind of ['patient', 'ocr', 'document', 'treatment'] as const)
-        for (const outer of ['snapshot', 'prepare', 'commit', 'abort'] as const)
-            for (const nested of ['mint', 'spend', 'dispose'] as const) {
-                let armed = false; let nestedResult: unknown = undefined;
-                const registry = createServerSessionProjectionOwnerRegistry({
-                    resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }), entropy: () => new Uint8Array(16),
-                    clock: () => { if (armed) { armed = false;
-                        try { nestedResult = nested === 'mint' ? owner.mintDurableReviewCommitPort(value)
-                            : nested === 'spend' ? spendDurableReviewCommitPort(durable) : disposeDurableReviewCommitPort(durable); } catch { nestedResult = 'denied'; }
-                    } return 1_000; },
-                });
-                const value = session(); const owner = registry.acquire(value);
-                owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-                const h1f = kind === 'patient' ? owner.mintPatientInsightLeaseCommitPort(value) : kind === 'ocr' ? owner.mintOcrLeaseCommitPort(value)
-                    : kind === 'document' ? owner.mintDocumentSynthesisLeaseCommitPort(value) : owner.mintTreatmentReasoningLeaseCommitPort(value);
-                const before = h1f.snapshot()!;
-                const staged = outer === 'commit' || outer === 'abort' ? h1f.prepare(Object.freeze({ expected: before.currentRef }))! : null;
-                const durable = nested === 'mint' ? null : owner.mintDurableReviewCommitPort(value);
-                armed = true;
-                const result = outer === 'snapshot' ? h1f.snapshot() : outer === 'prepare' ? h1f.prepare(Object.freeze({ expected: before.currentRef }))
-                    : outer === 'commit' ? h1f.commit(Object.freeze({ expected: before.currentRef, replacement: staged! })) : h1f.abort(Object.freeze({ replacement: staged! }));
-                assert.equal(result, outer === 'snapshot' || outer === 'prepare' ? null : false);
-                assert.equal(nestedResult, nested === 'mint' ? 'denied' : nested === 'spend' ? false : undefined);
-                const after = h1f.snapshot()!;
-                assert.equal(after.currentRef, before.currentRef);
-                assert.equal(after.stagedRef, staged);
-                assert.equal(after.generation, before.generation);
-                assert.equal(after.terminal, false);
-                if (durable) { assert.equal(spendDurableReviewCommitPort(durable), true); disposeDurableReviewCommitPort(durable); }
-            }
-});
-
-test('owner-wide lease-port isolation denies durable mint and spend against every H1f port operation', () => {
-    for (const kind of ['patient', 'ocr', 'document', 'treatment'] as const)
-        for (const nested of ['snapshot', 'prepare', 'commit', 'abort', 'dispose'] as const)
-            for (const outer of ['mint', 'spend'] as const) {
-                let armed = false; let nestedResult: unknown = undefined;
-                const registry = createServerSessionProjectionOwnerRegistry({
-                    resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }), entropy: () => new Uint8Array(16),
-                    clock: () => { if (armed) { armed = false;
-                        nestedResult = nested === 'snapshot' ? h1f.snapshot() : nested === 'prepare' ? h1f.prepare(Object.freeze({ expected: before.currentRef }))
-                            : nested === 'commit' ? h1f.commit(Object.freeze({ expected: before.currentRef, replacement: staged! }))
-                                : nested === 'abort' ? h1f.abort(Object.freeze({ replacement: staged! })) : h1f.dispose();
-                    } return 1_000; },
-                });
-                const value = session(); const owner = registry.acquire(value);
-                owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-                const h1f = kind === 'patient' ? owner.mintPatientInsightLeaseCommitPort(value) : kind === 'ocr' ? owner.mintOcrLeaseCommitPort(value)
-                    : kind === 'document' ? owner.mintDocumentSynthesisLeaseCommitPort(value) : owner.mintTreatmentReasoningLeaseCommitPort(value);
-                const before = h1f.snapshot()!;
-                const staged = nested === 'commit' || nested === 'abort' ? h1f.prepare(Object.freeze({ expected: before.currentRef }))! : null;
-                const durable = outer === 'spend' ? owner.mintDurableReviewCommitPort(value) : null;
-                armed = true;
-                if (outer === 'mint') assert.throws(() => owner.mintDurableReviewCommitPort(value), ServerSessionProjectionOwnerError);
-                else assert.equal(spendDurableReviewCommitPort(durable), false);
-                assert.equal(nestedResult, nested === 'snapshot' || nested === 'prepare' ? null : nested === 'commit' || nested === 'abort' ? false : undefined);
-                const after = h1f.snapshot()!;
-                assert.equal(after.currentRef, before.currentRef);
-                assert.equal(after.stagedRef, staged);
-                assert.equal(after.generation, before.generation);
-                assert.equal(after.terminal, false);
-                if (durable) disposeDurableReviewCommitPort(durable);
-            }
-});
-
-test('Treatment Reasoning port has a private brand and fails closed for stale, expired, replayed, disposed, and foreign authority', () => {
-    const first = ownerWithSelection();
-    const treatment = first.owner.mintTreatmentReasoningLeaseCommitPort(first.value);
+    const treatment = first.owner.mintDocumentSynthesisLeaseCommitPort(first.value);
     const patientInsight = first.owner.mintPatientInsightLeaseCommitPort(first.value);
-    const ocr = first.owner.mintOcrLeaseCommitPort(first.value);
-    const documentSynthesis = first.owner.mintDocumentSynthesisLeaseCommitPort(first.value);
     const current = treatment.snapshot()!.currentRef;
     const replacement = treatment.prepare(Object.freeze({ expected: current }));
     assert.ok(replacement);
     assert.equal(patientInsight.commit(Object.freeze({ expected: patientInsight.snapshot()!.currentRef, replacement } as never)), false);
-    assert.equal(ocr.abort(Object.freeze({ replacement } as never)), false);
-    assert.equal(documentSynthesis.commit(Object.freeze({ expected: documentSynthesis.snapshot()!.currentRef, replacement } as never)), false);
+    assert.equal(patientInsight.abort(Object.freeze({ replacement } as never)), false);
     first.owner.issueSelection({ expectedEpoch: 1, ...PAIR });
     first.owner.issueSelection({ expectedEpoch: 2, ...PAIR });
     assert.equal(treatment.commit(Object.freeze({ expected: current, replacement })), false);
 
     const expired = ownerWithSelection();
-    const expiredPort = expired.owner.mintTreatmentReasoningLeaseCommitPort(expired.value);
+    const expiredPort = expired.owner.mintDocumentSynthesisLeaseCommitPort(expired.value);
     const expiredCurrent = expiredPort.snapshot()!.currentRef;
     const expiredReplacement = expiredPort.prepare(Object.freeze({ expected: expiredCurrent }));
     assert.ok(expiredReplacement);
@@ -666,17 +493,17 @@ test('Treatment Reasoning port has a private brand and fails closed for stale, e
     assert.equal(expiredPort.commit(Object.freeze({ expected: expiredCurrent, replacement: expiredReplacement })), false);
 
     const loggedOut = ownerWithSelection();
-    const loggedOutPort = loggedOut.owner.mintTreatmentReasoningLeaseCommitPort(loggedOut.value);
+    const loggedOutPort = loggedOut.owner.mintDocumentSynthesisLeaseCommitPort(loggedOut.value);
     deleteSession(loggedOut.value.id);
     assert.equal(loggedOutPort.snapshot(), null);
-    assert.throws(() => first.owner.mintTreatmentReasoningLeaseCommitPort(session()));
+    assert.throws(() => first.owner.mintDocumentSynthesisLeaseCommitPort(session()));
     first.owner.dispose();
     assert.equal(treatment.snapshot(), null);
 });
 
-test('Treatment Reasoning accepts frozen exact data without hostile or ambient then reads and does no post-return work', async () => {
+test('Patient Insight accepts frozen exact data without hostile or ambient then reads and does no post-return work', async () => {
     const { value, owner } = ownerWithSelection();
-    const port = owner.mintTreatmentReasoningLeaseCommitPort(value);
+    const port = owner.mintPatientInsightLeaseCommitPort(value);
     const current = port.snapshot()!.currentRef;
     let traps = 0; let ambientReads = 0; let unhandled = 0;
     const hostile = new Proxy(Object.freeze({ expected: current }), {
@@ -767,13 +594,13 @@ test('fails closed on reselection, expiry, logout, disposal, cross-session, and 
     first.owner.issueSelection({ expectedEpoch: 1, ...PAIR });
     assert.equal(port.commit(Object.freeze({ expected: current, replacement })), false);
 
-    const expired = ownerWithSelection(); const expiryPort = expired.owner.mintOcrLeaseCommitPort(expired.value);
+    const expired = ownerWithSelection(); const expiryPort = expired.owner.mintDocumentSynthesisLeaseCommitPort(expired.value);
     const expiryCurrent = expiryPort.snapshot()!.currentRef;
     const expiryReplacement = expiryPort.prepare(Object.freeze({ expected: expiryCurrent }));
     expired.setClock(expired.value.expiresAt);
     assert.equal(expiryPort.commit(Object.freeze({ expected: expiryCurrent, replacement: expiryReplacement! })), false);
 
-    const loggedOut = ownerWithSelection(); const logoutPort = loggedOut.owner.mintOcrLeaseCommitPort(loggedOut.value);
+    const loggedOut = ownerWithSelection(); const logoutPort = loggedOut.owner.mintDocumentSynthesisLeaseCommitPort(loggedOut.value);
     deleteSession(loggedOut.value.id);
     assert.equal(logoutPort.snapshot(), null);
     const foreign = session();
@@ -784,8 +611,8 @@ test('fails closed on reselection, expiry, logout, disposal, cross-session, and 
     assert.equal(port.snapshot(), null);
 });
 
-test('denies same-kind nested operations and isolates all four kinds during snapshots', () => {
-    for (const kind of ['patient-insight', 'ocr', 'document-synthesis', 'treatment-reasoning'] as const) for (const operation of ['snapshot', 'prepare', 'commit', 'abort', 'dispose'] as const) {
+test('denies same-kind nested operations and isolates both kinds during snapshots', () => {
+    for (const kind of ['patient-insight', 'document-synthesis'] as const) for (const operation of ['snapshot', 'prepare', 'commit', 'abort', 'dispose'] as const) {
         let armed = false;
         const registry = createServerSessionProjectionOwnerRegistry({
             resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }), entropy: () => new Uint8Array(16),
@@ -796,8 +623,7 @@ test('denies same-kind nested operations and isolates all four kinds during snap
             } return 1_000; },
         });
         const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-        const port = kind === 'patient-insight' ? owner.mintPatientInsightLeaseCommitPort(value) : kind === 'ocr' ? owner.mintOcrLeaseCommitPort(value)
-            : kind === 'document-synthesis' ? owner.mintDocumentSynthesisLeaseCommitPort(value) : owner.mintTreatmentReasoningLeaseCommitPort(value);
+        const port = kind === 'patient-insight' ? owner.mintPatientInsightLeaseCommitPort(value) : owner.mintDocumentSynthesisLeaseCommitPort(value);
         const current = port.snapshot()!.currentRef;
         armed = true;
         assert.equal(port.snapshot(), null);
@@ -806,7 +632,7 @@ test('denies same-kind nested operations and isolates all four kinds during snap
 });
 
 test('all ports deny every nested operation while snapshot, prepare, commit, or abort is in flight', () => {
-    for (const kind of ['patient-insight', 'ocr', 'document-synthesis', 'treatment-reasoning'] as const)
+    for (const kind of ['patient-insight', 'document-synthesis'] as const)
         for (const outer of ['snapshot', 'prepare', 'commit', 'abort'] as const)
             for (const nested of ['snapshot', 'prepare', 'commit', 'abort', 'dispose'] as const) {
                 let armed = false;
@@ -819,8 +645,7 @@ test('all ports deny every nested operation while snapshot, prepare, commit, or 
                     } return 1_000; },
                 });
                 const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-                const port = kind === 'patient-insight' ? owner.mintPatientInsightLeaseCommitPort(value) : kind === 'ocr' ? owner.mintOcrLeaseCommitPort(value)
-                    : kind === 'document-synthesis' ? owner.mintDocumentSynthesisLeaseCommitPort(value) : owner.mintTreatmentReasoningLeaseCommitPort(value);
+                const port = kind === 'patient-insight' ? owner.mintPatientInsightLeaseCommitPort(value) : owner.mintDocumentSynthesisLeaseCommitPort(value);
                 const current = port.snapshot()!.currentRef;
                 const replacement = outer === 'commit' || outer === 'abort' ? port.prepare(Object.freeze({ expected: current }))! : current;
                 armed = true;
@@ -834,23 +659,21 @@ test('all ports deny every nested operation while snapshot, prepare, commit, or 
 
 test('all ports dispose synchronously without a reentry boundary', () => {
     const { value, owner } = ownerWithSelection();
-    for (const port of [owner.mintPatientInsightLeaseCommitPort(value), owner.mintOcrLeaseCommitPort(value),
-        owner.mintDocumentSynthesisLeaseCommitPort(value), owner.mintTreatmentReasoningLeaseCommitPort(value)]) {
+    for (const port of [owner.mintPatientInsightLeaseCommitPort(value), owner.mintDocumentSynthesisLeaseCommitPort(value)]) {
         port.dispose();
         assert.equal(port.snapshot()!.terminal, true);
     }
 });
 
-test('Document Synthesis ports cannot union authority with Patient Insight or OCR ports', () => {
+test('Document Synthesis ports cannot union authority with Patient Insight ports', () => {
     const { value, owner } = ownerWithSelection();
     const document = owner.mintDocumentSynthesisLeaseCommitPort(value);
     const patient = owner.mintPatientInsightLeaseCommitPort(value);
-    const ocr = owner.mintOcrLeaseCommitPort(value);
     const current = document.snapshot()!.currentRef;
     const replacement = document.prepare(Object.freeze({ expected: current }));
     assert.ok(replacement);
     assert.equal(patient.commit(Object.freeze({ expected: patient.snapshot()!.currentRef, replacement } as never)), false);
-    assert.equal(ocr.abort(Object.freeze({ replacement } as never)), false);
+    assert.equal(patient.abort(Object.freeze({ replacement } as never)), false);
     assert.equal(document.commit(Object.freeze({ expected: current, replacement })), true);
     assert.deepEqual(document.snapshot(), { currentRef: replacement, stagedRef: null, generation: 1, terminal: true });
 });
