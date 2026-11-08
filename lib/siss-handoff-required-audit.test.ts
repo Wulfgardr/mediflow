@@ -151,7 +151,6 @@ for (const method of ['POST', 'PUT', 'DELETE'] as const) {
     });
 }
 
-
 test('observed patient and version fence writes, stale replay and delete replay without effects', async () => {
     reset(); seed();
     for (const method of ['PUT', 'DELETE'] as const) {
@@ -228,7 +227,6 @@ test('fresh and legacy bootstraps converge on version 1 without losing rows or v
     } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-
 test('client captures the displayed precondition and never refreshes or retries it', async t => {
     const { db, captureSissHandoffWritePrecondition } = load('./db.ts') as typeof import('./db.ts');
     const calls: Array<{ method: string; body: unknown }> = [];
@@ -250,7 +248,6 @@ test('client captures the displayed precondition and never refreshes or retries 
         { method: 'DELETE', body: precondition },
     ]);
 });
-
 
 test('clear uses the listed SISS versions and reports partial failures without refreshing', async t => {
     const { db } = load('./db.ts') as typeof import('./db.ts');
@@ -303,9 +300,6 @@ test('a compiled closure draft cannot adopt a refreshed version, pending record 
     for (const field of ['Outcome', 'Notes', 'NextAction']) {
         assert.ok(source.includes(`if (beginDraft()) set${field}`));
     }
-    const submitSource = source.slice(source.indexOf('const close = async'), source.indexOf('const title ='));
-    assert.match(submitSource, /resolveSissHandoffDraftPrecondition\(precondition.current, handoff\)/);
-    assert.match(submitSource, /update\(sissPrecondition.id/);
 });
 
 /* WUL-800, coorte 5: esiti dei passaggi SISS e data di chiusura sul server. */

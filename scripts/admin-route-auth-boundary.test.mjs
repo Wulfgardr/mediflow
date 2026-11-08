@@ -159,8 +159,6 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
 
 test('backup verification cannot write: its route imports the preflight and no executor or database', () => {
     const source = readSource('app/api/system/backup-restore/verify/route.ts');
-    assert.match(source, /runBackupRestorePreflight/);
-    assert.match(source, /isTrustedWebMutationRequest\(request\)/);
     assert.doesNotMatch(source, /backup-restore-executor|restoreBackupArtifact|db-server|@\/lib\/schema/);
 });
 

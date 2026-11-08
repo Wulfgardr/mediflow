@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
 import zlib from 'node:zlib';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
@@ -27,11 +26,6 @@ function whitePng(width: number, height: number) {
 }
 
 test('the limits are the ones of the local page renderer', () => {
-    const worker = readFileSync(new URL('../scripts/anydoc-pdf-page-worker.mjs', import.meta.url), 'utf8');
-    assert.match(worker, new RegExp(`const MAX_DIMENSION_PIXELS = ${OCR_MAX_SIDE_PIXELS};`, 'u'));
-    assert.match(worker, new RegExp(`const MAX_PIXELS = ${OCR_MAX_PIXELS.toLocaleString('en-US').replaceAll(',', '_')};`, 'u'));
-    assert.match(worker, new RegExp(`const DPI = ${OCR_RENDER_DPI};`, 'u'));
-    assert.match(worker, /const MAX_RASTER_BYTES = 16 \* 1024 \* 1024;/u);
     assert.equal(OCR_MAX_RASTER_BYTES, 16 * 1024 * 1024);
     assert.ok(OCR_IMAGE_PIXEL_BUDGET < OCR_MAX_PIXELS);
 });

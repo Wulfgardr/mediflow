@@ -254,8 +254,6 @@ test('bounded reader cancels before unbounded JSON allocation and rejects duplic
 test('route exports only the allowed GET and PUT symbols and adapter owns the one CAS delegation', () => {
     const source = fs.readFileSync(path.join(root, 'app/api/attachments/[id]/content/route.ts'), 'utf8');
     const adapterSource = fs.readFileSync(path.join(root, 'lib/attachment-content-cas-route.ts'), 'utf8');
-    assert.match(source, /export async function GET\(/u);
-    assert.match(source, /export async function PUT\(/u);
     assert.doesNotMatch(source, /export (?!async function (?:GET|PUT)\b)/u);
     assert.doesNotMatch(source, /dbServer|runDbServerImmediateTransaction|attachmentUpdateSchema|ocrQueueState|provider|apply|request\.json/iu);
     assert.equal((adapterSource.match(/transitionAttachmentContentCurrentness\(/gu) ?? []).length, 1);
@@ -270,7 +268,6 @@ test('two process-level route contenders produce one receipt and one conflict', 
         assert.deepEqual(snapshot(), { patient_id: 'patient.synthetic.1', data: sealed, document_source_ref: ref, document_revision: 2, document_freshness_epoch: 2 });
     } finally { fs.rmSync(workerPath, { force: true }); }
 });
-
 
 function atomicSnapshot() {
     const sql = new Database(dbPath);

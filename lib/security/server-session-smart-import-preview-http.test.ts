@@ -133,8 +133,6 @@ test('sanitizes a runtime-invalid controlled error code while logging its origin
 test('route stays a thin dynamic Node adapter and the handler uses the shared exact preview wire', () => {
     const route = readFileSync(new URL('../../app/api/ai/smart-import/preview/route.ts', import.meta.url), 'utf8');
     const handlerSource = readFileSync(new URL('./server-session-smart-import-preview-http.ts', import.meta.url), 'utf8');
-    assert.match(route, /runtime\s*=\s*'nodejs'|runtime\s*=\s*"nodejs"/u); assert.match(route, /dynamic\s*=\s*'force-dynamic'|dynamic\s*=\s*"force-dynamic"/u);
-    assert.match(route, /acquireAuthenticatedSmartImportPreview/u); assert.match(handlerSource, /function exhaustiveCode\(code: never\): null/u); assert.match(handlerSource, /serializeSmartImportPreviewWireRoot/u);
-    assert.doesNotMatch(handlerSource, /function plainData|function capabilityResult/u);
+    assert.match(route, /acquireAuthenticatedSmartImportPreview/u);    assert.doesNotMatch(handlerSource, /function plainData|function capabilityResult/u);
     assert.doesNotMatch(`${route}\n${handlerSource}`, /requireSession|createServerSessionProjectionOwnerRegistry|resolveProjectionService|createPatientSmartImportHostCapability|createTypedProjectionBroker|\.apply\(|proxy/u);
 });

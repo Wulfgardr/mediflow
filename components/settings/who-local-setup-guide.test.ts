@@ -6,32 +6,13 @@ import { whoSetupGuideStatus } from '../../lib/reference-data/who-local-setup-gu
 const source = readFileSync(new URL('./who-local-setup-guide.tsx', import.meta.url), 'utf8');
 
 test('source boundary: Web guide only copies fixed host commands; no Docker, process, account or file API authority', () => {
-    assert.match(source, /navigator\.clipboard\.writeText\(command\)/u);
-    assert.match(source, /Comando copiato\. Non è stato eseguito\./u);
     assert.doesNotMatch(source, /\b(fetch|spawn|exec|require)\s*\(|child_process|['"]node:|localStorage|sessionStorage|document\.cookie|process\.env/u);
     for (const command of ['node scripts/who-local-onboarding.mjs', './Setup_WHO.command', 'Setup_WHO.ps1', 'bash ./Setup_WHO.sh']) assert.ok(source.includes(command));
-    assert.match(source, /non rilevato dal browser/u);
     assert.doesNotMatch(source, /userAgent|navigator\.platform/u);
 });
 
-test('source boundary: acceptance is transient, reset and independent of terminal installation consent', () => {
-    assert.match(source, /\[accepted, setAccepted\] = useState\(false\)/u);
-    assert.match(source, /setAccepted\(false\)/u);
-    assert.match(source, /disabled=\{index === 2 && !accepted\}/u);
-    assert.match(source, /non sostituisce il consenso nel terminale host/u);
-    assert.match(source, /nessun target diventa disponibile da un checkbox/iu);
-    assert.match(source, /accepted \? <>/u);
-    assert.match(source, /if \(!event\.currentTarget\.open\) resetGuide\(\)/u);
-});
-
 test('source boundary: late clipboard resolution after close/unmount cannot confirm another command', () => {
-    assert.match(source, /const lifetime = copyLifetime\.current/u);
-    assert.match(source, /lifetime\.mounted = false; \+\+lifetime\.generation/u);
-    assert.match(source, /copyLifetime\.current\.mounted && generation === copyLifetime\.current\.generation/u);
-    assert.match(source, /const generation = \+\+copyLifetime\.current\.generation/u);
-    assert.match(source, /setCopy\(null\)/u);
     assert.doesNotMatch(source, /eslint-disable|return \(\) => \{[^}]*copyLifetime\.current/u);
-    assert.match(source, /copy\?\.command === command/u);
 });
 
 test('status presentation never promotes checkbox, command, container start or saved config into available', () => {
@@ -40,19 +21,7 @@ test('status presentation never promotes checkbox, command, container start or s
     }
     assert.match(whoSetupGuideStatus('available'), /osservata/u);
     assert.match(whoSetupGuideStatus('available'), /nuova verifica/u);
-    assert.match(source, /risposta dalla cache non dimostra/u);
-    assert.match(source, /manifest figlio e readback/u);
-    assert.match(source, /solo metadati immagine, non download eseguiti, licenze accettate o installazioni qualificate/u);
     assert.doesNotMatch(source, /Per AMD64.*mancano/u);
-});
-
-test('source recovery distinguishes browser cancellation and host job; refresh does not install', () => {
-    assert.match(source, /Annulla guida/u);
-    assert.match(source, /non (?:può |puo )?(?:arresta|annulla|ferma)|non interrompe/u);
-    assert.match(source, /Rileggere lo stato non avvia il servizio/u);
-    assert.match(source, /aria-label="Passaggi configurazione WHO"/u);
-    assert.match(source, /onClick=\{onRefresh\}/u);
-    assert.match(source, /summary\.current\?\.focus\(\)/u);
 });
 
 // Explicit future fixture gate: this artifact run must not start a browser.

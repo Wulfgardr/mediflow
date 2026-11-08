@@ -1,11 +1,6 @@
 import { archiveGenerationForSession } from './security/archive-session-generation';
 import {
-    classifyPatientMutationEvent,
-    listChangedFields,
     requestIdFromRequest,
-    writeAuditEvent,
-    type AuditEventType,
-    type AuditRedactedMetadata,
 } from './security/audit';
 import { isSealedValue } from './network-patient-lifecycle';
 import { parseExpectedVersion } from './patient-concurrency';
@@ -95,37 +90,6 @@ function validateNetworkPatientMutationBoundary(
 
     return null;
 }
-
-export async function writeNetworkPatientAuditEvent(input: {
-    context: NetworkPatientMutationContext;
-    eventType: AuditEventType;
-    metadata?: AuditRedactedMetadata | null;
-}): Promise<void> {
-    try {
-        await writeAuditEvent({
-            eventType: input.eventType,
-            outcome: 'success',
-            archiveGeneration: archiveGenerationForSession(input.context.session), actorType: 'user',
-            actorRef: input.context.session.userId,
-            subjectType: 'patient',
-            subjectRef: input.context.patientId,
-            sourceSurface: 'native',
-            requestId: requestIdFromRequest(input.context.request),
-            redactedMetadata: {
-                ...(input.metadata ?? {}),
-                flags: [
-                    ...(input.metadata?.flags ?? []),
-                    'auth:paired-client',
-                    `paired-client:${input.context.pairedClient.clientId}`,
-                    'scope:ambulatory',
-                ],
-            },
-        });
-    } catch (error) {
-        console.error('[MediFlow] Network patient audit write failed:', error);
-    }
-}
-
 export async function updateNetworkScopedPatient(
     context: NetworkPatientMutationContext,
     body: Record<string, unknown>

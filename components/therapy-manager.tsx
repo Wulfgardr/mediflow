@@ -11,7 +11,7 @@ import { clientArchiveGeneration } from '@/lib/security/client-auth-api';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createTherapyDeleteRecovery, type DeleteRecovery } from '@/lib/therapy-delete-recovery';
 import { useLiveQuery } from '@/lib/live-query';
-import { ApiConflictError, ApiWriteRejectedError, db, Therapy } from '@/lib/db';
+import { ApiConflictError, db, Therapy } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';

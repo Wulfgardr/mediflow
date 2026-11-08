@@ -499,18 +499,6 @@ export function uninstallBackupLaunchAgent(): void {
         fs.unlinkSync(plistPath);
     }
 }
-
-export function getBackupSchedulerStatus(value: string | null | undefined): BackupSchedulerStatus {
-    const state = readBackupSchedulerStateFromValue(value);
-    const plistPath = process.platform === 'darwin' ? getBackupLaunchAgentPath() : null;
-    return {
-        supported: process.platform === 'darwin',
-        installed: plistPath ? readBackupLaunchAgentInstalled() : false,
-        plistPath,
-        state,
-    };
-}
-
 export function runBackupSchedulerScript(options?: {
     force?: boolean;
     projectRoot?: string;

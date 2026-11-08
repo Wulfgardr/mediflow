@@ -1,6 +1,4 @@
 export const SECURITY_CONFIG = {
-    PIN_SALT_KEY: 'mediflow_pin_salt',
-    ENCRYPTED_MASTER_KEY: 'mediflow_master_key_v1',
     PIN_MIN_LENGTH: 4,
     PIN_MAX_LENGTH: 8,
     AUTO_LOCK_TIMEOUT_MS: 15 * 60 * 1000,
@@ -262,27 +260,4 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
         bytes[i] = binary_string.charCodeAt(i);
     }
     return bytes.buffer;
-}
-
-// --- Storage Helpers ---
-
-export function getStoredSalt(): Uint8Array | null {
-    const b64 = localStorage.getItem(SECURITY_CONFIG.PIN_SALT_KEY);
-    return b64 ? new Uint8Array(base64ToArrayBuffer(b64)) : null;
-}
-
-export function storeSalt(salt: Uint8Array) {
-    localStorage.setItem(SECURITY_CONFIG.PIN_SALT_KEY, arrayBufferToBase64(salt.buffer));
-}
-
-export function getStoredEncryptedMasterKey(): string | null {
-    return localStorage.getItem(SECURITY_CONFIG.ENCRYPTED_MASTER_KEY);
-}
-
-export function storeEncryptedMasterKey(key: string) {
-    localStorage.setItem(SECURITY_CONFIG.ENCRYPTED_MASTER_KEY, key);
-}
-
-export function hasSecuritySetup(): boolean {
-    return !!getStoredEncryptedMasterKey();
 }

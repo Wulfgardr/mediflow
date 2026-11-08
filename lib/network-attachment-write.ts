@@ -36,11 +36,6 @@ type NetworkAttachmentMutationResponse =
 const NETWORK_ALLOWED_ATTACHMENT_CREATE_FIELDS = ['name', 'path', 'data', 'type', 'size', 'expectedCollection'] as const;
 
 const NETWORK_SEALED_ATTACHMENT_CREATE_FIELDS = ['name', 'path', 'data'] as const;
-
-function hasOwn(input: Record<string, unknown>, key: string): boolean {
-    return Object.prototype.hasOwnProperty.call(input, key);
-}
-
 function isNonEmptyString(value: unknown): value is string {
     return typeof value === 'string' && value.trim().length > 0;
 }

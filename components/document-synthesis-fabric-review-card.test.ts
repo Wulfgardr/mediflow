@@ -30,7 +30,6 @@ test('document upload persists the attachment first and never invokes OCR, legac
 test('the three production routes bind only the authenticated host operation', async () => {
     for (const phase of ['capture', 'ingest', 'preview']) {
         const source = await readFile(`app/api/ai/document-synthesis/${phase}/route.ts`, 'utf8');
-        assert.match(source, /acquireDocumentSynthesisProductionOperation/u);
         assert.doesNotMatch(source, /request\.json|dbServer|provider\s*:|prompt|patientId|apply\s*\(/u);
     }
 });

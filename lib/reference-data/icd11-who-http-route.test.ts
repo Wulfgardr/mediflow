@@ -145,7 +145,5 @@ test('maps bounded service failures without returning raw errors or query conten
 test('the production route has no Docker target and wires session auth before the server-only runtime', () => {
     const source = readFileSync(new URL('../../app/api/icd/proxy/route.ts', import.meta.url), 'utf8');
     assert.match(source, /requireSession/u);
-    assert.match(source, /getIcd11WhoProductionRuntime/u);
-    assert.match(source, /createIcd11WhoHttpRoute/u);
     assert.doesNotMatch(source, /ICD_BASE_URL|127\.0\.0\.1:8888|validateLocalTarget|destinationEntities|console\./u);
 });

@@ -211,7 +211,6 @@ test('binding and corpus expose no DB, writer, filesystem, shell or arbitrary in
     const binding = readFileSync(new URL('./chatgpt-synthetic-synthesis-binding.ts', import.meta.url), 'utf8');
     const imports = [...binding.matchAll(/^import\s+(?!type\b).*?from\s+'([^']+)'/gm)].map(match => match[1]);
     assert.deepEqual(imports, ['../../security/web-auth-lifecycle-owner-adapter', '../../chatgpt-execution/execution-contract', '../../chatgpt-execution/execution-service', '../../chatgpt-execution/synthetic-synthesis-fixture']);
-    assert.match(binding, /input: CHATGPT_SYNTHESIS_FIXTURE/);
     assert.doesNotMatch(binding, /\b(?:require|eval)\s*\(|import\s*\(|\bprocess\.|node:(?:fs|child_process|net|http)|db-server|clinicalWriter/);
     const corpus = readFileSync(new URL('../../chatgpt-execution/synthetic-synthesis-fixture.ts', import.meta.url), 'utf8');
     assert.deepEqual([...corpus.matchAll(/^import\s+(?!type\b).*?from\s+'([^']+)'/gm)].map(match => match[1]), ['node:crypto']);

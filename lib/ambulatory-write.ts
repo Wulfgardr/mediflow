@@ -80,11 +80,6 @@ function normalizeType(value: unknown, allowUndefined: boolean): 'live' | 'test'
 function conflictSnapshot(row: AmbulatoryRow | undefined): AmbulatoryRow | null {
     return row ?? null;
 }
-
-function affected(row: Pick<AmbulatoryRow, 'id' | 'version'>): { id: string; version: number } {
-    return { id: row.id, version: row.version };
-}
-
 /* a network surface never commits without an authority recheck carried by its admitted context. */
 function requireCommitGuard(
     context: AmbulatoryCoreContext, surface: 'host' | 'network',

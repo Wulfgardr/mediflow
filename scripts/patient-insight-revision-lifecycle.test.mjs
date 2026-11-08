@@ -32,7 +32,7 @@ function fixture(t) {
     const doubles = {
         'server-only': {},
         '../../db-server': { dbServer },
-        '../../security/ordinary-application-context': { acquireOrdinaryApplicationContext: unavailable, registerOrdinaryApplicationResource: unavailable },
+        '../../security/ordinary-application-context': { acquireOrdinaryApplicationContext: unavailable },
         '../host-local-provider-binding': { createHostLocalProviderBindingService: () => Object.freeze({}) },
         '../host-local-provider-readiness': { observeClinical: unavailable },
         './provider-lifecycle-service': { createHostProviderLifecycleService: () => ({ service: Object.freeze({}) }) },

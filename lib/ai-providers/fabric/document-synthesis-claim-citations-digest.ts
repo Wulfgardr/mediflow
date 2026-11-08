@@ -10,9 +10,7 @@ const ReflectApply = Reflect.apply; const ReflectOwnKeys = Reflect.ownKeys; cons
 const CreateHash = nodeCreateHash; const encoder = new TextEncoder(); const hashProbe = CreateHash('sha256'); const HashPrototype = ObjectGetPrototypeOf(hashProbe); const HashUpdate = ObjectGetOwnPropertyDescriptor(HashPrototype, 'update')?.value; const HashDigest = ObjectGetOwnPropertyDescriptor(HashPrototype, 'digest')?.value;
 const U0_KEYS = ['status', 'code', 'schemaVersion', 'output', 'outputSha256', 'citations', 'claims', 'reviewOnly', 'writesPerformed', 'applyPolicy', 'sourceSetDigestSha256'];
 const CITATION_KEYS = ['label', 'quote', 'startByte', 'endByte', 'quoteSha256']; const CLAIM_KEYS = ['claimPath', 'labels'];
-const MAX_U32 = 0xffff_ffff; const BYTE = BigIntConstructor(255); const SHIFT = BigIntConstructor(8);
-export const DOCUMENT_SYNTHESIS_CLAIM_CITATIONS_DIGEST_DOMAIN = DOMAIN;
-export type DocumentSynthesisClaimCitationsDigest = readonly number[];
+const MAX_U32 = 0xffff_ffff; const BYTE = BigIntConstructor(255); const SHIFT = BigIntConstructor(8);export type DocumentSynthesisClaimCitationsDigest = readonly number[];
 
 function inert<T>(value: readonly T[]): readonly T[] { const copy: T[] = []; for (let index = 0; index < value.length; index += 1) copy[index] = value[index]!; ObjectDefineProperty(copy, 'toJSON', { value: null, enumerable: false, configurable: false, writable: false }); return ObjectFreeze(copy); }
 function record(value: unknown, keys: readonly string[], prototype: object | null): Record<string, unknown> | null {

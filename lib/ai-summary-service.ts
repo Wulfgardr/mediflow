@@ -16,7 +16,6 @@ import {
 } from '@/lib/patient-insight';
 import {
     AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
-    AiPatientInsightDisabledError,
     assertAiPatientInsightEnabledValue,
 } from '@/lib/ai-patient-insight-kill-switch';
 import {
@@ -251,39 +250,5 @@ export async function regeneratePatientSummary(
             // generazione se la run appena conclusa ha gia catturato tutto.
             void regeneratePatientSummary(patientId, { skipIfUnchanged: true }).catch(() => {});
         }
-    }
-}
-
-export async function refreshPatientSummaryIfEnabled(
-    patientId: string,
-    options: SummaryOptions = {}
-): Promise<PatientSummaryRefreshResult> {
-    if (!patientId) {
-        return { status: 'skipped', reason: 'missing-patient-id' };
-    }
-
-    // Osservabilita: se una generazione e gia in corso questa richiesta vi si
-    // aggancia (e lascia in coda un rerun trailing), quindi non e una nuova run.
-    const joinedInFlight = isSummaryGenerationInFlight(patientId);
-
-    try {
-        // Via automatica: skipIfUnchanged di default (a meno di override esplicito),
-        // cosi i trigger post-upload non rigenerano se il contesto non e cambiato.
-        const modelInfo = await regeneratePatientSummary(patientId, { skipIfUnchanged: true, ...options });
-        if (!modelInfo) {
-            return { status: 'skipped', reason: 'missing-patient-id' };
-        }
-        if (joinedInFlight) {
-            return { status: 'skipped', reason: 'already-running' };
-        }
-        return { status: 'updated', modelInfo };
-    } catch (error) {
-        if (error instanceof PatientInsightUnchangedError) {
-            return { status: 'skipped', reason: 'unchanged' };
-        }
-        if (error instanceof AiPatientInsightDisabledError) {
-            return { status: 'skipped', reason: 'disabled' };
-        }
-        throw error;
     }
 }

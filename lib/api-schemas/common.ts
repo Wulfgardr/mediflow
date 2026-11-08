@@ -19,11 +19,3 @@ export const dateInputSchema = z
 export const optionalDateInputSchema = dateInputSchema.optional();
 
 export const nullableDateInputSchema = z.union([dateInputSchema, z.null(), z.literal('')]).optional();
-
-export const optionalIntegerInputSchema = z
-    .union([
-        z.number().finite(),
-        z.string().refine((value) => value.trim().length > 0 && Number.isFinite(Number.parseInt(value, 10))),
-    ])
-    .optional();
-

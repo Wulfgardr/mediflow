@@ -12,7 +12,7 @@ import { normalizeCheckupUpdateInput } from '@/lib/api-v1-clinical-write-normali
 import { normalizeCheckupStatus } from '@/lib/status-normalization';
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
 import { updateCheckupOperation } from '@/lib/checkup-write-operation';
-import { parseCheckupExpectedVersion } from '@/lib/checkup-concurrency';
+import { parseExpectedVersion } from '@/lib/version-concurrency';
 import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
 
 function toIsoString(value: unknown): string | null {
@@ -77,7 +77,7 @@ export async function PUT(
         if (!envelope.ok) return envelope.response;
         const body = envelope.body;
         // WUL-308: child PUTs require optimistic concurrency like the patient PUT.
-        const expectedVersion = parseCheckupExpectedVersion(body.version);
+        const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
@@ -128,7 +128,7 @@ export async function DELETE(
             return NextResponse.json({ error: parsedBody.error,
                 ...(parsedBody.code ? { code: parsedBody.code } : {}) }, { status: parsedBody.status ?? 400 });
         }
-        const expectedVersion = parseCheckupExpectedVersion(parsedBody.values.version);
+        const expectedVersion = parseExpectedVersion(parsedBody.values.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }

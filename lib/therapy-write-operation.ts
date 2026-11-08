@@ -5,7 +5,7 @@ import { dbServer } from './db-server';
 import { activePatients } from './patient-lifecycle';
 import { writeAuditEventInTransaction, type RequiredAuditContext } from './security/audit';
 import { patients, patientsToAmbulatories, therapies } from './schema';
-import { buildTherapyVersionConflictPayload } from './therapy-concurrency';
+import { buildVersionConflictPayload } from './version-concurrency';
 import { planTherapyStatusChange } from './clinical-status-transitions';
 import { parseTherapyStatus } from './status-normalization';
 
@@ -78,7 +78,7 @@ export function updateTherapyOperationInTransaction(tx: Tx, input: TherapyUpdate
     if (!existing) return { status: 404, value: { error: 'Not found' } };
     if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
     if (existing.version !== input.expectedVersion) return { status: 409,
-        value: buildTherapyVersionConflictPayload(input.expectedVersion, input.therapyId, existing) as unknown as Record<string, unknown> };
+        value: buildVersionConflictPayload('therapy', input.expectedVersion, input.therapyId, existing) as unknown as Record<string, unknown> };
     // WUL-800: passaggio di stato e data di fine coerenti; gli alias salvati valgono come lo stato canonico.
     const plan = planTherapyStatusChange(
         { status: parseTherapyStatus(existing.status) ?? existing.status ?? '', endDate: existing.endDate ?? null },

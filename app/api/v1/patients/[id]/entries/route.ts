@@ -10,6 +10,7 @@ import type { EntrySummary } from '@/lib/api/v1/types';
 import { prepareEntryCreate, readEntryJsonObject } from '@/lib/entry-write-input';
 import { createEntryOperation } from '@/lib/entry-write-operation';
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
+import { parseCappedLimit, parseDateParam } from '@/lib/list-query-params';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -17,21 +18,8 @@ function toIsoString(value: unknown): string | null {
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function parseLimit(value: string | null): number | null {
-    if (!value) return null;
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed) || parsed <= 0) return null;
-    return Math.min(parsed, 100);
-}
-
 function parseIncludeDeleted(value: string | null): boolean {
     return value === 'true' || value === '1';
-}
-
-function parseDateParam(value: string | null): Date | null {
-    if (!value) return null;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -41,7 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     try {
         const { id } = await params;
         const { searchParams } = new URL(request.url);
-        const limit = parseLimit(searchParams.get('limit'));
+        const limit = parseCappedLimit(searchParams.get('limit'), 100);
         const type = searchParams.get('type')?.trim();
         const dateFrom = parseDateParam(searchParams.get('dateFrom'));
         const dateTo = parseDateParam(searchParams.get('dateTo'));

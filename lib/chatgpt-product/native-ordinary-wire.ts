@@ -1,8 +1,6 @@
 /* selectors only; no caller text, projection, capability or authority. */
 import { types } from 'node:util';
-import { ProductError } from './product-contract';
-export const NATIVE_ORDINARY_SCHEMA = 'mediflow.native-ordinary.v1' as const;
-type Context = Readonly<{ patientId: string; ambulatoryId: string; patientRevision: number }>;
+import { ProductError } from './product-contract';type Context = Readonly<{ patientId: string; ambulatoryId: string; patientRevision: number }>;
 export type NativeOrdinaryPreparation = Context & (
     | Readonly<{ functionId: 'patient_insight'; input: Readonly<{ selector: 'current_patient_insight' }> }>
     | Readonly<{ functionId: 'smart_import'; input: Readonly<{ selector: 'current_smart_import' }> }>

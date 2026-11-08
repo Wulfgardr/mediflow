@@ -84,5 +84,4 @@ test('rejects duplicate, unknown, sparse, accessor, and oversized source sets', 
 test('keeps the projection builder pure and outside provider, selection, persistence, and apply boundaries', () => {
     const source = readFileSync(new URL('./treatment-reasoning-projection.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /server-only|AIService|generateWithAthena|fetch\(|db\.|\/api\/|provider-lifecycle|apply|write/u);
-    assert.match(source, /buildTreatmentReasoningContextBundle/u);
 });

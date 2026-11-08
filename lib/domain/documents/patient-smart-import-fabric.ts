@@ -10,8 +10,6 @@ import type { ProviderSelectionReceipt } from '../../ai-providers/registry';
 import { observeVenue } from '../../ai-providers/fabric/routing-observability';
 import { buildProvenanceRecord } from '../../ai-providers/fabric/resolver';
 
-export const PATIENT_SMART_IMPORT_FABRIC_METADATA = Symbol('patient-smart-import-fabric-metadata');
-
 export type PatientSmartImportFabricHostSnapshot = Readonly<{
     capabilityAvailable: boolean;
     onboarding: ProviderOnboardingState;
@@ -162,12 +160,4 @@ export async function executePatientSmartImportFabricPreview<T>(
     });
     const output = await invokeProvider();
     return Object.freeze({ output, metadata });
-}
-
-export function getPatientSmartImportFabricMetadata(
-    result: object,
-): PatientSmartImportFabricMetadata | undefined {
-    return (result as { [PATIENT_SMART_IMPORT_FABRIC_METADATA]?: PatientSmartImportFabricMetadata })[
-        PATIENT_SMART_IMPORT_FABRIC_METADATA
-    ];
 }

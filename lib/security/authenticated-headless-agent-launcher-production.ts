@@ -102,15 +102,6 @@ function createProductionLauncher(
       ?? (async () => { throw new AuthenticatedAgentLauncherV1Error('operation_unavailable'); }),
   });
 }
-
-export function createProductionMcpAgentLauncherV1(sourcesValue: unknown) {
-  return createProductionLauncher('mcp', sourcesValue);
-}
-
-export function createProductionMiniAgentLauncherV1(sourcesValue: unknown) {
-  return createProductionLauncher('mini', sourcesValue);
-}
-
 export function createProductionMcpAgentLauncherWithPreSpawnedChildV1(
   sourcesValue: unknown, childPortValue: unknown,
 ) {

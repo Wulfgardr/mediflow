@@ -1,9 +1,9 @@
-import { validateAmbulatoryCommandRows } from './ambulatory-destructive-command-backup';
-import { validateTherapyStatusCommandRows } from './therapy-status-command-backup';
+import { validateAmbulatoryCommandRows } from './ambulatory-destructive-command-backup.ts';
+import { validateTherapyStatusCommandRows } from './therapy-status-command-backup.ts';
 import { types } from 'node:util';
-import { backupAuditCoverage, canonicalizeBackupAuditRows, snapshotBackupAudit } from './backup-audit';
-import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
-import { assertProstheticsCatalogBackup } from './reference-data/prosthetics-catalog-backup';
+import { backupAuditCoverage, canonicalizeBackupAuditRows, snapshotBackupAudit } from './backup-audit.ts';
+import { assertExemptionImportReceiptRows } from './exemption-import-receipt.ts';
+import { assertProstheticsCatalogBackup } from './reference-data/prosthetics-catalog-backup.ts';
 
 export const BACKUP_ARTIFACT_FORMAT = 'mediflow-backup' as const;
 export const BACKUP_ARTIFACT_VERSION = 1 as const;

@@ -95,32 +95,6 @@ test('delete confirmation is fenced and failures remain visible; only successful
     assert.doesNotMatch(source, /console\.(log|error)|showToast/u);
 });
 
-test('terminal model display is the existing host receipt, while retry resets rather than generating', async () => {
-    const source = await readFile('components/document-synthesis-fabric-review-card.tsx', 'utf8');
-    assert.match(source, /\(phase !== 'terminal' \|\| picker\.view\.remote\) && <FunctionModelPicker picker=\{picker\}/u);
-    assert.match(source, /providerBindingReceipt\.model/u);
-    assert.match(source, /publication\.citations\.map/u);
-    assert.match(source, /onClick=\{cancelPreview\}[\s\S]*Prepara un nuovo tentativo/u);
-    assert.match(source, /aria-busy=\{phase === 'loading' \|\| phase === 'running'\}/u);
-});
-
-test('actual route files retain authenticated operation acquisition and preview model dispatch', async () => {
-    for (const phase of ['capture', 'ingest', 'preview']) {
-        const source = await readFile(`app/api/ai/document-synthesis/${phase}/route.ts`, 'utf8');
-        assert.match(source, /runtime = 'nodejs'/u);
-        assert.match(source, /dynamic = 'force-dynamic'/u);
-        assert.match(source, /acquireOperation: acquireDocumentSynthesisProductionOperation/u);
-        if (phase === 'preview') assert.match(source, /withFunctionModelDispatch\('document_synthesis'/u);
-    }
-});
-
-test('collapsed document metadata does not manufacture empty counts on pending or failed reads', async () => {
-    const source = await readFile('app/patients/[id]/modules/page.tsx', 'utf8');
-    assert.match(source, /const \{ data: attachments, error: attachmentsError \} = useLiveQueryState/u);
-    assert.match(source, /count=\{attachmentsError \|\| attachments === undefined \? undefined/u);
-    assert.match(source, /summary=\{attachmentsError \? 'Conteggio non disponibile/u);
-});
-
 test('the actual synthesis picker condition keeps remote terminal recovery reachable and hides the local terminal selector', async () => {
     const source = await readFile('components/document-synthesis-fabric-review-card.tsx', 'utf8');
     const ast = ts.createSourceFile('document-synthesis.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);

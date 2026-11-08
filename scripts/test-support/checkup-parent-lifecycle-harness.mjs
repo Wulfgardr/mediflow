@@ -67,7 +67,7 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
     const cache = new Map();
     const allowed = new Set([
         'app/api/checkups/[id]/route.ts', 'lib/patient-edit-session.ts', 'lib/schema.ts',
-        'lib/patient-identity.ts', 'lib/patient-allergies.ts', 'lib/patient-lifecycle.ts', 'lib/checkup-concurrency.ts', 'lib/version-concurrency.ts',
+        'lib/patient-identity.ts', 'lib/patient-allergies.ts', 'lib/patient-lifecycle.ts', 'lib/version-concurrency.ts',
         'lib/api-v1-clinical-lifecycle.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts',
         'lib/api-error-response.ts', 'lib/archive-generation.ts', 'lib/security/archive-write-request.ts',
         'lib/security/loopback-ingress.mjs', 'lib/checkup-json-body.ts', 'lib/bounded-request-body.ts', 'lib/checkup-write-operation.ts',

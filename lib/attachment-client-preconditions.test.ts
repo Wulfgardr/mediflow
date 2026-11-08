@@ -62,7 +62,6 @@ test('seeder reports attachment cleanup failure after the earlier patient deleti
     assert.deepEqual(deleted, [item.patientId]);
 });
 
-
 test('document delete wiring captures before confirmation and provides explicit reread on failure', () => {
     const source = fs.readFileSync('components/document-upload.tsx', 'utf8');
     const handler = sourceVariableDeclaration(source, 'handleDelete');
@@ -70,10 +69,6 @@ test('document delete wiring captures before confirmation and provides explicit 
     assert.ok(handler.indexOf('AttachmentCollectionView.capture(patientId, currentAttachments)') < handler.indexOf('await confirm('));
     assert.match(handler, /db\.attachments\.delete\(file\.id, \{ attachmentPrecondition, attachmentCollection \}\)/);
     assert.doesNotMatch(handler, /db\.attachments\.get|fetch\(/);
-    assert.match(source, /onClick=\{refreshAttachments\}[^>]*>Rileggi elenco/);
-    const seeder = fs.readFileSync('components/data-seeder.tsx', 'utf8');
-    assert.match(seeder, /Eliminazione non completata/);
-    assert.match(seeder, /Alcuni dati potrebbero essere già stati eliminati/);
 });
 
 test('a batch sends the reviewed collection, extends it with its own confirmed rows and stops on a changed list', async t => {

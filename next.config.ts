@@ -92,6 +92,7 @@ const nextConfig: NextConfig = {
       "./scripts/scheduled-backup-date-fields.mjs",
       "./lib/sqlite-maintenance-admission.mjs",
       "./lib/sqlite-durability.mjs",
+      "./lib/backup-artifact.ts",
       "./lib/backup-audit.ts",
       "./lib/therapy-status-command-backup.ts",
       "./lib/therapy-status-command-contract.ts",

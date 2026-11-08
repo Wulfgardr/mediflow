@@ -79,11 +79,6 @@ export async function getDrugCatalogStatus(): Promise<AifaCatalogClientStatus> {
     if (!response.ok) throw new Error('Lettura stato catalogo AIFA non riuscita');
     return response.json() as Promise<AifaCatalogClientStatus>;
 }
-
-export async function getDrugStats(): Promise<number> {
-    return (await getDrugCatalogStatus()).count;
-}
-
 export class AifaReductionConfirmationRequired extends Error {
     constructor(message: string, public confirmation: string) { super(message); }
 }

@@ -26,16 +26,6 @@ export type DocumentStructuredAnalysis = {
     therapyCandidates: SmartImportTherapyExtraction[];
     servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 };
-
-export function normalizeDiagnosisSystem(value: unknown): DocumentDiagnosisSuggestion['system'] | null {
-    if (typeof value !== 'string') return null;
-    const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
-    if (normalized === 'ICD-9' || normalized === 'ICD9') return 'ICD-9';
-    if (normalized === 'ICD-10' || normalized === 'ICD10') return 'ICD-10';
-    if (normalized === 'ICD-11' || normalized === 'ICD11') return 'ICD-11';
-    return null;
-}
-
 export function parseStructuredAnalysisResponse(response: string, rawMarkdown: string): DocumentStructuredAnalysis {
     const result = parseDocumentSynthesisExtractionResponse(response, rawMarkdown);
     const parsed = result.value;
