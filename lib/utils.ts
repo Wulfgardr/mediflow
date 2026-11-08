@@ -12,8 +12,3 @@ export function estimateBirthYearFromTaxCode(taxCode: string, identifierType: st
   const year = 2000 + yy;
   return year > new Date().getFullYear() ? year - 100 : year;
 }
-
-export function calculateAge(birthYear: number): number {
-  const currentYear = new Date().getFullYear();
-  return currentYear - birthYear;
-}

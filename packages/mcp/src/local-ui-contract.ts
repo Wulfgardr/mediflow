@@ -1,7 +1,4 @@
-import { z } from 'zod';
-
-export const LOCAL_UI_PROFILE = 'plugin_local_ui' as const;
-export const LOCAL_UI_TOOL_ID = 'mediflow.local_ui.navigate.v1' as const;
+import { z } from 'zod';export const LOCAL_UI_TOOL_ID = 'mediflow.local_ui.navigate.v1' as const;
 export const LOCAL_UI_IPC_SCHEMA = 'mediflow.local-ui.navigation.v1' as const;
 export const LOCAL_UI_RPC_MODE = 'navigation_inherited_child_ipc_v1' as const;
 export const LOCAL_UI_INTENTS = ['search', 'identity', 'history', 'prescribing'] as const;
@@ -12,4 +9,3 @@ export const LOCAL_UI_OPERATION = Object.freeze({ operationId: LOCAL_UI_TOOL_ID,
 export const LOCAL_UI_RESULT = Object.freeze({ status: 'continue_in_mediflow' as const });
 export const LOCAL_UI_ERROR = 'MediFlow navigation unavailable. Complete startup or pairing in MediFlow, then retry. This request is no longer pending.';
 export const LOCAL_UI_CONTENT = 'continue_in_mediflow';
-export const LOCAL_UI_BUS = 'mediflow.local-ui.navigation.v1';

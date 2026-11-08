@@ -47,26 +47,6 @@ export function optionalPrescriptionTextForUpdate(value: unknown): string | null
     if (value === null) return null;
     return typeof value === 'string' ? value.trim() || null : undefined;
 }
-
-export function optionalPrescriptionInteger(value: unknown, fallback = 0): number {
-    if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
-    if (typeof value === 'string' && value.trim()) {
-        const parsed = Number.parseInt(value, 10);
-        if (Number.isFinite(parsed)) return parsed;
-    }
-    return fallback;
-}
-
-export function optionalPrescriptionIntegerForUpdate(value: unknown): number | undefined {
-    if (value === undefined) return undefined;
-    if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
-    if (typeof value === 'string' && value.trim()) {
-        const parsed = Number.parseInt(value, 10);
-        if (Number.isFinite(parsed)) return parsed;
-    }
-    return undefined;
-}
-
 export function isAllowedPrescriptionValue<T extends string>(
     values: ReadonlySet<T>,
     value: string | null | undefined

@@ -6,9 +6,7 @@ function freeze<T>(value: T): T {
     return value;
 }
 const fixtures = freeze(JSON.parse(JSON.stringify(corpus)) as typeof corpus);
-export const SYNTHETIC_CARD_CORPUS_JSON = JSON.stringify(fixtures, null, 2) + '\n';
-export const SYNTHETIC_CARD_PATIENTS: readonly string[] = Object.freeze(fixtures.map(value => value.id));
-export function syntheticCardFixture(patient: string) {
+export const SYNTHETIC_CARD_CORPUS_JSON = JSON.stringify(fixtures, null, 2) + '\n';export function syntheticCardFixture(patient: string) {
     const fixture = fixtures.find(value => value.id === patient);
     if (!fixture) throw new Error('synthetic_card_denied');
     return fixture;

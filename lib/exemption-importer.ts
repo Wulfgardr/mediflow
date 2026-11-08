@@ -31,15 +31,3 @@ export async function commitExemptionFile(source: ExemptionImportSource, proof: 
 export async function getExemptionImportStatus(): Promise<ExemptionCatalogStatus> {
     return readResponse(await fetch('/api/exemptions/import/status', { cache: 'no-store' }));
 }
-/** Retired batch entrypoint: retained as an explicit failure for old callers. */
-export async function importExemptionFiles(_files: File[], _onProgress?: (processed: number, total: number) => void): Promise<never> {
-    void _files; void _onProgress;
-    throw new Error('EXEMPTION_IMPORT_PREVIEW_REQUIRED');
-}
-export async function clearExemptionDatabase() {
-    return readResponse(await fetch('/api/exemptions', { method: 'DELETE' }));
-}
-export async function getExemptionStats(): Promise<number> {
-    const payload = await readResponse<{ count: number }>(await fetch('/api/exemptions?count=1', { cache: 'no-store' }));
-    return payload.count;
-}

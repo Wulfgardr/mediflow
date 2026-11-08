@@ -1,4 +1,4 @@
-import type { DocumentDiagnosisSuggestion, DocumentInsight, DocumentQualityLevel } from '../../db';
+import type { DocumentInsight, DocumentQualityLevel } from '../../db';
 import type { DocumentIntelligenceCasePack } from './document-intelligence-case-pack';
 import {
     DOCUMENT_EVIDENCE_PACK_SCHEMA_VERSION,
@@ -458,18 +458,4 @@ export function evaluateDocumentParseEvidenceArtifact(
         missingKinds,
         leakedNegativeAssertions,
     };
-}
-
-export function toDocumentDiagnosisSuggestionsFromArtifactFacts(
-    artifact: DocumentParseEvidenceArtifact,
-): DocumentDiagnosisSuggestion[] {
-    return artifact.evidenceMemory.facts
-        .filter((fact) => fact.kind === 'problem' && fact.code && fact.system)
-        .map((fact) => ({
-            code: fact.code as string,
-            description: fact.label,
-            system: fact.system as DocumentDiagnosisSuggestion['system'],
-            evidence: fact.excerpt,
-            confidence: fact.origin === 'documented' ? 'high' : 'medium',
-        }));
 }

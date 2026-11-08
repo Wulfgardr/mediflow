@@ -238,30 +238,6 @@ function overlapScore(candidate: string, tokens: string[]): number {
     const haystack = normalizeText(candidate);
     return tokens.reduce((score, token) => score + (haystack.includes(token) ? 1 : 0), 0);
 }
-
-export function rankIcdMatch(
-    query: string,
-    label: string,
-    explicitCode: string | undefined,
-    candidate: { code: string; description: string }
-): number {
-    if (!candidate.code || candidate.code === 'N/A') return -1;
-
-    const queryTokens = uniqueTokens(tokenize(query));
-    const labelTokens = uniqueTokens(tokenize(label));
-    let score = overlapScore(candidate.description, queryTokens) * 6;
-    score += overlapScore(candidate.description, labelTokens) * 4;
-
-    if (explicitCode && candidate.code.toUpperCase() === explicitCode.toUpperCase()) {
-        score += 100;
-    }
-    if (normalizeText(candidate.description).includes(normalizeText(label))) {
-        score += 15;
-    }
-
-    return score;
-}
-
 export function sanitizeDrugSearchText(value: string): string {
     return value
         .replace(/\([^)]*\)/g, ' ')

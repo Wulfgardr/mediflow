@@ -149,15 +149,3 @@ export async function openSissPrescrizione(codiceFiscale: string): Promise<OpenS
         successMessage: `CF "${codiceFiscale.trim().toUpperCase()}" copiato! Incollalo nel Prescrittivo Regionale (PRREG) (Cmd+V).`,
     });
 }
-
-/**
- * Opens the SISS FSE (Fascicolo Sanitario Elettronico) portal.
- * @param codiceFiscale - The patient's Codice Fiscale
- */
-export async function openSissFse(codiceFiscale: string): Promise<OpenSissResult> {
-    return await completeSissPortalHandoff({
-        handoffUrl: SISS_URLS.FSE,
-        clipboardText: codiceFiscale,
-        successMessage: `CF "${codiceFiscale.trim().toUpperCase()}" copiato! Cercalo nel FSE.`,
-    });
-}

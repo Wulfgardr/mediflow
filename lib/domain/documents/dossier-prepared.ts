@@ -154,11 +154,6 @@ export function parsePreparedExtraction(json: string): PreparedParseResult {
     });
     return { ok: true, value: { schema: DOSSIER_PREPARED_SCHEMA, preparedAt: str(parsed.preparedAt, 40), preparedBy: str(parsed.preparedBy, 120), sources }, warnings };
 }
-
-export function preparedBySha(extraction: PreparedExtraction | null | undefined): Map<string, PreparedSource> {
-    return new Map((extraction?.sources ?? []).map((source) => [source.sha256, source]));
-}
-
 /**
  * Chiave di raggruppamento per paziente: CF valido, altrimenti cognome, nome e nascita.
  * Vale solo ciò che MediFlow legge nel testo del documento: un CF o un nome proposti
@@ -406,19 +401,6 @@ function percentageWritten(percentage: string, excerpt: string): boolean {
     if (!number) return false;
     return new RegExp(`(?:^|[^0-9.,])${number.replace(/[.,]/gu, '[.,]')}\\s*(?:%|per\\s*cento)`, 'iu').test(excerpt);
 }
-
-/** Compatibilità: il valore compare, in ordine e contiguo, nel testo dato. */
-export function valueInQuote(value: string, quote: string): boolean {
-    const v = preparedTokens(value).map((token) => token.text);
-    const q = preparedTokens(quote).map((token) => token.text);
-    if (!v.length) return true;
-    outer: for (let start = 0; start + v.length <= q.length; start += 1) {
-        for (let k = 0; k < v.length; k += 1) if (q[start + k] !== v[k]) continue outer;
-        return true;
-    }
-    return false;
-}
-
 // ---------------------------------------------------------------------------
 // Fatti dall'estrazione preparata
 // ---------------------------------------------------------------------------

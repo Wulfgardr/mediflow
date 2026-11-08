@@ -210,11 +210,6 @@ function compareDatesDesc(left: unknown, right: unknown): number {
     const rightTime = new Date(right as string | number | Date).getTime();
     return rightTime - leftTime;
 }
-
-function compareDatesAsc(left: unknown, right: unknown): number {
-    return compareDatesDesc(right, left);
-}
-
 function buildDocumentSourceLabel(fileName: string, date: unknown): string {
     const formattedDate = formatDate(date);
     if (fileName && formattedDate) return `${fileName} (${formattedDate})`;
@@ -614,7 +609,6 @@ export async function buildPatientInsightContext(
         .filter((entry) => !entry.deletedAt && entry.content?.trim())
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .sort((left: any, right: any) => compareDatesDesc(left.date, right.date));
-    const entries = activeEntries.slice(0, MAX_ENTRIES);
 
     const therapies = await db.therapies
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -943,12 +937,4 @@ export async function buildPatientInsightContext(
         },
         contextHash: computeContextHash(sourceRefs),
     };
-}
-
-/**
- * Builds an assistant-safe text context for a specific patient ID.
- */
-export async function buildPatientContext(patientId: string): Promise<string> {
-    const context = await buildPatientInsightContext(patientId);
-    return context.prompt;
 }
