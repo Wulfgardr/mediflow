@@ -42,9 +42,9 @@ Le sette righe sono chiuse sul prodotto Web sintetico verificato. La CI
 sulla head della PR resta un requisito distinto, consultabile nella
 [PR #722](https://github.com/Wulfgardr/mediflow/pull/722).
 
-Esempi: [Profilo prima](prove/prima/profile/profilo-ritorno-giorno-1440.png),
-[Profilo dopo](prove/dopo/profile/profilo-ritorno-giorno-1440.png),
-[avviso intero Grafite 400%](prove/dopo/backup/avviso-grafite-400-intero-1440x2160.png).
+Esempi: [Profilo prima](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-30-settings-closure/prove/prima/profile/profilo-ritorno-giorno-1440.png),
+[Profilo dopo](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-30-settings-closure/prove/dopo/profile/profilo-ritorno-giorno-1440.png),
+[avviso intero Grafite 400%](https://github.com/Wulfgardr/mediflow/raw/5afa7f0f2503abe4549133b8dddd5e865b218498/docs/analysis/2026-10-30-settings-closure/prove/dopo/backup/avviso-grafite-400-intero-1440x2160.png).
 
 I rossi intermedi sono conservati nel dossier locale originale del run
 `/tmp/mf-settings-closure-20261030`: ammissione build respinta per la fixture
