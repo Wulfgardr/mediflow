@@ -17,9 +17,6 @@ import { NETWORK_FSE_VALIDATE_CAPABILITY } from './network-contract';
 import { eq } from 'drizzle-orm';
 import { ambulatories, patients, patientsToAmbulatories, settings, users } from './schema';
 import type { RequiredAuditContext } from './security/audit';
-import { PROFILE_NOTES_COMMIT_POLICY } from '../packages/patient-profile-contracts/src/notes-commit';
-import { resolveHeadlessCanonicalCapability } from './headless/canonical-capability-catalog';
-import { resolveApplicationOperation } from './headless/application-operation-registry';
 
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-profile-port-'));
@@ -135,9 +132,6 @@ test('named notes commit is unavailable to local-token, native and paired capabi
         assert.equal(resolvedPatient, false);
         assert.deepEqual(snapshot(), before);
     }
-    assert.equal(resolveHeadlessCanonicalCapability(PROFILE_NOTES_COMMIT_POLICY), null);
-    const unavailable = resolveApplicationOperation(PROFILE_NOTES_COMMIT_POLICY, PROFILE_NOTES_COMMIT_POLICY);
-    assert.equal(unavailable.status, 'denied'); assert.equal(unavailable.applyPolicy, 'none'); assert.equal(unavailable.writesPerformed, 0);
 });
 
 test('three projections preserve ciphertext, nulls and epoch dates without read effects', async () => {

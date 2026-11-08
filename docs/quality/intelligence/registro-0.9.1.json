@@ -530,7 +530,7 @@
   "additionalContractRequirements": [
     {
       "id": "search",
-      "source": "lib/headless/application-operation-registry.ts",
+      "source": "docs/adr/0108-piano-canonico-headless-read-only-085.md",
       "status": "not_qualified",
       "chatCriteria": [
         "C-7",
@@ -539,7 +539,7 @@
     },
     {
       "id": "navigation",
-      "source": "lib/headless/canonical-capability-catalog.ts",
+      "source": "docs/adr/0108-piano-canonico-headless-read-only-085.md",
       "status": "not_qualified",
       "chatCriteria": [
         "C-7",

@@ -34,7 +34,6 @@ const FORBIDDEN_EXTERNAL = new Set([
 const NATIVE_SEGMENT = /(?:^|[-_/@.])(xpc|swift|vision|metal|mlx|cuda|cudnn)(?:$|[-_/@.])/iu;
 const ALLOWED_PURE_LIB_MODULES = new Set([
     'lib/terminology', 'lib/terminology.ts',
-    'lib/headless/application-operation-registry', 'lib/headless/application-operation-registry.ts',
 ]);
 
 function sourceFile(source, file) {
