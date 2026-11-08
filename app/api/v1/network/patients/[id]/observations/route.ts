@@ -9,19 +9,7 @@ import {
     createNetworkScopedObservation,
 } from '@/lib/network-observation-write';
 import { requireNetworkCapabilityContext, requireNetworkWriteContext } from '@/lib/network-write-context';
-
-function parseLimit(value: string | null): number | null {
-    if (!value) return null;
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed) || parsed <= 0) return null;
-    return Math.min(parsed, 200);
-}
-
-function parseDateParam(value: string | null): Date | null {
-    if (!value) return null;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
+import { parseCappedLimit, parseDateParam } from '@/lib/list-query-params';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -31,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         const { searchParams } = new URL(request.url);
         const observations = await listNetworkScopedObservations(id, resolved.context.scopeAmbulatoryId, {
-            limit: parseLimit(searchParams.get('limit')),
+            limit: parseCappedLimit(searchParams.get('limit'), 200),
             code: searchParams.get('code')?.trim() || null,
             dateFrom: parseDateParam(searchParams.get('dateFrom')),
             dateTo: parseDateParam(searchParams.get('dateTo')),

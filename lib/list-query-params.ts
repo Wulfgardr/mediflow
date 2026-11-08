@@ -117,3 +117,17 @@ export function parseListParams(
         },
     };
 }
+
+// Lenient filters of the /api/v1 patient lists: a missing or unreadable value means "no filter".
+export function parseCappedLimit(value: string | null, max: number): number | null {
+    if (!value) return null;
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isNaN(parsed) || parsed <= 0) return null;
+    return Math.min(parsed, max);
+}
+
+export function parseDateParam(value: string | null): Date | null {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
