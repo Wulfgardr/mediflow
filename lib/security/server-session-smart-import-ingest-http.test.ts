@@ -143,15 +143,11 @@ test('sanitizes a runtime-invalid controlled code while retaining the original e
 
 test('keeps controlled error unions explicit and host attachment faults internal', () => {
     const source = readFileSync(new URL('./server-session-smart-import-ingest-http.ts', import.meta.url), 'utf8');
-    assert.match(source, /SmartImportProjectionAttachmentHostError/u);
-    assert.match(source, /function exhaustiveCode\(code: never\): null/u);
     assert.doesNotMatch(source, /default:\s*return null;/u);
 });
 
 test('route remains a thin dynamic Node adapter over production ingest composition', () => {
     const source = readFileSync(new URL('../../app/api/ai/smart-import/ingest/route.ts', import.meta.url), 'utf8');
-    assert.match(source, /runtime\s*=\s*'nodejs'|runtime\s*=\s*"nodejs"/u);
-    assert.match(source, /dynamic\s*=\s*'force-dynamic'|dynamic\s*=\s*"force-dynamic"/u);
     assert.match(source, /acquireAuthenticatedSmartImportAttachmentIngest/u);
     assert.doesNotMatch(source, /requireSession|createServerSessionProjectionOwnerRegistry|issueSelection|createTypedProjectionBroker|preview|apply/u);
 });

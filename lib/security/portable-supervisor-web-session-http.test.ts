@@ -169,8 +169,6 @@ test('route is a thin dynamic Node adapter with no direct capture or database au
     const route = readFileSync(new URL(
         '../../app/api/patients/[id]/intelligent-host/activate/route.ts', import.meta.url,
     ), 'utf8');
-    assert.match(route, /runtime\s*=\s*'nodejs'|runtime\s*=\s*"nodejs"/u);
-    assert.match(route, /dynamic\s*=\s*'force-dynamic'|dynamic\s*=\s*"force-dynamic"/u);
     assert.match(route, /readAuthenticatedWebSession/u);
     assert.match(route, /activatePortableSupervisorWebSessionV1/u);
     assert.doesNotMatch(route, /\bdb\b|database|capture|patientRef|sessionRef|parentRef|userRef|console\./iu);

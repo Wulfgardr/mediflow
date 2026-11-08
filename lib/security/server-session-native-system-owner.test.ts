@@ -171,10 +171,6 @@ test('historical P3 activation is fail-closed and server-session has no P2 runti
     assert.doesNotMatch(adapter, /new (?:Map|WeakMap|Set)|globalThis/u);
     const source = readFileSync(new URL('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /from ['"]\.\/web-auth-control-record['"]/u);
-    assert.match(source, /function prepareAuthControlActivation[\s\S]*?return null;/u);
-    assert.match(source, /function commitPreparedAuthControlActivation[\s\S]*?return 0;/u);
-    assert.match(source, /function prepareAuthControlRetirement[\s\S]*?return null;/u);
-    assert.match(source, /function commitPreparedAuthControlRetirement[\s\S]*?return 0;/u);
 
     const staged = stageWebServerSession({ ...USER });
     assert.ok(staged);

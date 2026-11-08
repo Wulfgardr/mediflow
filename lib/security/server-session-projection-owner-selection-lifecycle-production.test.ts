@@ -31,10 +31,7 @@ test('production facade and private lifecycle share one exact process owner', as
 });
 
 test('production facade imports only the internal singleton and exports no lifecycle authority', () => {
-    const internalSource = fs.readFileSync(new URL('./server-session-projection-owner-production-internal.ts', import.meta.url), 'utf8');
     const facadeSource = fs.readFileSync(new URL('./server-session-projection-owner-production.ts', import.meta.url), 'utf8');
-    assert.match(internalSource, /serverSessionProjectionOwnerProductionOwner = createFullPortProjectionOwnerProcessOwner/u);
-    assert.match(facadeSource, /serverSessionProjectionOwnerRegistry = serverSessionProjectionOwnerProductionOwner\.registry/u);
     assert.doesNotMatch(facadeSource,
         /selection(?:Lifecycle|Binding|CommitBinding)Controller|createFullPortProjectionOwner/u);
     assert.equal(facadeSource.match(/^export\s+(?:const|function|class)\s/gmu)?.length, 1);

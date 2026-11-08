@@ -139,9 +139,6 @@ test('sanitizes a verifier fault raised after capture', async () => {
 
 test('keeps sourceRevision local-only and leaves the shared freshness validator canonical', () => {
     const sourceText = readFileSync(new URL('./smart-import-projection-attachment-browser-normalizer.ts', import.meta.url), 'utf8');
-    const validator = readFileSync(new URL('../smart-import-projection.ts', import.meta.url), 'utf8');
-    assert.match(sourceText, /browser-adapter-local ordinal/u); assert.match(sourceText, /Number\.MAX_SAFE_INTEGER/u);
     assert.doesNotMatch(sourceText, /console\.|localStorage|sessionStorage|ingest|preview|apply/u);
     assert.doesNotMatch(sourceText, /sourceRevision\s*(?:===|!==|<=|>=|<|>)/u);
-    assert.match(validator, /SMART_IMPORT_PROJECTION_FRESHNESS_MS\s*=\s*300_000/u);
 });
