@@ -722,17 +722,6 @@
       "classification": "legacy-node-http"
     },
     {
-      "file": "lib/ai-providers/fabric/document-synthesis-authenticated-attachment-capture.ts",
-      "target": "lib/db-server.ts",
-      "capability": "server:lib/db-server.ts",
-      "form": "import",
-      "symbols": [
-        "dbServer"
-      ],
-      "count": 1,
-      "classification": "legacy-node-service"
-    },
-    {
       "file": "lib/ai-providers/fabric/document-synthesis-production-operation.ts",
       "target": "lib/db-server.ts",
       "capability": "server:lib/db-server.ts",
