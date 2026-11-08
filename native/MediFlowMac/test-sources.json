@@ -17,8 +17,6 @@
     "FHIRBundleDTOAdapterLifecycleTests.swift",
     "FHIRBundleGeneratorTests.swift",
     "GlobalDiaryPresentationTests.swift",
-    "HeadlessSoapEntryContractGoldenTests.swift",
-    "HeadlessSoapEntryH4GoldenTests.swift",
     "HomeBaseAttachmentModelsTests.swift",
     "NetworkWriteBoundaryTests.swift",
     "PatientConcurrencyTests.swift",

@@ -14,6 +14,7 @@ import { readSqliteArchiveGeneration } from './archive-generation';
 import { ACCOUNT_RESET_RECEIPT_PREFIX } from './backup-restore-receipt-contract';
 import { openAdmittedSqlite } from './sqlite-maintenance-admission.mjs';
 import { createRecoverySnapshot, restoreRecoveryBackup } from './recovery-backup-server';
+import { RETIRED_FEATURE_TABLES_SQL } from './ambulatory-destructive-command-recovery-schema';
 import { encryptRecoveryBackup, decryptRecoveryBackup, parseRecoveryKit, type RecoveryKit } from './recovery-backup';
 import { generateMasterKey, encryptData, decryptData } from './security/security';
 import { parseNetworkPairingState } from './network-pairing-model';
@@ -27,7 +28,6 @@ const review = `review_${'a'.repeat(32)}`;
 const event = `event_${'b'.repeat(32)}`;
 const command = { action: 'accept', expectedRevision: 1, idempotencyKey: `idem_${'a'.repeat(16)}`,
     gestureProof: `gesture_${'a'.repeat(32)}`, uncertaintyAcknowledged: true };
-const outcome = { reviewId: review, state: 'accepted', revision: 2, eventId: event };
 const commandDigest = digest(JSON.stringify(['accept', 1, true, digest(command.gestureProof), actor]));
 const quote = (name: string) => '"' + name.replaceAll('"', '""') + '"';
 function contents(db: Database.Database) {
@@ -62,9 +62,6 @@ async function fixture(paddingBytes = 0) {
     db.prepare("INSERT INTO patient_duplicate_intents(id) VALUES ('synthetic-consumed-intent')").run();
     db.prepare('INSERT INTO audit_events(event_id,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,redacted_metadata) VALUES (?, ?, 1783000000, ?, ?, ?, ?, ?, ?, ?)')
         .run(event, 'ai.review.accepted', 'success', 'user', actor, 'ai_review', review, 'api', JSON.stringify({ flags: ['accept', 'accepted', `digest_${commandDigest}`], resourceVersion: 2 }));
-    db.prepare('INSERT INTO durable_review_command_states(review_id,review_state,revision,action) VALUES (?, ?, 2, ?)').run(review, 'accepted', 'accept');
-    db.prepare('INSERT INTO durable_review_command_operations(id,review_id,idempotency_key,command_digest,result_snapshot,audit_event_id) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(digest(`${review}\0${command.idempotencyKey}`), review, command.idempotencyKey, commandDigest, JSON.stringify(outcome), event);
     db.prepare('INSERT INTO archive_session_generations VALUES (?, ?, ?)').run(digest('synthetic-old-session'), readSqliteArchiveGeneration(db), Date.now() + 60000);
     const pairing = JSON.stringify({ archiveGeneration: readSqliteArchiveGeneration(db), intents: [], clients: [{
         clientId: 'synthetic-paired-client', deviceName: 'Synthetic device', clientPlatform: 'ios', appVersion: null,
@@ -161,16 +158,13 @@ test('complete encrypted snapshot recovers keys, all tables and replay history i
         } finally { restored.close(); }
         const admitted = new Database(f.destination, { readonly: true });
         const installedContents = contents(admitted); admitted.close();
-        // Real post-restart command service: replay returns its receipt without consuming a gesture or emitting audit.
+        // After restart the restored archive admits neither the old session nor the old paired clients, and reading adds nothing.
         const output = execFileSync(process.execPath, ['--import', pathToFileURL(path.resolve('scripts/register-strip-types-loader.mjs')).href, '--input-type=module', '--eval', `
-            import { createPhysicianReviewCommandService } from './lib/ai-providers/fabric/physician-review-command.ts';
             import { sessionMatchesArchive } from './lib/security/archive-session-generation.ts';
             import { loadNetworkPairingState } from './lib/network-home-base-server.ts';
-            const forbidden = () => { throw new Error('historical command executed again'); };
-            const result = createPhysicianReviewCommandService({ resolveContext: () => ({reviewId:${JSON.stringify(review)}, actorRef:${JSON.stringify(actor)}, uncertaintyAcknowledgmentRequired:true}), consumeGesture:forbidden, eventId:forbidden, now:forbidden }).execute(${JSON.stringify(command)});
-            console.log(JSON.stringify({result, oldSession:sessionMatchesArchive({id:'synthetic-old-session', expiresAt:Date.now()+60000}), pairedClients:(await loadNetworkPairingState()).clients.length}));
+            console.log(JSON.stringify({oldSession:sessionMatchesArchive({id:'synthetic-old-session', expiresAt:Date.now()+60000}), pairedClients:(await loadNetworkPairingState()).clients.length}));
         `], { cwd: process.cwd(), env: { ...process.env, MEDIFLOW_DATA_DIR: f.targetDir }, encoding: 'utf8' });
-        assert.deepEqual(JSON.parse(output.trim()), { result: outcome, oldSession: false, pairedClients: 0 });
+        assert.deepEqual(JSON.parse(output.trim()), { oldSession: false, pairedClients: 0 });
         const check = new Database(f.destination, { readonly: true });
         try { assert.deepEqual(contents(check), installedContents, 'replay did not add data or audit'); } finally { check.close(); }
     } finally { f.cleanup(); }
@@ -281,6 +275,7 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
+        for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
         if (alteration === 'index') old.exec('CREATE INDEX synthetic_drift ON therapies(status)');
@@ -302,7 +297,6 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
                 assert.deepEqual(installed.prepare('SELECT * FROM therapy_status_commands').all(), []);
                 assert.deepEqual(result.users, expected.users);
                 assert.deepEqual(result.patients, migratedPatientRows(expected.patients));
-                assert.deepEqual(result.durable_review_command_operations, expected.durable_review_command_operations);
                 assertPredecessorAuditHistory(result.audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
                 assert.equal(installed.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             } finally { installed.close(); }
@@ -321,6 +315,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
+        for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
         if (alteration === 'index') old.exec('CREATE INDEX synthetic_drift ON therapies(status)');
@@ -335,7 +330,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
             try {
                 const actual = contents(restored);
                 assert.deepEqual(actual.ambulatory_destructive_commands, []);
-                for (const key of ['users','patients','therapy_status_commands','durable_review_command_operations']) assert.deepEqual(actual[key], key === 'patients' ? migratedPatientRows(expected[key]) : expected[key]);
+                for (const key of ['users','patients','therapy_status_commands']) assert.deepEqual(actual[key], key === 'patients' ? migratedPatientRows(expected[key]) : expected[key]);
                 assertPredecessorAuditHistory(actual.audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
                 assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             } finally { restored.close(); }
@@ -362,6 +357,7 @@ for (const alteration of ['none', 'column', 'index', 'view', 'authority-table'])
         old.exec('DROP TABLE synthetic_extension');
         old.exec('DROP TABLE portable_import_origins');
         old.pragma('user_version=6');
+        for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN drift TEXT');
         if (alteration === 'index') old.exec('CREATE INDEX drift ON therapies(status)');
         if (alteration === 'view') old.exec('CREATE VIEW drift AS SELECT id FROM therapies');
@@ -440,12 +436,34 @@ test('the CLI terminal fixture waits for a child that closes the terminal before
         input: JSON.stringify({ command: ['python3', '-c', child], key: 'synthetic' }) });
 });
 
+test('encrypted v10 predecessor recovers without the tables of the removed features', async () => {
+    const f = await fixture();
+    try {
+        const file = path.join(f.root, 'canonical10.db'); fs.writeFileSync(file, f.snapshot);
+        const old = new Database(file);
+        old.exec('DROP TABLE synthetic_extension; PRAGMA user_version=10;');
+        for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
+        old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE');
+        const expected = contents(old); old.close();
+        const bytes = fs.readFileSync(file), artifact = await encryptRecoveryBackup(bytes, f.key);
+        await f.restore({ artifact });
+        const restored = openVersionedSqliteDatabase(f.destination);
+        try {
+            assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
+            const actual = contents(restored);
+            assert.equal(Object.keys(actual).some(table => table.startsWith('durable_review') || table.startsWith('headless_soap')), false);
+            for (const table of ['users', 'patients', 'entries', 'therapy_status_commands', 'ambulatory_destructive_commands']) assert.deepEqual(actual[table], expected[table]);
+        } finally { restored.close(); }
+        assert.deepEqual(fs.readFileSync(file), bytes);
+    } finally { f.cleanup(); }
+});
 test('encrypted v9 predecessor resta recuperabile dopo l’aggiunta dell’autore', async () => {
     const f = await fixture();
     try {
         const file = path.join(f.root, 'canonical9.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
         old.exec('DROP TABLE synthetic_extension; ALTER TABLE entries DROP COLUMN recorded_by; PRAGMA user_version=9;');
+        for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
         old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE');
         const expected = contents(old); old.close();
         const bytes = fs.readFileSync(file), artifact = await encryptRecoveryBackup(bytes, f.key);

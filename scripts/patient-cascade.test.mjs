@@ -185,7 +185,6 @@ test('the cascade keeps the ADR 0066 child-first ordering', () => {
     'prostheticPrescriptions',
     'sissHandoffEvents',
     'documentDiagnosisProposals',
-    'durableReviewPatientLinks',
     'observations',
     'checkups',
     'therapies',

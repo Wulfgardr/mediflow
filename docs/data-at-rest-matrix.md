@@ -7,8 +7,8 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 14.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
-criterio 1. Aggiornata il 7 novembre 2026 per le allergie cifrate (ADR 0182); il 3 novembre 2026 per finestre e blocchi della conservazione (ADR 0178); il 21 ottobre 2026 per il marker Web di cambio stato
+**Versione 15.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+criterio 1. Aggiornata l'8 novembre 2026 per l'uscita delle tabelle di review durevole e scrittura SOAP headless (schema 11); il 7 novembre 2026 per le allergie cifrate (ADR 0182); il 3 novembre 2026 per finestre e blocchi della conservazione (ADR 0178); il 21 ottobre 2026 per il marker Web di cambio stato
 terapia (ADR 0156); il 13 ottobre 2026 per i permessi del database adottato dalla cartella
 dell’applicazione; l’11 ottobre per credenziali v3 e generazione dell’archivio, recupero cifrato completo e permessi delle copie di riparazione; la prima classificazione era su `main` `bcb7af46a`.
 
@@ -135,32 +135,6 @@ locali salvano ciò che ricevono.
 - In chiaro: `aic`, `name`, `active_principle`, `company`, `packaging`, `class`, `price`, `atc`, `aic_search`, `name_search`, `active_principle_search`, `packaging_search`
 - Leggibile senza chiave: dato pubblico di riferimento.
 
-### `durable_review_command_operations`: comandi di revisione, idempotenza
-
-- In chiaro: `id`, `review_id`, `idempotency_key`, `command_digest`, `result_snapshot`, `audit_event_id`, `created_at`
-- Leggibile senza chiave: riferimenti, digest e istantanea del risultato.
-
-### `durable_review_command_states`: comandi di revisione, stato
-
-- In chiaro: `review_id`, `review_state`, `revision`, `action`, `created_at`
-- Leggibile senza chiave: stato e revisione della revisione.
-
-### `durable_review_operations`: operazioni di revisione durevole
-
-- In chiaro: `id`, `review_id`, `idempotency_key`, `operation`, `expected_review_revision`, `operation_digest`, `record_snapshot`, `created_at`
-- Leggibile senza chiave: riferimenti e digest; `record_snapshot` ripete il valore sigillato del record.
-
-### `durable_review_patient_links`: collegamento fra revisione e paziente
-
-- In chiaro: `review_id`, `patient_id`, `created_at`, `updated_at`
-- Leggibile senza chiave: coppia revisione-paziente.
-
-### `durable_review_records`: record di revisione durevole
-
-- Altra protezione: `sealed_ciphertext`
-- In chiaro: `id`, `patient_ref`, `review_id`, `review_revision`, `receipt_ref`, `provenance_ref`, `receipt_binding`, `provenance_binding`, `presentation_version`, `sealed_digest`, `created_at`
-- Leggibile senza chiave: riferimenti, digest e versione di presentazione. Il contenuto è in `sealed_ciphertext`, che la validazione del backup accetta solo come valore `ENC:`.
-
 ### `entries`: diario clinico
 
 - Cifrate: `title`, `content`, `metadata`, `attachments`, `deletion_reason`
@@ -181,16 +155,6 @@ locali salvano ciò che ricevono.
 
 - In chiaro: `attestation_ref`, `actor_ref`, `schema_version`, `role`, `operation_id`, `policy_version`, `status`, `attestation_version`, `issuer_ref`, `expires_at`, `activated_at`, `revocation_generation`, `revoked_at`, `created_at`, `updated_at`
 - Leggibile senza chiave: stato e scadenze dell'abilitazione; nessun dato clinico.
-
-### `headless_soap_active_role_attestations`: attestazione di ruolo SOAP
-
-- In chiaro: `attestation_ref`, `actor_ref`, `schema_version`, `role`, `operation_id`, `policy_version`, `status`, `attestation_version`, `issuer_ref`, `expires_at`, `activated_at`, `revocation_generation`, `revoked_at`, `created_at`, `updated_at`
-- Leggibile senza chiave: stato e scadenze dell'abilitazione; nessun dato clinico.
-
-### `headless_soap_entry_commits`: registro dei commit SOAP headless
-
-- In chiaro: `idempotency_key`, `approval_ref`, `authorization_proof_digest`, `command_id`, `entry_id`, `audit_event_id`, `receipt_ref`, `binding_snapshot`, `binding_digest`, `entry_digest`, `audit_snapshot`, `audit_digest`, `receipt_snapshot`, `receipt_digest`, `committed_at`
-- Leggibile senza chiave: riferimenti, digest e istantanee di binding, audit e ricevuta. Il testo della nota resta nei campi cifrati di `entries`.
 
 ### `messages`: messaggi delle conversazioni
 
@@ -408,3 +372,4 @@ cambia una classificazione.
 | 9 | Database adottato dalla cartella dell’applicazione `0600`, come ogni copia fatta attraverso SQLite; restano com'erano gli archivi adottati dalle versioni precedenti. |
 
 | 12 | Indice locale di provenienza: identificativi e classificazione leggibili in chiaro, esclusione dal portabile e inclusione nel recupero completo. |
+| 15 | Escono le sette tabelle di review durevole e scrittura SOAP headless, mai scritte dal prodotto: lo schema 11 le elimina, la copia originale dell'aggiornamento le conserva. |

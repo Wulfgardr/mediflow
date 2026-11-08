@@ -27,7 +27,6 @@ type Outcome = {
 };
 
 const BLOCKED_NEXT_STEP: Record<string, string> = {
-    durable_review_commands: 'Questo archivio contiene comandi di revisione che un backup non sa rappresentare: finché esistono, il ripristino resta bloccato di proposito.',
     audit: 'Lo storico di audit del backup è in conflitto con quello di questo archivio. Controlla di aver scelto un backup di questo studio.',
     runtime_fence: 'Riavvia MediFlow e riprova.',
 };

@@ -744,30 +744,6 @@
       "classification": "legacy-node-service"
     },
     {
-      "file": "lib/ai-providers/fabric/durable-current-review-locator.ts",
-      "target": "lib/db-server.ts",
-      "capability": "server:lib/db-server.ts",
-      "form": "import",
-      "symbols": [
-        "dbServer",
-        "hasCanonicalDurableReviewPatientLinkSchema"
-      ],
-      "count": 1,
-      "classification": "legacy-node-service"
-    },
-    {
-      "file": "lib/ai-providers/fabric/durable-review-record-store.ts",
-      "target": "lib/db-server.ts",
-      "capability": "server:lib/db-server.ts",
-      "form": "import",
-      "symbols": [
-        "dbServer",
-        "runDbServerImmediateTransaction"
-      ],
-      "count": 1,
-      "classification": "legacy-node-service"
-    },
-    {
       "file": "lib/ai-providers/fabric/function-model-preferences-production.ts",
       "target": "lib/db-server.ts",
       "capability": "server:lib/db-server.ts",
@@ -809,18 +785,6 @@
       "form": "import",
       "symbols": [
         "dbServer"
-      ],
-      "count": 1,
-      "classification": "legacy-node-service"
-    },
-    {
-      "file": "lib/ai-providers/fabric/physician-review-command.ts",
-      "target": "lib/db-server.ts",
-      "capability": "server:lib/db-server.ts",
-      "form": "import",
-      "symbols": [
-        "dbServer",
-        "runDbServerImmediateTransaction"
       ],
       "count": 1,
       "classification": "legacy-node-service"
@@ -1433,19 +1397,6 @@
       "form": "import",
       "symbols": [
         "dbServer"
-      ],
-      "count": 1,
-      "classification": "legacy-node-service"
-    },
-    {
-      "file": "lib/security/durable-review-patient-link-store.ts",
-      "target": "lib/db-server.ts",
-      "capability": "server:lib/db-server.ts",
-      "form": "import",
-      "symbols": [
-        "dbServer",
-        "hasCanonicalDurableReviewPatientLinkSchema",
-        "runDbServerImmediateTransaction"
       ],
       "count": 1,
       "classification": "legacy-node-service"

@@ -1,11 +1,9 @@
 import { validateAmbulatoryCommandRows } from './ambulatory-destructive-command-backup';
 import { validateTherapyStatusCommandRows } from './therapy-status-command-backup';
 import { types } from 'node:util';
-import { assertBackupAuditSnapshots, backupAuditCoverage, canonicalizeBackupAuditRows, snapshotBackupAudit } from './backup-audit';
+import { backupAuditCoverage, canonicalizeBackupAuditRows, snapshotBackupAudit } from './backup-audit';
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
 import { assertProstheticsCatalogBackup } from './reference-data/prosthetics-catalog-backup';
-
-import { validateHeadlessSoapEntryCommitSemanticChain } from './security/headless-soap-entry-commit-semantic-validator';
 
 export const BACKUP_ARTIFACT_FORMAT = 'mediflow-backup' as const;
 export const BACKUP_ARTIFACT_VERSION = 1 as const;
@@ -16,11 +14,6 @@ export const BACKUP_COLLECTIONS = [
     'attachments',
     'conversations',
     'documentDiagnosisProposals',
-    'durableReviewCommandStates',
-    'durableReviewCommandOperations',
-    'durableReviewPatientLinks',
-    'durableReviewRecords',
-    'durableReviewOperations',
     'drugs',
     'entries',
     'exemptions',
@@ -33,8 +26,6 @@ export const BACKUP_COLLECTIONS = [
     'observations',
     'patients',
     'physicianReviewAttestations',
-    'headlessSoapActiveRoleAttestations',
-    'headlessSoapEntryCommits',
     'prostheticPrescriptions',
     'serviceCatalogEntries',
     'servicePrescriptionItems',
@@ -49,84 +40,41 @@ export const BACKUP_COLLECTIONS = [
 
 export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
-type AdditiveBackupCollection = 'ambulatoryDestructiveCommands' | 'therapyStatusCommands' | 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts' | 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
+type AdditiveBackupCollection = 'ambulatoryDestructiveCommands' | 'therapyStatusCommands' | 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts';
 export type BackupDataset = Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, BackupRecord[]>
     & Partial<Record<AdditiveBackupCollection, BackupRecord[]>>;
 
-const DURABLE_REVIEW_AUTHORITY_COLLECTIONS = new Set<BackupCollectionName>([
-    'durableReviewPatientLinks',
-    'physicianReviewAttestations',
+/* Collections of the durable AI review and of the headless SOAP write, removed on
+ * 2026-11-08. The product never wrote them, so an older artifact may carry them
+ * only empty; a non-empty one is refused rather than silently dropped. */
+const RETIRED_BACKUP_COLLECTIONS: ReadonlySet<string> = new Set([
+    'durableReviewCommandStates', 'durableReviewCommandOperations', 'durableReviewPatientLinks',
+    'durableReviewRecords', 'durableReviewOperations', 'headlessSoapActiveRoleAttestations', 'headlessSoapEntryCommits',
 ]);
-/* Artifacts created before H7b have no durable SOAP commit ledger. */
-const PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS = BACKUP_COLLECTIONS.filter(
-    (collection) => collection !== 'headlessSoapEntryCommits',
-);
-/* v1 also tolerates an explicitly empty H7b generation without the earlier H2a-S collection. */
-const WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS = BACKUP_COLLECTIONS.filter(
-    (collection) => collection !== 'headlessSoapActiveRoleAttestations',
-);
-/* Artifacts created before H2a-S have neither SOAP authority nor the later H7b ledger. */
-const PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS = PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS.filter(
-    (collection) => collection !== 'headlessSoapActiveRoleAttestations',
-);
-/* Artifacts created before durable review authority was added have no such collections. */
-const PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter(
-    (collection) => !DURABLE_REVIEW_AUTHORITY_COLLECTIONS.has(collection),
-);
-/* Known v1 omissions remain recognizable when a later producer adds an empty H7b ledger. */
-const WITHOUT_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter(
-    (collection) => !DURABLE_REVIEW_AUTHORITY_COLLECTIONS.has(collection),
-);
-const LEGACY_OMITTED_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
-    ['durableReviewCommandStates', 'durableReviewCommandOperations'],
-    ['durableReviewRecords', 'durableReviewOperations', 'durableReviewCommandStates', 'durableReviewCommandOperations'],
-    ['documentDiagnosisProposals', 'durableReviewRecords', 'durableReviewOperations', 'durableReviewCommandStates', 'durableReviewCommandOperations'],
-];
-/* v1 recognizes both the authority-era and pre-authority collection generations. */
-const PRE_EXEMPTION_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
-    WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS,
-    PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS,
-    PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS,
-    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => BACKUP_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
-    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
-    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
-    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => WITHOUT_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
-    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
-    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
-];
-/* Preserve every previously recognized v1 generation, with or without import receipts. */
-const PRE_PROSTHETICS_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
-    ...PRE_EXEMPTION_LEGACY_COLLECTION_SETS,
-    BACKUP_COLLECTIONS.filter((collection) => collection !== 'exemptionImportReceipts'),
-    ...PRE_EXEMPTION_LEGACY_COLLECTION_SETS.map((collections) => collections.filter((collection) => collection !== 'exemptionImportReceipts')),
-];
-/* Both repertory collections form one additive generation; partial omission is invalid. */
-const AUDIT_ERA_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
-    ...PRE_PROSTHETICS_LEGACY_COLLECTION_SETS,
-    ...[BACKUP_COLLECTIONS, ...PRE_PROSTHETICS_LEGACY_COLLECTION_SETS].map(collections => collections.filter(
-        collection => collection !== 'prostheticsCatalogEntries' && collection !== 'prostheticsCatalogReceipts')),
+/* Every v1 generation is the current set minus any of these groups: each group
+ * arrived in one release, so an artifact has a group whole or not at all. */
+const OPTIONAL_COLLECTION_GROUPS: readonly (readonly BackupCollectionName[])[] = [
+    ['ambulatoryDestructiveCommands'],
+    ['auditEvents'],
+    ['documentDiagnosisProposals'],
+    ['exemptionImportReceipts'],
+    ['physicianReviewAttestations'],
+    ['prostheticsCatalogSources', 'prostheticsCatalogDocuments'],
+    ['prostheticsCatalogEntries', 'prostheticsCatalogReceipts'],
+    ['therapyStatusCommands'],
 ];
 const PRE_AUDIT_COLLECTIONS = BACKUP_COLLECTIONS.filter(collection => collection !== 'auditEvents');
-const LEGACY_WITH_SOURCE_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
-    ...AUDIT_ERA_LEGACY_COLLECTION_SETS,
-    ...[BACKUP_COLLECTIONS, ...AUDIT_ERA_LEGACY_COLLECTION_SETS]
-        .map(collections => collections.filter(collection => collection !== 'auditEvents')),
-];
-const PRE_COMMAND_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
-    ...LEGACY_WITH_SOURCE_COLLECTION_SETS,
-    ...[BACKUP_COLLECTIONS, ...LEGACY_WITH_SOURCE_COLLECTION_SETS].map(collections => collections.filter(
-        collection => collection !== 'prostheticsCatalogSources' && collection !== 'prostheticsCatalogDocuments')),
-];
 
-const PRE_AMBULATORY_COMMAND_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
-    ...PRE_COMMAND_LEGACY_COLLECTION_SETS,
-    ...[BACKUP_COLLECTIONS, ...PRE_COMMAND_LEGACY_COLLECTION_SETS].map(collections => collections.filter(collection => collection !== 'therapyStatusCommands')),
-];
-
-const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
-    ...PRE_AMBULATORY_COMMAND_COLLECTION_SETS,
-    ...[BACKUP_COLLECTIONS, ...PRE_AMBULATORY_COMMAND_COLLECTION_SETS].map(collections => collections.filter(collection => collection !== 'ambulatoryDestructiveCommands')),
-];
+function generationCollections(present: readonly string[]): readonly BackupCollectionName[] | null {
+    const keys = new Set(present);
+    let expected: readonly BackupCollectionName[] = BACKUP_COLLECTIONS;
+    for (const group of OPTIONAL_COLLECTION_GROUPS) {
+        const found = group.filter(collection => keys.has(collection)).length;
+        if (found === 0) expected = expected.filter(collection => !group.includes(collection));
+        else if (found !== group.length) return null;
+    }
+    return expected;
+}
 
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
     'attachments',
@@ -140,48 +88,11 @@ const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
     'sissHandoffs',
     'therapies',
 ];
-/* Backup validation mirrors the durable store without importing its server-only writer. */
-const DURABLE_REVIEW = /^review_[0-9a-f]{32}$/;
-const DURABLE_PATIENT = /^ptr_[0-9a-f]{32}$/;
-const DURABLE_RECEIPT = /^receipt_[0-9a-f]{32}$/;
-const DURABLE_PROVENANCE = /^provenance_[0-9a-f]{32}$/;
-const SHA256 = /^[0-9a-f]{64}$/;
 const DOCUMENT_SOURCE_REF = /^[0-9a-f]{64}$/;
-const SEALED_CIPHERTEXT = /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/;
-const IDEMPOTENCY_KEY = /^idem_[a-z0-9]{16,160}$/;
-const DURABLE_RECORD_KEYS = ['patientRef', 'reviewId', 'reviewRevision', 'receiptRef', 'provenanceRef', 'receiptBinding', 'provenanceBinding', 'presentationVersion', 'sealedCiphertext', 'sealedDigest'] as const;
-const DURABLE_BACKUP_RECORD_KEYS = ['id', ...DURABLE_RECORD_KEYS, 'createdAt'] as const;
-const DURABLE_OPERATION_KEYS = ['id', 'reviewId', 'idempotencyKey', 'operation', 'expectedReviewRevision', 'operationDigest', 'recordSnapshot', 'createdAt'] as const;
-const DURABLE_PRESENTATION_VERSION = 'mediflow.ai.durable-review.presentation.v1';
-const DURABLE_REVIEW_PATIENT_LINK_KEYS = ['reviewId', 'patientId', 'createdAt', 'updatedAt'] as const;
 const PHYSICIAN_REVIEW_ATTESTATION_KEYS = ['actorRef', 'schemaVersion', 'capability', 'status', 'attestationVersion', 'policyVersion', 'revokedAt', 'createdAt', 'updatedAt'] as const;
 const PHYSICIAN_REVIEW_ATTESTATION_SCHEMA = 'mediflow.physician-review-attestation.v1';
 const PHYSICIAN_REVIEW_CAPABILITY = 'physician_terminal_review';
 const PHYSICIAN_REVIEW_POLICY = 'physician_terminal_review.v1';
-const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_KEYS = ['attestationRef', 'actorRef', 'schemaVersion', 'role', 'operationId', 'policyVersion', 'status', 'attestationVersion', 'issuerRef', 'expiresAt', 'activatedAt', 'revocationGeneration', 'revokedAt', 'createdAt', 'updatedAt'] as const;
-const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_SCHEMA = 'mediflow.headless-soap-active-role-attestation.v1';
-const HEADLESS_SOAP_ACTIVE_ROLE_ROLE = 'physician';
-const HEADLESS_SOAP_ACTIVE_ROLE_OPERATION = 'mediflow.clinical_diary.append_soap.v1';
-const HEADLESS_SOAP_ACTIVE_ROLE_POLICY = 'clinician_confirmed_single_use.v1';
-const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_REF = /^hsar_[0-9a-f]{32}$/;
-const HEADLESS_SOAP_ACTIVE_ROLE_ISSUER_REF = /^hsari_[0-9a-f]{32}$/;
-const HEADLESS_SOAP_COMMAND_ID = /^hsac_[0-9a-f]{64}$/;
-const HEADLESS_SOAP_APPROVAL_REF = /^hsaa_[0-9a-f]{64}$/;
-const HEADLESS_SOAP_IDEMPOTENCY_KEY = /^hsai_[0-9a-f]{64}$/;
-const HEADLESS_SOAP_ENTRY_ID = /^hsei_[0-9a-f]{64}$/;
-const HEADLESS_SOAP_AUDIT_EVENT_ID = /^hsea_[0-9a-f]{64}$/;
-const HEADLESS_SOAP_RECEIPT_REF = /^hser_[0-9a-f]{64}$/;
-const HEADLESS_SOAP_BINDING_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-binding-digest.v1';
-const HEADLESS_SOAP_AUDIT_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-audit-digest.v1';
-const HEADLESS_SOAP_RECEIPT_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-receipt-digest.v1';
-const HEADLESS_SOAP_ENTRY_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-entry-digest.v1';
-const HEADLESS_SOAP_PATIENT_ID_DIGEST_DOMAIN = 'mediflow.headless.soap-entry-commit-patient-id-digest.v1';
-const HEADLESS_SOAP_ENTRY_ID_DOMAIN = 'mediflow.headless.soap-entry-id.v1';
-const HEADLESS_SOAP_AUDIT_ID_DOMAIN = 'mediflow.headless.soap-entry-audit-id.v1';
-const HEADLESS_SOAP_RECEIPT_ID_DOMAIN = 'mediflow.headless.soap-entry-receipt-ref.v1';
-const HEADLESS_SOAP_COMMIT_KEYS = ['idempotencyKey', 'approvalRef', 'authorizationProofDigest', 'commandId', 'entryId', 'auditEventId', 'receiptRef', 'bindingSnapshot', 'bindingDigest', 'entryDigest', 'auditSnapshot', 'auditDigest', 'receiptSnapshot', 'receiptDigest', 'committedAt'] as const;
-const HEADLESS_SOAP_AUDIT_KEYS = ['eventId', 'schemaVersion', 'eventType', 'occurredAt', 'outcome', 'actorType', 'actorRef', 'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata', 'createdAt'] as const;
-const HEADLESS_SOAP_RECEIPT_KEYS = ['schema', 'receiptRef', 'operationId', 'outcome', 'commandId', 'entryRef', 'auditEventRef', 'patientVersion', 'entryVersion', 'committedAt', 'bindingDigest', 'entryDigest', 'auditDigest'] as const;
 const BACKUP_ARTIFACT_ROOT_KEYS = ['format', 'version', 'manifest', 'payload'] as const;
 
 export interface BackupArtifactManifest {
@@ -299,34 +210,7 @@ function timestampMilliseconds(value: unknown): number | null {
     return Number.isFinite(date.getTime()) && date.toISOString() === value ? date.getTime() : null;
 }
 
-/* H2a-S persists whole Unix seconds and serializes only canonical, non-negative ISO timestamps. */
-function headlessSoapTimestampMilliseconds(value: unknown, serialized: boolean): number | null {
-    if (serialized && typeof value !== 'string') return null;
-    const milliseconds = timestampMilliseconds(value);
-    return milliseconds === null || milliseconds < 0 || milliseconds % 1000 !== 0 ? null : milliseconds;
-}
-
-function assertDurableReviewAuthorityRows(
-    payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
-    durableReviewIds: ReadonlySet<string>,
-    patientIds: ReadonlySet<string>,
-): void {
-    const linkedReviewIds = new Set<string>();
-    for (const link of payload.durableReviewPatientLinks ?? []) {
-        if (!hasExactKeys(link, DURABLE_REVIEW_PATIENT_LINK_KEYS)) {
-            throw new BackupArtifactError('invalid-manifest', 'durableReviewPatientLinks contains an invalid durable review reference.');
-        }
-        const createdAt = timestampMilliseconds(link.createdAt);
-        const updatedAt = timestampMilliseconds(link.updatedAt);
-        if (typeof link.reviewId !== 'string' || !DURABLE_REVIEW.test(link.reviewId) || !durableReviewIds.has(link.reviewId)
-            || typeof link.patientId !== 'string' || !patientIds.has(link.patientId)
-            || createdAt === null || updatedAt === null || updatedAt < createdAt
-            || linkedReviewIds.has(link.reviewId)) {
-            throw new BackupArtifactError('invalid-manifest', 'durableReviewPatientLinks contains an invalid durable review reference.');
-        }
-        linkedReviewIds.add(link.reviewId);
-    }
-
+function assertPhysicianReviewAttestationRows(payload: Partial<Record<BackupCollectionName, BackupRecord[]>>): void {
     const actorRefs = new Set<string>();
     for (const attestation of payload.physicianReviewAttestations ?? []) {
         if (!hasExactKeys(attestation, PHYSICIAN_REVIEW_ATTESTATION_KEYS)) {
@@ -348,261 +232,6 @@ function assertDurableReviewAuthorityRows(
             throw new BackupArtifactError('invalid-manifest', 'physicianReviewAttestations contains an invalid authority record.');
         }
         actorRefs.add(attestation.actorRef);
-    }
-}
-
-/* H2a-S backup accounting validates only persistent attestation facts; it never restores a session or grant. */
-function assertHeadlessSoapActiveRoleAttestationRows(
-    payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
-    serialized: boolean,
-): void {
-    const attestationRefs = new Set<string>();
-    const actorRefs = new Set<string>();
-    for (const attestation of payload.headlessSoapActiveRoleAttestations ?? []) {
-        if (!hasExactKeys(attestation, HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_KEYS)) {
-            throw new BackupArtifactError('invalid-manifest', 'headless SOAP active-role attestations contain an invalid authority record.');
-        }
-        const createdAt = headlessSoapTimestampMilliseconds(attestation.createdAt, serialized);
-        const updatedAt = headlessSoapTimestampMilliseconds(attestation.updatedAt, serialized);
-        const expiresAt = attestation.expiresAt === null ? null : headlessSoapTimestampMilliseconds(attestation.expiresAt, serialized);
-        const activatedAt = attestation.activatedAt === null ? null : headlessSoapTimestampMilliseconds(attestation.activatedAt, serialized);
-        const revokedAt = attestation.revokedAt === null ? null : headlessSoapTimestampMilliseconds(attestation.revokedAt, serialized);
-        const hasValidIssuer = typeof attestation.issuerRef === 'string'
-            && HEADLESS_SOAP_ACTIVE_ROLE_ISSUER_REF.test(attestation.issuerRef);
-        const hasFixedActivationWindow = expiresAt !== null && activatedAt !== null
-            && expiresAt - activatedAt === 8 * 60 * 60 * 1000;
-        const inactive = attestation.status === 'inactive'
-            && attestation.issuerRef === null && expiresAt === null && activatedAt === null && revokedAt === null
-            && attestation.revocationGeneration === 0;
-        const active = attestation.status === 'active'
-            && hasValidIssuer && hasFixedActivationWindow && revokedAt === null
-            && attestation.revocationGeneration === 0;
-        const revoked = attestation.status === 'revoked'
-            && revokedAt !== null && typeof attestation.revocationGeneration === 'number'
-            && Number.isSafeInteger(attestation.revocationGeneration) && attestation.revocationGeneration === 1
-            && ((attestation.issuerRef === null && expiresAt === null && activatedAt === null)
-                || (hasValidIssuer && hasFixedActivationWindow));
-        if (typeof attestation.attestationRef !== 'string' || !HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_REF.test(attestation.attestationRef) || attestationRefs.has(attestation.attestationRef)
-            || typeof attestation.actorRef !== 'string' || attestation.actorRef.trim() !== attestation.actorRef || attestation.actorRef.length < 1 || attestation.actorRef.length > 256 || actorRefs.has(attestation.actorRef)
-            || attestation.schemaVersion !== HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_SCHEMA
-            || attestation.role !== HEADLESS_SOAP_ACTIVE_ROLE_ROLE
-            || attestation.operationId !== HEADLESS_SOAP_ACTIVE_ROLE_OPERATION
-            || attestation.policyVersion !== HEADLESS_SOAP_ACTIVE_ROLE_POLICY
-            || attestation.attestationVersion !== 1
-            || typeof attestation.revocationGeneration !== 'number' || !Number.isSafeInteger(attestation.revocationGeneration) || attestation.revocationGeneration < 0
-            || (!inactive && !active && !revoked)
-            || createdAt === null || updatedAt === null || updatedAt < createdAt
-            || (expiresAt !== null && expiresAt < createdAt)
-            || (activatedAt !== null && (activatedAt < createdAt || (expiresAt !== null && activatedAt > expiresAt)))
-            || (revokedAt !== null && (revokedAt < createdAt || (activatedAt !== null && revokedAt < activatedAt)))) {
-            throw new BackupArtifactError('invalid-manifest', 'headless SOAP active-role attestations contain an invalid authority record.');
-        }
-        attestationRefs.add(attestation.attestationRef);
-        actorRefs.add(attestation.actorRef);
-    }
-}
-
-/* H7b embeds only its own exact audit snapshot; audit_events never becomes a backup collection. */
-function parseCanonicalSnapshot(value: unknown, keys?: readonly string[]): Record<string, unknown> | null {
-    if (typeof value !== 'string') return null;
-    try {
-        const parsed = JSON.parse(value) as unknown;
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.getPrototypeOf(parsed) !== Object.prototype
-            || JSON.stringify(parsed) !== value) return null;
-        if (keys && (Object.keys(parsed).length !== keys.length
-            || keys.some((key, index) => Object.keys(parsed)[index] !== key))) return null;
-        return parsed as Record<string, unknown>;
-    } catch {
-        return null;
-    }
-}
-
-/* Backup preflight binds the ledger to its embedded audit and exported entry before target mutation. */
-async function assertHeadlessSoapEntryCommitRows(
-    payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
-    serialized: boolean,
-): Promise<void> {
-    const entriesById = new Map<string, BackupRecord>();
-    for (const entry of payload.entries ?? []) {
-        if (typeof entry.id === 'string') entriesById.set(entry.id, entry);
-    }
-    const patientsById = new Map<string, BackupRecord>();
-    for (const patient of payload.patients ?? []) {
-        if (typeof patient.id === 'string') patientsById.set(patient.id, patient);
-    }
-    const unique = {
-        idempotencyKey: new Set<string>(), commandId: new Set<string>(), entryId: new Set<string>(),
-        auditEventId: new Set<string>(), receiptRef: new Set<string>(),
-    };
-    let previousIdempotencyKey: string | null = null;
-    for (const row of payload.headlessSoapEntryCommits ?? []) {
-        if (!hasExactKeys(row, HEADLESS_SOAP_COMMIT_KEYS)) {
-            throw new BackupArtifactError('invalid-manifest', 'headlessSoapEntryCommits contains an invalid ledger row.');
-        }
-        const committedAtMs = headlessSoapTimestampMilliseconds(row.committedAt, serialized);
-        const committedAt = committedAtMs === null ? null : new Date(committedAtMs).toISOString();
-        const binding = parseCanonicalSnapshot(row.bindingSnapshot);
-        const audit = parseCanonicalSnapshot(row.auditSnapshot, HEADLESS_SOAP_AUDIT_KEYS);
-        const receipt = parseCanonicalSnapshot(row.receiptSnapshot, HEADLESS_SOAP_RECEIPT_KEYS);
-        const redactedMetadata = audit ? parseCanonicalSnapshot(audit.redactedMetadata) : null;
-        const strings = [row.authorizationProofDigest, row.bindingDigest, row.entryDigest, row.auditDigest, row.receiptDigest];
-        const validIds = typeof row.idempotencyKey === 'string' && HEADLESS_SOAP_IDEMPOTENCY_KEY.test(row.idempotencyKey)
-            && typeof row.approvalRef === 'string' && HEADLESS_SOAP_APPROVAL_REF.test(row.approvalRef)
-            && typeof row.commandId === 'string' && HEADLESS_SOAP_COMMAND_ID.test(row.commandId)
-            && typeof row.entryId === 'string' && HEADLESS_SOAP_ENTRY_ID.test(row.entryId)
-            && typeof row.auditEventId === 'string' && HEADLESS_SOAP_AUDIT_EVENT_ID.test(row.auditEventId)
-            && typeof row.receiptRef === 'string' && HEADLESS_SOAP_RECEIPT_REF.test(row.receiptRef);
-        const duplicated = validIds && (unique.idempotencyKey.has(row.idempotencyKey as string)
-            || unique.commandId.has(row.commandId as string) || unique.entryId.has(row.entryId as string)
-            || unique.auditEventId.has(row.auditEventId as string) || unique.receiptRef.has(row.receiptRef as string));
-        const auditSeconds = committedAtMs === null ? null : committedAtMs / 1000;
-        const domainDigest = (domain: string, snapshot: string) => sha256Hex(`${domain}\0${snapshot}`);
-        const expectedEntryId = validIds ? `hsei_${await domainDigest(HEADLESS_SOAP_ENTRY_ID_DOMAIN, row.commandId as string)}` : null;
-        const expectedAuditEventId = validIds ? `hsea_${await domainDigest(HEADLESS_SOAP_AUDIT_ID_DOMAIN, row.commandId as string)}` : null;
-        const expectedReceiptRef = validIds ? `hser_${await domainDigest(HEADLESS_SOAP_RECEIPT_ID_DOMAIN, row.commandId as string)}` : null;
-        const expectedBindingDigest = binding ? await domainDigest(HEADLESS_SOAP_BINDING_DIGEST_DOMAIN, row.bindingSnapshot as string) : null;
-        const expectedAuditDigest = audit ? await domainDigest(HEADLESS_SOAP_AUDIT_DIGEST_DOMAIN, row.auditSnapshot as string) : null;
-        const expectedReceiptDigest = receipt ? await domainDigest(HEADLESS_SOAP_RECEIPT_DIGEST_DOMAIN, row.receiptSnapshot as string) : null;
-        const entry = validIds ? entriesById.get(row.entryId as string) : undefined;
-        const entryDateMs = entry ? timestampMilliseconds(entry.date) : null;
-        const entryCreatedAtMs = entry ? timestampMilliseconds(entry.createdAt) : null;
-        const entryUpdatedAtMs = entry ? timestampMilliseconds(entry.updatedAt) : null;
-        const entrySnapshot = entry && typeof entry.patientId === 'string'
-            && entryDateMs !== null && entryDateMs % 1000 === 0
-            && entryCreatedAtMs !== null && entryCreatedAtMs % 1000 === 0
-            && entryUpdatedAtMs !== null && entryUpdatedAtMs % 1000 === 0
-            ? JSON.stringify({
-                schema: 'mediflow.headless.soap-entry-record.v1', entryId: entry.id,
-                patientIdDigest: await domainDigest(HEADLESS_SOAP_PATIENT_ID_DIGEST_DOMAIN, entry.patientId),
-                type: entry.type, title: entry.title, date: entryDateMs / 1000, content: entry.content,
-                setting: entry.setting, metadata: entry.metadata, attachments: entry.attachments ?? null,
-                deletedAt: entry.deletedAt ?? null, deletionReason: entry.deletionReason ?? null, version: entry.version,
-                createdAt: entryCreatedAtMs / 1000, updatedAt: entryUpdatedAtMs / 1000,
-            })
-            : null;
-        const expectedEntryDigest = entrySnapshot ? await domainDigest(HEADLESS_SOAP_ENTRY_DIGEST_DOMAIN, entrySnapshot) : null;
-        const patient = entry && typeof entry.patientId === 'string' ? patientsById.get(entry.patientId) : undefined;
-        const ambulatoryIds = patient ? [...new Set([
-            typeof patient.ambulatoryId === 'string' ? patient.ambulatoryId : null,
-            ...parseAssignedAmbulatoryIds(patient.assignedAmbulatoryIds),
-            ...parseAssignedAmbulatoryMemberships(patient.assignedAmbulatoryMemberships)
-                .map((membership) => membership.ambulatoryId),
-        ].filter((value): value is string => typeof value === 'string' && value.length > 0))] : [];
-        const semanticChainValid = entrySnapshot !== null && entry && typeof entry.patientId === 'string'
-            && validateHeadlessSoapEntryCommitSemanticChain({
-                idempotencyKey: row.idempotencyKey,
-                approvalRef: row.approvalRef,
-                authorizationProofDigest: row.authorizationProofDigest,
-                commandId: row.commandId,
-                entryId: row.entryId,
-                auditEventId: row.auditEventId,
-                receiptRef: row.receiptRef,
-                bindingSnapshot: row.bindingSnapshot,
-                bindingDigest: row.bindingDigest,
-                entrySnapshot,
-                entryDigest: row.entryDigest,
-                auditSnapshot: row.auditSnapshot,
-                auditDigest: row.auditDigest,
-                receiptSnapshot: row.receiptSnapshot,
-                receiptDigest: row.receiptDigest,
-                committedAtSeconds: auditSeconds,
-                patientId: entry.patientId,
-                ambulatoryIds,
-            });
-        if (!validIds || duplicated || !entry || strings.some((value) => typeof value !== 'string' || !SHA256.test(value))
-            || !binding || !audit || !receipt || !redactedMetadata || committedAt === null
-            || !semanticChainValid
-            || row.entryId !== expectedEntryId || row.auditEventId !== expectedAuditEventId || row.receiptRef !== expectedReceiptRef
-            || row.bindingDigest !== expectedBindingDigest || row.entryDigest !== expectedEntryDigest
-            || row.auditDigest !== expectedAuditDigest || row.receiptDigest !== expectedReceiptDigest
-            || audit.eventId !== row.auditEventId || audit.schemaVersion !== 1 || audit.eventType !== 'entry.created'
-            || audit.occurredAt !== auditSeconds || audit.outcome !== 'success' || audit.actorType !== 'user'
-            || typeof audit.actorRef !== 'string' || audit.actorRef.length === 0 || audit.subjectType !== 'entry'
-            || audit.subjectRef !== row.entryId || audit.sourceSurface !== 'web' || audit.requestId !== null
-            || audit.createdAt !== auditSeconds
-            || receipt.schema !== 'mediflow.headless.soap-entry-commit-receipt.v1'
-            || receipt.receiptRef !== row.receiptRef || receipt.operationId !== HEADLESS_SOAP_ACTIVE_ROLE_OPERATION
-            || receipt.outcome !== 'entry_committed' || receipt.commandId !== row.commandId
-            || receipt.entryRef !== row.entryId || receipt.auditEventRef !== row.auditEventId
-            || typeof receipt.patientVersion !== 'number' || !Number.isSafeInteger(receipt.patientVersion) || receipt.patientVersion < 1
-            || receipt.entryVersion !== 1 || receipt.committedAt !== committedAt
-            || receipt.bindingDigest !== row.bindingDigest || receipt.entryDigest !== row.entryDigest || receipt.auditDigest !== row.auditDigest
-            || (serialized && previousIdempotencyKey !== null && previousIdempotencyKey.localeCompare(row.idempotencyKey as string) >= 0)) {
-            throw new BackupArtifactError('invalid-manifest', 'headlessSoapEntryCommits contains an invalid ledger row.');
-        }
-        unique.idempotencyKey.add(row.idempotencyKey as string); unique.commandId.add(row.commandId as string);
-        unique.entryId.add(row.entryId as string); unique.auditEventId.add(row.auditEventId as string);
-        unique.receiptRef.add(row.receiptRef as string); previousIdempotencyKey = row.idempotencyKey as string;
-    }
-}
-
-async function normalizeDurableReviewRecord(value: unknown): Promise<Record<string, unknown>> {
-    if (!hasExactKeys(value, DURABLE_RECORD_KEYS)) throw new BackupArtifactError('invalid-manifest', 'Durable review record is invalid.');
-    const patientRef = value.patientRef; const reviewId = value.reviewId; const reviewRevision = value.reviewRevision;
-    const receiptRef = value.receiptRef; const provenanceRef = value.provenanceRef; const receiptBinding = value.receiptBinding;
-    const provenanceBinding = value.provenanceBinding; const sealedCiphertext = value.sealedCiphertext; const sealedDigest = value.sealedDigest;
-    if (typeof patientRef !== 'string' || !DURABLE_PATIENT.test(patientRef)
-        || typeof reviewId !== 'string' || !DURABLE_REVIEW.test(reviewId)
-        || typeof reviewRevision !== 'number' || !Number.isSafeInteger(reviewRevision) || reviewRevision < 1
-        || typeof receiptRef !== 'string' || !DURABLE_RECEIPT.test(receiptRef)
-        || typeof provenanceRef !== 'string' || !DURABLE_PROVENANCE.test(provenanceRef)
-        || typeof receiptBinding !== 'string' || !SHA256.test(receiptBinding) || receiptBinding !== await sha256Hex(`${patientRef}\0${reviewId}\0${receiptRef}`)
-        || typeof provenanceBinding !== 'string' || !SHA256.test(provenanceBinding) || provenanceBinding !== await sha256Hex(`${patientRef}\0${reviewId}\0${provenanceRef}`)
-        || value.presentationVersion !== DURABLE_PRESENTATION_VERSION
-        || typeof sealedCiphertext !== 'string' || !SEALED_CIPHERTEXT.test(sealedCiphertext)
-        || typeof sealedDigest !== 'string' || !SHA256.test(sealedDigest) || sealedDigest !== await sha256Hex(sealedCiphertext)) {
-        throw new BackupArtifactError('invalid-manifest', 'Durable review record is invalid.');
-    }
-    return { patientRef, reviewId, reviewRevision, receiptRef, provenanceRef, receiptBinding, provenanceBinding, presentationVersion: DURABLE_PRESENTATION_VERSION, sealedCiphertext, sealedDigest };
-}
-
-async function assertDurableReviewLedger(payload: Partial<Record<BackupCollectionName, BackupRecord[]>>): Promise<void> {
-    /* The v1 payload does not own the append-only audit ledger required by command replay. */
-    if ((payload.durableReviewCommandStates?.length ?? 0) > 0 || (payload.durableReviewCommandOperations?.length ?? 0) > 0) {
-        throw new BackupArtifactError('invalid-manifest', 'Durable review command state requires its append-only audit ledger.');
-    }
-    const records = new Map<string, Record<string, unknown>>();
-    for (const row of payload.durableReviewRecords ?? []) {
-        if (!hasExactKeys(row, DURABLE_BACKUP_RECORD_KEYS) || row.id !== row.reviewId) throw new BackupArtifactError('invalid-manifest', 'Durable review record is invalid.');
-        const record = await normalizeDurableReviewRecord((( { id: _id, createdAt: _createdAt, ...value }) => value)(row));
-        if (records.has(record.reviewId as string)) throw new BackupArtifactError('invalid-manifest', 'Durable review record is duplicated.');
-        records.set(record.reviewId as string, record);
-    }
-
-    const operationsByReview = new Map<string, Array<{ operation: 'create' | 'replace'; expectedReviewRevision: number; record: Record<string, unknown> }>>();
-    const operationIds = new Set<string>();
-    const operationKeys = new Set<string>();
-    for (const row of payload.durableReviewOperations ?? []) {
-        if (!hasExactKeys(row, DURABLE_OPERATION_KEYS)
-            || typeof row.id !== 'string' || typeof row.reviewId !== 'string' || typeof row.idempotencyKey !== 'string'
-            || typeof row.expectedReviewRevision !== 'number' || !Number.isSafeInteger(row.expectedReviewRevision) || row.expectedReviewRevision < 0
-            || (row.operation !== 'create' && row.operation !== 'replace') || typeof row.operationDigest !== 'string' || !SHA256.test(row.operationDigest)
-            || typeof row.recordSnapshot !== 'string' || !IDEMPOTENCY_KEY.test(row.idempotencyKey) || !records.has(row.reviewId)) {
-            throw new BackupArtifactError('invalid-manifest', 'Durable review operation is invalid.');
-        }
-        const key = `${row.reviewId}\0${row.idempotencyKey}`;
-        if (operationIds.has(row.id) || operationKeys.has(key) || row.id !== await sha256Hex(key)) throw new BackupArtifactError('invalid-manifest', 'Durable review operation is invalid.');
-        let snapshot: unknown;
-        try { snapshot = JSON.parse(row.recordSnapshot); } catch { throw new BackupArtifactError('invalid-manifest', 'Durable review operation is invalid.'); }
-        const record = await normalizeDurableReviewRecord(snapshot);
-        if (row.recordSnapshot !== JSON.stringify(record)
-            || record.reviewId !== row.reviewId
-            || record.reviewRevision !== row.expectedReviewRevision + 1
-            || row.operationDigest !== await sha256Hex(JSON.stringify([row.operation, row.expectedReviewRevision, record]))) {
-            throw new BackupArtifactError('invalid-manifest', 'Durable review operation is invalid.');
-        }
-        operationIds.add(row.id); operationKeys.add(key);
-        operationsByReview.set(row.reviewId, [...(operationsByReview.get(row.reviewId) ?? []), { operation: row.operation, expectedReviewRevision: row.expectedReviewRevision, record }]);
-    }
-
-    for (const [reviewId, current] of records) {
-        const operations = operationsByReview.get(reviewId)?.sort((left, right) => (left.record.reviewRevision as number) - (right.record.reviewRevision as number));
-        if (!operations || operations.length === 0 || operations[0].operation !== 'create' || operations[0].expectedReviewRevision !== 0) throw new BackupArtifactError('invalid-manifest', 'Durable review ledger is incomplete.');
-        for (let index = 1; index < operations.length; index += 1) {
-            if (operations[index].operation !== 'replace' || operations[index].expectedReviewRevision !== operations[index - 1].record.reviewRevision || operations[index].record.patientRef !== operations[index - 1].record.patientRef) throw new BackupArtifactError('invalid-manifest', 'Durable review ledger is inconsistent.');
-        }
-        const latest = operations.at(-1)!.record;
-        if (JSON.stringify(latest) !== JSON.stringify(current)) throw new BackupArtifactError('invalid-manifest', 'Durable review ledger is inconsistent.');
     }
 }
 
@@ -692,7 +321,6 @@ function assertAttachmentCurrentnessRows(rows: readonly BackupRecord[]): void {
 async function assertCollectionReferences(
     payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
     patientDependentCollections: readonly BackupCollectionName[] = PATIENT_DEPENDENT_COLLECTIONS,
-    serialized = false,
 ): Promise<void> {
     const ambulatoryIds = new Set(
         (payload.ambulatories ?? [])
@@ -763,11 +391,6 @@ async function assertCollectionReferences(
         }
     }
 
-    const durableReviewIds = new Set(
-        (payload.durableReviewRecords ?? [])
-            .map((item) => item.reviewId)
-            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
-    );
     for (const message of payload.messages ?? []) {
         if (typeof message.conversationId !== 'string' || !conversationIds.has(message.conversationId)) {
             throw new BackupArtifactError(
@@ -786,30 +409,11 @@ async function assertCollectionReferences(
     catch { throw new BackupArtifactError('invalid-manifest', 'Therapy status command ledger or audit is invalid.'); }
     try { validateAmbulatoryCommandRows(payload.ambulatoryDestructiveCommands ?? [], payload.auditEvents ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Ambulatory command ledger or audit is invalid.'); }
-    await assertDurableReviewLedger(payload);
-    assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);
-    assertHeadlessSoapActiveRoleAttestationRows(payload, serialized);
-    await assertHeadlessSoapEntryCommitRows(payload, serialized);
+    assertPhysicianReviewAttestationRows(payload);
     if (backupAuditCoverage(payload) === 'included') {
-        try {
-            const audits = canonicalizeBackupAuditRows(payload.auditEvents);
-            assertBackupAuditSnapshots(audits, (payload.headlessSoapEntryCommits ?? []).map(row => row.auditSnapshot));
-        } catch {
-            throw new BackupArtifactError('invalid-manifest', 'Backup audit rows, identities or H7b snapshots are invalid.');
-        }
+        try { canonicalizeBackupAuditRows(payload.auditEvents); }
+        catch { throw new BackupArtifactError('invalid-manifest', 'Backup audit rows or identities are invalid.'); }
     }
-}
-
-/* Backup producers canonicalize the H2a-S collection after exact-row validation. */
-function sortHeadlessSoapActiveRoleAttestations(rows: BackupRecord[]): BackupRecord[] {
-    return [...rows].sort((left, right) => {
-        const byAttestation = String(left.attestationRef).localeCompare(String(right.attestationRef));
-        return byAttestation === 0 ? String(left.actorRef).localeCompare(String(right.actorRef)) : byAttestation;
-    });
-}
-
-function sortHeadlessSoapEntryCommits(rows: BackupRecord[]): BackupRecord[] {
-    return [...rows].sort((left, right) => String(left.idempotencyKey).localeCompare(String(right.idempotencyKey)));
 }
 
 export async function createBackupArtifact(payload: BackupDataset, createdAt = new Date()): Promise<BackupArtifact> {
@@ -826,10 +430,8 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
     const canonicalPayload = {
         ...currentPayload,
         exemptionImportReceipts: [...(currentPayload.exemptionImportReceipts ?? [])].sort((a, b) => Number(a.id) - Number(b.id)),
-        headlessSoapActiveRoleAttestations: sortHeadlessSoapActiveRoleAttestations(currentPayload.headlessSoapActiveRoleAttestations),
         ambulatoryDestructiveCommands: validateAmbulatoryCommandRows(currentPayload.ambulatoryDestructiveCommands ?? [], currentPayload.auditEvents ?? []),
         therapyStatusCommands: validateTherapyStatusCommandRows(currentPayload.therapyStatusCommands ?? [], currentPayload.auditEvents ?? []),
-        headlessSoapEntryCommits: sortHeadlessSoapEntryCommits(currentPayload.headlessSoapEntryCommits ?? []),
         ...(backupAuditCoverage(currentPayload) === 'included'
             ? { auditEvents: canonicalizeBackupAuditRows(currentPayload.auditEvents) } : {}),
     } as BackupDataset;
@@ -890,28 +492,44 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
         throw new BackupArtifactError('invalid-manifest', 'Backup payload is missing.');
     }
 
-    const legacyCollections = LEGACY_COLLECTION_SETS.find((collections) => hasCollectionSet(payload, collections));
-    const expectedCollections = legacyCollections ?? BACKUP_COLLECTIONS;
-    const missingLegacyCollections = legacyCollections
-        ? BACKUP_COLLECTIONS.filter((collection) => collection !== 'auditEvents' && !legacyCollections.includes(collection))
-        : [];
+    const retiredCollections = Object.keys(payload).filter((collection) => RETIRED_BACKUP_COLLECTIONS.has(collection)).sort();
+    for (const collection of retiredCollections) {
+        if (!Array.isArray(payload[collection]) || payload[collection].length !== 0) {
+            throw new BackupArtifactError('collection-mismatch', `Backup collection ${collection} belongs to a removed feature and must be empty.`);
+        }
+    }
+    const currentPayload = Object.fromEntries(Object.entries(payload).filter(([collection]) => !RETIRED_BACKUP_COLLECTIONS.has(collection)));
+    const expectedCollections = generationCollections(Object.keys(currentPayload)) ?? BACKUP_COLLECTIONS;
+    const legacy = expectedCollections.length !== BACKUP_COLLECTIONS.length || retiredCollections.length > 0;
+    const missingLegacyCollections = BACKUP_COLLECTIONS.filter((collection) => collection !== 'auditEvents' && !expectedCollections.includes(collection));
     const expectedPatientDependentCollections = PATIENT_DEPENDENT_COLLECTIONS.filter(
         (collection) => expectedCollections.includes(collection),
     );
 
-    assertCollectionSet(payload, expectedCollections);
-    assertCollectionArrays(payload, expectedCollections);
+    assertCollectionSet(currentPayload, expectedCollections);
+    assertCollectionArrays(currentPayload, expectedCollections);
 
-    if (!Array.isArray(manifest.collections) || manifest.collections.length !== expectedCollections.length || manifest.collections.some((collection, index) => collection !== expectedCollections[index])) {
+    const manifestCollections = Array.isArray(manifest.collections) ? manifest.collections : null;
+    const listedCollections = manifestCollections?.filter((collection) => !RETIRED_BACKUP_COLLECTIONS.has(collection));
+    const listedRetired = manifestCollections?.filter((collection) => RETIRED_BACKUP_COLLECTIONS.has(collection)).sort();
+    if (!listedCollections || !listedRetired || listedCollections.length !== expectedCollections.length
+        || listedCollections.some((collection, index) => collection !== expectedCollections[index])
+        || listedRetired.join() !== retiredCollections.join()) {
         throw new BackupArtifactError('collection-mismatch', 'Backup manifest collection list is invalid.');
     }
 
     if (!manifest.recordCounts || typeof manifest.recordCounts !== 'object') {
         throw new BackupArtifactError('invalid-manifest', 'Backup manifest counts are missing.');
     }
+    const recordCounts = Object.fromEntries(Object.entries(manifest.recordCounts as Record<string, unknown>)
+        .filter(([collection]) => !RETIRED_BACKUP_COLLECTIONS.has(collection)));
+    if (Object.keys(manifest.recordCounts).length - Object.keys(recordCounts).length !== retiredCollections.length
+        || retiredCollections.some((collection) => (manifest.recordCounts as Record<string, unknown>)[collection] !== 0)) {
+        throw new BackupArtifactError('collection-mismatch', 'Backup manifest record counts do not match the v1 schema.');
+    }
 
-    assertCollectionCounts(payload, manifest.recordCounts as Record<string, unknown>, expectedCollections);
-    await assertCollectionReferences(payload as Partial<Record<BackupCollectionName, BackupRecord[]>>, expectedPatientDependentCollections, true);
+    assertCollectionCounts(currentPayload, recordCounts, expectedCollections);
+    await assertCollectionReferences(currentPayload as Partial<Record<BackupCollectionName, BackupRecord[]>>, expectedPatientDependentCollections);
 
     const createdAt = new Date(manifest.createdAt);
     if (Number.isNaN(createdAt.getTime())) {
@@ -924,13 +542,13 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
     }
 
     // Checksum verifies the original payload before normalization; it does not authenticate its source.
-    const normalizedPayload = legacyCollections
-        ? { ...payload, ...Object.fromEntries(missingLegacyCollections.map((collection) => [collection, []])) } as BackupDataset
+    const normalizedPayload = legacy
+        ? { ...currentPayload, ...Object.fromEntries(missingLegacyCollections.map((collection) => [collection, []])) } as BackupDataset
         : payload as BackupDataset;
-    const normalizedRecordCounts = legacyCollections
-        ? { ...manifest.recordCounts, ...Object.fromEntries(missingLegacyCollections.map((collection) => [collection, 0])) } as Record<BackupCollectionName, number>
+    const normalizedRecordCounts = legacy
+        ? { ...recordCounts, ...Object.fromEntries(missingLegacyCollections.map((collection) => [collection, 0])) } as Record<BackupCollectionName, number>
         : manifest.recordCounts as Record<BackupCollectionName, number>;
-    const normalizedChecksum = legacyCollections
+    const normalizedChecksum = legacy
         ? await sha256Hex(stableStringify(normalizeJson(normalizedPayload)))
         : manifest.checksum;
 

@@ -70,8 +70,6 @@ test('scheduled backup table map covers the canonical backup artifact collection
   const runnerTableKeys = extractObjectKeys(runnerSource, 'BACKUP_TABLES');
 
   assert.deepEqual([...runnerTableKeys].sort(), [...canonicalCollections].sort());
-  assert.ok(canonicalCollections.includes('headlessSoapEntryCommits'));
-  assert.ok(runnerTableKeys.includes('headlessSoapEntryCommits'));
 });
 
 test('scheduled backup runner does not keep a duplicated local collection list', () => {
@@ -81,33 +79,11 @@ test('scheduled backup runner does not keep a duplicated local collection list',
   assert.equal(localCollections, undefined);
 });
 
-test('scheduled backup canonicalizes SOAP attestations before artifact checksum', async () => {
-  const firstRef = `hsar_${'f'.repeat(32)}`;
-  const secondRef = `hsar_${'a'.repeat(32)}`;
-  const first = {
-    attestationRef: firstRef, actorRef: 'actor-z', schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1',
-    role: 'physician', operationId: 'mediflow.clinical_diary.append_soap.v1', policyVersion: 'clinician_confirmed_single_use.v1',
-    status: 'inactive', attestationVersion: 1, issuerRef: null, expiresAt: null, activatedAt: null,
-    revocationGeneration: 0, revokedAt: null, createdAt: '2026-08-26T08:00:00.000Z', updatedAt: '2026-08-26T08:00:00.000Z',
-  };
-  const second = { ...first, attestationRef: secondRef, actorRef: 'actor-a' };
-  const createdAt = new Date('2026-08-26T08:00:00.000Z');
-  const forward = JSON.parse(await serializeBackupArtifact({ headlessSoapActiveRoleAttestations: [first, second] }, createdAt));
-  const reverse = JSON.parse(await serializeBackupArtifact({ headlessSoapActiveRoleAttestations: [second, first] }, createdAt));
-
-  assert.deepEqual(forward.payload.headlessSoapActiveRoleAttestations.map((row) => row.attestationRef), [secondRef, firstRef]);
-  assert.deepEqual(forward.payload, reverse.payload);
-  assert.equal(forward.manifest.checksum, reverse.manifest.checksum);
-});
-
 test('scheduled serialization keeps general audit omitted when its source did not supply it', async () => {
-  const later = { idempotencyKey: `hsai_${'f'.repeat(64)}`, auditSnapshot: '{"eventId":"synthetic-later"}' };
-  const earlier = { idempotencyKey: `hsai_${'a'.repeat(64)}`, auditSnapshot: '{"eventId":"synthetic-earlier"}' };
   const createdAt = new Date('2026-08-26T08:00:00.000Z');
-  const forward = JSON.parse(await serializeBackupArtifact({ headlessSoapEntryCommits: [later, earlier] }, createdAt));
-  const reverse = JSON.parse(await serializeBackupArtifact({ headlessSoapEntryCommits: [earlier, later] }, createdAt));
+  const forward = JSON.parse(await serializeBackupArtifact({ drugs: [{ aic: 'B' }, { aic: 'A' }] }, createdAt));
+  const reverse = JSON.parse(await serializeBackupArtifact({ drugs: [{ aic: 'B' }, { aic: 'A' }] }, createdAt));
 
-  assert.deepEqual(forward.payload.headlessSoapEntryCommits.map((row) => row.idempotencyKey), [earlier.idempotencyKey, later.idempotencyKey]);
   assert.equal('auditEvents' in forward.payload, false);
   assert.deepEqual(forward.payload, reverse.payload);
   assert.equal(forward.manifest.checksum, reverse.manifest.checksum);
@@ -128,8 +104,6 @@ test('scheduled serialization preserves audit seconds, NULL, text and determinis
   assert.equal(forward.manifest.recordCounts.auditEvents, 2);
   assert.ok(forward.manifest.collections.includes('auditEvents'));
   await assert.rejects(() => serializeBackupArtifact({ ...empty, auditEvents: [first, first] }), /duplicate/i);
-  await assert.rejects(() => serializeBackupArtifact({ ...empty, auditEvents: [],
-    headlessSoapEntryCommits: [{ auditSnapshot: JSON.stringify(first) }] }), /missing or divergent/);
 });
 
 

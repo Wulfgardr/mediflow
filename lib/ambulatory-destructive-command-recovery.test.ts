@@ -7,20 +7,22 @@ import { join } from 'node:path';
 import { openVersionedSqliteDatabase } from './sqlite-schema-open';
 import { initializeSqliteSchema } from './sqlite-schema';
 import { schemaSnapshot } from './sqlite-schema-shape';
-import { assertAmbulatoryCommandPredecessorRecoverySchema } from './ambulatory-destructive-command-recovery-schema';
+import { assertAmbulatoryCommandPredecessorRecoverySchema, RETIRED_FEATURE_TABLES_SQL } from './ambulatory-destructive-command-recovery-schema';
 
 const canonical = new Map([
     [4, 'a998dad7b46c831f283032144f43cd690f68e962b199256ecd68c11736f867ed'],
     [5, '33ce371c41f4cb51033af18ef9a0f06bf8c81a248bca29f18b21d3db9f24ea46'],
     [6, '4becef1521ec507b3da31047e01ab3e25562197c8a518472bb4cdef93ed3867b'],
     [9, '85259ea3bdcbdfa286a0d8a206a04bfc5621c106a604488c0e17d8c7c37d3ba1'],
+    [10, '459c212cd2d9a65e4df72df63923c64551ec530c3efe07459235af8b362d6452'],
 ]);
-for (const version of [4, 5, 6, 9]) {
+for (const version of [4, 5, 6, 9, 10]) {
     function predecessor() {
         const db = new Database(':memory:'); initializeSqliteSchema(db);
+        for (const sql of RETIRED_FEATURE_TABLES_SQL) db.exec(sql);
         if (version < 9) db.exec('DROP TABLE portable_import_origins');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) if (version < 9) db.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
-        db.exec('ALTER TABLE entries DROP COLUMN recorded_by');
+        if (version < 10) db.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         if (version < 6) db.exec('DROP TABLE ambulatory_destructive_commands');
         if (version === 4) db.exec('DROP TABLE therapy_status_commands');
         db.pragma(`user_version=${version}`); return db;
@@ -33,7 +35,7 @@ for (const version of [4, 5, 6, 9]) {
             assert.deepEqual(db.serialize(), before);
         } finally { db.close(); }
     });
-    for (const mutation of ['column', ...(version < 9 ? ['allergies'] : []), 'recorded_by', 'index', 'trigger', 'table', 'view', 'false-version'] as const) test(`canonical${version} denies ${mutation} before migration`, () => {
+    for (const mutation of ['column', ...(version < 9 ? ['allergies'] : []), ...(version < 10 ? ['recorded_by'] : []), 'index', 'trigger', 'table', 'view', 'false-version'] as const) test(`canonical${version} denies ${mutation} before migration`, () => {
         const db = predecessor();
         try {
             if (mutation === 'recorded_by') db.exec('ALTER TABLE entries ADD COLUMN recorded_by TEXT');
@@ -67,6 +69,7 @@ test('failure after the new v6 DDL rolls back the predecessor ledger, account by
     for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) original.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
     original.exec('ALTER TABLE entries DROP COLUMN recorded_by');
     original.exec('DROP TABLE portable_import_origins; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
+    for (const sql of RETIRED_FEATURE_TABLES_SQL) original.exec(sql);
     original.prepare("INSERT INTO users(id,username,role,password_hash,encrypted_master_key,salt) VALUES ('synthetic-v5','synthetic-v5','admin','synthetic-hash','v3:synthetic-wrapped-key','synthetic-salt')").run();
     const user = original.prepare("SELECT * FROM users WHERE id='synthetic-v5'").get(); original.close();
     assert.throws(() => openVersionedSqliteDatabase(file, name => {
