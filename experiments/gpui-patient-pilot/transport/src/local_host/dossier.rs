@@ -485,7 +485,8 @@ impl DossierImport {
                 Ok(Value::Null)
             }
             "exemptions" => {
-                let value = self.request(Method::GET, &["api", "exemptions"], None, &[])?;
+                let value =
+                    self.request(Method::GET, &["api", "exemptions"], None, &[("all", "1")])?;
                 Ok(json!(
                     value
                         .as_array()

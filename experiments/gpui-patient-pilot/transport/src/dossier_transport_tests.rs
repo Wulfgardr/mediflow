@@ -124,8 +124,20 @@ impl Fixture {
                     store.clinical += 1;
                     store.writes += 1;
                     json!({"success":true})
-                } else if first.starts_with("GET /api/exemptions ") {
-                    json!([{ "code":"031" }])
+                } else if first.starts_with("GET /api/exemptions") {
+                    // Same shape as app/api/exemptions: the plain list stops at
+                    // the first 100 codes in order, only `all=1` returns the
+                    // whole catalog. "031" sorts after the 100 filler codes.
+                    let mut codes: Vec<String> = (1..=100).map(|n| format!("0{n:03}")).collect();
+                    codes.push("031".to_owned());
+                    let whole = first.starts_with("GET /api/exemptions?all=1 ");
+                    json!(
+                        codes
+                            .iter()
+                            .take(if whole { codes.len() } else { 100 })
+                            .map(|code| json!({ "code": code }))
+                            .collect::<Vec<_>>()
+                    )
                 } else if first.starts_with("POST /api/documents/dossier-extraction ") {
                     json!({"status":"extracted","markdown":text,"ocr":null})
                 } else if first.starts_with("GET /api/attachments?") {

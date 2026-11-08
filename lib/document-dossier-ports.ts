@@ -177,7 +177,7 @@ export function createDossierPorts(): DossierPorts {
             };
         },
         async exemptionCodes(signal) {
-            const rows = await db.exemptions.toArray({ signal, rejectAuthUnavailable: true });
+            const rows = await db.exemptionCatalog.toArray({ signal, rejectAuthUnavailable: true });
             return new Set(rows.map((row) => String(row.code ?? '').toUpperCase()).filter(Boolean));
         },
         newId: () => crypto.randomUUID(),
