@@ -17,24 +17,12 @@ import {
 } from '@/lib/status-normalization';
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
 import { createCheckupOperation } from '@/lib/checkup-write-operation';
+import { parseCappedLimit, parseDateParam } from '@/lib/list-query-params';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value as string | number);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function parseLimit(value: string | null): number | null {
-    if (!value) return null;
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed) || parsed <= 0) return null;
-    return Math.min(parsed, 100);
-}
-
-function parseDateParam(value: string | null): Date | null {
-    if (!value) return null;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 // WUL-308: lists hide soft-deleted rows by default, like entries.
@@ -49,7 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     try {
         const { id } = await params;
         const { searchParams } = new URL(request.url);
-        const limit = parseLimit(searchParams.get('limit'));
+        const limit = parseCappedLimit(searchParams.get('limit'), 100);
         const status = searchParams.get('status')?.trim();
         const statusFilterValues = status ? checkupStatusFilterValues(status) : null;
         const dateFrom = parseDateParam(searchParams.get('dateFrom'));

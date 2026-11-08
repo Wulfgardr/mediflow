@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseListParams } from './list-query-params';
+import { parseCappedLimit, parseDateParam, parseListParams } from './list-query-params';
 
 function sp(query: string): URLSearchParams {
     return new URLSearchParams(query);
@@ -104,4 +104,15 @@ test('metadata flag is rejected unless the spec opts in', () => {
     assert.equal(off.params.metadataOnly, false);
 
     assert.equal(parseListParams(sp('metadata=yes'), attachmentSpec).ok, false);
+});
+
+test('parseCappedLimit and parseDateParam treat unreadable values as no filter', () => {
+    assert.equal(parseCappedLimit(null, 100), null);
+    assert.equal(parseCappedLimit('0', 100), null);
+    assert.equal(parseCappedLimit('abc', 100), null);
+    assert.equal(parseCappedLimit('25', 100), 25);
+    assert.equal(parseCappedLimit('500', 200), 200);
+    assert.equal(parseDateParam(null), null);
+    assert.equal(parseDateParam('non una data'), null);
+    assert.equal(parseDateParam('2026-05-02')?.toISOString(), '2026-05-02T00:00:00.000Z');
 });
