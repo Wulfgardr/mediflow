@@ -177,8 +177,12 @@ export function createDossierPorts(): DossierPorts {
             };
         },
         async exemptionCodes(signal) {
-            const rows = await db.exemptionCatalog.toArray({ signal, rejectAuthUnavailable: true });
-            return new Set(rows.map((row) => String(row.code ?? '').toUpperCase()).filter(Boolean));
+            // The plain /api/exemptions list stops at the first 100 codes: the dossier needs all of them.
+            const response = await fetch('/api/exemptions?all=1', { cache: 'no-store', signal });
+            if (!response.ok) throw new Error(`Exemption catalog unavailable: ${response.status}`);
+            const rows: unknown = await response.json();
+            if (!Array.isArray(rows)) throw new Error('Exemption catalog unavailable: invalid response');
+            return new Set(rows.map((row) => String((row as { code?: unknown })?.code ?? '').toUpperCase()).filter(Boolean));
         },
         newId: () => crypto.randomUUID(),
         now: () => new Date(),
