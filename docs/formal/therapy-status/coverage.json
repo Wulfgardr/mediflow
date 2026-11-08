@@ -1,5 +1,5 @@
 {
-  "syncCommit": "ae2ab57aa37e5837cd4e02e6a8d1c5c8e9988a53",
+  "syncCommit": "badb3f83d4452fcb0077233cc6045c5c8409095b",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -47,18 +47,18 @@
     "lib/therapy-status-command-backup.ts": "1606ac41684c18ed2f7ff6de19e378e0ef1baac5645d1a160c4906faba4bab92",
     "lib/therapy-status-command-schema.ts": "98c0aba0a361ef83655a632be41a257f8b9e99a950591113683a8094e26f4c87",
     "lib/therapy-status-command-recovery-schema.ts": "8231c04d505139c63f36f9657e2a2a0c964cd48b39d4ae4b2d2a0f2c552f5f4a",
-    "lib/ambulatory-destructive-command-recovery-schema.ts": "427fdc06c243fbfd237b76e87f5227c981805b4dafbaa4c36c8052d15b9b37ad",
+    "lib/ambulatory-destructive-command-recovery-schema.ts": "2400c3121e5a5a1452f7c12ff1700f0daf046a2e26f8db4a3fcccb3305304d7e",
     "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
     "lib/backup-encrypted-fields.json": "1fe7775a81e0f2d2882946815e4e17840ca4661439c410b75a58c3dd0ce65998",
     "lib/backup-import-provenance.ts": "13eb1cc6083b5a07489d64cc9d195b82b6b8b660cb9874e4dc46b93fdf25999e",
-    "lib/sqlite-schema.ts": "6c7f5264dd62d5cf6744c11d870b7158f4a4841e102f366c9fd8715bf0d80c5e",
-    "lib/sqlite-schema-open.ts": "4c90e9cff49c11684644c8c1864ffd07f573d997028026960e4ca7d05a20d86d",
-    "lib/backup-restore-executor.ts": "227af5f5806ab46a081e660b4462a628db9e3f44ecfeff30ea3e14cf9dbe03ea",
+    "lib/sqlite-schema.ts": "a920dc2429cc307687aa02f202c1495af832593f15b500d234bc4db68083d978",
+    "lib/sqlite-schema-open.ts": "de253e0e3f0b33c49c1f5f61894a2f421ef96640cedd958f7c7c7ce83963f1b5",
+    "lib/backup-restore-executor.ts": "830d9e11fb3d14be07e1901de74e1000ec466ef488133a788b3350bf73c80086",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
     "lib/clinical-status-transitions.ts": "67d92e79e1123a3e79399e5907177255f56f9794f9c775b86c67fdade287441f",
     "lib/status-normalization.ts": "fa2bbdeef55384ed1bf4a851f09a5d899d56e6331cde018f68f3d8a74d3a4e51",
     "docs/domain/clinical-status-transitions.json": "70233eaac55960b999f25768bb9f8897dcce27197ed99c1a692a2d98a0582f04",
-    "lib/recovery-backup-server.ts": "18e27c05171a49bbec2e9226dae52764a43e81f0db72a1a854f61d5d129e26a3"
+    "lib/recovery-backup-server.ts": "3b160fa72212930ca7a344908583a1e681ffea9db5025286c514702b8273816e"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
