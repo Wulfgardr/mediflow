@@ -163,7 +163,7 @@ for (const platform of ['windows', 'linux'] as const) test(`${platform}: native 
     const inference = load('./security/native-inference-lifecycle.ts') as typeof import('./security/native-inference-lifecycle');
     assert.equal(inference.mintResourcePort(authority.session), null);
     for (const method of ['resolveProjectionService', 'acquireProjectionIngest', 'mintPatientInsightLeaseCommitPort',
-        'mintOcrLeaseCommitPort', 'mintDocumentSynthesisLeaseCommitPort', 'mintTreatmentReasoningLeaseCommitPort', 'mintDurableReviewCommitPort']) {
+        'mintDocumentSynthesisLeaseCommitPort']) {
         assert.equal(Reflect.get(owner, method), undefined);
     }
 });

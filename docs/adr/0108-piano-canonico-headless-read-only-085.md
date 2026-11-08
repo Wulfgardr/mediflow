@@ -4,6 +4,17 @@ Date: 2026-08-31
 
 Status: Accepted
 
+
+## Emendamento dell'8 novembre 2026: codice rimosso
+
+Piano canonico (`lib/headless/canonical-read-plan.ts`), catalogo delle
+capacità canoniche, registro statico delle operazioni applicative, runtime
+semantico con il suo verificatore di ricevute e report di stato referenziale
+del Mini non erano raggiungibili da alcun ingresso del prodotto: li usavano
+solo i loro test. Sono stati rimossi. La decisione resta il riferimento per
+ricerca e navigazione headless, che nel registro della 0.9.1 restano
+`not_qualified`.
+
 ## Problema
 
 Il catalogo Headless contiene 66 anchor semantici canonici, ordinati e

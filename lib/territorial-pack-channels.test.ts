@@ -6,7 +6,6 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { parseMiniRequest } from '../packages/mini/src/protocol.ts';
-import { resolveApplicationOperation } from './headless/application-operation-registry.ts';
 import { createAipOperationRpcHostV1 } from '../packages/aip/src/operation-rpc.ts';
 import { spawn, spawnSync } from 'node:child_process';
 import { openVersionedSqliteDatabase } from './sqlite-schema-open';
@@ -88,7 +87,6 @@ for (const channel of ['generic-settings', 'paired-client', 'client-declaration'
             if (channel === 'mcp') await attemptTerritorialMcpCall('mediflow.system.capabilities.v1', { ...command(), channel: 'supervisor' });
             if (channel === 'headless') {
                 assert.throws(() => parseMiniRequest(new TextEncoder().encode(JSON.stringify({ command: 'territorial-packs', args: command() }))));
-                assert.equal(resolveApplicationOperation('territorial-packs', 'territorial-packs').status, 'denied');
                 const frames: string[] = [];
                 let receive!: (frame: unknown) => void;
                 const rpc = createAipOperationRpcHostV1({ operations: [{ operationId: 'mediflow.system.status.v1', capabilityId: 'mediflow.system.status.v1', serviceRef: 'SyntheticStatusServiceV1', maximumStage: 'read_only', timeoutMs: 100, execute: () => ({ status: 'ready' }) }] });
