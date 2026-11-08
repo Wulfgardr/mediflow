@@ -71,12 +71,3 @@ export function backupAuditsEqual(left: BackupAuditRow, right: BackupAuditRow): 
     return BACKUP_AUDIT_FIELDS.every(key => Object.is(left[key], right[key]));
 }
 
-export function assertBackupAuditSnapshots(audits: BackupAuditRow[], snapshots: unknown[]): void {
-    const byId = new Map(audits.map(row => [row.eventId, row]));
-    for (const value of snapshots) {
-        if (typeof value !== 'string') throw new Error('Backup H7b audit snapshot is invalid.');
-        const [snapshot] = canonicalizeBackupAuditRows([JSON.parse(value)]);
-        const audit = byId.get(snapshot.eventId);
-        if (!audit || !backupAuditsEqual(audit, snapshot)) throw new Error('Backup H7b audit is missing or divergent.');
-    }
-}

@@ -2,7 +2,6 @@ import { prepareSyntheticBackupDestination } from './scheduled-backup.test-suppo
 import { isCiphertext, openPatientDocumentFile } from './security/attachment-file-envelope';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,8 +13,6 @@ import { EXEMPTION_COLUMNS } from './exemption-import-contract';
 import { createProstheticsCatalog } from './reference-data/prosthetics-catalog-service';
 import { PROSTHETICS_TEMPLATE } from './reference-data/prosthetics-catalog-contract';
 import { BACKUP_COLLECTIONS, createEmptyDataset, parseBackupArtifact, serializeBackupArtifact, stableStringify } from './backup-artifact';
-import { ATTACHMENTS_ABSENT, frame, PAYLOAD_DIGEST_CODEC, SEAL_DIGEST_CODEC,
-    SEAL_SCHEMA } from './headless/clinician-soap-entry-seal-codec-internal';
 import { decryptData, encryptData, generateMasterKey } from './security/security';
 
 const fileGolden = JSON.parse(fs.readFileSync('native/contracts/attachment-file-golden.v2.json', 'utf8'));
@@ -30,18 +27,12 @@ const NON_BACKUP_TABLES = new Set(['settings', 'users', 'patient_duplicate_inten
 /* Checkup enrollment is host-local authorization state and is not exported by the v1 clinical backup. */
 const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['headless_checkup_active_role_attestations', 'archive_generation', 'archive_session_generations', 'portable_import_origins']);
 /* Command replay remains empty until append-only audit restore has a separate contract. */
-const AUDIT_DEPENDENT_EMPTY_TABLES = new Set(['durable_review_command_operations', 'durable_review_command_states']);
 const BACKUP_TABLES = {
     auditEvents: 'audit_events',
     ambulatories: 'ambulatories',
     attachments: 'attachments',
     conversations: 'conversations',
     documentDiagnosisProposals: 'document_diagnosis_proposals',
-    durableReviewCommandOperations: 'durable_review_command_operations',
-    durableReviewCommandStates: 'durable_review_command_states',
-    durableReviewPatientLinks: 'durable_review_patient_links',
-    durableReviewRecords: 'durable_review_records',
-    durableReviewOperations: 'durable_review_operations',
     drugs: 'drugs',
     entries: 'entries',
     exemptions: 'exemptions',
@@ -54,8 +45,6 @@ const BACKUP_TABLES = {
     observations: 'observations',
     patients: 'patients',
     physicianReviewAttestations: 'physician_review_attestations',
-    headlessSoapActiveRoleAttestations: 'headless_soap_active_role_attestations',
-    headlessSoapEntryCommits: 'headless_soap_entry_commits',
     therapyStatusCommands: 'therapy_status_commands',
     ambulatoryDestructiveCommands: 'ambulatory_destructive_commands',
     prostheticPrescriptions: 'prosthetic_prescriptions',
@@ -164,11 +153,6 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
     });
     insertRow(db, MEMBERSHIP_TABLE, { patient_id: 'w7-patient', ambulatory_id: 'w7-amb-primary', assigned_at: now + 24 });
     insertRow(db, MEMBERSHIP_TABLE, { patient_id: 'w7-patient', ambulatory_id: 'w7-amb-secondary', assigned_at: now + 25 });
-    insertRow(db, 'patients', {
-        id: 'w7-h7b-patient', first_name: 'Synthetic', last_name: 'H7b', tax_code: 'SYNTHETIC-H7B-RT',
-        ambulatory_id: 'w7-amb-primary', is_archived: 0, version: 7, created_at: now, updated_at: now,
-    });
-    insertRow(db, MEMBERSHIP_TABLE, { patient_id: 'w7-h7b-patient', ambulatory_id: 'w7-amb-primary', assigned_at: now + 25 });
     insertRow(db, 'entries', {
         recorded_by: 'Ada Sintetica al momento della registrazione',
         id: 'w7-entry', patient_id: 'w7-patient', type: 'note', date: now + 3,
@@ -230,57 +214,6 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         id: 'w7-proposal-other-source', source_document_key: 'source-hmac-w7-other', status: 'pending', decided_at: null,
         decision_actor_type: null, decision_actor_ref: null, decision_payload: null,
     });
-    const durableReviewRecord = {
-        patientRef: `ptr_${'a'.repeat(32)}`,
-        reviewId: `review_${'b'.repeat(32)}`,
-        reviewRevision: 1,
-        receiptRef: `receipt_${'c'.repeat(32)}`,
-        provenanceRef: `provenance_${'d'.repeat(32)}`,
-        receiptBinding: '',
-        provenanceBinding: '',
-        presentationVersion: 'mediflow.ai.durable-review.presentation.v1',
-        sealedCiphertext: 'ENC:YWJj:c3ludGhldGljLWR1cmFibGUtcmV2aWV3',
-        sealedDigest: '',
-    };
-    const digest = (value: string) => createHash('sha256').update(value).digest('hex');
-    durableReviewRecord.receiptBinding = digest(`${durableReviewRecord.patientRef}\0${durableReviewRecord.reviewId}\0${durableReviewRecord.receiptRef}`);
-    durableReviewRecord.provenanceBinding = digest(`${durableReviewRecord.patientRef}\0${durableReviewRecord.reviewId}\0${durableReviewRecord.provenanceRef}`);
-    durableReviewRecord.sealedDigest = digest(durableReviewRecord.sealedCiphertext);
-    const durableReviewCommand = {
-        record: durableReviewRecord,
-        expectedReviewRevision: 0,
-        idempotencyKey: 'idem_aaaaaaaaaaaaaaaa',
-    };
-    insertRow(db, 'durable_review_records', {
-        id: durableReviewRecord.reviewId,
-        patient_ref: durableReviewRecord.patientRef,
-        review_id: durableReviewRecord.reviewId,
-        review_revision: durableReviewRecord.reviewRevision,
-        receipt_ref: durableReviewRecord.receiptRef,
-        provenance_ref: durableReviewRecord.provenanceRef,
-        receipt_binding: durableReviewRecord.receiptBinding,
-        provenance_binding: durableReviewRecord.provenanceBinding,
-        presentation_version: durableReviewRecord.presentationVersion,
-        sealed_ciphertext: durableReviewRecord.sealedCiphertext,
-        sealed_digest: durableReviewRecord.sealedDigest,
-        created_at: now + 22,
-    });
-    insertRow(db, 'durable_review_operations', {
-        id: digest(`${durableReviewRecord.reviewId}\0${durableReviewCommand.idempotencyKey}`),
-        review_id: durableReviewRecord.reviewId,
-        idempotency_key: durableReviewCommand.idempotencyKey,
-        operation: 'create',
-        expected_review_revision: durableReviewCommand.expectedReviewRevision,
-        operation_digest: digest(JSON.stringify(['create', durableReviewCommand.expectedReviewRevision, durableReviewRecord])),
-        record_snapshot: JSON.stringify(durableReviewRecord),
-        created_at: now + 22,
-    });
-    insertRow(db, 'durable_review_patient_links', {
-        review_id: durableReviewRecord.reviewId,
-        patient_id: 'w7-patient',
-        created_at: now + 22,
-        updated_at: now + 22,
-    });
     insertRow(db, 'physician_review_attestations', {
         actor_ref: actorRef,
         schema_version: 'mediflow.physician-review-attestation.v1',
@@ -291,13 +224,6 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         revoked_at: null,
         created_at: now + 22,
         updated_at: now + 22,
-    });
-    insertRow(db, 'headless_soap_active_role_attestations', {
-        attestation_ref: `hsar_${'7'.repeat(32)}`, actor_ref: actorRef,
-        schema_version: 'mediflow.headless-soap-active-role-attestation.v1', role: 'physician',
-        operation_id: 'mediflow.clinical_diary.append_soap.v1', policy_version: 'clinician_confirmed_single_use.v1',
-        status: 'active', attestation_version: 1, issuer_ref: `hsari_${'7'.repeat(32)}`, expires_at: now + 26 + (8 * 60 * 60),
-        activated_at: now + 26, revocation_generation: 0, revoked_at: null, created_at: now + 26, updated_at: now + 26,
     });
     insertRow(db, 'attachments', {
         id: 'w7-attachment', patient_id: 'w7-patient', type: 'application/pdf', size: 128,
@@ -318,7 +244,6 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
     const preview = previewExemptionImport(db, bytes, 'inventato-backup.txt', 'synthetic-backup-operator');
     assert.ok(preview.proof);
     commitExemptionImport(db, { bytes, sourceName: 'inventato-backup.txt', proof: preview.proof, acceptSubset: true }, 'synthetic-backup-operator');
-    return durableReviewCommand;
 }
 
 function primaryKeyColumns(db: Database.Database, table: string): string[] {
@@ -424,152 +349,6 @@ function exerciseCheckupAbaRestoreFence(targetDataDir: string, artifactPath: str
     )) as Record<string, unknown>;
 }
 
-function headlessSoapRestoreFixture(): {
-    payload: ReturnType<typeof createEmptyDataset>;
-    audit: Record<string, unknown>;
-} {
-    const commandId = `hsac_${'1'.repeat(64)}`;
-    const approvalRef = `hsaa_${'2'.repeat(64)}`;
-    const idempotencyKey = `hsai_${'3'.repeat(64)}`;
-    const digest = (domain: string, snapshot: string) => createHash('sha256')
-        .update(domain, 'utf8').update('\0', 'utf8').update(snapshot, 'utf8').digest('hex');
-    const entryId = `hsei_${digest('mediflow.headless.soap-entry-id.v1', commandId)}`;
-    const auditEventId = `hsea_${digest('mediflow.headless.soap-entry-audit-id.v1', commandId)}`;
-    const receiptRef = `hser_${digest('mediflow.headless.soap-entry-receipt-ref.v1', commandId)}`;
-    const committedAt = '2026-03-17T08:10:00.000Z'; const committedAtSeconds = 1_773_735_000;
-    const authorizationProofDigest = 'a'.repeat(64), payloadDigest = 'b'.repeat(64);
-    const encrypted = (byte: number) =>
-        `ENC:${Buffer.alloc(12, byte).toString('base64')}:${Buffer.alloc(16, byte).toString('base64')}`;
-    const title = encrypted(1), content = encrypted(2), metadata = encrypted(3);
-    const sealPacket = frame([SEAL_DIGEST_CODEC, SEAL_SCHEMA, PAYLOAD_DIGEST_CODEC, payloadDigest,
-        'visit', committedAt, 'ambulatory', title, content, metadata, ATTACHMENTS_ABSENT]);
-    assert.ok(sealPacket);
-    const sealDigest = createHash('sha256').update(sealPacket).digest('hex');
-    const patientIdDigest = digest('mediflow.headless.soap-entry-commit-patient-id-digest.v1', 'h7b-patient');
-    const bindingSnapshot = JSON.stringify({
-        schema: 'mediflow.headless.soap-entry-commit-binding.v1',
-        operationId: 'mediflow.clinical_diary.append_soap.v1',
-        commandId,
-        approvalRef,
-        idempotencyKey,
-        authorizationProofDigest,
-        webSessionId: '4'.repeat(64),
-        webSessionCreatedAt: committedAtSeconds - 300,
-        webSessionExpiresAt: committedAtSeconds + 3_600,
-        principalRef: 'synthetic-clinician',
-        actorRef: 'synthetic-clinician',
-        attestationRef: `hsar_${'5'.repeat(32)}`,
-        attestationVersion: 1,
-        activeRoleRevocationGeneration: 0,
-        activeRolePolicyVersion: 'clinician_confirmed_single_use.v1',
-        parentContractVersion: 1,
-        parentGeneration: 1,
-        parentRevocationGeneration: 0,
-        childContractVersion: 1,
-        childGeneration: 1,
-        childRevocationGeneration: 0,
-        childExpiresAt: committedAtSeconds + 3_000,
-        leaseContractVersion: 1,
-        leaseGeneration: 1,
-        leaseRevocationGeneration: 0,
-        sessionRef: `ssr_${'6'.repeat(32)}`,
-        patientRef: `ptr_${'7'.repeat(32)}`,
-        ambulatoryRef: `abr_${'8'.repeat(32)}`,
-        leaseRef: `lsr_${'9'.repeat(32)}`,
-        selectionEpoch: 1,
-        selectionExpiresAt: committedAtSeconds + 3_600,
-        patientVersion: 1,
-        action: 'append',
-        purpose: 'clinician_requested_documentation',
-        proposalRevision: 1,
-        proposalExpiresAt: committedAtSeconds + 1_000,
-        payloadDigest,
-        sealDigest,
-        policyDigest: '1175ad0f063ac03d73f71afce252a7922e359882c9c1f7313a5cbc445e3a5f17',
-        patientIdDigest,
-        ambulatoryIdDigest: digest('mediflow.headless.soap-entry-commit-ambulatory-id-digest.v1', 'h7b-amb'),
-    });
-    const bindingDigest = digest('mediflow.headless.soap-entry-commit-binding-digest.v1', bindingSnapshot);
-    const entry = {
-        id: entryId, patientId: 'h7b-patient', type: 'visit', title, date: committedAt,
-        content, setting: 'ambulatory', metadata,
-        attachments: null, deletedAt: null, deletionReason: null, version: 1,
-        createdAt: committedAt, updatedAt: committedAt,
-    };
-    const entrySnapshot = JSON.stringify({
-        schema: 'mediflow.headless.soap-entry-record.v1', entryId,
-        patientIdDigest,
-        type: entry.type, title: entry.title, date: committedAtSeconds, content: entry.content,
-        setting: entry.setting, metadata: entry.metadata, attachments: null, deletedAt: null,
-        deletionReason: null, version: 1, createdAt: committedAtSeconds, updatedAt: committedAtSeconds,
-    });
-    const entryDigest = digest('mediflow.headless.soap-entry-commit-entry-digest.v1', entrySnapshot);
-    const audit = {
-        eventId: auditEventId, schemaVersion: 1, eventType: 'entry.created', occurredAt: committedAtSeconds,
-        outcome: 'success', actorType: 'user',
-        actorRef: `hsa_${digest('mediflow.headless.soap-entry-commit-actor-ref.v1', 'synthetic-clinician')}`,
-        subjectType: 'entry', subjectRef: entryId, sourceSurface: 'web', requestId: null,
-        redactedMetadata: JSON.stringify({
-            schema: 'mediflow.headless.soap-entry-commit-audit-metadata.v1',
-            operationId: 'mediflow.clinical_diary.append_soap.v1', commandRef: commandId, bindingDigest, entryDigest,
-        }),
-        createdAt: committedAtSeconds,
-    };
-    const auditSnapshot = JSON.stringify(audit);
-    const auditDigest = digest('mediflow.headless.soap-entry-commit-audit-digest.v1', auditSnapshot);
-    const receipt = {
-        schema: 'mediflow.headless.soap-entry-commit-receipt.v1', receiptRef,
-        operationId: 'mediflow.clinical_diary.append_soap.v1', outcome: 'entry_committed', commandId,
-        entryRef: entryId, auditEventRef: auditEventId, patientVersion: 1, entryVersion: 1, committedAt,
-        bindingDigest, entryDigest, auditDigest,
-    };
-    const receiptSnapshot = JSON.stringify(receipt);
-    const receiptDigest = digest('mediflow.headless.soap-entry-commit-receipt-digest.v1', receiptSnapshot);
-    const payload = createEmptyDataset();
-    payload.ambulatories = [{ id: 'h7b-amb', name: 'Ambulatorio sintetico H7b', createdAt: committedAt }];
-    payload.patients = [{
-        id: 'h7b-patient', firstName: 'Synthetic', lastName: 'H7b', taxCode: 'SYNTHETIC-H7B',
-        ambulatoryId: 'h7b-amb', assignedAmbulatoryIds: ['h7b-amb'], version: 1,
-        createdAt: committedAt, updatedAt: committedAt,
-    }];
-    payload.entries = [entry];
-    payload.headlessSoapEntryCommits = [{
-        idempotencyKey, approvalRef, authorizationProofDigest, commandId,
-        entryId, auditEventId, receiptRef,
-        bindingSnapshot, bindingDigest, entryDigest, auditSnapshot, auditDigest, receiptSnapshot, receiptDigest, committedAt,
-    }];
-    payload.auditEvents = [audit];
-    return { payload, audit };
-}
-
-/* Moves the hand-built H7b ledger into the source archive through a real restore, so export and restore both validate a non-empty chain. */
-async function seedHeadlessSoapLedger(workDir: string, sourceDb: Database.Database): Promise<void> {
-    const scratchDataDir = path.join(workDir, 'h7b-scratch'); const artifactPath = path.join(workDir, 'h7b-seed.mediflow');
-    prepareDatabase(scratchDataDir);
-    fs.writeFileSync(artifactPath, await serializeBackupArtifact(headlessSoapRestoreFixture().payload));
-    restoreArtifact(scratchDataDir, artifactPath);
-    sourceDb.prepare('ATTACH DATABASE ? AS h7b').run(path.join(scratchDataDir, 'medical.db'));
-    try {
-        for (const [table, where] of [
-            ['ambulatories', "id = 'h7b-amb'"],
-            ['patients', "id = 'h7b-patient'"],
-            [MEMBERSHIP_TABLE, "patient_id = 'h7b-patient'"],
-            ['entries', "patient_id = 'h7b-patient'"],
-            ['audit_events', 'event_id IN (SELECT audit_event_id FROM h7b.headless_soap_entry_commits)'],
-            ['headless_soap_entry_commits', '1 = 1'],
-        ]) sourceDb.exec(`INSERT INTO main.${quoteIdentifier(table)} SELECT * FROM h7b.${quoteIdentifier(table)} WHERE ${where}`);
-    } finally { sourceDb.exec('DETACH DATABASE h7b'); }
-}
-
-function insertAuditSnapshot(db: Database.Database, audit: Record<string, unknown>): void {
-    insertRow(db, 'audit_events', {
-        event_id: audit.eventId, schema_version: audit.schemaVersion, event_type: audit.eventType,
-        occurred_at: audit.occurredAt, outcome: audit.outcome, actor_type: audit.actorType, actor_ref: audit.actorRef,
-        subject_type: audit.subjectType, subject_ref: audit.subjectRef, source_surface: audit.sourceSurface,
-        request_id: audit.requestId, redacted_metadata: audit.redactedMetadata, created_at: audit.createdAt,
-    });
-}
-
 function countRows(db: Database.Database, table: string, where = ''): number {
     return (db.prepare(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(table)} ${where}`).get() as { count: number }).count;
 }
@@ -668,177 +447,6 @@ test('retires a pending Checkup proposal before a same-ID/version restore ABA sw
     } finally { fs.rmSync(workDir, { recursive: true, force: true }); }
 });
 
-test('preflights H7b audit collisions before deleting target data', async () => {
-    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-h7b-collision-'));
-    const targetDataDir = path.join(workDir, 'target'); const artifactPath = path.join(workDir, 'h7b.mediflow');
-    try {
-        prepareDatabase(targetDataDir);
-        const fixture = headlessSoapRestoreFixture();
-        fs.writeFileSync(artifactPath, await serializeBackupArtifact(fixture.payload));
-        const target = new Database(path.join(targetDataDir, 'medical.db'));
-        try {
-            insertRow(target, 'ambulatories', { id: 'h7b-preserved', name: 'Sentinella sintetica', created_at: 1_773_735_000 });
-            insertAuditSnapshot(target, { ...fixture.audit, outcome: 'failure' });
-            assert.throws(() => restoreArtifact(targetDataDir, artifactPath), /audit.*collision|collision.*audit/iu);
-            assert.equal(countRows(target, 'ambulatories', "WHERE id = 'h7b-preserved'"), 1);
-            assert.equal(countRows(target, 'headless_soap_entry_commits'), 0);
-        } finally { target.close(); }
-    } finally { fs.rmSync(workDir, { recursive: true, force: true }); }
-});
-
-test('restores entries then exact H7b audits then ledger while preserving unrelated audit rows', async () => {
-    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-h7b-exact-'));
-    const targetDataDir = path.join(workDir, 'target'); const artifactPath = path.join(workDir, 'h7b.mediflow');
-    try {
-        prepareDatabase(targetDataDir);
-        const fixture = headlessSoapRestoreFixture();
-        fs.writeFileSync(artifactPath, await serializeBackupArtifact(fixture.payload));
-        const target = new Database(path.join(targetDataDir, 'medical.db'));
-        try {
-            insertAuditSnapshot(target, fixture.audit);
-            insertAuditSnapshot(target, { ...fixture.audit, eventId: `event_${'c'.repeat(32)}`, eventType: 'patient.updated', subjectRef: null });
-            restoreArtifact(targetDataDir, artifactPath);
-            assert.equal(countRows(target, 'entries'), 1);
-            assert.equal(countRows(target, 'headless_soap_entry_commits'), 1);
-            assert.equal(countRows(target, 'audit_events'), 4);
-            const restored = target.prepare('SELECT audit_snapshot AS auditSnapshot FROM headless_soap_entry_commits').get() as { auditSnapshot: string };
-            assert.equal(restored.auditSnapshot, JSON.stringify(fixture.audit));
-        } finally { target.close(); }
-    } finally { fs.rmSync(workDir, { recursive: true, force: true }); }
-});
-
-function countCommandLedger(db: Database.Database): [number, number, number] {
-    const count = (table: string) => (db.prepare(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(table)}`).get() as { count: number }).count;
-    return [count('durable_review_command_states'), count('durable_review_command_operations'), count('audit_events')];
-}
-
-function seedCommandLedger(db: Database.Database): void {
-    const reviewId = `review_${'a'.repeat(32)}`;
-    db.prepare('INSERT INTO durable_review_command_states (review_id, review_state, revision, action) VALUES (?, ?, ?, ?)').run(reviewId, 'accepted', 2, 'accept');
-    db.prepare('INSERT INTO durable_review_command_operations (id, review_id, idempotency_key, command_digest, result_snapshot, audit_event_id) VALUES (?, ?, ?, ?, ?, ?)').run(
-        'command-operation-synthetic', reviewId, 'idem_aaaaaaaaaaaaaaaa', 'a'.repeat(64), JSON.stringify({ reviewId, state: 'accepted', revision: 2, eventId: `event_${'b'.repeat(32)}` }), `event_${'b'.repeat(32)}`,
-    );
-    db.prepare('INSERT INTO audit_events (event_id, schema_version, event_type, occurred_at, outcome, actor_type, actor_ref, subject_type, subject_ref, source_surface, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-        `event_${'b'.repeat(32)}`, 1, 'ai.review.accepted', 1_783_000_000, 'success', 'user', `actor_${'c'.repeat(32)}`, 'ai_review', reviewId, 'api', 1_783_000_000,
-    );
-}
-
-test('blocks current and legacy empty artifacts before clearing a target command replay ledger', async () => {
-    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-command-hold-'));
-    const emptyDataDir = path.join(workDir, 'empty-target');
-    const protectedDataDir = path.join(workDir, 'protected-target');
-    const currentPath = path.join(workDir, 'current-empty.mediflow');
-    const legacyPath = path.join(workDir, 'legacy-empty.mediflow');
-
-    try {
-        prepareDatabase(emptyDataDir);
-        prepareDatabase(protectedDataDir);
-        const current = JSON.parse(await serializeBackupArtifact(createEmptyDataset())) as { manifest: { collections: string[]; recordCounts: Record<string, number>; checksum: string }; payload: Record<string, unknown> };
-        fs.writeFileSync(currentPath, JSON.stringify(current));
-        assert.doesNotThrow(() => restoreArtifact(emptyDataDir, currentPath));
-
-        const legacy = structuredClone(current);
-        for (const collection of ['durableReviewCommandStates', 'durableReviewCommandOperations']) {
-            delete legacy.payload[collection];
-            delete legacy.manifest.recordCounts[collection];
-        }
-        legacy.manifest.collections = legacy.manifest.collections.filter((collection) => collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations');
-        legacy.manifest.checksum = createHash('sha256').update(stableStringify(legacy.payload)).digest('hex');
-        fs.writeFileSync(legacyPath, JSON.stringify(legacy));
-
-        const protectedDb = new Database(path.join(protectedDataDir, 'medical.db'));
-        try {
-            seedCommandLedger(protectedDb);
-            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 2]);
-            assert.throws(() => restoreArtifact(protectedDataDir, currentPath), /Restore blocked/);
-            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 2]);
-            assert.throws(() => restoreArtifact(protectedDataDir, legacyPath), /Restore blocked/);
-            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 2]);
-        } finally {
-            protectedDb.close();
-        }
-    } finally {
-        fs.rmSync(workDir, { recursive: true, force: true });
-    }
-});
-
-test('rolls back a SOAP attestation restore when its local actor is absent', async () => {
-    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-soap-attestation-fk-'));
-    const targetDataDir = path.join(workDir, 'target');
-    const artifactPath = path.join(workDir, 'missing-actor.mediflow');
-    try {
-        prepareDatabase(targetDataDir);
-        const payload = createEmptyDataset();
-        payload.headlessSoapActiveRoleAttestations = [{
-            attestationRef: `hsar_${'e'.repeat(32)}`, actorRef: 'absent-synthetic-actor',
-            schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1', role: 'physician',
-            operationId: 'mediflow.clinical_diary.append_soap.v1', policyVersion: 'clinician_confirmed_single_use.v1',
-            status: 'inactive', attestationVersion: 1, issuerRef: null, expiresAt: null, activatedAt: null,
-            revocationGeneration: 0, revokedAt: null, createdAt: '2026-08-26T08:00:00.000Z', updatedAt: '2026-08-26T08:00:00.000Z',
-        }];
-        fs.writeFileSync(artifactPath, await serializeBackupArtifact(payload));
-
-        const targetDb = new Database(path.join(targetDataDir, 'medical.db'));
-        try {
-            insertRow(targetDb, 'ambulatories', { id: 'preserved-on-rollback', name: 'Synthetic rollback sentinel', created_at: 1_783_000_000 });
-            assert.throws(() => restoreArtifact(targetDataDir, artifactPath));
-            assert.equal(readOrderedRows(targetDb, 'ambulatories').some((row) => row.id === 'preserved-on-rollback'), true);
-            assert.equal(readOrderedRows(targetDb, 'headless_soap_active_role_attestations').length, 0);
-        } finally {
-            targetDb.close();
-        }
-    } finally {
-        fs.rmSync(workDir, { recursive: true, force: true });
-    }
-});
-
-test('restores a SOAP role attestation without its activation and keeps a later revocation', async () => {
-    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-soap-attestation-authority-'));
-    const targetDataDir = path.join(workDir, 'target');
-    const artifactPath = path.join(workDir, 'active-attestation.mediflow');
-    try {
-        prepareDatabase(targetDataDir);
-        const targetDb = new Database(path.join(targetDataDir, 'medical.db'));
-        try {
-            const actorRef = alignSyntheticAuthorityActor(targetDb);
-            const attestationRef = `hsar_${'a'.repeat(32)}`;
-            // Activated a minute ago: the backup carries an activation that is still inside its eight hours.
-            const activatedAt = Math.floor(Date.now() / 1000) - 60, expiresAt = activatedAt + (8 * 60 * 60);
-            const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
-            const payload = createEmptyDataset();
-            payload.headlessSoapActiveRoleAttestations = [{
-                attestationRef, actorRef,
-                schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1', role: 'physician',
-                operationId: 'mediflow.clinical_diary.append_soap.v1', policyVersion: 'clinician_confirmed_single_use.v1',
-                status: 'active', attestationVersion: 1, issuerRef: `hsari_${'b'.repeat(32)}`,
-                expiresAt: iso(expiresAt), activatedAt: iso(activatedAt), revocationGeneration: 0, revokedAt: null,
-                createdAt: iso(activatedAt), updatedAt: iso(activatedAt),
-            }];
-            fs.writeFileSync(artifactPath, await serializeBackupArtifact(payload));
-
-            restoreArtifact(targetDataDir, artifactPath);
-            assert.deepEqual(readOrderedRows(targetDb, 'headless_soap_active_role_attestations'), [{
-                attestation_ref: attestationRef, actor_ref: actorRef,
-                schema_version: 'mediflow.headless-soap-active-role-attestation.v1', role: 'physician',
-                operation_id: 'mediflow.clinical_diary.append_soap.v1', policy_version: 'clinician_confirmed_single_use.v1',
-                status: 'inactive', attestation_version: 1, issuer_ref: null, expires_at: null, activated_at: null,
-                revocation_generation: 0, revoked_at: null, created_at: activatedAt, updated_at: activatedAt,
-            }]);
-            // A later local revocation survives a second restore of the same archive.
-            const revokedAt = activatedAt + 30;
-            targetDb.prepare("UPDATE headless_soap_active_role_attestations SET status = 'revoked', revocation_generation = 1, revoked_at = ?, updated_at = ? WHERE attestation_ref = ?")
-                .run(revokedAt, revokedAt, attestationRef);
-            const revoked = readOrderedRows(targetDb, 'headless_soap_active_role_attestations');
-            restoreArtifact(targetDataDir, artifactPath);
-            assert.deepEqual(readOrderedRows(targetDb, 'headless_soap_active_role_attestations'), revoked);
-        } finally {
-            targetDb.close();
-        }
-    } finally {
-        fs.rmSync(workDir, { recursive: true, force: true });
-    }
-});
-
 test('scheduled backup restores every clinical table and preserves ciphertext bytes', async () => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-roundtrip-'));
     const sourceDataDir = path.join(workDir, 'source');
@@ -868,11 +476,11 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             assert.deepEqual([...Object.keys(BACKUP_TABLES)].sort(), [...BACKUP_COLLECTIONS].sort());
 
             const clinicalTables = actualSchemaTables.filter((table) => !NON_BACKUP_TABLES.has(table)
-                && !LOCAL_ONLY_AUTHORITY_TABLES.has(table) && !AUDIT_DEPENDENT_EMPTY_TABLES.has(table));
+                && !LOCAL_ONLY_AUTHORITY_TABLES.has(table));
             clearBackupTables(sourceDb, clinicalTables);
             clearBackupTables(targetDb, clinicalTables);
             const targetInitialAudits = readOrderedRows(targetDb, 'audit_events');
-            const durableReviewCommand = await populateSyntheticClinicalFixture(sourceDb, sourceActorRef);
+            await populateSyntheticClinicalFixture(sourceDb, sourceActorRef);
             /* Include nonempty synthetic repertory and receipt in the total round-trip gate. */
             const prosthetics = createProstheticsCatalog(sourceDb), catalogBytes = Buffer.from(PROSTHETICS_TEMPLATE);
             const catalogPreview = prosthetics.preview(catalogBytes, 'synthetic-roundtrip.csv', 'synthetic-backup');
@@ -889,7 +497,6 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                 base64: Buffer.from('%PDF-1.4 Originale sintetico').toString('base64'), page: '2' }, () => {});
             const selection = { entryId: prosthetics.search('').entries[0].id, revision: prosthetics.status().revision };
             sourceDb.prepare('UPDATE prosthetic_prescriptions SET catalog_snapshot=? WHERE id=?').run(JSON.stringify(prosthetics.snapshot(selection)), 'w7-prosthetic');
-            await seedHeadlessSoapLedger(workDir, sourceDb);
 
             for (const table of clinicalTables) {
                 assert.deepEqual(readOrderedRows(targetDb, table), table === 'audit_events' ? targetInitialAudits : [], `target ${table} retains only its initial host audit before restore`);
@@ -918,11 +525,6 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
 
             restoreArtifact(targetDataDir, runner.artifactPath);
 
-            const replayed = JSON.parse(runNode(
-                ['scripts/run-strip-types.mjs', 'scripts/durable-review-record-store-worker.mjs', 'create'],
-                { MEDIFLOW_DATA_DIR: targetDataDir, MEDIFLOW_DURABLE_REVIEW_RECORD: JSON.stringify(durableReviewCommand) },
-            ));
-            assert.deepEqual(replayed, { recordId: durableReviewCommand.record.reviewId, ...durableReviewCommand.record });
 
             let encryptedFieldCount = 0;
             for (const table of clinicalTables) {
@@ -937,10 +539,8 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                     assert.ok(markers.every(row => row.request_id === imports[0].event_id));
                 }
                 const targetRows = table === 'audit_events' ? allTargetRows.filter(row => !['backup.portable.imported', 'backup.audit.imported', 'backup.therapy-command.imported'].includes(String(row.event_type))) : allTargetRows;
-                // The activation is a grant of the source host: the attestation reaches the target inactive.
-                const expectedRows: Array<Record<string, unknown>> = table === 'headless_soap_active_role_attestations'
-                    ? sourceRows.map((row) => ({ ...row, status: 'inactive', issuer_ref: null, expires_at: null, activated_at: null }))
-                    : table === 'physician_review_attestations' ? sourceRows.map(row => row.status === 'active' ? { ...row, status: 'inactive' } : row)
+                // The activation is a grant of the source host: the physician attestation reaches the target inactive.
+                const expectedRows: Array<Record<string, unknown>> = table === 'physician_review_attestations' ? sourceRows.map(row => row.status === 'active' ? { ...row, status: 'inactive' } : row)
                     : table === 'audit_events' ? [...sourceRows, ...targetInitialAudits].sort((a, b) => String(a.event_id).localeCompare(String(b.event_id))) : sourceRows;
                 assert.equal(targetRows.length, expectedRows.length, `${table} count must survive restore`);
                 assert.deepEqual(targetRows, expectedRows, `${table} rows must reach the target as the restore contract declares`);
@@ -968,7 +568,6 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             const restoredFile = restoredArtifact.payload.attachments.find(row => row.id === 'w7-attachment')!;
             assert.equal(restoredFile.data, fileGolden.data);
             assert.equal(await openPatientDocumentFile(restoredFile.data as string, fileKey), `data:application/pdf;base64,${fileGolden.original}`);
-            assert.deepEqual(restoredArtifact.payload.headlessSoapEntryCommits, artifact.payload.headlessSoapEntryCommits);
             assert.deepEqual(restoredArtifact.payload.attachments.map(({ documentSourceRef, documentRevision, documentFreshnessEpoch }) => ({ documentSourceRef, documentRevision, documentFreshnessEpoch })),
                 artifact.payload.attachments.map(({ documentSourceRef, documentRevision, documentFreshnessEpoch }) => ({ documentSourceRef, documentRevision, documentFreshnessEpoch })));
             assert.ok(encryptedFieldCount >= 50, 'fixture must exercise the complete encrypted clinical surface');

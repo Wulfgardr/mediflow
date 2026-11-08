@@ -187,7 +187,6 @@ export const RETENTION_CLASSIFICATION: Readonly<Record<PatientChildTableName, Re
     sissHandoffEvents: { category: 'prescription', timestamps: ['started_at', 'completed_at', 'created_at', 'updated_at'] },
     checkups: { category: 'ambulatory_record', timestamps: ['date', 'created_at', 'updated_at'] },
     documentDiagnosisProposals: { category: 'ambulatory_record', timestamps: ['decided_at', 'created_at', 'updated_at'] },
-    durableReviewPatientLinks: { category: 'ambulatory_record', timestamps: ['created_at', 'updated_at'] },
     patientsToAmbulatories: { category: 'ambulatory_record', timestamps: ['assigned_at'] },
 });
 

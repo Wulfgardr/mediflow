@@ -73,15 +73,6 @@ const commandAudit: BackupAuditRow = {
     eventType: 'ai.review.accepted', subjectType: 'ai_review', subjectRef: commandReviewId,
     actorRef: `actor_${'c'.repeat(32)}`, requestId: null, redactedMetadata: null,
 };
-const commandStateInsert = 'INSERT INTO durable_review_command_states (review_id, review_state, revision, action, created_at) VALUES (?, ?, ?, ?, ?)';
-const commandStateValues = [commandReviewId, 'accepted', 2, 'accept', 1783000001];
-const commandOperationInsert = 'INSERT INTO durable_review_command_operations (id, review_id, idempotency_key, command_digest, result_snapshot, audit_event_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)';
-const commandOperationValues = [
-    'command-operation-synthetic', commandReviewId, 'idem_aaaaaaaaaaaaaaaa', 'a'.repeat(64),
-    JSON.stringify({ reviewId: commandReviewId, state: 'accepted', revision: 2, eventId: commandAudit.eventId }),
-    commandAudit.eventId, 1783000001,
-];
-
 const webBackupDatasetScript = [
     "const {serializeProstheticsDocument} = await import('./lib/reference-data/prosthetics-catalog-backup.ts');",
     "const source = ts.createSourceFile('route.ts', fs.readFileSync('app/api/system/backup-restore/route.ts','utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);",
@@ -248,9 +239,9 @@ for (const coverage of ['omitted', 'included'] as const) {
 test('legacy normalization retains original checksum and omitted coverage in preflight', async () => {
     const payload = createEmptyDataset(); delete payload.auditEvents;
     const raw = JSON.parse(await serializeBackupArtifact(payload));
-    delete raw.payload.headlessSoapEntryCommits;
-    delete raw.manifest.recordCounts.headlessSoapEntryCommits;
-    raw.manifest.collections = raw.manifest.collections.filter((name: string) => name !== 'headlessSoapEntryCommits');
+    delete raw.payload.therapyStatusCommands;
+    delete raw.manifest.recordCounts.therapyStatusCommands;
+    raw.manifest.collections = raw.manifest.collections.filter((name: string) => name !== 'therapyStatusCommands');
     raw.manifest.checksum = checksum(raw.payload);
     const original = raw.manifest.checksum;
     const parsed = await parseBackupArtifact(raw);
@@ -338,73 +329,7 @@ test('scheduled snapshot restores original audits, preserves target history and 
     } finally { fs.rmSync(work, { recursive: true, force: true }); }
 });
 
-test('Web export rejects either durable command collection without changing source rows', async () => {
-    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-web-command-export-'));
-    try {
-        for (const history of ['state', 'operation', 'both']) {
-            const dir = path.join(work, history); prepare(dir);
-            const db = new Database(path.join(dir, 'medical.db'));
-            try {
-                db.prepare("INSERT INTO ambulatories (id,name,type) VALUES ('command-amb','Synthetic command','synthetic')").run();
-                db.prepare("INSERT INTO patients (id,first_name,last_name,tax_code,ambulatory_id,version) VALUES ('command-patient','Synthetic','Before','SYNTHETIC-COMMAND','command-amb',1)").run();
-                seedAudit(db, originalAudit);
-                seedAudit(db, commandAudit);
-                if (history !== 'operation') db.prepare(commandStateInsert).run(...commandStateValues);
-                if (history !== 'state') db.prepare(commandOperationInsert).run(...commandOperationValues);
-                const snapshot = () => db.transaction(() => Object.fromEntries(
-                    (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as { name: string }[])
-                        .map(({ name }) => [name, db.prepare('SELECT * FROM ' + JSON.stringify(name)).all()
-                            .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))]),
-                ))();
-                const before = snapshot();
-                const result = JSON.parse(evalNode(dir, webBackupExportScript));
-                assert.equal(result.artifact, null, history);
-                assert.match(result.error ?? '', /Durable review command state requires its append-only audit ledger\./, history);
-                assert.deepEqual(snapshot(), before, history);
-                assert.deepEqual(before.audit_events, db.prepare('SELECT * FROM audit_events ORDER BY event_id').all()
-                    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
-                assert.equal((db.prepare("SELECT last_name FROM patients WHERE id='command-patient'").get() as { last_name: string }).last_name, 'Before');
-            } finally { db.close(); }
-        }
-    } finally { fs.rmSync(work, { recursive: true, force: true }); }
-});
-
-test('Web export rejects command history committed before the snapshot first read', () => {
-    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-web-command-first-read-'));
-    try {
-        prepare(work);
-        const db = new Database(path.join(work, 'medical.db'));
-        try {
-            db.prepare("INSERT INTO ambulatories (id,name,type) VALUES ('first-read-amb','Synthetic first read','synthetic')").run();
-            db.prepare("INSERT INTO patients (id,first_name,last_name,tax_code,ambulatory_id,version) VALUES ('first-read-patient','Synthetic','Before','SYNTHETIC-FIRST-READ','first-read-amb',1)").run();
-            const initialAuditIds = (db.prepare('SELECT event_id FROM audit_events').all() as { event_id: string }[]).map(row => row.event_id);
-            seedAudit(db, originalAudit);
-            assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_states').get() as { n: number }).n, 0);
-            assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_operations').get() as { n: number }).n, 0);
-            const script = [
-                "import path from 'node:path'; import Database from 'better-sqlite3';",
-                "const originalPrepare = Database.prototype.prepare; let fired = false;",
-                "Database.prototype.prepare = function(statement) { const prepared = originalPrepare.call(this, statement); if (!fired && /from\\s+[\"']?ambulatories[\"']?(?:\\s|$)/i.test(statement)) { fired = true; const other = new Database(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));",
-                "other.transaction(() => { other.prepare(\"UPDATE patients SET last_name='After', version=2 WHERE id='first-read-patient'\").run(); other.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_COMMAND_AUDIT_ROW))); other.prepare(process.env.SNAPSHOT_COMMAND_STATE_INSERT).run(...JSON.parse(process.env.SNAPSHOT_COMMAND_STATE_VALUES)); other.prepare(process.env.SNAPSHOT_COMMAND_OPERATION_INSERT).run(...JSON.parse(process.env.SNAPSHOT_COMMAND_OPERATION_VALUES)); })(); other.close(); } return prepared; };",
-                webBackupExportScript,
-            ].join('\n');
-            const result = JSON.parse(evalNode(work, script, {
-                SNAPSHOT_COMMAND_AUDIT_ROW: JSON.stringify(commandAudit),
-                SNAPSHOT_COMMAND_STATE_INSERT: commandStateInsert, SNAPSHOT_COMMAND_STATE_VALUES: JSON.stringify(commandStateValues),
-                SNAPSHOT_COMMAND_OPERATION_INSERT: commandOperationInsert, SNAPSHOT_COMMAND_OPERATION_VALUES: JSON.stringify(commandOperationValues),
-            }));
-            assert.equal(result.artifact, null);
-            assert.match(result.error ?? '', /Durable review command state requires its append-only audit ledger\./);
-            assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_states').get() as { n: number }).n, 1);
-            assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_operations').get() as { n: number }).n, 1);
-            assert.deepEqual(db.prepare('SELECT event_id FROM audit_events ORDER BY event_id').all(),
-                [...initialAuditIds, commandAudit.eventId, originalAudit.eventId].sort().map(event_id => ({ event_id })));
-            assert.deepEqual(db.prepare("SELECT last_name, version FROM patients WHERE id='first-read-patient'").get(), { last_name: 'After', version: 2 });
-        } finally { db.close(); }
-    } finally { fs.rmSync(work, { recursive: true, force: true }); }
-});
-
-test('manual and scheduled producers keep one SQLite snapshot across a concurrent clinical/audit/command commit', async () => {
+test('manual and scheduled producers keep one SQLite snapshot across a concurrent clinical and audit commit', async () => {
     const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-audit-snapshot-'));
     try {
         for (const producer of ['manual', 'scheduled']) {
@@ -426,7 +351,7 @@ test('manual and scheduled producers keep one SQLite snapshot across a concurren
                 "import {serializeBackupArtifact} from './lib/backup-artifact.ts';",
                 "const originalPrepare = Database.prototype.prepare; let fired = false;",
                 "Database.prototype.prepare = function(statement) { const prepared = originalPrepare.call(this, statement); if (!fired && /from\\s+[\"']?patients[\"']?(?:\\s|$)/i.test(statement)) { fired = true; const other = new Database(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));",
-                "other.transaction(() => { other.prepare(\"UPDATE patients SET last_name='After', version=2 WHERE id='snapshot-patient'\").run(); other.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_AUDIT_ROW))); other.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_COMMAND_AUDIT_ROW))); other.prepare(process.env.SNAPSHOT_COMMAND_STATE_INSERT).run(...JSON.parse(process.env.SNAPSHOT_COMMAND_STATE_VALUES)); other.prepare(process.env.SNAPSHOT_COMMAND_OPERATION_INSERT).run(...JSON.parse(process.env.SNAPSHOT_COMMAND_OPERATION_VALUES)); })(); other.close(); } return prepared; };",
+                "other.transaction(() => { other.prepare(\"UPDATE patients SET last_name='After', version=2 WHERE id='snapshot-patient'\").run(); other.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_AUDIT_ROW))); other.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_COMMAND_AUDIT_ROW))); })(); other.close(); } return prepared; };",
                 "if (process.env.SNAPSHOT_PRODUCER === 'scheduled') { process.argv[1] = path.resolve('scripts/run-scheduled-backup.mjs'); await import('./scripts/run-scheduled-backup.mjs'); } else {",
                 webBackupDatasetScript,
                 "console.log(await serializeBackupArtifact(buildWebBackupDataset())); }",
@@ -434,8 +359,6 @@ test('manual and scheduled producers keep one SQLite snapshot across a concurren
             const output = evalNode(dir, script, {
                 SNAPSHOT_PRODUCER: producer, SNAPSHOT_AUDIT_ROW: JSON.stringify(concurrentRow),
                 SNAPSHOT_COMMAND_AUDIT_ROW: JSON.stringify(commandAudit),
-                SNAPSHOT_COMMAND_STATE_INSERT: commandStateInsert, SNAPSHOT_COMMAND_STATE_VALUES: JSON.stringify(commandStateValues),
-                SNAPSHOT_COMMAND_OPERATION_INSERT: commandOperationInsert, SNAPSHOT_COMMAND_OPERATION_VALUES: JSON.stringify(commandOperationValues),
                 MEDIFLOW_BACKUP_FORCE: '1', MEDIFLOW_BACKUP_DEST_DIR: path.join(dir, 'backups'),
             });
             const result = JSON.parse(output);
@@ -444,27 +367,17 @@ test('manual and scheduled producers keep one SQLite snapshot across a concurren
             assert.equal(artifact.payload.patients[0].lastName, 'Before');
             assert.equal(artifact.payload.patients[0].version, 1);
             assert.deepEqual(artifact.payload.auditEvents?.map(row => row.eventId).sort(), [...initialAuditIds, 'synthetic-before'].sort());
-            assert.deepEqual(artifact.payload.durableReviewCommandStates, []);
-            assert.deepEqual(artifact.payload.durableReviewCommandOperations, []);
-            assert.equal(artifact.manifest.recordCounts.durableReviewCommandStates, 0);
-            assert.equal(artifact.manifest.recordCounts.durableReviewCommandOperations, 0);
             const observed = new Database(path.join(dir, 'medical.db'));
             try {
                 assert.equal((observed.prepare("SELECT last_name FROM patients WHERE id='snapshot-patient'").get() as { last_name: string }).last_name, 'After');
                 assert.equal((observed.prepare("SELECT version FROM patients WHERE id='snapshot-patient'").get() as { version: number }).version, 2);
                 assert.equal((observed.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n, 4);
-                const statesBefore = observed.prepare('SELECT * FROM durable_review_command_states').all();
-                const operationsBefore = observed.prepare('SELECT * FROM durable_review_command_operations').all();
-                const auditsBefore = observed.prepare('SELECT * FROM audit_events ORDER BY event_id').all();
-                assert.equal(statesBefore.length, 1);
-                assert.equal(operationsBefore.length, 1);
                 const fresh = JSON.parse(evalNode(dir, webBackupExportScript));
-                assert.equal(fresh.artifact, null);
-                assert.match(fresh.error ?? '', /Durable review command state requires its append-only audit ledger\./);
-                assert.deepEqual(observed.prepare('SELECT * FROM durable_review_command_states').all(), statesBefore);
-                assert.deepEqual(observed.prepare('SELECT * FROM durable_review_command_operations').all(), operationsBefore);
-                assert.deepEqual(observed.prepare('SELECT * FROM audit_events ORDER BY event_id').all(), auditsBefore);
-                assert.equal((observed.prepare("SELECT last_name FROM patients WHERE id='snapshot-patient'").get() as { last_name: string }).last_name, 'After');
+                assert.equal(fresh.error, null);
+                const current = await parseBackupArtifact(fresh.artifact);
+                assert.equal(current.payload.patients[0].lastName, 'After');
+                assert.deepEqual(current.payload.auditEvents?.map(row => row.eventId).sort(),
+                    [...initialAuditIds, 'synthetic-before', 'synthetic-concurrent', commandAudit.eventId].sort());
                 await retainImage(observed, producer + '-snapshot-current');
                 if (process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR) fs.writeFileSync(path.join(process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR, producer + '-snapshot.mediflow'), JSON.stringify(raw));
             } finally { observed.close(); }

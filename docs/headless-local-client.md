@@ -26,7 +26,7 @@ nei descrittori canonici; il server dichiara ancora la versione `0.8.5`.
 
 Nessun commit è esposto da MCP. La scrittura SOAP autorizzata ha un contratto
 separato ([ADR 0103](./adr/0103-headless-clinician-authorized-soap-entry-write.md))
-senza runtime: non è un ottavo tool. Le 66 anchor della
+senza codice: non è un ottavo tool. Le 66 anchor della
 [matrice semantica storica](./headless/semantic-plane.v1.json) e del
 [catalogo manuale](./capability-mapping/headless-plane-inventory.v1.json)
 restano `manual_only`, non concedibili e non disponibili tramite discovery.

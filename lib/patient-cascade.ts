@@ -9,7 +9,6 @@ import {
     attachments,
     checkups,
     documentDiagnosisProposals,
-    durableReviewPatientLinks,
     entries,
     observations,
     patients,
@@ -31,7 +30,6 @@ export const PATIENT_CHILD_TABLES = [
     /* @Codex */
     { name: 'documentDiagnosisProposals', table: documentDiagnosisProposals, patientId: documentDiagnosisProposals.patientId },
     /* @Codex */
-    { name: 'durableReviewPatientLinks', table: durableReviewPatientLinks, patientId: durableReviewPatientLinks.patientId },
     { name: 'observations', table: observations, patientId: observations.patientId },
     { name: 'checkups', table: checkups, patientId: checkups.patientId },
     { name: 'therapies', table: therapies, patientId: therapies.patientId },

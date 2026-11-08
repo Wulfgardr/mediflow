@@ -56,19 +56,6 @@ const allowlist = [
       + 'writer senza quel packet viola le regole di arresto dell\'ADR stesso.',
     reference: 'docs/adr/0087-registro-proposte-diagnostiche-documentali.md',
   },
-  {
-    table: 'headless_soap_entry_commits',
-    reason: 'ledger del commit SOAP headless: il runtime che lo scriveva non era mai '
-      + 'raggiungibile ed è stato rimosso. La tabella resta perché backup e ripristino '
-      + 'ne validano il formato; rimuoverla è una migrazione dei dati a riposo.',
-    reference: 'docs/adr/0103-headless-clinician-authorized-soap-entry-write.md',
-  },
-  {
-    table: 'headless_soap_active_role_attestations',
-    reason: 'attestazioni di ruolo della scrittura SOAP headless: stesso caso del ledger, '
-      + 'il runtime è stato rimosso e la tabella resta per il formato dei backup.',
-    reference: 'docs/adr/0103-headless-clinician-authorized-soap-entry-write.md',
-  },
 ];
 
 function toRelative(file) {

@@ -24,12 +24,6 @@ const AUTHORITY_DB_PATH = path.join(AUTHORITY_DATA_DIR, 'medical.db');
 
 {
     const sqlite = new Database(AUTHORITY_DB_PATH);
-    sqlite.exec(`CREATE TABLE durable_review_records (
-        id TEXT PRIMARY KEY NOT NULL, patient_ref TEXT NOT NULL, review_id TEXT NOT NULL UNIQUE, review_revision INTEGER NOT NULL,
-        receipt_ref TEXT NOT NULL, provenance_ref TEXT NOT NULL, receipt_binding TEXT NOT NULL, provenance_binding TEXT NOT NULL,
-        presentation_version TEXT NOT NULL, sealed_ciphertext TEXT NOT NULL, sealed_digest TEXT NOT NULL,
-        created_at INTEGER DEFAULT (unixepoch())
-    )`);
     for (const fileName of fs.readdirSync(path.join(ROOT_DIR, 'drizzle')).filter((file) => file.endsWith('.sql')).sort()) {
         const sql = fs.readFileSync(path.join(ROOT_DIR, 'drizzle', fileName), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gm, '');
         if (sql.trim().length > 0) sqlite.exec(sql);
@@ -54,12 +48,6 @@ function bootstrapDatabase(): { sqlite: Database.Database; db: BetterSQLite3Data
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-cascade-'));
     const sqlite = new Database(path.join(dir, 'medical.db'));
     const migrationsDir = path.join(ROOT_DIR, 'drizzle');
-    sqlite.exec(`CREATE TABLE durable_review_records (
-        id TEXT PRIMARY KEY NOT NULL, patient_ref TEXT NOT NULL, review_id TEXT NOT NULL UNIQUE, review_revision INTEGER NOT NULL,
-        receipt_ref TEXT NOT NULL, provenance_ref TEXT NOT NULL, receipt_binding TEXT NOT NULL, provenance_binding TEXT NOT NULL,
-        presentation_version TEXT NOT NULL, sealed_ciphertext TEXT NOT NULL, sealed_digest TEXT NOT NULL,
-        created_at INTEGER DEFAULT (unixepoch())
-    )`);
     const migrationFiles = fs
         .readdirSync(migrationsDir)
         .filter((file) => file.endsWith('.sql'))
@@ -95,32 +83,6 @@ function insertPatientWithChildren(sqlite: Database.Database, patientId: string)
     ).run(patientId);
     const digest = (value: string): string => createHash('sha256').update(value).digest('hex');
     const currentnessRef = digest(patientId);
-    const patientRef = `ptr_${digest(`synthetic:patient:${suffix}`).slice(0, 32)}`;
-    const reviewId = `review_${digest(`synthetic:review:${suffix}`).slice(0, 32)}`;
-    const receiptRef = `receipt_${digest(`synthetic:receipt:${suffix}`).slice(0, 32)}`;
-    const provenanceRef = `provenance_${digest(`synthetic:provenance:${suffix}`).slice(0, 32)}`;
-    const sealedCiphertext = 'ENC:c3ludGhldGlj:Y2lwaGVy';
-    sqlite.prepare(`
-        INSERT INTO durable_review_records (
-            id, patient_ref, review_id, review_revision, receipt_ref,
-            provenance_ref, receipt_binding, provenance_binding,
-            presentation_version, sealed_ciphertext, sealed_digest
-        ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        reviewId,
-        patientRef,
-        reviewId,
-        receiptRef,
-        provenanceRef,
-        digest(`${patientRef}\0${reviewId}\0${receiptRef}`),
-        digest(`${patientRef}\0${reviewId}\0${provenanceRef}`),
-        'mediflow.ai.durable-review.presentation.v1',
-        sealedCiphertext,
-        digest(sealedCiphertext),
-    );
-    sqlite.prepare(
-        'INSERT INTO durable_review_patient_links (review_id, patient_id) VALUES (?, ?)'
-    ).run(reviewId, patientId);
     sqlite.prepare(
         "INSERT INTO service_prescriptions (id, patient_id, prescribed_at, service_name) VALUES (?, ?, 1, 'Visita di controllo')"
     ).run(`sp-${suffix}`, patientId);

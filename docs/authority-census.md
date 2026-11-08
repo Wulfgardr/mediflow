@@ -39,11 +39,8 @@ più transizioni lifecycle del profilo. I percorsi assenti restano assenti.
   possono preparare proposte, non ottenere proof o commit. Il catalogo
   [headless canonico](../lib/headless/canonical-capability-catalog.ts) descrive
   ancore manuali non concedibili: non prova la raggiungibilità di un writer.
-- `R-*` registra persistenza dell'envelope, link paziente e decisione terminale.
-  Le ricerche degli export nei sorgenti, negli script e nei manifest non trovano
-  caller prodotto di create/link/command; il worker del record store è un harness
-  di prova. Il command ha audit atomico, record/link no: non sono applicazione
-  clinica né servizi da concedere agli agenti per colmare una differenza.
+- `R-*` (record, link paziente e decisione della review durevole) è ritirato
+  l'8 novembre 2026: nessun caller di prodotto, tabelle eliminate dallo schema 11.
 - `L-01` e `X-13` sono ritirati in WUL-774 dopo la verifica dell'assenza di
   caller runtime: helper Smart Import ed export legacy della sintesi sono rimossi.
   La route legacy conserva il `410` autenticato; le preview Fabric non scrivono

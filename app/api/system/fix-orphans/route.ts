@@ -32,8 +32,7 @@ function inspectRepair(tx: Pick<typeof dbServer, 'select'>) {
     const linkedPids = new Set(tx.select({ pid: patientsToAmbulatories.patientId }).from(patientsToAmbulatories).all().map(link => link.pid));
     const orphanPatients = allPatients.filter(patient => !linkedPids.has(patient.id));
     const orphanChildren = PATIENT_CHILD_TABLES.map(child => {
-        const identity = 'id' in child.table ? child.table.id
-            : 'reviewId' in child.table ? child.table.reviewId : child.table.ambulatoryId;
+        const identity = 'id' in child.table ? child.table.id : child.table.ambulatoryId;
         const rows = tx.select({ id: identity, patientId: child.patientId }).from(child.table)
             .where(notInArray(child.patientId, tx.select({ id: patients.id }).from(patients))).all();
         return [child.name, rows.map(row => JSON.stringify([row.id, row.patientId])).sort()] as const;

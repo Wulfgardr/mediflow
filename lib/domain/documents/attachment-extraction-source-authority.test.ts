@@ -157,12 +157,9 @@ test('revokes same-tuple locators and operations before restore and rejects the 
 
 test('keeps restore revocation fail-closed after precondition and transaction failures', async () => {
     seed(); const precondition = fixture(); const preconditionLocator = precondition.authority.issue({ attachmentId: ATTACHMENT }); assert.ok(preconditionLocator);
-    const artifact = await sameTupleArtifact(); const db = new Database(dbPath);
-    db.prepare('INSERT INTO durable_review_command_states (review_id, review_state, revision, action) VALUES (?, ?, ?, ?)')
-        .run(`review_${'c'.repeat(32)}`, 'accepted', 1, 'accept'); db.close();
-    assert.throws(() => restoreBackupArtifact(artifact, noVolatileRestoreAuthority), /append-only audit ledger/u);
+    const artifact = await sameTupleArtifact();
+    assert.throws(() => restoreBackupArtifact(artifact, () => { throw new Error('synthetic fence failure'); }), /runtime mutation fence unavailable/u);
     assert.equal(precondition.authority.consume(preconditionLocator).status, 'denied');
-    const cleanup = new Database(dbPath); cleanup.exec('DELETE FROM durable_review_command_states'); cleanup.close();
 
     const transaction = fixture(); const transactionLocator = transaction.authority.issue({ attachmentId: ATTACHMENT }); assert.ok(transactionLocator);
     artifact.payload.ambulatories.push({ id: AMBULATORY, name: 'Duplicato sintetico', type: 'test' });

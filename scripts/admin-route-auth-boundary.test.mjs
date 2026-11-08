@@ -71,9 +71,8 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
             ['@/lib/db-server', ${JSON.stringify(toDataModule("export const dbServer = { transaction() { globalThis.dbCalls = (globalThis.dbCalls ?? 0) + 1; throw new Error('database touched'); } };"))}],
             ['@/lib/schema', ${JSON.stringify(toDataModule(`export const ${[
                 'attachments', 'ambulatories', 'checkups', 'conversations', 'documentDiagnosisProposals',
-                'durableReviewCommandOperations', 'durableReviewCommandStates',
-                'durableReviewOperations', 'durableReviewPatientLinks', 'durableReviewRecords', 'drugs', 'entries',
-                'exemptions', 'exemptionImportReceipts', 'headlessSoapActiveRoleAttestations', 'headlessSoapEntryCommits', 'messages',
+                'drugs', 'entries',
+                'exemptions', 'exemptionImportReceipts', 'messages',
                 'observations', 'patients', 'patientsToAmbulatories', 'physicianReviewAttestations',
                 'prostheticPrescriptions', 'prostheticsCatalogEntries', 'prostheticsCatalogReceipts', 'prostheticsCatalogSources', 'prostheticsCatalogDocuments',
                 'serviceCatalogEntries', 'servicePrescriptionItems',
@@ -90,7 +89,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
             ['@/lib/backup-artifact', ${JSON.stringify(toDataModule("export const BACKUP_COLLECTIONS = Object.freeze([]); export function backupArtifactInputChecksum() { return 'b'.repeat(64); } export async function serializeBackupArtifact() { return '{}'; }"))}],
             ['@/lib/backup-patient-ambulatory-links', ${JSON.stringify(toDataModule("export function enrichBackupPatientsWithAmbulatoryLinks(rows) { return rows; }"))}],
             ['@/lib/backup-restore-preflight', ${JSON.stringify(toDataModule("export async function runBackupRestorePreflight() { globalThis.preflightCalls = (globalThis.preflightCalls ?? 0) + 1; return { artifact: { format: 'mediflow-backup', version: 1, manifest: { recordCounts: {} } }, result: { ok: true } }; }"))}],
-            ['@/lib/backup-restore-executor', ${JSON.stringify(toDataModule("export class BackupRestoreBlockedError extends Error { constructor(reason, detail) { super(detail); this.reason = reason; } } export function restoreBackupArtifact(_artifact, fence) { globalThis.restoreCalls = (globalThis.restoreCalls ?? 0) + 1; if (globalThis.blockRestore) throw new BackupRestoreBlockedError('durable_review_commands', 'synthetic block'); fence(); }"))}],
+            ['@/lib/backup-restore-executor', ${JSON.stringify(toDataModule("export class BackupRestoreBlockedError extends Error { constructor(reason, detail) { super(detail); this.reason = reason; } } export function restoreBackupArtifact(_artifact, fence) { globalThis.restoreCalls = (globalThis.restoreCalls ?? 0) + 1; if (globalThis.blockRestore) throw new BackupRestoreBlockedError('audit', 'synthetic block'); fence(); }"))}],
             ['@/lib/api-error-response', ${JSON.stringify(toDataModule("export function archiveReplacementResponse() { return null; } export function apiFailure(code, error, status) { const response = Response.json({ error, code }, { status }); response.headers.set('Cache-Control', 'no-store'); return response; } export function apiInternalError() { return Response.json({ error: 'internal' }, { status: 500 }); }"))}],
             ['@/lib/security/headless-checkup-status-transition-web-production', ${JSON.stringify(toDataModule("export function disposeCheckupStatusTransitionForHostV1() { globalThis.fenceCalls = (globalThis.fenceCalls ?? 0) + 1; return true; }"))}],
             ['@/lib/security/request-transport', ${JSON.stringify(toDataModule(`export { isTrustedWebMutationRequest } from ${JSON.stringify(transportUrl)};`))}],
@@ -132,7 +131,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
         }));
         const blockedObserved = { status: blocked.status, cacheControl: blocked.headers.get('cache-control'), body: await blocked.json() };
         const blockedExpected = { status: 409, cacheControl: 'no-store', body: { success: false, code: 'restore_blocked',
-            reason: 'durable_review_commands', error: 'Ripristino bloccato: i dati attuali non sono stati modificati.' } };
+            reason: 'audit', error: 'Ripristino bloccato: i dati attuali non sono stati modificati.' } };
         if (JSON.stringify(blockedObserved) !== JSON.stringify(blockedExpected)) throw new Error(JSON.stringify(blockedObserved));
         const { POST: VERIFY } = await import(verifyUrl);
         for (const handler of [POST, VERIFY]) {
