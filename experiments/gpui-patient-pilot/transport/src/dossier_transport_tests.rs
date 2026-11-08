@@ -1,7 +1,7 @@
-use super::tests::{local_host_login, local_host_reply, session_at};
+use super::tests::{local_host_login, session_at, try_local_host_reply};
 use super::*;
 use crate::DossierImport;
-use std::io::Read;
+use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{
     Arc, Mutex,
@@ -237,8 +237,10 @@ impl Fixture {
                 } else {
                     panic!("unexpected request: {first}")
                 };
-                local_host_reply(
+                drop(store);
+                dossier_reply(
                     &mut stream,
+                    server_session.is_locked(),
                     status,
                     response,
                     if first.starts_with("GET /api/auth/check ") {
@@ -246,7 +248,8 @@ impl Fixture {
                     } else {
                         ""
                     },
-                );
+                )
+                .unwrap();
             }
         });
         let host = Arc::new(
@@ -479,4 +482,69 @@ fn dossier_all_ordinary_writers_read_back_the_same_clinical_fields() {
     assert!(store.updated_patient.is_some());
     drop(store);
     worker.retire();
+}
+
+fn dossier_reply(
+    stream: &mut impl Write,
+    cancelled: bool,
+    status: u16,
+    body: Value,
+    extra: &str,
+) -> io::Result<()> {
+    match try_local_host_reply(stream, status, body, extra) {
+        Err(error)
+            if cancelled
+                && matches!(
+                    error.kind(),
+                    io::ErrorKind::BrokenPipe
+                        | io::ErrorKind::ConnectionReset
+                        | io::ErrorKind::ConnectionAborted
+                ) =>
+        {
+            Ok(())
+        }
+        result => result,
+    }
+}
+
+#[test]
+fn dossier_cancelled_reply_accepts_only_peer_disconnects() {
+    struct FailedWrite(io::ErrorKind);
+    impl Write for FailedWrite {
+        fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+            Err(io::Error::from(self.0))
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    for kind in [
+        io::ErrorKind::BrokenPipe,
+        io::ErrorKind::ConnectionReset,
+        io::ErrorKind::ConnectionAborted,
+    ] {
+        assert!(dossier_reply(&mut FailedWrite(kind), true, 200, json!({}), "").is_ok());
+        assert_eq!(
+            dossier_reply(&mut FailedWrite(kind), false, 200, json!({}), "")
+                .unwrap_err()
+                .kind(),
+            kind
+        );
+    }
+    assert_eq!(
+        dossier_reply(
+            &mut FailedWrite(io::ErrorKind::PermissionDenied),
+            true,
+            200,
+            json!({}),
+            "",
+        )
+        .unwrap_err()
+        .kind(),
+        io::ErrorKind::PermissionDenied
+    );
+    let mut sent = vec![];
+    dossier_reply(&mut sent, false, 201, json!({"id":"synthetic"}), "").unwrap();
+    assert!(sent.starts_with(b"HTTP/1.1 201 Synthetic\r\n"));
+    assert!(sent.ends_with(br#"{"id":"synthetic"}"#));
 }
