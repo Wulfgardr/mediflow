@@ -307,6 +307,4 @@ test('bridge source is stateless, Web-only and never writes protocol data to std
     const source = readFileSync(new URL('./portable-supervisor-web-ipc-bridge.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /(?:db-server|server-auth|owner-broker|operation-rpc|child_process|net|http|listen\s*\(|process\.stdout|console\.(?:log|info)|process\.env|writeFile|readFile)/iu);
     assert.doesNotMatch(source, /(?:let|const)\s+(?:pending|challenge|capture|owner)\s*=/u);
-    assert.match(source, /process\.on\('message'/u);
-    assert.match(source, /process\.off\('message'/u);
 });

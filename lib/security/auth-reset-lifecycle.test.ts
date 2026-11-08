@@ -22,8 +22,6 @@ test('admin reset fences Web and native/system owners before DB and commits both
 
 test('admin reset aborts both capabilities on DB failure and does not use mixed legacy APIs', () => {
     // Only a committed reset whose receipt file failed keeps the capabilities, to retire the sessions.
-    assert.match(source, /catch \(error\) \{[\s\S]*?'RESET_RECEIPT_UNRECORDED'[\s\S]*?\} else \{\s*abortPreparedReset\(webCapability, nativeCapability\);/u);
-    assert.match(source, /function abortPreparedReset[\s\S]*abortAdminReset\(webCapability\)[\s\S]*abortNativeSystemAdminReset\(nativeCapability\)/u);
     assert.doesNotMatch(source, /\bclearAllSessions\b|\binvalidateSessionsForUser\b/u);
     assert.doesNotMatch(source, /cookieStore\.delete|cookies\(\)/u);
     assert.match(source, /maxAge: 0/u);

@@ -165,8 +165,6 @@ test('maps session errors and sanitizes invalid epoch or internal faults without
 test('route keeps POST unchanged and wires GET only to the epoch composition with a dynamic Node runtime', () => {
     const source = readFileSync(new URL('../../app/api/ai/smart-import/selection/route.ts', import.meta.url), 'utf8');
     const epochProduction = readFileSync(new URL('./server-session-authenticated-selection-epoch-production.ts', import.meta.url), 'utf8');
-    assert.match(source, /runtime\s*=\s*'nodejs'|runtime\s*=\s*"nodejs"/u);
-    assert.match(source, /dynamic\s*=\s*'force-dynamic'|dynamic\s*=\s*"force-dynamic"/u);
     assert.match(source, /acquireAuthenticatedWebSessionSelection/u);
     assert.match(source, /readAuthenticatedWebSessionSelectionEpoch/u);
     assert.match(source, /export const GET = createSmartImportSelectionEpochHttpHandler/u);

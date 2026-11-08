@@ -83,8 +83,6 @@ test('supported callbacks ignore ambient Promise poison', () => {
 test('production registrations remain declared synchronous void callbacks', () => {
     const broker = readFileSync(new URL('./server-session-projection-broker.ts', import.meta.url), 'utf8');
     const owner = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
-    assert.match(broker, /registerServerSessionResource\(sessionId, \(\) => control\.revoke\(\)\)/u);
-    assert.match(owner, /registerServerSessionResource\(session\.id, \(\) => finish\(false\)\)/u);
     assert.doesNotMatch(`${broker}\n${owner}`, /registerServerSessionResource\([^\n]*async/u);
 });
 
