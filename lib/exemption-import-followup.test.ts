@@ -103,7 +103,7 @@ test('unsupported receipt schema, inconsistent counters and duplicate keys rejec
         rehash(value);
         await assert.rejects(parseBackupArtifact(value), /receipts are invalid/u);
         assert.throws(() => restoreBackupArtifact(value, () => true), /RECEIPT_INVALID/u);
-        await assert.rejects(scheduledSerialize(value.payload), /RECEIPT_INVALID/u);
+        await assert.rejects(scheduledSerialize(value.payload), /receipts are invalid/u);
         assert.deepEqual(snapshot(), before);
     }
     const rows = receiptRows();
