@@ -103,22 +103,6 @@ const AI_PATH_WRITE_CONTRACTS = [
         reason: 'Selezione del modello e default: configurazione, non dato clinico.',
         reference: 'docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md',
     },
-    {
-        module: 'lib/ai-providers/fabric/durable-review-record-store.ts',
-        lane: 'durable-review',
-        policy: 'non-clinical',
-        table: 'durableReviewRecords',
-        reason: 'Conserva soltanto envelope review sigillati e ledger di replay con digest; non scrive record clinici strutturati, decisioni o apply.',
-        reference: 'docs/adr/0094-intelligence-fabric-headless-contract-085.md',
-    },
-    {
-        module: 'lib/ai-providers/fabric/physician-review-command.ts',
-        lane: 'physician-review',
-        policy: 'non-clinical',
-        table: 'durableReviewCommandStates',
-        reason: 'La transazione registra solo stato review terminale, replay idempotente e audit PHI-safe; non scrive record clinici strutturati né espone apply.',
-        reference: 'docs/adr/0095-broker-projection-e-servizi-host-per-capability.md',
-    },
 ];
 
 // ADR 0086 §4: le write policy di Atena sono un insieme chiuso. `auto_apply` non esiste.

@@ -19,7 +19,6 @@ const FRESH_BOOT_TABLES = [
     'therapies',
     'checkups',
     'attachments',
-    'headless_soap_active_role_attestations',
     'headless_checkup_active_role_attestations',
 ] as const;
 

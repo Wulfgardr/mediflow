@@ -35,6 +35,23 @@ il commit di implementazione d72bea412. Il gate completo riesegue anche TLC,
 che non dimostra la correttezza della nuova attribuzione del diario: questa
 è verificata dai test API, del componente e dello standalone Web.
 
+## Raccordo dell'8 novembre 2026: tabelle di review durevole e SOAP headless
+
+Lo schema corrente passa da 10 a 11 in `lib/sqlite-schema-open.ts`.
+`lib/sqlite-schema.ts` non crea più le sette tabelle `durable_review_*` e
+`headless_soap_*`, mai scritte dal prodotto, e le elimina nell'apertura
+versionata di un archivio esistente, dopo la copia verificata dell'originale.
+La ricostruzione dei predecessori in
+`lib/ambulatory-destructive-command-recovery-schema.ts` le aggiunge con il
+loro DDL storico, così le impronte 4, 5, 6 e 9 restano immutate; la 10 entra
+fra i predecessori ammessi da `lib/recovery-backup-server.ts`.
+`lib/backup-restore-executor.ts` perde le collezioni ritirate.
+
+Le transizioni delle terapie, le autorità di commit, i comandi e le ricevute
+non cambiano. Modello, statechart, invarianti, testimoni e mutanti restano
+invariati. I digest dei file modificati sono aggiornati dopo le prove sullo
+schema, sui predecessori e sul recupero cifrato; il gate completo riesegue TLC.
+
 ## Raccordo allergie strutturate del 7 novembre 2026 (ADR 0182)
 
 Lo schema corrente passa da 8 a 9 in `lib/sqlite-schema-open.ts`.

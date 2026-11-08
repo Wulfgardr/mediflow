@@ -51,9 +51,9 @@ test('the client tells a blocked restore from a failed one and verifies through 
     const artifact = await artifactSealedWith(key);
     try {
         db.setKey(key);
-        answer = () => Response.json({ success: false, code: 'restore_blocked', reason: 'durable_review_commands', error: 'Ripristino bloccato: i dati attuali non sono stati modificati.' }, { status: 409 });
+        answer = () => Response.json({ success: false, code: 'restore_blocked', reason: 'audit', error: 'Ripristino bloccato: i dati attuali non sono stati modificati.' }, { status: 409 });
         await assert.rejects(importRawDatabase(artifact),
-            (error: unknown) => error instanceof BackupRestoreBlockedError && error.reason === 'durable_review_commands');
+            (error: unknown) => error instanceof BackupRestoreBlockedError && error.reason === 'audit');
         answer = () => Response.json({ success: true, createdAt: '2026-10-10T08:00:00.000Z', collections: ['patients', 'entries'], counts: { patients: 2, entries: 3 } });
         assert.deepEqual(await verifyRawDatabase(artifact), { createdAt: '2026-10-10T08:00:00.000Z', collections: 2, records: 5 });
         assert.deepEqual(urls, ['/api/system/backup-restore', '/api/system/backup-restore/verify']);

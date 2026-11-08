@@ -277,7 +277,7 @@ roster non li promuove a un nuovo dominio di commit clinico.
 - Transizione checkup trusted e attestazioni di ruolo hanno i propri owner,
   receipt e replay: [ADR 0116](./adr/0116-agentic-checkup-status-transition.md).
   La scrittura SOAP di [ADR 0103](./adr/0103-headless-clinician-authorized-soap-entry-write.md)
-  non ha più un runtime: restano solo contratto, ledger e backup. Non sono migrazioni
+  e la review durevole non hanno più runtime né tabelle (schema 11). Non sono migrazioni
   al writer ordinario C05 e nessuna capacità nuova viene concessa agli agenti.
 - Backup restore, swap/repair DB e scheduler operano su custodia/storia e autorità
   differenti: [repair route](../app/api/system/repair-db/route.ts),

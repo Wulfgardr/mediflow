@@ -1,0 +1,365 @@
+{
+ "note": "Artefatti v1 scritti dal produttore di ca30bf97c, prima della rimozione di review durevole e SOAP headless: il parser attuale deve continuare ad accettarli.",
+ "artifacts": [
+  {
+   "format": "mediflow-backup",
+   "manifest": {
+    "checksum": "9b64ff2edd6d6cf131160d3e83ada5fb16566f63acc6ea30708a783518e5439e",
+    "checksumAlgorithm": "sha256",
+    "collections": [
+     "ambulatories",
+     "attachments",
+     "conversations",
+     "documentDiagnosisProposals",
+     "durableReviewCommandStates",
+     "durableReviewCommandOperations",
+     "durableReviewPatientLinks",
+     "durableReviewRecords",
+     "durableReviewOperations",
+     "drugs",
+     "entries",
+     "exemptions",
+     "exemptionImportReceipts",
+     "prostheticsCatalogEntries",
+     "prostheticsCatalogReceipts",
+     "prostheticsCatalogSources",
+     "prostheticsCatalogDocuments",
+     "messages",
+     "observations",
+     "patients",
+     "physicianReviewAttestations",
+     "headlessSoapActiveRoleAttestations",
+     "headlessSoapEntryCommits",
+     "prostheticPrescriptions",
+     "serviceCatalogEntries",
+     "servicePrescriptionItems",
+     "servicePrescriptions",
+     "sissHandoffs",
+     "checkups",
+     "therapies",
+     "therapyStatusCommands",
+     "ambulatoryDestructiveCommands"
+    ],
+    "createdAt": "2026-11-08T02:32:17.672Z",
+    "recordCounts": {
+     "ambulatories": 1,
+     "ambulatoryDestructiveCommands": 0,
+     "attachments": 0,
+     "checkups": 0,
+     "conversations": 0,
+     "documentDiagnosisProposals": 0,
+     "drugs": 0,
+     "durableReviewCommandOperations": 0,
+     "durableReviewCommandStates": 0,
+     "durableReviewOperations": 0,
+     "durableReviewPatientLinks": 0,
+     "durableReviewRecords": 0,
+     "entries": 1,
+     "exemptionImportReceipts": 0,
+     "exemptions": 0,
+     "headlessSoapActiveRoleAttestations": 0,
+     "headlessSoapEntryCommits": 0,
+     "messages": 0,
+     "observations": 0,
+     "patients": 1,
+     "physicianReviewAttestations": 0,
+     "prostheticPrescriptions": 0,
+     "prostheticsCatalogDocuments": 0,
+     "prostheticsCatalogEntries": 0,
+     "prostheticsCatalogReceipts": 0,
+     "prostheticsCatalogSources": 0,
+     "serviceCatalogEntries": 0,
+     "servicePrescriptionItems": 0,
+     "servicePrescriptions": 0,
+     "sissHandoffs": 0,
+     "therapies": 0,
+     "therapyStatusCommands": 0
+    },
+    "scope": "mediflow-web-local-backup"
+   },
+   "payload": {
+    "ambulatories": [
+     {
+      "createdAt": "2026-03-17T08:00:00.000Z",
+      "id": "amb-1",
+      "name": "Ambulatorio"
+     }
+    ],
+    "ambulatoryDestructiveCommands": [],
+    "attachments": [],
+    "checkups": [],
+    "conversations": [],
+    "documentDiagnosisProposals": [],
+    "drugs": [],
+    "durableReviewCommandOperations": [],
+    "durableReviewCommandStates": [],
+    "durableReviewOperations": [],
+    "durableReviewPatientLinks": [],
+    "durableReviewRecords": [],
+    "entries": [
+     {
+      "content": "ENC:a:b",
+      "createdAt": "2026-03-17T08:00:00.000Z",
+      "date": "2026-03-17T08:00:00.000Z",
+      "id": "e-1",
+      "patientId": "pat-1",
+      "title": "ENC:a:b",
+      "type": "visit",
+      "updatedAt": "2026-03-17T08:00:00.000Z",
+      "version": 1
+     }
+    ],
+    "exemptionImportReceipts": [],
+    "exemptions": [],
+    "headlessSoapActiveRoleAttestations": [],
+    "headlessSoapEntryCommits": [],
+    "messages": [],
+    "observations": [],
+    "patients": [
+     {
+      "ambulatoryId": "amb-1",
+      "assignedAmbulatoryIds": [
+       "amb-1"
+      ],
+      "createdAt": "2026-03-17T08:00:00.000Z",
+      "firstName": "Sintetico",
+      "id": "pat-1",
+      "lastName": "Rossi",
+      "taxCode": "SYNTH",
+      "updatedAt": "2026-03-17T08:00:00.000Z",
+      "version": 1
+     }
+    ],
+    "physicianReviewAttestations": [],
+    "prostheticPrescriptions": [],
+    "prostheticsCatalogDocuments": [],
+    "prostheticsCatalogEntries": [],
+    "prostheticsCatalogReceipts": [],
+    "prostheticsCatalogSources": [],
+    "serviceCatalogEntries": [],
+    "servicePrescriptionItems": [],
+    "servicePrescriptions": [],
+    "sissHandoffs": [],
+    "therapies": [],
+    "therapyStatusCommands": []
+   },
+   "version": 1
+  },
+  {
+   "format": "mediflow-backup",
+   "manifest": {
+    "checksum": "742ecce19929b1e8a8aca7207799d752d5737897d66198613f0730373bdfd140",
+    "checksumAlgorithm": "sha256",
+    "collections": [
+     "ambulatories",
+     "attachments",
+     "conversations",
+     "durableReviewPatientLinks",
+     "drugs",
+     "entries",
+     "exemptions",
+     "prostheticsCatalogEntries",
+     "prostheticsCatalogReceipts",
+     "prostheticsCatalogSources",
+     "prostheticsCatalogDocuments",
+     "messages",
+     "observations",
+     "patients",
+     "physicianReviewAttestations",
+     "headlessSoapActiveRoleAttestations",
+     "headlessSoapEntryCommits",
+     "prostheticPrescriptions",
+     "serviceCatalogEntries",
+     "servicePrescriptionItems",
+     "servicePrescriptions",
+     "sissHandoffs",
+     "checkups",
+     "therapies"
+    ],
+    "createdAt": "2026-11-08T02:32:17.672Z",
+    "recordCounts": {
+     "ambulatories": 1,
+     "attachments": 0,
+     "checkups": 0,
+     "conversations": 0,
+     "drugs": 0,
+     "durableReviewPatientLinks": 0,
+     "entries": 1,
+     "exemptions": 0,
+     "headlessSoapActiveRoleAttestations": 0,
+     "headlessSoapEntryCommits": 0,
+     "messages": 0,
+     "observations": 0,
+     "patients": 1,
+     "physicianReviewAttestations": 0,
+     "prostheticPrescriptions": 0,
+     "prostheticsCatalogDocuments": 0,
+     "prostheticsCatalogEntries": 0,
+     "prostheticsCatalogReceipts": 0,
+     "prostheticsCatalogSources": 0,
+     "serviceCatalogEntries": 0,
+     "servicePrescriptionItems": 0,
+     "servicePrescriptions": 0,
+     "sissHandoffs": 0,
+     "therapies": 0
+    },
+    "scope": "mediflow-web-local-backup"
+   },
+   "payload": {
+    "ambulatories": [
+     {
+      "createdAt": "2026-03-17T08:00:00.000Z",
+      "id": "amb-1",
+      "name": "Ambulatorio"
+     }
+    ],
+    "attachments": [],
+    "checkups": [],
+    "conversations": [],
+    "drugs": [],
+    "durableReviewPatientLinks": [],
+    "entries": [
+     {
+      "content": "ENC:a:b",
+      "createdAt": "2026-03-17T08:00:00.000Z",
+      "date": "2026-03-17T08:00:00.000Z",
+      "id": "e-1",
+      "patientId": "pat-1",
+      "title": "ENC:a:b",
+      "type": "visit",
+      "updatedAt": "2026-03-17T08:00:00.000Z",
+      "version": 1
+     }
+    ],
+    "exemptions": [],
+    "headlessSoapActiveRoleAttestations": [],
+    "headlessSoapEntryCommits": [],
+    "messages": [],
+    "observations": [],
+    "patients": [
+     {
+      "ambulatoryId": "amb-1",
+      "assignedAmbulatoryIds": [
+       "amb-1"
+      ],
+      "createdAt": "2026-03-17T08:00:00.000Z",
+      "firstName": "Sintetico",
+      "id": "pat-1",
+      "lastName": "Rossi",
+      "taxCode": "SYNTH",
+      "updatedAt": "2026-03-17T08:00:00.000Z",
+      "version": 1
+     }
+    ],
+    "physicianReviewAttestations": [],
+    "prostheticPrescriptions": [],
+    "prostheticsCatalogDocuments": [],
+    "prostheticsCatalogEntries": [],
+    "prostheticsCatalogReceipts": [],
+    "prostheticsCatalogSources": [],
+    "serviceCatalogEntries": [],
+    "servicePrescriptionItems": [],
+    "servicePrescriptions": [],
+    "sissHandoffs": [],
+    "therapies": []
+   },
+   "version": 1
+  },
+  {
+   "format": "mediflow-backup",
+   "manifest": {
+    "checksum": "15f56696de454d0ad7c15303a73504169df50542bbc631ad7c4aa5ef0a9b8842",
+    "checksumAlgorithm": "sha256",
+    "collections": [
+     "ambulatories",
+     "attachments",
+     "conversations",
+     "drugs",
+     "entries",
+     "exemptions",
+     "messages",
+     "observations",
+     "patients",
+     "prostheticPrescriptions",
+     "serviceCatalogEntries",
+     "servicePrescriptionItems",
+     "servicePrescriptions",
+     "sissHandoffs",
+     "checkups",
+     "therapies"
+    ],
+    "createdAt": "2026-11-08T02:32:17.672Z",
+    "recordCounts": {
+     "ambulatories": 1,
+     "attachments": 0,
+     "checkups": 0,
+     "conversations": 0,
+     "drugs": 0,
+     "entries": 1,
+     "exemptions": 0,
+     "messages": 0,
+     "observations": 0,
+     "patients": 1,
+     "prostheticPrescriptions": 0,
+     "serviceCatalogEntries": 0,
+     "servicePrescriptionItems": 0,
+     "servicePrescriptions": 0,
+     "sissHandoffs": 0,
+     "therapies": 0
+    },
+    "scope": "mediflow-web-local-backup"
+   },
+   "payload": {
+    "ambulatories": [
+     {
+      "createdAt": "2026-03-17T08:00:00.000Z",
+      "id": "amb-1",
+      "name": "Ambulatorio"
+     }
+    ],
+    "attachments": [],
+    "checkups": [],
+    "conversations": [],
+    "drugs": [],
+    "entries": [
+     {
+      "content": "ENC:a:b",
+      "createdAt": "2026-03-17T08:00:00.000Z",
+      "date": "2026-03-17T08:00:00.000Z",
+      "id": "e-1",
+      "patientId": "pat-1",
+      "title": "ENC:a:b",
+      "type": "visit",
+      "updatedAt": "2026-03-17T08:00:00.000Z",
+      "version": 1
+     }
+    ],
+    "exemptions": [],
+    "messages": [],
+    "observations": [],
+    "patients": [
+     {
+      "ambulatoryId": "amb-1",
+      "assignedAmbulatoryIds": [
+       "amb-1"
+      ],
+      "createdAt": "2026-03-17T08:00:00.000Z",
+      "firstName": "Sintetico",
+      "id": "pat-1",
+      "lastName": "Rossi",
+      "taxCode": "SYNTH",
+      "updatedAt": "2026-03-17T08:00:00.000Z",
+      "version": 1
+     }
+    ],
+    "prostheticPrescriptions": [],
+    "serviceCatalogEntries": [],
+    "servicePrescriptionItems": [],
+    "servicePrescriptions": [],
+    "sissHandoffs": [],
+    "therapies": []
+   },
+   "version": 1
+  }
+ ]
+}

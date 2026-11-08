@@ -18,7 +18,7 @@ import { collectAuditAppendOnlyProblems } from './schema-drift-audit-append-only
 // Explicitly opening db-server exercises the real brand-new database path: the empty
 // database receives its minimal base schema and then the runtime guards layer
 // on additive columns, guard-owned tables, constraints, and indices.
-const { openDbServer, hasCanonicalDurableReviewPatientLinkSchema, hasCanonicalHeadlessSoapActiveRoleAttestationSchema, hasCanonicalPhysicianReviewAttestationSchema } = await import('@/lib/db-server');
+const { openDbServer, hasCanonicalPhysicianReviewAttestationSchema } = await import('@/lib/db-server');
 openDbServer();
 
 function collectExpected() {
@@ -81,12 +81,6 @@ function main() {
 
     if (!hasCanonicalPhysicianReviewAttestationSchema()) {
         problems.push('INVALID CONSTRAINTS: "physician_review_attestations" is not the canonical constrained DDL.');
-    }
-    if (!hasCanonicalHeadlessSoapActiveRoleAttestationSchema()) {
-        problems.push('INVALID CONSTRAINTS: Headless SOAP active-role attestation schema is not canonical.');
-    }
-    if (!hasCanonicalDurableReviewPatientLinkSchema()) {
-        problems.push('INVALID CONSTRAINTS: "durable_review_patient_links" is not the canonical constrained DDL.');
     }
 
     problems.push(...collectAuditProblems(dbPath));

@@ -48,32 +48,6 @@ const PHYSICIAN_REVIEW_ATTESTATIONS_P2A_DDL = `
 const normalizeSchemaSql = (value: string) => value.toLowerCase().replace(/if\s+not\s+exists/gu, '').replace(/[\s`"']/gu, '');
 const PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_DDL);
 const PHYSICIAN_REVIEW_ATTESTATIONS_P2A_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_P2A_DDL);
-const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL = `
-    CREATE TABLE headless_soap_active_role_attestations (
-        attestation_ref TEXT PRIMARY KEY NOT NULL CHECK (length(attestation_ref) BETWEEN 1 AND 256 AND trim(attestation_ref) = attestation_ref),
-        actor_ref TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE RESTRICT CHECK (length(actor_ref) BETWEEN 1 AND 256 AND trim(actor_ref) = actor_ref),
-        schema_version TEXT NOT NULL CHECK (schema_version = 'mediflow.headless-soap-active-role-attestation.v1'), role TEXT NOT NULL CHECK (role = 'physician'),
-        operation_id TEXT NOT NULL CHECK (operation_id = 'mediflow.clinical_diary.append_soap.v1'), policy_version TEXT NOT NULL CHECK (policy_version = 'clinician_confirmed_single_use.v1'),
-        status TEXT NOT NULL CHECK (status IN ('inactive', 'active', 'revoked')), attestation_version INTEGER NOT NULL CHECK (attestation_version = 1),
-        issuer_ref TEXT, expires_at INTEGER, activated_at INTEGER,
-        revocation_generation INTEGER NOT NULL DEFAULT 0 CHECK (typeof(revocation_generation) = 'integer' AND revocation_generation BETWEEN 0 AND 9007199254740991),
-        revoked_at INTEGER, created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
-        CONSTRAINT headless_soap_active_role_attestations_lifecycle_check CHECK (
-            (status = 'inactive' AND issuer_ref IS NULL AND expires_at IS NULL AND activated_at IS NULL AND revoked_at IS NULL AND revocation_generation = 0)
-            OR (status = 'active' AND issuer_ref IS NOT NULL AND length(issuer_ref) BETWEEN 1 AND 256 AND trim(issuer_ref) = issuer_ref AND expires_at IS NOT NULL AND activated_at IS NOT NULL AND revoked_at IS NULL AND revocation_generation = 0)
-            OR (status = 'revoked' AND revoked_at IS NOT NULL AND revocation_generation BETWEEN 1 AND 9007199254740991
-                AND ((issuer_ref IS NULL AND expires_at IS NULL AND activated_at IS NULL)
-                    OR (issuer_ref IS NOT NULL AND length(issuer_ref) BETWEEN 1 AND 256 AND trim(issuer_ref) = issuer_ref AND expires_at IS NOT NULL AND activated_at IS NOT NULL)))
-        ),
-        CONSTRAINT headless_soap_active_role_attestations_timestamp_check CHECK (
-            typeof(created_at) = 'integer' AND created_at BETWEEN 0 AND 8640000000000 AND typeof(updated_at) = 'integer' AND updated_at BETWEEN created_at AND 8640000000000
-            AND (expires_at IS NULL OR (typeof(expires_at) = 'integer' AND expires_at BETWEEN created_at AND 8640000000000))
-            AND (activated_at IS NULL OR (typeof(activated_at) = 'integer' AND activated_at BETWEEN created_at AND 8640000000000 AND (expires_at IS NULL OR activated_at <= expires_at)))
-            AND (revoked_at IS NULL OR (typeof(revoked_at) = 'integer' AND revoked_at BETWEEN created_at AND 8640000000000 AND (activated_at IS NULL OR revoked_at >= activated_at)))
-        )
-    )
-`;
-const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA = normalizeSchemaSql(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL);
 const HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_DDL = `
     CREATE TABLE headless_checkup_active_role_attestations (
         attestation_ref TEXT PRIMARY KEY NOT NULL CHECK (length(attestation_ref) BETWEEN 1 AND 256 AND trim(attestation_ref) = attestation_ref),
@@ -101,85 +75,12 @@ const HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_DDL = `
     )
 `;
 const HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA = normalizeSchemaSql(HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_DDL);
-export type HeadlessSoapActiveRoleAttestationSchemaErrorCode = 'schema_incompatible' | 'schema_unavailable';
-export class HeadlessSoapActiveRoleAttestationSchemaError extends Error {
-    constructor(readonly code: HeadlessSoapActiveRoleAttestationSchemaErrorCode) {
-        super(`Headless SOAP active-role attestation schema ${code === 'schema_incompatible' ? 'is incompatible' : 'is unavailable'}.`);
-        this.name = 'HeadlessSoapActiveRoleAttestationSchemaError';
-    }
-}
-const HEADLESS_SOAP_ENTRY_COMMITS_DDL = `
-    CREATE TABLE headless_soap_entry_commits (
-        idempotency_key TEXT PRIMARY KEY NOT NULL,
-        approval_ref TEXT NOT NULL,
-        authorization_proof_digest TEXT NOT NULL,
-        command_id TEXT NOT NULL,
-        entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
-        audit_event_id TEXT NOT NULL REFERENCES audit_events(event_id) ON DELETE RESTRICT,
-        receipt_ref TEXT NOT NULL,
-        binding_snapshot TEXT NOT NULL,
-        binding_digest TEXT NOT NULL,
-        entry_digest TEXT NOT NULL,
-        audit_snapshot TEXT NOT NULL,
-        audit_digest TEXT NOT NULL,
-        receipt_snapshot TEXT NOT NULL,
-        receipt_digest TEXT NOT NULL,
-        committed_at INTEGER NOT NULL
-    )
-`;
-const HEADLESS_SOAP_ENTRY_COMMITS_SCHEMA = normalizeSchemaSql(HEADLESS_SOAP_ENTRY_COMMITS_DDL);
-const HEADLESS_SOAP_ENTRY_COMMITS_UNIQUE_INDEXES = [
-    ['headless_soap_entry_commits_command_id_unique', 'command_id'],
-    ['headless_soap_entry_commits_entry_id_unique', 'entry_id'],
-    ['headless_soap_entry_commits_audit_event_id_unique', 'audit_event_id'],
-    ['headless_soap_entry_commits_receipt_ref_unique', 'receipt_ref'],
-] as const;
-export type HeadlessSoapEntryCommitSchemaErrorCode = 'schema_incompatible' | 'schema_unavailable';
-export class HeadlessSoapEntryCommitSchemaError extends Error {
-    constructor(readonly code: HeadlessSoapEntryCommitSchemaErrorCode) {
-        super(`Headless SOAP entry commit schema ${code === 'schema_incompatible' ? 'is incompatible' : 'is unavailable'}.`);
-        this.name = 'HeadlessSoapEntryCommitSchemaError';
-    }
-}
-const DURABLE_REVIEW_PATIENT_LINKS_DDL = `
-    CREATE TABLE IF NOT EXISTS durable_review_patient_links (
-        review_id TEXT PRIMARY KEY NOT NULL REFERENCES durable_review_records(review_id),
-        patient_id TEXT NOT NULL REFERENCES patients(id),
-        created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
-        CONSTRAINT durable_review_patient_links_timestamp_check CHECK (typeof(created_at) = 'integer' AND created_at BETWEEN 0 AND 8640000000000 AND typeof(updated_at) = 'integer' AND updated_at BETWEEN created_at AND 8640000000000)
-    )
-`;
-const DURABLE_REVIEW_PATIENT_LINKS_SCHEMA = normalizeSchemaSql(DURABLE_REVIEW_PATIENT_LINKS_DDL);
 function physicianReviewAttestationSchemaEquals(sqlite: Database.Database, expected: string): boolean {
     const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'physician_review_attestations'").get() as { sql?: unknown } | undefined;
     return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === expected;
 }
 export function checkHasCanonicalPhysicianReviewAttestationSchema(sqlite: Database.Database): boolean {
     return physicianReviewAttestationSchemaEquals(sqlite, PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA);
-}
-function headlessSoapActiveRoleAttestationSchemaEquals(sqlite: Database.Database, expected: string): boolean {
-    try {
-        const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get('headless_soap_active_role_attestations') as { sql?: unknown } | undefined;
-        return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === expected;
-    } catch {
-        return false;
-    }
-}
-function hasNoHeadlessSoapActiveRoleAttestationOrphans(sqlite: Database.Database): boolean {
-    try {
-        const orphan = sqlite.prepare(`
-            SELECT 1 FROM headless_soap_active_role_attestations AS attestation
-            LEFT JOIN users AS actor ON actor.id = attestation.actor_ref
-            WHERE actor.id IS NULL LIMIT 1
-        `).get();
-        return !orphan;
-    } catch {
-        return false;
-    }
-}
-export function checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema(sqlite: Database.Database): boolean {
-    return headlessSoapActiveRoleAttestationSchemaEquals(sqlite, HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA)
-        && hasNoHeadlessSoapActiveRoleAttestationOrphans(sqlite);
 }
 export function checkHasCanonicalHeadlessCheckupActiveRoleAttestationSchema(sqlite: Database.Database): boolean {
     try {
@@ -202,60 +103,22 @@ function ensureHeadlessCheckupActiveRoleAttestationSchema(sqlite: Database.Datab
         throw new Error('Headless checkup active-role attestation schema is incompatible.');
     }
 }
-function ensureHeadlessSoapActiveRoleAttestationSchema(sqlite: Database.Database): void {
-    let exists: boolean;
-    try {
-        exists = Boolean(sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get('headless_soap_active_role_attestations'));
-        if (!exists) sqlite.prepare(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL.replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS')).run();
-    } catch {
-        throw new HeadlessSoapActiveRoleAttestationSchemaError('schema_unavailable');
-    }
-    if (!checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema(sqlite)) {
-        throw new HeadlessSoapActiveRoleAttestationSchemaError('schema_incompatible');
-    }
+/* Tables of the durable AI review and of the headless SOAP write, removed on
+ * 2026-11-08: no product code ever wrote them. Children before parents, so no
+ * foreign key is checked against a dropped table. */
+const RETIRED_SQLITE_TABLES = Object.freeze([
+    'headless_soap_entry_commits',
+    'headless_soap_active_role_attestations',
+    'durable_review_patient_links',
+    'durable_review_operations',
+    'durable_review_command_operations',
+    'durable_review_command_states',
+    'durable_review_records',
+] as const);
+function retireRemovedFeatureTables(sqlite: Database.Database): void {
+    for (const table of RETIRED_SQLITE_TABLES) sqlite.exec(`DROP TABLE IF EXISTS ${table}`);
 }
-export function checkHasCanonicalHeadlessSoapEntryCommitSchema(sqlite: Database.Database): boolean {
-    try {
-        const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
-            .get('headless_soap_entry_commits') as { sql?: unknown } | undefined;
-        if (typeof row?.sql !== 'string' || normalizeSchemaSql(row.sql) !== HEADLESS_SOAP_ENTRY_COMMITS_SCHEMA) return false;
-        for (const [name, column] of HEADLESS_SOAP_ENTRY_COMMITS_UNIQUE_INDEXES) {
-            const index = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ? AND tbl_name = ?")
-                .get(name, 'headless_soap_entry_commits') as { sql?: unknown } | undefined;
-            const expected = normalizeSchemaSql(`CREATE UNIQUE INDEX ${name} ON headless_soap_entry_commits (${column})`);
-            if (typeof index?.sql !== 'string' || normalizeSchemaSql(index.sql) !== expected) return false;
-        }
-        return true;
-    } catch {
-        return false;
-    }
-}
-function ensureHeadlessSoapEntryCommitSchema(sqlite: Database.Database): void {
-    try {
-        const exists = Boolean(sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
-            .get('headless_soap_entry_commits'));
-        if (!exists) {
-            sqlite.prepare(HEADLESS_SOAP_ENTRY_COMMITS_DDL.replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS')).run();
-        } else {
-            const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
-                .get('headless_soap_entry_commits') as { sql?: unknown } | undefined;
-            if (typeof row?.sql !== 'string' || normalizeSchemaSql(row.sql) !== HEADLESS_SOAP_ENTRY_COMMITS_SCHEMA) {
-                throw new HeadlessSoapEntryCommitSchemaError('schema_incompatible');
-            }
-        }
-        for (const [name, column] of HEADLESS_SOAP_ENTRY_COMMITS_UNIQUE_INDEXES) {
-            sqlite.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS ${name} ON headless_soap_entry_commits (${column})`).run();
-        }
-    } catch (error) {
-        if (error instanceof HeadlessSoapEntryCommitSchemaError) throw error;
-        throw new HeadlessSoapEntryCommitSchemaError('schema_unavailable');
-    }
-    if (!checkHasCanonicalHeadlessSoapEntryCommitSchema(sqlite)) throw new HeadlessSoapEntryCommitSchemaError('schema_incompatible');
-}
-export function checkHasCanonicalDurableReviewPatientLinkSchema(sqlite: Database.Database): boolean {
-    const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'durable_review_patient_links'").get() as { sql?: unknown } | undefined;
-    return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === DURABLE_REVIEW_PATIENT_LINKS_SCHEMA;
-}
+
 function migrateP2aPhysicianReviewAttestationSchema(sqlite: Database.Database): void {
     if (!physicianReviewAttestationSchemaEquals(sqlite, PHYSICIAN_REVIEW_ATTESTATIONS_P2A_SCHEMA)) return;
     sqlite.transaction(() => {
@@ -444,7 +307,6 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Physician review attestation schema check failed:', error);
         throw error;
     }
-    ensureHeadlessSoapActiveRoleAttestationSchema(sqlite);
     ensureHeadlessCheckupActiveRoleAttestationSchema(sqlite);
     try {
         ensureColumn(sqlite, 'attachments', 'summary_snapshot', 'summary_snapshot TEXT');
@@ -865,37 +727,6 @@ function applySchemaGuards(sqlite: Database.Database) {
     sqlite.prepare('CREATE INDEX IF NOT EXISTS document_diagnosis_proposals_patient_idx ON document_diagnosis_proposals(patient_id)').run();
     sqlite.prepare('CREATE INDEX IF NOT EXISTS document_diagnosis_proposals_patient_status_idx ON document_diagnosis_proposals(patient_id, status)').run();
     sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS document_diagnosis_proposals_source_candidate_unique ON document_diagnosis_proposals(patient_id, source_document_key, candidate_key)').run();
-    sqlite.prepare(`
-        CREATE TABLE IF NOT EXISTS durable_review_records (
-            id TEXT PRIMARY KEY NOT NULL, patient_ref TEXT NOT NULL, review_id TEXT NOT NULL UNIQUE, review_revision INTEGER NOT NULL,
-            receipt_ref TEXT NOT NULL, provenance_ref TEXT NOT NULL, receipt_binding TEXT NOT NULL, provenance_binding TEXT NOT NULL,
-            presentation_version TEXT NOT NULL, sealed_ciphertext TEXT NOT NULL, sealed_digest TEXT NOT NULL,
-            created_at INTEGER DEFAULT (unixepoch())
-        )
-    `).run();
-    ensureColumn(sqlite, 'durable_review_records', 'patient_ref', "patient_ref TEXT NOT NULL DEFAULT ''");
-    sqlite.prepare(`
-        CREATE TABLE IF NOT EXISTS durable_review_operations (
-            id TEXT PRIMARY KEY NOT NULL, review_id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
-            operation TEXT NOT NULL, expected_review_revision INTEGER NOT NULL, operation_digest TEXT NOT NULL,
-            record_snapshot TEXT NOT NULL, created_at INTEGER DEFAULT (unixepoch())
-        )
-    `).run();
-    sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS durable_review_operations_review_key_unique ON durable_review_operations(review_id, idempotency_key)').run();
-    sqlite.prepare(DURABLE_REVIEW_PATIENT_LINKS_DDL).run();
-    sqlite.prepare(`
-        CREATE TABLE IF NOT EXISTS durable_review_command_states (
-            review_id TEXT PRIMARY KEY NOT NULL, review_state TEXT NOT NULL, revision INTEGER NOT NULL, action TEXT NOT NULL,
-            created_at INTEGER DEFAULT (unixepoch())
-        )
-    `).run();
-    sqlite.prepare(`
-        CREATE TABLE IF NOT EXISTS durable_review_command_operations (
-            id TEXT PRIMARY KEY NOT NULL, review_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, command_digest TEXT NOT NULL,
-            result_snapshot TEXT NOT NULL, audit_event_id TEXT NOT NULL, created_at INTEGER DEFAULT (unixepoch())
-        )
-    `).run();
-    sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS durable_review_command_operations_review_key_unique ON durable_review_command_operations(review_id, idempotency_key)').run();
     // WUL-268 (STREAM A): core tables shipped without secondary indices, so
     // patient-scoped reads and lookups fell back to full table scans (verified
     // via EXPLAIN QUERY PLAN). Guards are the operative migration mechanism, so
@@ -938,7 +769,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         retire.run(id);
         if (!retired.get(id)) throw new Error('Patient identity retirement backfill failed');
     }
-    ensureHeadlessSoapEntryCommitSchema(sqlite);
+    retireRemovedFeatureTables(sqlite);
 }
 
 export function initializeSqliteSchema(sqlite: Database.Database): void {

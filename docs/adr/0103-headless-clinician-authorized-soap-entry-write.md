@@ -26,13 +26,12 @@ figlia, dialogo di approvazione e seal nel provider di sicurezza) non è mai
 stato collegato a una rotta, a una schermata o a un processo del prodotto:
 lo raggiungevano soltanto i suoi test. È stato rimosso.
 
-Restano, perché toccano i dati a riposo o i client nativi: il contratto della
-bozza e della ricevuta (`lib/headless/clinician-soap-write-contract.ts`,
-`clinician-soap-entry-commit-receipt.ts`), field set e codec del seal con i
-golden Swift, le tabelle `headless_soap_entry_commits` e
-`headless_soap_active_role_attestations` con le migrazioni, e la validazione
-del ledger in backup e ripristino. Chi riprende la funzione parte da questa
-decisione e dal codice nella storia git, prima del commit che lo rimuove.
+In un secondo passaggio sono usciti anche contratto, codec Swift e golden, e
+le tabelle `headless_soap_entry_commits` e `headless_soap_active_role_attestations`:
+lo schema 11 le elimina, la copia originale dell'aggiornamento le conserva. I
+backup portabili più vecchi le portano vuote e restano ripristinabili; una
+collezione non vuota viene rifiutata, non scartata. Chi riprende la funzione
+parte da questa decisione e dal codice nella storia git.
 
 ## Problema
 

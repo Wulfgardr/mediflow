@@ -210,6 +210,34 @@ test('a version 1 archive gains the unlock credential columns once and keeps its
     } finally { w.cleanup(); }
 });
 
+test('a version 10 archive drops the tables of the removed features and keeps them in the verified original', () => {
+    const retired = ['durable_review_records', 'durable_review_operations', 'durable_review_patient_links',
+        'durable_review_command_states', 'durable_review_command_operations',
+        'headless_soap_active_role_attestations', 'headless_soap_entry_commits'];
+    const tables = (db: Database.Database) => (db.prepare("SELECT name FROM sqlite_schema WHERE type='table'").pluck().all() as string[]);
+    const w = workspace();
+    try {
+        const v10 = seed(w.file);
+        for (const table of retired) v10.exec(`CREATE TABLE ${table} (id TEXT PRIMARY KEY NOT NULL)`);
+        v10.prepare('INSERT INTO durable_review_records (id) VALUES (?)').run('synthetic-review');
+        v10.pragma('user_version = 10');
+        v10.close();
+
+        const db = openVersionedSqliteDatabase(w.file);
+        assert.equal(db.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
+        assert.deepEqual(tables(db).filter(table => retired.includes(table)), []);
+        assert.equal(db.prepare('SELECT value FROM settings WHERE key = ?').pluck().get('synthetic-original'), 'preserved');
+        db.close();
+
+        const [name] = originals(w.directory);
+        assert.match(name, /\.schema-original-v10-/u);
+        const original = new Database(path.join(w.directory, name), { readonly: true });
+        assert.deepEqual(tables(original).filter(table => retired.includes(table)).sort(), [...retired].sort());
+        assert.equal(original.prepare('SELECT id FROM durable_review_records').pluck().get(), 'synthetic-review');
+        original.close();
+    } finally { w.cleanup(); }
+});
+
 test('future versions, corrupt and unreserved empty files are preserved and refused', () => {
     for (const scenario of ['future', 'corrupt', 'zero', 'empty', 'missing-existing', 'current-drift']) {
         const w = workspace();
@@ -449,7 +477,7 @@ test('autore: schema nuovo e migrazione v9 conservano voce storica, originale e 
             }
             const opened = openVersionedSqliteDatabase(w.file);
             assert.ok((opened.pragma('table_info(entries)') as { name: string }[]).some(column => column.name === 'recorded_by'));
-            assert.equal(opened.pragma('user_version', { simple: true }), 10);
+            assert.equal(opened.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             if (existing) {
                 assert.deepEqual(opened.prepare('SELECT content,version,created_at,recorded_by FROM entries').get(), {
                     content: 'ENC:content:bytes', version: 4, created_at: 2, recorded_by: null,
@@ -497,6 +525,6 @@ test('autore: errore dopo il DDL v10 ripristina schema, dati e versione e permet
         after.close();
         assert.deepEqual(originals(w.directory), []);
         const retried = openVersionedSqliteDatabase(w.file);
-        assert.equal(retried.pragma('user_version', { simple: true }), 10); retried.close();
+        assert.equal(retried.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION); retried.close();
     } finally { w.cleanup(); }
 });

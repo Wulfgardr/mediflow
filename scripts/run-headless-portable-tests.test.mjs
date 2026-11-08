@@ -229,8 +229,7 @@ test('the CLI reports failure when its test process cannot start', async () => {
 });
 
 test('keeps the direct CI caller and npm entrypoint wired to explicit test fixtures', async () => {
-    const [coreWorkflow, crossPlatformWorkflow, webCoreWorkflow, packageJson] = await Promise.all([
-        readFile(path.join(path.dirname(path.dirname(import.meta.filename)), '.github/workflows/core-tri-os.yml'), 'utf8'),
+    const [crossPlatformWorkflow, webCoreWorkflow, packageJson] = await Promise.all([
         readFile(path.join(path.dirname(path.dirname(import.meta.filename)), '.github/workflows/cross-platform.yml'), 'utf8'),
         readFile(path.join(path.dirname(path.dirname(import.meta.filename)), '.github/workflows/web-core.yml'), 'utf8'),
         readFile(path.join(path.dirname(path.dirname(import.meta.filename)), 'package.json'), 'utf8'),
@@ -238,12 +237,6 @@ test('keeps the direct CI caller and npm entrypoint wired to explicit test fixtu
     const manifest = JSON.parse(packageJson);
 
     assert.equal(manifest.scripts['test:headless-portable'], 'node scripts/run-headless-portable-tests.mjs');
-    assert.match(coreWorkflow, /data_dir="\$\(mktemp -d "\$\{RUNNER_TEMP\}\/mediflow-h4-golden\.XXXXXX"\)"/u);
-    assert.match(coreWorkflow, /export MEDIFLOW_DATA_DIR="\$\{data_dir\}"/u);
-    assert.match(coreWorkflow, /trap cleanup EXIT/u);
-    assert.match(coreWorkflow, /NODE_BIN="\$\(command -v node\)"/u);
-    assert.match(coreWorkflow, /"\$\{NODE_BIN\}" scripts\/run-strip-types\.mjs --test/u);
-    assert.match(coreWorkflow, /rm -rf -- "\$\{data_dir\}"/u);
     assert.match(crossPlatformWorkflow, /node-version: 24/u);
     assert.match(crossPlatformWorkflow, /npm run test:headless-portable/u);
     assert.match(webCoreWorkflow, /DATA_DIR="\$\(mktemp -d "\$\{RUNNER_TEMP\}\/mediflow-web-core\.XXXXXX"\)"/u);
