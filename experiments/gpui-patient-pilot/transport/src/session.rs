@@ -3208,6 +3208,63 @@ impl RuntimeSession {
     pub(crate) fn document_archive_epoch(&self) -> u64 {
         self.inner.document_archive_epoch.load(Ordering::Acquire)
     }
+    pub(crate) fn dossier_check(&self, epoch: u64) -> Result<()> {
+        self.ensure_open()?;
+        if epoch != self.document_archive_epoch() {
+            return Err(RuntimeError::ReadRequired);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn dossier_open(&self, table: &str, value: &mut Value) -> Result<()> {
+        self.ensure_open()?;
+        let secrets = self
+            .inner
+            .secrets
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        let master = secrets.master.as_ref().ok_or(RuntimeError::Locked)?;
+        let registry: Value =
+            serde_json::from_str(include_str!("../../../../lib/backup-encrypted-fields.json"))
+                .map_err(|_| RuntimeError::InvalidResponse)?;
+        for key in registry[table]
+            .as_array()
+            .ok_or(RuntimeError::InvalidInput)?
+        {
+            let key = key.as_str().ok_or(RuntimeError::InvalidInput)?;
+            if let Some(field) = value.get_mut(key) {
+                if let Some(text) = field.as_str().filter(|text| crypto::is_ciphertext(text)) {
+                    let decoded =
+                        crypto::open(text, master).map_err(|_| RuntimeError::LockedField)?;
+                    crate::local_host::wipe_value(field);
+                    *field = decoded;
+                }
+                if table == "patients"
+                    && ["diagnoses", "exemptions"].contains(&key)
+                    && let Some(text) = field.as_str()
+                {
+                    let decoded =
+                        serde_json::from_str(text).map_err(|_| RuntimeError::LockedField)?;
+                    crate::local_host::wipe_value(field);
+                    *field = decoded;
+                }
+            }
+        }
+        self.ensure_open()
+    }
+
+    pub(crate) fn dossier_seal(&self, table: &str, value: Value) -> Result<Value> {
+        let registry: Value =
+            serde_json::from_str(include_str!("../../../../lib/backup-encrypted-fields.json"))
+                .map_err(|_| RuntimeError::InvalidResponse)?;
+        let fields: Vec<_> = registry[table]
+            .as_array()
+            .ok_or(RuntimeError::InvalidInput)?
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        self.seal_fields(value, &fields)
+    }
     pub(crate) fn track_document_archive(
         &self,
         data: &Arc<crate::local_host::DocumentInsightsData>,
@@ -3295,7 +3352,7 @@ impl RuntimeSession {
         Ok(json!({"documentInsights": encrypted}))
     }
 
-    fn seal_fields(&self, mut value: Value, fields: &[&str]) -> Result<Value> {
+    pub(crate) fn seal_fields(&self, mut value: Value, fields: &[&str]) -> Result<Value> {
         self.ensure_open()?;
         let secrets = self
             .inner
@@ -3314,7 +3371,11 @@ impl RuntimeSession {
         self.ensure_open()?;
         Ok(value)
     }
-    fn decrypt_fields(&self, value: &mut Value, fields: &[Field]) -> Result<Vec<String>> {
+    pub(crate) fn decrypt_fields(
+        &self,
+        value: &mut Value,
+        fields: &[Field],
+    ) -> Result<Vec<String>> {
         self.ensure_open()?;
         let secrets = self
             .inner
@@ -11430,3 +11491,7 @@ fn shows_lombardy_features(value: &Value) -> bool {
     }
     !matches!(value["preset"].as_str(), Some("core" | "core+it"))
 }
+
+#[cfg(test)]
+#[path = "dossier_transport_tests.rs"]
+mod dossier_transport_tests;

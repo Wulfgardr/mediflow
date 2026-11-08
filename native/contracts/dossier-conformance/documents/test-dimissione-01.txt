@@ -1,0 +1,103 @@
+## Pagina 1
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+LETTERA DI DIMISSIONE
+Protocollo test-dimissione-01 | Pagina 1 di 4
+Paziente: Sintetico042 Persona042 - Nato il 1947-03-12
+Codice fiscale paziente: ZZZXXX42A16Z999M
+Data referto: 09.10.2026
+
+MOTIVO DELL’ACCESSO
+Motivo: ricovero per riacutizzazione di dispnea e riduzione della tolleranza allo sforzo. I sintomi sono riferiti da circa tre settimane; il paziente viene ascoltato prima del colloquio con il familiare accompagnatore.
+
+INQUADRAMENTO CLINICO
+La valutazione complessiva conferma scompenso cardiaco cronico tra le condizioni personali rilevanti.
+
+INQUADRAMENTO CLINICO
+La valutazione complessiva conferma insufficienza renale cronica tra le condizioni personali rilevanti.
+
+ANAMNESI FAMILIARE
+Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare.
+
+TERAPIA FARMACOLOGICA
+Alla visita risulta in uso Lasix (furosemide) 25 mg, 1 cp al mattino per os.
+
+TERAPIA FARMACOLOGICA
+È stata sospesa la somministrazione di Norvasc (amlodipina) 5 mg, 1 cp al giorno. La sospensione è stata confermata durante il colloquio odierno.
+
+RICOGNIZIONE TERAPEUTICA
+Il paziente non assume Coumadin (warfarin); il nome compare soltanto nel questionario di riconciliazione.
+
+IPOTESI NON ATTUATA
+Si propone eventualmente Lyrica (pregabalin) 25 mg alla sera, ma la terapia non è stata iniziata e resta da discutere.
+
+DATI DEL CAREGIVER
+Il coniuge assume Eutirox (levotiroxina) 50 microgrammi al giorno; questa terapia non riguarda il paziente.
+
+ESCLUSIONI
+Non vi sono elementi per porre diagnosi di polmonite batterica in questa visita.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-dimissione-01 - Pagina 1/4 - nessun dato reale.
+
+## Pagina 2
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+LETTERA DI DIMISSIONE
+Protocollo test-dimissione-01 | Pagina 2 di 4
+Paziente: Sintetico042 Persona042 - Nato il 1947-03-12
+Codice fiscale paziente: ZZZXXX42A16Z999M
+Data referto: 09.10.2026
+
+INQUADRAMENTO CLINICO
+Resta il sospetto di ipotensione ortostatica, da confermare con gli accertamenti successivi.
+
+CONTESTO ASSISTENZIALE
+La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.
+
+CONCLUSIONI E INDICAZIONI
+È richiesto un controllo ambulatoriale tra due settimane, con diario dei sintomi e confezioni dei farmaci. La data del prossimo appuntamento non è ancora fissata.
+
+DECORSO DEL RICOVERO
+All’ingresso del 04.10.2026 il paziente riferiva un progressivo affaticamento nei tragitti abituali. Nel corso della degenza è stato rivalutato il quadro funzionale; alla dimissione il rientro al domicilio avviene con il supporto familiare già presente.
+
+CONCLUSIONI E INDICAZIONI
+La riconciliazione è stata svolta confrontando le confezioni portate dalla famiglia con la lista domiciliare. I medicinali sospesi sono mantenuti nella documentazione come storia terapeutica. Il MMG riceve la copia della lettera e può verificare con il paziente le discrepanze residue.
+
+CONCLUSIONI E INDICAZIONI
+Il colloquio conclusivo ha riguardato gli orari di assunzione e l’organizzazione dei controlli già indicati. Il paziente ha ripetuto verbalmente le istruzioni ricevute; la documentazione viene consegnata insieme al riepilogo degli accertamenti. Non sono state definite ulteriori modifiche farmacologiche oltre a quelle riportate nella sezione dedicata.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-dimissione-01 - Pagina 2/4 - nessun dato reale.
+
+## Pagina 3
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+LETTERA DI DIMISSIONE
+Protocollo test-dimissione-01 | Pagina 3 di 4
+Paziente: Sintetico042 Persona042 - Nato il 1947-03-12
+Codice fiscale paziente: ZZZXXX42A16Z999M
+Data referto: 09.10.2026
+
+MODALITÀ DELLA RACCOLTA DOCUMENTALE
+Il colloquio è stato svolto in un ambiente tranquillo, lasciando inizialmente spazio al racconto spontaneo e successivamente verificando gli elementi della documentazione. Quando il racconto e la lista dei medicinali non coincidevano, la discrepanza è stata mantenuta visibile nella sezione della ricognizione. Il documento distingue le condizioni già note dalle ipotesi che richiedono ulteriori accertamenti. I dati forniti dall’accompagnatore sono identificati come tali e non vengono assunti come storia patologica del paziente. Le abbreviazioni cp, os e MMG sono utilizzate rispettivamente per compressa, via orale e medico di medicina generale. Il resoconto deve essere letto insieme alle indicazioni poste nelle conclusioni e alle date degli eventi, senza attribuire a oggi ogni notizia riportata in anamnesi.
+
+RICOGNIZIONE E CONTINUITÀ
+La lista farmacologica è stata discussa voce per voce. Per ogni medicinale si è distinto ciò che viene assunto abitualmente da ciò che è stato sospeso, citato per confronto o soltanto proposto. Le informazioni sulla terapia al bisogno descrivono le condizioni di utilizzo dichiarate; non attestano che il medicinale sia stato assunto il giorno della visita. Le confezioni non disponibili al colloquio non sono state ricostruite sulla base della sola diagnosi. La presenza di un nome commerciale permette di trascrivere il prodotto, mentre il principio attivo è registrato quando compare esplicitamente nella documentazione. Le prescrizioni di accertamenti appartengono alla sezione delle prestazioni e non modificano la lista farmacologica. Restano visibili eventuali divergenze tra storia domiciliare e indicazioni ricevute in altri accessi.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-dimissione-01 - Pagina 3/4 - nessun dato reale.
+
+## Pagina 4
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+LETTERA DI DIMISSIONE
+Protocollo test-dimissione-01 | Pagina 4 di 4
+Paziente: Sintetico042 Persona042 - Nato il 1947-03-12
+Codice fiscale paziente: ZZZXXX42A16Z999M
+Data referto: 09.10.2026
+
+COMPOSIZIONE DELLA COPIA
+Al termine della valutazione viene controllata la corrispondenza tra intestazione e pagine allegate. La copia consegnata comprende il motivo dell’accesso, l’inquadramento delle condizioni personali, le informazioni familiari pertinenti, la ricognizione farmacologica e le indicazioni per la continuità assistenziale. La firma si riferisce al contenuto di questa emissione. Le date dei controlli futuri, quando non definite, sono riportate come intervalli e non come appuntamenti già prenotati. Un programma di rivalutazione non attesta l’avvenuta esecuzione della prestazione. Il destinatario può verificare quali passaggi siano conclusi e quali richiedano ancora un riscontro, mantenendo distinta la valutazione clinica dall’organizzazione degli accessi e dalla disponibilità del supporto al domicilio.
+
+RIFERIMENTO DI EMISSIONE
+Emissione sintetica 215955. Copia per il medico curante; conservare tutte le pagine del documento.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-dimissione-01 - Pagina 4/4 - nessun dato reale.

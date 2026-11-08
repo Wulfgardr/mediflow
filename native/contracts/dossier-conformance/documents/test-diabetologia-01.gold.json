@@ -1,0 +1,107 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "4c56f05f2a21d20d2e06c4e0e9a7a959cc99ae2e429c4bb1e4237f110439ccca",
+      "fileName": "test-diabetologia-01.pdf",
+      "patient": {
+        "lastName": "Sintetico054",
+        "firstName": "Persona054",
+        "birthDate": "1959-03-12",
+        "taxCode": "ZZZXXX54A01Z999C"
+      },
+      "documentDate": "2026-10-11",
+      "documentType": "diabetologia",
+      "summary": null,
+      "coverage": {
+        "pages": 2,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Motivo: rivalutazione del diario glicemico domiciliare. I sintomi sono riferiti da circa tre settimane; il paziente viene ascoltato prima del colloquio con il familiare accompagnatore.",
+            "subject": "paziente"
+          },
+          "quote": "Motivo: rivalutazione del diario glicemico domiciliare. I sintomi sono riferiti da circa tre settimane; il paziente viene ascoltato prima del colloquio con il familiare accompagnatore."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "diabete mellito tipo 2",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma diabete mellito tipo 2 tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "obesità",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma obesità tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare.",
+            "subject": "familiare"
+          },
+          "quote": "Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare."
+        },
+        {
+          "kind": "therapy",
+          "values": {
+            "drugName": "Glucophage",
+            "activePrinciple": "metformina",
+            "dosage": "500 mg, 1 cp dopo colazione e 1 cp dopo cena per os",
+            "status": "active",
+            "subject": "paziente"
+          },
+          "quote": "Alla visita risulta in uso Glucophage (metformina) 500 mg, 1 cp dopo colazione e 1 cp dopo cena per os."
+        },
+        {
+          "kind": "therapy",
+          "values": {
+            "drugName": "Norvasc",
+            "activePrinciple": "amlodipina",
+            "dosage": "5 mg, 1 cp al giorno",
+            "status": "suspended",
+            "subject": "paziente"
+          },
+          "quote": "È stata sospesa la somministrazione di Norvasc (amlodipina) 5 mg, 1 cp al giorno. La sospensione è stata confermata durante il colloquio odierno."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "ipotensione ortostatica",
+            "subject": "paziente",
+            "certainty": "incerta"
+          },
+          "quote": "Resta il sospetto di ipotensione ortostatica, da confermare con gli accertamenti successivi."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.",
+            "subject": "paziente"
+          },
+          "quote": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "È richiesto un controllo ambulatoriale tra due settimane, con diario dei sintomi e confezioni dei farmaci. La data del prossimo appuntamento non è ancora fissata.",
+            "subject": "paziente"
+          },
+          "quote": "È richiesto un controllo ambulatoriale tra due settimane, con diario dei sintomi e confezioni dei farmaci. La data del prossimo appuntamento non è ancora fissata."
+        }
+      ]
+    }
+  ]
+}

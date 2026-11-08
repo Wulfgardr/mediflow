@@ -29,6 +29,7 @@ pbkdf2 = "0.12"
 sha2 = "0.10"
 subtle = "2.6"
 unicode-normalization = "0.1"
+regex = "1"
 zeroize = { version = "1.8", features = ["derive"] }
 
 bytes = "1"

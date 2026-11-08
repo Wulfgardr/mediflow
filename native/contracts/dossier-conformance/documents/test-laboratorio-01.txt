@@ -1,0 +1,40 @@
+## Pagina 1
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+REFERTO DI LABORATORIO
+Protocollo test-laboratorio-01 | Pagina 1 di 1
+Paziente: Sintetico072 Persona072 - Nato il 1942-03-12
+Codice fiscale paziente: ZZZXXX72A19Z999A
+Data referto: 14.10.2026
+
+MATERIALE E PRELIEVO
+Campione: sangue venoso. Data prelievo: 14.10.2026 ore 08:15. Materiale pervenuto in laboratorio nella stessa mattina. Identificazione mediante etichetta sintetica LAB-0072.
+
+RISULTATI ANALITICI
+Esame | Risultato | Unità | Intervallo di riferimento
+
+Glucosio | 100 | mg/dL | 70-100
+
+Creatinina | 1,2 | mg/dL | 0,7-1,2
+
+Sodio | 137 | mmol/L | 136-145
+
+Potassio | 4,1 | mmol/L | 3,5-5,1
+
+Emoglobina | 12,1 | g/dL | 12,0-16,0
+
+HbA1c | 44 | mmol/mol | 20-42
+
+CONCLUSIONI E INDICAZIONI
+Campione lievemente emolizzato; il risultato del potassio richiede valutazione nel contesto del prelievo. Il laboratorio non formula in questo referto una diagnosi clinica e segnala il limite preanalitico al richiedente.
+
+NOTE INTERPRETATIVE
+Il valore di riferimento stampato per la creatinina è 0,7-1,2 mg/dL e non rappresenta un secondo risultato del paziente.
+
+VALIDAZIONE TECNICA
+Controllo di qualità interno completato per la seduta. Metodo: spettrofotometria per chimica clinica; elettrodi ionoselettivi per elettroliti. Gli intervalli stampati si riferiscono alla matrice indicata e possono differire da quelli di altri laboratori. La copia riporta il risultato validato della seduta, senza recuperare misure precedenti.
+
+RIFERIMENTO DI EMISSIONE
+Emissione sintetica 740700. Copia per il medico curante; conservare tutte le pagine del documento.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-laboratorio-01 - Pagina 1/1 - nessun dato reale.

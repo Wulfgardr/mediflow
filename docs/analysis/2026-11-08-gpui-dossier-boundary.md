@@ -1,7 +1,8 @@
 # Import dossier in GPUI: confine di applicazione
 
 Data: 8 novembre 2026. Base verificata: `71c92e002`.
-Stato: funzione non implementata, confine di scrittura da scegliere.
+Stato del primo giro: funzione non implementata, confine di scrittura da scegliere.
+Secondo giro: consumer GPUI sul percorso host locale nella [PR #883](https://github.com/Wulfgardr/mediflow/pull/883).
 Refs [WUL-771](https://linear.app/wulfgardr/issue/WUL-771) e
 [WUL-804](https://linear.app/wulfgardr/issue/WUL-804).
 
@@ -97,3 +98,24 @@ Non sono stati prodotti corpus di conformità, attese rigenerabili, test Rust,
 mutazioni di sensibilità, catture del renderer o prove GPUI di annullamento,
 applicazione parziale e duplicato. I 105 test Web non dimostrano equivalenza
 con Rust. G-0 resta aperto su questa funzione.
+
+## Secondo giro: percorso host locale
+
+È stata scelta ed implementata la prima alternativa. GPUI richiede l'apertura
+esplicita di `LocalHostAccess`, usa i writer Web esistenti e conserva il confine
+paired di Classe C. ADR 0175 e 0176 nominano questo consumer.
+
+La sessione TS del Web è riusata in un processo Node 24 locale senza chiavi o
+cookie, con porte controllate in Rust. Il verificatore Rust indipendente è
+confrontato con il Web su un corpus sintetico versionato sotto 2 MB. Non sono
+esclusi campi dai risultati JSON. Il processo viene interrotto su annullamento,
+lock, ritiro dell'accesso o cambio di contesto. Le scritture restano vietate nella
+revisione ed ammesse solo per la scheda confermata durante l'applicazione.
+
+Le prove comprendono tutte le dieci falsificazioni, tre mutazioni singole che
+fanno fallire la conformità, scritture parziali con ripresa, duplicati, tutti i
+writer ordinari usati dal dossier e ritiro del contesto. Le catture dei cinque
+stati provengono dal renderer headless dei componenti reali. Provano la
+presentazione delle fixture, non una sessione del medico sul desktop.
+Restano fuori la validazione clinica, la creazione di schede da documento, l'installazione
+del candidato e la verifica su documenti reali.

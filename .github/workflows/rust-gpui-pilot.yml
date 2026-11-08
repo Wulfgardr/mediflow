@@ -14,6 +14,8 @@ on:
       - 'public/brand/mediflow/*.svg'
       - 'native/contracts/crypto-golden-vectors.v3.json'
       - 'native/contracts/recovery-backup-golden.v1.json'
+      - 'native/contracts/dossier-conformance/**'
+      - 'scripts/*dossier*'
       - 'app/api/**'
       - 'lib/**'
       - 'drizzle/**'
@@ -43,6 +45,8 @@ on:
       - 'public/brand/mediflow/*.svg'
       - 'native/contracts/crypto-golden-vectors.v3.json'
       - 'native/contracts/recovery-backup-golden.v1.json'
+      - 'native/contracts/dossier-conformance/**'
+      - 'scripts/*dossier*'
       - 'app/api/**'
       - 'lib/**'
       - 'drizzle/**'
@@ -87,7 +91,6 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Install Node for owned process regression tests
-        if: runner.os != 'Windows'
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444b # v5
         with:
           node-version: '24.18.0'

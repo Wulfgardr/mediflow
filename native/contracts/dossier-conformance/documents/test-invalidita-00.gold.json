@@ -1,0 +1,69 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "3d08cea544a702f8a3e90e288b4bcd859bf1130defba53a198400fb56097f158",
+      "fileName": "test-invalidita-00.pdf",
+      "patient": {
+        "lastName": "Sintetico083",
+        "firstName": "Persona083",
+        "birthDate": "1953-03-12",
+        "taxCode": "ZZZXXX83A03Z999O"
+      },
+      "documentDate": "2026-10-13",
+      "documentType": "invalidita",
+      "summary": null,
+      "coverage": {
+        "pages": 2,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "esiti di frattura del femore",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma esiti di frattura del femore tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "artrosi polidistrettuale",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma artrosi polidistrettuale tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "invalidity",
+          "values": {
+            "text": "La commissione riconosce invalidità civile nella misura del 67%. Non è riconosciuta indennità di accompagnamento. Decorrenza dalla domanda; revisione prevista nel mese di ottobre 2028.",
+            "percentage": "67",
+            "allowance": "non riconosciuta"
+          },
+          "quote": "La commissione riconosce invalidità civile nella misura del 67%. Non è riconosciuta indennità di accompagnamento. Decorrenza dalla domanda; revisione prevista nel mese di ottobre 2028."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente.",
+            "subject": "paziente"
+          },
+          "quote": "La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente."
+        },
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Per il familiare indicato come madre viene riferita ipertensione arteriosa; questa informazione appartiene all’anamnesi familiare.",
+            "subject": "familiare"
+          },
+          "quote": "Per il familiare indicato come madre viene riferita ipertensione arteriosa; questa informazione appartiene all’anamnesi familiare."
+        }
+      ]
+    }
+  ]
+}
