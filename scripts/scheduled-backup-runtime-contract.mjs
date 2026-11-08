@@ -18,7 +18,7 @@ export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/manifest.json', 'f39f01aab5c84671461fd9f7f0abf96e7b64a9069eaa084afec4754d10982a95', true],
   ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/system-directory.node', '35666d8b5e9aa882c66dd28300634ac23128f85c178d3b2beb69561b3cbffb3c', true],
 
-  ['scripts/run-scheduled-backup.mjs', '93be3e894c903bfc1276132a27e9cf1b60852baa3632453af1a08c2fe979c24d'],
+  ['scripts/run-scheduled-backup.mjs', 'd7dca9909424e871ad0102e5326f06486c3869445b7d7c9272cb623545655578'],
   ['scripts/backup-destination-policy.mjs', 'e8092ad74fe3ce830ada88210348d159c1263ddc20591872a2e0087775536257'],
   ['scripts/scheduled-backup-date-fields.mjs', '91779e9df7f34bd71bce6329ca1577070cfb3a12fbc55365272982d8fb4fb1a0'],
   ['lib/sqlite-maintenance-admission.mjs', 'd5a74f882934a3175f17476b4633effd5325ae6985c28e9baccfb73789088356'],
@@ -27,6 +27,7 @@ export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['lib/therapy-status-command-contract.ts', '3432124d9b5f8b3113265d9779fa12e1411e508b0964cfd2e1bc532f49f4a7fe'],
   ['lib/ambulatory-destructive-command-backup.ts', 'f6910fcfbd4d31a1c7879c85d53450980c0f1e34eac313a737f575564f87ac5f'],
   ['lib/ambulatory-destructive-command-contract.ts', 'cfe41527fa09e7a0a16afebbbd48fe303c0a2fee229cf7d00bf637e83cd08315'],
+  ['lib/backup-artifact.ts', '173aca45d1c60d332d532841ec43ea50058b702e68e961a608ebb1a66817dbb0'],
   ['lib/backup-audit.ts', 'add784b36e61651a99e1b6dd6fb7af6c6eb6dafa946e837f242298b830db6efd'],
   ['lib/exemption-import-receipt.ts', '894cc749fa4f512f65d10e3ff66f0a445b129cd23c56627bfe0c549a932c1e3a'],
   ['lib/exemption-import-contract.ts', '12b97b4a54bca6a3d56103f442035b81d5269ec276789ee2febc0560e533b0e0'],
