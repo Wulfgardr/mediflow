@@ -935,6 +935,8 @@ class MedicalApiClient {
     attachments: ApiTable<Attachment>;
     drugs: ApiTable<AifaDrug>;
     exemptions: ApiTable<ExemptionCode>;
+    /** The whole exemption catalog: the plain list stops at the first 100 codes. */
+    exemptionCatalog: ApiTable<ExemptionCode>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     settings: ApiTable<any>;
     patientsToAmbulatories: ApiTable<PatientAmbulatory>;
@@ -959,6 +961,7 @@ class MedicalApiClient {
         this.attachments = new ApiTable<Attachment>('/api/attachments', 'attachments', getKey, getReadSession);
         this.drugs = new ApiTable<AifaDrug>('/api/drugs', 'drugs', getKey, getReadSession);
         this.exemptions = new ApiTable<ExemptionCode>('/api/exemptions', 'exemptions', getKey, getReadSession);
+        this.exemptionCatalog = new ApiTable<ExemptionCode>('/api/exemptions?all=1', 'exemptions', getKey, getReadSession);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.settings = new ApiTable<any>('/api/settings', 'settings', getKey, getReadSession);
         this.patientsToAmbulatories = new ApiTable<PatientAmbulatory>('/api/patients/assign', 'patients_to_ambulatories', getKey, getReadSession);
