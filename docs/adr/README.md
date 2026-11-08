@@ -16,6 +16,7 @@ verifica dello stato successivo.
 
 - [0183-autore-delle-voci-di-diario.md](./0183-autore-delle-voci-di-diario.md): autore assegnato dal server, schema 10 e contratto di lettura additivo.
 - [0184-prove-sul-comportamento-e-vincoli-sul-testo.md](./0184-prove-sul-comportamento-e-vincoli-sul-testo.md): prove sul comportamento e vincoli sul testo dei sorgenti ammessi solo per confini, contratti immutabili e verifica formale.
+- [0185-rotta-di-mediflow.md](./0185-rotta-di-mediflow.md): un centro (la cartella dei pazienti che il sistema non vede) e un laboratorio intelligente; giri di due settimane, quaderno delle idee in Linear, orizzonte senza numeri; 0.9.1 a contratto intero.
 
 - [0166-athena-method-runner-boundary.md](./0166-athena-method-runner-boundary.md): **Proposed (2026-10-26)**; I-3b/WUL-790, metodo Fabric separato dal runner locale con byte conservati; ammissione delle venue remote subordinata ad ADR accettato e qualità I-7.
 
