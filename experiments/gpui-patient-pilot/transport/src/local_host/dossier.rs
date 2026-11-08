@@ -79,7 +79,9 @@ impl DossierImport {
             .arg(worker_read_permission(
                 script.to_str().ok_or(RuntimeError::InvalidInput)?,
             ))
-            .arg(&script)
+            .arg(node_visible_path(
+                script.to_str().ok_or(RuntimeError::InvalidInput)?,
+            ))
             .env_clear()
             .envs(worker_environment())
             .stdin(Stdio::piped())
@@ -553,21 +555,27 @@ fn worker_environment() -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
     }
 }
 
-fn worker_read_permission(path: &str) -> String {
+/// Windows `canonicalize` returns verbatim paths (`\\?\C:\...`). With
+/// `--permission`, Node 24 neither matches a verbatim grant nor resolves a
+/// verbatim entry script, so both receive the ordinary form of the same file.
+fn node_visible_path(path: &str) -> String {
     if let Some(unc) = path.strip_prefix(r"\\?\UNC\") {
-        format!(r"--allow-fs-read=\\{unc}")
+        format!(r"\\{unc}")
     } else {
-        let path = path
-            .strip_prefix(r"\\?\")
+        path.strip_prefix(r"\\?\")
             .filter(|path| {
                 let bytes = path.as_bytes();
                 bytes.first().is_some_and(u8::is_ascii_alphabetic)
                     && bytes.get(1) == Some(&b':')
                     && bytes.get(2) == Some(&b'\\')
             })
-            .unwrap_or(path);
-        format!("--allow-fs-read={path}")
+            .unwrap_or(path)
+            .to_owned()
     }
+}
+
+fn worker_read_permission(path: &str) -> String {
+    format!("--allow-fs-read={}", node_visible_path(path))
 }
 
 #[cfg(test)]
@@ -623,22 +631,22 @@ mod tests {
         let canonical = std::fs::canonicalize(&script).unwrap();
         let path = canonical.to_str().unwrap();
         assert!(path.starts_with(r"\\?\"));
-        let run = |permission: String| {
+        let run = |permission: String, entry: String| {
             Command::new(&node)
                 .arg("--permission")
                 .arg(permission)
-                .arg(&canonical)
+                .arg(entry)
                 .env_clear()
                 .envs(worker_environment())
                 .output()
                 .unwrap()
         };
-        let before = run(format!("--allow-fs-read={path}"));
+        let before = run(format!("--allow-fs-read={path}"), path.to_owned());
         assert!(!before.status.success());
         let error = String::from_utf8_lossy(&before.stderr);
         assert!(error.contains("ERR_ACCESS_DENIED"), "{error}");
         assert!(error.contains("FileSystemRead"), "{error}");
-        let after = run(worker_read_permission(path));
+        let after = run(worker_read_permission(path), node_visible_path(path));
         std::fs::remove_file(script).unwrap();
         assert!(
             after.status.success(),
