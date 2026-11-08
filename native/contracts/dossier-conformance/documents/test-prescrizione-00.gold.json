@@ -1,0 +1,75 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "dfd636c64d633f7b708a90a32e40985747daa867b5c2e3f8fb2d3119f9e5b6f0",
+      "fileName": "test-prescrizione-00.pdf",
+      "patient": {
+        "lastName": "Sintetico077",
+        "firstName": "Persona077",
+        "birthDate": "1947-03-12",
+        "taxCode": "ZZZXXX77A24Z999U"
+      },
+      "documentDate": "2026-10-12",
+      "documentType": "prescrizione",
+      "summary": null,
+      "coverage": {
+        "pages": 1,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "service_prescription",
+          "values": {
+            "serviceName": "Visita cardiologica",
+            "category": "visit",
+            "priority": "D",
+            "requestReference": "999990000000077",
+            "clinicalQuestion": "palpitazioni episodiche"
+          },
+          "quote": "Prestazione richiesta: Visita cardiologica; priorità D; NRE 999990000000077; quesito: palpitazioni episodiche."
+        },
+        {
+          "kind": "service_prescription",
+          "values": {
+            "serviceName": "Elettrocardiogramma",
+            "category": "procedure",
+            "priority": "D",
+            "requestReference": "999990000000077",
+            "clinicalQuestion": "palpitazioni episodiche"
+          },
+          "quote": "Prestazione richiesta: Elettrocardiogramma; priorità D; NRE 999990000000077; quesito: palpitazioni episodiche."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "palpitazioni episodiche",
+            "subject": "paziente",
+            "certainty": "incerta"
+          },
+          "quote": "Resta il sospetto di palpitazioni episodiche, da confermare con gli accertamenti successivi."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "La richiesta è destinata alla prenotazione; la prestazione non risulta ancora eseguita. L’eventuale confronto con esami precedenti sarà effettuato dallo specialista al momento della visita.",
+            "subject": "paziente"
+          },
+          "quote": "La richiesta è destinata alla prenotazione; la prestazione non risulta ancora eseguita. L’eventuale confronto con esami precedenti sarà effettuato dallo specialista al momento della visita."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente.",
+            "subject": "paziente"
+          },
+          "quote": "La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente."
+        }
+      ]
+    }
+  ]
+}

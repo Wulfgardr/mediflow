@@ -13,6 +13,7 @@ mod analytics;
 mod catalogs;
 mod context;
 mod crypto;
+pub mod dossier;
 mod dto;
 mod error;
 mod http;

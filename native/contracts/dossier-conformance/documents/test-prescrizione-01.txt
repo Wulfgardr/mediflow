@@ -1,0 +1,31 @@
+## Pagina 1
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+PRESCRIZIONE AMBULATORIALE
+Protocollo test-prescrizione-01 | Pagina 1 di 1
+Paziente: Sintetico078 Persona078 - Nato il 1948-03-12
+Codice fiscale paziente: ZZZXXX78A25Z999Z
+Data referto: 15.10.2026
+
+RICETTA FARMACOLOGICA
+Ricetta non ripetibile sintetica. Il documento distingue il medicinale dalla prestazione richiesta in un precedente accesso. Nessuna esenzione è attestata in questa copia.
+
+TERAPIA FARMACOLOGICA
+Alla visita risulta in uso Augmentin (amoxicillina e acido clavulanico) 875 mg/125 mg, 1 compressa ogni 12 ore per 6 giorni per os.
+
+TERAPIA FARMACOLOGICA
+Alla visita risulta in uso Tachipirina (paracetamolo) 500 mg, 1 cp al bisogno per dolore, massimo 3 cp al giorno.
+
+MEDICINALE NON PRESCRITTO
+Non è prescritta aspirina; il nome resta stampato nel campo delle terapie precedenti non confermate.
+
+CONCLUSIONI E INDICAZIONI
+L’avvio della somministrazione è previsto oggi. La confezione deve essere confrontata con il principio attivo e il dosaggio indicati, senza desumere ulteriori farmaci dal quesito clinico.
+
+CONTESTO ASSISTENZIALE
+La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.
+
+RIFERIMENTO DI EMISSIONE
+Emissione sintetica 858814. Copia per il medico curante; conservare tutte le pagine del documento.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-prescrizione-01 - Pagina 1/1 - nessun dato reale.

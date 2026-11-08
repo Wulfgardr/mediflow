@@ -1,0 +1,69 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "07a723d65956e9a94b103188690a3013909e64e4cd1a2c5345006dbac43ad93d",
+      "fileName": "test-protesica-01.pdf",
+      "patient": {
+        "lastName": "Sintetico090",
+        "firstName": "Persona090",
+        "birthDate": "1960-03-12",
+        "taxCode": "ZZZXXX90A10Z999I"
+      },
+      "documentDate": "2026-10-17",
+      "documentType": "protesica",
+      "summary": null,
+      "coverage": {
+        "pages": 2,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "paraparesi degli arti inferiori",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma paraparesi degli arti inferiori tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "prosthetic",
+          "values": {
+            "description": "deambulatore con ruote",
+            "category": "standard",
+            "status": "prescribed"
+          },
+          "quote": "Ausilio prescritto: deambulatore con ruote. Categoria: standard. Stato: prescritto; non ancora consegnato."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "Obiettivo funzionale: facilitare gli spostamenti e le attività assistite al domicilio. È previsto un controllo dopo la prova d’uso; la famiglia deve poter riferire le difficoltà nell’utilizzo. Il programma non attesta che il collaudo sia già avvenuto.",
+            "subject": "paziente"
+          },
+          "quote": "Obiettivo funzionale: facilitare gli spostamenti e le attività assistite al domicilio. È previsto un controllo dopo la prova d’uso; la famiglia deve poter riferire le difficoltà nell’utilizzo. Il programma non attesta che il collaudo sia già avvenuto."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.",
+            "subject": "paziente"
+          },
+          "quote": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare."
+        },
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare.",
+            "subject": "familiare"
+          },
+          "quote": "Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare."
+        }
+      ]
+    }
+  ]
+}

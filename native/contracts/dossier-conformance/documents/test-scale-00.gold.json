@@ -1,0 +1,80 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "0553d91984a1125a5dd9acf798a76a492f1ba9d0d136f9b138fe1ad5b5a9cc69",
+      "fileName": "test-scale-00.pdf",
+      "patient": {
+        "lastName": "Sintetico095",
+        "firstName": "Persona095",
+        "birthDate": "1965-03-12",
+        "taxCode": "ZZZXXX95A15Z999Z"
+      },
+      "documentDate": "2026-10-15",
+      "documentType": "scale",
+      "summary": null,
+      "coverage": {
+        "pages": 1,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "reported_scale",
+          "values": {
+            "scaleName": "MMSE",
+            "scaleTotal": "21",
+            "scaleMax": "30"
+          },
+          "quote": "MMSE: totale 21/30, valutazione del 15/10/2026."
+        },
+        {
+          "kind": "reported_scale",
+          "values": {
+            "scaleName": "Barthel",
+            "scaleTotal": "40",
+            "scaleMax": "100"
+          },
+          "quote": "Barthel: totale 40/100, valutazione del 15/10/2026."
+        },
+        {
+          "kind": "reported_scale",
+          "values": {
+            "scaleName": "ADL",
+            "scaleTotal": "2",
+            "scaleMax": "6"
+          },
+          "quote": "ADL: totale 2/6, valutazione del 15/10/2026."
+        },
+        {
+          "kind": "reported_scale",
+          "values": {
+            "scaleName": "IADL",
+            "scaleTotal": "2",
+            "scaleMax": "8"
+          },
+          "quote": "IADL: totale 2/8, valutazione del 15/10/2026."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente.",
+            "subject": "paziente"
+          },
+          "quote": "La persona vive al domicilio con il coniuge, che prepara il portapillole settimanale; il paziente assume poi i farmaci autonomamente."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "I punteggi vanno letti insieme all’osservazione funzionale: l’aiuto disponibile al domicilio modifica la prestazione quotidiana ma non riscrive il totale annotato. Non viene formulata una nuova diagnosi sulla sola base delle scale.",
+            "subject": "paziente"
+          },
+          "quote": "I punteggi vanno letti insieme all’osservazione funzionale: l’aiuto disponibile al domicilio modifica la prestazione quotidiana ma non riscrive il totale annotato. Non viene formulata una nuova diagnosi sulla sola base delle scale."
+        }
+      ]
+    }
+  ]
+}

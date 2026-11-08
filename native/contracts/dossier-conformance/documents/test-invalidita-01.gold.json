@@ -1,0 +1,69 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "6d65111d2d30ea60c7ec6575d61c1a7b243e21a77084f22a0818f5a7ff49e6d5",
+      "fileName": "test-invalidita-01.pdf",
+      "patient": {
+        "lastName": "Sintetico084",
+        "firstName": "Persona084",
+        "birthDate": "1954-03-12",
+        "taxCode": "ZZZXXX84A04Z999R"
+      },
+      "documentDate": "2026-10-16",
+      "documentType": "invalidita",
+      "summary": null,
+      "coverage": {
+        "pages": 2,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "esiti di frattura del femore",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma esiti di frattura del femore tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "diagnosis",
+          "values": {
+            "description": "artrosi polidistrettuale",
+            "subject": "paziente"
+          },
+          "quote": "La valutazione complessiva conferma artrosi polidistrettuale tra le condizioni personali rilevanti."
+        },
+        {
+          "kind": "invalidity",
+          "values": {
+            "text": "La commissione riconosce invalidità civile nella misura del 74%. Non è riconosciuta indennità di accompagnamento. Decorrenza dalla domanda; revisione prevista nel mese di ottobre 2028.",
+            "percentage": "74",
+            "allowance": "non riconosciuta"
+          },
+          "quote": "La commissione riconosce invalidità civile nella misura del 74%. Non è riconosciuta indennità di accompagnamento. Decorrenza dalla domanda; revisione prevista nel mese di ottobre 2028."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.",
+            "subject": "paziente"
+          },
+          "quote": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare."
+        },
+        {
+          "kind": "anamnesis",
+          "values": {
+            "text": "Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare.",
+            "subject": "familiare"
+          },
+          "quote": "Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare."
+        }
+      ]
+    }
+  ]
+}

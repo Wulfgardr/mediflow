@@ -1,0 +1,48 @@
+## Pagina 1
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+PRESCRIZIONE PROTESICA
+Protocollo test-protesica-01 | Pagina 1 di 2
+Paziente: Sintetico090 Persona090 - Nato il 1960-03-12
+Codice fiscale paziente: ZZZXXX90A10Z999I
+Data referto: 17.10.2026
+
+RICHIESTA DEL PRESCRITTORE
+Prima fornitura nell’ambito del progetto riabilitativo individuale. La prescrizione indica il dispositivo e gli obiettivi funzionali; autorizzazione, consegna e collaudo sono fasi distinte, da documentare separatamente.
+
+INQUADRAMENTO CLINICO
+La valutazione complessiva conferma paraparesi degli arti inferiori tra le condizioni personali rilevanti.
+
+DISPOSITIVO RICHIESTO
+Ausilio prescritto: deambulatore con ruote. Categoria: standard. Stato: prescritto; non ancora consegnato.
+
+CONCLUSIONI E INDICAZIONI
+Obiettivo funzionale: facilitare gli spostamenti e le attività assistite al domicilio. È previsto un controllo dopo la prova d’uso; la famiglia deve poter riferire le difficoltà nell’utilizzo. Il programma non attesta che il collaudo sia già avvenuto.
+
+CONTESTO ASSISTENZIALE
+La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-protesica-01 - Pagina 1/2 - nessun dato reale.
+
+## Pagina 2
+CENTRO CLINICO SINTETICO - DOCUMENTO DI PROVA
+PRESCRIZIONE PROTESICA
+Protocollo test-protesica-01 | Pagina 2 di 2
+Paziente: Sintetico090 Persona090 - Nato il 1960-03-12
+Codice fiscale paziente: ZZZXXX90A10Z999I
+Data referto: 17.10.2026
+
+ANAMNESI FAMILIARE
+Per il familiare indicato come padre viene riferita diabete mellito; questa informazione appartiene all’anamnesi familiare.
+
+DISPOSITIVO PRECEDENTE
+Il vecchio bastone è stato restituito e non costituisce una nuova prescrizione.
+
+SPAZIO RISERVATO ALLA FORNITURA
+Fornitore: da individuare. Data autorizzazione: campo non compilato. Data consegna: campo non compilato. Esito collaudo: campo non compilato. Le caselle vuote non hanno valore di assenso. Il presente modulo accompagna il programma funzionale senza attestare le successive fasi amministrative.
+
+RIFERIMENTO DI EMISSIONE
+Emissione sintetica 567053. Copia per il medico curante; conservare tutte le pagine del documento.
+
+Firma: dott. Medico Esempio - firma simulata, priva di valore.
+Archivio didattico test-protesica-01 - Pagina 2/2 - nessun dato reale.

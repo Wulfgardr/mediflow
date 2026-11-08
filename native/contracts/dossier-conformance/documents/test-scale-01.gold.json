@@ -1,0 +1,80 @@
+{
+  "schema": "mediflow.dossier_prepared_extraction.v1",
+  "preparedAt": "2026-11-05T12:00:00Z",
+  "preparedBy": "deterministic-generator",
+  "sources": [
+    {
+      "sha256": "6f65a1f1fb25e02516835ac8e098b869a63fdb8f9431f64c655a66e8bce3f113",
+      "fileName": "test-scale-01.pdf",
+      "patient": {
+        "lastName": "Sintetico096",
+        "firstName": "Persona096",
+        "birthDate": "1966-03-12",
+        "taxCode": "ZZZXXX96A16Z999C"
+      },
+      "documentDate": "2026-10-18",
+      "documentType": "scale",
+      "summary": null,
+      "coverage": {
+        "pages": 1,
+        "unreadablePages": [],
+        "complete": true,
+        "note": ""
+      },
+      "facts": [
+        {
+          "kind": "reported_scale",
+          "values": {
+            "scaleName": "MMSE",
+            "scaleTotal": "22",
+            "scaleMax": "30"
+          },
+          "quote": "MMSE: totale 22/30, valutazione del 18.10.2026."
+        },
+        {
+          "kind": "reported_scale",
+          "values": {
+            "scaleName": "Barthel",
+            "scaleTotal": "50",
+            "scaleMax": "100"
+          },
+          "quote": "Barthel: totale 50/100, valutazione del 18.10.2026."
+        },
+        {
+          "kind": "reported_scale",
+          "values": {
+            "scaleName": "ADL",
+            "scaleTotal": "3",
+            "scaleMax": "6"
+          },
+          "quote": "ADL: totale 3/6, valutazione del 18.10.2026."
+        },
+        {
+          "kind": "reported_scale",
+          "values": {
+            "scaleName": "IADL",
+            "scaleTotal": "3",
+            "scaleMax": "8"
+          },
+          "quote": "IADL: totale 3/8, valutazione del 18.10.2026."
+        },
+        {
+          "kind": "care_context",
+          "values": {
+            "text": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare.",
+            "subject": "paziente"
+          },
+          "quote": "La figlia accompagna alle visite e controlla le scorte dei medicinali; non sono riferiti accessi di assistenza domiciliare."
+        },
+        {
+          "kind": "assessment",
+          "values": {
+            "text": "I punteggi vanno letti insieme all’osservazione funzionale: l’aiuto disponibile al domicilio modifica la prestazione quotidiana ma non riscrive il totale annotato. Non viene formulata una nuova diagnosi sulla sola base delle scale.",
+            "subject": "paziente"
+          },
+          "quote": "I punteggi vanno letti insieme all’osservazione funzionale: l’aiuto disponibile al domicilio modifica la prestazione quotidiana ma non riscrive il totale annotato. Non viene formulata una nuova diagnosi sulla sola base delle scale."
+        }
+      ]
+    }
+  ]
+}
