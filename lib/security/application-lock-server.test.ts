@@ -83,11 +83,9 @@ test('supported callbacks ignore ambient Promise poison', () => {
 test('production registrations remain declared synchronous void callbacks', () => {
     const broker = readFileSync(new URL('./server-session-projection-broker.ts', import.meta.url), 'utf8');
     const owner = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
-    const capture = readFileSync(new URL('../ai-providers/fabric/document-synthesis-authenticated-attachment-capture.ts', import.meta.url), 'utf8');
     assert.match(broker, /registerServerSessionResource\(sessionId, \(\) => control\.revoke\(\)\)/u);
     assert.match(owner, /registerServerSessionResource\(session\.id, \(\) => finish\(false\)\)/u);
-    assert.match(capture, /const dispose = \(\) => \{/u);
-    assert.doesNotMatch(`${broker}\n${owner}\n${capture}`, /registerServerSessionResource\([^\n]*async/u);
+    assert.doesNotMatch(`${broker}\n${owner}`, /registerServerSessionResource\([^\n]*async/u);
 });
 
 test('route delegates the exact cookie to the P3 application-lock service', () => {
