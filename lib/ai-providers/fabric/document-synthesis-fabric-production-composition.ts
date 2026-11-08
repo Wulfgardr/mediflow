@@ -3,7 +3,7 @@ import 'server-only';
 import { types } from 'node:util';
 
 import { admitDocumentSynthesisFabric, beginDocumentSynthesisFabricExecution, disposeDocumentSynthesisFabricAdmission } from './document-synthesis-fabric-admission';
-import { disposeDocumentSynthesisFabricPreparedExecution, finalizeDocumentSynthesisFabricPreparedExecution, prepareDocumentSynthesisFabricExecution } from './document-synthesis-fabric-execution-prepare';
+import { finalizeDocumentSynthesisFabricPreparedExecution, prepareDocumentSynthesisFabricExecution } from './document-synthesis-fabric-execution-prepare';
 import { bindDocumentSynthesisProvider, type DocumentSynthesisProviderBindingResult } from './document-synthesis-provider-binding';
 import { resolveDocumentSynthesisSourceSetExecutionInputAccessor } from './document-synthesis-source-set-currentness-owner';
 import { isServerSessionProjectionOwner } from '../../security/server-session-projection-owner';

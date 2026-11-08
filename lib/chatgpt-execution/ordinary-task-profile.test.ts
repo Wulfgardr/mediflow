@@ -20,12 +20,6 @@ function documentSources() {
     assert.equal(captured.status, 'available');
     return captured.sourceSet;
 }
-function trOutput() {
-    return JSON.stringify({ schemaVersion: 'mediflow.treatment_reasoning.v1', task: 'treatment_reasoning', summary: 'Revisione richiesta.',
-        data: { recommendation: 'Rivedere le fonti.', keyEvidence: [], reasoning: [], caveats: [], safetyFlags: [], suggestedActions: [], trace: { mode: 'chatgpt_subscription', toolsUsed: [], limitations: [] } },
-        sourceBindings: [{ claimPath: 'summary', claim: 'Revisione richiesta.', evidenceRefs: ['source_synthetic'] }, { claimPath: 'data.recommendation', claim: 'Rivedere le fonti.', evidenceRefs: ['source_synthetic'] }] });
-}
-
 function piOutput(task = 'patient_insight') { return JSON.stringify({ schemaVersion: 'mediflow.ai.extract.v1', task, summary: 'Quadro stabile [S1]', data: { currentState: ['Stabile [S1]'], alerts: [], nextSteps: [], gaps: [] } }); }
 function siOutput(task = 'smart_import') { return JSON.stringify({ schemaVersion: 'mediflow.ai.extract.v1', task, summary: 'Nessuna proposta', data: { diagnoses: [], therapies: [], servicePrescriptions: [] } }); }
 function dsOutput(task = 'document_synthesis') { return JSON.stringify({ schemaVersion: 'mediflow.document-synthesis.provider-envelope.v2', output: { schemaVersion: 'mediflow.ai.extract.v1', task, summary: 'Sintesi sintetica', data: { qualityLevel: 'yellow', medications: [], diagnoses: [], problemStatements: [], therapyCandidates: [], servicePrescriptions: [] } }, citations: [{ label: 'S1', quote: 'Documento sintetico.' }], claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] }); }

@@ -8,7 +8,7 @@ import PrivacyBlur from './privacy-blur';
 import { useRef, useState } from 'react';
 import { useForm, useFieldArray, Control, Controller, FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch, type DefaultValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Save, User, Phone, MapPin, HeartHandshake, FileText, Activity, Plus, Trash2, AlertTriangle, Calendar, Ticket, ChevronDown } from 'lucide-react';
+import { Save, Phone, HeartHandshake, Activity, Plus, Trash2, AlertTriangle, Calendar, ChevronDown } from 'lucide-react';
 import ICDAutocomplete from '@/components/icd-autocomplete';
 import { WhoCodeCheck } from '@/components/who-code-check';
 
@@ -456,7 +456,6 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                 <CheckupsFieldArray register={register} control={control} errors={errors} />
             </div>
 
-
             <div className={FORM_SECTION_CLASS}>
                 <div className="flex items-center gap-4 graphite-divider pt-3 pb-5 mb-2">
 
@@ -484,7 +483,6 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
                 </div>
             </div>
-
 
             <div className={FORM_SECTION_CLASS}>
                 <div className="flex items-center gap-4 graphite-divider pt-3 pb-5 mb-2">

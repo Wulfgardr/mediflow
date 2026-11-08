@@ -1,6 +1,4 @@
 export const SECURITY_CONFIG = {
-    PIN_SALT_KEY: 'mediflow_pin_salt',
-    ENCRYPTED_MASTER_KEY: 'mediflow_master_key_v1',
     PIN_MIN_LENGTH: 4,
     PIN_MAX_LENGTH: 8,
     AUTO_LOCK_TIMEOUT_MS: 15 * 60 * 1000,

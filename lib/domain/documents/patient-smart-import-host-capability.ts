@@ -1,5 +1,5 @@
 import 'server-only';
-import { isOrdinaryFunctionSelected, executeOwnedOrdinaryProfile, ordinaryResultMetadata, ordinaryApplicationIsCurrent } from '../../chatgpt-product/ordinary-flow';
+import { isOrdinaryFunctionSelected, executeOwnedOrdinaryProfile, ordinaryResultMetadata } from '../../chatgpt-product/ordinary-flow';
 import { validateGenerativeJson } from '../../ai-providers/generative-json-validation';
 import { createSmartImportOrdinaryTaskProfile } from '../../chatgpt-execution/ordinary-task-profile';
 import type { OrdinaryRemoteReceipt, OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';

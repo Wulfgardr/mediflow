@@ -8,7 +8,6 @@ import { join } from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3';
 import { spawn } from 'node:child_process';
-import { eq } from 'drizzle-orm';
 import type { ServerSession } from './security/server-session.ts';
 
 const dir = mkdtempSync(join(process.env.MEDIFLOW_DATA_DIR!, 'service-atomic-'));
@@ -259,7 +258,6 @@ test('host system actor and paired patient identity survive body spoofing', asyn
     const pairedEvent = snapshot(other).audit[0] as Record<string, unknown>;
     assert.equal(pairedEvent.actor_ref, pairedSession.userId); assert.equal(pairedEvent.source_surface, 'native');
 });
-
 
 test('duplicate service parent and item create IDs return conflict without effects', async () => {
     for (const op of ['host-parent-create', 'paired-parent-create', 'host-item-create', 'paired-item-create'] as const) {

@@ -9,7 +9,6 @@ import {
     generateMasterKey,
     getKdfVersion,
     parseWrappedMasterKey,
-    unwrapMasterKey,
     unwrapMasterKeyVersioned,
     wrapMasterKey,
     wrapMasterKeyVersioned,

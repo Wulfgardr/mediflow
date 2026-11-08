@@ -250,18 +250,6 @@ export interface BuildDocumentDecisionInput {
     humanRequiredFor?: DocumentDecisionHumanRequirement[];
     model?: Partial<DocumentDecisionModelMetadata>;
 }
-
-const EMPTY_DOMAINS: DocumentDecisionDomains = {
-    patientFields: [],
-    clinicalFacts: [],
-    diagnosticQuestions: [],
-    medicationPrescriptions: [],
-    servicePrescriptions: [],
-    exemptions: [],
-    prosthetics: [],
-    ocrNeeded: [],
-};
-
 const SERVICE_PRESCRIPTION_TYPES = new Set<DocumentDecisionClassification>([
     'specialist_service_prescription',
     'lab_prescription',
@@ -661,4 +649,3 @@ export function createDocumentDecisionEvidenceRef(
     };
 }
 
-export { EMPTY_DOMAINS as EMPTY_DOCUMENT_DECISION_DOMAINS };

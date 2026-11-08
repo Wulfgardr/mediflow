@@ -1,6 +1,5 @@
 import { formatCountLabel } from '@/lib/format-count';
 import type * as React from 'react';
-import Link from 'next/link';
 import {
   AlertTriangle,
   CalendarClock,
@@ -9,11 +8,9 @@ import {
   Database,
   FileSearch,
   FileText,
-  Filter,
   Inbox,
   Search,
   Settings as SettingsIcon,
-  Upload,
   UserSquare2,
   Workflow,
 } from 'lucide-react';
@@ -40,7 +37,6 @@ import { stripMarkdownMarks } from '@/lib/clinical-rich-text';
 import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiaryWorkflowState, patientDiaryRegistration, type PatientDiaryWorkflowState } from '@/lib/patient-diary-metadata';
 import styles from './kree8-clinical-cockpit-foundation.module.css';
 import shellStyles from './kree8-clinical-cockpit-shell.module.css';
-
 
 export type AreaId =
   | 'turno'
