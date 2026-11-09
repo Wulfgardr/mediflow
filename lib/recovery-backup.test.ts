@@ -476,3 +476,39 @@ test('encrypted v9 predecessor resta recuperabile dopo l’aggiunta dell’autor
         assert.deepEqual(fs.readFileSync(file), bytes);
     } finally { f.cleanup(); }
 });
+for (const alteration of ['none', 'prosthetics-source', 'therapy-ledger'] as const)
+test(`encrypted 0.9.0 predecessor (schema 3) ${alteration}: the published release's backup restores`, async () => {
+    const f = await fixture();
+    try {
+        const file = path.join(f.root, 'canonical3.db'); fs.writeFileSync(file, f.snapshot);
+        const old = new Database(file);
+        for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
+        old.exec(`ALTER TABLE entries DROP COLUMN recorded_by; DROP TABLE synthetic_extension; DROP TABLE portable_import_origins;
+            DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands;
+            DROP TABLE prosthetics_catalog_documents; DROP TABLE prosthetics_catalog_sources;
+            ALTER TABLE prosthetics_catalog_entries DROP COLUMN source_id; ALTER TABLE prosthetic_prescriptions DROP COLUMN catalog_snapshot;
+            PRAGMA user_version=3;`);
+        for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
+        // A 0.9.0 archive cannot carry tables introduced after the release.
+        if (alteration === 'prosthetics-source') old.exec('CREATE TABLE prosthetics_catalog_sources (id TEXT PRIMARY KEY)');
+        if (alteration === 'therapy-ledger') old.exec('CREATE TABLE therapy_status_commands (id TEXT PRIMARY KEY)');
+        const expected = contents(old); old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE'); old.close();
+        const bytes = fs.readFileSync(file), artifact = await encryptRecoveryBackup(bytes, f.key);
+        if (alteration !== 'none') { await assert.rejects(f.restore({ artifact })); assert.equal(fs.existsSync(f.destination), false); }
+        else {
+            await f.restore({ artifact });
+            const restored = openVersionedSqliteDatabase(f.destination);
+            try {
+                assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
+                const actual = contents(restored);
+                assert.deepEqual(actual.users, expected.users);
+                assert.deepEqual(actual.patients, migratedPatientRows(expected.patients));
+                assert.deepEqual((actual.entries as Record<string, unknown>[]).map(({ recorded_by: _, ...row }) => row), expected.entries);
+                assertPredecessorAuditHistory(actual.audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
+                const [, iv, ciphertext] = (restored.prepare('SELECT notes FROM patients').pluck().get() as string).split(':');
+                assert.equal(await decryptData(ciphertext, iv, f.key), 'nota clinica sintetica recuperabile');
+            } finally { restored.close(); }
+        }
+        assert.deepEqual(fs.readFileSync(file), bytes);
+    } finally { f.cleanup(); }
+});
