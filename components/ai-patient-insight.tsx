@@ -22,6 +22,7 @@ import {
 } from '@/lib/ai-providers/fabric/patient-insight-preview-contract';
 import { db, type Patient } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
+import { currentPatientInsightSourceSignature, patientInsightSourceSignature } from '@/lib/patient-insight-source-signature';
 
 interface AIPatientInsightProps {
     patient: Patient;
@@ -30,6 +31,15 @@ interface AIPatientInsightProps {
 }
 
 type AvailablePreview = Extract<PatientInsightPreviewWire, { status: 'available' }>;
+type StoredPreview = Readonly<{ patientId: string; patientKey: string; sourceSignature: string; value: AvailablePreview }>;
+
+/* the same minimal read a generation sends, so a later read can be compared with it. */
+function readInsightSources(patientId: string) {
+    return Promise.all([
+        db.entries.query({ patientId, orderBy: 'date', orderDir: 'desc', limit: 12 }).toArray(),
+        db.therapies.query({ patientId, limit: 12 }).toArray(),
+    ]);
+}
 
 /* scoped control geometry overrides the legacy shared button chrome. */
 const actionStyle = { borderRadius: 'var(--lume-control-radius, 10px)', fontSize: '0.875rem', minHeight: 'var(--lume-control-height, 44px)' };
@@ -70,7 +80,7 @@ function InsightList({ items, warning = false }: Readonly<{ items: readonly stri
 export default function AIPatientInsight({ patient, stale = false, onProposalChange }: AIPatientInsightProps) {
     const patientKey = `${patient.id}:${patient.version ?? 'unknown'}`;
     const picker = useFunctionModelPicker('patient_insight', patientKey, stale);
-    const [storedPreview, setPreview] = useState<Readonly<{ patientKey: string; value: AvailablePreview }> | null>(null);
+    const [storedPreview, setPreview] = useState<StoredPreview | null>(null);
     const [storedError, setStoredError] = useState<Readonly<{ patientKey: string; value: string | null }> | null>(null);
     const [generation, setGeneration] = useState<Readonly<{ patientKey: string; active: boolean }>>({ patientKey, active: false });
     const [progress, setProgress] = useState('');
@@ -80,7 +90,16 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
         [], undefined, ['settings'],
     );
     const enabled = isAiPatientInsightEnabledValue(killSwitch?.value);
-    const preview = picker.active && storedPreview?.patientKey === patientKey ? storedPreview.value : null;
+    const shown = picker.active && storedPreview?.patientId === patient.id ? storedPreview : null;
+    /* a proposal is current only while a request made now would send the same sources. */
+    const liveSignature = useLiveQuery(async () => {
+        if (!shown) return null;
+        const [entries, therapies] = await readInsightSources(patient.id);
+        return { patientKey, signature: currentPatientInsightSourceSignature({ patient, entries, therapies }) };
+    }, [patient.id, patientKey, shown !== null], null, ['entries', 'therapies']);
+    const superseded = shown !== null && (shown.patientKey !== patientKey
+        || (liveSignature?.patientKey === patientKey && liveSignature.signature !== shown.sourceSignature));
+    const preview = shown && !superseded ? shown.value : null;
     const error = storedError?.patientKey === patientKey ? storedError.value : null;
     const isGenerating = generation.patientKey === patientKey && generation.active;
     const setError = (value: string | null) => setStoredError({ patientKey, value });
@@ -91,9 +110,11 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
     }, [onProposalChange, patientKey, preview]);
 
     useEffect(() => {
-        abortControllerRef.current?.abort(); setPreview(null); setGeneration({ patientKey, active: false });
+        abortControllerRef.current?.abort(); setGeneration({ patientKey, active: false });
+        /* a newer revision of the same patient keeps the proposal, declared superseded; anything else clears it. */
+        setPreview(previous => previous && previous.patientId === patient.id && previous.patientKey !== patientKey ? previous : null);
         return () => abortControllerRef.current?.abort();
-    }, [patientKey, picker.active, picker.view.choice, picker.view.blocked, picker.view.preparationRevision]);
+    }, [patient.id, patientKey, picker.active, picker.view.choice, picker.view.blocked, picker.view.preparationRevision]);
 
     const generateInsight = async () => {
         if (!enabled) {
@@ -104,10 +125,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
         setGeneration({ patientKey, active: true }); setPreview(null); setError(null); setProgress('Raccolta del contesto clinico minimo…');
         try {
             const modelToken = await picker.client.begin();
-            const [entries, therapies] = await Promise.all([
-                db.entries.query({ patientId: patient.id, orderBy: 'date', orderDir: 'desc', limit: 12 }).toArray(),
-                db.therapies.query({ patientId: patient.id, limit: 12 }).toArray(),
-            ]);
+            const [entries, therapies] = await readInsightSources(patient.id);
             if (controller.signal.aborted) return;
             const request = buildPatientInsightPreviewRequest({
                 patient, entries, therapies,
@@ -133,7 +151,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
             if (result.writesPerformed !== 0 || result.apply !== 'denied' || result.proposal.reviewOnly !== true) {
                 setError('La proposta non rispetta il formato di sola revisione.'); return;
             }
-            setPreview({ patientKey, value: result });
+            setPreview({ patientId: patient.id, patientKey, sourceSignature: patientInsightSourceSignature(request), value: result });
         } catch {
             if (!controller.signal.aborted) setError('Patient Insight non è disponibile in questo momento.');
         } finally {
@@ -149,7 +167,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
         setGeneration({ patientKey, active: false }); setProgress(''); setError('Generazione interrotta. Nessuna modifica è stata applicata.');
     };
 
-    if (!patient.aiSummary && !preview && !isGenerating && !enabled) {
+    if (!patient.aiSummary && !shown && !isGenerating && !enabled) {
         return (
             /* a disabled function is a compact state with an explicit recovery action. */
             <section className="min-w-0 space-y-4 py-3 text-sm leading-relaxed text-[color:var(--lume-ink)]" data-testid="patient-insight-disabled-card">
@@ -160,7 +178,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
         );
     }
 
-    if (!patient.aiSummary && !preview && !isGenerating) {
+    if (!patient.aiSummary && !shown && !isGenerating) {
         return (
             <section className="min-w-0 space-y-4 py-3 text-sm leading-relaxed text-[color:var(--lume-ink)]">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -194,6 +212,13 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
                     <div><p className="font-semibold">Analisi in corso</p><p className="mt-1 text-[color:var(--lume-ink-muted)]">{progress}</p></div>
                     <button type="button" onClick={stopGeneration} className="ui-btn-secondary" style={actionStyle}>Interrompi</button>
                 </div>
+            )}
+
+            {!isGenerating && superseded && (
+                <section className="space-y-2" data-testid="patient-insight-superseded" role="status">
+                    <h4 className="font-semibold">Proposta superata</h4>
+                    <p className="text-[color:var(--lume-ink-muted)]">Proposta superata: profilo, diario o terapie sono cambiati dopo la generazione. Non viene mostrata; puoi prepararne una nuova.</p>
+                </section>
             )}
 
             {!isGenerating && preview && (
@@ -232,7 +257,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
                 </section>
             )}
 
-            {!isGenerating && !preview && patient.aiSummary && (
+            {!isGenerating && !shown && patient.aiSummary && (
                 <section className="space-y-3" data-testid="patient-insight-historical-summary">
                     <h4 className="font-semibold">Riepilogo storico salvato · sola lettura</h4>
                     {stale && <p className="text-[color:var(--lume-ink-muted)]">Dati modificati dopo la generazione</p>}
