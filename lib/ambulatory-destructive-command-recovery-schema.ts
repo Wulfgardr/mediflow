@@ -4,6 +4,7 @@ import { initializeSqliteSchema } from './sqlite-schema';
 import { schemaSnapshot, schemaDifferences } from './sqlite-schema-shape';
 
 const PREDECESSORS = new Map([
+    [3, 'f7a926813c169edfd7c75ce5e6a1d1b9f5b1e9201c7a20456dc557b943bbaac5'],
     [4, 'a998dad7b46c831f283032144f43cd690f68e962b199256ecd68c11736f867ed'],
     [5, '33ce371c41f4cb51033af18ef9a0f06bf8c81a248bca29f18b21d3db9f24ea46'],
     [6, '4becef1521ec507b3da31047e01ab3e25562197c8a518472bb4cdef93ed3867b'],
@@ -41,11 +42,14 @@ export function assertAmbulatoryCommandPredecessorRecoverySchema(probe: Database
         }
         if (version < 10) canonical.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         if (version < 6) canonical.exec('DROP TABLE ambulatory_destructive_commands');
-        if (version === 4) canonical.exec('DROP TABLE therapy_status_commands');
+        if (version <= 4) canonical.exec('DROP TABLE therapy_status_commands');
+        // Version 3 is the published 0.9.0: no personal prosthetics catalog sources yet.
+        if (version === 3) canonical.exec(`DROP TABLE prosthetics_catalog_documents; DROP TABLE prosthetics_catalog_sources;
+            ALTER TABLE prosthetics_catalog_entries DROP COLUMN source_id; ALTER TABLE prosthetic_prescriptions DROP COLUMN catalog_snapshot`);
         const expected = schemaSnapshot(canonical);
         if (createHash('sha256').update(JSON.stringify(expected)).digest('hex') !== fingerprint)
             throw new Error('Immutable recovery predecessor contract drift');
-        const unexpected = probe.prepare("SELECT 1 FROM sqlite_schema WHERE type='view' OR (?<9 AND name='portable_import_origins') OR (?<6 AND name='ambulatory_destructive_commands') OR (?=4 AND name='therapy_status_commands') LIMIT 1").get(version, version, version);
+        const unexpected = probe.prepare("SELECT 1 FROM sqlite_schema WHERE type='view' OR (?<9 AND name='portable_import_origins') OR (?<6 AND name='ambulatory_destructive_commands') OR (?<=4 AND name='therapy_status_commands') OR (?=3 AND name GLOB 'prosthetics_catalog_[ds]*') LIMIT 1").get(version, version, version, version);
         if (unexpected || schemaDifferences(expected, schemaSnapshot(probe)).length > 0)
             throw new Error('Recovery predecessor schema incompatible');
     } finally { canonical.close(); }
