@@ -220,16 +220,23 @@ final class MediFlowMobileAppUITests: XCTestCase {
                     refresh.tap()
                 }
                 openPatientSection(.overview)
+                attachScreenshot(named: "anchor-return-expanded-\(expanded)-reload-\(reload)")
                 XCTAssertTrue(anchor.isHittable)
                 XCTAssertEqual(anchor.frame.minY, before, accuracy: 1)
                 let venues = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Esegui la funzione"))
                 XCTAssertEqual(venues.count > 0, expanded)
-                XCTAssertEqual(app.buttons["patient-open-section-diary"].exists, expanded)
+                // The reopened overview rebuilds the expanded disclosure: on a
+                // slower runner its links join the tree a moment after the header.
+                let diaryLink = app.buttons["patient-open-section-diary"]
+                if expanded {
+                    XCTAssertTrue(diaryLink.waitForExistence(timeout: 5), "The expanded collection summary must survive the return")
+                } else {
+                    XCTAssertFalse(diaryLink.exists)
+                }
                 if reload {
                     XCTAssertTrue(app.descendants(matching: .any).matching(
                         NSPredicate(format: "label CONTAINS %@", "TEST-R1")).firstMatch.exists)
                 }
-                attachScreenshot(named: "anchor-return-expanded-\(expanded)-reload-\(reload)")
             }
         }
     }
