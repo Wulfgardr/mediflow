@@ -7,6 +7,7 @@ use super::*;
 use mediflow_runtime_client::{
     LocalHostAccess, PatientInsightOutcome, PatientInsightProposal, PatientInsightRequest,
     build_patient_insight_request, cited_sources, patient_insight_capture, patient_insight_message,
+    patient_insight_sources,
 };
 use serde_json::Value;
 use std::sync::Arc;
@@ -121,10 +122,25 @@ impl ClinicalApp {
         (self.selected_id.as_deref() == Some(detail.id.as_str())).then_some(detail)
     }
 
-    /// La proposta è della scheda mostrata e della sua revisione attuale.
-    pub(super) fn insight_is_current(&self, proposal: &PatientInsightProposal) -> bool {
-        self.insight_patient()
-            .is_some_and(|patient| patient.version == proposal.patient_revision)
+    /// La proposta descrive ancora la scheda mostrata: stessa revisione del paziente
+    /// e stesse fonti minimizzate di allora. Diario e terapie cambiano senza alzare
+    /// la revisione del paziente, quindi si confrontano le fonti. Se diario o terapie
+    /// non sono letti in questo momento, la proposta non vale come attuale.
+    pub(super) fn insight_is_current(
+        &self,
+        request: &PatientInsightRequest,
+        proposal: &PatientInsightProposal,
+    ) -> bool {
+        let (Some(patient), Some(therapies), Some(entries)) = (
+            self.insight_patient(),
+            self.patient.therapies.ready(),
+            self.patient.entries.ready(),
+        ) else {
+            return false;
+        };
+        patient.version == proposal.patient_revision
+            && patient_insight_sources(patient, self.scope.as_deref(), therapies, entries)
+                .is_ok_and(|sources| sources == request.sources)
     }
 
     /// Primo passo: verifica che la funzione sia accesa sull'host e prepara la
@@ -450,11 +466,11 @@ impl ClinicalApp {
                     );
             }
             InsightPhase::Proposal { request, proposal } => {
-                if !self.insight_is_current(proposal) {
+                if !self.insight_is_current(request, proposal) {
                     return pane
                         .child(notice(
                             "patient-insight-obsolete",
-                            "La scheda è cambiata dopo la generazione: la proposta non è più attuale e non viene mostrata.",
+                            "Proposta superata: profilo, diario o terapie sono cambiati dopo la generazione, oppure la scheda è in rilettura. Non viene mostrata; puoi prepararne una nuova.",
                             theme,
                             false,
                         ))

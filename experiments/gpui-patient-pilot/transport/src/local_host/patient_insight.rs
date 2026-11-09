@@ -321,6 +321,44 @@ pub fn patient_insight_capture(
     therapies: &[crate::Therapy],
     entries: &[crate::Entry],
 ) -> Result<Value> {
+    capture_with(
+        patient,
+        scope,
+        therapies,
+        entries,
+        format!("pi_{}", crate::http::operation_uuid()?),
+        iso_now(),
+    )
+}
+
+/// Le fonti numerate che una richiesta costruita adesso invierebbe. Servono a dire
+/// se una proposta descrive ancora la scheda: diario e terapie cambiano senza
+/// alzare la revisione del paziente.
+pub fn patient_insight_sources(
+    patient: &crate::PatientDetail,
+    scope: Option<&str>,
+    therapies: &[crate::Therapy],
+    entries: &[crate::Entry],
+) -> Result<Vec<InsightSource>> {
+    let capture = capture_with(
+        patient,
+        scope,
+        therapies,
+        entries,
+        "pi_current_sources_check".into(),
+        "2000-01-01T00:00:00.000Z".into(),
+    )?;
+    Ok(build_patient_insight_request(&capture)?.sources)
+}
+
+fn capture_with(
+    patient: &crate::PatientDetail,
+    scope: Option<&str>,
+    therapies: &[crate::Therapy],
+    entries: &[crate::Entry],
+    request_id: String,
+    captured_at: String,
+) -> Result<Value> {
     if patient
         .locked_fields
         .iter()
@@ -364,8 +402,8 @@ pub fn patient_insight_capture(
         },
         "therapies": therapies,
         "entries": entries,
-        "requestId": format!("pi_{}", crate::http::operation_uuid()?),
-        "capturedAt": iso_now(),
+        "requestId": request_id,
+        "capturedAt": captured_at,
     }))
 }
 
