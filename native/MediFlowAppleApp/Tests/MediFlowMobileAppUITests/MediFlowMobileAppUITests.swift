@@ -1275,7 +1275,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(ambulatoryScopePicker.waitForExistence(timeout: 5))
         XCTAssertTrue(ambulatoryScopePicker.isHittable)
         attachScreenshot(named: "audit-worklist")
-        try app.performAccessibilityAudit()
+        try performAuditNamingElements(screen: "worklist")
 
         app.terminate()
         launch(seedPatients: true, singlePatient: true)
@@ -1284,7 +1284,43 @@ final class MediFlowMobileAppUITests: XCTestCase {
         agendaTab.tap()
         let agenda = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
         waitForUIReady(agenda, in: app)
-        try app.performAccessibilityAudit()
+        try performAuditNamingElements(screen: "agenda")
+    }
+
+    /// Runs the accessibility audit without ignoring anything, but attaches what
+    /// XCTest's own failure message leaves out: which element the issue is on.
+    /// Without this a CI failure reads "Text clipped" and nothing else.
+    private func performAuditNamingElements(screen: String) throws {
+        var index = 0
+        try app.performAccessibilityAudit { issue in
+            index += 1
+            var lines = [
+                "screen: \(screen)",
+                "audit type: \(issue.auditType)",
+                "compact: \(issue.compactDescription)",
+                "detailed: \(issue.detailedDescription)",
+            ]
+            if let element = issue.element {
+                lines.append("identifier: \(element.identifier)")
+                lines.append("label: \(element.label)")
+                lines.append("element type: \(element.elementType.rawValue)")
+                lines.append("frame: \(element.frame)")
+                lines.append("debug: \(element.debugDescription)")
+                if element.exists, !element.frame.isEmpty {
+                    let shot = XCTAttachment(screenshot: element.screenshot())
+                    shot.name = "audit-\(screen)-\(index)-element"
+                    shot.lifetime = .keepAlways
+                    self.add(shot)
+                }
+            } else {
+                lines.append("element: none reported")
+            }
+            let text = XCTAttachment(string: lines.joined(separator: "\n"))
+            text.name = "audit-\(screen)-\(index)-issue"
+            text.lifetime = .keepAlways
+            self.add(text)
+            return false
+        }
     }
 
     /// The three cross-patient views must say something true about themselves,
