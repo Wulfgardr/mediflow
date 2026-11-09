@@ -319,7 +319,7 @@ persistenza delle chiavi non si ricavano dal solo comportamento della UI.
 | KEK | PBKDF2(PIN, salt, 100k) | memoria | decifra master key |
 | MasterKey | random 256 bit | DB (cifrata) + RAM (chiaro) | cifra/decifra dati |
 
-L’implementazione web è `lib/security.ts`; quella macOS è
+L’implementazione web è `lib/security/security.ts`; quella macOS è
 `native/MediFlowMac/.../CryptoService.swift`.
 
 ---
@@ -731,7 +731,7 @@ sequenceDiagram
 | Schema DB | `lib/schema.ts` |
 | DB server | `lib/db-server.ts` |
 | Client DB web | `lib/db.ts` |
-| Sicurezza web | `lib/security.ts`, `components/security-provider.tsx` |
+| Sicurezza web | `lib/security/security.ts`, `components/security-provider.tsx` |
 | API auth | `app/api/auth/*` |
 | API web | `app/api/*` |
 | API v1 | `app/api/v1/*` |
