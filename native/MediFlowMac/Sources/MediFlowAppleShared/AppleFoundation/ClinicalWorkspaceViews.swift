@@ -749,6 +749,37 @@ struct AgendaWorkspaceView: View {
     #endif
 
     private var content: some View {
+        // VARIANTE DIAGNOSTICA (ramo da non unire): il messaggio di stato fuori dalla List.
+        Group {
+            if case .message(let message) = sectionContent {
+                ScrollView {
+                    Text(message).font(.body).foregroundStyle(PlatformColors.secondaryInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20).padding(.vertical, 16)
+                }
+                .background(PlatformColors.chartCardSurface)
+            } else {
+                agendaList
+            }
+        }
+        #if DEBUG
+        .safeAreaInset(edge: .bottom) {
+            if AppleFoundationDemoMode.isDemoDataset {
+                Text("Dati sintetici di esempio · Nessuna lettura dall’host")
+                    .chartMetadata().padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(PlatformColors.chartCardSurface)
+            }
+        }
+        #endif
+        .navigationTitle("Agenda")
+        .toolbar {
+            Button("Aggiorna", systemImage: "arrow.clockwise", action: refresh)
+                .disabled(!canRefresh)
+                .accessibilityIdentifier("clinical-workspace-agenda-refresh-button")
+        }
+    }
+
+    private var agendaList: some View {
         List {
             switch sectionContent {
             case .progress:
@@ -790,21 +821,6 @@ struct AgendaWorkspaceView: View {
             }
         }
         .clinicalRegisterList()
-        #if DEBUG
-        .safeAreaInset(edge: .bottom) {
-            if AppleFoundationDemoMode.isDemoDataset {
-                Text("Dati sintetici di esempio · Nessuna lettura dall’host")
-                    .chartMetadata().padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(PlatformColors.chartCardSurface)
-            }
-        }
-        #endif
-        .navigationTitle("Agenda")
-        .toolbar {
-            Button("Aggiorna", systemImage: "arrow.clockwise", action: refresh)
-                .disabled(!canRefresh)
-                .accessibilityIdentifier("clinical-workspace-agenda-refresh-button")
-        }
     }
 
     private func agendaGroupTitle(_ pill: AgendaPill) -> String {
