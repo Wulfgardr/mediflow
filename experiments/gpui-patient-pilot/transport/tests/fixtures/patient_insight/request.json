@@ -1,0 +1,43 @@
+{
+  "ambulatoryId": "ambulatory-synthetic-01",
+  "capturedAt": "2026-11-09T10:00:00.000Z",
+  "patientId": "pi-gpui-synthetic-0001",
+  "patientRevision": 3,
+  "requestId": "pi_00000000-0000-4000-8000-000000000001",
+  "schemaVersion": "mediflow.patient-insight.preview-request.v1",
+  "sources": {
+    "activeTherapies": [
+      {
+        "label": "Ramipril — 5 mg una volta al giorno"
+      },
+      {
+        "label": "Metformina"
+      }
+    ],
+    "conditions": [
+      {
+        "label": "Ipertensione arteriosa essenziale (I10)"
+      },
+      {
+        "label": "Diabete mellito tipo 2"
+      },
+      {
+        "label": "Dislipidemia 🩺 in trattamento (E78.5)"
+      }
+    ],
+    "focus": {
+      "summary": "Valutazione manuale del follow-up clinico attuale"
+    },
+    "recentEvents": [
+      {
+        "summary": "Visita domiciliare: <p>Controllo domiciliare: pressione stabile, deambulazione con ausilio, alimentazione regolare. Controllo domiciliare: pressione stabile, deambulazione con ausilio, alimentazione regolare. Controllo domiciliare: pression"
+      },
+      {
+        "summary": "Evento clinico: Telefonata con la figlia: nessuna novità."
+      },
+      {
+        "summary": "Esami ematici"
+      }
+    ]
+  }
+}
