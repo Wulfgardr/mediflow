@@ -50,8 +50,8 @@ test('keeps every retired OCR replay fingerprint absent from the live contract a
 
 test('exact repository inventory is classified with no currentness gaps', () => {
     const findings = compareInventory(inventory(), CONTRACT);
-    assert.equal(CONTRACT.length, 25);
-    assert.equal(inventory().length, 25);
+    assert.equal(CONTRACT.length, 27);
+    assert.equal(inventory().length, 27);
     assert.deepEqual(CONTRACT.filter((item) => item.path === 'lib/document-dossier-ports.ts').map(({ kind, count, disposition }) => ({ kind, count, disposition })), [
         { kind: 'facade-add', count: 1, disposition: 'delegated' },
         { kind: 'facade-update', count: 1, disposition: 'delegated' },

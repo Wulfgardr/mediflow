@@ -1,0 +1,12 @@
+{
+  "kit": {
+    "schemaVersion": "mediflow.recovery-kit.v1",
+    "username": "synthetic-090-admin",
+    "wrappedMasterKey": "r1:eoFI/J+uQhGxnFUp78BCKNqnO6Box3FRBelDoKhBa3hxNnAckQck5AWR5pDx+CqEr1q97FBO0WLui10k",
+    "salt": "VAkCaL/qUv5SOZ8geG7Yxw=="
+  },
+  "recoveryKey": "DQ6H-KD79-Q3VN-ED8Y-FBMA-DT7B-3VJA-KWE5",
+  "passphrase": "passphrase solo sintetica 090",
+  "noteText": "Nota clinica soltanto sintetica 090",
+  "attachmentText": "JVBERi0xLjQKQWxsZWdhdG8gc2ludGV0aWNvIDA5MAolJUVPRg=="
+}
