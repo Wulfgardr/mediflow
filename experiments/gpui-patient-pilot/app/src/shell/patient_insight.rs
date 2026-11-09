@@ -285,32 +285,45 @@ impl ClinicalApp {
         {
             return;
         }
+        if !matches!(self.patient.insight.phase, InsightPhase::Running { .. }) {
+            return;
+        }
         let InsightPhase::Running { request, .. } = std::mem::take(&mut self.patient.insight.phase)
         else {
             return;
         };
-        self.patient.insight.phase = match result {
+        let shown = match result {
             Ok(PatientInsightOutcome::Proposal(proposal))
                 if self.insight_patient().is_some_and(|p| {
                     p.id == patient_id && p.version == proposal.patient_revision
                 }) =>
             {
-                InsightPhase::Proposal { request, proposal }
+                Ok(proposal)
             }
-            Ok(PatientInsightOutcome::Proposal(_)) => {
-                InsightPhase::Error(patient_insight_message("source_stale").into())
-            }
-            Ok(PatientInsightOutcome::Unavailable(code)) => {
-                InsightPhase::Unavailable(patient_insight_message(&code).into())
-            }
+            Ok(PatientInsightOutcome::Proposal(_)) => Err(InsightPhase::Error(
+                patient_insight_message("source_stale").into(),
+            )),
+            Ok(PatientInsightOutcome::Unavailable(code)) => Err(InsightPhase::Unavailable(
+                patient_insight_message(&code).into(),
+            )),
             Ok(PatientInsightOutcome::Failed(code)) => {
-                InsightPhase::Error(patient_insight_message(&code).into())
+                Err(InsightPhase::Error(patient_insight_message(&code).into()))
             }
-            Err(RuntimeError::InvalidResponse) => {
-                InsightPhase::Error(patient_insight_message("response_invalid").into())
-            }
-            Err(error) => {
-                InsightPhase::Error(format!("{} Nessuna proposta creata.", ui_error(error)))
+            Err(RuntimeError::InvalidResponse) => Err(InsightPhase::Error(
+                patient_insight_message("response_invalid").into(),
+            )),
+            Err(error) => Err(InsightPhase::Error(format!(
+                "{} Nessuna proposta creata.",
+                ui_error(error)
+            ))),
+        };
+        self.patient.insight.phase = match shown {
+            Ok(proposal) => InsightPhase::Proposal { request, proposal },
+            Err(phase) => {
+                // Senza proposta il testo inviato non serve più: non resta in memoria.
+                let mut request = request;
+                wipe_request(&mut request);
+                phase
             }
         };
         cx.notify();
