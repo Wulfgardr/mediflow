@@ -214,7 +214,7 @@ fn proposal_is_shown_with_its_sources_and_receipt(cx: &mut gpui::TestAppContext)
         let InsightPhase::Proposal { request, proposal } = &app.patient.insight.phase else {
             panic!("la risposta disponibile è una proposta");
         };
-        assert!(app.insight_is_current(proposal));
+        assert!(app.insight_is_current(request, proposal));
         let lines = insight_lines(request, proposal);
         assert_eq!(lines[0].section, "Sintesi proposta");
         assert_eq!(
@@ -433,10 +433,10 @@ fn proposal_becomes_obsolete_when_the_record_changes(cx: &mut gpui::TestAppConte
         if let ReadLoad::Ready(detail) = &mut app.patient.detail {
             detail.version += 1;
         }
-        let InsightPhase::Proposal { proposal, .. } = &app.patient.insight.phase else {
+        let InsightPhase::Proposal { request, proposal } = &app.patient.insight.phase else {
             panic!("proposta attesa");
         };
-        assert!(!app.insight_is_current(proposal));
+        assert!(!app.insight_is_current(request, proposal));
         let buttons = rendered_command::button_ids(|| {
             let _ = app.patient_insight_view(cx);
         });
@@ -514,4 +514,95 @@ fn unreadable_diagnoses_block_the_request(cx: &mut gpui::TestAppContext) {
         InsightPhase::Unavailable(m) if m.contains("non sono leggibili")
     )));
     assert!(bench.host.bodies(PREVIEW).is_empty());
+}
+
+fn shown_proposal(bench: &Bench, cx: &mut gpui::VisualTestContext) {
+    prepare(bench, cx);
+    let answer = bench.answer("response-available");
+    bench.view.update(cx, |app, cx| app.insight_confirm(cx));
+    cx.run_until_parked();
+    assert!(answer.join().unwrap());
+    assert!(bench.phase(cx, |phase| matches!(phase, InsightPhase::Proposal { .. })));
+}
+
+fn proposal_is_current(bench: &Bench, cx: &mut gpui::VisualTestContext) -> bool {
+    bench.view.read_with(cx, |app, _| {
+        let InsightPhase::Proposal { request, proposal } = &app.patient.insight.phase else {
+            panic!("proposta attesa");
+        };
+        app.insight_is_current(request, proposal)
+    })
+}
+
+/// Rilievo Codex su #892: modificare una voce di diario alza solo la versione della
+/// voce, non quella del paziente. La proposta mostrata non deve restare attuale.
+#[gpui::test]
+fn proposal_is_superseded_when_a_diary_entry_changes(cx: &mut gpui::TestAppContext) {
+    let (bench, cx) = bench(cx);
+    shown_proposal(&bench, cx);
+    assert!(proposal_is_current(&bench, cx));
+    bench.view.update(cx, |app, cx| {
+        // Diario riletto dopo il salvataggio: stessa revisione del paziente.
+        if let ReadLoad::Ready(entries) = &mut app.patient.entries {
+            entries[1].content = "Telefonata con la figlia: febbre da due giorni.".into();
+            entries[1].version += 1;
+        }
+        cx.notify();
+    });
+    assert!(!proposal_is_current(&bench, cx));
+    // Dichiarata superata, non cancellata in silenzio: resta chiudibile e rigenerabile.
+    assert!(bench.phase(cx, |phase| matches!(phase, InsightPhase::Proposal { .. })));
+    let buttons = rendered_buttons(&bench, cx);
+    assert!(buttons.contains(&"patient-insight-discard".to_owned()));
+    assert!(buttons.contains(&"patient-insight-prepare".to_owned()));
+}
+
+/// Sezioni in rilettura: finché diario o terapie non sono di nuovo letti, la proposta
+/// non vale come attuale.
+#[gpui::test]
+fn proposal_is_not_current_while_sections_reload(cx: &mut gpui::TestAppContext) {
+    let (bench, cx) = bench(cx);
+    shown_proposal(&bench, cx);
+    bench
+        .view
+        .update(cx, |app, _| app.patient.entries = ReadLoad::loading());
+    assert!(!proposal_is_current(&bench, cx));
+}
+
+/// Stesso caso per le terapie: una terapia modificata o aggiunta.
+#[gpui::test]
+fn proposal_is_superseded_when_therapies_change(cx: &mut gpui::TestAppContext) {
+    let (bench, cx) = bench(cx);
+    shown_proposal(&bench, cx);
+    bench.view.update(cx, |app, _| {
+        if let ReadLoad::Ready(therapies) = &mut app.patient.therapies {
+            therapies[0].dosage = "10 mg una volta al giorno".into();
+            therapies[0].version += 1;
+        }
+    });
+    assert!(!proposal_is_current(&bench, cx));
+    let (bench, cx2) = (bench, cx);
+    bench.view.update(cx2, |app, _| {
+        let (_, mut therapies, _) = records("pi-gpui-synthetic-0001");
+        let mut added = therapies[0].clone();
+        added.id = "t-nuova".into();
+        added.drug_name = "Bisoprololo".into();
+        therapies.push(added);
+        app.patient.therapies = ReadLoad::Ready(therapies);
+    });
+    assert!(!proposal_is_current(&bench, cx2));
+}
+
+/// Controesempio: rilettura con lo stesso contenuto (versioni uguali o alzate senza
+/// cambiare il testo inviato) non rende obsoleta la proposta.
+#[gpui::test]
+fn proposal_stays_current_when_reread_without_changes(cx: &mut gpui::TestAppContext) {
+    let (bench, cx) = bench(cx);
+    shown_proposal(&bench, cx);
+    bench.view.update(cx, |app, _| {
+        let (_, therapies, entries) = records("pi-gpui-synthetic-0001");
+        app.patient.therapies = ReadLoad::Ready(therapies);
+        app.patient.entries = ReadLoad::Ready(entries);
+    });
+    assert!(proposal_is_current(&bench, cx));
 }
