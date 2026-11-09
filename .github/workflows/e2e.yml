@@ -217,6 +217,9 @@ jobs:
           # @Codex: document-flow-real-route owns an empty standalone runtime and
           # runs only when this explicit synthetic-fixture opt-in is present.
           E2E_DOCUMENTS_SYNTHETIC_ONLY: "1"
+          # clinical-scales-validation scrive scale vere: gira solo su questo
+          # archivio sintetico isolato e su loopback.
+          E2E_SCALES_SYNTHETIC_ONLY: "1"
         run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
 
       - name: Official UI production acceptance
