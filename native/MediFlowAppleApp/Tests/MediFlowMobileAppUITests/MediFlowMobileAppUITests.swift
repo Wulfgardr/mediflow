@@ -1284,6 +1284,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
         agendaTab.tap()
         let agenda = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
         waitForUIReady(agenda, in: app)
+        // VARIANTE DIAGNOSTICA (ramo da non unire): l'audit parte dopo 10 s di quiete.
+        Thread.sleep(forTimeInterval: 10)
         try performAuditNamingElements(screen: "agenda")
     }
 
