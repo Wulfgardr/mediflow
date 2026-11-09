@@ -45,6 +45,11 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "e2e/fixtures/territorial-preset.ts",
+    "reason": "Cambio dell'assetto territoriale dalla UI di Impostazioni, condiviso da e2e/territorial-core.spec.ts e e2e/retention-qualification.spec.ts; nessun test autonomo.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "e2e/fixtures/isolated-runtime.ts",
     "reason": "WUL-729: Playwright fixture/test extension consumed by the route spec, no standalone spec.",
     "owner": "@Wulfgardr"
