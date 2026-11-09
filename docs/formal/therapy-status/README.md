@@ -8,7 +8,28 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 10 ed i predecessori canonici 4, 5, 6 e 9; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 11 ed i predecessori canonici 3, 4, 5, 6, 9 e 10; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+
+## Raccordo del 9 novembre 2026: backup della 0.9.0 pubblicata
+
+Lo schema 3, scritto dalla 0.9.0, entra fra i predecessori ammessi da
+`lib/recovery-backup-server.ts`. La ricostruzione in
+`lib/ambulatory-destructive-command-recovery-schema.ts` toglie, oltre a quanto
+già tolto per il 4, le fonti e i documenti del catalogo protesico e le due
+colonne nate dopo la 0.9.0; come il 4, lo schema 3 non ha il ledger dei comandi
+terapia. La nuova impronta è confrontata con un archivio prodotto dal codice del
+tag `v0.9.0`, senza differenze di forma; le impronte 4, 5, 6, 9 e 10 restano
+invariate. Il test sul predecessore 3 fallisce con
+`RECOVERY_BACKUP_PREFLIGHT_FAILED` prima della modifica e poi ripristina account,
+pazienti, diario e audit; un ledger terapia o una fonte protesica dentro un
+archivio dichiarato 3 restano respinti.
+
+Le transizioni delle terapie, le autorità di commit, i comandi e le ricevute
+non cambiano: il ripristino conserva il ledger della destinazione come per il
+predecessore 4. Modello, statechart, invarianti, testimoni e mutanti restano
+invariati. I digest dei due file sono aggiornati dopo le prove sui predecessori
+e sul recupero cifrato; `syncCommit` indica il commit di implementazione
+09642085a e il gate completo riesegue TLC.
 
 ## Raccordo autore del diario del 7 novembre 2026 (ADR 0183)
 
