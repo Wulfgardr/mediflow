@@ -201,6 +201,12 @@ const auditedFamilies = ['terminology_search', 'patient_open_loops_read',
 function auditCounts() {
   return Object.fromEntries(auditedFamilies.map(family => [family, successfulAudits(family).length]));
 }
+/** On a denied operation, the host audit names the denial code that the Mini response redacts. */
+function denialDiagnosis(response: unknown): string {
+  const denials = dbServer.$client.prepare(`SELECT event_type, outcome, redacted_metadata FROM audit_events
+    WHERE outcome <> 'success' ORDER BY rowid DESC LIMIT 4`).all();
+  return JSON.stringify({ response, denials });
+}
 function auditRows(): string[] {
   return dbServer.$client.prepare('SELECT * FROM audit_events ORDER BY rowid').all()
     .map(row => createHash('sha256').update(JSON.stringify(row)).digest('hex'));
@@ -307,7 +313,7 @@ for (const { ending, revokedRequest } of scenarios) {
     const proposalCount = successfulAudits('patient_open_loops_follow_up_proposal').length;
     const semanticCount = successfulAudits('semantic_query').length;
     const search = await request(operationRequests[0]!.command, operationRequests[0]!.args);
-    assert.equal(search.ok, true, JSON.stringify(search));
+    assert.equal(search.ok, true, denialDiagnosis(search));
     terminologyOutputSchema.parse(search.result);
     assert.equal(search.result.applicationServiceRef, 'AipTerminologySearchServiceV1');
     assert.equal(search.result.outcome, 'read');
@@ -319,7 +325,7 @@ for (const { ending, revokedRequest } of scenarios) {
     assert.deepEqual(dataSnapshot(), initialData, 'terminology search changes no non-audit table');
 
     const readResponse = await request('open-loops');
-    assert.equal(readResponse.ok, true, JSON.stringify(readResponse));
+    assert.equal(readResponse.ok, true, denialDiagnosis(readResponse));
     const read = openLoopsOutputSchema.parse(readResponse.result);
     assert.equal(read.items.length, expectedItems, 'only the selected patient contributes loops');
     assert.equal(read.truncated, false);
@@ -334,7 +340,7 @@ for (const { ending, revokedRequest } of scenarios) {
     assert.deepEqual(dataSnapshot(), initialData, 'open-loops changes no non-audit table');
 
     const proposalResponse = await request('follow-up-proposal');
-    assert.equal(proposalResponse.ok, true, JSON.stringify(proposalResponse));
+    assert.equal(proposalResponse.ok, true, denialDiagnosis(proposalResponse));
     const proposal = followUpProposalOutputSchema.parse(proposalResponse.result);
     assert.equal(proposal.outcome, 'proposed');
     assert.equal(proposal.maximumStage, 'proposal_only');
@@ -350,7 +356,7 @@ for (const { ending, revokedRequest } of scenarios) {
 
     const semanticRequest = operationRequests[3]!;
     const semanticResponse = await request(semanticRequest.command, semanticRequest.args);
-    assert.equal(semanticResponse.ok, true, JSON.stringify(semanticResponse));
+    assert.equal(semanticResponse.ok, true, denialDiagnosis(semanticResponse));
     const semantic = semanticQueryOutputSchema.parse(semanticResponse.result);
     assert.equal(semantic.outcome, 'read_completed');
     assert.equal(semantic.steps.length, 2);
