@@ -24,6 +24,7 @@ mod local_voice;
 mod notes_recovery_tests;
 #[cfg(unix)]
 mod patient_document;
+mod patient_insight;
 #[cfg(test)]
 pub(crate) mod rendered_command;
 mod scales;
@@ -368,6 +369,7 @@ struct PatientData {
     attachments: ReadLoad<Vec<Attachment>>,
     document_curation: document_curation::DocumentCuration,
     dossier: dossier_import::DossierArea,
+    insight: patient_insight::PatientInsightArea,
     document_details_id: Option<String>,
     document_original: Option<document_details::DocumentOriginal>,
 }
@@ -382,6 +384,7 @@ impl Default for PatientData {
             attachments: ReadLoad::Idle,
             document_curation: document_curation::DocumentCuration::default(),
             dossier: dossier_import::DossierArea::default(),
+            insight: patient_insight::PatientInsightArea::default(),
             document_details_id: None,
             document_original: None,
         }
@@ -910,6 +913,7 @@ impl ClinicalApp {
 
     fn next_presentation_epoch(&mut self) {
         self.patient.dossier = dossier_import::DossierArea::default();
+        self.interrupt_insight();
         if matches!(self.ambulatories, Load::Loading) {
             self.ambulatories = Load::Idle;
         }
@@ -4388,7 +4392,7 @@ impl ClinicalApp {
             overview =
                 overview.child(self.unreadable_field("clinical-workspace-locked-fields", cx));
         }
-        overview
+        overview.child(self.patient_insight_view(cx))
     }
 
     fn load_hint<T>(&self, id: &'static str, state: &Load<T>) -> Stateful<Div> {

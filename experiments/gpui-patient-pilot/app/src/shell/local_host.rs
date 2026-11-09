@@ -176,8 +176,8 @@ impl LocalAdministration {
             _ => None,
         }
     }
-    #[cfg(all(test, target_os = "macos"))]
-    pub(super) fn dossier_test_access(&mut self, access: Arc<LocalHostAccess>) {
+    #[cfg(test)]
+    pub(super) fn test_access(&mut self, access: Arc<LocalHostAccess>) {
         self.authority = Authority::Open(access);
     }
     pub(super) fn withdraw(&mut self, cx: &mut App) -> Option<RetiringAccess> {
