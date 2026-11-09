@@ -158,8 +158,10 @@ final class MediFlowMobileAppUITests: XCTestCase {
             start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -200)),
                         withVelocity: XCUIGestureVelocity(rawValue: 100), thenHoldForDuration: 0.2)
             XCTAssertLessThan(header.frame.minY, initialY - 100)
+            // The four summary tables push the chart summary below the first
+            // drag on iPhone: bring the anchor into view before leaving.
             let anchor = app.buttons["patient-summary-scales"]
-            XCTAssertTrue(anchor.isHittable)
+            positionInChart(anchor)
             attachScreenshot(named: "chart-before-departure-\(departure)")
             if departure != "list" { anchor.tap() }
             if departure == "workspace-close" {
@@ -200,33 +202,15 @@ final class MediFlowMobileAppUITests: XCTestCase {
                 let row = app.buttons["patient-cell-demo-0"]
                 XCTAssertTrue(row.waitForExistence(timeout: 15))
                 row.tap()
-                func position(_ element: XCUIElement) {
-                    XCTAssertTrue(element.waitForExistence(timeout: 5))
-                    var previousY: CGFloat?
-                    for _ in 0..<30 {
-                        if element.elementType == .staticText && element.isHittable { break }
-                        if element.elementType == .button && element.frame.minY > 190 && element.frame.minY < 400 { break }
-                        if let previousY, abs(previousY - element.frame.midY) < 1 && element.isHittable { break }
-                        previousY = element.frame.midY
-                        let delta = element.frame.midY - 333
-                        if abs(delta) < 40 { break }
-                        let start = app.coordinate(withNormalizedOffset: CGVector(
-                            dx: UIDevice.current.userInterfaceIdiom == .pad ? 0.75 : 0.5, dy: 0.65))
-                        let end = start.withOffset(CGVector(dx: 0, dy: -min(150, max(-150, delta))))
-                        start.press(forDuration: 0.1, thenDragTo: end,
-                                    withVelocity: XCUIGestureVelocity(rawValue: 100), thenHoldForDuration: 0.2)
-                    }
-                    XCTAssertTrue(element.isHittable)
-                }
                 if expanded {
                     for label in ["Strumenti con IA", "Altre sezioni della cartella"] {
                         let header = app.staticTexts[label].firstMatch
-                        position(header)
+                        positionInChart(header)
                         header.tap()
                     }
                 }
                 let anchor = app.buttons["patient-summary-scales"]
-                position(anchor)
+                positionInChart(anchor)
                 let before = anchor.frame.minY
                 attachScreenshot(named: "anchor-before-expanded-\(expanded)-reload-\(reload)")
                 anchor.tap()
@@ -310,6 +294,33 @@ final class MediFlowMobileAppUITests: XCTestCase {
             case .documents: "documents"
             }
         }
+    }
+
+    /// Scrolls the patient chart until `element` sits in the reading pane.
+    /// A drag that starts on a control, such as the diary filter, does not
+    /// scroll the chart: when the element has not moved, the next drag starts
+    /// from another height instead of repeating the same gesture.
+    private func positionInChart(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(element.waitForExistence(timeout: 5), file: file, line: line)
+        var previousY: CGFloat?
+        var startY: CGFloat = 0.65
+        for _ in 0..<30 {
+            if element.elementType == .staticText && element.isHittable { break }
+            if element.elementType == .button && element.frame.minY > 190 && element.frame.minY < 400 { break }
+            if let previousY, abs(previousY - element.frame.midY) < 1 {
+                if element.isHittable { break }
+                startY = startY == 0.65 ? 0.4 : 0.65
+            }
+            previousY = element.frame.midY
+            let delta = element.frame.midY - 333
+            if abs(delta) < 40 { break }
+            let start = app.coordinate(withNormalizedOffset: CGVector(
+                dx: UIDevice.current.userInterfaceIdiom == .pad ? 0.75 : 0.5, dy: startY))
+            let end = start.withOffset(CGVector(dx: 0, dy: -min(150, max(-150, delta))))
+            start.press(forDuration: 0.1, thenDragTo: end,
+                        withVelocity: XCUIGestureVelocity(rawValue: 100), thenHoldForDuration: 0.2)
+        }
+        XCTAssertTrue(element.isHittable, file: file, line: line)
     }
 
     private func openPatientSection(_ section: PatientSection, file: StaticString = #filePath, line: UInt = #line) {
