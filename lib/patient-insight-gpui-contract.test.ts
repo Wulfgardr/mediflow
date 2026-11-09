@@ -23,6 +23,7 @@ const WRITE = process.env.MEDIFLOW_WRITE_FIXTURES !== undefined;
 const MODEL = 'synthetic-patient-insight:1';
 const ENDPOINT = 'http://127.0.0.1:11434';
 const VERIFIED_AT = '2026-11-09T10:00:01.000Z';
+const SYNTHETIC_USER = 'user.synthetic';
 
 /* Risposta deterministica del modello finto: cita le fonti nell'ordine in cui l'host le numera. */
 const MODEL_REPLY = JSON.stringify({
@@ -63,7 +64,7 @@ function route(t: TestContext, mode: Mode, revision = 3) {
     ollamaLifecycle: { status: 'available', record: { version: 1, lifecycle: { provider: 'ollama', credentialClass: 'local_model', status: 'available_unqualified' } } } };
     const lease = Object.freeze({ sessionRef: `ssr_${'1'.repeat(32)}`, selectionEpoch: 7, patientRef: `ptr_${'2'.repeat(32)}`,
         ambulatoryRef: `abr_${'3'.repeat(32)}`, leaseRef: `lsr_${'4'.repeat(32)}`, expiresAt: Date.parse('2026-11-09T11:00:00.000Z') });
-    const session = Object.freeze({ id: '1'.repeat(64), userId: 'user.synthetic', username: 'synthetic', role: 'doctor', authChannel: 'web' as const,
+    const session = Object.freeze({ id: '1'.repeat(64), userId: SYNTHETIC_USER, username: SYNTHETIC_USER, role: 'doctor', authChannel: 'web' as const,
         createdAt: Date.parse('2026-11-09T09:00:00.000Z'), expiresAt: lease.expiresAt });
     const request = read('request');
     const currentRef = Object.freeze({}); let stagedRef: object | null = null; let generation = 0; let terminal = false;
