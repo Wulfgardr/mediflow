@@ -12,5 +12,8 @@ const service = record({ serviceName: text(240), category, priority: text(80), c
 // patient-insight-host-capability.ts): the schema asks the model for the same rule, summary included.
 const CITED_CLAIM_PATTERN = '.*\\[(S[0-9]+|DATI-INCOMPLETI)(, ?(S[0-9]+|DATI-INCOMPLETI))*\\].*';
 const cited = (maxLength: number) => Object.freeze({ ...text(maxLength), pattern: CITED_CLAIM_PATTERN });
-export const PATIENT_INSIGHT_JSON_SCHEMA = record({ schemaVersion: Object.freeze({ type: 'string', const: 'mediflow.ai.extract.v1' }), task: Object.freeze({ type: 'string', const: 'patient_insight' }), summary: cited(220), data: record({ currentState: list(cited(220), 2), alerts: list(cited(220), 2), nextSteps: list(cited(220), 3), gaps: list(cited(220), 1) }) });
+// Il prompt dichiara lo stesso limite (ai-task-contract-prompts.ts): Ollama non applica maxLength.
+export const PATIENT_INSIGHT_CLAIM_MAX_LENGTH = 220;
+const claim = cited(PATIENT_INSIGHT_CLAIM_MAX_LENGTH);
+export const PATIENT_INSIGHT_JSON_SCHEMA = record({ schemaVersion: Object.freeze({ type: 'string', const: 'mediflow.ai.extract.v1' }), task: Object.freeze({ type: 'string', const: 'patient_insight' }), summary: claim, data: record({ currentState: list(claim, 2), alerts: list(claim, 2), nextSteps: list(claim, 3), gaps: list(claim, 1) }) });
 export const SMART_IMPORT_JSON_SCHEMA = record({ schemaVersion: Object.freeze({ type: 'string', const: 'mediflow.ai.extract.v1' }), task: Object.freeze({ type: 'string', const: 'smart_import' }), summary: text(220), data: record({ diagnoses: list(diagnosis, 32), therapies: list(therapy, 32), servicePrescriptions: list(service, 32) }) });
