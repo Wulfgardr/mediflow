@@ -301,6 +301,74 @@ pub fn build_patient_insight_request(capture: &Value) -> Result<PatientInsightRe
     })
 }
 
+/// Ora corrente nel formato di `Date.prototype.toISOString`.
+pub fn iso_now() -> String {
+    chrono::DateTime::<chrono::Utc>::from(std::time::SystemTime::now())
+        .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+        .to_string()
+}
+
+/// Materiale della richiesta dai dati della scheda già letti e decifrati da GPUI,
+/// con identificativo e ora nuovi. Stesse scelte del Web: terapie non eliminate
+/// (il costruttore tiene le attive), al più dodici voci di diario dalla più recente.
+/// Righe con campi cifrati illeggibili restano fuori: non diventano testo vuoto.
+///
+/// Il profilo abbinato non espone l'ambulatorio interno: vale l'ambulatorio con cui
+/// GPUI ha letto la scheda. Se il profilo lo porta e non coincide, la richiesta non parte.
+pub fn patient_insight_capture(
+    patient: &crate::PatientDetail,
+    scope: Option<&str>,
+    therapies: &[crate::Therapy],
+    entries: &[crate::Entry],
+) -> Result<Value> {
+    if patient
+        .locked_fields
+        .iter()
+        .any(|field| field == "diagnoses")
+    {
+        return Err(RuntimeError::LockedField);
+    }
+    let ambulatory_id = match (patient.ambulatory_id.as_deref(), scope) {
+        (Some(own), Some(scope)) if own != scope => return Err(RuntimeError::InvalidInput),
+        (Some(id), _) | (None, Some(id)) => id,
+        (None, None) => return Err(RuntimeError::InvalidInput),
+    };
+    let diagnoses = match patient.diagnoses.as_deref().map(str::trim) {
+        None | Some("") => json!([]),
+        Some(text) => serde_json::from_str::<Value>(text)
+            .ok()
+            .filter(Value::is_array)
+            .ok_or(RuntimeError::InvalidInput)?,
+    };
+    let therapies: Vec<Value> = therapies
+        .iter()
+        .filter(|row| row.deleted_at.is_none() && row.locked_fields.is_empty())
+        .map(|row| json!({"drugName": row.drug_name, "dosage": row.dosage, "status": row.status}))
+        .collect();
+    let mut rows: Vec<&crate::Entry> = entries
+        .iter()
+        .filter(|row| row.deleted_at.is_none() && row.locked_fields.is_empty())
+        .collect();
+    rows.sort_by(|a, b| b.date.cmp(&a.date));
+    let entries: Vec<Value> = rows
+        .into_iter()
+        .take(MAX_ITEMS)
+        .map(|row| json!({"title": row.title, "content": row.content}))
+        .collect();
+    Ok(json!({
+        "patient": {
+            "id": patient.id,
+            "ambulatoryId": ambulatory_id,
+            "version": patient.version,
+            "diagnoses": diagnoses,
+        },
+        "therapies": therapies,
+        "entries": entries,
+        "requestId": format!("pi_{}", crate::http::operation_uuid()?),
+        "capturedAt": iso_now(),
+    }))
+}
+
 /// Una proposta da rivedere: nessuna scrittura, nessuna applicazione.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PatientInsightProposal {
@@ -693,10 +761,11 @@ impl LocalHostAccess {
     }
     /// Il kill switch del Quadro paziente come lo legge il Web, prima di ogni richiesta.
     pub fn patient_insight_enabled(&self) -> Result<bool> {
-        Ok(self
-            .read_switches()?
-            .into_iter()
-            .any(|(key, enabled)| key == HostSettingKey::PatientInsight && enabled))
+        Ok(matches!(
+            self.setting_value(HostSettingKey::PatientInsight)?
+                .as_deref(),
+            Some("enabled" | "true" | "1")
+        ))
     }
     /// Una richiesta, un tentativo. Non è una scrittura: l'host risponde con `writesPerformed: 0`.
     pub fn preview_patient_insight(
@@ -805,6 +874,74 @@ mod tests {
         assert_eq!(
             build_patient_insight_request(&capture),
             Err(RuntimeError::InvalidInput)
+        );
+    }
+
+    /// Il profilo abbinato arriva senza ambulatorio: vale quello della lettura, e un
+    /// profilo che ne indica un altro non parte. Righe illeggibili restano fuori.
+    #[test]
+    fn capture_uses_the_read_scope_and_skips_unreadable_rows() {
+        let detail = |ambulatory: Value| -> crate::PatientDetail {
+            serde_json::from_value(json!({
+                "id": "pi-gpui-synthetic-0001", "firstName": "Ada", "lastName": "Sintetica",
+                "birthDate": null, "taxCode": "SYNTHETIC", "address": null, "phone": null,
+                "caregiver": null, "exemptions": null,
+                "diagnoses": "[{\"code\":\"I10\",\"description\":\"Ipertensione\"}]",
+                "monitoringProfile": null, "statusReason": null, "archiveReason": null,
+                "archiveNote": null, "notes": null, "isAdi": false, "isArchived": false,
+                "version": 3, "ambulatoryId": ambulatory, "createdAt": null,
+                "updatedAt": null, "deletedAt": null,
+            }))
+            .unwrap()
+        };
+        let therapy = |name: &str, locked: bool| -> crate::Therapy {
+            let mut row: crate::Therapy = serde_json::from_value(json!({
+                "id": name, "patientId": "p", "drugName": name, "aic": null, "atc": null,
+                "activePrinciple": null, "dosage": "", "motivation": null, "diagnosisCode": null,
+                "diagnosisName": null, "status": "active", "startDate": "2026-01-01",
+                "endDate": null, "version": 1, "createdAt": null, "updatedAt": null,
+                "deletedAt": null, "deletionReason": null,
+            }))
+            .unwrap();
+            if locked {
+                row.locked_fields.push("dosage".into());
+            }
+            row
+        };
+        let therapies = [therapy("Ramipril", false), therapy("Illeggibile", true)];
+        let capture = patient_insight_capture(
+            &detail(Value::Null),
+            Some("ambulatory-synthetic-01"),
+            &therapies,
+            &[],
+        )
+        .unwrap();
+        assert_eq!(
+            capture["patient"]["ambulatoryId"],
+            "ambulatory-synthetic-01"
+        );
+        assert_eq!(capture["therapies"].as_array().unwrap().len(), 1);
+        let request = build_patient_insight_request(&capture).unwrap();
+        assert_eq!(request.therapy_count(), 1);
+        assert_eq!(request.condition_count(), 1);
+        assert_eq!(
+            patient_insight_capture(&detail(Value::Null), None, &therapies, &[]),
+            Err(RuntimeError::InvalidInput)
+        );
+        assert_eq!(
+            patient_insight_capture(
+                &detail(json!("altro")),
+                Some("ambulatory-synthetic-01"),
+                &therapies,
+                &[]
+            ),
+            Err(RuntimeError::InvalidInput)
+        );
+        let mut locked = detail(Value::Null);
+        locked.locked_fields.push("diagnoses".into());
+        assert_eq!(
+            patient_insight_capture(&locked, Some("ambulatory-synthetic-01"), &therapies, &[]),
+            Err(RuntimeError::LockedField)
         );
     }
 
