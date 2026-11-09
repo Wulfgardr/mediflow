@@ -2,6 +2,7 @@
 import { test, expect } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { switchPreset } from './fixtures/territorial-preset';
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -16,74 +17,101 @@ async function createPatient(page: Page, firstName: string, taxCode: string): Pr
   }, { firstName, taxCode });
 }
 
-const LABELS = { core: 'Nucleo internazionale', 'core+it': 'Italia', 'core+it+lom': 'Italia e Lombardia' } as const;
+const SYNTHETIC_SISS_SESSION = { status: 'unavailable', source: 'synthetic', checkedAt: '2026-11-09T10:00:00Z', browserProfile: null,
+  warning: 'Stato sintetico: nessuna osservazione reale.', sessionHealth: 'none', lastModule: null, lastModuleLabel: null, lastModuleAt: null, checkpoints: [] };
 
-async function currentPreset(page: Page): Promise<string> {
-  const response = await page.request.get('/api/system/territorial-packs');
-  expect(response.status()).toBe(200);
-  const capability = await response.json();
-  expect(capability.status).toBe('ready');
-  return capability.preset;
-}
-
-/** Cambia l'assetto dall'interfaccia di Impostazioni, come farebbe il titolare. */
-async function usePreset(page: Page, preset: keyof typeof LABELS) {
-  if (await currentPreset(page) !== preset) await applyPreset(page, LABELS[preset]);
-  expect(await currentPreset(page)).toBe(preset);
-}
-
-async function applyPreset(page: Page, label: string) {
-  await page.goto('/settings/profilo');
-  await page.getByRole('button', { name: 'Personalizzazione territoriale', exact: true }).click();
-  await page.getByRole('radio', { name: new RegExp(`^${label}( \\(attivo\\))?(?! e )`, 'u') }).check();
-  await page.getByRole('button', { name: 'Applica assetto', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Cambia assetto', exact: true }).click();
-  await expect(page.getByText(`Assetto attivo: ${label}.`, { exact: true })).toBeVisible();
-}
-
-test('J-2: con il solo nucleo SISS, portali e PRREG spariscono dalla scheda e i writer si fermano; riattivando la Lombardia tornano', async ({ page }, info) => {
-  test.setTimeout(180_000);
+test('J-2: con il solo nucleo SISS, portali e PRREG spariscono dalla scheda e i writer si fermano; lo storico resta e torna con la Lombardia', async ({ page, isolatedRuntime }, info) => {
+  test.setTimeout(240_000);
   const evidence = process.env.TERRITORIAL_EVIDENCE_DIR || info.outputPath('territoriale');
   mkdirSync(evidence, { recursive: true });
+  // Lo stato della sessione SISS legge la cronologia del browser dell'host: qui resta sintetico.
+  await page.route('**/api/siss/session-status', route => route.fulfill({ json: SYNTHETIC_SISS_SESSION }));
   await bootstrapUnlockedSession(page, '314159');
-  await usePreset(page, 'core+it+lom');
+  await switchPreset(page, 'core+it+lom');
   const patientId = await createPatient(page, 'Lombardia', 'LMBNCL80A01H501K');
   const navigation = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
+  const pane = page.locator('#siss');
   const scheda = async () => {
     await page.goto(`/patients/${patientId}/modules`);
     await expect(navigation).toBeVisible();
   };
+  const reason = 'Passaggio sintetico J-2 da conservare';
+  const handoffRow = pane.locator('[data-siss-handoff-id]').filter({ hasText: 'Anagrafe' });
+  const openDiary = async () => {
+    const diary = pane.getByRole('button', { name: /^Diario locale dei passaggi/u });
+    if (await diary.getAttribute('aria-expanded') !== 'true') await diary.click();
+  };
+  const archived = async () => {
+    const response = await page.request.get(`/api/siss-handoffs?patientId=${patientId}`);
+    expect(response.status()).toBe(200);
+    return await response.json() as { id: string; action: string; outcome: string }[];
+  };
+  const db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
+  try {
+    await scheda();
+    await openPatientSection(page, 'siss');
+    await expect(pane).toContainText('SISS e FSE');
+    // Superfici lombarde presenti: le stesse che con il solo nucleo devono sparire.
+    await expect(pane.getByRole('region', { name: 'Passaggio al portale regionale', exact: true }), 'J-2 portali presenti con Lombardia').toBeVisible();
+    await expect(pane.getByRole('button', { name: 'Apri Prescrittivo Regionale (PRREG), fuori da MediFlow', exact: true }), 'J-2 PRREG presente con Lombardia').toBeVisible();
 
-  await scheda();
-  await openPatientSection(page, 'siss');
-  await expect(page.locator('#siss')).toContainText('SISS e FSE');
-  await page.screenshot({ path: join(evidence, 'lombardia.png'), fullPage: true });
+    // Un passaggio registrato dalla UI con il modulo lombardo attivo.
+    await openDiary();
+    await pane.getByRole('button', { name: 'Registra passaggio', exact: true }).first().click();
+    const form = pane.getByRole('form', { name: 'Registra passaggio locale', exact: true });
+    await form.getByLabel('Perché ho aperto il portale', { exact: true }).fill(reason);
+    await form.getByRole('button', { name: 'Salva voce', exact: true }).click();
+    await expect(handoffRow).toBeVisible();
+    const seeded = await archived();
+    expect(seeded).toHaveLength(1);
+    const handoffId = seeded[0].id;
+    await expect(handoffRow).toHaveAttribute('data-siss-handoff-id', handoffId);
+    await page.screenshot({ path: join(evidence, 'lombardia.png'), fullPage: true });
 
-  await usePreset(page, 'core');
-  await scheda();
-  await navigation.getByRole('button', { name: 'Altro', exact: true }).click();
-  await expect(navigation.locator('a[href="#protesica"]')).toBeVisible();
-  await expect(navigation.locator('a[href="#siss"]')).toHaveCount(0);
-  await page.screenshot({ path: join(evidence, 'nucleo.png'), fullPage: true });
-  await page.goto(`/patients/${patientId}/modules#siss`);
-  await expect(navigation).toBeVisible();
-  await expect(page.locator('#siss')).toHaveCount(0);
-  await expect(page.getByText('SISS e FSE', { exact: true })).toHaveCount(0);
+    await switchPreset(page, 'core');
+    await scheda();
+    await navigation.getByRole('button', { name: 'Altro', exact: true }).click();
+    await expect(navigation.locator('a[href="#protesica"]')).toBeVisible();
+    await expect(navigation.locator('a[href="#siss"]'), 'J-2 SISS assente dalla navigazione con il solo nucleo').toHaveCount(0);
+    await page.screenshot({ path: join(evidence, 'nucleo.png'), fullPage: true });
+    await page.goto(`/patients/${patientId}/modules#siss`);
+    await expect(navigation).toBeVisible();
+    await expect(pane, 'J-2 sezione SISS assente con il solo nucleo').toHaveCount(0);
+    await expect(page.getByText('SISS e FSE', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Passaggio al portale regionale', exact: true }), 'J-2 portali assenti con il solo nucleo').toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Apri (FSE|Anagrafe|Menu SISS|Protesica-RL), fuori da MediFlow$/u }), 'J-2 aperture dei portali assenti con il solo nucleo').toHaveCount(0);
+    await expect(page.getByText(/Prescrittivo Regionale \(PRREG\)/u), 'J-2 PRREG assente con il solo nucleo').toHaveCount(0);
+    await expect(page.locator(`[data-siss-handoff-id="${handoffId}"]`)).toHaveCount(0);
 
-  const headers = await trustedArchiveWebRequestHeaders(page);
-  const writers: unknown[] = [];
-  for (const path of ['/api/siss/context', '/api/siss/prescription']) {
-    const response = await page.request.post(path, { headers, data: { patientId } });
-    expect(response.status()).toBe(403);
-    expect(await response.json()).toEqual({ code: 'TERRITORIAL_PACK_DISABLED', error: 'Pacchetto Lombardia non attivo' });
-    writers.push({ path, status: 403 });
-  }
+    // Lo storico resta nell'archivio: rilettura via API e nel database del runtime isolato.
+    expect((await archived()).map(row => row.id), 'J-2 storico conservato con il solo nucleo (API)').toEqual([handoffId]);
+    expect(db.prepare('SELECT id FROM siss_handoff_events WHERE patient_id=?').pluck().all(patientId), 'J-2 storico conservato con il solo nucleo (database)').toEqual([handoffId]);
 
-  await usePreset(page, 'core+it+lom');
-  await scheda();
-  await openPatientSection(page, 'siss');
-  await expect(page.locator('#siss')).toContainText('SISS e FSE');
-  writeFileSync(join(evidence, 'writer-nucleo.json'), JSON.stringify(writers, null, 2));
+    const headers = await trustedArchiveWebRequestHeaders(page);
+    const writers: unknown[] = [];
+    for (const [path, data] of [
+      ['/api/siss/context', { patientId }],
+      ['/api/siss/prescription', { patientId }],
+      ['/api/siss-handoffs', { patientId, action: 'registry.lookup', outcome: 'completed' }],
+    ] as const) {
+      const response = await page.request.post(path, { headers, data });
+      expect(response.status()).toBe(403);
+      expect(await response.json()).toEqual({ code: 'TERRITORIAL_PACK_DISABLED', error: 'Pacchetto Lombardia non attivo' });
+      writers.push({ path, status: 403 });
+    }
+    expect(db.prepare('SELECT COUNT(*) FROM siss_handoff_events WHERE patient_id=?').pluck().get(patientId)).toBe(1);
+
+    await switchPreset(page, 'core+it+lom');
+    await scheda();
+    await openPatientSection(page, 'siss');
+    await expect(pane).toContainText('SISS e FSE');
+    await openDiary();
+    await expect(handoffRow, 'J-2 passaggio di nuovo visibile al ritorno della Lombardia').toHaveAttribute('data-siss-handoff-id', handoffId);
+    await handoffRow.getByRole('button', { name: 'Dettagli del passaggio', exact: true }).click();
+    await expect(handoffRow).toContainText(reason);
+    await page.screenshot({ path: join(evidence, 'ritorno-lombardia.png'), fullPage: true });
+    writeFileSync(join(evidence, 'writer-nucleo.json'), JSON.stringify({ writers, handoffId }, null, 2));
+  } finally { db.close(); }
 });
 
 test('J-4: con il solo nucleo la protesica chiede un prontuario con fonte dichiarata, poi registra la voce', async ({ page, isolatedRuntime }, info) => {
@@ -91,7 +119,7 @@ test('J-4: con il solo nucleo la protesica chiede un prontuario con fonte dichia
   const evidence = process.env.TERRITORIAL_EVIDENCE_DIR || info.outputPath('protesica-nucleo');
   mkdirSync(evidence, { recursive: true });
   await bootstrapUnlockedSession(page, '314159');
-  await usePreset(page, 'core');
+  await switchPreset(page, 'core');
   const patientId = await createPatient(page, 'Protesica', 'PRTNCL80A01H501Q');
   const name = 'Deambulatore sintetico J4';
   const db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
