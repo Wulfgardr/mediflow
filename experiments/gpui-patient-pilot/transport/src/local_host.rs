@@ -8,6 +8,7 @@ mod governance;
 mod models;
 mod network;
 mod parameters;
+mod patient_insight;
 mod references;
 mod retention;
 mod security;
@@ -30,6 +31,7 @@ pub use governance::*;
 pub use models::*;
 pub use network::*;
 pub use parameters::*;
+pub use patient_insight::*;
 pub use references::*;
 use reqwest::{
     Method,

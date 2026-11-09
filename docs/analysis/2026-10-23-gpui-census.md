@@ -133,7 +133,7 @@ consegne del registro chiuso sotto; G-7 e G-8 restano trasversali.
 | P16 — Archivio Intelligente / Document Insights (view estrazioni + delete) | `#documenti` — `document-insights-panel.tsx` | DOC mostra snapshot e archivio insight tramite gestione locale | L sintesi/fonte/estratti archiviati paginati; S rimozione singola o completa con conferma e CAS Web | D/Ø | QD/QS | G-4b |
 | P17 — Smart Import (candidati diagnosi/terapie da documenti, applica in scheda) | Scheda/nuova scheda — `patient-smart-import-fabric-preview-card.tsx` | Assente | Nessuna generazione/apply nativa; apply legacy ritirato, non da riattivare | Ø | QI/QS | G-5c,G-4d,G-6j |
 | P18 — Referti recenti (Evidence Stack tile, view sintesi) | Scheda — `app/patients/[id]/modules/page.tsx`, `document-insights-panel.tsx` | DOC nel dettaglio; niente tile equivalenti di referti recenti | L snapshot; nessuna S all'apertura | D | QL/QD | G-4b,G-8b |
-| P19 — AI Patient Insight (sintesi/follow-up/alert generati) | Scheda — `ai-patient-insight.tsx` | Assente come generazione/revisione | L configurazione AI; S proiezione assistita assente | R0/Ø | QI/QS | G-5a,G-6j |
+| P19 — AI Patient Insight (sintesi/follow-up/alert generati) | Scheda — `ai-patient-insight.tsx` | Panoramica della scheda sul Mac host, tramite accesso locale: consenso, proposta con fonti e ricevuta, interruzione, scarto (vedi «Funzioni intelligenti che generano») | L proposta dal servizio Web; S nessuna, le azioni sul risultato restano a G-6j | R1 | QI/QS | G-5a,G-6j |
 | P20 — Foglio sinottico / Identity Lens / Review Queue (viste sintetiche cockpit) | `/patients/{id}/modules` — sinottico, identity lens, review queue, timeline | SH overview, sei sezioni; composizione parziale | L profilo/risorse; niente nuova autorità; attenzione/timeline da comporre | R1 | QL/QA | G-8b,G-6b,G-6e |
 | P21 — Export FHIR paziente (pre-check locale) | Scheda/edit — export FHIR e `/api/fse/validate-patient` | Assente | L dati/export/pre-check locali assenti; nessun invio istituzionale | Ø | QL/QD | G-6i |
 | P22 — Report PDF paziente | Scheda — `lib/report-service.ts` | Assente | L aggregato e file PDF da generare/salvare esplicitamente | Ø | QL/QD | G-6i |
@@ -726,6 +726,18 @@ esecuzione di Treatment Reasoning. Le route `/api/system/mlx` e
 | `/api/auth/reset/previous` | Recupero dell'account sul Web | GPUI accede con il PIN precedente tramite `/api/auth/local-client/login` | Coperta per l'accesso; il reset resta sul Web |
 | `/api/plugin-local-ui/*` | ADR 0159, plugin locale | Nessuno: è un canale del plugin, non una vista | Fuori dal perimetro GPUI |
 | `/api/v1/network/ai/fabric/*`, `/api/v1/network/ai/authority-retirement` | Intelligence Fabric | Solo Apple | Per GPUI resta il criterio di G-5 e I-1: niente AI implicita, funzioni spente o assenti dichiarate |
+
+### Funzioni intelligenti che generano (decisione del 9 novembre 2026)
+
+Leonardo ha deciso di portare in GPUI per Mac, dentro la 0.9.1, le tre funzioni
+che generano: Quadro paziente, sintesi dei documenti e import assistito. Prima
+GPUI aveva soltanto stato, interruttori ed etichette di governo.
+
+| Riga | Stato | Percorso | Prove e limiti |
+| --- | --- | --- | --- |
+| G-5a, P19 Quadro paziente | Coperta sul Mac host, [PR #892](https://github.com/Wulfgardr/mediflow/pull/892) | `LocalHostAccess` verso `/api/ai/patient-insight/preview`, con la sessione Web dell'host. Kill switch, governo, validazione, fonti `[Sx]` e ricevuta restano del servizio; GPUI legge l'interruttore prima di chiedere il consenso e non scrive nulla | Contratto Rust e TypeScript sugli stessi file; stati GPUI contro un host sintetico; giro con host vero, archivio sintetico e Ollama finto. Non provati: finestra reale, Ollama reale, VoiceOver, Windows e Linux |
+| G-5b Sintesi documenti | Da fare | Stessa strada, route `/api/ai/document-synthesis/preview` | Riusa trasporto annullabile, consenso, fonti e ricevuta del Quadro |
+| G-5c Import assistito | Da fare | Stessa strada, route `/api/ai/smart-import/preview` | Come G-5b; nessuna scrittura derivata prima di G-6j |
 
 ### Cosa resta per chiudere G-0
 
