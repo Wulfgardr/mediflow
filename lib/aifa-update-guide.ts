@@ -34,7 +34,15 @@ export function assertAifaGuideStatus(value: unknown): asserts value is AifaCata
         || !['ready', 'unverified', 'not-imported'].includes(String(value.state))) {
         throw new Error('Stato del catalogo non leggibile. Rileggi stato.');
     }
-    if (value.state === 'ready') {
+    if (value.state === 'ready' && value.manifest === null) {
+        // Catalogo di un'altra agenzia (ADR 0177): la fonte dichiarata prende il posto del manifest AIFA.
+        const s = value.source;
+        if (!isRecord(s) || s.kind !== 'file' || s.rowCount !== value.count
+            || typeof s.sha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(s.sha256)
+            || ['agency', 'codeSystem', 'version', 'date'].some(key => typeof s[key] !== 'string' || !s[key])) {
+            throw new Error('Manifest del catalogo non leggibile. Rileggi stato.');
+        }
+    } else if (value.state === 'ready') {
         const m = value.manifest;
         if (!isRecord(m) || m.format !== 'mediflow.aifa-catalog-manifest.v1' || m.rowCount !== value.count
             || typeof m.sha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(m.sha256)
