@@ -5,6 +5,11 @@ import { loginWithWebAuthControl } from '../scripts/web-auth-control-test-client
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { switchPreset, type TerritorialPreset } from './fixtures/territorial-preset';
+import {
+  RETENTION_CATEGORIES, RETENTION_CATEGORY_LABELS, RETENTION_PROFILES, RETENTION_SOURCES, effectiveRetentionTerm,
+  type EffectiveTerm, type RetentionProfileId, type RetentionTerm, type RetentionWindows,
+} from '../lib/retention-policy';
 
 const endpoint = '/api/system/retention';
 
@@ -206,4 +211,75 @@ test('blocco su documento dal browser: il documento resta finché il blocco non 
     expect(audit[0].flags).toContain(`attachment:${attachmentId}`);
     writeFileSync(join(evidence, 'audit.json'), JSON.stringify(audit, null, 2));
   } finally { db.close(); }
+});
+
+// R-1: il contratto 0.9.1 fissa la corrispondenza fra assetto e profilo; minimi e fonti si leggono dalla tabella del prodotto.
+const PROFILE_FOR_PRESET: Record<TerritorialPreset, RetentionProfileId> = { core: 'none', 'core+it': 'it-national', 'core+it+lom': 'it-lom-rev04' };
+const termText = (term: RetentionTerm | EffectiveTerm) => term.kind === 'years' ? `${term.years} anni` : term.kind === 'unlimited' ? 'Illimitata' : 'Da fissare';
+
+test('R-1: profilo di conservazione per nucleo, Italia e Lombardia con minimi e fonti della tabella del prodotto', async ({ page }, info) => {
+  test.setTimeout(240_000);
+  const evidence = process.env.RETENTION_EVIDENCE_DIR || info.outputPath('retention-profili');
+  mkdirSync(evidence, { recursive: true });
+  await bootstrapUnlockedSession(page, '314159');
+  const overview = async () => {
+    const response = await page.request.get(endpoint); expect(response.status()).toBe(200);
+    return await response.json() as { preset: string; profileId: RetentionProfileId; windows: RetentionWindows; windowsRevision: number; review: unknown[] };
+  };
+  const observed: unknown[] = [];
+  const saveWindow = async (category: string, years: number) => {
+    await page.getByTestId(`retention-term-${category}`).getByRole('spinbutton').fill(String(years));
+    await page.getByTestId('retention-save-windows').click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Salva finestre', exact: true }).click();
+  };
+  for (const preset of ['core', 'core+it', 'core+it+lom'] as const) {
+    const profileId = PROFILE_FOR_PRESET[preset];
+    const profile = RETENTION_PROFILES[profileId];
+    await switchPreset(page, preset);
+    await page.goto('/settings/conservazione');
+    const state = await overview();
+    expect(state, `R-1 profilo ${profileId} per ${preset}`).toMatchObject({ preset, profileId, review: [] });
+    const card = page.getByTestId('retention-profile');
+    await expect(card.getByText(profile.label, { exact: true }), `R-1 nome del profilo ${profileId}`).toBeVisible();
+    const sources = [...new Set(RETENTION_CATEGORIES.map(category => profile.terms[category].sourceId).filter(id => id !== null))];
+    await expect(card.getByRole('link'), `R-1 fonti del profilo ${profileId}`).toHaveText(sources.map(id => RETENTION_SOURCES[id].label));
+    for (const id of sources) await expect(card.getByRole('link', { name: RETENTION_SOURCES[id].label, exact: true })).toHaveAttribute('href', RETENTION_SOURCES[id].href);
+    await expect(card.getByText(/Senza profilo, nessun fascicolo scade/u)).toHaveCount(profileId === 'none' ? 1 : 0);
+    for (const category of RETENTION_CATEGORIES) {
+      const minimum = profile.terms[category];
+      const row = page.getByTestId(`retention-term-${category}`);
+      await expect(row).toContainText(RETENTION_CATEGORY_LABELS[category]);
+      await expect(row, `R-1 minimo ${profileId}/${category}`).toContainText(`Minimo: ${termText(minimum.term)}.`);
+      if (minimum.sourceId) await expect(row, `R-1 fonte ${profileId}/${category}`).toContainText(RETENTION_SOURCES[minimum.sourceId].label);
+      await expect(row.getByText('Non modificabile', { exact: true })).toHaveCount(minimum.term.kind === 'unlimited' ? 1 : 0);
+      await expect(row, `R-1 termine applicato ${profileId}/${category}`)
+        .toContainText(`Applicato: ${termText(effectiveRetentionTerm(profileId, category, state.windows[category]))}`);
+    }
+    await page.screenshot({ path: join(evidence, `profilo-${profileId}.png`), fullPage: true });
+
+    if (preset === 'core+it+lom') { observed.push({ preset, profileId }); continue; }
+    // Finestre: sotto il minimo del profilo il salvataggio è respinto, sopra resta dopo la ricarica.
+    const bounded = RETENTION_CATEGORIES.find(category => profile.terms[category].term.kind === 'years');
+    if (bounded) {
+      const minimum = profile.terms[bounded].term as { kind: 'years'; years: number };
+      await saveWindow(bounded, minimum.years - 1);
+      await expect(page.getByText('La finestra è più breve del minimo del profilo attivo.', { exact: true })).toBeVisible();
+      expect((await overview()).windows, `R-1 finestra sotto il minimo respinta per ${profileId}`).toEqual(state.windows);
+      await page.reload();
+    } else {
+      // Senza minimi in anni (nessun profilo) il titolare fissa il termine: nessun fascicolo scade prima.
+      expect(RETENTION_CATEGORIES.filter(category => profile.terms[category].term.kind === 'owner')).toHaveLength(RETENTION_CATEGORIES.length - 1);
+    }
+    const category = bounded ?? 'ambulatory_record';
+    const years = (profile.terms[category].term.kind === 'years' ? (profile.terms[category].term as { years: number }).years : 0) + 3;
+    await saveWindow(category, years);
+    await expect(page.getByText('Finestre salvate', { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByTestId(`retention-term-${category}`).getByRole('spinbutton')).toHaveValue(String(years));
+    await expect(page.getByTestId(`retention-term-${category}`)).toContainText(`Applicato: ${years} anni`);
+    const saved = await overview();
+    expect(saved.windows[category], `R-1 finestra del titolare salvata per ${profileId}`).toEqual({ kind: 'years', years });
+    observed.push({ preset, profileId, sources, window: { category, years } });
+  }
+  writeFileSync(join(evidence, 'profili.json'), JSON.stringify(observed, null, 2));
 });
