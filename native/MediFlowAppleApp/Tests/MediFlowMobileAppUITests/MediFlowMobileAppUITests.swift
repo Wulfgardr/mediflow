@@ -203,11 +203,22 @@ final class MediFlowMobileAppUITests: XCTestCase {
                 XCTAssertTrue(row.waitForExistence(timeout: 15))
                 row.tap()
                 if expanded {
-                    for label in ["Strumenti con IA", "Altre sezioni della cartella"] {
-                        let header = app.staticTexts[label].firstMatch
-                        positionInChart(header)
-                        header.tap()
-                    }
+                    // Each disclosure is brought to mid-screen and must be open
+                    // before the chart is left. Tapping the label as soon as it
+                    // was hittable could land under the floating "Nuova voce"
+                    // button, and the return was then blamed for a disclosure
+                    // that had never opened.
+                    let aiTools = app.buttons["patient-ai-tools-disclosure"]
+                    positionInChart(aiTools)
+                    aiTools.tap()
+                    let firstVenue = app.descendants(matching: .any).matching(
+                        NSPredicate(format: "label BEGINSWITH %@", "Esegui la funzione")).firstMatch
+                    XCTAssertTrue(firstVenue.waitForExistence(timeout: 5), "The AI tools must be open before leaving the chart")
+                    let contents = app.buttons["patient-chart-contents-disclosure"]
+                    positionInChart(contents)
+                    contents.tap()
+                    XCTAssertTrue(app.buttons["patient-open-section-diary"].waitForExistence(timeout: 5),
+                                  "The collection summary must be open before leaving the chart")
                 }
                 let anchor = app.buttons["patient-summary-scales"]
                 positionInChart(anchor)
