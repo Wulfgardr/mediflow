@@ -1284,6 +1284,19 @@ final class MediFlowMobileAppUITests: XCTestCase {
         agendaTab.tap()
         let agenda = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
         waitForUIReady(agenda, in: app)
+        // VARIANTE DIAGNOSTICA (ramo da non unire): un primo giro del solo
+        // controllo Dynamic Type, che registra i rilievi senza far fallire il
+        // test, poi l'audit completo. Dice se il rilievo compare solo alla
+        // prima misura dello stesso processo.
+        var warmupIssues: [String] = []
+        try app.performAccessibilityAudit(for: .dynamicType) { issue in
+            warmupIssues.append("\(issue.compactDescription) | \(issue.element?.label ?? "nessun elemento")")
+            return true
+        }
+        let warmup = XCTAttachment(string: "primo giro, rilievi: \(warmupIssues.count)\n" + warmupIssues.joined(separator: "\n"))
+        warmup.name = "audit-agenda-primo-giro"
+        warmup.lifetime = .keepAlways
+        add(warmup)
         try performAuditNamingElements(screen: "agenda")
     }
 
