@@ -3,7 +3,7 @@
   "release": "0.9.1",
   "sourceRevision": "498658cbf596b96811eecb843a3a60e3ea8ea458",
   "contract": "docs/releases/0.9.1-contract.md",
-  "contractSha256": "b36af2db410769a726481c6b9f44179f8b9f6a0561469be69b7df0da72753c02",
+  "contractSha256": "8a046306d5723791dbcc1372793c5243b370bca639c05a23e1546b75a0c20fdb",
   "purpose": "coverage_only_no_runtime_admission",
   "capabilities": [
     {
