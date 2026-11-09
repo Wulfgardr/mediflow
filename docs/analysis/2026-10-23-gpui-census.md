@@ -735,7 +735,7 @@ GPUI aveva soltanto stato, interruttori ed etichette di governo.
 
 | Riga | Stato | Percorso | Prove e limiti |
 | --- | --- | --- | --- |
-| G-5a, P19 Quadro paziente | Coperta sul Mac host | `LocalHostAccess` verso `/api/ai/patient-insight/preview`, con la sessione Web dell'host. Kill switch, governo, validazione, fonti `[Sx]` e ricevuta restano del servizio; GPUI legge l'interruttore prima di chiedere il consenso e non scrive nulla | Contratto Rust e TypeScript sugli stessi file; stati GPUI contro un host sintetico; giro con host vero, archivio sintetico e Ollama finto. Non provati: finestra reale, Ollama reale, VoiceOver, Windows e Linux |
+| G-5a, P19 Quadro paziente | Coperta sul Mac host, [PR #892](https://github.com/Wulfgardr/mediflow/pull/892) | `LocalHostAccess` verso `/api/ai/patient-insight/preview`, con la sessione Web dell'host. Kill switch, governo, validazione, fonti `[Sx]` e ricevuta restano del servizio; GPUI legge l'interruttore prima di chiedere il consenso e non scrive nulla | Contratto Rust e TypeScript sugli stessi file; stati GPUI contro un host sintetico; giro con host vero, archivio sintetico e Ollama finto. Non provati: finestra reale, Ollama reale, VoiceOver, Windows e Linux |
 | G-5b Sintesi documenti | Da fare | Stessa strada, route `/api/ai/document-synthesis/preview` | Riusa trasporto annullabile, consenso, fonti e ricevuta del Quadro |
 | G-5c Import assistito | Da fare | Stessa strada, route `/api/ai/smart-import/preview` | Come G-5b; nessuna scrittura derivata prima di G-6j |
 
