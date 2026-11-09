@@ -64,6 +64,8 @@ const eslintConfig = defineConfig([
     // while the JavaScript source lint is running.
     "experiments/gpui-patient-pilot/target/**",
     "experiments/rust-boundary/target/**",
+    // Output minificato di scripts/build-dossier-worker.mjs: si corregge la sorgente, non il bundle.
+    "experiments/gpui-patient-pilot/worker/dossier.bundle.mjs",
   ]),
 ]);
 

@@ -284,7 +284,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant UI as Web UI
-    participant Sec as lib/security.ts
+    participant Sec as lib/security/security.ts
     participant API as Next.js Web API
     participant DB as SQLite
     UI->>Sec: encryptData(plainText, masterKey)
@@ -613,10 +613,10 @@ documentati in [SECURITY.md](../SECURITY.md).
 - Apertura/allineamento DB: `lib/sqlite-schema-open.ts` → `lib/sqlite-schema.ts`; dichiarazioni ORM: `lib/schema.ts`
 - Accesso DB server: `lib/db-server.ts`
 - Facade web + cifratura client: `lib/db.ts`
-- Cifratura web: `lib/security.ts`
+- Cifratura web: `lib/security/security.ts`
 - Auth web: `app/api/auth/*`
 - API native v1: `app/api/v1/*`
-- Controllo token locale: `lib/local-api-auth.ts`, `lib/local-api-token.ts`
+- Controllo token locale: `lib/security/local-api-auth.ts`, `lib/security/local-api-token.ts`
 - Proxy TLS locale: `scripts/local-api-tls-proxy.mjs`
 - AnyDoc e source authority: `lib/domain/documents/anydoc-current-source-composition.ts`, `lib/domain/documents/anydoc-local-extraction-runner.ts`
 - Core OCR selettivo: `lib/domain/documents/anydoc-page-manifest.ts`, `lib/domain/documents/anydoc-pdf-page-materializer.ts`, `lib/domain/documents/anydoc-pdf-page-renderer.ts`
