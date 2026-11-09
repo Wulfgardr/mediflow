@@ -51,6 +51,28 @@ test('finds repetitions below per-device and configuration wrappers', () => {
   assert.match(retryReport(tree(testCase([wrapped]))).markdown, /Failed → Passed/);
 });
 
+const app = '<XCUIApplicationImpl: 0x600000c80a80 com.mediflow.mobile at /Users/runner/work/_temp/dd/Build/Products/Debug-iphonesimulator/MediFlow.app>';
+const launchProgress = `MediFlowMobileAppUITests.swift:274: Failed to get launch progress for ${app}: Timed out while requesting launch progress.`;
+const launchViaXcode = `MediFlowMobileAppUITests.swift:274: Failed to launch ${app} via Xcode: Timed out while launching application via Xcode.`;
+
+test('a launch that timed out on a cold simulator is infrastructure only when the next attempt passes', () => {
+  for (const message of [launchProgress, launchViaXcode]) {
+    const recovered = retryReport(tree(testCase([attempt('Failed', [message]), attempt('Passed')], 'Failed')));
+    assert.equal(recovered.failed, false, message);
+    assert.match(recovered.markdown, /infrastruttura/);
+    assert.equal(retryReport(tree(testCase([attempt('Failed', [message]), attempt('Failed', [message])], 'Failed'))).failed, true,
+      'a launch that never succeeds stays blocking');
+  }
+});
+
+test('a launch that failed for another reason, or next to an assertion, stays blocking', () => {
+  const crashed = `MediFlowMobileAppUITests.swift:274: Failed to launch ${app} via Xcode: The application crashed.`;
+  assert.equal(retryReport(tree(testCase([attempt('Failed', [crashed]), attempt('Passed')], 'Failed'))).failed, true);
+  assert.equal(retryReport(tree(testCase([
+    attempt('Failed', [launchProgress, 'MediFlowMobileAppUITests.swift:1280: XCTAssertTrue failed']), attempt('Passed'),
+  ], 'Failed'))).failed, true);
+});
+
 test('a recovered content assertion is red, never classified as infrastructure', () => {
   const report = retryReport(tree(testCase([
     attempt('Failed', ['MediFlowMobileAppUITests.swift:1226: XCTAssertEqual failed: Agenda non pronta']),
