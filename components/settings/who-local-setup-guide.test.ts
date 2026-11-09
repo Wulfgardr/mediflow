@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import { secureLaunch } from '../../e2e/fixtures/secure-browser';
 import { whoSetupGuideStatus } from '../../lib/reference-data/who-local-setup-guide-state.ts';
 const source = readFileSync(new URL('./who-local-setup-guide.tsx', import.meta.url), 'utf8');
 
@@ -24,11 +25,11 @@ test('status presentation never promotes checkbox, command, container start or s
     assert.doesNotMatch(source, /Per AMD64.*mancano/u);
 });
 
-// Explicit future fixture gate: this artifact run must not start a browser.
-// With opt-in, missing locked dependencies/browser are failures, never substituted mocks.
+// Runs in the unit suite like the other component browser tests: missing locked
+// dependencies/browser are failures, never substituted mocks.
 // This uses the real component and invented UI state, not a backend/WHO availability trial.
 test('WHO browser acceptance: explicit host commands, fresh consent, copy-only actions and no invented availability', {
-    skip: process.env.MEDIFLOW_WHO_UI_ACCEPTANCE !== '1', timeout: 60_000,
+    timeout: 60_000,
 }, async () => {
     assert.ok(process.env.MEDIFLOW_DATA_DIR?.trim(), 'Set an explicit synthetic MEDIFLOW_DATA_DIR');
     const { chromium, expect } = await import('@playwright/test');
@@ -45,7 +46,7 @@ window.remountWhoFixture(0);`;
     const bundle = await build({ stdin: { contents: entry, resolveDir: process.cwd(), loader: 'tsx' },
         bundle: true, write: false, outfile: 'fixture/bundle.js', platform: 'browser', format: 'iife',
         define: { 'process.env.NODE_ENV': '"development"' } });
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch(secureLaunch({ headless: true }));
     try {
         const context = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['clipboard-read', 'clipboard-write'] });
         const page = await context.newPage(); const errors: string[] = [], unexpected: string[] = [];
