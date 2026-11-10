@@ -72,8 +72,9 @@ fn collapse(value: &str) -> String {
         .join(" ")
 }
 
-/// `trimPatientSmartImportSnippet`: spazi compressi; oltre `max` unità UTF-16 taglia
-/// a `max - 1` e aggiunge tre punti.
+const SNIPPET_SUFFIX: &str = "...";
+/// `trimPatientSmartImportSnippet`: spazi compressi; oltre `max` unità UTF-16 accorcia
+/// in modo che testo e tre punti stiano in `max`, senza spezzare un carattere.
 fn snippet(value: &str, max: usize) -> String {
     let normalized = collapse(value);
     if units(&normalized) <= max {
@@ -82,13 +83,16 @@ fn snippet(value: &str, max: usize) -> String {
     let mut taken = 0;
     let mut cut = 0;
     for (index, c) in normalized.char_indices() {
-        if taken + c.len_utf16() > max - 1 {
+        if taken + c.len_utf16() > max - SNIPPET_SUFFIX.len() {
             break;
         }
         taken += c.len_utf16();
         cut = index + c.len_utf8();
     }
-    format!("{}...", normalized[..cut].trim_matches(js_space))
+    format!(
+        "{}{SNIPPET_SUFFIX}",
+        normalized[..cut].trim_matches(js_space)
+    )
 }
 
 /// `splitPromptSourceSegments`: righe e punti elenco; un solo segmento resta intero.

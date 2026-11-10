@@ -65,12 +65,12 @@ afterEach(() => { for (const session of sessions.splice(0)) retireSyntheticWebSe
 after(() => fs.rmSync(DATA_DIRECTORY, { recursive: true, force: true }));
 
 /* La scheda di `chart.json` nella forma che riceve il costruttore Web. */
-function webCapture() {
-    const patient = { ...CHART.patient, documentInsights: undefined };
-    const entries = CHART.entries.map((row: Record<string, unknown>) => ({ ...row, patientId: CHART.patient.id }));
-    const attachments = CHART.attachments.map((row: { createdAt: string }) => ({ ...row, createdAt: new Date(row.createdAt) }));
+function webCapture(chart = CHART) {
+    const patient = { ...chart.patient, documentInsights: undefined };
+    const entries = chart.entries.map((row: Record<string, unknown>) => ({ ...row, patientId: chart.patient.id }));
+    const attachments = chart.attachments.map((row: { createdAt: string }) => ({ ...row, createdAt: new Date(row.createdAt) }));
     // Come la pagina Web: alle fonti arrivano le terapie non eliminate; il costruttore tiene le attive.
-    return buildPatientSmartImportProjectionCaptureInput(patient as never, entries as never, attachments as never, CHART.therapies as never);
+    return buildPatientSmartImportProjectionCaptureInput(patient as never, entries as never, attachments as never, chart.therapies as never);
 }
 /* La proiezione che il normalizzatore Web produce da quella cattura, con l'ordinale e l'ora fissati. */
 function webAttachment() {
@@ -206,6 +206,22 @@ test('GPUI raccoglie dalla scheda le stesse fonti del costruttore e del normaliz
     assert.deepEqual(capture, read('capture-input'));
     if (!WRITE) assert.deepEqual(read('request-ingest').attachment, webAttachment(), 'la proiezione inviata da GPUI è quella del normalizzatore Web');
     assert.equal(read('request-selection').patientId, CHART.patient.id);
+});
+
+test('note oltre 900 unità UTF-16: il Web le accorcia entro il limite e il normalizzatore le accetta, come GPUI', () => {
+    const limit = read('chart-limit');
+    const capture = JSON.parse(JSON.stringify(webCapture(limit)));
+    const notes = capture.sources.filter((source: { kind: string }) => source.kind === 'patient-notes');
+    assert.equal(notes.length, 2);
+    for (const source of notes) {
+        assert.ok(source.content.length <= 900, `${source.label}: ${source.content.length} unità`);
+        assert.ok(source.content.endsWith('...'));
+        assert.doesNotMatch(source.content, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u, 'nessuna coppia surrogata spezzata');
+    }
+    const normalizer = createSmartImportProjectionAttachmentBrowserNormalizer({ clock: () => new Date(CHART.capturedAt) });
+    assert.doesNotThrow(() => normalizer.capture(webCapture(limit), true), 'la cattura Web passa il normalizzatore');
+    if (WRITE) writeFixture('capture-input-limit', capture);
+    assert.deepEqual(capture, read('capture-input-limit'));
 });
 
 test('i corpi di GPUI passano per selezione, ingest e capacità reali fino a una proposta con fonti', async (t) => {

@@ -75,10 +75,15 @@ function tokenize(value: string): string[] {
         .filter((token) => token.length > 1);
 }
 
+const SNIPPET_SUFFIX = '...';
+
+/** Shortens to `maxLength` UTF-16 units including the suffix, never splitting a surrogate pair. */
 export function trimPatientSmartImportSnippet(value: string, maxLength = 260): string {
     const normalized = value.replace(/\s+/g, ' ').trim();
     if (normalized.length <= maxLength) return normalized;
-    return `${normalized.slice(0, maxLength - 1).trim()}...`;
+    let cut = maxLength - SNIPPET_SUFFIX.length;
+    if (cut > 0 && /[\uD800-\uDBFF]/u.test(normalized[cut - 1])) cut -= 1;
+    return `${normalized.slice(0, cut).trim()}${SNIPPET_SUFFIX}`;
 }
 
 function splitSourceClauses(content: string): string[] {

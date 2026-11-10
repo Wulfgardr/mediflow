@@ -38,7 +38,10 @@ pub(crate) struct Chart {
     pub scope: String,
 }
 pub(crate) fn chart() -> Chart {
-    let chart = fixture("chart");
+    chart_from("chart")
+}
+pub(crate) fn chart_from(name: &str) -> Chart {
+    let chart = fixture(name);
     let patient_id = chart["patient"]["id"].clone();
     let patient = serde_json::from_value(json!({
         "id": patient_id, "firstName": "Persona", "lastName": "Sintetica",
@@ -328,4 +331,25 @@ fn request_follows_the_chart() {
     bound.wipe();
     assert!(bound.sources.iter().all(|s| s.content.is_empty()));
     assert_eq!(bound.capture, Value::Null);
+}
+
+/// Note oltre il limite di 900 unità UTF-16 (una riga ASCII di 901 caratteri, una di
+/// caratteri fuori dal piano base): la richiesta nasce con le note accorciate entro il
+/// limite, identiche a quelle del Web (`capture-input-limit.json`, scritto dal test TS).
+#[test]
+fn notes_over_the_limit_are_shortened_like_the_web() {
+    let chart = chart_from("chart-limit");
+    let request = chart
+        .request()
+        .expect("la preparazione riesce con le note accorciate");
+    assert_eq!(request.count("patient-notes"), 2);
+    for source in &request.sources {
+        assert!(
+            source.content.encode_utf16().count() <= 900,
+            "{}",
+            source.label
+        );
+        assert!(source.content.ends_with("..."));
+    }
+    assert_eq!(fixture("capture-input-limit"), chart.capture().unwrap());
 }

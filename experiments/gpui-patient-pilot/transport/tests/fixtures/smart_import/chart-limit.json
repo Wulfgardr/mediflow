@@ -1,0 +1,37 @@
+{
+  "ambulatoryId": "ambulatory.synthetic.si.1",
+  "capturedAt": "2026-11-10T09:00:00.000Z",
+  "sourceRevision": 1,
+  "requestIds": [
+    "req_00000000000000000000000000000a01",
+    "req_00000000000000000000000000000a02"
+  ],
+  "patient": {
+    "id": "patient.synthetic.si.1",
+    "version": 3,
+    "notes": "Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sinteticaX\n𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀",
+    "diagnoses": "[{\"system\":\"ICD-10\",\"code\":\"I10\",\"description\":\"Ipertensione essenziale\"}]"
+  },
+  "entries": [],
+  "therapies": [
+    {
+      "id": "therapy.synthetic.si.1",
+      "drugName": "Ramipril",
+      "activePrinciple": "ramipril",
+      "dosage": "5 mg al giorno",
+      "aic": null,
+      "atc": "C09AA05",
+      "status": "active"
+    },
+    {
+      "id": "therapy.synthetic.si.2",
+      "drugName": "Amlodipina",
+      "activePrinciple": "amlodipina",
+      "dosage": "10 mg al giorno",
+      "aic": null,
+      "atc": null,
+      "status": "suspended"
+    }
+  ],
+  "attachments": []
+}
