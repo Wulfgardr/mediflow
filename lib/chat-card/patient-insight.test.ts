@@ -39,7 +39,7 @@ async function frame(meta: unknown) {
 test('the frame pins its script and the adapter admits the insight command and states', () => {
     assert.ok(html.includes(`script-src 'sha256-${createHash('sha256').update(script).digest('base64')}'`));
     for (const state of ['insight-opened', 'insight-unavailable', 'insight-busy', 'insight-closed']) assert.ok(adapter.includes(`"${state}"`), state);
-    assert.match(adapter, /"local-voice","patient-insight","receipt"/u);
+    assert.match(adapter, /"local-voice","patient-insight","document-synthesis","receipt"/u);
 });
 
 test('the insight command sends no argument and shows each state without clinical content', async () => {
