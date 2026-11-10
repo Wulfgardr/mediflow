@@ -149,6 +149,8 @@ pub(crate) struct Shared {
     state: Option<State>,
     problem: Option<Problem>,
     stable: Zeroizing<String>,
+    provisional: Zeroizing<String>,
+    open_confirmed: usize,
     finals: usize,
     transcript: Option<Zeroizing<String>>,
     #[cfg(test)]
@@ -166,6 +168,11 @@ pub(crate) struct Engine {
     pub(crate) files: [&'static ModelFile; 2],
     pub(crate) prompt: Zeroizing<String>,
 }
+
+/// Per le prove: stato, lunghezza del provvisorio e del confermato della
+/// frase aperta, definitivi e finestre (inizio, fine, parole).
+#[cfg(test)]
+pub(crate) type Snapshot = (State, usize, usize, usize, Vec<(usize, usize, usize)>);
 
 /// Sessione di dettatura con whisper: comandi verso il thread di lavoro e
 /// lettura dello stato pubblicato.
@@ -217,6 +224,11 @@ impl WhisperSession {
         self.read(|s| Zeroizing::new(s.stable.as_str().to_owned()))
             .unwrap_or_default()
     }
+    /// Testo provvisorio della frase in corso: solo da mostrare.
+    pub(crate) fn provisional_text(&self) -> Zeroizing<String> {
+        self.read(|s| Zeroizing::new(s.provisional.as_str().to_owned()))
+            .unwrap_or_default()
+    }
     pub(crate) fn transcript(&self) -> Option<Zeroizing<String>> {
         self.read(|s| {
             (s.state == Some(State::Review))
@@ -260,11 +272,12 @@ impl WhisperSession {
     }
     /// Stato pubblicato, per le misure delle prove.
     #[cfg(test)]
-    pub(crate) fn snapshot(&self) -> (State, usize, usize, Vec<(usize, usize, usize)>) {
+    pub(crate) fn snapshot(&self) -> Snapshot {
         let s = self.shared.lock().unwrap();
         (
             s.state.unwrap_or(State::Unavailable),
-            s.stable.len(),
+            s.provisional.len(),
+            s.open_confirmed,
             s.finals,
             s.windows.clone(),
         )
@@ -303,6 +316,7 @@ fn fail(shared: &Mutex<Shared>, state: State, problem: Option<Problem>) {
         s.state = Some(state);
         s.problem = problem;
         s.stable.zeroize();
+        s.provisional.zeroize();
         s.transcript = None;
     });
 }
@@ -380,10 +394,14 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
             break Err(State::Unavailable);
         }
         blocks.zeroize();
-        let stable = dictation.stable_text();
+        let stable = dictation.confirmed_text();
+        let provisional = dictation.provisional_text();
+        let open_confirmed = dictation.open_confirmed_len();
         let finals = dictation.finals_count();
         publish(shared, |s| {
             s.stable = stable;
+            s.provisional = provisional;
+            s.open_confirmed = open_confirmed;
             s.finals = finals;
         });
     };
@@ -416,6 +434,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
             s.windows = windows;
         }
         s.stable.zeroize();
+        s.provisional.zeroize();
         s.transcript = Some(transcript);
         s.state = Some(State::Review);
     });
@@ -595,6 +614,7 @@ pub(crate) mod tests {
         let text = shared.lock().unwrap().transcript.clone().unwrap();
         assert_eq!(text.matches("parola").count(), 4 + 2, "{}", text.as_str());
         assert!(shared.lock().unwrap().stable.is_empty());
+        assert!(shared.lock().unwrap().provisional.is_empty());
         let _ = commands.send(Command::Cancel);
         worker.join().unwrap();
     }
@@ -625,7 +645,7 @@ pub(crate) mod tests {
         worker.join().unwrap();
         let s = shared.lock().unwrap();
         assert_eq!(s.state, Some(State::Cancelled));
-        assert!(s.transcript.is_none() && s.stable.is_empty());
+        assert!(s.transcript.is_none() && s.stable.is_empty() && s.provisional.is_empty());
     }
 
     #[test]
@@ -737,22 +757,29 @@ pub(crate) mod tests {
             );
             session.start();
             let mut started = None;
-            let mut first_stable = None;
+            let mut partials: Vec<Option<f64>> = Vec::new();
+            let mut confirmed: Vec<Option<f64>> = Vec::new();
             let mut finals: Vec<f64> = Vec::new();
             let mut stopped = false;
             let review = loop {
                 std::thread::sleep(Duration::from_millis(2));
-                let (state, stable, count, windows) = session.snapshot();
+                let (state, provisional, open_confirmed, count, windows) = session.snapshot();
                 if state == State::Recording && started.is_none() {
                     started = Some(Instant::now());
                 }
                 let Some(t0) = started else { continue };
                 let now = t0.elapsed().as_secs_f64() * speed;
-                if stable > 0 && first_stable.is_none() {
-                    first_stable = Some(now);
-                }
                 while finals.len() < count {
                     finals.push(now);
+                }
+                // Frase aperta = indice del prossimo definitivo.
+                partials.resize(count + 1, None);
+                confirmed.resize(count + 1, None);
+                if (provisional > 0 || open_confirmed > 0) && partials[count].is_none() {
+                    partials[count] = Some(now);
+                }
+                if open_confirmed > 0 && confirmed[count].is_none() {
+                    confirmed[count] = Some(now);
                 }
                 if !stopped && now >= total + 0.3 * speed {
                     session.stop();
@@ -776,7 +803,7 @@ pub(crate) mod tests {
                 "{}",
                 serde_json::json!({
                     "file": file, "durata_s": duration, "velocita": speed, "pezzo": chunk,
-                    "primo_stabile_s": first_stable, "definitivi_s": finals,
+                    "parziali_s": partials, "confermati_s": confirmed, "definitivi_s": finals,
                     "finestre": windows, "testo": text.as_str(),
                 })
             )

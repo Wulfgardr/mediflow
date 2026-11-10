@@ -130,7 +130,9 @@ impl ClinicalApp {
             return;
         }
         let state = work.session.state();
-        let live = work.session.live_text().map_or(0, |text| text.len());
+        let live = work.session.live_text().map_or(0, |live| {
+            live.confirmed.len() * 4096 + live.provisional.len() + 1
+        });
         if live != work.live {
             work.live = live;
             cx.notify();
@@ -224,7 +226,8 @@ impl ClinicalApp {
                     self.theme,
                     matches!(work.state, State::PermissionDenied | State::Unavailable),
                 ))
-                .when_some(work.session.live_text(), |el, text| {
+                .when_some(work.session.live_text(), |el, live| {
+                    let (text, provisional) = live.joined();
                     el.child(
                         div()
                             .id("chat-local-voice-live")
@@ -233,7 +236,7 @@ impl ClinicalApp {
                             .whitespace_normal()
                             .text_color(self.theme.secondary)
                             .type_role(self.theme, crate::theme::TextRole::Body)
-                            .child(text.to_string()),
+                            .child(live_runs(text.to_string(), provisional, self.theme)),
                     )
                 })
                 .when(work.state == State::Disclosure, |el| {
@@ -295,6 +298,25 @@ impl ClinicalApp {
                 ),
         )
     }
+}
+
+/// Confermato nel grigio della vista, provvisorio a matita (inchiostro della
+/// proposta): un tono più chiaro, che asciuga quando due parziali concordano.
+fn live_highlights(
+    provisional: std::ops::Range<usize>,
+    theme: Theme,
+) -> Vec<(std::ops::Range<usize>, gpui::HighlightStyle)> {
+    let pencil = gpui::HighlightStyle {
+        color: Some(theme.pencil),
+        ..Default::default()
+    };
+    (!provisional.is_empty())
+        .then_some((provisional, pencil))
+        .into_iter()
+        .collect()
+}
+fn live_runs(text: String, provisional: std::ops::Range<usize>, theme: Theme) -> gpui::StyledText {
+    gpui::StyledText::new(text).with_highlights(live_highlights(provisional, theme))
 }
 
 #[cfg(all(test, target_os = "macos"))]
@@ -388,13 +410,17 @@ mod tests {
             app.chat_access.voice.work = Some(Work { binding, pending: pending.clone(), session, state, live: 0 });
         });
         let mut live = String::new();
+        let mut provisional_seen = false;
+        let mut confirmed_seen: Vec<String> = Vec::new();
         for _ in 0..2_000 {
             std::thread::sleep(std::time::Duration::from_millis(5));
             cx.update_window_entity(&view, |app, window, cx| {
                 app.poll_chat_voice(cx);
                 let work = app.chat_access.voice.work.as_ref().unwrap();
                 if let Some(text) = work.session.live_text() {
-                    live = text.to_string();
+                    provisional_seen |= !text.provisional.is_empty();
+                    confirmed_seen.push(text.confirmed.to_string());
+                    live = text.confirmed.to_string();
                 }
                 assert!(
                     work.session.transcript().is_none(),
@@ -411,7 +437,17 @@ mod tests {
             }
         }
         assert!(live.starts_with("parola1"), "live text: {live}");
-        assert!(!live.contains("incerta"), "unconfirmed word shown: {live}");
+        assert!(
+            !live.contains("incerta"),
+            "unconfirmed word confirmed: {live}"
+        );
+        assert!(provisional_seen, "provisional text never shown");
+        for pair in confirmed_seen.windows(2) {
+            assert!(
+                pair[1].starts_with(pair[0].as_str()),
+                "confirmed went back: {pair:?}"
+            );
+        }
         cx.update_window_entity(&view, |app, _, _| {
             app.chat_access.voice.work.as_ref().unwrap().session.stop();
         });
@@ -441,5 +477,31 @@ mod tests {
             assert!(form.kind == FormKind::Entry && form.state == FormState::Draft);
             assert_eq!(form.fields[2].editor.read(cx).value(), reviewed);
         });
+    }
+
+    #[test]
+    fn provisional_words_use_the_pencil_ink_and_confirmed_words_do_not() {
+        let theme = Theme::for_dark(false);
+        let live = crate::local_voice::LiveText {
+            confirmed: zeroize::Zeroizing::new("prosegue ramipril".into()),
+            provisional: zeroize::Zeroizing::new("5 mg".into()),
+        };
+        let (text, range) = live.joined();
+        assert_eq!(text.as_str(), "prosegue ramipril 5 mg");
+        assert_eq!(&text[range.clone()], "5 mg");
+        for dark in [false, true] {
+            let theme = Theme::for_dark(dark);
+            let runs = live_highlights(range.clone(), theme);
+            assert_eq!(runs.len(), 1, "only the provisional words change ink");
+            assert_eq!(runs[0].0, range);
+            assert_eq!(runs[0].1.color, Some(theme.pencil));
+        }
+        assert!(live_highlights(22..22, theme).is_empty());
+        let only = crate::local_voice::LiveText {
+            confirmed: zeroize::Zeroizing::default(),
+            provisional: zeroize::Zeroizing::new("visita".into()),
+        };
+        assert_eq!(only.joined().1, 0..6);
+        assert_ne!(theme.pencil, theme.secondary);
     }
 }
