@@ -110,6 +110,10 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ steps.playwright_version.outputs.version }}
 
       - name: Install Playwright system dependencies
+        # Nei giri verdi dura da 12 a 208 secondi. Quando un mirror apt del runner
+        # non risponde restava appeso fino al tempo massimo del job (34 minuti,
+        # tre volte il 10/11/2026): con il tetto il blocco fallisce presto e si rilancia.
+        timeout-minutes: 8
         run: npx --no-install playwright install-deps chromium
 
       - name: Install Playwright chromium
