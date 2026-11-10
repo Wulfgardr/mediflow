@@ -17,8 +17,10 @@ export async function bundleDossierWorker() {
     } }] });
   return result.outputFiles[0].text;
 }
+// Senza await al livello del modulo: il test di allineamento lo carica con require().
 if (process.argv[1] === new URL(import.meta.url).pathname) {
-  const result = await bundleDossierWorker();
-  await writeFile('experiments/gpui-patient-pilot/worker/dossier.bundle.mjs', result);
-  console.log(`Worker locale: ${Buffer.byteLength(result)} byte`);
+  bundleDossierWorker().then(async result => {
+    await writeFile('experiments/gpui-patient-pilot/worker/dossier.bundle.mjs', result);
+    console.log(`Worker locale: ${Buffer.byteLength(result)} byte`);
+  }).catch(error => { console.error(error); process.exitCode = 1; });
 }
