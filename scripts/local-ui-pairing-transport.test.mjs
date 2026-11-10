@@ -110,3 +110,33 @@ test('bridge admits bounded clock skew and rejects expired or oversized navigati
     assert.deepEqual(sent.at(-1), { type: 'mediflow-local-ui-result', requestId, status }, `offset ${offset}`);
   }
 });
+
+test('Web identity: a chunked reply without Content-Length is verified, with at most 64 bytes read', async t => {
+  const http = await import('node:http');
+  const { verifyOwnedWeb, webIdentityProof } = await import('./local-ui-web-identity.mjs');
+  const secret = crypto.randomBytes(32).toString('hex');
+  let mode = 'chunked', sent = 0;
+  const server = http.createServer(async (request, response) => {
+    let challenge = ''; for await (const part of request) challenge += part;
+    const proof = webIdentityProof(secret, challenge);
+    if (mode === 'declared') { response.setHeader('Content-Length', '64'); response.end(proof); return; }
+    if (mode === 'declared-other') { response.setHeader('Content-Length', '65'); response.end(`${proof}0`); return; }
+    if (mode === 'wrong') { response.write('0'.repeat(32)); response.end('0'.repeat(32)); return; }
+    if (mode === 'endless') {
+      // A different server on the port must not make the launcher read without bound.
+      const timer = setInterval(() => { sent += 1; response.write(proof); }, 5);
+      response.on('close', () => clearInterval(timer)); return;
+    }
+    response.write(proof.slice(0, 20)); response.end(proof.slice(20)); // what Next 16.4 sends: no Content-Length
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  assert.equal(await verifyOwnedWeb(origin, secret), true);
+  mode = 'declared'; assert.equal(await verifyOwnedWeb(origin, secret), true);
+  mode = 'declared-other'; assert.equal(await verifyOwnedWeb(origin, secret), false);
+  mode = 'wrong'; assert.equal(await verifyOwnedWeb(origin, secret), false);
+  mode = 'endless'; assert.equal(await verifyOwnedWeb(origin, secret), false);
+  assert.ok(sent < 50, `stopped after ${sent} chunks`);
+  assert.equal(await verifyOwnedWeb(origin, crypto.randomBytes(32).toString('hex')), false);
+});
