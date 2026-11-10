@@ -333,7 +333,7 @@ all'agente la proof o l'autorità di commit.
 - Web app: `app/`, `components/`
 - API locali (web): `app/api/*`
 - Native API (versionata): `app/api/v1/*`
-- Facade dati/cifratura (client-side): `lib/db.ts`, `lib/security.ts`
+- Facade dati/cifratura (client-side): `lib/db.ts`, `lib/security/security.ts`
 - Layer DB server (SQLite + Drizzle): `lib/db-server.ts`, `lib/schema.ts`
 - Migrazioni: `drizzle/`
 - Client nativo macOS: `native/`
