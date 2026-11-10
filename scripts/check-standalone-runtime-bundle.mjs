@@ -8,6 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
 import { assertScheduledBackupRuntime } from './scheduled-backup-runtime-contract.mjs';
+import { assertStandaloneSsrChunks } from './standalone-ssr-chunks.mjs';
 import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
 
 import http from 'node:http';
@@ -1180,6 +1181,8 @@ const requireFromStandalone = createRequire(serverPath);
 
 // require the raw scheduler closure before any runtime smoke is attempted.
 await assertScheduledBackupRuntime(standaloneDir);
+const nextDistDir = process.env.MEDIFLOW_NEXT_DIST_DIR || '.next';
+assertStandaloneSsrChunks(path.join(root, nextDistDir), path.join(standaloneDir, nextDistDir));
 
 function fail(message) {
   console.error(message);
