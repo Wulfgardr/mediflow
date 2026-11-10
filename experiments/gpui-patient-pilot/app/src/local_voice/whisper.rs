@@ -154,15 +154,20 @@ pub(crate) enum Problem {
 
 #[derive(Default)]
 pub(crate) struct Shared {
+    /// La sessione è stata ritirata: il thread finisce da solo e non pubblica più nulla.
+    retired: bool,
     state: Option<State>,
     problem: Option<Problem>,
-    stable: Zeroizing<String>,
-    provisional: Zeroizing<String>,
+    pub(crate) stable: Zeroizing<String>,
+    pub(crate) provisional: Zeroizing<String>,
     open_confirmed: usize,
     finals: usize,
-    transcript: Option<Zeroizing<String>>,
+    pub(crate) transcript: Option<Zeroizing<String>>,
     #[cfg(test)]
     windows: Vec<(usize, usize, usize)>,
+    /// Per le prove: campioni rimasti nel ciclo dopo l'annullamento.
+    #[cfg(test)]
+    pub(crate) retained_after_cancel: Option<usize>,
 }
 
 pub(crate) enum Command {
@@ -278,6 +283,10 @@ impl WhisperSession {
             worker: Some(worker),
         }
     }
+    #[cfg(test)]
+    pub(crate) fn shared_for_test(&self) -> Arc<Mutex<Shared>> {
+        self.shared.clone()
+    }
     /// Stato pubblicato, per le misure delle prove.
     #[cfg(test)]
     pub(crate) fn snapshot(&self) -> Snapshot {
@@ -304,17 +313,31 @@ impl WhisperSession {
     }
 }
 
+/// Il ritiro torna subito: non aspetta il thread, che può essere fermo sulla
+/// verifica del modello, sul caricamento o su una decodifica. Il thread vede
+/// l'annullamento appena finisce il passo in corso, azzera i buffer e chiude;
+/// da qui in poi non pubblica più testo.
 impl Drop for WhisperSession {
     fn drop(&mut self) {
-        let _ = self.commands.send(Command::Cancel);
-        if let Some(worker) = self.worker.take() {
-            let _ = worker.join();
+        if let Ok(mut s) = self.shared.lock() {
+            s.retired = true;
+            s.stable.zeroize();
+            s.provisional.zeroize();
+            s.transcript = None;
         }
+        let _ = self.commands.send(Command::Cancel);
+        drop(self.worker.take());
     }
 }
 
+fn retired(shared: &Mutex<Shared>) -> bool {
+    shared.lock().map_or(true, |s| s.retired)
+}
+
 fn publish(shared: &Mutex<Shared>, f: impl FnOnce(&mut Shared)) {
-    if let Ok(mut s) = shared.lock() {
+    if let Ok(mut s) = shared.lock()
+        && !s.retired
+    {
         f(&mut s);
     }
 }
@@ -347,6 +370,9 @@ fn run(
         fail(&shared, State::Unavailable, Some(Problem::ModelInvalid));
         return;
     }
+    if retired(&shared) {
+        return;
+    }
     let loaded =
         SileroDetector::load(&engine.directory.join(engine.files[1].name)).and_then(|detector| {
             WhisperDecoder::load(&engine.directory.join(engine.files[0].name), engine.prompt)
@@ -356,6 +382,9 @@ fn run(
         fail(&shared, State::Unavailable, Some(Problem::EngineFailed));
         return;
     };
+    if retired(&shared) {
+        return;
+    }
     listen(dictation, source.as_mut(), &commands, &shared);
 }
 
@@ -416,6 +445,13 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
     if let Err(state) = outcome {
         source.stop();
         dictation.wipe();
+        #[cfg(test)]
+        {
+            let retained = dictation.retained_samples();
+            if let Ok(mut s) = shared.lock() {
+                s.retained_after_cancel = Some(retained);
+            }
+        }
         let problem = (state == State::Unavailable).then_some(Problem::EngineFailed);
         fail(shared, state, problem);
         return;
@@ -517,6 +553,58 @@ pub(crate) mod tests {
     use super::super::listening::tests::{CountingDecoder, LoudnessDetector, silence, tone};
     use super::super::listening::{BLOCK, Dictation};
     use super::*;
+
+    /// Decodificatore che resta fermo finché il test non lo sblocca.
+    pub(crate) struct BlockingDecoder {
+        entered: Option<Sender<()>>,
+        release: Arc<(Mutex<bool>, std::sync::Condvar)>,
+        finished: Sender<()>,
+    }
+    pub(crate) struct Gate {
+        pub(crate) entered: Receiver<()>,
+        pub(crate) release: Arc<(Mutex<bool>, std::sync::Condvar)>,
+        pub(crate) finished: Receiver<()>,
+    }
+    impl BlockingDecoder {
+        pub(crate) fn new() -> (Self, Gate) {
+            let (entered, entered_rx) = mpsc::channel();
+            let (finished, finished_rx) = mpsc::channel();
+            let release = Arc::new((Mutex::new(false), std::sync::Condvar::new()));
+            (
+                Self {
+                    entered: Some(entered),
+                    release: release.clone(),
+                    finished,
+                },
+                Gate {
+                    entered: entered_rx,
+                    release,
+                    finished: finished_rx,
+                },
+            )
+        }
+        pub(crate) fn open(release: &Arc<(Mutex<bool>, std::sync::Condvar)>) {
+            *release.0.lock().unwrap() = true;
+            release.1.notify_all();
+        }
+    }
+    impl Decoder for BlockingDecoder {
+        fn decode(&mut self, _: &[f32]) -> Result<Zeroizing<String>, EngineFailure> {
+            if let Some(entered) = self.entered.take() {
+                let _ = entered.send(());
+            }
+            let mut open = self.release.0.lock().unwrap();
+            while !*open {
+                open = self.release.1.wait(open).unwrap();
+            }
+            Ok(Zeroizing::new("parola riservata".into()))
+        }
+    }
+    impl Drop for BlockingDecoder {
+        fn drop(&mut self) {
+            let _ = self.finished.send(());
+        }
+    }
 
     /// Sorgente che consegna un file già in memoria a blocchi da 0,5 s, come
     /// farebbe il microfono.

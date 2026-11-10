@@ -15,8 +15,8 @@ struct Work {
     pending: Pending,
     session: Session,
     state: State,
-    /// Lunghezza del testo stabile già mostrato durante la registrazione.
-    live: usize,
+    /// Testo dal vivo già mostrato, per ridisegnare solo quando cambia.
+    live: zeroize::Zeroizing<String>,
 }
 pub(super) struct LocalVoice {
     work: Option<Work>,
@@ -106,7 +106,7 @@ impl ClinicalApp {
                 pending: pending.clone(),
                 session,
                 state,
-                live: 0,
+                live: Default::default(),
             });
         }
         if let Ok(mut p) = pending.lock() {
@@ -130,9 +130,17 @@ impl ClinicalApp {
             return;
         }
         let state = work.session.state();
-        let live = work.session.live_text().map_or(0, |live| {
-            live.confirmed.len() * 4096 + live.provisional.len() + 1
-        });
+        // Si confronta il contenuto: una parola rivista può avere la stessa
+        // lunghezza della precedente.
+        let live = work
+            .session
+            .live_text()
+            .map_or_else(zeroize::Zeroizing::default, |live| {
+                let mut text = zeroize::Zeroizing::new(live.confirmed.as_str().to_owned());
+                text.push('\u{1}');
+                text.push_str(&live.provisional);
+                text
+            });
         if live != work.live {
             work.live = live;
             cx.notify();
@@ -347,7 +355,7 @@ mod tests {
                 app.privacy_shield = false;
                 let binding = app.voice_binding().unwrap();
                 let state = if scenario == 1 { State::Recording } else { State::Review };
-                app.chat_access.voice.work = Some(Work { binding, pending: pending.clone(), session: Session::synthetic(state, TEXT), state, live: 0 });
+                app.chat_access.voice.work = Some(Work { binding, pending: pending.clone(), session: Session::synthetic(state, TEXT), state, live: Default::default() });
                 app.chat_access.voice.editor.update(cx, |input, cx| input.set_content(TEXT, cx));
                 assert!(app.form.is_none(), "transcription completion must not open a writer");
                 app.open_form(FormKind::Entry, window, cx);
@@ -407,7 +415,7 @@ mod tests {
             let state = session.state();
             assert_eq!(state, State::Disclosure);
             session.start();
-            app.chat_access.voice.work = Some(Work { binding, pending: pending.clone(), session, state, live: 0 });
+            app.chat_access.voice.work = Some(Work { binding, pending: pending.clone(), session, state, live: Default::default() });
         });
         let mut live = String::new();
         let mut provisional_seen = false;
@@ -503,5 +511,117 @@ mod tests {
         };
         assert_eq!(only.joined().1, 0..6);
         assert_ne!(theme.pencil, theme.secondary);
+    }
+
+    fn recording_app<'a>(
+        cx: &'a mut gpui::TestAppContext,
+        host: &Host,
+        session: Session,
+    ) -> (
+        gpui::Entity<ClinicalApp>,
+        &'a mut gpui::VisualTestContext,
+        impl Sized,
+    ) {
+        let (pending, remote) = crate::chat_access::owner::tests::voice_request();
+        pending.lock().unwrap().finish_voice_open(true);
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.update_window_entity(&view, |app, _, _| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.selected_id = Some("patient-a".into());
+            app.patient.detail = ReadLoad::Ready(serde_json::from_value(serde_json::json!({
+                "id":"patient-a","firstName":"Ada","lastName":"Esempio","taxCode":"SYNTHETIC","version":1
+            })).unwrap());
+            let binding = app.voice_binding().unwrap();
+            let state = session.state();
+            app.chat_access.voice.work = Some(Work { binding, pending, session, state, live: Default::default() });
+        });
+        (view, cx, remote)
+    }
+
+    #[gpui::test]
+    fn live_text_redraws_when_a_word_changes_at_the_same_length(cx: &mut gpui::TestAppContext) {
+        use std::{cell::Cell, rc::Rc};
+        let host = Host::new();
+        let live = std::sync::Arc::new(std::sync::Mutex::new((String::new(), "alfa".to_owned())));
+        let (view, cx, _remote) = recording_app(
+            cx,
+            &host,
+            Session::synthetic_live(State::Recording, live.clone()),
+        );
+        let redraws = Rc::new(Cell::new(0));
+        let counter = redraws.clone();
+        cx.update(|_, cx| {
+            cx.observe(&view, move |_, _| counter.set(counter.get() + 1))
+                .detach()
+        });
+        cx.update_window_entity(&view, |app, _, cx| app.poll_chat_voice(cx));
+        cx.run_until_parked();
+        let first = redraws.get();
+        assert!(first > 0, "first provisional word not drawn");
+        *live.lock().unwrap() = (String::new(), "beta".to_owned());
+        cx.update_window_entity(&view, |app, _, cx| app.poll_chat_voice(cx));
+        cx.run_until_parked();
+        assert!(redraws.get() > first, "same-length word change not redrawn");
+        cx.update_window_entity(&view, |app, _, _| {
+            let shown = app
+                .chat_access
+                .voice
+                .work
+                .as_ref()
+                .unwrap()
+                .session
+                .live_text()
+                .unwrap();
+            assert_eq!(shown.provisional.as_str(), "beta");
+        });
+    }
+
+    #[gpui::test]
+    fn retiring_a_busy_whisper_session_returns_at_once_and_keeps_nothing(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use crate::local_voice::listening::tests::{LoudnessDetector, tone};
+        use crate::local_voice::whisper::{
+            WhisperSession,
+            tests::{BlockingDecoder, InjectedSource},
+        };
+        use std::time::{Duration, Instant};
+        let host = Host::new();
+        let (decoder, gate) = BlockingDecoder::new();
+        let whisper = WhisperSession::with_parts(
+            LoudnessDetector,
+            decoder,
+            Box::new(InjectedSource::new(tone(5.0))),
+        );
+        let shared = whisper.shared_for_test();
+        whisper.start();
+        gate.entered
+            .recv_timeout(Duration::from_secs(10))
+            .expect("decoder never started");
+        let (view, cx, _remote) = recording_app(cx, &host, Session::with_whisper(whisper));
+        // Se il ritiro aspettasse il decodificatore resterebbe fermo: lo si
+        // sblocca comunque dopo 1,5 s, così il test fallisce invece di bloccarsi.
+        let release = gate.release.clone();
+        let releaser = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(1_500));
+            BlockingDecoder::open(&release);
+        });
+        let started = Instant::now();
+        cx.update_window_entity(&view, |app, _, cx| app.chat_access.voice.retire(cx));
+        let elapsed = started.elapsed();
+        BlockingDecoder::open(&gate.release);
+        releaser.join().unwrap();
+        gate.finished
+            .recv_timeout(Duration::from_secs(10))
+            .expect("worker never ended");
+        assert!(
+            elapsed < Duration::from_millis(200),
+            "retire blocked the interface for {elapsed:?}"
+        );
+        let s = shared.lock().unwrap();
+        assert!(s.transcript.is_none() && s.stable.is_empty() && s.provisional.is_empty());
+        assert_eq!(s.retained_after_cancel, Some(0), "audio buffers not wiped");
     }
 }
