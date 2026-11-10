@@ -191,7 +191,9 @@ test('the portable backup still exports and validates after a chat booking and a
 test('the native view shows the agenda read with the same revision: dates and states only, no free text', async () => {
     const f = await fixture();
     const db = dbServer.$client;
-    const at = (days: number) => Math.floor(Date.now() / 1000) + days * 86_400;
+    // Un solo istante per scritture e attese: letto due volte, a cavallo di un secondo i due valori divergono.
+    const now = Math.floor(Date.now() / 1000);
+    const at = (days: number) => now + days * 86_400;
     db.prepare("INSERT INTO checkups (id,patient_id,date,title,notes,status,version) VALUES (?,?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(9), 'Testo libero da non mostrare', 'ENC:a:b', 'done');
     db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version,deleted_at) VALUES (?,?,?,?,?,1,?)").run(randomUUID(), f.patientId, at(3), 'Eliminato', 'pending', at(0));
     db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(2), 'Altro', 'pending');
