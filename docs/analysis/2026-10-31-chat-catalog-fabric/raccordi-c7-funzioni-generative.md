@@ -2,8 +2,8 @@
 
 Nota di progetto del 10 novembre 2026, per la decisione di Leonardo del 9/11
 (contratto 0.9.1, riga C-7 ed emendamento del 9 novembre). Il primo raccordo,
-il Quadro paziente, è nel codice; gli altri due seguono quando le viste GPUI
-corrispondenti sono in `main`.
+il Quadro paziente, ed il raccordo della sintesi dei documenti sono nel codice.
+L’import assistito dalla chat resta successivo.
 
 ## Regola comune
 
@@ -33,7 +33,7 @@ Stati restituiti alla chat, per tutti e tre i comandi:
 | Stato | Significato |
 | --- | --- |
 | `requested`, `preparing` | La finestra ha ricevuto la richiesta; ammissione o controllo della funzione in corso |
-| `<funzione>-opened` | La vista è aperta e attende il consenso nella finestra |
+| `<funzione>-opened` | La vista è aperta ed attende il consenso nella finestra. Per la sintesi attende prima la scelta del documento |
 | `<funzione>-unavailable` | Funzione spenta, kill switch o host locale chiuso |
 | `<funzione>-busy` | Nella finestra c'è già un lavoro della stessa funzione: non viene sostituito |
 | `<funzione>-closed` | La finestra ha concluso il lavoro aperto dalla chat (proposta, scarto, errore, indisponibilità) |
@@ -87,9 +87,9 @@ ritirata senza rinnovo, anche durante consenso o generazione.
   provider reali (Ollama e ChatGPT) scelti dalla configurazione della funzione;
   budget end-to-end dal comando alla proposta nella finestra.
 
-## Sintesi dei documenti (Document Synthesis): da collegare
+## Sintesi dei documenti (Document Synthesis): raccordo alla finestra
 
-- **Comando previsto:** `{"command":"document-synthesis"}`, senza argomenti.
+- **Comando:** `{"command":"document-synthesis"}`, senza argomenti.
   Il documento si sceglie nella finestra, nella lista dei documenti del
   paziente selezionato: la chat non indica file o allegati.
 - **Permessi e capability:** gli stessi del Quadro, più la lettura dei documenti
@@ -97,8 +97,16 @@ ritirata senza rinnovo, anche durante consenso o generazione.
   della sintesi è in `main` dalla #899: il prerequisito è soddisfatto.
 - **Stati alla chat:** `synthesis-opened`, `synthesis-unavailable`,
   `synthesis-busy`, `synthesis-closed`, `withdrawn`.
-- **Nella finestra:** la vista della sintesi del documento scelto, con consenso,
-  proposta, fonti nel documento, ricevuta e scarto.
+- **Nella finestra:** l'ammissione sul server e il controllo dell'interruttore
+  precedono la scelta del documento. `synthesis-opened` apre la sezione Documenti:
+  il medico sceglie il documento, prepara la richiesta e dà il consenso. Proposta,
+  fonti, ricevuta e scarto usano la sintesi GPUI esistente. Senza documenti la vista
+  indica lo stato vuoto e la chat conserva Revoca. Un secondo comando trova la
+  sintesi occupata anche mentre la finestra aspetta la prima scelta.
+- **Chiusura:** `synthesis-closed` rilascia il legame con la chat quando la finestra
+  mostra la proposta o termina la richiesta. Revoca, EOF e scadenza successivi
+  non tolgono una proposta già mostrata. La sua validità segue soltanto il
+  documento e il contesto nativi. Quadro e sintesi hanno legami distinti.
 - **Negativi C-7:** gli stessi otto del Quadro, più documento cambiato o
   rimosso dopo il consenso (fonte superata) e documento di un altro paziente.
 - **Seconda seduta:** come il Quadro.
@@ -128,17 +136,26 @@ ritirata senza rinnovo, anche durante consenso o generazione.
 
 ## Che cosa è comune e che cosa no
 
-Dalla #899 Quadro e sintesi condividono `shell/generation.rs`: fasi, biglietto
-contro le risposte tardive, cancellazione dei testi. Il legame con la chat del
-Quadro resta fuori da quel modulo, in `InsightChat` dentro i dati della scheda,
-perché oggi solo il Quadro ha un comando della chat. Le tre protezioni del
-raccordo sono però nei punti del Quadro che la sintesi ripete con la propria
-struttura: controllo del ritiro fra consenso e invio
-(`chat_withdrawn_before_consent_sends_nothing`), controllo del ritiro prima di
-mostrare una risposta in volo (`late_answer_after_chat_revocation_is_not_shown`)
-e chiusura della proprietà con lo stato finale. Il raccordo della sintesi le
-deve riportare tutte e tre, con gli stessi test; quando i raccordi saranno due,
-conviene portare il legame con la chat nell'area di generazione comune.
+Quadro, sintesi e l'anteprima dell'import assistito condividono
+`shell/generation.rs`: fasi, biglietto contro risposte tardive, cancellazione
+del contesto e dei testi. Il legame opzionale `ChatHold` appartiene all'area
+che la chat ha aperto. Le richieste del canale indicano una `Function` e uno
+`Stage`; le stringhe `insight-*` restano invariate.
+
+I tre controlli sono nell'area comune: `start` controlla il ritiro prima
+che il chiamante invii, `take_running` prima che il chiamante mostri una
+risposta e `follow_chat` chiude la proprietà con lo stato finale. `end`
+conserva il legame durante preparazione e scelte successive del documento.
+Un invio rifiutato annulla anche il nuovo contesto e cancella il payload.
+Il canale non aggiunge un comando per l'import assistito.
+
+`scripts/falsify-chat-generation.py` toglie separatamente i controlli M1
+(invio), M2 (risposta), M3a (scelta ancora aperta), M3b (chiusura) e M4
+(legame conservato fra scelte). Richiede un target Cargo proprio e una
+`MEDIFLOW_DATA_DIR` sintetica esplicita. Esegue i test sensibili con due job
+Cargo e un solo worker, accetta soltanto fallimenti di asserzione e
+ripristina il sorgente anche se la prova fallisce. Il verde sul sorgente
+ripristinato va registrato separatamente.
 
 ## Le altre capability «Non collegata»
 

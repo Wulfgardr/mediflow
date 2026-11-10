@@ -558,7 +558,8 @@ fn text_line(id: String, content: String, theme: Theme) -> Stateful<Div> {
 
 impl ClinicalApp {
     pub(super) fn toggle_document_details(&mut self, id: &str, cx: &mut Context<Self>) {
-        if self.document_operation != DocumentOperation::Idle
+        if !self.patient.synthesis.area.chat_ready()
+            || self.document_operation != DocumentOperation::Idle
             || self.form.is_some()
             || !self.patient.attachments.ready().is_some_and(|rows| {
                 rows.iter().any(|row| {

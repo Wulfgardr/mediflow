@@ -249,6 +249,19 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                 pending = Some(request);
                 State::Requested
             }
+            Ok(value) if pending.is_none() && is_synthesis_command(&value) => {
+                let Ok(copy) = stream.try_clone() else {
+                    break;
+                };
+                let Some(request) = Request::for_synthesis(peer, copy) else {
+                    break;
+                };
+                if incoming.try_send(request.clone()).is_err() {
+                    break;
+                }
+                pending = Some(request);
+                State::Requested
+            }
             Ok(value) if pending.is_none() && value == json!({"command":"patient-document"}) => {
                 let Ok(copy) = stream.try_clone() else {
                     break;
@@ -370,6 +383,10 @@ pub(crate) fn reply(status: State, pending: Option<&Pending>, payload: Option<St
 /// ambulatorio, fonti o modello. Ogni altro campo chiude la connessione.
 fn is_insight_command(value: &Value) -> bool {
     *value == json!({"command": "patient-insight"})
+}
+
+fn is_synthesis_command(value: &Value) -> bool {
+    *value == json!({"command": "document-synthesis"})
 }
 
 pub(crate) fn install_lock_observer() {

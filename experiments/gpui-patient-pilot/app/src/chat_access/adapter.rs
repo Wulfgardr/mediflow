@@ -39,7 +39,11 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
     writeln!(stream, "{value}")?;
     let mut bytes = Vec::new();
     BufReader::new(Read::take(&mut *stream, 65_537)).read_until(b'\n', &mut bytes)?;
-    let value: Value = serde_json::from_slice(&bytes)?;
+    checked_reply(command, &bytes)
+}
+
+fn checked_reply(command: &str, bytes: &[u8]) -> io::Result<Value> {
+    let value: Value = serde_json::from_slice(bytes)?;
     let state = value["status"].as_str().filter(|s| {
         [
             "requested",
@@ -49,6 +53,10 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
             "insight-unavailable",
             "insight-busy",
             "insight-closed",
+            "synthesis-opened",
+            "synthesis-unavailable",
+            "synthesis-busy",
+            "synthesis-closed",
             "preparing",
             "selecting",
             "challenge",
@@ -71,6 +79,11 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
     let has_receipt = value.get("receipt").is_some();
     if bytes.len() > 65_536
         || state.is_none()
+        || ((matches!(command, "patient-insight" | "document-synthesis")
+            || state.is_some_and(|state| {
+                state.starts_with("insight-") || state.starts_with("synthesis-")
+            }))
+            && fields != Some(1))
         || (!has_payload && !has_receipt && fields != Some(1))
         || (has_receipt
             && (fields != Some(2)
@@ -146,7 +159,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["model"]}}},
                 {"name": CONTROL, "description":"Scheda sintetica monouso dopo consenso nella GPUI; payload riservato alla vista.",
-                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","clinical-profile","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","patient-insight","receipt","drugs","prosthetics","agenda","booking","booking-receipt"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
+                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","clinical-profile","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","patient-insight","document-synthesis","receipt","drugs","prosthetics","agenda","booking","booking-receipt"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
                     "annotations":{"readOnlyHint":false,"destructiveHint":true,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["app"]}}}]}),
             "resources/list" => {
@@ -234,6 +247,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                             "patient-document",
                             "local-voice",
                             "patient-insight",
+                            "document-synthesis",
                             "status",
                             "consume",
                             "revoke",
@@ -302,6 +316,47 @@ mod tests {
             json!({"command":"patient-insight"})
         );
     }
+    #[test]
+    fn synthesis_command_and_replies_have_no_clinical_fields() {
+        assert_eq!(
+            wire_command("document-synthesis"),
+            json!({"command":"document-synthesis"})
+        );
+        for state in [
+            "requested",
+            "preparing",
+            "synthesis-opened",
+            "synthesis-unavailable",
+            "synthesis-busy",
+            "synthesis-closed",
+            "withdrawn",
+        ] {
+            let reply = json!({"status":state});
+            assert_eq!(
+                checked_reply("document-synthesis", reply.to_string().as_bytes()).unwrap(),
+                reply
+            );
+            for field in [
+                "summary",
+                "patientId",
+                "attachmentId",
+                "token",
+                "payload",
+                "sources",
+                "receipt",
+            ] {
+                let mut altered = reply.clone();
+                altered[field] = json!("synthetic-private");
+                assert!(
+                    checked_reply("document-synthesis", altered.to_string().as_bytes()).is_err(),
+                    "{state}: {field}"
+                );
+            }
+        }
+        let receipt = json!({"status":"synthesis-opened", "receipt":{"commandId":"a".repeat(36),"outcome":"applied"}});
+        assert!(checked_reply("status", receipt.to_string().as_bytes()).is_err());
+    }
+
     #[test]
     fn catalog_query_is_data_and_cannot_choose_another_command() {
         for (prefix, expected) in [("prosthetics", "prosthetics"), ("drugs", "drugs")] {
