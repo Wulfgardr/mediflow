@@ -1,0 +1,76 @@
+{
+  "status": 200,
+  "body": {
+    "preview": {
+      "writesPerformed": 0,
+      "apply": "denied",
+      "status": "failed",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "receipt": {
+        "schemaVersion": "mediflow.ai.fabric-resolution.v1",
+        "capability": "smart_import",
+        "class": "generative",
+        "venue": "local_process",
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "provider": "ollama",
+        "model": "synthetic-smart-import:1",
+        "providerReceipt": {
+          "schemaVersion": "mediflow.ai.provider-selection.v1",
+          "authorityPlane": "clinical_application",
+          "task": "clinical",
+          "provider": "ollama",
+          "model": "synthetic-smart-import:1",
+          "execution": "local",
+          "endpointClass": "loopback",
+          "egress": "none",
+          "runtimeReadiness": "required",
+          "fallbackCount": 0
+        },
+        "fallbackCount": 0
+      },
+      "provenance": {
+        "schemaVersion": "mediflow.ai.fabric-provenance.v1",
+        "capability": "smart_import",
+        "venue": "local_process",
+        "provider": "ollama",
+        "model": "synthetic-smart-import:1",
+        "preprocessing": [
+          "context_minimization",
+          "envelope_validation"
+        ],
+        "receipt": {
+          "schemaVersion": "mediflow.ai.fabric-resolution.v1",
+          "capability": "smart_import",
+          "class": "generative",
+          "venue": "local_process",
+          "egressProfile": {
+            "id": "local_only",
+            "version": "mediflow.ai.egress-profile.v1",
+            "egress": "none"
+          },
+          "provider": "ollama",
+          "model": "synthetic-smart-import:1",
+          "providerReceipt": {
+            "schemaVersion": "mediflow.ai.provider-selection.v1",
+            "authorityPlane": "clinical_application",
+            "task": "clinical",
+            "provider": "ollama",
+            "model": "synthetic-smart-import:1",
+            "execution": "local",
+            "endpointClass": "loopback",
+            "egress": "none",
+            "runtimeReadiness": "required",
+            "fallbackCount": 0
+          },
+          "fallbackCount": 0
+        }
+      },
+      "reviewRef": null
+    }
+  }
+}
