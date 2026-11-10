@@ -105,9 +105,9 @@ di integrità non sostituisce un audit delle implementazioni transitive.
 
 ## Prove locali attribuite ai file
 
-La [ricevuta completa](../../experiments/gpui-patient-pilot/evidence/connected/pr558-review-repairs-validation.json)
+La [ricevuta completa](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/pr558-review-repairs-validation.json)
 registra hash dei sorgenti, comandi, autori delle esecuzioni, risultati e
-limiti. I [log aggregati](../../experiments/gpui-patient-pilot/evidence/connected/pr558-review-repairs-local.log)
+limiti. I [log aggregati](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/pr558-review-repairs-local.log)
 conservano i transcript indicizzati nella ricevuta.
 
 | Prova sul candidato | Esito |

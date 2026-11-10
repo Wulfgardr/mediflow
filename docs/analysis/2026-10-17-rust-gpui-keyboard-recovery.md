@@ -17,7 +17,7 @@ dopo un reset del workspace: le prove qui allegate sono esecuzioni nuove,
 con hash propri. Le precedenti immagini non recuperabili non sono state
 ricreate né riattribuite.
 
-La [ricevuta dei controlli](../../experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/checks.json)
+La [ricevuta dei controlli](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/checks.json)
 identifica i tre sorgenti modificati e il binario effettivamente usato.
 Test dell'app: **45 superati, zero falliti**. `cargo fmt --all --check`,
 clippy con `-D warnings` e build sono conclusi con esito positivo su Linux,
@@ -86,7 +86,7 @@ non sono presentate come percorsi grafici rieseguiti in questa QA mirata.
 
 ## Prova nativa e provenienza
 
-La [ricevuta nativa](../../experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/native-qa.json)
+La [ricevuta nativa](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/native-qa.json)
 contiene provenienza, sequenze, hash delle PNG originali, focus e posizione
 di scorrimento. Tutte le immagini sono catture della sola finestra GPUI,
 ottenute con `import -window`, senza ritagli, ritocchi o composizioni.
@@ -115,7 +115,7 @@ L'esito osservato del blocco da editor rimane nella ricevuta nativa;
 non è stata ripetuta la QA. I metadati della cattura trattenuta sono in
 `withheldArtifacts`, senza immagine incorporata né collegamento pubblico:
 SHA-256 `ea66b781081ea7020f5775c4aa34ac4a93597e2681dd61e117b315ae227ca730`,
-45.405 byte. La [nota di pubblicazione](../../experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/publication-note.json)
+45.405 byte. La [nota di pubblicazione](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/publication-note.json)
 registra il diniego, l'azione e gli otto originali selezionati per il commit.
 Il manifesto aggiornato elenca soltanto i file inclusi nella pubblicazione;
 il digest del manifesto originale delle nove catture era
@@ -161,7 +161,7 @@ di una ricerca catalografica.
 ### Tentativo interrotto e ripetizione valida
 
 Il primo tentativo della sequenza di bozza è
-[registrato separatamente](../../experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/interrupted-attempt.json).
+[registrato separatamente](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/interrupted-attempt.json).
 È stato reinserito testo prima di verificare che la sequenza di input e il
 frame si fossero stabilizzati. Il focus aveva già raggiunto altri controlli:
 Tab, Invio e Spazio hanno attivato i normali comandi del form. Una voce
@@ -174,14 +174,14 @@ La sequenza finale è stata ripetuta su un nuovo seed, con un'azione per
 frame osservato e inserimento del testo tramite clipboard soltanto dopo
 aver verificato il focus dell'editor. Non è stato necessario modificare
 il binario. Il
-[confronto finale](../../experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/snapshot-comparison.json)
+[confronto finale](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/snapshot-comparison.json)
 conferma snapshot identici prima e dopo, **zero richieste cliniche di
 scrittura paired**, quattro pazienti attivi, uno archiviato, due voci e
 scheda versione 1. Il digest dello snapshot è in entrambi i casi:
 
 `f29750364416db67b7eaee5180712fb482c245a3194943dde45bef21c00e1e43`
 
-Il [cleanup](../../experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/cleanup.json)
+Il [cleanup](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/cleanup.json)
 conferma chiusura di app, host e Xvfb alle 20:44:27 UTC, porta 43183 chiusa
 e socket del display privato assente. La scansione dei file destinati
 all'integrazione confronta i byte con i valori privati generati per
