@@ -220,6 +220,7 @@ impl ClinicalApp {
 
     fn poll_chat_access(&mut self, cx: &mut Context<Self>) {
         self.poll_chat_voice(cx);
+        self.poll_chat_insight(cx);
         if self.chat_access.pending.is_some()
             && self
                 .session
@@ -263,6 +264,10 @@ impl ClinicalApp {
                 if let Ok(mut p) = pending.lock() {
                     p.withdraw();
                 }
+                return;
+            }
+            if pending.lock().is_ok_and(|mut p| p.insight_requested()) {
+                self.open_chat_insight(&pending, cx);
                 return;
             }
             if pending.lock().is_ok_and(|mut p| p.document_requested()) {

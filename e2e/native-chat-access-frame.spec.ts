@@ -21,7 +21,7 @@ test.beforeEach(async ({ page, context }) => {
     await context.route(url => url.port === '3000', route => route.abort('blockedbyclient'));
     await page.goto(fixtureUrl);
     await page.evaluate(source => {
-        const state = { status: 'challenge', attached: false, holdRevoke: false, releaseRevoke: undefined as undefined | (() => void), revokeStatus: 'withdrawn', calls: [] as unknown[], payload: undefined as undefined | string, receipt: undefined as undefined | { commandId: string; outcome: string } };
+        const state = { status: 'challenge', attached: false, holdRevoke: false, releaseRevoke: undefined as undefined | (() => void), revokeStatus: 'withdrawn', calls: [] as unknown[], payload: undefined as undefined | string, extra: undefined as undefined | Record<string, unknown>, receipt: undefined as undefined | { commandId: string; outcome: string } };
         (window as unknown as { accessFixture: typeof state }).accessFixture = state;
         window.addEventListener('message', event => {
             const request = event.data;
@@ -36,7 +36,7 @@ test.beforeEach(async ({ page, context }) => {
                 if (command === 'attach') { status = state.attached ? (state.status = state.revokeStatus) : 'ready'; state.attached = true; }
                 if (command === 'consume') { status = state.status = 'consumed'; payload = state.payload ?? JSON.stringify({ profile: 'mediflow.synthetic-chat-card.v1', pseudonym: 'card_' + 'a'.repeat(32), history: [], therapies: [], measures: [] }); }
                 if (command === 'revoke') status = state.status = state.revokeStatus;
-                result = { content: [{ type: 'text', text: 'Esito disponibile nella vista.' }], _meta: { status, ...(payload ? { payload } : {}), ...(state.receipt ? { receipt: state.receipt } : {}) } };
+                result = { content: [{ type: 'text', text: 'Esito disponibile nella vista.' }], _meta: { status, ...(state.extra ?? {}), ...(payload ? { payload } : {}), ...(state.receipt ? { receipt: state.receipt } : {}) } };
             }
             const reply = () => (event.source as Window).postMessage({ jsonrpc: '2.0', id: request.id, result }, '*');
             if (request.params?.arguments?.command === 'revoke' && state.holdRevoke) state.releaseRevoke = reply;
@@ -243,6 +243,57 @@ for (const width of [390, 1440]) test(`local voice opens native review without r
     await page.screenshot({ path: info.outputPath('voice-frame.png'), fullPage: true });
 });
 
+// Uno stato per test, su una pagina nuova: ricaricare il frame dentro lo stesso test mescola il
+// revoke della carta uscente e il collegamento della nuova con lo stato della finta host.
+for (const width of [390, 1440]) for (const [status, text] of [
+    ['insight-opened', 'Quadro paziente aperto nella finestra MediFlow'],
+    ['insight-unavailable', 'Quadro paziente non disponibile'],
+    ['insight-busy', 'già in uso nella finestra MediFlow'],
+    ['insight-closed', 'concluso nella finestra MediFlow'],
+]) test(`patient insight ${status} returns only the state at ${width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.evaluate(status => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = status; }, status);
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Apri il Quadro paziente in MediFlow' }).click();
+    await expect(frame.getByRole('status')).toContainText(text);
+    await expect(frame.locator('#card')).toBeHidden();
+    await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeDisabled();
+    await expect(frame.getByRole('button', { name: 'Apri il Quadro paziente in MediFlow' })).toBeDisabled();
+    // La chat possiede la richiesta solo finché la finestra attende il consenso o genera.
+    if (status === 'insight-opened') await expect(frame.getByRole('button', { name: 'Revoca' })).toBeEnabled();
+    else await expect(frame.getByRole('button', { name: 'Revoca' })).toBeDisabled();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: unknown }[] } }).accessFixture.calls);
+    // Solo comando e rinnovi di stato, mai altri argomenti.
+    expect(calls.map(call => call.arguments).slice(0, 2)).toEqual([{ command: 'attach' }, { command: 'patient-insight' }]);
+    expect(calls.slice(2).every(call => JSON.stringify(call.arguments) === '{"command":"status"}')).toBe(true);
+    expect(await frame.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath(`insight-${status}.png`), fullPage: true });
+});
+
+test('patient insight can be revoked from the chat while the native window owns consent and generation', async ({ page }) => {
+    await page.evaluate(() => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = 'insight-opened'; });
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Apri il Quadro paziente in MediFlow' }).click();
+    await expect(frame.getByRole('status')).toContainText('Quadro paziente aperto');
+    await frame.getByRole('button', { name: 'Revoca' }).click();
+    await expect(frame.getByRole('status')).toContainText('Richiesta ritirata');
+    await expect(frame.getByRole('button', { name: 'Revoca' })).toBeDisabled();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: { command: string } }[] } }).accessFixture.calls);
+    expect(calls.at(-1)?.arguments).toEqual({ command: 'revoke' });
+});
+
+test('patient insight refuses a reply that carries anything beyond the state', async ({ page }) => {
+    await page.evaluate(() => {
+        const fixture = (window as unknown as { accessFixture: { status: string; extra: Record<string, unknown> } }).accessFixture;
+        fixture.status = 'insight-opened'; fixture.extra = { summary: 'Ada Esempio · ipertensione arteriosa' };
+    });
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Apri il Quadro paziente in MediFlow' }).click();
+    await expect(frame.getByRole('status')).toContainText('Apertura non confermata');
+    await expect(frame.locator('body')).not.toContainText('Ada Esempio');
+    await expect(frame.locator('#card')).toBeHidden();
+});
+
 const sourcedCard = () => ({
     profile: 'mediflow.synthetic-chat-card.v1', pseudonym: 'card_' + 'a'.repeat(32),
     history: [], therapies: [{ medicine: 'metformina', dose: '500 mg', frequency: 'due volte al giorno', sourceRef: 'src_' + 'b'.repeat(32) }], measures: [],
@@ -306,7 +357,9 @@ for (const state of ['uncertain', 'applied', 'retired', 'rejected', 'closed', 'p
 test('unconnected clinical functions and Treatment Reasoning are explicit before access', async ({ page }) => {
     const frame = page.frameLocator('#access');
     await frame.getByText('Funzioni nella chat', { exact: true }).click();
-    for (const name of ['Farmaci', 'Protesica', 'Riassunto', 'Treatment Reasoning']) await expect(frame.getByRole('cell', { name, exact: true })).toBeVisible();
+    for (const name of ['Farmaci', 'Protesica', 'Sintesi documenti', 'Treatment Reasoning']) await expect(frame.getByRole('cell', { name, exact: true })).toBeVisible();
+    await expect(frame.getByRole('row').filter({ has: frame.getByRole('cell', { name: 'Sintesi documenti', exact: true }) })).toContainText('Non collegata alla chat');
+    await expect(frame.getByRole('row').filter({ has: frame.getByRole('rowheader', { name: 'Quadro paziente', exact: true }) })).toContainText('Alla chat torna solo lo stato');
     await expect(frame.getByRole('row').filter({ has: frame.getByRole('cell', { name: 'Treatment Reasoning', exact: true }) })).toContainText('Non disponibile in questa versione');
     await captureFrame(page, 'catalog.png');
 });
