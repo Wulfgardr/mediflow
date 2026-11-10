@@ -144,7 +144,10 @@ impl<V: SpeechDetector> Listener<V> {
             utterance.speech_frames += 1;
             utterance.silence_frames = 0;
             utterance.speech_end = utterance.audio.len();
-        } else if probability < NEG_THRESHOLD {
+        } else if probability < NEG_THRESHOLD || utterance.silence_frames > 0 {
+            // Come sherpa-onnx nel banco: il silenzio parte dalla prima
+            // finestra sotto la soglia bassa e continua finché una finestra
+            // non torna sopra la soglia.
             utterance.silence_frames += 1;
         }
         if utterance.silence_frames >= MIN_SILENCE_FRAMES {
@@ -490,6 +493,39 @@ pub(crate) mod tests {
         assert_eq!(finals.len(), 1, "first utterance final");
         let text = dictation.transcript();
         assert_eq!(text.matches("parola").count(), 4 + 2, "{text}");
+    }
+
+    /// Rilevatore che restituisce una sequenza fissa di probabilità, una per
+    /// chiamata: il test spinge una finestra alla volta e il contesto
+    /// ripassato in testa riceve zeri.
+    struct Scripted(Vec<f32>, usize);
+    impl SpeechDetector for Scripted {
+        fn probabilities(&mut self, samples: &[f32]) -> Result<Vec<f32>, EngineFailure> {
+            let mut out = vec![0.0; samples.len() / FRAME - 1];
+            out.push(self.0[self.1]);
+            self.1 += 1;
+            Ok(out)
+        }
+    }
+
+    #[test]
+    fn silence_counts_from_the_first_quiet_frame_like_the_bench_vad() {
+        // Come sherpa-onnx nel banco: il silenzio parte dalla prima finestra
+        // sotto 0,35 e continua anche fra 0,35 e 0,5; solo sopra 0,5 riparte.
+        let mut probabilities = vec![0.9; 20];
+        probabilities.push(0.1);
+        probabilities.extend(vec![0.42; 15]);
+        probabilities.extend(vec![0.1; 30]);
+        let frames = probabilities.len();
+        let mut listener = Listener::new(Scripted(probabilities, 0));
+        let mut closed_at = None;
+        for index in 0..frames {
+            if !listener.push(&[0.0; FRAME]).unwrap().is_empty() {
+                closed_at = Some(index);
+                break;
+            }
+        }
+        assert_eq!(closed_at, Some(20 + MIN_SILENCE_FRAMES - 1));
     }
 
     #[test]
