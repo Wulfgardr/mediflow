@@ -15,6 +15,8 @@ struct Work {
     pending: Pending,
     session: Session,
     state: State,
+    /// Lunghezza del testo stabile già mostrato durante la registrazione.
+    live: usize,
 }
 pub(super) struct LocalVoice {
     work: Option<Work>,
@@ -67,6 +69,21 @@ impl ClinicalApp {
             epoch: self.epoch,
         })
     }
+    /// Nomi dei farmaci delle terapie del paziente aperto: orientano il
+    /// motore whisper e restano sul Mac.
+    fn voice_vocabulary(&self) -> zeroize::Zeroizing<String> {
+        #[cfg(target_os = "macos")]
+        if let Some(therapies) = self.patient.therapies.ready() {
+            return crate::local_voice::whisper::vocabulary_prompt(
+                therapies.iter().map(|t| t.drug_name.as_str()).chain(
+                    therapies
+                        .iter()
+                        .filter_map(|t| t.active_principle.as_deref()),
+                ),
+            );
+        }
+        zeroize::Zeroizing::default()
+    }
     pub(super) fn open_chat_voice(&mut self, pending: &Pending, cx: &mut Context<Self>) {
         let binding = self.voice_binding().filter(|_| {
             self.form.is_none()
@@ -82,13 +99,14 @@ impl ClinicalApp {
                 .voice
                 .editor
                 .update(cx, |input, cx| input.set_content("", cx));
-            let session = Session::new();
+            let session = Session::new(self.voice_vocabulary());
             let state = session.state();
             self.chat_access.voice.work = Some(Work {
                 binding,
                 pending: pending.clone(),
                 session,
                 state,
+                live: 0,
             });
         }
         if let Ok(mut p) = pending.lock() {
@@ -112,6 +130,11 @@ impl ClinicalApp {
             return;
         }
         let state = work.session.state();
+        let live = work.session.live_text().map_or(0, |text| text.len());
+        if live != work.live {
+            work.live = live;
+            cx.notify();
+        }
         if state != work.state {
             work.state = state;
             if state == State::Review {
@@ -197,10 +220,22 @@ impl ClinicalApp {
                 ))
                 .child(notice(
                     "chat-local-voice-state",
-                    work.state.message(),
+                    work.session.message(work.state),
                     self.theme,
                     matches!(work.state, State::PermissionDenied | State::Unavailable),
                 ))
+                .when_some(work.session.live_text(), |el, text| {
+                    el.child(
+                        div()
+                            .id("chat-local-voice-live")
+                            .min_w_0()
+                            .max_w_full()
+                            .whitespace_normal()
+                            .text_color(self.theme.secondary)
+                            .type_role(self.theme, crate::theme::TextRole::Body)
+                            .child(text.to_string()),
+                    )
+                })
                 .when(work.state == State::Disclosure, |el| {
                     el.child(
                         button(
@@ -290,7 +325,7 @@ mod tests {
                 app.privacy_shield = false;
                 let binding = app.voice_binding().unwrap();
                 let state = if scenario == 1 { State::Recording } else { State::Review };
-                app.chat_access.voice.work = Some(Work { binding, pending: pending.clone(), session: Session::synthetic(state, TEXT), state });
+                app.chat_access.voice.work = Some(Work { binding, pending: pending.clone(), session: Session::synthetic(state, TEXT), state, live: 0 });
                 app.chat_access.voice.editor.update(cx, |input, cx| input.set_content(TEXT, cx));
                 assert!(app.form.is_none(), "transcription completion must not open a writer");
                 app.open_form(FormKind::Entry, window, cx);
@@ -320,5 +355,91 @@ mod tests {
                 app.chat_access.voice.retire(cx);
             });
         }
+    }
+
+    #[gpui::test]
+    fn whisper_live_text_is_shown_but_only_review_reaches_the_writer(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use crate::local_voice::listening::tests::{CountingDecoder, LoudnessDetector, tone};
+        use crate::local_voice::whisper::{WhisperSession, tests::InjectedSource};
+        let host = Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let (pending, _remote) = crate::chat_access::owner::tests::voice_request();
+        pending.lock().unwrap().finish_voice_open(true);
+        let whisper = WhisperSession::with_parts(
+            LoudnessDetector,
+            CountingDecoder::default(),
+            Box::new(InjectedSource::paced(tone(600.0), 20.0)),
+        );
+        cx.update_window_entity(&view, |app, _, _| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.selected_id = Some("patient-a".into());
+            app.patient.detail = ReadLoad::Ready(serde_json::from_value(serde_json::json!({
+                "id":"patient-a","firstName":"Ada","lastName":"Esempio","taxCode":"SYNTHETIC","version":1
+            })).unwrap());
+            let binding = app.voice_binding().unwrap();
+            let session = Session::with_whisper(whisper);
+            let state = session.state();
+            assert_eq!(state, State::Disclosure);
+            session.start();
+            app.chat_access.voice.work = Some(Work { binding, pending: pending.clone(), session, state, live: 0 });
+        });
+        let mut live = String::new();
+        for _ in 0..2_000 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            cx.update_window_entity(&view, |app, window, cx| {
+                app.poll_chat_voice(cx);
+                let work = app.chat_access.voice.work.as_ref().unwrap();
+                if let Some(text) = work.session.live_text() {
+                    live = text.to_string();
+                }
+                assert!(
+                    work.session.transcript().is_none(),
+                    "partial became transferable"
+                );
+                let requests = host.request_count();
+                app.transfer_chat_voice(window, cx);
+                assert!(app.form.is_none(), "live text reached the writer");
+                assert_eq!(host.request_count(), requests);
+                assert_eq!(app.chat_access.voice.editor.read(cx).value(), "");
+            });
+            if !live.is_empty() {
+                break;
+            }
+        }
+        assert!(live.starts_with("parola1"), "live text: {live}");
+        assert!(!live.contains("incerta"), "unconfirmed word shown: {live}");
+        cx.update_window_entity(&view, |app, _, _| {
+            app.chat_access.voice.work.as_ref().unwrap().session.stop();
+        });
+        let mut reviewed = String::new();
+        for _ in 0..2_000 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            cx.update_window_entity(&view, |app, _, cx| {
+                app.poll_chat_voice(cx);
+                let work = app.chat_access.voice.work.as_ref().unwrap();
+                if work.state == State::Review {
+                    reviewed = app.chat_access.voice.editor.read(cx).value().to_owned();
+                    assert!(work.session.live_text().is_none());
+                }
+            });
+            if !reviewed.is_empty() {
+                break;
+            }
+        }
+        assert!(reviewed.starts_with("parola1"), "review text: {reviewed}");
+        cx.update_window_entity(&view, |app, window, cx| {
+            assert!(
+                app.form.is_none(),
+                "transcription completion must not open a writer"
+            );
+            app.transfer_chat_voice(window, cx);
+            let form = app.form.as_ref().unwrap();
+            assert!(form.kind == FormKind::Entry && form.state == FormState::Draft);
+            assert_eq!(form.fields[2].editor.read(cx).value(), reviewed);
+        });
     }
 }
