@@ -24,7 +24,7 @@ Questa revisione è stata ricostruita dal commit pubblico dopo la perdita
 dell'ambiente temporaneo. Il servizio e i test sono stati nuovamente
 revisionati e verificati. Le prove qui riportate sono nuove esecuzioni su
 questi file; non riattribuiscono ai nuovi byte risultati o hash precedenti.
-La [ricevuta di validazione](../../experiments/gpui-patient-pilot/evidence/connected/patient-profile-port-validation.json)
+La [ricevuta di validazione](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/patient-profile-port-validation.json)
 contiene gli hash ricalcolati dei sorgenti, degli ingressi e dei log.
 
 ## Confine implementato
