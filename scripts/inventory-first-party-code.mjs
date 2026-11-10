@@ -26,11 +26,9 @@ const SCOPE_ROOTS = new Set([
 ]);
 
 const ROOT_TOOLING_FILES = new Set([
-  'Dockerfile',
   'MediFlow.cmd',
   'MediFlow.command',
   'MediFlow.sh',
-  'ecosystem.config.js',
   'eslint.config.mjs',
   'next.config.ts',
   'package.json',
