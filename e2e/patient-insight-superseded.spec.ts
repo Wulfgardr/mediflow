@@ -91,7 +91,10 @@ async function expectSuperseded(page: Page) {
   await openPatientSection(page, 'attenzione');
   const panel = page.locator('#patient-insight');
   await expect(panel.getByTestId('patient-insight-review-proposal')).toHaveCount(0);
-  await expect(panel.getByTestId('patient-insight-superseded')).toContainText('Proposta superata: profilo, diario o terapie sono cambiati dopo la generazione.');
+  const superseded = panel.getByTestId('patient-insight-superseded');
+  await expect(superseded.getByRole('heading', { name: 'Proposta superata', exact: true })).toBeVisible();
+  // the reason is said once, under the heading, without repeating it.
+  await expect(superseded.locator('p')).toHaveText('Profilo, diario o terapie sono cambiati dopo la generazione.');
   await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
 }
 
