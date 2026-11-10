@@ -265,6 +265,17 @@ impl Agreement {
     pub(crate) fn stable(&self) -> &str {
         &self.stable
     }
+    /// Ultimo parziale oltre il prefisso confermato: si mostra subito, in un
+    /// tono più chiaro, e può ancora cambiare.
+    pub(crate) fn provisional(&self) -> Zeroizing<String> {
+        let confirmed = words(&self.stable).len();
+        Zeroizing::new(
+            words(&self.previous)
+                .get(confirmed..)
+                .map(|rest| rest.join(" "))
+                .unwrap_or_default(),
+        )
+    }
     pub(crate) fn reset(&mut self) {
         self.previous.zeroize();
         self.stable.zeroize();
@@ -346,9 +357,9 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
         result
     }
 
-    /// Testo da mostrare in grigio mentre si parla: frasi definitive più il
+    /// Testo confermato da mostrare mentre si parla: frasi definitive più il
     /// prefisso confermato della frase in corso. Non si trasferisce.
-    pub(crate) fn stable_text(&self) -> Zeroizing<String> {
+    pub(crate) fn confirmed_text(&self) -> Zeroizing<String> {
         let mut text = Zeroizing::new(self.finals.as_str().to_owned());
         let stable = self.agreement.stable();
         if !stable.is_empty() {
@@ -358,6 +369,17 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
             text.push_str(stable);
         }
         text
+    }
+
+    /// Testo provvisorio della frase in corso: non si trasferisce e non entra
+    /// in Review, se non come parte del definitivo della frase.
+    pub(crate) fn provisional_text(&self) -> Zeroizing<String> {
+        self.agreement.provisional()
+    }
+
+    /// Lunghezza del prefisso confermato della frase in corso.
+    pub(crate) fn open_confirmed_len(&self) -> usize {
+        self.agreement.stable().len()
     }
 
     /// Testo definitivo, da consegnare solo allo stato Review.
@@ -443,7 +465,7 @@ pub(crate) mod tests {
         let mut shown = Vec::new();
         for block in audio.chunks(BLOCK) {
             dictation.feed(block).unwrap();
-            shown.push(dictation.stable_text().to_string());
+            shown.push(dictation.confirmed_text().to_string());
         }
         (dictation, shown, decoder)
     }
@@ -510,16 +532,63 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn provisional_text_appears_with_the_first_partial_and_never_reaches_review() {
+        let decoder = CountingDecoder::default();
+        let mut dictation = Dictation::new(LoudnessDetector, decoder.clone());
+        let mut first = None;
+        let mut confirmed_seen: Vec<String> = Vec::new();
+        for (index, block) in tone(3.0).chunks(BLOCK).enumerate() {
+            dictation.feed(block).unwrap();
+            let partials = decoder.calls.lock().unwrap().len();
+            if partials > 0 && first.is_none() {
+                first = Some(index);
+                assert!(
+                    !dictation.provisional_text().is_empty(),
+                    "first partial not shown"
+                );
+                assert!(dictation.confirmed_text().is_empty());
+            }
+            confirmed_seen.push(dictation.confirmed_text().to_string());
+            assert!(
+                dictation.transcript().is_empty(),
+                "provisional reached review"
+            );
+        }
+        assert!(first.is_some());
+        for pair in confirmed_seen.windows(2) {
+            assert!(
+                pair[1].starts_with(pair[0].as_str()),
+                "confirmed went back: {pair:?}"
+            );
+        }
+        assert!(dictation.provisional_text().contains("incerta"));
+        dictation.feed(&silence(1.0)).unwrap();
+        assert!(
+            dictation.provisional_text().is_empty(),
+            "closed sentence keeps provisional"
+        );
+        assert!(!dictation.transcript().is_empty(), "final of the sentence");
+        dictation.feed(&tone(1.5)).unwrap();
+        dictation.feed(&tone(0.5)).unwrap();
+        assert!(!dictation.provisional_text().is_empty());
+        dictation.wipe();
+        assert!(dictation.provisional_text().is_empty() && dictation.confirmed_text().is_empty());
+    }
+
+    #[test]
     fn agreement_keeps_only_the_confirmed_prefix() {
         let mut agreement = Agreement::default();
         agreement.observe("prosegue rami");
         assert_eq!(agreement.stable(), "");
+        assert_eq!(agreement.provisional().as_str(), "prosegue rami");
         agreement.observe("prosegue ramipril 5");
         assert_eq!(agreement.stable(), "prosegue");
         agreement.observe("prosegue ramipril 5 mg");
         assert_eq!(agreement.stable(), "prosegue ramipril 5");
+        assert_eq!(agreement.provisional().as_str(), "mg");
         agreement.observe("prosegue Ramipril cinque");
         assert_eq!(agreement.stable(), "prosegue ramipril 5", "never goes back");
+        assert_eq!(agreement.provisional().as_str(), "");
         agreement.reset();
         agreement.observe("Visita.");
         agreement.observe("visita di controllo");
@@ -547,7 +616,7 @@ pub(crate) mod tests {
         assert!(dictation.listener.utterance.is_some());
         dictation.finish().unwrap();
         assert_eq!(dictation.retained_samples(), 0);
-        assert_eq!(dictation.stable_text().as_str(), dictation.transcript());
+        assert_eq!(dictation.confirmed_text().as_str(), dictation.transcript());
     }
 
     #[test]
@@ -560,7 +629,7 @@ pub(crate) mod tests {
         dictation.wipe();
         assert_eq!(dictation.retained_samples(), 0);
         assert!(dictation.transcript().is_empty());
-        assert!(dictation.stable_text().is_empty());
+        assert!(dictation.confirmed_text().is_empty());
     }
 
     #[test]

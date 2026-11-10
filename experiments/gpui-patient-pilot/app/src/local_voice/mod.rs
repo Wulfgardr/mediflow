@@ -62,6 +62,27 @@ impl State {
     }
 }
 
+/// Testo mentre si parla, in due inchiostri: confermato (frasi definitive e
+/// prefisso confermato) e provvisorio (l'ultimo parziale oltre quel prefisso).
+/// Nessuno dei due è modificabile o trasferibile.
+pub(crate) struct LiveText {
+    pub(crate) confirmed: Zeroizing<String>,
+    pub(crate) provisional: Zeroizing<String>,
+}
+impl LiveText {
+    /// Testo intero e intervallo in byte del provvisorio.
+    pub(crate) fn joined(&self) -> (Zeroizing<String>, std::ops::Range<usize>) {
+        let mut text = Zeroizing::new(self.confirmed.as_str().to_owned());
+        if !text.is_empty() && !self.provisional.is_empty() {
+            text.push(' ');
+        }
+        let start = text.len();
+        text.push_str(&self.provisional);
+        let end = text.len();
+        (text, start..end)
+    }
+}
+
 pub(crate) struct Session {
     #[cfg(test)]
     synthetic: Option<(State, Zeroizing<String>)>,
@@ -177,14 +198,17 @@ impl Session {
         }
         state.message()
     }
-    /// Testo stabile mentre si parla (solo whisper): da mostrare in grigio,
-    /// mai modificabile né trasferibile.
-    pub(crate) fn live_text(&self) -> Option<Zeroizing<String>> {
+    /// Testo mentre si parla (solo whisper): da mostrare, mai modificabile né
+    /// trasferibile.
+    pub(crate) fn live_text(&self) -> Option<LiveText> {
         #[cfg(target_os = "macos")]
         if let Some(whisper) = &self.whisper {
             return matches!(self.state(), State::Recording | State::Finalizing)
-                .then(|| whisper.stable_text())
-                .filter(|text| !text.is_empty());
+                .then(|| LiveText {
+                    confirmed: whisper.stable_text(),
+                    provisional: whisper.provisional_text(),
+                })
+                .filter(|live| !live.confirmed.is_empty() || !live.provisional.is_empty());
         }
         None
     }
