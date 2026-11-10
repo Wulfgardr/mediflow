@@ -49,7 +49,7 @@ type Dependencies = Readonly<{
     readCurrentness(attachmentId: string, patientId: string, ambulatoryId: string): unknown;
     readLaneEnabled(): unknown;
     extract(session: ServerSession, attachmentId: string, request: Request): Promise<LocalExtractionResult>;
-    execute(configuration: unknown): Promise<unknown>;
+    execute(configuration: unknown, stillCurrent: () => boolean): Promise<unknown>;
     entropy(): unknown;
     registerResource(context: AuthenticatedWebSessionProjectionOwnerContext, dispose: () => void): (() => void) | null;
 }>;
@@ -237,7 +237,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                         selection => selectionAgrees(context, preview, selection) && sameCurrentness(preview.currentness, read(preview))); }
                     catch { return false; }
                 };
-                const publication = remote ? await executeDocumentSynthesisChatGpt(configuration, sourceSet, stillCurrent) : await dependencies.execute(configuration);
+                const publication = remote ? await executeDocumentSynthesisChatGpt(configuration, sourceSet, stillCurrent) : await dependencies.execute(configuration, stillCurrent);
                 if (dependencies.readLaneEnabled() !== true) return previewDenied('lane_disabled');
                 if (!publication) return previewDenied('operation_unavailable');
                 const current = context.owner.withLeaseCriticalSection(context.session, (selection) => selectionAgrees(context, preview, selection) && sameCurrentness(preview.currentness, read(preview)));
@@ -307,7 +307,7 @@ const production = factory(Object.freeze({
     readCurrentness: readProductionCurrentness,
     readLaneEnabled: readProductionLaneEnabled,
     extract: (session: ServerSession, attachmentId: string, request: Request) => composeAnyDocCurrentSelectionClientProjectionExtraction(session, { attachmentId }, request),
-    async execute(configuration: unknown) { return (await createDocumentSynthesisFabricProductionComposition(configuration)?.execute()) ?? null; },
+    async execute(configuration: unknown, stillCurrent: () => boolean) { return (await createDocumentSynthesisFabricProductionComposition(configuration)?.execute(stillCurrent)) ?? null; },
     entropy: () => randomBytes(16),
     registerResource: registerProductionResource,
 }));
