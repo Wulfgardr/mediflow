@@ -105,9 +105,12 @@ Gli hash coincidono con l'oid LFS di Hugging Face e con `motori/INVENTARIO.md` d
   pagina legge soltanto il disco e dice peso (0,57 GB) e host (`huggingface.co`); nessuna connessione parte prima del
   gesto. Lo scaricamento gira sul thread `mediflow-voce-installazione` con il `curl` di sistema (solo HTTPS, anche
   nei redirect, URL fissati, timeout di connessione 30 s, interruzione sotto 1 kB/s per 60 s); ogni file si scarica
-  in `NOME.parziale`, si verifica e solo allora si rinomina. «Annulla» torna subito: il thread ferma `curl` entro
-  20 ms e cancella il parziale. Errore, hash diverso o annullamento non lasciano file. Un secondo clic non avvia un
-  secondo scaricamento. «Rimuovi» toglie i file e la dettatura torna alla trascrizione Apple. Il comando
+  in `NOME.parziale` e si verifica; i file diventano definitivi solo insieme, rinominati quando sono tutti
+  verificati e nessuno ha annullato. Quelli già buoni restano e non si riscaricano. «Annulla» torna subito: il
+  thread ferma `curl` entro 20 ms e cancella i parziali. Errore, hash diverso o annullamento, anche a metà del
+  secondo file, non lasciano file nuovi. All'uscita dall'app (Cmd-Q) il gestore d'uscita ferma il `curl` (SIGKILL
+  al suo PID e `wait`) e toglie i parziali in pochi millisecondi, dentro i 200 ms che GPUI concede; all'avvio un
+  parziale rimasto da un'uscita brusca si toglie. Un secondo clic non avvia un secondo scaricamento. «Rimuovi» toglie i file e la dettatura torna alla trascrizione Apple. Il comando
   `--installa-modello-voce` della prima fetta è stato tolto: il pulsante è l'unico percorso.
 - **Uscite di rete**: `network.mode` governa la LAN e non autorizza Internet (ADR 0125); vale l'interruttore
   `MEDIFLOW_NETWORK_DISABLED` (presente e diverso da `0`), ricontrollato prima di ogni richiesta: con le uscite

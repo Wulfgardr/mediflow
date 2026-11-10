@@ -37,7 +37,12 @@ impl Default for VoiceModelArea {
     }
 }
 impl VoiceModelArea {
+    /// All'avvio si tolgono i parziali di un'uscita brusca: nessuno
+    /// scaricamento può essere in corso prima di questo stato.
     pub(super) fn with_catalog(catalog: Option<Catalog>) -> Self {
+        if let Some(catalog) = &catalog {
+            catalog.remove_partials();
+        }
         Self {
             status: if catalog.is_some() {
                 Status::Checking
@@ -48,6 +53,12 @@ impl VoiceModelArea {
             download: None,
             check: None,
             poller: None,
+        }
+    }
+    /// Uscita dall'app: ferma `curl` e toglie i parziali senza aspettare.
+    pub(super) fn shutdown(&self) {
+        if let Some(download) = &self.download {
+            download.shutdown();
         }
     }
     fn network_disabled(&self) -> bool {
@@ -355,7 +366,9 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::local_voice::model::tests::{LoopbackServer, invented, loopback_catalog, temp};
+    use crate::local_voice::model::tests::{
+        LoopbackServer, alive, invented, loopback_catalog, temp,
+    };
 
     struct Fixture {
         server: LoopbackServer,
@@ -583,6 +596,59 @@ mod tests {
         assert!(!catalog.directory.exists());
         let (ids, _) = rendered(&view, cx);
         assert_eq!(ids, ["voice-model-install"]);
+        std::fs::remove_dir_all(&f.root).unwrap();
+    }
+
+    #[gpui::test]
+    fn quitting_the_app_ends_the_download_and_leaves_no_partial_file(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use crate::local_voice::model::tests::Reply;
+        let f = fixture("uscita");
+        let content = invented(2_000_000, 15);
+        let model = f.server.file("lento.bin", &content);
+        f.server.set("/lento.bin", vec![Reply::Stall(content)]);
+        let catalog = loopback_catalog(f.catalog.directory.clone(), vec![model]);
+        let (view, cx) = open(catalog.clone(), cx);
+        cx.update(|_, cx| view.update(cx, |app, cx| app.install_voice_model(cx)));
+        wait_until(&view, cx, |area| {
+            area.download.as_ref().is_some_and(|d| d.progress().0 > 0)
+        });
+        let pid = cx.update(|_, cx| {
+            view.read(cx)
+                .voice_model
+                .download
+                .as_ref()
+                .and_then(|d| d.child_pid())
+                .unwrap()
+        });
+        assert!(alive(pid));
+        let quitting = std::time::Instant::now();
+        // Il vero gestore `on_app_quit` della shell, come con Cmd-Q.
+        cx.cx.update(|cx| cx.shutdown());
+        assert!(
+            quitting.elapsed() < Duration::from_millis(200),
+            "{:?}",
+            quitting.elapsed()
+        );
+        assert!(!alive(pid), "curl {pid} still alive after quit");
+        assert!(!catalog.directory.join("lento.bin.parziale").exists());
+        assert!(!catalog.directory.join("lento.bin").exists());
+        std::fs::remove_dir_all(&f.root).unwrap();
+    }
+
+    #[gpui::test]
+    fn a_partial_file_left_by_an_abrupt_exit_is_removed_when_the_state_starts(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let f = fixture("orfano");
+        std::fs::create_dir_all(&f.catalog.directory).unwrap();
+        let orphan = f.catalog.directory.join("modello.bin.parziale");
+        std::fs::write(&orphan, b"mezzo").unwrap();
+        let (view, cx) = open(f.catalog.clone(), cx);
+        assert!(!orphan.exists());
+        assert_eq!(status(&view, cx), Status::Missing);
+        assert_eq!(f.server.connections(), 0);
         std::fs::remove_dir_all(&f.root).unwrap();
     }
 
