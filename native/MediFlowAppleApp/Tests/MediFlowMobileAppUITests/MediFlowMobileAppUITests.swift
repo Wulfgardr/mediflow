@@ -1406,6 +1406,21 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(analyticsSaysSomething, "Analytics non dice nulla sul perche non ci siano numeri")
     }
 
+    /// Choosing the patient for a scale used to open an empty sheet when no
+    /// home-base was connected: the message existed in the model and was never
+    /// drawn. The sheet must say why it lists no patients.
+    func testScalePatientPickerSaysWhyItListsNoPatients() throws {
+        launch(seedPatients: true)
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(openSection("Scale"), "Scale must be reachable")
+        XCTAssertTrue(sectionView("clinical-workspace-scales-view").waitForExistence(timeout: 15))
+        let scale = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "ADL")).firstMatch
+        XCTAssertTrue(scale.waitForExistence(timeout: 10))
+        scale.tap()
+        XCTAssertTrue(app.navigationBars["Seleziona paziente"].waitForExistence(timeout: 10))
+        attachScreenshot(named: "scale-patient-picker-unconnected")
+    }
+
     func testTabBarNavigatesBetweenSections() throws {
         /* La meta speculare della matrice adattiva. I quattro contratti solo-iPad
            si auto-saltano su iPhone; questi cinque pretendono il cromo compatto,
@@ -2162,6 +2177,10 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.buttons["patient-cell-uitest-1"].tap()
         openPatientSection(.overview)
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
+        attachScreenshot(named: "clean-copy-chart-locked-top")
+        app.swipeUp()
+        attachScreenshot(named: "clean-copy-chart-locked-scrolled")
+        app.swipeDown()
 
         app.buttons["edit-patient-button"].tap()
         let address = app.textFields["edit-patient-address"]
@@ -2462,6 +2481,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.buttons["edit-patient-button"].tap()
         let icdSearch = app.textFields["icd-search-field"]
         XCTAssertTrue(scrollDown(to: icdSearch), "The in-app ICD search should be in the edit form")
+        attachScreenshot(named: "clean-copy-edit-icd-search")
         icdSearch.tap()
         icdSearch.typeText("ipertensione")
 
