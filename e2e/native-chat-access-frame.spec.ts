@@ -243,29 +243,25 @@ for (const width of [390, 1440]) test(`local voice opens native review without r
     await page.screenshot({ path: info.outputPath('voice-frame.png'), fullPage: true });
 });
 
-for (const width of [390, 1440]) test(`patient insight opens in the native window and returns only states at ${width}`, async ({ page }, info) => {
+// Uno stato per test, su una pagina nuova: ricaricare il frame dentro lo stesso test mescola il
+// revoke della carta uscente e il collegamento della nuova con lo stato della finta host.
+for (const width of [390, 1440]) for (const [status, text] of [
+    ['insight-opened', 'Quadro paziente aperto nella finestra MediFlow'],
+    ['insight-unavailable', 'Quadro paziente non disponibile'],
+    ['insight-busy', 'già in uso nella finestra MediFlow'],
+]) test(`patient insight ${status} returns only the state at ${width}`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 1000 });
-    for (const [status, text] of [
-        ['insight-opened', 'Quadro paziente aperto nella finestra MediFlow'],
-        ['insight-unavailable', 'Quadro paziente non disponibile'],
-        ['insight-busy', 'già in uso nella finestra MediFlow'],
-    ]) {
-        await page.locator('#access').evaluate(element => { const frame = element as HTMLIFrameElement; frame.srcdoc = frame.srcdoc; });
-        await page.evaluate(status => {
-            const fixture = (window as unknown as { accessFixture: { status: string; attached: boolean; calls: unknown[] } }).accessFixture;
-            fixture.status = status; fixture.attached = false; fixture.calls = [];
-        }, status);
-        const frame = page.frameLocator('#access');
-        await frame.getByRole('button', { name: 'Apri il Quadro paziente in MediFlow' }).click();
-        await expect(frame.getByRole('status')).toContainText(text);
-        await expect(frame.locator('#card')).toBeHidden();
-        await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeDisabled();
-        await expect(frame.getByRole('button', { name: 'Apri il Quadro paziente in MediFlow' })).toBeDisabled();
-        const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: unknown }[] } }).accessFixture.calls);
-        expect(calls.map(call => call.arguments)).toEqual([{ command: 'attach' }, { command: 'patient-insight' }]);
-        expect(await frame.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
-        await page.screenshot({ path: info.outputPath(`insight-${status}.png`), fullPage: true });
-    }
+    await page.evaluate(status => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = status; }, status);
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Apri il Quadro paziente in MediFlow' }).click();
+    await expect(frame.getByRole('status')).toContainText(text);
+    await expect(frame.locator('#card')).toBeHidden();
+    await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeDisabled();
+    await expect(frame.getByRole('button', { name: 'Apri il Quadro paziente in MediFlow' })).toBeDisabled();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: unknown }[] } }).accessFixture.calls);
+    expect(calls.map(call => call.arguments)).toEqual([{ command: 'attach' }, { command: 'patient-insight' }]);
+    expect(await frame.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath(`insight-${status}.png`), fullPage: true });
 });
 
 test('patient insight refuses a reply that carries anything beyond the state', async ({ page }) => {
