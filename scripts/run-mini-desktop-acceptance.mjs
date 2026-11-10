@@ -20,8 +20,8 @@ const SUPPORT_FILES = Object.freeze([
   'scripts/register-strip-types-loader.mjs',
   'lib/security/portable-supervisor-production.ts',
   'lib/security/web-auth-lifecycle-owner-test-fixture.ts',
-  'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.7.tgz',
 ]);
+const OWNER_PACKAGE = '@mediflow/web-auth-lifecycle-owner';
 const LOCKED_DEPENDENCIES = Object.freeze([
   'typescript', 'better-sqlite3', 'drizzle-orm', 'zod', 'bcryptjs',
   '@mediflow/web-auth-lifecycle-owner',
@@ -31,13 +31,25 @@ const OS_ENVIRONMENT = new Set([
   'HOME', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA', 'LANG', 'LC_ALL', 'TZ',
 ]);
 
+/** The owner package the run needs is the one package.json installs, never a version frozen here. */
+function ownerPackageFile(root) {
+  let spec;
+  try { spec = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).dependencies?.[OWNER_PACKAGE]; } catch { /* reported below */ }
+  if (typeof spec !== 'string' || !/^file:packages\/web-auth-lifecycle-owner\/artifacts\/[A-Za-z0-9._-]+\.tgz$/u.test(spec)) {
+    throw new Error(`Required acceptance dependency is not a local package: ${OWNER_PACKAGE}`);
+  }
+  return spec.slice('file:'.length);
+}
+
 /** A fixed roster is intentional: missing tests must not become a smaller green run. */
 export function requireMiniAcceptanceFiles(root = repoRoot) {
-  for (const relative of [...SUPPORT_FILES, ...MINI_DESKTOP_ACCEPTANCE_TESTS]) {
+  const requireFile = (relative) => {
     let stat;
     try { stat = fs.lstatSync(path.join(root, relative)); } catch { /* checked below */ }
     if (!stat?.isFile() || stat.isSymbolicLink()) throw new Error(`Required acceptance file missing: ${relative}`);
-  }
+  };
+  for (const relative of [...SUPPORT_FILES, ...MINI_DESKTOP_ACCEPTANCE_TESTS]) requireFile(relative);
+  requireFile(ownerPackageFile(root));
   return [...MINI_DESKTOP_ACCEPTANCE_TESTS];
 }
 
