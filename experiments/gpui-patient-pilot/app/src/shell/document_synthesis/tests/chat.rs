@@ -222,6 +222,8 @@ fn revocation_before_consent_and_after_a_second_choice_sends_nothing(
             assert!(bench.phase(cx, |phase| matches!(phase, GenerationPhase::Consent(_))));
             assert_eq!(reply(&pending), json!({"status":"synthesis-opened"}));
         }
+        bench.until_preview();
+        bench.respond(PREVIEW, "response-available");
         bench.view.update(cx, |app, cx| {
             match change {
                 "eof" => drop(remote.take()),
@@ -424,4 +426,22 @@ fn synthesis_and_insight_have_independent_chat_ownership(cx: &mut gpui::TestAppC
             GenerationPhase::Consent(_)
         ))
     });
+}
+
+#[gpui::test]
+fn a_document_of_another_patient_is_not_read_or_sent(cx: &mut gpui::TestAppContext) {
+    let (bench, cx) = bench(cx);
+    let (pending, _remote) = opened(&bench, cx);
+    bench.view.update(cx, |app, cx| {
+        let mut foreign = row();
+        foreign.patient_id = "patient-synthetic-foreign".into();
+        app.patient.attachments = ReadLoad::Ready(vec![foreign]);
+        app.synthesis_prepare(&text("attachmentId"), cx);
+    });
+    cx.run_until_parked();
+    follow(&bench, cx);
+    assert_eq!(reply(&pending), json!({"status":"synthesis-closed"}));
+    assert!(bench.phase(cx, |phase| matches!(phase, GenerationPhase::Error(_))));
+    assert!(!bench.host.routes().contains(&detail_route()));
+    assert!(bench.generation_routes().is_empty());
 }
