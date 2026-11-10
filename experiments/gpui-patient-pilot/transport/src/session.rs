@@ -108,6 +108,33 @@ impl ChatWriteRecovery {
             Err(_) => (None, ChatWriteResolution::Uncertain),
         }
     }
+    /// Reads only the durable receipt, never revokes: the answer after an execute was sent.
+    /// Like `reconcile`, it survives selection cancellation. A terminal receipt counts only
+    /// with this command's id; an HTTP error, silence or `unknown` leave the outcome unknown.
+    pub fn read_receipt(&self) -> (Option<ChatWriteOutcome>, Option<Value>) {
+        let mut read = None;
+        for &kind in &self.kinds {
+            let Ok(receipt) = self.call(kind, "receipt", crate::http::JSON_LIMIT) else {
+                continue;
+            };
+            let outcome = (receipt["outcome"] == "terminal"
+                && receipt["receipt"]["commandId"] == self.command_id.as_str())
+            .then(|| Self::outcome(&receipt["receipt"]).ok())
+            .flatten()
+            .filter(|outcome| *outcome != ChatWriteOutcome::Retired)
+            .map(|outcome| match outcome {
+                ChatWriteOutcome::Applied if receipt["receipt"]["historical"] == true => {
+                    ChatWriteOutcome::AppliedHistorical
+                }
+                outcome => outcome,
+            });
+            if outcome.is_some() {
+                return (outcome, Some(receipt));
+            }
+            read.get_or_insert(receipt);
+        }
+        (None, read)
+    }
     fn call(&self, kind: ChatWriteKind, operation: &str, limit: usize) -> Result<Value> {
         self.session.request(
             Method::POST,
