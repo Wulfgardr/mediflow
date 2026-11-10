@@ -1,4 +1,5 @@
 use super::native::{self, Peer};
+#[cfg(all(test, target_os = "macos"))]
 use mediflow_runtime_client::ChatWriteOutcome;
 use mediflow_runtime_client::{
     ChatAccessContext, ChatWriteKind, ChatWriteRecovery, ChatWriteResolution, RuntimeSession,
@@ -414,32 +415,13 @@ impl Request {
             self.withdraw();
         }
     }
+    /// After an execute was sent only the durable receipt tells the outcome. It is read through
+    /// the recovery handle, which outlives a selection change, and never revokes.
     fn read_therapy_receipt(&mut self) {
-        let receipt = self.binding.as_ref().and_then(|binding| {
-            let (_, id) = self.therapy.as_ref()?.selected.as_ref()?;
-            binding
-                .session
-                .chat_therapy_request(
-                    &binding.context,
-                    &serde_json::json!({"operation":"receipt", "commandId":id}),
-                )
-                .ok()
-        });
-        let outcome = receipt.as_ref().and_then(|value| {
-            let (_, id) = self.therapy.as_ref()?.selected.as_ref()?;
-            if value["outcome"] != "terminal" || value["receipt"]["commandId"] != *id {
-                return None;
-            }
-            match value["receipt"]["outcome"].as_str()? {
-                "applied" if value["receipt"]["historical"] == true => {
-                    Some(ChatWriteOutcome::AppliedHistorical)
-                }
-                "applied" => Some(ChatWriteOutcome::Applied),
-                "rejected" => Some(ChatWriteOutcome::Rejected),
-                "closed" => Some(ChatWriteOutcome::Closed),
-                _ => None,
-            }
-        });
+        let (outcome, receipt) = self
+            .recovery
+            .as_ref()
+            .map_or((None, None), ChatWriteRecovery::read_receipt);
         self.state = State::Write(outcome.map_or(
             ChatWriteResolution::Uncertain,
             ChatWriteResolution::Confirmed,
@@ -2458,6 +2440,38 @@ pub(crate) mod tests {
                 .iter()
                 .all(|call| call == &json!({"operation":"receipt","commandId":id}))
         );
+    }
+
+    /// The execute was sent and the host committed; the physician changes patient before the
+    /// answer is read. The durable receipt still names the outcome, and nothing is revoked.
+    #[test]
+    fn therapy_receipt_after_execute_survives_a_selection_change() {
+        let (session, host) = native_session();
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        let (a, _remote) = UnixStream::pair().unwrap();
+        let pending = Request::for_therapy(Peer::test_peer(), a, "suspended").unwrap();
+        assert!(pending.lock().unwrap().bind(session.clone(), context));
+        prepare_card(&pending);
+        choose_therapy(&pending, 0);
+        let id = pending.lock().unwrap().safe_result().unwrap()["commandId"].clone();
+        pending.lock().unwrap().begin().unwrap();
+        let mut p = pending.lock().unwrap();
+        p.state = State::Consuming;
+        session.clear_profile_selection();
+        p.read_therapy_receipt();
+        assert_eq!(
+            p.safe_result().unwrap(),
+            json!({"commandId":id,"outcome":"applied"})
+        );
+        assert!(p.begin().is_none());
+        let calls = host.therapy_calls.lock().unwrap();
+        assert!(
+            !calls
+                .iter()
+                .any(|c| ["execute", "revoke"].contains(&c["operation"].as_str().unwrap())),
+            "receipt reading executed or revoked: {calls:?}"
+        );
+        assert!(calls.iter().any(|c| c["operation"] == "receipt"));
     }
 
     #[test]
