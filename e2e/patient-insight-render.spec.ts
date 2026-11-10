@@ -103,7 +103,8 @@ test('patient insight renders stored markdown as read-only history without fallb
   // proposals have their own review-only surface and are covered separately.
   await expect(page.getByRole('heading', { name: 'Supporto al ragionamento clinico' })).toBeVisible();
   const historicalSummary = page.getByTestId('patient-insight-historical-summary');
-  await expect(historicalSummary).toContainText('Riepilogo storico salvato · sola lettura');
+  await expect(historicalSummary.getByRole('heading', { name: 'Riepilogo storico salvato', exact: true })).toBeVisible();
+  await expect(historicalSummary).toContainText('Le nuove generazioni non sostituiscono né aggiornano automaticamente questo contenuto.');
   await expect(historicalSummary).toContainText('Quadro attuale');
   await expect(historicalSummary).toContainText('Attenzioni');
   await expect(historicalSummary).toContainText('Prossimi passi');

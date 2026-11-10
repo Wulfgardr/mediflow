@@ -129,7 +129,7 @@ export async function finishOrdinaryChatGpt(controls: Locator, option = OPTION) 
   await expect(controls).toContainText('SYNTHETIC-ONLY');
   // The official URL is fixture data only: never open the link or authenticate.
   await controls.getByRole('button', { name: 'Ho completato: verifica accesso' }).click();
-  await controls.getByRole('button', { name: 'Leggi catalogo di questo processo' }).click();
+  await controls.getByRole('button', { name: 'Leggi i modelli disponibili' }).click();
   await controls.getByRole('combobox', { name: 'Modello e ragionamento correnti' }).selectOption(option);
   await controls.getByRole('button', { name: 'Genera questa proposta' }).click();
 }
