@@ -70,6 +70,9 @@ const nextConfig: NextConfig = {
   /* @Codex */
   outputFileTracingIncludes: {
     "/*": [
+      // Next 16.4 can omit a generated Turbopack SSR chunk from a route trace.
+      // Keep the compiled SSR closure, including builds in .next-e2e.
+      `./${distDir}/server/chunks/ssr/**/*.js`,
       "./package.json",
       "./assets/reference-data/icd11/*",
       "./LICENSE",
