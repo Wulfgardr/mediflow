@@ -820,6 +820,8 @@ impl ClinicalApp {
         #[cfg(unix)]
         app.start_chat_access(cx);
         let quit = cx.on_app_quit(|this, cx| {
+            #[cfg(target_os = "macos")]
+            this.voice_model.shutdown();
             let local_access = this.local_host.withdraw(cx);
             #[cfg(unix)]
             this.chat_access.detach(cx);

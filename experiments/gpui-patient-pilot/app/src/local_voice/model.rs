@@ -185,6 +185,12 @@ impl Catalog {
     }
     /// Toglie i file del modello e gli eventuali parziali. La dettatura torna al
     /// motore di sistema.
+    /// Avvio: i parziali lasciati da un'uscita brusca non servono a nulla.
+    pub(crate) fn remove_partials(&self) {
+        for file in &self.files {
+            let _ = fs::remove_file(partial_path(&self.directory, file));
+        }
+    }
     pub(crate) fn remove(&self) -> io::Result<()> {
         for file in &self.files {
             for path in [
@@ -208,6 +214,19 @@ struct Shared {
     cancel: AtomicBool,
     received: AtomicU64,
     outcome: Mutex<Option<Result<(), InstallError>>>,
+    /// Il `curl` in corso: lo ferma il thread all'annullamento, o l'uscita
+    /// dall'app senza aspettare il thread.
+    child: Mutex<Option<std::process::Child>>,
+    /// Preso per rinominare i parziali e per toglierli all'uscita.
+    commit: Mutex<()>,
+    #[cfg(test)]
+    child_pid: std::sync::atomic::AtomicU32,
+    /// Prove: il thread si ferma prima delle rinomine finché il test non lo
+    /// lascia andare.
+    #[cfg(test)]
+    hold_commit: AtomicBool,
+    #[cfg(test)]
+    at_commit: AtomicBool,
 }
 
 /// Un'installazione in corso su un thread suo. L'interfaccia legge avanzamento
@@ -215,11 +234,20 @@ struct Shared {
 pub(crate) struct Download {
     shared: Arc<Shared>,
     total: u64,
+    partials: Vec<PathBuf>,
 }
 impl Download {
     pub(crate) fn start(catalog: Catalog) -> Self {
-        let shared = Arc::new(Shared::default());
+        Self::start_with(catalog, Shared::default())
+    }
+    fn start_with(catalog: Catalog, shared: Shared) -> Self {
+        let shared = Arc::new(shared);
         let total = catalog.total_size();
+        let partials = catalog
+            .files
+            .iter()
+            .map(|file| partial_path(&catalog.directory, file))
+            .collect();
         let worker = shared.clone();
         let spawned = std::thread::Builder::new()
             .name("mediflow-voce-installazione".into())
@@ -231,7 +259,11 @@ impl Download {
             *shared.outcome.lock().unwrap_or_else(|e| e.into_inner()) =
                 Some(Err(InstallError::Write));
         }
-        Self { shared, total }
+        Self {
+            shared,
+            total,
+            partials,
+        }
     }
     /// Byte ricevuti e byte attesi.
     pub(crate) fn progress(&self) -> (u64, u64) {
@@ -253,60 +285,119 @@ impl Download {
     pub(crate) fn cancel(&self) {
         self.shared.cancel.store(true, Ordering::SeqCst);
     }
+    /// Uscita dall'app: il thread di lavoro muore con il processo, quindi qui
+    /// si ferma il suo `curl` (SIGKILL al suo PID, poi `wait`) e si tolgono i
+    /// parziali, senza aspettare il thread. Pochi millisecondi.
+    pub(crate) fn shutdown(&self) {
+        self.cancel();
+        if let Some(mut child) = self
+            .shared
+            .child
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take()
+        {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        let _commit = self.shared.commit.lock().unwrap_or_else(|e| e.into_inner());
+        for path in &self.partials {
+            let _ = fs::remove_file(path);
+        }
+    }
+    #[cfg(test)]
+    pub(crate) fn child_pid(&self) -> Option<u32> {
+        Some(self.shared.child_pid.load(Ordering::SeqCst)).filter(|pid| *pid != 0)
+    }
 }
 
+/// Due tempi: prima ogni file mancante si scarica e si verifica nel suo
+/// parziale; poi, solo se tutti sono buoni e nessuno ha annullato, si
+/// rinominano insieme. Un'installazione annullata o fallita non lascia file
+/// nuovi; quelli che erano già buoni restano.
 fn install(catalog: &Catalog, shared: &Shared) -> Result<(), InstallError> {
     let created = !catalog.directory.exists();
     let result = (|| {
         fs::create_dir_all(&catalog.directory).map_err(|_| InstallError::Write)?;
         let mut done = 0;
+        let mut pending = Vec::new();
         for file in &catalog.files {
-            install_file(catalog, file, shared, done)?;
+            if download_file(catalog, file, shared, done)? {
+                pending.push(*file);
+            }
             done += file.size;
             shared.received.store(done, Ordering::Relaxed);
         }
-        Ok(())
+        commit(catalog, &pending, shared)
     })();
-    if result.is_err() && created {
-        let _ = fs::remove_dir(&catalog.directory);
+    if result.is_err() {
+        catalog.remove_partials();
+        if created {
+            let _ = fs::remove_dir(&catalog.directory);
+        }
     }
     result
 }
 
-/// Installa un file: scarica in un file temporaneo nella stessa cartella,
-/// verifica lo SHA-256 e solo allora lo rinomina. In ogni altro caso il file
-/// temporaneo si cancella.
-fn install_file(
+/// Rinomina i parziali verificati. Tiene il lucchetto di `commit`, lo stesso
+/// dell'uscita dall'app: o si rinominano tutti o nessuno.
+fn commit(catalog: &Catalog, pending: &[&ModelFile], shared: &Shared) -> Result<(), InstallError> {
+    #[cfg(test)]
+    {
+        shared.at_commit.store(true, Ordering::SeqCst);
+        while shared.hold_commit.load(Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+    let _commit = shared.commit.lock().unwrap_or_else(|e| e.into_inner());
+    if shared.cancel.load(Ordering::SeqCst) {
+        return Err(InstallError::Cancelled);
+    }
+    let mut renamed = Vec::new();
+    for file in pending {
+        let target = catalog.directory.join(file.name);
+        if fs::rename(partial_path(&catalog.directory, file), &target).is_err() {
+            for path in renamed {
+                let _ = fs::remove_file(path);
+            }
+            return Err(InstallError::Write);
+        }
+        renamed.push(target);
+    }
+    Ok(())
+}
+
+/// Porta un file nel suo parziale verificato. `false` se il file al suo posto
+/// era già buono e non serve scaricarlo.
+fn download_file(
     catalog: &Catalog,
     file: &ModelFile,
     shared: &Shared,
     done: u64,
-) -> Result<(), InstallError> {
+) -> Result<bool, InstallError> {
     let target = catalog.directory.join(file.name);
     if hash_file(&target, &shared.cancel).is_ok_and(|hash| hash == file.sha256) {
-        return Ok(());
+        return Ok(false);
+    }
+    if shared.cancel.load(Ordering::SeqCst) {
+        return Err(InstallError::Cancelled);
     }
     let partial = partial_path(&catalog.directory, file);
     let _ = fs::remove_file(&partial);
-    let result = fetch(catalog, file.url, &partial, shared, done).and_then(|()| {
-        let hash = hash_file(&partial, &shared.cancel).map_err(|error| {
-            if shared.cancel.load(Ordering::SeqCst) {
-                InstallError::Cancelled
-            } else if error.kind() == io::ErrorKind::NotFound {
-                InstallError::Interrupted
-            } else {
-                InstallError::Write
-            }
-        })?;
-        if hash != file.sha256 {
-            return Err(InstallError::HashMismatch);
+    fetch(catalog, file.url, &partial, shared, done)?;
+    let hash = hash_file(&partial, &shared.cancel).map_err(|error| {
+        if shared.cancel.load(Ordering::SeqCst) {
+            InstallError::Cancelled
+        } else if error.kind() == io::ErrorKind::NotFound {
+            InstallError::Interrupted
+        } else {
+            InstallError::Write
         }
-        fs::rename(&partial, &target).map_err(|_| InstallError::Write)
-    });
-    if result.is_err() {
-        let _ = fs::remove_file(&partial);
+    })?;
+    if hash != file.sha256 {
+        return Err(InstallError::HashMismatch);
     }
-    result
+    Ok(true)
 }
 
 /// SHA-256 che si interrompe all'annullamento.
@@ -363,7 +454,7 @@ fn fetch(
         #[cfg(test)]
         Transport::LoopbackHttp => command.args(["--proto", "=http", "--noproxy", "*"]),
     };
-    let mut child = command
+    let child = command
         .arg("--output")
         .arg(output)
         .arg(url)
@@ -372,24 +463,44 @@ fn fetch(
         .stderr(Stdio::null())
         .spawn()
         .map_err(|_| InstallError::Unreachable)?;
+    #[cfg(test)]
+    shared.child_pid.store(child.id(), Ordering::SeqCst);
+    *shared.child.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
     loop {
-        if shared.cancel.load(Ordering::SeqCst) {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(InstallError::Cancelled);
+        let finished = {
+            let mut slot = shared.child.lock().unwrap_or_else(|e| e.into_inner());
+            let Some(child) = slot.as_mut() else {
+                // L'uscita dall'app l'ha già fermato.
+                return Err(InstallError::Cancelled);
+            };
+            if shared.cancel.load(Ordering::SeqCst) {
+                let _ = child.kill();
+                let _ = child.wait();
+                slot.take();
+                return Err(InstallError::Cancelled);
+            }
+            match child.try_wait() {
+                Ok(None) => None,
+                Ok(Some(status)) => Some(curl_result(status.code())),
+                Err(_) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    Some(Err(InstallError::Interrupted))
+                }
+            }
+        };
+        if let Some(result) = finished {
+            shared
+                .child
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .take();
+            return result;
         }
         if let Some(received) = fs::metadata(output).ok().map(|m| m.len()) {
             shared.received.store(done + received, Ordering::Relaxed);
         }
-        match child.try_wait() {
-            Ok(Some(status)) => return curl_result(status.code()),
-            Ok(None) => std::thread::sleep(Duration::from_millis(20)),
-            Err(_) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(InstallError::Interrupted);
-            }
-        }
+        std::thread::sleep(Duration::from_millis(20));
     }
 }
 
@@ -815,6 +926,153 @@ pub(crate) mod tests {
         assert_eq!(catalog.quick_status(), ModelStatus::Missing);
         assert!(!catalog.directory.exists());
         catalog.remove().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Processo ancora vivo (zombie compresi: `ps` li elenca finché nessuno li raccoglie).
+    pub(crate) fn alive(pid: u32) -> bool {
+        Command::new("/bin/ps")
+            .args(["-o", "stat=", "-p", &pid.to_string()])
+            .output()
+            .is_ok_and(|out| {
+                out.status.success() && !String::from_utf8_lossy(&out.stdout).trim().is_empty()
+            })
+    }
+
+    #[test]
+    fn cancelling_during_the_second_file_of_a_fresh_install_leaves_no_model_files() {
+        let server = LoopbackServer::start();
+        let model = server.file("modello.bin", &invented(200_000, 10));
+        let slow = invented(2_000_000, 11);
+        let vad = server.file("vad.bin", &slow);
+        server.set("/vad.bin", vec![Reply::Stall(slow)]);
+        let root = temp("install-cancel-second");
+        let dir = root.join("modelli-voce");
+        let catalog = loopback_catalog(dir.clone(), vec![model, vad]);
+        let download = Download::start(catalog.clone());
+        let started = Instant::now();
+        while download.progress().0 <= model.size {
+            assert!(
+                started.elapsed() < Duration::from_secs(10),
+                "second file never started"
+            );
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        download.cancel();
+        assert_eq!(wait(&download), Err(InstallError::Cancelled));
+        assert_eq!(
+            catalog.quick_status(),
+            ModelStatus::Missing,
+            "{:?}",
+            names(&dir)
+        );
+        assert!(!dir.exists(), "{:?}", names(&dir));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn cancel_after_the_last_file_is_verified_still_installs_nothing() {
+        let server = LoopbackServer::start();
+        let model = server.file("modello.bin", &invented(100_000, 16));
+        let vad = server.file("vad.bin", &invented(2_000, 17));
+        let root = temp("install-cancel-commit");
+        let dir = root.join("modelli-voce");
+        let catalog = loopback_catalog(dir.clone(), vec![model, vad]);
+        let held = Shared::default();
+        held.hold_commit.store(true, Ordering::SeqCst);
+        let download = Download::start_with(catalog.clone(), held);
+        let started = Instant::now();
+        while !download.shared.at_commit.load(Ordering::SeqCst) {
+            assert!(started.elapsed() < Duration::from_secs(10));
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(download.progress(), (102_000, 102_000));
+        download.cancel();
+        download.shared.hold_commit.store(false, Ordering::SeqCst);
+        assert_eq!(wait(&download), Err(InstallError::Cancelled));
+        assert_eq!(catalog.quick_status(), ModelStatus::Missing);
+        assert!(!dir.exists(), "{:?}", names(&dir));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reinstall_cancelled_midway_keeps_files_that_were_already_good() {
+        let server = LoopbackServer::start();
+        let model = server.file("modello.bin", &invented(200_000, 12));
+        let slow = invented(2_000_000, 13);
+        let vad = server.file("vad.bin", &slow);
+        let root = temp("install-cancel-keep");
+        let dir = root.join("modelli-voce");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("modello.bin"), invented(200_000, 12)).unwrap();
+        fs::write(dir.join("vad.bin"), b"alterato").unwrap();
+        server.set("/vad.bin", vec![Reply::Stall(slow)]);
+        let catalog = loopback_catalog(dir.clone(), vec![model, vad]);
+        let download = Download::start(catalog);
+        let started = Instant::now();
+        while download.progress().0 <= model.size {
+            assert!(started.elapsed() < Duration::from_secs(10));
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        download.cancel();
+        assert_eq!(wait(&download), Err(InstallError::Cancelled));
+        assert_eq!(
+            names(&dir),
+            ["modello.bin", "vad.bin"],
+            "nothing new, nothing lost"
+        );
+        assert_eq!(
+            server.connections(),
+            1,
+            "the good file is not downloaded again"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn quitting_midway_ends_curl_and_removes_the_partial_file_at_once() {
+        let server = LoopbackServer::start();
+        let content = invented(2_000_000, 14);
+        let model = server.file("modello.bin", &content);
+        server.set("/modello.bin", vec![Reply::Stall(content)]);
+        let root = temp("install-quit");
+        let dir = root.join("modelli-voce");
+        let download = Download::start(loopback_catalog(dir.clone(), vec![model]));
+        let started = Instant::now();
+        while download.progress().0 == 0 {
+            assert!(started.elapsed() < Duration::from_secs(10));
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        let pid = download.child_pid().expect("curl started");
+        assert!(alive(pid));
+        let quitting = Instant::now();
+        download.shutdown();
+        let spent = quitting.elapsed();
+        // GPUI concede 200 ms a tutti i gestori d'uscita insieme.
+        assert!(spent < Duration::from_millis(100), "{spent:?}");
+        // Il thread di lavoro muore con il processo: si guarda lo stato subito
+        // dopo `shutdown`, senza aspettarlo.
+        assert!(!alive(pid), "curl {pid} still alive after shutdown");
+        assert!(
+            !dir.join("modello.bin.parziale").exists(),
+            "{:?}",
+            names(&dir)
+        );
+        eprintln!("uscita chiusa in {spent:?}");
+        let _ = wait(&download);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn partial_files_left_by_an_abrupt_exit_are_removed_at_start() {
+        let root = temp("orphan");
+        let catalog = Catalog::pinned(root.join("modelli-voce"));
+        fs::create_dir_all(&catalog.directory).unwrap();
+        fs::write(catalog.directory.join(WHISPER.name), b"pesi inventati").unwrap();
+        fs::write(partial_path(&catalog.directory, &VAD), b"mezzo").unwrap();
+        fs::write(catalog.directory.join("nota.txt"), b"non mio").unwrap();
+        catalog.remove_partials();
+        assert_eq!(names(&catalog.directory), [WHISPER.name, "nota.txt"]);
         fs::remove_dir_all(root).unwrap();
     }
 
