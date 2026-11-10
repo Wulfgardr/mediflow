@@ -14,7 +14,9 @@ pub(super) trait Wipe {
     fn wipe(&mut self);
 }
 
+#[derive(Default)]
 pub(super) enum GenerationPhase<R, P> {
+    #[default]
     Idle,
     Checking,
     Unavailable(String),
@@ -30,11 +32,6 @@ pub(super) enum GenerationPhase<R, P> {
     /// Fine senza proposta per scelta di chi usa la scheda (scarto, interruzione, rinuncia).
     Ended(String),
     Error(String),
-}
-impl<R, P> Default for GenerationPhase<R, P> {
-    fn default() -> Self {
-        Self::Idle
-    }
 }
 impl<R, P> GenerationPhase<R, P> {
     pub(super) fn is_busy(&self) -> bool {
