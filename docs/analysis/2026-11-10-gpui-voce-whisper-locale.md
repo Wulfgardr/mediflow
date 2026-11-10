@@ -82,9 +82,9 @@ Gli stati restano quelli di oggi. Cambiano solo i messaggi diventati falsi con w
 | Disclosure | invariato: «L'audio viene trascritto sul Mac…» |
 | Preparing | «Verifica del permesso microfono e del modello vocale locale…» |
 | Recording | invariato, più il testo provvisorio a matita e quello confermato in grigio |
-| Unavailable, modello alterato | «Il modello vocale locale è incompleto o diverso da quello atteso. Reinstallalo avviando MediFlow GPUI con --installa-modello-voce.» |
+| Unavailable, modello alterato | «Il modello vocale locale è incompleto o diverso da quello atteso. Reinstallalo da Impostazioni, Voce locale.» |
 | Unavailable, motore o cattura interrotti | «La dettatura locale si è interrotta e il testo non è stato conservato. Apri una nuova dettatura.» |
-| Unavailable, motore Apple senza modello | messaggio di oggi più l'indicazione di installare il modello vocale locale |
+| Unavailable, motore Apple senza modello | messaggio di oggi più l'indicazione di installare il modello vocale locale da Impostazioni, Voce locale |
 
 ## Dove sta il modello e come si verifica
 
@@ -101,10 +101,20 @@ Gli hash coincidono con l'oid LFS di Hugging Face e con `motori/INVENTARIO.md` d
   vuota, motore Apple come oggi; almeno un file presente, whisper.
 - **Verifica completa** dello SHA-256 nel thread di lavoro a ogni avvio (Preparing). Un file mancante, troncato o
   con hash diverso dà Unavailable con il messaggio che dice come reinstallarlo.
-- **Installazione** solo con il comando esplicito `mediflow-gpui-patient-pilot --installa-modello-voce`: `curl` di
-  sistema, solo HTTPS, URL fissati; ogni file si scarica in `NOME.parziale`, si verifica e solo allora si rinomina;
-  se l'hash non coincide il file si cancella. In questa fetta non c'è la pagina «Impostazioni, Voce locale» con il
-  pulsante: arriverà in una fetta successiva (scelta di Leonardo), e fino ad allora vale il comando.
+- **Installazione** solo dal pulsante «Installa» di Impostazioni, Voce locale (solo macOS). Prima del clic la
+  pagina legge soltanto il disco e dice peso (0,57 GB) e host (`huggingface.co`); nessuna connessione parte prima del
+  gesto. Lo scaricamento gira sul thread `mediflow-voce-installazione` con il `curl` di sistema (solo HTTPS, anche
+  nei redirect, URL fissati, timeout di connessione 30 s, interruzione sotto 1 kB/s per 60 s); ogni file si scarica
+  in `NOME.parziale` e si verifica; i file diventano definitivi solo insieme, rinominati quando sono tutti
+  verificati e nessuno ha annullato. Quelli già buoni restano e non si riscaricano. «Annulla» torna subito: il
+  thread ferma `curl` entro 20 ms e cancella i parziali. Errore, hash diverso o annullamento, anche a metà del
+  secondo file, non lasciano file nuovi. All'uscita dall'app (Cmd-Q) il gestore d'uscita ferma il `curl` (SIGKILL
+  al suo PID e `wait`) e toglie i parziali in pochi millisecondi, dentro i 200 ms che GPUI concede; all'avvio un
+  parziale rimasto da un'uscita brusca si toglie. Un secondo clic non avvia un secondo scaricamento. «Rimuovi» toglie i file e la dettatura torna alla trascrizione Apple. Il comando
+  `--installa-modello-voce` della prima fetta è stato tolto: il pulsante è l'unico percorso.
+- **Uscite di rete**: `network.mode` governa la LAN e non autorizza Internet (ADR 0125); vale l'interruttore
+  `MEDIFLOW_NETWORK_DISABLED` (presente e diverso da `0`), ricontrollato prima di ogni richiesta: con le uscite
+  disattivate il pulsante è spento e la pagina dice perché.
 - Nessun file di modello nel repository o nel pacchetto. Il rilevatore Silero (885 kB) si installa con il modello;
   le prove in CI usano un rilevatore finto.
 
@@ -184,7 +194,7 @@ dentro `whisper-rs-sys`) li raccoglie già `bundle_macos.py`: verificato su 470 
   quando due parziali concordano. Scelta di Leonardo del 10 novembre; da giudicare con la sua voce nella seconda
   seduta.
 - **Installazione del modello** (domanda 2): pulsante in «Impostazioni, Voce locale», come per il catalogo AIFA, in
-  una fetta successiva. In questa PR resta il comando esplicito `--installa-modello-voce`.
+  una fetta successiva. Fatto: la pagina Impostazioni, Voce locale ha sostituito il comando `--installa-modello-voce`.
 
 ## Domande per Leonardo
 

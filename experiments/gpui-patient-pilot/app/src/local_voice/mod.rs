@@ -8,13 +8,13 @@ pub(crate) mod model;
 pub(crate) mod whisper;
 
 #[cfg(target_os = "macos")]
-const MODEL_INVALID: &str = "Il modello vocale locale è incompleto o diverso da quello atteso. Reinstallalo avviando MediFlow GPUI con --installa-modello-voce.";
+const MODEL_INVALID: &str = "Il modello vocale locale è incompleto o diverso da quello atteso. Reinstallalo da Impostazioni, Voce locale.";
 #[cfg(target_os = "macos")]
 const ENGINE_FAILED: &str = "La dettatura locale si è interrotta e il testo non è stato conservato. Apri una nuova dettatura.";
 #[cfg(target_os = "macos")]
 const WHISPER_PREPARING: &str = "Verifica del permesso microfono e del modello vocale locale…";
 #[cfg(target_os = "macos")]
-const APPLE_UNAVAILABLE_WITH_MODEL_HINT: &str = "Trascrizione Apple locale non disponibile. Servono macOS 26 o successivo e le risorse italiane già installate, oppure il modello vocale locale: avvia MediFlow GPUI con --installa-modello-voce. Non viene usato alcun servizio remoto.";
+const APPLE_UNAVAILABLE_WITH_MODEL_HINT: &str = "Trascrizione Apple locale non disponibile. Servono macOS 26 o successivo e le risorse italiane già installate, oppure il modello vocale locale, da installare in Impostazioni, Voce locale. Non viene usato alcun servizio remoto.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum State {
@@ -136,7 +136,7 @@ impl Session {
     #[cfg(local_voice_apple)]
     fn whisper(prompt: Zeroizing<String>) -> Option<whisper::WhisperSession> {
         let directory = model::directory()?;
-        if model::quick_status(&directory, &model::FILES) == model::ModelStatus::Missing {
+        if !model::whisper_selected(&directory) {
             return None;
         }
         let capture = whisper::swift::SwiftCapture::new()?;
