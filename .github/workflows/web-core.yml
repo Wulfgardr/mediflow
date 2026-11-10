@@ -6,9 +6,10 @@ on:
     branches:
       - main
 
-# Un push nuovo sulla stessa PR sostituisce il giro in corso. Su main ogni commit conclude il suo.
+# Un push nuovo sulla stessa PR sostituisce il giro in corso. Su main ogni commit conclude il suo:
+# lì il gruppo è unico per giro, perché in un gruppo condiviso un giro in attesa viene comunque sostituito.
 concurrency:
-  group: web-core-${{ github.ref }}
+  group: web-core-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
