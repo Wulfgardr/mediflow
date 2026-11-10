@@ -36,9 +36,11 @@ whisper.cpp 1.9.5. **L'app usa whisper.cpp 1.8.3**, quella inclusa in `whisper-r
    da rivedere; la frase aperta si ridecodifica a ogni passo della griglia da 0,5 s, un solo parziale sull'audio più
    recente.
 5. Il thread pubblica in un `Mutex` lo stato, il testo confermato e il provvisorio; la vista li legge a ogni
-   ridisegno e ridisegna solo quando cambiano.
+   ridisegno e ridisegna quando cambia il contenuto (non la lunghezza: una parola rivista può avere la stessa).
 6. «Termina e trascrivi» manda `Stop`: la cattura si ferma, l'ultima frase diventa definitiva, lo stato passa a
-   Review con il testo definitivo. Scarta o chiusura mandano `Cancel`: audio e testo si azzerano.
+   Review con il testo definitivo. Scarta, chiusura o cambio di paziente mandano `Cancel` e tornano subito: l'interfaccia non aspetta il thread, che
+   può essere fermo sulla verifica del modello, sul caricamento o su una decodifica. Il testo pubblicato si azzera
+   subito; il thread, finito il passo in corso, azzera i buffer audio, chiude e non pubblica più nulla.
 
 L'audio sta in buffer preallocati (`Zeroizing`), mai riallocati: frase in corso fino a 20 s, circa 1 s di contesto
 per il rilevatore, buffer del ponte di 30 s. Ogni frase chiusa, l'annullamento e la fine azzerano i campioni.

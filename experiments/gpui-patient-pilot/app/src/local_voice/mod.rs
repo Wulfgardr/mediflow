@@ -86,6 +86,9 @@ impl LiveText {
 pub(crate) struct Session {
     #[cfg(test)]
     synthetic: Option<(State, Zeroizing<String>)>,
+    /// Per le prove: testo dal vivo (confermato, provvisorio) deciso dal test.
+    #[cfg(test)]
+    synthetic_live: Option<std::sync::Arc<std::sync::Mutex<(String, String)>>>,
     #[cfg(local_voice_apple)]
     pointer: *mut std::ffi::c_void,
     /// Motore whisper: si usa solo se il modello è installato.
@@ -108,6 +111,8 @@ impl Session {
             return Self {
                 #[cfg(test)]
                 synthetic: None,
+                #[cfg(test)]
+                synthetic_live: None,
                 pointer: std::ptr::null_mut(),
                 whisper: Some(whisper),
             };
@@ -117,6 +122,8 @@ impl Session {
         Self {
             #[cfg(test)]
             synthetic: None,
+            #[cfg(test)]
+            synthetic_live: None,
             #[cfg(local_voice_apple)]
             pointer: unsafe { MFVoiceCreate() },
             #[cfg(target_os = "macos")]
@@ -146,6 +153,7 @@ impl Session {
     pub(crate) fn synthetic(state: State, text: &str) -> Self {
         Self {
             synthetic: Some((state, Zeroizing::new(text.to_owned()))),
+            synthetic_live: None,
             #[cfg(local_voice_apple)]
             pointer: std::ptr::null_mut(),
             whisper: None,
@@ -155,6 +163,7 @@ impl Session {
     pub(crate) fn with_whisper(session: whisper::WhisperSession) -> Self {
         Self {
             synthetic: None,
+            synthetic_live: None,
             #[cfg(local_voice_apple)]
             pointer: std::ptr::null_mut(),
             whisper: Some(session),
@@ -200,7 +209,28 @@ impl Session {
     }
     /// Testo mentre si parla (solo whisper): da mostrare, mai modificabile né
     /// trasferibile.
+    #[cfg(all(test, target_os = "macos"))]
+    pub(crate) fn synthetic_live(
+        state: State,
+        live: std::sync::Arc<std::sync::Mutex<(String, String)>>,
+    ) -> Self {
+        Self {
+            synthetic: Some((state, Zeroizing::default())),
+            synthetic_live: Some(live),
+            #[cfg(local_voice_apple)]
+            pointer: std::ptr::null_mut(),
+            whisper: None,
+        }
+    }
     pub(crate) fn live_text(&self) -> Option<LiveText> {
+        #[cfg(test)]
+        if let Some(live) = &self.synthetic_live {
+            let (confirmed, provisional) = live.lock().unwrap().clone();
+            return Some(LiveText {
+                confirmed: Zeroizing::new(confirmed),
+                provisional: Zeroizing::new(provisional),
+            });
+        }
         #[cfg(target_os = "macos")]
         if let Some(whisper) = &self.whisper {
             return matches!(self.state(), State::Recording | State::Finalizing)
