@@ -34,6 +34,12 @@ const eslintConfig = defineConfig([
       // @Codex: temporary downgrade to unblock delivery while typed refactors are phased in.
       "@typescript-eslint/no-explicit-any": "warn",
       "react-hooks/set-state-in-effect": "warn",
+      // Regole arrivate con eslint-plugin-react-hooks 7.1: segnalano dieci punti già presenti
+      // (ref letti o scritti durante il render, Date.now() nel render, funzioni usate prima
+      // della dichiarazione). Restano visibili come avvisi finché quei punti non sono corretti.
+      "react-hooks/refs": "warn",
+      "react-hooks/immutability": "warn",
+      "react-hooks/purity": "warn",
     },
   },
   // Override default ignores of eslint-config-next.

@@ -23,8 +23,8 @@ async function centered(control: Locator) {
     expect(await control.evaluate(element => {
         const box = element.getBoundingClientRect();
         const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-        return element === hit || element.contains(hit);
-    }), 'Il comando deve essere raggiungibile senza sovrapposizioni').toBe(true);
+        return box.top >= 0 && box.bottom <= innerHeight && (element === hit || element.contains(hit));
+    }), 'Il comando deve essere interamente visibile e raggiungibile senza sovrapposizioni').toBe(true);
 }
 
 test('Prestazioni: composizione, bozza, dettagli e conferma nei due temi e allo zoom reale', async ({ baseURL }) => {
