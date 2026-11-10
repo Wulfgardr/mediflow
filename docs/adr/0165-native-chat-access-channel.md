@@ -397,3 +397,30 @@ superata secondo la validità nativa. Le stringhe `insight-*` non cambiano.
 
 Questo raccordo tecnico precisa gli stati già previsti da C-7. La qualifica
 dei due desktop, dei provider reali e dei tempi end-to-end resta separata.
+
+
+## Import assistito dalla chat, 10 novembre 2026
+
+Il comando app-only `smart-import` porta soltanto il nome del comando. La
+chat non indica note, voci di diario, documenti o candidati: le fonti sono
+quelle della scheda selezionata nella finestra. L'ammissione sul server e il
+controllo dell'interruttore dell'importazione assistita precedono
+`import-opened`, che apre la sezione Documenti. Lì il medico prepara la
+richiesta, vede che cosa parte e dà il consenso. Preparazione e invio non
+partono durante l'ammissione. Senza note, voci di diario o sintesi di
+documenti la richiesta resta aperta con uno stato vuoto che dice che cosa
+manca, e Revoca resta disponibile. Un'altra richiesta della stessa funzione
+restituisce `import-busy`.
+
+L'import assistito in GPUI è sola anteprima (#901): candidati con la loro
+fonte e ricevuta, nessun comando di applicazione e nessuna scrittura nella
+scheda. La chat riceve soltanto `status`: `requested`, `preparing`,
+`import-opened`, `import-unavailable`, `import-busy`, `import-closed` oppure
+`withdrawn`. Nessuna fonte, proposta o ricevuta passa al modello della chat.
+
+Il raccordo riusa i controlli comuni di `GenerationArea` (`start`,
+`take_running`, `follow_chat`) e l'apertura comune del canale, con un legame
+proprio: Quadro, sintesi e import non si sostituiscono il lavoro a vicenda.
+Dopo `import-closed` la proposta appartiene alla finestra e la sua validità
+segue solo le fonti della scheda. Le stringhe `insight-*` e `synthesis-*`
+non cambiano. L'applicazione dei candidati resta legata al contratto G-6j.

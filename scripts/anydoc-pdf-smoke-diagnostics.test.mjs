@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
+import { localImportClosure } from './fixtures/local-import-closure.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SCHEMA = 'mediflow.anydoc_pdf_child_protocol.v1';
@@ -164,12 +165,13 @@ test('real checker still exits 1 on an intentionally incomplete physical package
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   fs.mkdirSync(path.join(directory, 'scripts'));
   fs.mkdirSync(path.join(directory, 'synthetic-data'));
-  for (const name of [
-    'check-standalone-runtime-bundle.mjs', 'anydoc-pdf-smoke-diagnostics.mjs',
-    'node-runtime-contract.mjs', 'scheduled-backup-runtime-contract.mjs', 'anydoc-pdf-page-worker.mjs',
-    'anydoc-pdf-renderer-profiles.json', 'anydoc-tesseract-artifacts.json',
-  ]) {
-    fs.copyFileSync(path.join(root, 'scripts', name), path.join(directory, 'scripts', name));
+  // Il checker con i moduli che importa davvero, più worker e dati letti a runtime.
+  for (const file of localImportClosure(root, [
+    'scripts/check-standalone-runtime-bundle.mjs', 'scripts/anydoc-pdf-page-worker.mjs',
+    'scripts/anydoc-pdf-renderer-profiles.json', 'scripts/anydoc-tesseract-artifacts.json',
+  ])) {
+    fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
+    fs.copyFileSync(path.join(root, file), path.join(directory, file));
   }
   const copiedWorker = fs.readFileSync(path.join(directory, 'scripts', 'anydoc-pdf-page-worker.mjs'));
   assert.equal(createHash('sha256').update(copiedWorker).digest('hex'), WORKER_HASH);

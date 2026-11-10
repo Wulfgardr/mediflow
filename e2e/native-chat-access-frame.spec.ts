@@ -359,6 +359,72 @@ for (const field of ['summary', 'payload', 'sources', 'patientId', 'attachmentId
     });
 }
 
+for (const [status, text] of [
+    ['import-opened', 'Prepara la richiesta nella finestra MediFlow'],
+    ['import-unavailable', 'Import assistito non disponibile'],
+    ['import-busy', 'già in uso nella finestra MediFlow'],
+    ['import-closed', 'concluso nella finestra MediFlow'],
+]) test(`smart import ${status} returns only the state`, async ({ page }) => {
+    await page.evaluate(status => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = status; }, status);
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Apri l’import assistito in MediFlow' }).click();
+    await expect(frame.getByRole('status')).toContainText(text);
+    await expect(frame.locator('#card')).toBeHidden();
+    await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeDisabled();
+    await expect(frame.getByRole('button', { name: 'Apri l’import assistito in MediFlow' })).toBeDisabled();
+    if (status === 'import-opened') await expect(frame.getByRole('button', { name: 'Revoca' })).toBeEnabled();
+    else await expect(frame.getByRole('button', { name: 'Revoca' })).toBeDisabled();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: unknown }[] } }).accessFixture.calls);
+    expect(calls.map(call => call.arguments).slice(0, 2)).toEqual([{ command: 'attach' }, { command: 'smart-import' }]);
+    expect(calls.slice(2).every(call => JSON.stringify(call.arguments) === '{"command":"status"}')).toBe(true);
+    expect(await frame.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await captureFrame(page, `import-${status}-light.png`);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    expect(await frame.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await captureFrame(page, `import-${status}-dark.png`);
+});
+
+test('smart import keeps revocation available until the native operation closes', async ({ page }) => {
+    await page.clock.install();
+    await page.evaluate(() => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = 'import-opened'; });
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Apri l’import assistito in MediFlow' }).click();
+    await expect(frame.getByRole('button', { name: 'Revoca' })).toBeEnabled();
+    await page.clock.runFor(1000);
+    await expect(frame.getByRole('button', { name: 'Revoca' })).toBeEnabled();
+    await page.evaluate(() => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = 'import-closed'; });
+    await page.clock.runFor(1000);
+    await expect(frame.getByRole('status')).toContainText('concluso nella finestra MediFlow');
+    await expect(frame.getByRole('button', { name: 'Revoca' })).toBeDisabled();
+});
+
+test('smart import can be revoked without returning sources or candidates', async ({ page }) => {
+    await page.evaluate(() => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = 'import-opened'; });
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Apri l’import assistito in MediFlow' }).click();
+    await frame.getByRole('button', { name: 'Revoca' }).click();
+    await expect(frame.getByRole('status')).toContainText('Richiesta ritirata');
+    await expect(frame.locator('#card')).toBeHidden();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: unknown }[] } }).accessFixture.calls);
+    expect(calls.at(-1)?.arguments).toEqual({ command: 'revoke' });
+});
+
+for (const field of ['summary', 'candidates', 'sources', 'patientId', 'noteId', 'token', 'receipt']) {
+    test(`smart import refuses a reply containing ${field}`, async ({ page }) => {
+        await page.evaluate(field => {
+            const fixture = (window as unknown as { accessFixture: { status: string; extra: Record<string, unknown> } }).accessFixture;
+            fixture.status = 'import-opened';
+            fixture.extra = { [field]: 'Ada Esempio · ipertensione arteriosa' };
+        }, field);
+        const frame = page.frameLocator('#access');
+        await frame.getByRole('button', { name: 'Apri l’import assistito in MediFlow' }).click();
+        await expect(frame.getByRole('status')).toContainText('Apertura non confermata');
+        await expect(frame.locator('body')).not.toContainText('Ada Esempio');
+        await expect(frame.locator('#card')).toBeHidden();
+        await expect(frame.getByRole('button', { name: 'Revoca' })).toBeDisabled();
+    });
+}
+
 const sourcedCard = () => ({
     profile: 'mediflow.synthetic-chat-card.v1', pseudonym: 'card_' + 'a'.repeat(32),
     history: [], therapies: [{ medicine: 'metformina', dose: '500 mg', frequency: 'due volte al giorno', sourceRef: 'src_' + 'b'.repeat(32) }], measures: [],

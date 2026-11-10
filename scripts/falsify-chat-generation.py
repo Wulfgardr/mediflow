@@ -22,11 +22,11 @@ def gate(source, method):
 
 
 mutations = [
-    ('M1', lambda s: gate(s, 'start'), ['chat_withdrawn_before_consent_sends_nothing', 'revocation_before_consent_and_after_a_second_choice_sends_nothing']),
-    ('M2', lambda s: gate(s, 'take_running'), ['late_answer_after_chat_revocation_is_not_shown']),
-    ('M3a', lambda s: replace_once(s, 'GenerationPhase::Idle\n                | GenerationPhase::Checking', 'GenerationPhase::Checking'), ['idle_document_choice_and_empty_list_remain_owned_until_revocation']),
-    ('M3b', lambda s: replace_once(s, '        if !matches!(\n            self.phase,', '        if false && !matches!(\n            self.phase,'), ['chat_waits_for_native_document_choice_and_consent']),
-    ('M4', lambda s: replace_once(s, '        self.replace(phase);', '        #[cfg(unix)]\n        { self.chat.0 = None; }\n        self.replace(phase);'), ['choices_keep_the_same_chat_hold']),
+    ('M1', lambda s: gate(s, 'start'), ['chat_withdrawn_before_consent_sends_nothing', 'revocation_before_consent_and_after_a_second_choice_sends_nothing', 'import_revocation_before_consent_sends_nothing']),
+    ('M2', lambda s: gate(s, 'take_running'), ['late_answer_after_chat_revocation_is_not_shown', 'import_late_answer_after_chat_revocation_is_not_shown']),
+    ('M3a', lambda s: replace_once(s, 'GenerationPhase::Idle\n                | GenerationPhase::Checking', 'GenerationPhase::Checking'), ['idle_document_choice_and_empty_list_remain_owned_until_revocation', 'idle_import_and_empty_chart_remain_owned_until_revocation']),
+    ('M3b', lambda s: replace_once(s, '        if !matches!(\n            self.phase,', '        if false && !matches!(\n            self.phase,'), ['chat_waits_for_native_document_choice_and_consent', 'chat_import_waits_for_native_preparation_and_consent']),
+    ('M4', lambda s: replace_once(s, '        self.replace(phase);', '        #[cfg(unix)]\n        { self.chat.0 = None; }\n        self.replace(phase);'), ['choices_keep_the_same_chat_hold', 'import_revocation_before_consent_sends_nothing']),
 ]
 
 env = dict(os.environ, CARGO_BUILD_JOBS='2', RUST_TEST_THREADS='1')
@@ -43,6 +43,11 @@ try:
         if run.returncode != 101 or not failures or 'error[E' in run.stdout:
             print(run.stdout, flush=True)
             raise SystemExit(f'{name}: non dimostrata una failure di asserzione nei test selezionati')
+        # Ogni test elencato deve cadere: un filtro che resta verde non prova nulla.
+        silent = [test for test in tests if not any(test in failure for failure in failures)]
+        if silent:
+            print(run.stdout, flush=True)
+            raise SystemExit(f'{name}: restano verdi {silent}')
         print(f'{name}: ROSSO ({"; ".join(failures)})', flush=True)
 finally:
     SOURCE.write_text(ORIGINAL)
