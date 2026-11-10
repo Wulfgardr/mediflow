@@ -1,0 +1,75 @@
+{
+  "ambulatoryId": "ambulatory.synthetic.si.1",
+  "capturedAt": "2026-11-10T09:00:00.000Z",
+  "sourceRevision": 1,
+  "requestIds": [
+    "req_00000000000000000000000000000a01",
+    "req_00000000000000000000000000000a02"
+  ],
+  "patient": {
+    "id": "patient.synthetic.si.1",
+    "version": 3,
+    "notes": "Riferisce dolore lombare da due settimane.\nTerapia domiciliare: ramipril 5 mg una volta al giorno, atorvastatina 20 mg la sera.",
+    "diagnoses": "[{\"system\":\"ICD-10\",\"code\":\"I10\",\"description\":\"Ipertensione essenziale\"}]"
+  },
+  "entries": [
+    {
+      "id": "entry.synthetic.si.1",
+      "type": "visita",
+      "title": "Controllo pressorio",
+      "date": "2026-11-05T12:00:00.000Z",
+      "content": "Pressione 150/95 in due misurazioni. Si richiede ecocardiogramma.",
+      "deletedAt": null
+    },
+    {
+      "id": "entry.synthetic.si.2",
+      "type": "nota",
+      "title": "Telefonata",
+      "date": "2026-10-20T12:00:00.000Z",
+      "content": "Sospesa amlodipina per edemi; poi ripresa a dosaggio ridotto.",
+      "deletedAt": null
+    },
+    {
+      "id": "entry.synthetic.si.3",
+      "type": "visita",
+      "title": "Voce eliminata",
+      "date": "2026-11-06T12:00:00.000Z",
+      "content": "Questa voce non deve arrivare all'host.",
+      "deletedAt": "2026-11-07T12:00:00.000Z"
+    }
+  ],
+  "therapies": [
+    {
+      "id": "therapy.synthetic.si.1",
+      "drugName": "Ramipril",
+      "activePrinciple": "ramipril",
+      "dosage": "5 mg al giorno",
+      "aic": null,
+      "atc": "C09AA05",
+      "status": "active"
+    },
+    {
+      "id": "therapy.synthetic.si.2",
+      "drugName": "Amlodipina",
+      "activePrinciple": "amlodipina",
+      "dosage": "10 mg al giorno",
+      "aic": null,
+      "atc": null,
+      "status": "suspended"
+    }
+  ],
+  "attachments": [
+    {
+      "id": "attachment.synthetic.si.1",
+      "name": "referto-cardiologico.pdf",
+      "summarySnapshot": "Referto cardiologico: lieve ipertrofia ventricolare sinistra. Consigliato ecocardiogramma di controllo.",
+      "createdAt": "2026-11-01T12:00:00.000Z"
+    },
+    {
+      "id": "attachment.synthetic.si.2",
+      "name": "foto-senza-sintesi.png",
+      "summarySnapshot": null,
+      "createdAt": "2026-11-02T12:00:00.000Z"
+    }
+  ]
+}

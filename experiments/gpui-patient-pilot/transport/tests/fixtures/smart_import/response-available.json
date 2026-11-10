@@ -1,0 +1,115 @@
+{
+  "status": 200,
+  "body": {
+    "preview": {
+      "writesPerformed": 0,
+      "apply": "denied",
+      "status": "available",
+      "code": null,
+      "proposal": {
+        "schemaVersion": "mediflow.smart-import.proposal.v1",
+        "generatedAt": "2026-11-10T09:00:01.000Z",
+        "contract": {
+          "validJson": true,
+          "validTask": true,
+          "legacyContract": false
+        },
+        "summary": "Ipertensione in terapia; ecocardiogramma da programmare.",
+        "diagnoses": [
+          {
+            "label": "Ipertensione arteriosa",
+            "icdQuery": "ipertensione essenziale",
+            "confidence": "high",
+            "evidence": "Pressione 150/95 in due misurazioni.",
+            "sourceId": "source.local.00000000001.03"
+          }
+        ],
+        "therapies": [
+          {
+            "drugMention": "ramipril 5 mg",
+            "drugQuery": "ramipril",
+            "confidence": "medium",
+            "evidence": "ramipril 5 mg una volta al giorno",
+            "sourceId": "source.local.00000000001.02",
+            "dosage": "5 mg una volta al giorno",
+            "therapyState": "active"
+          }
+        ],
+        "servicePrescriptions": [
+          {
+            "serviceName": "Ecocardiogramma",
+            "confidence": "medium",
+            "evidence": "Consigliato ecocardiogramma di controllo.",
+            "sourceId": "source.local.00000000001.06",
+            "category": "imaging"
+          }
+        ],
+        "writesPerformed": 0
+      },
+      "receipt": {
+        "schemaVersion": "mediflow.ai.fabric-resolution.v1",
+        "capability": "smart_import",
+        "class": "generative",
+        "venue": "local_process",
+        "egressProfile": {
+          "id": "local_only",
+          "version": "mediflow.ai.egress-profile.v1",
+          "egress": "none"
+        },
+        "provider": "ollama",
+        "model": "synthetic-smart-import:1",
+        "providerReceipt": {
+          "schemaVersion": "mediflow.ai.provider-selection.v1",
+          "authorityPlane": "clinical_application",
+          "task": "clinical",
+          "provider": "ollama",
+          "model": "synthetic-smart-import:1",
+          "execution": "local",
+          "endpointClass": "loopback",
+          "egress": "none",
+          "runtimeReadiness": "required",
+          "fallbackCount": 0
+        },
+        "fallbackCount": 0
+      },
+      "provenance": {
+        "schemaVersion": "mediflow.ai.fabric-provenance.v1",
+        "capability": "smart_import",
+        "venue": "local_process",
+        "provider": "ollama",
+        "model": "synthetic-smart-import:1",
+        "preprocessing": [
+          "context_minimization",
+          "envelope_validation"
+        ],
+        "receipt": {
+          "schemaVersion": "mediflow.ai.fabric-resolution.v1",
+          "capability": "smart_import",
+          "class": "generative",
+          "venue": "local_process",
+          "egressProfile": {
+            "id": "local_only",
+            "version": "mediflow.ai.egress-profile.v1",
+            "egress": "none"
+          },
+          "provider": "ollama",
+          "model": "synthetic-smart-import:1",
+          "providerReceipt": {
+            "schemaVersion": "mediflow.ai.provider-selection.v1",
+            "authorityPlane": "clinical_application",
+            "task": "clinical",
+            "provider": "ollama",
+            "model": "synthetic-smart-import:1",
+            "execution": "local",
+            "endpointClass": "loopback",
+            "egress": "none",
+            "runtimeReadiness": "required",
+            "fallbackCount": 0
+          },
+          "fallbackCount": 0
+        }
+      },
+      "reviewRef": "review_0102030405060708090a0b0c0d0e0f10"
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "tuple": {
+    "sessionRef": "ssr_00000000000000000000000000000001",
+    "selectionEpoch": 1,
+    "patientRef": "ptr_00000000000000000000000000000002",
+    "ambulatoryRef": "abr_00000000000000000000000000000003",
+    "leaseRef": "lsr_00000000000000000000000000000004"
+  },
+  "attachment": {
+    "schemaVersion": "mediflow.smart-import.projection-attachment.v1",
+    "capability": "smart_import",
+    "patientRevision": 3,
+    "sourceRevision": 1,
+    "capturedAt": "2026-11-10T09:00:00.000Z",
+    "currentDiagnoses": [
+      {
+        "system": "ICD-10",
+        "code": "I10",
+        "description": "Ipertensione essenziale"
+      }
+    ],
+    "currentActiveTherapies": [
+      {
+        "drugName": "Ramipril",
+        "activePrinciple": "ramipril",
+        "dosage": "5 mg al giorno",
+        "aic": null,
+        "atc": "C09AA05"
+      }
+    ],
+    "therapyCandidateHints": [
+      {
+        "sourceId": "source.local.00000000001.02",
+        "label": "Note paziente · segmento 2",
+        "excerpt": "Terapia domiciliare: ramipril 5 mg una volta al giorno"
+      },
+      {
+        "sourceId": "source.local.00000000001.02",
+        "label": "Note paziente · segmento 2",
+        "excerpt": "atorvastatina 20 mg la sera."
+      }
+    ],
+    "sources": [
+      {
+        "id": "source.local.00000000001.01",
+        "kind": "patient-notes",
+        "label": "Note paziente",
+        "date": null,
+        "content": "Riferisce dolore lombare da due settimane."
+      },
+      {
+        "id": "source.local.00000000001.02",
+        "kind": "patient-notes",
+        "label": "Note paziente · segmento 2",
+        "date": null,
+        "content": "Terapia domiciliare: ramipril 5 mg una volta al giorno, atorvastatina 20 mg la sera."
+      },
+      {
+        "id": "source.local.00000000001.03",
+        "kind": "clinical-entry",
+        "label": "VISITA 05/11/2026",
+        "date": "2026-11-05T12:00:00.000Z",
+        "content": "Pressione 150/95 in due misurazioni. Si richiede ecocardiogramma."
+      },
+      {
+        "id": "source.local.00000000001.04",
+        "kind": "clinical-entry",
+        "label": "NOTA 20/10/2026",
+        "date": "2026-10-20T12:00:00.000Z",
+        "content": "Sospesa amlodipina per edemi"
+      },
+      {
+        "id": "source.local.00000000001.05",
+        "kind": "clinical-entry",
+        "label": "NOTA 20/10/2026 · segmento 2",
+        "date": "2026-10-20T12:00:00.000Z",
+        "content": "poi ripresa a dosaggio ridotto."
+      },
+      {
+        "id": "source.local.00000000001.06",
+        "kind": "attachment-summary",
+        "label": "Allegato referto-cardiologico.pdf",
+        "date": "2026-11-01T12:00:00.000Z",
+        "content": "Referto cardiologico: lieve ipertrofia ventricolare sinistra. Consigliato ecocardiogramma di controllo."
+      }
+    ]
+  },
+  "requestId": "req_00000000000000000000000000000a01"
+}
