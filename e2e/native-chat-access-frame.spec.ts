@@ -299,7 +299,7 @@ for (const [status, text] of [
     ['synthesis-unavailable', 'Sintesi dei documenti non disponibile'],
     ['synthesis-busy', 'già in uso nella finestra MediFlow'],
     ['synthesis-closed', 'conclusa nella finestra MediFlow'],
-]) test(`document synthesis ${status} returns only the state`, async ({ page }, info) => {
+]) test(`document synthesis ${status} returns only the state`, async ({ page }) => {
     await page.evaluate(status => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = status; }, status);
     const frame = page.frameLocator('#access');
     await frame.getByRole('button', { name: 'Sintetizza un documento in MediFlow' }).click();
@@ -313,7 +313,9 @@ for (const [status, text] of [
     expect(calls.map(call => call.arguments).slice(0, 2)).toEqual([{ command: 'attach' }, { command: 'document-synthesis' }]);
     expect(calls.slice(2).every(call => JSON.stringify(call.arguments) === '{"command":"status"}')).toBe(true);
     expect(await frame.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
-    await page.screenshot({ path: info.outputPath(`synthesis-${status}.png`), fullPage: true });
+    await captureFrame(page, `synthesis-${status}-light.png`);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await captureFrame(page, `synthesis-${status}-dark.png`);
 });
 
 test('document synthesis keeps revocation available until the native operation closes', async ({ page }) => {
@@ -421,7 +423,7 @@ test('unconnected clinical functions and Treatment Reasoning are explicit before
     const frame = page.frameLocator('#access');
     await frame.getByText('Funzioni nella chat', { exact: true }).click();
     for (const name of ['Farmaci', 'Protesica', 'Sintesi documenti', 'Treatment Reasoning']) await expect(frame.getByRole('cell', { name, exact: true })).toBeVisible();
-    await expect(frame.getByRole('row').filter({ has: frame.getByRole('cell', { name: 'Sintesi documenti', exact: true }) })).toContainText('Non collegata alla chat');
+    await expect(frame.getByRole('row').filter({ has: frame.getByRole('cell', { name: 'Sintesi documenti', exact: true }) })).toContainText('Alla chat torna solo lo stato');
     await expect(frame.getByRole('row').filter({ has: frame.getByRole('rowheader', { name: 'Quadro paziente', exact: true }) })).toContainText('Alla chat torna solo lo stato');
     await expect(frame.getByRole('row').filter({ has: frame.getByRole('cell', { name: 'Treatment Reasoning', exact: true }) })).toContainText('Non disponibile in questa versione');
     await captureFrame(page, 'catalog.png');

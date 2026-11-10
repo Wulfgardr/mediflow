@@ -276,6 +276,37 @@ mod tests {
     }
 
     #[test]
+    fn choices_keep_the_same_chat_hold() {
+        for function in [Function::Insight, Function::Synthesis] {
+            let (session, _host) = native_session();
+            let (pending, _remote) = function_request(function);
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            assert!(pending.lock().unwrap().bind(session, context));
+            pending.lock().unwrap().finish_function_open(Stage::Opened);
+            let mut area: GenerationArea<Payload, Payload> = GenerationArea::default();
+            area.chat.0 = Some(pending.clone());
+            for _ in 0..2 {
+                area.end(GenerationPhase::Checking);
+                assert!(
+                    area.chat
+                        .0
+                        .as_ref()
+                        .is_some_and(|chat| Arc::ptr_eq(chat, &pending))
+                );
+                area.end(GenerationPhase::Consent(Box::new(Payload(Arc::new(
+                    AtomicBool::new(false),
+                )))));
+                assert!(
+                    area.chat
+                        .0
+                        .as_ref()
+                        .is_some_and(|chat| Arc::ptr_eq(chat, &pending))
+                );
+            }
+        }
+    }
+
+    #[test]
     fn take_running_rechecks_chat_and_cancels_and_wipes_a_withdrawn_request() {
         for revoked in [false, true] {
             for function in [Function::Insight, Function::Synthesis] {

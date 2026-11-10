@@ -1026,31 +1026,34 @@ mod chat {
 
     #[gpui::test]
     fn chat_with_local_host_closed_is_unavailable_without_any_call(cx: &mut gpui::TestAppContext) {
-        let host = Host::new();
-        let (view, cx) =
-            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
-        let session = host.session.clone();
-        view.update(cx, |app, _| {
-            show(app, FIRST);
-            session
-                .select_profile_patient(app.scope.as_deref().unwrap(), FIRST)
-                .unwrap();
-            app.session = Some(session);
-        });
-        let routes = host.routes().len();
-        let (pending, _remote) = insight_request();
-        view.update(cx, |app, cx| {
-            app.open_chat_function(&pending, crate::chat_access::owner::Function::Insight, cx)
-        });
-        cx.run_until_parked();
-        assert_eq!(wire(&pending), json!({"status": "insight-unavailable"}));
-        assert_eq!(host.routes().len(), routes);
-        assert_eq!(
-            pending.lock().unwrap().status(),
-            ChatState::Generative(
-                crate::chat_access::owner::Function::Insight,
-                crate::chat_access::owner::Stage::Unavailable
-            )
-        );
+        for function in [
+            crate::chat_access::owner::Function::Insight,
+            crate::chat_access::owner::Function::Synthesis,
+        ] {
+            let host = Host::new();
+            let (view, cx) =
+                cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+            let session = host.session.clone();
+            view.update(cx, |app, _| {
+                show(app, FIRST);
+                session
+                    .select_profile_patient(app.scope.as_deref().unwrap(), FIRST)
+                    .unwrap();
+                app.session = Some(session);
+            });
+            let routes = host.routes().len();
+            let (pending, _remote) = crate::chat_access::owner::tests::function_request(function);
+            view.update(cx, |app, cx| app.open_chat_function(&pending, function, cx));
+            cx.run_until_parked();
+            assert_eq!(
+                wire(&pending),
+                json!({"status": ChatState::Generative(function, crate::chat_access::owner::Stage::Unavailable).wire()})
+            );
+            assert_eq!(host.routes().len(), routes);
+            assert_eq!(
+                pending.lock().unwrap().status(),
+                ChatState::Generative(function, crate::chat_access::owner::Stage::Unavailable)
+            );
+        }
     }
 }

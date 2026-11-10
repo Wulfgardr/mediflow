@@ -39,7 +39,11 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
     writeln!(stream, "{value}")?;
     let mut bytes = Vec::new();
     BufReader::new(Read::take(&mut *stream, 65_537)).read_until(b'\n', &mut bytes)?;
-    let value: Value = serde_json::from_slice(&bytes)?;
+    checked_reply(command, &bytes)
+}
+
+fn checked_reply(command: &str, bytes: &[u8]) -> io::Result<Value> {
+    let value: Value = serde_json::from_slice(bytes)?;
     let state = value["status"].as_str().filter(|s| {
         [
             "requested",
@@ -312,6 +316,47 @@ mod tests {
             json!({"command":"patient-insight"})
         );
     }
+    #[test]
+    fn synthesis_command_and_replies_have_no_clinical_fields() {
+        assert_eq!(
+            wire_command("document-synthesis"),
+            json!({"command":"document-synthesis"})
+        );
+        for state in [
+            "requested",
+            "preparing",
+            "synthesis-opened",
+            "synthesis-unavailable",
+            "synthesis-busy",
+            "synthesis-closed",
+            "withdrawn",
+        ] {
+            let reply = json!({"status":state});
+            assert_eq!(
+                checked_reply("document-synthesis", reply.to_string().as_bytes()).unwrap(),
+                reply
+            );
+            for field in [
+                "summary",
+                "patientId",
+                "attachmentId",
+                "token",
+                "payload",
+                "sources",
+                "receipt",
+            ] {
+                let mut altered = reply.clone();
+                altered[field] = json!("synthetic-private");
+                assert!(
+                    checked_reply("document-synthesis", altered.to_string().as_bytes()).is_err(),
+                    "{state}: {field}"
+                );
+            }
+        }
+        let receipt = json!({"status":"synthesis-opened", "receipt":{"commandId":"a".repeat(36),"outcome":"applied"}});
+        assert!(checked_reply("status", receipt.to_string().as_bytes()).is_err());
+    }
+
     #[test]
     fn catalog_query_is_data_and_cannot_choose_another_command() {
         for (prefix, expected) in [("prosthetics", "prosthetics"), ("drugs", "drugs")] {
