@@ -5,6 +5,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { assertStandaloneSsrChunks, copyStandaloneSsrChunks } from './standalone-ssr-chunks.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const checker = path.join(root, 'scripts', 'check-standalone-runtime-bundle.mjs');
@@ -12,6 +13,30 @@ const node = process.execPath;
 const detectLibcTracePattern = './node_modules/detect-libc/**/*';
 const pnpmNestedSharpSemverTracePattern = './node_modules/.pnpm/node_modules/semver/**/*';
 const npmNestedSharpSemverTracePattern = './node_modules/sharp/node_modules/semver/**/*';
+
+test('standalone rejects a missing or altered generated SSR chunk, including the E2E dist directory', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-ssr-chunks-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  for (const dist of ['.next', '.next-e2e']) {
+    const build = path.join(directory, dist);
+    const packaged = path.join(build, 'standalone', dist);
+    const relative = path.join('server', 'chunks', 'ssr', 'nested', 'app-page.js');
+    const source = path.join(build, relative), target = path.join(packaged, relative);
+    // Webpack has no SSR directory; a complete generated closure is accepted.
+    assert.doesNotThrow(() => copyStandaloneSsrChunks(build, packaged));
+    assert.doesNotThrow(() => assertStandaloneSsrChunks(build, packaged));
+    fs.mkdirSync(path.dirname(source), { recursive: true });
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(source, 'module.exports = "synthetic SSR chunk";\n');
+    assert.throws(() => assertStandaloneSsrChunks(build, packaged), /Standalone SSR chunk missing/);
+    copyStandaloneSsrChunks(build, packaged);
+    assert.doesNotThrow(() => assertStandaloneSsrChunks(build, packaged));
+    fs.writeFileSync(target, 'module.exports = "stale chunk";\n');
+    assert.throws(() => assertStandaloneSsrChunks(build, packaged), /Standalone SSR chunk differs/);
+    copyStandaloneSsrChunks(build, packaged);
+    assert.doesNotThrow(() => assertStandaloneSsrChunks(build, packaged));
+  }
+});
 
 function checkSyntheticRuntimeManifest(manifest) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-runtime-manifest-'));
