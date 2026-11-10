@@ -342,8 +342,6 @@ pub struct SmartImportChart<'a> {
     pub therapies: &'a [crate::Therapy],
     pub entries: &'a [crate::Entry],
     pub attachments: &'a [crate::Attachment],
-    /// Testo semplice di una voce di diario (testo ricco nel Web).
-    pub plain: &'a dyn Fn(&str) -> String,
 }
 
 /// Fonti in forma Web (`buildPatientSmartImportSourceRecords`) dai dati della
@@ -389,7 +387,8 @@ fn chart_sources(chart: &SmartImportChart) -> Vec<SmartImportSource> {
             Some(date) => format!("{} {}", entry.entry_type.to_uppercase(), italian_day(date)),
             None => entry.entry_type.to_uppercase(),
         };
-        let plain = (chart.plain)(&entry.content);
+        // `clinicalRichTextToPlainText` del Web, non la copia leggibile della scheda.
+        let plain = rich_text_plain(&entry.content);
         for (index, segment) in prompt_segments(&plain, 4).into_iter().enumerate() {
             let content = snippet(&segment, 650);
             if content.is_empty() {

@@ -244,6 +244,29 @@ test('binds one attachment intent and one host-owned AnyDoc result to currentnes
     assert.equal(executions, 1); assert.equal(extractions, 1); assert.equal(reads, 5);
 });
 
+test('the local execution receives the consent and currentness check it rereads before a second attempt', async () => {
+    const selected = context(); let entropy = 0; let enabled = true; let current = CURRENT; const seen: boolean[] = [];
+    const factory = createDocumentSynthesisProductionOperationForTest(Object.freeze({
+        acquireContext: async () => selected,
+        readCurrentness: () => current,
+        readLaneEnabled: () => enabled,
+        extract: async (_session: unknown, attachmentId: string) => extracted(attachmentId),
+        execute: async (_configuration: unknown, stillCurrent: unknown) => {
+            assert.equal(typeof stillCurrent, 'function'); const check = stillCurrent as () => boolean;
+            seen.push(check()); enabled = false; seen.push(check()); enabled = true;
+            current = Object.freeze({ ...CURRENT, documentRevision: 8 }); seen.push(check()); current = CURRENT; seen.push(check());
+            return Object.freeze({ publication: 'synthetic' });
+        },
+        entropy: () => Uint8Array.from({ length: 16 }, () => ++entropy),
+        registerResource: () => () => undefined,
+    }));
+    const operation = await factory.acquire(); assert.ok(operation);
+    const captured = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
+    const ingested = await operation.ingest({ captureHandle: captured.captureHandle });
+    assert.equal((await operation.preview({ previewHandle: ingested.previewHandle })).status, 'available');
+    assert.deepEqual(seen, [true, false, false, true], 'consenso ritirato o documento cambiato: il controllo dice no');
+});
+
 test('suppresses drift and denies caller source injection, unsupported extraction, and a disabled lane', async () => {
     const selected = context(); let current = CURRENT; let executions = 0; let entropy = 0; let enabled = true; let extractionAvailable = true;
     const factory = createDocumentSynthesisProductionOperationForTest(Object.freeze({
