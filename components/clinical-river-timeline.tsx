@@ -7,8 +7,10 @@ import { InkState } from '@/components/ui/ink-state';
 import styles from './clinical-river-timeline.module.css';
 
 interface ClinicalRiverTimelineProps {
-    entries: ClinicalEntry[];
-    checkups: Checkup[];
+    /* undefined = not read yet: the river must not claim that nothing exists. */
+    entries: ClinicalEntry[] | undefined;
+    checkups: Checkup[] | undefined;
+    checkupsUnavailable?: boolean;
     documentInsights: DocumentInsight[];
 }
 
@@ -113,8 +115,15 @@ function HistoryAccess() {
 export function ClinicalRiverTimeline({
     entries,
     checkups,
+    checkupsUnavailable = false,
     documentInsights,
 }: ClinicalRiverTimelineProps) {
+    if (checkupsUnavailable) {
+        return <div className={styles.timeline}><HistoryAccess /><p className={styles.notice} role="alert">Impossibile leggere i controlli: timeline non disponibile.</p></div>;
+    }
+    if (entries === undefined || checkups === undefined) {
+        return <div className={styles.timeline}><HistoryAccess /><p className={styles.notice} role="status">Lettura degli eventi in corso…</p></div>;
+    }
     const items = buildRiverItems(entries, checkups, documentInsights);
     /* Conteggio onesto: la river e una anteprima, non l'elenco completo. */
     const totalAvailable =
@@ -149,7 +158,7 @@ export function ClinicalRiverTimeline({
                             );
                         })}
                     </div>
-                    {hiddenCount > 0 ? <p className={styles.notice}>Anteprima: {items.length} eventi di {totalAvailable}. La storia completa resta nelle rispettive sezioni.</p> : null}
+                    {hiddenCount > 0 ? <p className={styles.notice}>Anteprima: {items.length} eventi di {totalAvailable}.</p> : null}
                 </>
             )}
         </div>
