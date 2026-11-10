@@ -37,9 +37,9 @@ disegno scelto. L'ADR resta Proposed: l'accettazione si decide sui risultati.
 
 Base di lettura MediFlow: `973b19dbe6f91acd3141e96deda74ead9dfcf309`.
 [I-3/I-3b/I-7](../releases/0.9.1-contract.md) restano il contratto vigente.
-Il builder [Fabric](../../lib/ai-providers/fabric/treatment-reasoning-athena-method.ts)
-chiede JSON; l'[executor](../../lib/ai-providers/fabric/treatment-reasoning-athena-execution.ts)
-lo passa al [validatore V2](../../lib/ai-providers/fabric/treatment-reasoning-athena-output-contract-v2.ts):
+Il builder [Fabric](https://github.com/Wulfgardr/mediflow/blob/710561000a8a481719c0badf55e25c93544aff3a/lib/ai-providers/fabric/treatment-reasoning-athena-method.ts)
+chiede JSON; l'[executor](https://github.com/Wulfgardr/mediflow/blob/710561000a8a481719c0badf55e25c93544aff3a/lib/ai-providers/fabric/treatment-reasoning-athena-execution.ts)
+lo passa al [validatore V2](https://github.com/Wulfgardr/mediflow/blob/710561000a8a481719c0badf55e25c93544aff3a/lib/ai-providers/fabric/treatment-reasoning-athena-output-contract-v2.ts):
 root esatta `schemaVersion, task, summary, data, sourceBindings`, binding per
 summary, recommendation, ogni reasoning e caveat, oltre ai riferimenti di
 keyEvidence, safetyFlags e suggestedActions. V2 è il validatore privato;
