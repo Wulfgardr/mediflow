@@ -83,7 +83,7 @@ export default function EditPatientPage() {
                 if (validation.hasWarnings) {
                     const { confirmed } = await confirm({
                         title: 'Controllo locale dell\'esportazione: avvisi',
-                        message: `${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
+                        message: `${buildValidationMessage(validation)}\n\nVuoi esportare comunque?`,
                         confirmLabel: 'Prosegui',
                         cancelLabel: 'Annulla',
                     });
