@@ -201,6 +201,10 @@ impl Host {
             .collect()
     }
 
+    pub(super) fn requests_handle(&self) -> Arc<Mutex<Vec<(String, Value)>>> {
+        self.requests.clone()
+    }
+
     pub(super) fn replace_archive(&self) {
         self.state.lock().unwrap().identity_replaced = true;
     }

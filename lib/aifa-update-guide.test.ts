@@ -231,6 +231,14 @@ test('invalid payloads cannot manufacture a green catalog and preserve prior obs
     assert.doesNotThrow(() => assertAifaGuideStatus({ count: 2, manifest: null, state: 'unverified' }));
 });
 
+test('J-3: a catalog from another agency is a readable ready state; an incoherent file source is not', () => {
+    const source = { kind: 'file', agency: 'Agenzia inventata', codeSystem: 'AGX', version: '2026.1', date: '2026-10-15', rowCount: 3, sha256: 'e'.repeat(64) };
+    assert.doesNotThrow(() => assertAifaGuideStatus({ count: 3, manifest: null, state: 'ready', source }));
+    assert.throws(() => assertAifaGuideStatus({ count: 4, manifest: null, state: 'ready', source }), /Manifest del catalogo non leggibile/u);
+    assert.throws(() => assertAifaGuideStatus({ count: 3, manifest: null, state: 'ready', source: { ...source, agency: '' } }), /Manifest del catalogo non leggibile/u);
+    assert.throws(() => assertAifaGuideStatus({ count: 3, manifest: null, state: 'ready' }), /Manifest del catalogo non leggibile/u);
+});
+
 test('real client sends a single empty POST to the fixed local route with the original signal', async t => {
     const abort = new AbortController(); const requests: Array<{ url: unknown; init: RequestInit | undefined }> = [];
     t.mock.method(globalThis, 'fetch', async (url: unknown, init?: RequestInit) => {

@@ -16,7 +16,7 @@ Dopo `npm ci` e `npm run build` su sorgente committata e pulita:
 
 ```sh
 E2E_BASE_URL=http://127.0.0.1:3197 npx playwright test e2e/plugin-local-ui-history.spec.ts e2e/plugin-local-ui-pairing.spec.ts --workers=1 --retries=0
-MEDIFLOW_LIFECYCLE_REAL=1 MEDIFLOW_PRESERVATION_REAL=1 node --test --test-concurrency=1 --test-name-pattern='simultaneous plugin leases|real browser and plugin launcher' scripts/local-ui-lifecycle.test.mjs scripts/local-ui-work-preservation.test.mjs
+MEDIFLOW_LIFECYCLE_REAL=1 MEDIFLOW_PRESERVATION_REAL=1 node --test --test-concurrency=1 --test-name-pattern='^real ' scripts/local-ui-lifecycle.test.mjs scripts/local-ui-work-preservation.test.mjs
 ```
 
 La build segue l'esclusione sparse della fixture nativa prevista dalla CI.

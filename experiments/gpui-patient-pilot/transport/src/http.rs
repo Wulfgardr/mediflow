@@ -649,6 +649,9 @@ impl RuntimeClient {
         let archive = path.starts_with(&["api", "system", "backup-restore"]);
         let request_limit = if path == ["api", "prosthetics", "catalog", "documents"] {
             36 * 1024 * 1024
+        } else if path == crate::local_host::PATIENT_INSIGHT_PATH {
+            // Quadro paziente: fino a 37 righe di contesto da 240 caratteri.
+            AUTH_LIMIT
         } else if path == ["api", "attachments"] {
             25 * 1024 * 1024
         } else if archive
@@ -695,6 +698,10 @@ impl RuntimeClient {
                 ) {
                     request = request.timeout(Duration::from_secs(70));
                 }
+                if path == crate::local_host::PATIENT_INSIGHT_PATH {
+                    // L'host concede al modello locale fino a 300 s.
+                    request = request.timeout(Duration::from_secs(330));
+                }
                 let response = request.send().await.map_err(|_| uncertain(mutation))?;
                 received(response.status().as_u16(), response.headers());
                 let raw =
@@ -715,6 +722,9 @@ impl RuntimeClient {
                         // ADR 0178: i rifiuti della conservazione portano un codice per chi decide.
                         || (path == ["api", "system", "retention"]
                             && matches!(raw.status, 400 | 404 | 409))
+                        // Quadro paziente: i rifiuti portano un codice, mai testo per l'interfaccia.
+                        || (path == crate::local_host::PATIENT_INSIGHT_PATH
+                            && matches!(raw.status, 400 | 403 | 409 | 503))
                         || (path == ["api", "icd", "proxy"]
                             && query.is_empty()
                             && raw.status == 503)
