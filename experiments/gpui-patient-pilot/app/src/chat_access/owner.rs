@@ -47,6 +47,10 @@ impl State {
             Self::Generative(Function::Synthesis, Stage::Unavailable) => "synthesis-unavailable",
             Self::Generative(Function::Synthesis, Stage::Busy) => "synthesis-busy",
             Self::Generative(Function::Synthesis, Stage::Closed) => "synthesis-closed",
+            Self::Generative(Function::Import, Stage::Opened) => "import-opened",
+            Self::Generative(Function::Import, Stage::Unavailable) => "import-unavailable",
+            Self::Generative(Function::Import, Stage::Busy) => "import-busy",
+            Self::Generative(Function::Import, Stage::Closed) => "import-closed",
             Self::Preparing => "preparing",
             Self::Selecting => "selecting",
             Self::Challenge => "challenge",
@@ -64,6 +68,11 @@ impl State {
 pub(crate) enum Function {
     Insight,
     Synthesis,
+    Import,
+}
+impl Function {
+    pub(crate) const ALL: [Function; 3] =
+        [Function::Insight, Function::Synthesis, Function::Import];
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -285,14 +294,13 @@ impl Request {
         }
         self.state = State::VoiceOpened;
     }
-    pub(super) fn for_insight(peer: Peer, stream: UnixStream) -> Option<Pending> {
+    pub(super) fn for_function(
+        peer: Peer,
+        stream: UnixStream,
+        function: Function,
+    ) -> Option<Pending> {
         let request = Self::new(peer, stream)?;
-        request.lock().ok()?.function = Some(Function::Insight);
-        Some(request)
-    }
-    pub(super) fn for_synthesis(peer: Peer, stream: UnixStream) -> Option<Pending> {
-        let request = Self::new(peer, stream)?;
-        request.lock().ok()?.function = Some(Function::Synthesis);
+        request.lock().ok()?.function = Some(function);
         Some(request)
     }
     pub(crate) fn function_requested(&mut self, function: Function) -> bool {
@@ -1558,16 +1566,12 @@ pub(crate) mod tests {
     }
     pub(crate) fn function_request(function: Function) -> (Pending, UnixStream) {
         let (a, b) = UnixStream::pair().unwrap();
-        let pending = match function {
-            Function::Insight => Request::for_insight(Peer::test_peer(), a),
-            Function::Synthesis => Request::for_synthesis(Peer::test_peer(), a),
-        }
-        .unwrap();
+        let pending = Request::for_function(Peer::test_peer(), a, function).unwrap();
         (pending, b)
     }
 
     /// Solo questi stati possono tornare alla chat dal comando del Quadro paziente.
-    const INSIGHT_WIRE: [&str; 10] = [
+    const INSIGHT_WIRE: [&str; 14] = [
         "requested",
         "preparing",
         "insight-opened",
@@ -1578,6 +1582,10 @@ pub(crate) mod tests {
         "synthesis-unavailable",
         "synthesis-busy",
         "synthesis-closed",
+        "import-opened",
+        "import-unavailable",
+        "import-busy",
+        "import-closed",
     ];
     fn insight_reply(pending: &Pending) -> Value {
         let status = pending.lock().unwrap().status();
@@ -1598,7 +1606,7 @@ pub(crate) mod tests {
 
     #[test]
     fn generative_wire_states_and_synthesis_command_are_closed() {
-        let states = [Function::Insight, Function::Synthesis]
+        let states = Function::ALL
             .into_iter()
             .flat_map(|function| {
                 [
@@ -1621,12 +1629,51 @@ pub(crate) mod tests {
                 "synthesis-opened",
                 "synthesis-unavailable",
                 "synthesis-busy",
-                "synthesis-closed"
+                "synthesis-closed",
+                "import-opened",
+                "import-unavailable",
+                "import-busy",
+                "import-closed"
             ]
         );
         assert!(super::super::is_synthesis_command(
             &json!({"command":"document-synthesis"})
         ));
+        assert_eq!(
+            super::super::generative_function(&json!({"command":"smart-import"})),
+            Some(Function::Import)
+        );
+        for key in [
+            "patientId",
+            "noteId",
+            "entryId",
+            "sources",
+            "candidates",
+            "scope",
+            "provider",
+            "model",
+            "token",
+            "query",
+            "payload",
+        ] {
+            let mut command = json!({"command":"smart-import"});
+            command[key] = json!("foreign");
+            assert_eq!(
+                super::super::generative_function(&command),
+                None,
+                "{command}"
+            );
+        }
+        for command in [
+            json!({"command":"Smart-Import"}),
+            json!({"command":["smart-import"]}),
+        ] {
+            assert_eq!(
+                super::super::generative_function(&command),
+                None,
+                "{command}"
+            );
+        }
         for key in [
             "patientId",
             "attachmentId",
@@ -1662,7 +1709,7 @@ pub(crate) mod tests {
 
     #[test]
     fn insight_opens_only_with_paired_session_current_selection_and_server_admission() {
-        for function in [Function::Insight, Function::Synthesis] {
+        for function in Function::ALL {
             for scenario in [
                 "admitted",
                 "other-session",
@@ -1736,7 +1783,7 @@ pub(crate) mod tests {
 
     #[test]
     fn opened_insight_is_withdrawn_when_selection_session_or_chat_changes() {
-        for function in [Function::Insight, Function::Synthesis] {
+        for function in Function::ALL {
             for change in ["selection", "lock", "revoke", "eof"] {
                 let (session, _host) = native_session();
                 let context = session.chat_access_context("scope-a", "patient-a").unwrap();
@@ -1765,7 +1812,7 @@ pub(crate) mod tests {
 
     #[test]
     fn closing_ends_chat_ownership_only_for_an_opened_insight() {
-        for function in [Function::Insight, Function::Synthesis] {
+        for function in Function::ALL {
             let (session, _host) = native_session();
             let context = session.chat_access_context("scope-a", "patient-a").unwrap();
             let (pending, _remote) = function_request(function);
@@ -1792,7 +1839,7 @@ pub(crate) mod tests {
 
     #[test]
     fn unavailable_or_busy_insight_answers_once_and_keeps_no_authority() {
-        for function in [Function::Insight, Function::Synthesis] {
+        for function in Function::ALL {
             for (outcome, wire) in [
                 (
                     Stage::Unavailable,
@@ -1818,7 +1865,7 @@ pub(crate) mod tests {
 
     #[test]
     fn only_a_bound_insight_request_can_report_opened() {
-        for function in [Function::Insight, Function::Synthesis] {
+        for function in Function::ALL {
             // Senza legame alla sessione, o con un altro comando, l'apertura non esiste.
             let (pending, _remote) = function_request(function);
             pending.lock().unwrap().finish_function_open(Stage::Opened);

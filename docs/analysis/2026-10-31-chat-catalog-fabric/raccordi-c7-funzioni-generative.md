@@ -1,9 +1,9 @@
 # Raccordi C-7: le tre funzioni generative nella chat
 
 Nota di progetto del 10 novembre 2026, per la decisione di Leonardo del 9/11
-(contratto 0.9.1, riga C-7 ed emendamento del 9 novembre). Il primo raccordo,
-il Quadro paziente, ed il raccordo della sintesi dei documenti sono nel codice.
-L’import assistito dalla chat resta successivo.
+(contratto 0.9.1, riga C-7 ed emendamento del 9 novembre). I tre raccordi,
+Quadro paziente, sintesi dei documenti e import assistito in sola anteprima,
+sono nel codice.
 
 ## Regola comune
 
@@ -33,7 +33,7 @@ Stati restituiti alla chat, per tutti e tre i comandi:
 | Stato | Significato |
 | --- | --- |
 | `requested`, `preparing` | La finestra ha ricevuto la richiesta; ammissione o controllo della funzione in corso |
-| `<funzione>-opened` | La vista è aperta ed attende il consenso nella finestra. Per la sintesi attende prima la scelta del documento |
+| `<funzione>-opened` | La vista è aperta ed attende il consenso nella finestra. Per la sintesi attende prima la scelta del documento, per l'import la preparazione della richiesta |
 | `<funzione>-unavailable` | Funzione spenta, kill switch o host locale chiuso |
 | `<funzione>-busy` | Nella finestra c'è già un lavoro della stessa funzione: non viene sostituito |
 | `<funzione>-closed` | La finestra ha concluso il lavoro aperto dalla chat (proposta, scarto, errore, indisponibilità) |
@@ -111,28 +111,44 @@ ritirata senza rinnovo, anche durante consenso o generazione.
   rimosso dopo il consenso (fonte superata) e documento di un altro paziente.
 - **Seconda seduta:** come il Quadro.
 
-## Import assistito (Smart Import): da collegare
+## Import assistito (Smart Import): raccordo alla finestra, sola anteprima
 
-- **Comando previsto:** `{"command":"smart-import"}`, senza argomenti.
+- **Comando:** `{"command":"smart-import"}`, senza argomenti. La chat non
+  indica note, voci di diario, documenti o candidati.
 - **Permessi e capability:** gli stessi del Quadro, più l'interruttore
-  dell'importazione assistita e, per applicare, le capability di scrittura di
-  diagnosi e terapie. Prerequisito: la vista GPUI dell'import assistito, che
-  arriva con la #901 come sola anteprima (candidati con la loro fonte, nessun
-  comando di applicazione). L'applicazione dei candidati aspetta il contratto
-  G-6j, in GPUI come dalla chat.
+  `aiSmartImportKillSwitch`, letto dopo l'ammissione. La vista GPUI è quella
+  della #901: candidati con la loro fonte, ricevuta, nessun comando di
+  applicazione. L'applicazione dei candidati, con le capability di scrittura
+  di diagnosi e terapie, aspetta il contratto G-6j, in GPUI come dalla chat.
 - **Stati alla chat:** `import-opened`, `import-unavailable`, `import-busy`,
-  `import-closed`, `withdrawn`. Nessuna ricevuta di scrittura alla chat: l'esito di ogni
-  candidato applicato resta nella finestra.
-- **Nella finestra:** candidati (diagnosi, terapie, prestazioni) con la fonte
-  della scheda da cui vengono; dopo G-6j, ogni applicazione sarà un gesto esplicito per candidato, con revisione e
-  conferma nativa e il writer comune. È l'unica delle tre funzioni che può
-  scrivere nella scheda.
-- **Negativi C-7:** gli stessi otto, più: nessuna applicazione senza gesto per
-  candidato; conflitto di versione della scheda; candidato superato da un
-  cambio della scheda dopo la proposta; `npm run check:ai-clinical-writes`
-  sul nuovo percorso.
-- **Seconda seduta:** come il Quadro, più l'applicazione di un candidato con
-  PIN o Touch ID.
+  `import-closed`, `withdrawn`. Nessuna fonte, proposta o ricevuta alla chat.
+- **Nella finestra:** `import-opened` apre la sezione Documenti. Il medico
+  prepara la richiesta (fonti dalla scheda selezionata: note, ultime voci di
+  diario, sintesi salvate dei documenti), vede che cosa parte e dà il consenso.
+  Durante l'ammissione la preparazione non parte. Senza fonti la vista indica
+  che cosa manca, non offre la preparazione e la chat conserva Revoca.
+- **Chiusura:** `import-closed` quando la finestra mostra la proposta o
+  termina la richiesta (consenso negato, errore, indisponibilità, scheda
+  cambiata dopo la preparazione). Revoca, EOF e scadenza successivi non tolgono
+  la proposta; la sua validità segue solo le fonti della scheda.
+- **Negativi C-7 e dove si provano** (`shell/smart_import/tests/chat.rs`, test
+  comuni in `owner.rs`, `generation.rs`, `adapter.rs`):
+
+| Negativo | Prova |
+| --- | --- |
+| Fonti | Prove G-5c (`smart_import/tests.rs`); la proposta cita solo fonti inviate |
+| Funzione indisponibile | `denials_answer_a_state_and_never_generate` (interruttore spento o illeggibile, host chiuso) |
+| Output malformato o token estraneo | Prove G-5c (risposta alterata); `import_command_and_replies_have_no_clinical_fields`; comando con campi in più rifiutato (`generative_wire_states_and_synthesis_command_are_closed`); carta e frame |
+| Contesto scaduto | Nessun paziente, sessione bloccata, account non idoneo (`denials_*`), A-B-A (`patient_a_b_a_retires_chat_and_cancels_its_import`), scheda di un altro paziente (`a_chart_of_another_patient_is_not_sent`), test owner comuni |
+| Revoca durante l'operazione | `import_revocation_before_consent_sends_nothing`, `import_late_answer_after_chat_revocation_is_not_shown`, `idle_import_and_empty_chart_remain_owned_until_revocation` |
+| Fonte cambiata o rimossa | `chart_changed_or_removed_after_preparation_sends_nothing`, `closed_proposal_ignores_chat_revocation_and_follows_chart_currentness` |
+| Nessun ripiego e nessuna applicazione silenziosa | `assert_no_clinical_write` in ogni prova; lavoro aperto non sostituito (`an_active_import_or_proposal_is_never_replaced`); legami distinti (`import_synthesis_and_insight_have_independent_chat_ownership`) |
+
+- **Negativi rinviati a G-6j:** applicazione con gesto per candidato,
+  conflitto di versione della scheda, candidato superato dopo la proposta,
+  `npm run check:ai-clinical-writes` sul percorso di scrittura.
+- **Seconda seduta:** come il Quadro; l'applicazione con PIN o Touch ID
+  arriva con G-6j.
 
 ## Che cosa è comune e che cosa no
 
@@ -147,11 +163,13 @@ che il chiamante invii, `take_running` prima che il chiamante mostri una
 risposta e `follow_chat` chiude la proprietà con lo stato finale. `end`
 conserva il legame durante preparazione e scelte successive del documento.
 Un invio rifiutato annulla anche il nuovo contesto e cancella il payload.
-Il canale non aggiunge un comando per l'import assistito.
+Il canale ha un solo ramo per i tre comandi generativi (`generative_function`)
+e l'apertura comune `open_chat_function` sceglie l'area con `ChatArea`.
 
 `scripts/falsify-chat-generation.py` toglie separatamente i controlli M1
 (invio), M2 (risposta), M3a (scelta ancora aperta), M3b (chiusura) e M4
-(legame conservato fra scelte). Richiede un target Cargo proprio e una
+(legame conservato fra scelte), e pretende che ogni test elencato cada,
+compresi quelli dell'import. Richiede un target Cargo proprio e una
 `MEDIFLOW_DATA_DIR` sintetica esplicita. Esegue i test sensibili con due job
 Cargo e un solo worker, accetta soltanto fallimenti di asserzione e
 ripristina il sorgente anche se la prova fallisce. Il verde sul sorgente
