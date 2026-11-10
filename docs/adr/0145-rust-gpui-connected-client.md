@@ -129,7 +129,7 @@ mantengono significati diversi e permettono una scelta esplicita del medico.
 
 ## Contratto della presentazione
 
-`DESIGN.md`, ADR 0144 Punto d'inchiostro, token effettivamente pubblicati e
+`DESIGN.md`, ADR 0186 Punto d'inchiostro, token effettivamente pubblicati e
 mappa delle schermate restano i riferimenti. La nuova UI riprende le aree
 Pazienti, Agenda, Diario, Repertori, Analisi, Scale e Impostazioni, l'identità
 del paziente persistente, i segnali clinici e la soglia della scrittura.

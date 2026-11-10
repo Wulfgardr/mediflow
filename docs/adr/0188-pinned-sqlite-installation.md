@@ -1,4 +1,6 @@
-# 0173: Preparazione SQLite con impronte fissate
+# ADR 0188: Preparazione SQLite con impronte fissate
+
+> Numero precedente: 0173, assegnato per errore anche all'[ADR 0173](0173-portable-import-authority-and-audit-origin.md) (ripristino portabile). Rinumerato il 10 novembre 2026; il contenuto non cambia.
 
 Stato: accettato per implementazione, qualifica Windows affidata alla CI.
 

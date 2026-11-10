@@ -101,7 +101,7 @@ un titolo richiede il proprio ruolo, non una utility di corpo maggiore.
 Il [guard statico](../../../scripts/check-type-scale.mjs) e lo
 [spec sul testo renderizzato](../../../e2e/type-scale.spec.ts) verificano
 aspetti distinti del contratto. Copertura e limiti sono nell'emendamento
-all'[ADR 0144](../../adr/0144-punto-inchiostro.md).
+all'[ADR 0186](../../adr/0186-punto-inchiostro.md).
 
 Nel client nativo i ruoli sono il tipo `TypeRole`: ogni ruolo riunisce
 famiglia, corpo scalato, peso, interlinea e attributi del registro. Il corpo
