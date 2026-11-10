@@ -191,7 +191,7 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
             territorialPacks = nil
             availableKeys.removeAll()
             loadedConnectionIdentity = nil
-            state = .unavailable("Collega l'home-base per verificare le capability disponibili.")
+            state = .unavailable("Collega l'home-base.")
             return
         }
         let connectionIdentity = connection.identity
@@ -221,7 +221,7 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
                 state = .idle
                 return
             }
-            state = .failed("Non è stato possibile verificare le capability dell'host: \(error.localizedDescription)")
+            state = .failed("Impossibile verificare che cosa offre l'host: \(error.localizedDescription)")
         }
     }
 
@@ -267,19 +267,19 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
         guard state == .loaded, !availableKeys.contains(key) else { return nil }
         switch key {
         case "network.replica.readonly-agenda":
-            return "L'host collegato non espone ancora l'agenda cross-paziente (capability network.replica.readonly-agenda). Aggiorna MediFlow sull'host."
+            return "L'host non offre ancora l'agenda. Aggiorna MediFlow sull'host."
         case "network.replica.readonly-clinical-diary-global":
-            return "L'host collegato non espone ancora il diario clinico globale (capability network.replica.readonly-clinical-diary-global). Aggiorna MediFlow sull'host."
+            return "L'host non offre ancora il diario di tutti i pazienti. Aggiorna MediFlow sull'host."
         case "network.ambulatories.write":
-            return "L'host collegato non espone la gestione ambulatori. Il pairing potrebbe essere precedente: esegui di nuovo il pairing dopo aver aggiornato MediFlow sull'host."
+            return "L'host non offre la gestione ambulatori. Aggiorna MediFlow sull'host, poi ripeti il pairing."
         case "network.replica.readonly-documents":
-            return "L'host o il pairing corrente non espongono ancora l'archivio documenti. Aggiorna MediFlow sull'host e ripeti il pairing."
+            return "L'host non offre ancora l'archivio documenti. Aggiorna MediFlow sull'host, poi ripeti il pairing."
         case "network.replica.write-documents":
-            return "L'host collegato non espone il caricamento documenti. Il pairing potrebbe essere precedente: esegui di nuovo il pairing dopo aver aggiornato MediFlow sull'host."
+            return "L'host non offre il caricamento documenti. Aggiorna MediFlow sull'host, poi ripeti il pairing."
         case "network.compute.visit-draft":
-            return "L'host o il pairing corrente non espongono ancora l'elaborazione della bozza visita. Aggiorna MediFlow sull'host e ripeti il pairing."
+            return "L'host non offre ancora la bozza visita. Aggiorna MediFlow sull'host, poi ripeti il pairing."
         default:
-            return "L'host collegato non espone ancora la lettura pazienti richiesta (capability \(key)). Aggiorna MediFlow sull'host."
+            return "L'host non offre ancora questa sezione. Aggiorna MediFlow sull'host."
         }
     }
 }
@@ -344,7 +344,7 @@ final class AgendaWorkspaceModel: ObservableObject {
         }
         #endif
         guard let connection = connectionProvider()?.readRequest else {
-            state = .unavailable("Collega l'home-base prima di caricare l'agenda.")
+            state = .unavailable("Collega l'home-base.")
             return
         }
         state = .loading
@@ -452,7 +452,7 @@ final class GlobalDiaryWorkspaceModel: ObservableObject {
         }
         #endif
         guard let connection = connectionProvider()?.readRequest else {
-            state = .unavailable("Collega l'home-base prima di caricare il diario globale.")
+            state = .unavailable("Collega l'home-base.")
             return
         }
         state = .loading
@@ -548,7 +548,7 @@ final class PopulationAnalyticsWorkspaceModel: ObservableObject {
         }
         #endif
         guard let connection = connectionProvider()?.readRequest else {
-            state = .unavailable("Collega l'home-base prima di caricare gli analytics.")
+            state = .unavailable("Collega l'home-base.")
             return
         }
         state = .loading
@@ -581,7 +581,7 @@ final class PopulationAnalyticsWorkspaceModel: ObservableObject {
         } catch {
             guard requestGeneration == generation,
                   connection.current(using: connectionProvider) != nil else { return }
-            state = .failed("Impossibile caricare gli analytics: \(error.localizedDescription)")
+            state = .failed("Impossibile caricare l'analisi: \(error.localizedDescription)")
         }
     }
 
@@ -623,7 +623,7 @@ final class ClinicalScalesCatalogModel: ObservableObject {
         invalidateReadContext()
         let generation = requestGeneration
         guard let connection = connectionProvider()?.readRequest else {
-            state = .unavailable("Collega l'home-base prima di selezionare un paziente.")
+            state = .unavailable("Collega l'home-base.")
             return
         }
         state = .loading
@@ -644,6 +644,23 @@ final class ClinicalScalesCatalogModel: ObservableObject {
                   connection.current(using: connectionProvider) != nil else { return }
             state = .failed("Impossibile caricare i pazienti: \(error.localizedDescription)")
         }
+    }
+
+    /// What the patient picker of a scale shows. Without this the sheet drew
+    /// only the list, so a missing home-base or a failed read looked exactly
+    /// like an archive with no patients.
+    var pickerContent: ClinicalWorkspaceSectionContent {
+        ClinicalWorkspaceSectionContent(
+            state: state,
+            isEmpty: visiblePatients.isEmpty,
+            idleMessage: "Pazienti non ancora letti.",
+            emptyMessage: "Nessun paziente."
+        )
+    }
+
+    var canRetry: Bool {
+        if case .failed = state { return true }
+        return false
     }
 
     func search(_ query: String) {
@@ -692,9 +709,9 @@ struct ClinicalCapabilityGateView: View {
         if let message = store.unavailableMessage(for: capability) { return message }
         switch store.state {
         case .failed(let message), .unavailable(let message): return message
-        case .loading: return "Verifica delle capability dell'host in corso."
-        case .idle: return "Collega l'home-base per verificare le capability disponibili."
-        case .loaded: return "L'host collegato non espone la capability \(capability). Aggiorna MediFlow sull'host."
+        case .loading: return "Verifica dell'host in corso."
+        case .idle: return "Collega l'home-base."
+        case .loaded: return "L'host non offre ancora questa sezione. Aggiorna MediFlow sull'host."
         }
     }
 }
@@ -755,6 +772,7 @@ struct AgendaWorkspaceView: View {
                 ProgressView()
             case .message(let message):
                 Text(message).font(.body).foregroundStyle(PlatformColors.secondaryInk)
+                    .accessibilityIdentifier("clinical-workspace-agenda-message")
             case .rows:
                 ForEach([AgendaPill.coral, .yellow, .blue, .green, .muted], id: \.rawValue) { group in
                     let rows = model.rows.filter { $0.presentation.pill == group }
@@ -899,6 +917,7 @@ struct GlobalDiaryWorkspaceView: View {
                     ProgressView()
                 case .message(let message):
                     Text(message).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("clinical-workspace-diary-message")
                 case .rows:
                     ForEach(model.rows) { row in
                         VStack(alignment: .leading, spacing: ClinicalChartMetrics.itemSpacing / 2) {
@@ -1155,14 +1174,31 @@ struct ClinicalScalesWorkspaceView: View {
 
     private var patientPicker: some View {
         NavigationStack {
-            List(model.visiblePatients) { patient in
-                Button { Task { await open(patient) } } label: {
-                    VStack(alignment: .leading) {
-                        Text("\(patient.firstName) \(patient.lastName)")
-                        Text(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType))
-                            .font(.caption)
-                            .codice()
-                            .foregroundStyle(.secondary)
+            List {
+                switch model.pickerContent {
+                case .progress:
+                    ProgressView()
+                case .message(let message):
+                    Text(message)
+                        .font(.body)
+                        .foregroundStyle(PlatformColors.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("scale-patient-picker-message")
+                    if model.canRetry {
+                        Button("Riprova") { Task { await model.load() } }
+                            .accessibilityIdentifier("scale-patient-picker-retry")
+                    }
+                case .rows:
+                    ForEach(model.visiblePatients) { patient in
+                        Button { Task { await open(patient) } } label: {
+                            VStack(alignment: .leading) {
+                                Text("\(patient.firstName) \(patient.lastName)")
+                                Text(PairedPatientsWorkspaceSupport.labeledCompactTaxCode(patient.taxCode, type: patient.identifierType))
+                                    .font(.caption)
+                                    .codice()
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
             }

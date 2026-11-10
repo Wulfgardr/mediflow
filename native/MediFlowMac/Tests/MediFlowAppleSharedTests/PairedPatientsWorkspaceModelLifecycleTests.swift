@@ -829,6 +829,34 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(projectionRequests, [true])
     }
 
+    /// The patient diary used to say "Nessuna voce diario caricata." both when
+    /// the entries had not been read and when the read returned nothing. The
+    /// two are different facts about the chart and must read differently.
+    func testPatientDiaryTellsAnUnreadDiaryApartFromAnEmptyOne() async throws {
+        let remote = detail(id: "p1", archived: false, version: 1)
+        let source = LifecycleMockDataSource(details: ["p1": remote])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: remote)
+        let content: () async -> PairedPatientDiaryListContent = {
+            await MainActor.run {
+                PairedPatientDiaryListContent(
+                    isRead: model.selectedPatientEntriesRead,
+                    hasEntries: !model.entries.isEmpty,
+                    hasFilteredEntries: !model.entries.isEmpty
+                )
+            }
+        }
+
+        let beforeRead = await content()
+        XCTAssertEqual(beforeRead, .message("Diario non ancora letto."))
+
+        await model.loadPatient(summary(id: "p1", archived: false, version: 1))
+        let afterRead = await content()
+        let entries = await model.entries
+        XCTAssertTrue(entries.isEmpty, "the synthetic host has no entries for this patient")
+        XCTAssertEqual(afterRead, .message("Nessuna voce di diario."))
+    }
+
     func testUnreadableStructuredPatientFieldsSurviveAnUnrelatedEdit() async throws {
         let raw = #"[{"code":"I10","description":7}]"#
         let sealed = try XCTUnwrap(CryptoService.encryptField(raw, masterKey: masterKey))

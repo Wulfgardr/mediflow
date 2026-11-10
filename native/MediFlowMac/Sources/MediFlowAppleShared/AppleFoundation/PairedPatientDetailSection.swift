@@ -721,7 +721,7 @@ struct PairedPatientDetailSection: View {
                 }
                 // A14: in-app ICD search (ADR 0070), no external proxy. Tapping a
                 // result adds the coded diagnosis with its system.
-                TextField("Cerca ICD (in-app)", text: $icdQuery)
+                TextField("Cerca ICD", text: $icdQuery)
                     .accessibilityIdentifier("icd-search-field")
                 if !icdQuery.isEmpty {
                     ForEach(ICDCatalog.search(icdQuery, limit: 6)) { icd in
@@ -1059,7 +1059,8 @@ private extension PairedPatientDetailSection {
             }
             if model.isPatientFieldLocked(.notes) {
                 PatientChartGroup("Note") {
-                    PatientChartField(label: "Note", value: .protected)
+                    Label("Dato protetto", systemImage: "lock.fill")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
             } else if let notes = cleanedPatientWorkspaceValue(detail.notes) {
                 PatientChartGroup("Note") { PatientChartProse(text: notes) }
