@@ -42,8 +42,8 @@ authors), built from the whisper-rs-sys 0.15.0 crate through the whisper-rs
 with the other Rust dependencies. Windows and Linux builds do not include them.
 
 The voice model files are not part of the repository or the bundle. They are
-installed only by the explicit command --installa-modello-voce, from pinned
-Hugging Face revisions, and accepted only if their SHA-256 matches:
+installed only by the explicit Install button in Settings, Local voice, from
+pinned Hugging Face revisions, and accepted only if their SHA-256 matches:
 - ggml-large-v3-turbo-q5_0.bin: OpenAI Whisper large-v3-turbo weights
   (MIT, Copyright OpenAI), ggml conversion and quantization by the whisper.cpp
   project (MIT), from ggerganov/whisper.cpp.
