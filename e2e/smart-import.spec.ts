@@ -194,7 +194,7 @@ test('[E2E fixture] Smart Import exposes only the Fabric review preview and neve
   await modelPicker.focus();
   await expect(modelPicker.locator('option')).toHaveText([
     `Predefinito · ${FIXTURE_MODEL.model}`,
-    'OpenAI · abbonamento ChatGPT · prepara',
+    'OpenAI · abbonamento ChatGPT',
     `${FIXTURE_MODEL.model} · Ollama · locale`,
   ]);
   await modelPicker.selectOption(FIXTURE_MODEL.modelOptionId);

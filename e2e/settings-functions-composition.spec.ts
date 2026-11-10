@@ -92,7 +92,8 @@ for (const scenario of functionScenarios) test(`Funzioni baseline: ${scenario}`,
                 const label = scenario === 'off' ? 'Disattivata' : scenario === 'configured'
                     ? 'Configurazione locale presente' : 'Configurazione locale non disponibile';
                 await expect(status).toHaveText([label, label, label]);
-                await expect(region(page).getByText('La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.', { exact: true })).toBeVisible();
+                await expect(region(page).getByRole('button', { name: 'Ripristina predefiniti', exact: true })).toBeVisible();
+                await expect(region(page).getByText(/viene verificata alla richiesta/u)).toHaveCount(0);
             }
         }
         const directory = process.env.FUNCTIONS_COMPOSITION_SCREENSHOTS;

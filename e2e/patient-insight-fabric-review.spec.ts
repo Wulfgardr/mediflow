@@ -151,7 +151,7 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await modelPicker.focus();
   await expect(modelPicker.locator('option')).toHaveText([
     `Predefinito · ${MODEL}`,
-    'OpenAI · abbonamento ChatGPT · prepara',
+    'OpenAI · abbonamento ChatGPT',
     `${MODEL} · Ollama · locale`,
   ]);
   await modelPicker.selectOption(MODEL_OPTION_ID);
