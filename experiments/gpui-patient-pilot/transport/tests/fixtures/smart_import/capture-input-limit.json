@@ -1,0 +1,38 @@
+{
+  "patient": {
+    "version": 3
+  },
+  "currentDiagnoses": [
+    {
+      "system": "ICD-10",
+      "code": "I10",
+      "description": "Ipertensione essenziale"
+    }
+  ],
+  "currentActiveTherapies": [
+    {
+      "drugName": "Ramipril",
+      "activePrinciple": "ramipril",
+      "dosage": "5 mg al giorno",
+      "aic": null,
+      "atc": "C09AA05"
+    }
+  ],
+  "sources": [
+    {
+      "kind": "patient-notes",
+      "originKey": "patient-notes:1",
+      "label": "Note paziente",
+      "date": null,
+      "content": "Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintetica. Nota lunga sintet..."
+    },
+    {
+      "kind": "patient-notes",
+      "originKey": "patient-notes:2",
+      "label": "Note paziente · segmento 2",
+      "date": null,
+      "content": "𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀..."
+    }
+  ],
+  "therapyCandidateHints": []
+}
