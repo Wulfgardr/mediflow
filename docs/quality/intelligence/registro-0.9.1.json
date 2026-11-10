@@ -523,7 +523,7 @@
     },
     {
       "id": "apple_vision",
-      "source": "lib/domain/documents/ocr-service.ts",
+      "source": "lib/domain/documents/anydoc-apple-vision-ocr.ts",
       "status": "not_qualified"
     }
   ],

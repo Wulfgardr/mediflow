@@ -248,7 +248,7 @@ Usalo quando tocchi:
 - `lib/domain/documents/document-parse-evidence-artifact.ts`
 - `lib/ai-context.ts`
 - `lib/domain/documents/anydoc-*`
-- `lib/domain/documents/ocr-service.ts` e le route OCR legacy fail-closed
+- le route OCR legacy fail-closed
 - `components/document-upload.tsx`
 - `app/api/attachments/route.ts`
 - la persistenza/lettura di `summarySnapshot` o `parseEvidenceArtifactSnapshot`

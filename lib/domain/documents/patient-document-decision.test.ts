@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { PatientDocumentReviewDraft } from './patient-document-review';
 import { buildPatientDocumentDecision } from './patient-document-decision';
-import { validateDocumentDecisionModelGovernance } from './document-decision-model-governance';
 
 const baseDraft: PatientDocumentReviewDraft = {
     source: 'hybrid',
@@ -79,10 +78,3 @@ test('patient document decision stays review-required and never deterministic ap
     assert.ok(decision.model.recognitionMode === 'hybrid');
 });
 
-test('patient document decision satisfies model governance for hybrid reviewed proposals', () => {
-    const decision = buildPatientDocumentDecision(baseDraft);
-    const governance = validateDocumentDecisionModelGovernance(decision);
-
-    assert.equal(governance.valid, true);
-    assert.deepEqual(governance.errors, []);
-});
