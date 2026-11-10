@@ -1,5 +1,21 @@
 import SwiftUI
 
+/// What the patient diary says under its controls. A diary that has not been
+/// read yet and a diary with no entries are different facts about the chart:
+/// "caricata" used to cover both, so the first looked like the second.
+enum PairedPatientDiaryListContent: Equatable {
+    case message(String)
+    case rows
+
+    init(isRead: Bool, hasEntries: Bool, hasFilteredEntries: Bool) {
+        if hasEntries {
+            self = hasFilteredEntries ? .rows : .message("Nessuna voce per questo filtro.")
+        } else {
+            self = .message(isRead ? "Nessuna voce di diario." : "Diario non ancora letto.")
+        }
+    }
+}
+
 struct PairedPatientDiarySection: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -157,6 +173,14 @@ struct PairedPatientDiarySection: View {
             .accessibilityIdentifier("show-deleted-entries-toggle")
     }
 
+    private var listContent: PairedPatientDiaryListContent {
+        PairedPatientDiaryListContent(
+            isRead: model.selectedPatientEntriesRead,
+            hasEntries: !model.entries.isEmpty,
+            hasFilteredEntries: !filteredDiaryEntries.isEmpty
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
             diaryHeader
@@ -170,14 +194,11 @@ struct PairedPatientDiarySection: View {
                 )
             }
 
-            if model.entries.isEmpty {
-                Text("Nessuna voce diario caricata.")
+            if case .message(let message) = listContent {
+                Text(message)
                     .font(.body)
                     .foregroundStyle(.secondary)
-            } else if filteredDiaryEntries.isEmpty {
-                Text("Nessuna voce per questo filtro.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("patient-diary-list-message")
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(filteredDiaryEntries) { entry in

@@ -111,7 +111,9 @@ final class CaptureTests: XCTestCase {
             let empty = patient("Vuoto")
             if empty.waitForExistence(timeout: 30) {
                 empty.tap(); _ = name.waitForExistence(timeout: 15); diary()
-                XCTAssertTrue(app.staticTexts["Nessuna voce diario caricata."].waitForExistence(timeout: 5))
+                let emptyDiary = app.staticTexts["patient-diary-list-message"]
+                XCTAssertTrue(emptyDiary.waitForExistence(timeout: 5))
+                XCTAssertEqual(emptyDiary.label, "Nessuna voce di diario.")
                 capture("06-vuoto")
             }
             app.terminate()

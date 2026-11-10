@@ -67,10 +67,10 @@ final class SettingsWorkspaceTests: XCTestCase {
         let store = ClinicalWorkspaceCapabilitiesStore()
         await store.loadIfNeeded(using: connection(S6MockDataSource(details: [:])))
 
-        XCTAssertEqual(
-            store.unavailableMessage(for: "network.ambulatories.write"),
-            "L'host collegato non espone la gestione ambulatori. Il pairing potrebbe essere precedente: esegui di nuovo il pairing dopo aver aggiornato MediFlow sull'host."
-        )
+        let message = store.unavailableMessage(for: "network.ambulatories.write")
+        XCTAssertTrue(message?.contains("gestione ambulatori") == true)
+        XCTAssertTrue(message?.hasSuffix("Aggiorna MediFlow sull'host, poi ripeti il pairing.") == true,
+                      "repairing after the update is the step that restores the section")
     }
 
     func testAiFunctionsModelLoadsRuntimeStatusWithoutMutations() async throws {

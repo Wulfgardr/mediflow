@@ -45,10 +45,39 @@ final class ClinicalWorkspaceViewsTests: XCTestCase {
         XCTAssertEqual(scales.visiblePatients.count, 1)
     }
 
+    /// The patient picker of a scale computed these two messages and never drew
+    /// them: without a home-base, or after a failed read, the sheet was an
+    /// empty list. Both must reach the screen, and the failure offers a retry.
+    func testScalePatientPickerSaysWhyItHasNoPatients() async {
+        let disconnected = ClinicalScalesCatalogModel(connectionProvider: { nil })
+        await disconnected.load()
+        XCTAssertEqual(disconnected.pickerContent, .message("Collega l'home-base."))
+        XCTAssertFalse(disconnected.canRetry, "nothing to retry until a home-base is connected")
+
+        let failing = ClinicalScalesCatalogModel(connectionProvider: {
+            self.connection(S6MockDataSource(details: self.details(self.detail(id: "p1")), shouldFail: true))
+        })
+        await failing.load()
+        guard case .message(let message) = failing.pickerContent else { return XCTFail("Expected a message, not a list") }
+        XCTAssertTrue(message.hasPrefix("Impossibile caricare i pazienti:"))
+        XCTAssertTrue(failing.canRetry)
+
+        let loaded = ClinicalScalesCatalogModel(connectionProvider: {
+            self.connection(S6MockDataSource(details: self.details(self.detail(id: "p1"))))
+        })
+        await loaded.load()
+        XCTAssertEqual(loaded.pickerContent, .rows)
+        XCTAssertFalse(loaded.canRetry)
+    }
+
     func testCapabilityMissingAndNetworkFailureAreHonestStates() async {
         let unavailable = ClinicalWorkspaceCapabilitiesStore()
         await unavailable.loadIfNeeded(using: connection(S6MockDataSource(details: details(detail(id: "p1")))))
-        XCTAssertEqual(unavailable.unavailableMessage(for: "network.replica.readonly-agenda"), "L'host collegato non espone ancora l'agenda cross-paziente (capability network.replica.readonly-agenda). Aggiorna MediFlow sull'host.")
+        let agendaMessage = unavailable.unavailableMessage(for: "network.replica.readonly-agenda")
+        XCTAssertTrue(agendaMessage?.contains("agenda") == true, "the message names the missing section")
+        XCTAssertTrue(agendaMessage?.hasSuffix("Aggiorna MediFlow sull'host.") == true, "the message ends on the next step")
+        XCTAssertFalse(agendaMessage?.contains("network.") ?? true, "no internal capability key on screen")
+        XCTAssertFalse(agendaMessage?.contains("capability") ?? true, "no internal jargon on screen")
         let failing = AgendaWorkspaceModel(connectionProvider: { self.connection(S6MockDataSource(details: self.details(self.detail(id: "p1")), shouldFail: true)) })
         await failing.load()
         guard case .failed(let message) = failing.state else { return XCTFail("Expected network failure") }
@@ -231,12 +260,12 @@ final class ClinicalWorkspaceViewsTests: XCTestCase {
         // Agenda is actually in when no home-base is connected, and it is the
         // state demo mode leaves it in while forcing the capability gate open.
         let unread = ClinicalWorkspaceSectionContent(
-            state: .unavailable("Collega l'home-base prima di caricare l'agenda."),
+            state: .unavailable("Collega l'home-base."),
             isEmpty: true,
             idleMessage: "Agenda non ancora letta.",
             emptyMessage: "Nessuna visita pianificata."
         )
-        XCTAssertEqual(unread, .message("Collega l'home-base prima di caricare l'agenda."))
+        XCTAssertEqual(unread, .message("Collega l'home-base."))
         XCTAssertNotEqual(unread, .message("Nessuna visita pianificata."))
 
         let neverStarted = ClinicalWorkspaceSectionContent(
@@ -282,13 +311,13 @@ final class ClinicalWorkspaceViewsTests: XCTestCase {
     func testAgendaWithoutAConnectionSaysSoInsteadOfClaimingNoAppointments() async {
         let model = AgendaWorkspaceModel(connectionProvider: { nil })
         await model.load()
-        XCTAssertEqual(model.state, .unavailable("Collega l'home-base prima di caricare l'agenda."))
+        XCTAssertEqual(model.state, .unavailable("Collega l'home-base."))
         XCTAssertEqual(
             ClinicalWorkspaceSectionContent(
                 state: model.state, isEmpty: model.rows.isEmpty,
                 idleMessage: "Agenda non ancora letta.", emptyMessage: "Nessuna visita pianificata."
             ),
-            .message("Collega l'home-base prima di caricare l'agenda.")
+            .message("Collega l'home-base.")
         )
     }
 
