@@ -5,7 +5,11 @@ on:
   push:
     branches:
       - main
-      - codex/091-chat-clinical-projections
+
+# Un push nuovo sulla stessa PR sostituisce il giro in corso. Su main ogni commit conclude il suo.
+concurrency:
+  group: web-core-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
