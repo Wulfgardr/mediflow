@@ -151,3 +151,83 @@ test('rejects wrong-task and ambiguous envelopes through the current host previe
         assert.equal(result.proposal, null);
     }
 });
+
+// Secondo tentativo sul modello locale, come il Quadro paziente (#891): stesso prompt,
+// al massimo due chiamate, mai con un fornitore in rete, mai dopo il ritiro del consenso.
+type Answer = string | Readonly<{ content: string; truncated: true }> | Error;
+function retrying(answers: readonly Answer[], options: Readonly<{ enabled?: (read: number) => boolean; venue?: 'home_base' }> = {}) {
+    const prompts: string[] = [];
+    let kills = 0;
+    const binding = resolution(async (messages) => {
+        prompts.push(String(messages[0]!.content));
+        const answer = answers[Math.min(prompts.length - 1, answers.length - 1)]!;
+        if (answer instanceof Error) throw answer;
+        if (typeof answer !== 'string') return { content: answer.content, stats: { latency: 1, tokensIn: 2, tokensOut: 1_100, truncated: true } };
+        return { content: answer, stats: { latency: 1, tokensIn: 2, tokensOut: 3 } };
+    });
+    const capability = createPatientSmartImportHostCapability({
+        killSwitch: { read: async () => { kills += 1; return options.enabled?.(kills) === false ? { status: 'denied', code: 'disabled' } : { status: 'enabled' }; } },
+        broker: { consume: () => projection },
+        lifecycle: { read: () => ({ status: 'available', record: lifecycleRecord }) },
+        binding: { readClinical: async () => ({ status: 'available', resolution: binding }) },
+        readiness: { observeClinical: async () => ({ status: 'available', code: null, observation: { venue: 'local_process', state: 'available', reason: null } }) },
+        route: (input, lifecycle) => {
+            const routed = routeHostResolvedCandidateCapability(input, lifecycle);
+            if (!options.venue || !routed.resolution || !routed.decision.receipt) return routed;
+            // Una ricevuta con un luogo di esecuzione in rete: il secondo tentativo non deve partire.
+            const receipt = Object.freeze({ ...routed.decision.receipt, venue: options.venue });
+            return { ...routed, decision: Object.freeze({ ...routed.decision, receipt }), resolution: Object.freeze({ ...routed.resolution, receipt }) };
+        },
+        sources: { clock: () => '2026-08-22T16:00:01.000Z', entropy: () => new Uint8Array(16).fill(7) },
+    });
+    return { capability, prompts, kills: () => kills };
+}
+const MALFORMED = '{"schemaVersion":"mediflow.ai.extract.v1","task":"smart_import","summary":';
+const CUT = Object.freeze({ content: RESPONSE, truncated: true as const });
+
+test('local: an invalid first answer is retried once with the same prompt and the valid second answer is published', async () => {
+    const fixture = retrying([MALFORMED, RESPONSE]);
+    const result = await fixture.capability.preview({ handle: HANDLE, requestId: REQUEST_ID });
+    assert.equal(result.status, 'available'); assert.equal(result.writesPerformed, 0);
+    assert.equal(fixture.prompts.length, 2); assert.equal(fixture.prompts[0], fixture.prompts[1]);
+    if (result.status === 'available') {
+        assert.equal(result.proposal.summary, 'Proposta sintetica');
+        assert.equal(result.receipt.venue, 'local_process');
+        assert.deepEqual(Object.keys(result).sort(), ['apply', 'code', 'proposal', 'provenance', 'receipt', 'reviewRef', 'status', 'writesPerformed']);
+    }
+});
+
+test('local: an answer cut at the token ceiling is not published even when it parses, and is retried once', async () => {
+    const fixture = retrying([CUT, RESPONSE]);
+    const result = await fixture.capability.preview({ handle: HANDLE, requestId: REQUEST_ID });
+    assert.equal(result.status, 'available'); assert.equal(fixture.prompts.length, 2);
+});
+
+test('local: two invalid answers keep proposal_invalid after two calls, never three', async () => {
+    const fixture = retrying([MALFORMED, CUT, RESPONSE]);
+    const result = await fixture.capability.preview({ handle: HANDLE, requestId: REQUEST_ID });
+    assert.equal(result.status, 'failed'); assert.equal(result.code, 'proposal_invalid'); assert.equal(result.proposal, null);
+    assert.notEqual(result.receipt, null); assert.notEqual(result.provenance, null);
+    assert.equal(fixture.prompts.length, 2);
+});
+
+test('local: a provider failure is not retried', async () => {
+    const fixture = retrying([new Error('synthetic provider marker'), RESPONSE]);
+    const result = await fixture.capability.preview({ handle: HANDLE, requestId: REQUEST_ID });
+    assert.equal(result.code, 'provider_failed'); assert.equal(fixture.prompts.length, 1);
+});
+
+test('local: withdrawing consent between the attempts stops before the second call and publishes nothing', async () => {
+    // Lettura 1: ammissione; lettura 2: fra i due tentativi.
+    const fixture = retrying([MALFORMED, RESPONSE], { enabled: (read) => read < 2 });
+    const result = await fixture.capability.preview({ handle: HANDLE, requestId: REQUEST_ID });
+    assert.equal(result.status, 'denied'); assert.equal(result.code, 'kill_switch_disabled'); assert.equal(result.proposal, null);
+    assert.equal(fixture.prompts.length, 1); assert.equal(fixture.kills(), 2);
+});
+
+test('network venue: an invalid answer is not retried (no second egress)', async () => {
+    const fixture = retrying([MALFORMED, RESPONSE], { venue: 'home_base' });
+    const result = await fixture.capability.preview({ handle: HANDLE, requestId: REQUEST_ID });
+    assert.equal(result.status, 'failed'); assert.equal(result.code, 'proposal_invalid');
+    assert.equal(result.receipt?.venue, 'home_base'); assert.equal(fixture.prompts.length, 1);
+});

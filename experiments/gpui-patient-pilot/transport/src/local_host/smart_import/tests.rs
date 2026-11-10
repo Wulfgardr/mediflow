@@ -100,9 +100,6 @@ pub(crate) fn chart_from(name: &str) -> Chart {
         scope: chart["ambulatoryId"].as_str().unwrap().to_owned(),
     }
 }
-fn identity(text: &str) -> String {
-    text.to_owned()
-}
 impl Chart {
     pub(crate) fn capture(&self) -> Result<Value> {
         smart_import_capture(&SmartImportChart {
@@ -111,7 +108,6 @@ impl Chart {
             therapies: &self.therapies,
             entries: &self.entries,
             attachments: &self.attachments,
-            plain: &identity,
         })
     }
     pub(crate) fn request(&self) -> Result<SmartImportRequest> {
@@ -336,6 +332,24 @@ fn request_follows_the_chart() {
 /// Note oltre il limite di 900 unità UTF-16 (una riga ASCII di 901 caratteri, una di
 /// caratteri fuori dal piano base): la richiesta nasce con le note accorciate entro il
 /// limite, identiche a quelle del Web (`capture-input-limit.json`, scritto dal test TS).
+/// Voci di diario in testo ricco e note vicino a 900 unità con emoji e caratteri fuori
+/// dal piano base: le fonti sono quelle che il Web scrive in `capture-input-rich-text.json`.
+#[test]
+fn rich_text_entries_and_notes_near_the_limit_match_the_web() {
+    let chart = chart_from("chart-rich-text");
+    let capture = chart.capture().unwrap();
+    for source in capture["sources"].as_array().unwrap() {
+        if source["kind"] == "clinical-entry" {
+            let content = source["content"].as_str().unwrap();
+            assert!(
+                !content.contains("<p>") && !content.contains("&amp;") && !content.contains("**"),
+                "{content}"
+            );
+        }
+    }
+    assert_eq!(fixture("capture-input-rich-text"), capture);
+}
+
 #[test]
 fn notes_over_the_limit_are_shortened_like_the_web() {
     let chart = chart_from("chart-limit");

@@ -10,6 +10,7 @@ import type { HostLocalProviderBindingResult } from '../../ai-providers/host-loc
 import type { HostLocalProviderReadinessResult } from '../../ai-providers/host-local-provider-readiness';
 import type { ProviderLifecycleRead } from '../../ai-providers/fabric/provider-lifecycle-service';
 import { GENERATIVE_CAPABILITY_DESCRIPTORS } from '../../ai-providers/fabric/generative-catalog';
+import { runLocalGenerationAttempts } from '../../ai-providers/fabric/local-generation-attempts';
 import type {
     routeHostResolvedCandidateCapability,
     HostResolvedCandidateRoutingInput,
@@ -162,17 +163,33 @@ export function createPatientSmartImportHostCapability(dependencies: Dependencie
                 prompt = buildPatientSmartImportCapabilityPrompt(projection);
             } catch { return deny('fabric_denied'); }
 
-            let response: string;
-            try {
-                const providerResult = await routedBinding.adapter.chat(
-                    [{ role: 'user', content: prompt }], undefined, 1_100, { responseFormat: 'smart_import' },
-                );
-                response = providerResult.content;
-                if (typeof response !== 'string') throw new Error('invalid');
-            } catch { return failed('provider_failed', receipt, provenance); }
-            let proposal: PatientSmartImportCapabilityProposal;
-            try { validateGenerativeJson('smart_import', response); proposal = parsePatientSmartImportCapabilityProposal(response, projection, generatedAt); }
-            catch { return failed('proposal_invalid', receipt, provenance); }
+            // Come il Quadro paziente: stesso prompt e stessa proiezione gia' consumata dal broker,
+            // al massimo un secondo tentativo e solo sul modello locale.
+            const outcome = await runLocalGenerationAttempts<PatientSmartImportCapabilityProposal, PatientSmartImportHostCapabilityResult>({
+                venue: receipt.venue,
+                attempt: async () => {
+                    let response: string;
+                    try {
+                        const providerResult = await routedBinding.adapter.chat(
+                            [{ role: 'user', content: prompt }], undefined, 1_100, { responseFormat: 'smart_import' },
+                        );
+                        if (typeof providerResult.content !== 'string') throw new Error('invalid');
+                        // Una risposta tagliata dal tetto di token non si pubblica, anche se per caso fosse leggibile.
+                        if (providerResult.stats?.truncated === true) return Object.freeze({ status: 'rejected', reason: 'truncated' });
+                        response = providerResult.content;
+                    } catch { return Object.freeze({ status: 'provider_failed' }); }
+                    try {
+                        validateGenerativeJson('smart_import', response);
+                        return Object.freeze({ status: 'accepted', value: parsePatientSmartImportCapabilityProposal(response, projection, generatedAt) });
+                    } catch { return Object.freeze({ status: 'rejected', reason: 'invalid' }); }
+                },
+                // Prima del secondo tentativo si rilegge il consenso (kill switch).
+                between: permissionDenial,
+            });
+            if (outcome.status === 'stopped') return outcome.stop;
+            if (outcome.status === 'provider_failed') return failed('provider_failed', receipt, provenance);
+            if (outcome.status === 'rejected') return failed('proposal_invalid', receipt, provenance);
+            const proposal = outcome.value;
 
             const denied = await permissionDenial(); if (denied) return denied;
             return Object.freeze({ ...common, status: 'available', code: null, proposal, receipt, provenance,

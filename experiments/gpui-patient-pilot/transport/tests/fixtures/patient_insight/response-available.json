@@ -26,7 +26,7 @@
         "currentness": {
           "selectionEpoch": 7,
           "patientRevision": 3,
-          "projectionDigest": "sha256_e4ca2e3d3e04ea36d6873ece6d3eab5e60d7328be2b2f20062c361eaa867f604",
+          "projectionDigest": "sha256_a49a5feffe8760a0681bea92506cc256c5ea4496b20036c7ae2ae1fd478dd369",
           "capturedAt": "2026-11-09T10:00:00.000Z",
           "verifiedAt": "2026-11-09T10:00:01.000Z"
         }

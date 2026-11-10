@@ -21,7 +21,7 @@ test('prepares one fixed lease-bound prompt with no output leakage or finalizati
 
 test('denies replay and hostile inputs without a second provider call', { concurrency: false }, async () => { let calls = 0; const fixture = await handoff(async () => { calls += 1; return { content: body(), stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }; }); try { const first = prepareDocumentSynthesisFabricExecution(fixture.value); exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'canceled'); exact(await first, 'canceled'); assert.equal(calls, 1); for (const value of [{}, { ...fixture.value }, structuredClone(fixture.value), Object.freeze(Object.defineProperty({}, 'then', { value() {} }))]) exact(await prepareDocumentSynthesisFabricExecution(value), 'handoff_unavailable'); exact(await prepareDocumentSynthesisFabricExecution(new Proxy(fixture.value, {})), 'input_invalid'); } finally { fixture.restore(); } });
 
-test('burns the handoff after timeout, malformed envelope, or source validation denial', { concurrency: false }, async () => { for (const [content, code] of [[null, 'response_invalid'], [body('Different synthetic source.'), 'validation_denied']] as const) { let calls = 0; const fixture = await handoff(async () => { calls += 1; return { content: content as string, stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }; }); try { const result = await prepareDocumentSynthesisFabricExecution(fixture.value); exact(result, code); exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable'); assert.equal(calls, 1); } finally { fixture.restore(); } } });
+test('burns the handoff after timeout, malformed envelope, or source validation denial', { concurrency: false }, async () => { for (const [content, code, expectedCalls] of [[null, 'response_invalid', 2], [body('Different synthetic source.'), 'validation_denied', 1]] as const) { let calls = 0; const fixture = await handoff(async () => { calls += 1; return { content: content as string, stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }; }); try { const result = await prepareDocumentSynthesisFabricExecution(fixture.value); exact(result, code); exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable'); assert.equal(calls, expectedCalls); } finally { fixture.restore(); } } });
 
 test('aborts timeout or cancellation, burns the handoff, absorbs late rejection, and skips parse validation after return', { concurrency: false }, async () => { let rejectLate!: (reason: unknown) => void; const fixture = await handoff(async () => new Promise((_, reject) => { rejectLate = reject; })); const restore = setDocumentSynthesisFabricExecutionPrepareTimeoutForTest(0); const unhandled: unknown[] = []; const listener = (reason: unknown) => { unhandled.push(reason); }; process.on('unhandledRejection', listener); try { exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'provider_timeout'); exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable'); rejectLate(new Error('late')); await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []); } finally { process.off('unhandledRejection', listener); restore?.(); fixture.restore(); } });
 
@@ -54,4 +54,68 @@ test('structured generation still denies missing or wrong output schemaVersion w
             assert.equal(calls, 1);
         } finally { fixture.restore(); }
     }
+});
+
+// Secondo tentativo sul modello locale, come il Quadro paziente (#891): solo per un involucro
+// illeggibile o tagliato dal tetto di token, mai piu' di due chiamate, stesso prompt.
+type Scripted = string | Readonly<{ content: string; truncated: true }>;
+function scriptedChat(answers: readonly Scripted[], prompts: string[], before?: (call: number) => void): OllamaProviderAdapter['chat'] {
+    return async (messages) => {
+        prompts.push(String(messages[0]?.content)); before?.(prompts.length);
+        const answer = answers[Math.min(prompts.length - 1, answers.length - 1)]!;
+        return typeof answer === 'string' ? { content: answer, stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }
+            : { content: answer.content, stats: { latency: 0, tokensIn: 0, tokensOut: 1400, truncated: true } };
+    };
+}
+
+test('local: an unreadable first envelope is retried once with the same prompt and the valid second one is prepared', { concurrency: false }, async () => {
+    const prompts: string[] = [];
+    const fixture = await handoff(scriptedChat(['{malformed', body()], prompts));
+    try {
+        const result = await prepareDocumentSynthesisFabricExecution(fixture.value);
+        assert.equal(result.status, 'available'); if (result.status !== 'available') return;
+        assert.equal(prompts.length, 2); assert.equal(prompts[0], prompts[1]);
+        const publication = finalizeDocumentSynthesisFabricPreparedExecution(result.preparedToken);
+        assert.ok(publication); assert.equal(publication.receipt.reviewOnly, true); assert.equal(publication.receipt.writesPerformed, 0);
+    } finally { fixture.restore(); }
+});
+
+test('local: an answer cut at the token ceiling is not used even when it parses, and is retried once', { concurrency: false }, async () => {
+    const prompts: string[] = [];
+    const fixture = await handoff(scriptedChat([{ content: body(), truncated: true }, body()], prompts));
+    try {
+        const result = await prepareDocumentSynthesisFabricExecution(fixture.value);
+        assert.equal(result.status, 'available'); assert.equal(prompts.length, 2);
+        if (result.status === 'available') disposeDocumentSynthesisFabricPreparedExecution(result.preparedToken);
+    } finally { fixture.restore(); }
+});
+
+test('local: two unreadable envelopes keep response_invalid after two calls, never three', { concurrency: false }, async () => {
+    const prompts: string[] = [];
+    const fixture = await handoff(scriptedChat(['{malformed', { content: body(), truncated: true }, body()], prompts));
+    try {
+        exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'response_invalid');
+        exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable');
+        assert.equal(prompts.length, 2);
+    } finally { fixture.restore(); }
+});
+
+test('local: consent withdrawn or selection changed between the attempts sends no second call', { concurrency: false }, async () => {
+    const prompts: string[] = [];
+    let reads = 0;
+    const fixture = await handoff(scriptedChat(['{malformed', body()], prompts));
+    try {
+        exact(await prepareDocumentSynthesisFabricExecution(fixture.value, () => { reads += 1; return false; }), 'canceled');
+        assert.equal(prompts.length, 1); assert.equal(reads, 1);
+        exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable');
+    } finally { fixture.restore(); }
+});
+
+test('local: cancelling the preparation between the attempts sends no second call', { concurrency: false }, async () => {
+    const prompts: string[] = [];
+    const fixture = await handoff(scriptedChat(['{malformed', body()], prompts));
+    try {
+        exact(await prepareDocumentSynthesisFabricExecution(fixture.value, () => { cancelDocumentSynthesisFabricExecutionPrepare(fixture.value); return true; }), 'canceled');
+        assert.equal(prompts.length, 1);
+    } finally { fixture.restore(); }
 });
