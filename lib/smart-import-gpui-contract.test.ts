@@ -271,7 +271,8 @@ test('dinieghi e fallimenti reali arrivano a GPUI come codici senza proposta', a
         ['function_disabled', 'response-function-disabled', 403, 0],
         ['provider_unready', 'response-provider-unready', 200, 0],
         ['provider_failed', 'response-provider-failed', 200, 1],
-        ['malformed', 'response-proposal-invalid', 200, 1],
+        // Il modello locale ha un solo secondo tentativo quando la proposta non è valida.
+        ['malformed', 'response-proposal-invalid', 200, 2],
     ] as const) {
         const fixture = host(t, mode);
         const response = await untilPreview(fixture, false);
