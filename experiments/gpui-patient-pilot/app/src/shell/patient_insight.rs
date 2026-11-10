@@ -3,6 +3,7 @@
 //! chiede il consenso all'invio, mostra proposta, fonti e ricevuta e permette di
 //! interromperla o scartarla. Nessuna azione scrive nella scheda.
 
+use super::generation::{GenerationArea, GenerationPhase, Wipe, pencil_block};
 use super::*;
 #[cfg(unix)]
 use crate::chat_access::owner::{InsightOpen, Pending};
@@ -15,90 +16,47 @@ use serde_json::Value;
 use std::sync::Arc;
 use zeroize::Zeroize;
 
-#[derive(Default)]
-pub(super) enum InsightPhase {
-    #[default]
-    Idle,
-    Checking,
-    Unavailable(String),
-    Consent(Box<PatientInsightRequest>),
-    Running {
-        request: Box<PatientInsightRequest>,
-        context: RequestContext,
-    },
-    Proposal {
-        request: Box<PatientInsightRequest>,
-        proposal: Box<PatientInsightProposal>,
-    },
-    /// Fine senza proposta per scelta di chi usa la scheda (scarto, interruzione, rinuncia).
-    Ended(String),
-    Error(String),
+pub(super) type InsightPhase = GenerationPhase<PatientInsightRequest, PatientInsightProposal>;
+/// Stato del Quadro paziente, legato a una sola scheda: cambia con `PatientData`.
+pub(super) type PatientInsightArea = GenerationArea<PatientInsightRequest, PatientInsightProposal>;
+
+impl Wipe for PatientInsightProposal {
+    fn wipe(&mut self) {
+        for text in [&mut self.summary, &mut self.model]
+            .into_iter()
+            .chain(self.current_state.iter_mut())
+            .chain(self.alerts.iter_mut())
+            .chain(self.next_steps.iter_mut())
+            .chain(self.gaps.iter_mut())
+        {
+            text.zeroize();
+        }
+    }
+}
+impl Wipe for PatientInsightRequest {
+    fn wipe(&mut self) {
+        for source in &mut self.sources {
+            source.text.zeroize();
+        }
+        self.body = Value::Null;
+    }
 }
 
-/// Stato del Quadro paziente, legato a una sola scheda: cambia con `PatientData`.
+/// Richiesta della chat che ha aperto il Quadro di questa scheda, finché preparazione,
+/// consenso e generazione non finiscono. Resta fuori dall'area di generazione comune:
+/// riguarda solo il Quadro. Se la scheda cambia, la richiesta della chat è ritirata.
+#[cfg(unix)]
 #[derive(Default)]
-pub(super) struct PatientInsightArea {
-    ticket: Arc<()>,
-    pub(super) phase: InsightPhase,
-    /// Richiesta della chat che ha aperto questo Quadro, finché preparazione e
-    /// generazione non finiscono. Alla chat tornano solo stati.
-    #[cfg(unix)]
-    pub(super) chat: Option<Pending>,
-}
-impl PatientInsightArea {
-    fn renew(&mut self) -> Arc<()> {
-        self.ticket = Arc::new(());
-        self.ticket.clone()
-    }
-    fn end(&mut self, phase: InsightPhase) {
-        if let InsightPhase::Running { context, .. } = &self.phase {
-            context.cancel();
-        }
-        wipe_phase(&mut self.phase);
-        self.renew();
-        self.phase = phase;
-    }
-}
-impl Drop for PatientInsightArea {
+pub(super) struct InsightChat(pub(super) Option<Pending>);
+#[cfg(unix)]
+impl Drop for InsightChat {
     fn drop(&mut self) {
-        if let InsightPhase::Running { context, .. } = &self.phase {
-            context.cancel();
-        }
-        // Un'altra scheda o la chiusura della sessione: la richiesta della chat non vale più.
-        #[cfg(unix)]
-        if let Some(chat) = self.chat.take()
+        if let Some(chat) = self.0.take()
             && let Ok(mut chat) = chat.lock()
         {
             chat.withdraw();
         }
-        wipe_phase(&mut self.phase);
     }
-}
-fn wipe_phase(phase: &mut InsightPhase) {
-    match phase {
-        InsightPhase::Proposal { proposal, request } => {
-            for text in [&mut proposal.summary, &mut proposal.model]
-                .into_iter()
-                .chain(proposal.current_state.iter_mut())
-                .chain(proposal.alerts.iter_mut())
-                .chain(proposal.next_steps.iter_mut())
-                .chain(proposal.gaps.iter_mut())
-            {
-                text.zeroize();
-            }
-            wipe_request(request);
-        }
-        InsightPhase::Consent(request) | InsightPhase::Running { request, .. } => {
-            wipe_request(request)
-        }
-        _ => {}
-    }
-}
-fn wipe_request(request: &mut PatientInsightRequest) {
-    for source in &mut request.sources {
-        source.text.zeroize();
-    }
-    request.body = Value::Null;
 }
 
 /// Una riga mostrata: sezione, testo, fonti citate risolte nel testo inviato.
@@ -159,10 +117,7 @@ impl ClinicalApp {
     /// Primo passo: verifica che la funzione sia accesa sull'host e prepara la
     /// richiesta da mostrare. Nessun dato clinico lascia GPUI in questo passo.
     pub(super) fn insight_prepare(&mut self, cx: &mut Context<Self>) {
-        if matches!(
-            self.patient.insight.phase,
-            InsightPhase::Checking | InsightPhase::Running { .. }
-        ) {
+        if self.patient.insight.phase.is_busy() {
             return;
         }
         let Some(access) = self.local_host.access() else {
@@ -198,7 +153,7 @@ impl ClinicalApp {
                 build_patient_insight_request(&capture).map(Some)
             },
             move |this, result, cx| {
-                if !Arc::ptr_eq(&ticket, &this.patient.insight.ticket)
+                if !this.patient.insight.holds(&ticket)
                     || this.selected_id.as_deref() != Some(patient_id.as_str())
                 {
                     return;
@@ -318,9 +273,7 @@ impl ClinicalApp {
         cx: &mut Context<Self>,
     ) {
         // Una risposta tardiva non appartiene a un'altra scheda né a una richiesta interrotta.
-        if !Arc::ptr_eq(ticket, &self.patient.insight.ticket)
-            || self.selected_id.as_deref() != Some(patient_id)
-        {
+        if !self.patient.insight.holds(ticket) || self.selected_id.as_deref() != Some(patient_id) {
             return;
         }
         if !matches!(self.patient.insight.phase, InsightPhase::Running { .. }) {
@@ -335,8 +288,7 @@ impl ClinicalApp {
             cx.notify();
             return;
         }
-        let InsightPhase::Running { request, .. } = std::mem::take(&mut self.patient.insight.phase)
-        else {
+        let Some(request) = self.patient.insight.take_running() else {
             return;
         };
         let shown = match result {
@@ -369,7 +321,7 @@ impl ClinicalApp {
             Err(phase) => {
                 // Senza proposta il testo inviato non serve più: non resta in memoria.
                 let mut request = request;
-                wipe_request(&mut request);
+                request.wipe();
                 phase
             }
         };
@@ -513,14 +465,7 @@ impl ClinicalApp {
                 }
                 pane = pane
                     .child(
-                        div()
-                            .min_w_0()
-                            .border_l_2()
-                            .border_color(theme.pencil)
-                            .pl(px(14.))
-                            .flex()
-                            .flex_col()
-                            .gap(px(10.))
+                        pencil_block(theme)
                             .child(line("Proposta da rivedere. La scheda resta invariata.".into()))
                             .children(insight_lines(request, proposal).into_iter().enumerate().map(
                                 |(index, row)| {
@@ -592,7 +537,7 @@ impl ClinicalApp {
     /// Vero se il Quadro è legato a una richiesta della chat che non vale più.
     fn insight_chat_withdrawn(&self) -> bool {
         #[cfg(unix)]
-        if let Some(chat) = &self.patient.insight.chat {
+        if let Some(chat) = &self.patient.insight_chat.0 {
             return !chat
                 .lock()
                 .is_ok_and(|mut p| p.insight_bound() || p.insight_open());
@@ -658,7 +603,7 @@ impl ClinicalApp {
             return;
         }
         let early =
-            if self.patient.insight.chat.is_some() || insight_busy(&self.patient.insight.phase) {
+            if self.patient.insight_chat.0.is_some() || insight_busy(&self.patient.insight.phase) {
                 Some(InsightOpen::Busy)
             } else if self.local_host.access().is_none() {
                 Some(InsightOpen::Unavailable)
@@ -674,7 +619,7 @@ impl ClinicalApp {
         }
         // Un esito precedente (scarto, errore) lascia il posto alla richiesta della chat.
         self.patient.insight.end(InsightPhase::Idle);
-        self.patient.insight.chat = Some(pending.clone());
+        self.patient.insight_chat.0 = Some(pending.clone());
         let admitting = pending.clone();
         let target = pending.clone();
         self.run(
@@ -682,8 +627,8 @@ impl ClinicalApp {
             move |this, admitted, cx| {
                 let current = this
                     .patient
-                    .insight
-                    .chat
+                    .insight_chat
+                    .0
                     .as_ref()
                     .is_some_and(|chat| Arc::ptr_eq(chat, &target))
                     && this.selected_id.as_deref() == Some(patient_id.as_str());
@@ -692,7 +637,7 @@ impl ClinicalApp {
                         p.withdraw();
                     }
                     if current {
-                        this.patient.insight.chat = None;
+                        this.patient.insight_chat.0 = None;
                     }
                     return;
                 }
@@ -700,7 +645,7 @@ impl ClinicalApp {
                     if let Ok(mut p) = target.lock() {
                         p.finish_insight_open(InsightOpen::Busy);
                     }
-                    this.patient.insight.chat = None;
+                    this.patient.insight_chat.0 = None;
                     return;
                 }
                 if this.patient_section != PatientSection::Overview {
@@ -718,7 +663,7 @@ impl ClinicalApp {
     /// chat ritira, la sessione si chiude o la selezione cambia. Una proposta già
     /// mostrata appartiene alla finestra e non viene più legata alla chat.
     pub(super) fn poll_chat_insight(&mut self, cx: &mut Context<Self>) {
-        let Some(chat) = self.patient.insight.chat.clone() else {
+        let Some(chat) = self.patient.insight_chat.0.clone() else {
             return;
         };
         let (bound, open) = chat
@@ -726,7 +671,7 @@ impl ClinicalApp {
             .map(|mut p| (p.insight_bound(), p.insight_open()))
             .unwrap_or((false, false));
         if !bound && !open {
-            self.patient.insight.chat = None;
+            self.patient.insight_chat.0 = None;
             match self.patient.insight.phase {
                 InsightPhase::Checking
                 | InsightPhase::Consent(_)
@@ -755,7 +700,7 @@ impl ClinicalApp {
                 }
             }
             if outcome != Some(InsightOpen::Opened) {
-                self.patient.insight.chat = None;
+                self.patient.insight_chat.0 = None;
             }
             cx.notify();
             return;
@@ -768,7 +713,7 @@ impl ClinicalApp {
             if let Ok(mut p) = chat.lock() {
                 p.close_insight();
             }
-            self.patient.insight.chat = None;
+            self.patient.insight_chat.0 = None;
             cx.notify();
         }
     }

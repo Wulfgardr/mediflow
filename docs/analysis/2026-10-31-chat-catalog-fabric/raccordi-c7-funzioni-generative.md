@@ -93,8 +93,8 @@ ritirata senza rinnovo, anche durante consenso o generazione.
   Il documento si sceglie nella finestra, nella lista dei documenti del
   paziente selezionato: la chat non indica file o allegati.
 - **Permessi e capability:** gli stessi del Quadro, più la lettura dei documenti
-  del paziente e l'interruttore della sintesi dei documenti. Prerequisito: la
-  vista GPUI della sintesi in `main` (ramo `claude/gpui-sintesi-documenti`).
+  del paziente e l'interruttore della sintesi dei documenti. La vista GPUI
+  della sintesi è in `main` dalla #899: il prerequisito è soddisfatto.
 - **Stati alla chat:** `synthesis-opened`, `synthesis-unavailable`,
   `synthesis-busy`, `synthesis-closed`, `withdrawn`.
 - **Nella finestra:** la vista della sintesi del documento scelto, con consenso,
@@ -123,6 +123,20 @@ ritirata senza rinnovo, anche durante consenso o generazione.
   sul nuovo percorso.
 - **Seconda seduta:** come il Quadro, più l'applicazione di un candidato con
   PIN o Touch ID.
+
+## Che cosa è comune e che cosa no
+
+Dalla #899 Quadro e sintesi condividono `shell/generation.rs`: fasi, biglietto
+contro le risposte tardive, cancellazione dei testi. Il legame con la chat del
+Quadro resta fuori da quel modulo, in `InsightChat` dentro i dati della scheda,
+perché oggi solo il Quadro ha un comando della chat. Le tre protezioni del
+raccordo sono però nei punti del Quadro che la sintesi ripete con la propria
+struttura: controllo del ritiro fra consenso e invio
+(`chat_withdrawn_before_consent_sends_nothing`), controllo del ritiro prima di
+mostrare una risposta in volo (`late_answer_after_chat_revocation_is_not_shown`)
+e chiusura della proprietà con lo stato finale. Il raccordo della sintesi le
+deve riportare tutte e tre, con gli stessi test; quando i raccordi saranno due,
+conviene portare il legame con la chat nell'area di generazione comune.
 
 ## Le altre capability «Non collegata»
 

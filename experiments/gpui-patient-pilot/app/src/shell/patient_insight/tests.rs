@@ -730,7 +730,7 @@ mod chat {
                 panic!("proposta attesa nella finestra");
             };
             assert!(
-                app.patient.insight.chat.is_none(),
+                app.patient.insight_chat.0.is_none(),
                 "la proposta appartiene alla finestra"
             );
             let mut lines: Vec<String> = proposal
@@ -776,7 +776,7 @@ mod chat {
                 &app.patient.insight.phase,
                 InsightPhase::Proposal { proposal, .. } if proposal.summary == before
             ));
-            assert!(app.patient.insight.chat.is_none());
+            assert!(app.patient.insight_chat.0.is_none());
         });
     }
 
@@ -947,7 +947,7 @@ mod chat {
         assert_eq!(wire(&pending), json!({"status": "withdrawn"}));
         bench.view.read_with(cx, |app, _| {
             assert!(matches!(app.patient.insight.phase, InsightPhase::Idle));
-            assert!(app.patient.insight.chat.is_none());
+            assert!(app.patient.insight_chat.0.is_none());
         });
         bench.assert_no_clinical_write();
     }
@@ -1004,7 +1004,7 @@ mod chat {
                 "{scenario}: l'interruttore si legge solo dopo l'ammissione"
             );
             bench.view.read_with(cx, |app, _| {
-                assert!(app.patient.insight.chat.is_none(), "{scenario}");
+                assert!(app.patient.insight_chat.0.is_none(), "{scenario}");
                 assert!(
                     !matches!(
                         app.patient.insight.phase,

@@ -576,6 +576,51 @@ impl RuntimeClient {
         ))
     }
 
+    /// Byte già decifrati di un documento verso l'estrazione locale della sintesi
+    /// (G-5b). Stessa origine e stesso tipo del Web; la maniglia di cattura è
+    /// nell'intestazione `x-mediflow-document-synthesis-capture`.
+    pub(crate) fn document_synthesis_ingest(
+        &self,
+        headers: HeaderMap,
+        bytes: Vec<u8>,
+    ) -> Result<RawResponse> {
+        if !self.is_local_bootstrap_origin() {
+            return Err(RuntimeError::Forbidden);
+        }
+        if bytes.is_empty() || bytes.len() > crate::local_host::DOCUMENT_SYNTHESIS_MAX_BYTES {
+            return Err(RuntimeError::TooLarge);
+        }
+        http_runtime().block_on(self.context.run(
+            async {
+                let response = self
+                    .http
+                    .post(self.endpoint(crate::local_host::DOCUMENT_SYNTHESIS_INGEST_PATH, &[])?)
+                    .headers(headers)
+                    .header("origin", self.origin.origin().ascii_serialization())
+                    .header("sec-fetch-site", "same-origin")
+                    .header("content-type", "application/octet-stream")
+                    .body(bytes::Bytes::from_owner(Zeroizing::new(bytes)))
+                    // L'estrazione può passare dall'OCR locale dell'host.
+                    .timeout(Duration::from_secs(180))
+                    .send()
+                    .await
+                    .map_err(|_| RuntimeError::Transport)?;
+                let raw = read_response_body(response, AUTH_LIMIT, false).await?;
+                match raw.status {
+                    200 | 400 | 410 | 503 => Ok(raw),
+                    401 => Err(RuntimeError::Rejected(401)),
+                    403 => Err(classify_forbidden(&raw.body)),
+                    409 if matches!(conflict_code(&raw.body), ConflictCode::ArchiveReplaced) => {
+                        Err(RuntimeError::ArchiveReplaced)
+                    }
+                    409 => Ok(raw),
+                    n => Err(RuntimeError::Rejected(n)),
+                }
+            },
+            false,
+        ))
+    }
+
     pub(crate) fn who_administration_read(
         &self,
         code_check: bool,
@@ -698,7 +743,9 @@ impl RuntimeClient {
                 ) {
                     request = request.timeout(Duration::from_secs(70));
                 }
-                if path == crate::local_host::PATIENT_INSIGHT_PATH {
+                if path == crate::local_host::PATIENT_INSIGHT_PATH
+                    || path == crate::local_host::DOCUMENT_SYNTHESIS_PREVIEW_PATH
+                {
                     // L'host concede al modello locale fino a 300 s.
                     request = request.timeout(Duration::from_secs(330));
                 }
@@ -725,6 +772,10 @@ impl RuntimeClient {
                         // Quadro paziente: i rifiuti portano un codice, mai testo per l'interfaccia.
                         || (path == crate::local_host::PATIENT_INSIGHT_PATH
                             && matches!(raw.status, 400 | 403 | 409 | 503))
+                        // Sintesi documenti: cattura e anteprima rifiutano con un codice.
+                        || ((path == crate::local_host::DOCUMENT_SYNTHESIS_CAPTURE_PATH
+                            || path == crate::local_host::DOCUMENT_SYNTHESIS_PREVIEW_PATH)
+                            && matches!(raw.status, 400 | 403 | 409 | 410 | 503))
                         || (path == ["api", "icd", "proxy"]
                             && query.is_empty()
                             && raw.status == 503)
@@ -1460,6 +1511,8 @@ fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
         ["api", "prosthetics", "catalog", "documents"] => 25 * 1024 * 1024,
         ["api", "system", "recovery-backup"] => 512 * 1024 * 1024,
         ["api", "prosthetics", "catalog", "search"] => JSON_LIMIT,
+        // Fino a 32 citazioni di 12 000 caratteri.
+        ["api", "ai", "document-synthesis", "preview"] => JSON_LIMIT,
         ["api", "system", "backup-scheduler"] => JSON_LIMIT,
         // These reports carry their full Markdown beside the fields the panel reads.
         ["api", "system", "ai-parliament" | "ai-rollout-readiness"] => JSON_LIMIT,

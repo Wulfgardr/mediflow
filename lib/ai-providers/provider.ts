@@ -13,6 +13,8 @@ export interface AIStats {
     latency: number;
     tokensIn: number;
     tokensOut: number;
+    // true quando il provider ha chiuso la risposta per il tetto di token (Ollama: done_reason "length").
+    truncated?: boolean;
 }
 
 export interface AIChatOptions {

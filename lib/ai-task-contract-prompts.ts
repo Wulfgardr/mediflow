@@ -1,3 +1,4 @@
+import { PATIENT_INSIGHT_CLAIM_MAX_LENGTH } from './ai-providers/extraction-json-schemas';
 import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPlan } from './ai-preparation/emission-plan';
 export const AI_TASK_EXTRACTION_SCHEMA_VERSION = 'mediflow.ai.extract.v1';
 
@@ -81,6 +82,7 @@ export function buildPatientInsightExtractionPlan(contextPlan: EmissionPlan): Em
             'in gaps privilegia aderenza, risposta a terapia, andamento funzionale, sintomi non rivalutati o dati che mancano per leggere il problema attuale; evita gap generici che ripetono semplicemente esami gia programmati',
             'non usare gaps per duplicare nextSteps, per elencare dati mancanti ovvi o per riempire spazio',
             'ogni stringa deve gia includere [Sx] o [DATI-INCOMPLETI]',
+            `ogni stringa, summary compreso, al massimo ${PATIENT_INSIGHT_CLAIM_MAX_LENGTH} caratteri compresi i marker: frasi brevi, una sola idea per stringa`,
             'hard fail interno: se anche una sola stringa non contiene [Sx] o [DATI-INCOMPLETI], correggi il JSON prima di rispondere',
             'mantieni sempre i marker [Sx] anche quando riassumi piu fatti clinici nella stessa stringa',
             'usa solo riferimenti [Sx] presenti nel contesto',

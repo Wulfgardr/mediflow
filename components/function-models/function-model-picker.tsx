@@ -34,7 +34,7 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
     const defaultModel = f?.options.find(o => o.modelOptionId === f.defaultModelOptionId);
     const selected = !view.remote ? f?.options.find(o => o.modelOptionId === (view.choice?.modelOptionId ?? f.defaultModelOptionId)) : undefined;
     const remoteChoice = view.remote?.catalog?.choices.find(o => o.optionId === view.remote?.choice);
-    const blockingStatus = view.remote ? (!active ? 'Sblocca MediFlow.' : !view.remote.settings?.enabled ? 'Consenti OpenAI esplicitamente prima di preparare il contesto.' : 'Account collegato, catalogo disponibile e funzione pronta sono verifiche distinte per ogni tentativo.') : !active ? 'Sblocca MediFlow per scegliere il modello.' : f && !f.enabled ? 'Esperienza spenta nelle impostazioni.'
+    const blockingStatus = view.remote ? (!active ? 'Sblocca MediFlow.' : !view.remote.settings?.enabled ? 'Consenti OpenAI esplicitamente prima di preparare il contesto.' : null) : !active ? 'Sblocca MediFlow per scegliere il modello.' : f && !f.enabled ? 'Funzione spenta nelle impostazioni.'
         : view.loading ? 'Lettura modelli in corso…' : f?.options.length === 0 ? 'Nessun modello configurato.' : f && f.bindingState !== 'current' && !view.choice ? 'Predefinito non attuale: scegli un modello disponibile.'
         : f && selected?.state !== 'available_unqualified' ? 'Modello locale non disponibile.' : null;
     const confirmDefault = !view.remote && (view.blocked || view.consumed) && !!f?.enabled && f.bindingState === 'current' && defaultModel?.state === 'available_unqualified';
@@ -42,7 +42,7 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
     const recoveryStatus = blockingStatus ?? (needsRefresh && !view.error ? 'Rileggi i modelli prima di preparare la proposta.' : null);
     if (functionId === 'treatment_reasoning') return <div className={styles.picker}><p>{TREATMENT_REASONING_UNAVAILABLE_LABEL}</p><p>{TREATMENT_REASONING_UNAVAILABLE_REASON}</p></div>;
     if (f && !f.enabled && !view.remote) return <div className={styles.picker} data-testid={`model-picker-${functionId}`}>
-        <p role="status">Esperienza spenta nelle impostazioni. <a href="/settings/ai/funzioni">Apri le funzioni cliniche</a></p>
+        <p role="status">Funzione spenta nelle impostazioni. <a href="/settings/ai/funzioni">Apri le funzioni cliniche</a></p>
     </div>;
     return <div className={styles.picker} data-testid={`model-picker-${functionId}`}>
         <div className={styles.summary}>
@@ -61,7 +61,7 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
                 onFocus={() => { if (!view.remote && !f && !view.loading && !view.error) void client.read(); }}
                 onChange={e => e.target.value === 'chatgpt_subscription' ? client.chooseRemote() : client.choose(e.target.value)}>
                 <option value="">{view.loading ? 'Lettura modelli…' : defaultModel ? `Predefinito · ${defaultModel.label}${defaultModel.state === 'unavailable' ? ' · non disponibile' : ''}` : f ? 'Predefinito non disponibile' : 'Modello predefinito · scegli'}</option>
-                <option value="chatgpt_subscription">OpenAI · abbonamento ChatGPT · prepara</option>
+                <option value="chatgpt_subscription">OpenAI · abbonamento ChatGPT</option>
                 {f?.options.map(o => <option key={o.modelOptionId} value={o.modelOptionId} disabled={o.state !== 'available_unqualified'}>{o.label}{o.modelOptionId !== view.choice?.modelOptionId ? ` · ${providerName(o.provider)}` : ''}{o.state === 'unavailable' ? ' · non disponibile' : ''}</option>)}
             </ChoiceField>
             {view.remote ? <span className={styles.pickerProvider}>OpenAI · abbonamento ChatGPT<small>Solo questa proposta</small></span>
@@ -72,7 +72,7 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
             {recoveryStatus && <p id={`${fieldId}-status`} role="status" className={styles.hint}>{recoveryStatus}</p>}
             {view.error && <p id={`${fieldId}-error`} role="alert" className={styles.error}>{view.error}</p>}
             {confirmDefault && !view.error && <p id={`${fieldId}-recovery`} role="status" className={styles.hint}>
-                {view.consumed ? 'Proposta già preparata. Per ripetere, scegli nuovamente o riusa il predefinito.' : 'Conferma nuovamente il modello prima di preparare la proposta.'}
+                {view.consumed ? 'Proposta già preparata.' : 'Conferma nuovamente il modello prima di preparare la proposta.'}
             </p>}
             {needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading}
                 aria-describedby={`${fieldId}-${view.error ? 'error' : 'status'}`} onClick={() => void client.read()}>Rileggi modelli</button>}
@@ -81,10 +81,9 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
         </div>}
             <Disclosure label="Dettagli modello" className={styles.pickerDetails} title="Dettagli">
             <div className={styles.pickerDetailBody}>
-                <p>{view.remote ? remoteChoice ? `${remoteChoice.model} · ${remoteChoice.effort} · OpenAI · abbonamento ChatGPT` : 'OpenAI · abbonamento ChatGPT. Modello e ragionamento devono essere scelti dal catalogo corrente dopo l’accesso.'
-                    : selected ? `${selected.label} · ${providerName(selected.provider)}` : 'Il modello viene risolto dalle impostazioni correnti.'}</p>
-                <p>{view.remote ? 'Scelta per questa proposta. Accesso, consenso e disponibilità vengono verificati per ogni preparazione.' : view.choice ? 'Scelta per una sola proposta; non salvata.' : 'Usa il modello predefinito delle impostazioni.'} {!view.remote && view.consumed ? 'Per ripetere, scegli nuovamente o riusa il predefinito.' : ''}</p>
-                <p>La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.</p>
+                {view.remote ? <p>{remoteChoice ? `${remoteChoice.model} · ${remoteChoice.effort} · OpenAI · abbonamento ChatGPT` : 'OpenAI · abbonamento ChatGPT. Modello e ragionamento devono essere scelti dal catalogo corrente dopo l’accesso.'}</p>
+                    : selected && <p>{`${selected.label} · ${providerName(selected.provider)}`}</p>}
+                {view.remote && <p>Scelta per questa proposta. Accesso, consenso e disponibilità vengono verificati per ogni preparazione.</p>}
                 {!view.remote && !needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => void client.read()}>Rileggi modelli</button>}
             </div>
             </Disclosure>
@@ -117,18 +116,17 @@ function OrdinaryFunctionControls({ client, view, needsReprepare = false, canRep
             <a href={view.challenge.verificationUrl} target="_blank" rel="noopener noreferrer">Apri accesso ufficiale</a>
             <button type="button" disabled={view.loading} onClick={() => void client.remote.action('login/complete')}>Ho completato: verifica accesso</button>
         </>}
-        {phase === 'connected' && <button type="button" disabled={view.loading} onClick={() => void client.remote.action('models')}>Leggi catalogo di questo processo</button>}
+        {phase === 'connected' && <button type="button" disabled={view.loading} onClick={() => void client.remote.action('models')}>Leggi i modelli disponibili</button>}
         {phase === 'ready' && view.catalog && <>
             <ChoiceField label="Modello e ragionamento correnti" disabled={view.loading} disabledReason="Verifica in corso…" value={view.choice} onChange={e => client.remote.choose(e.target.value)}>
-                <option value="">Scegli modello ed effort</option>
+                <option value="">Scegli modello e ragionamento</option>
                 {view.catalog.choices.map(choice => <option key={choice.optionId} value={choice.optionId}>{choice.model} · {choice.effort}</option>)}
             </ChoiceField>
             <button type="button" disabled={view.loading || !view.choice} onClick={() => void client.remote.action('generate')}>Genera questa proposta</button>
-            <button type="button" disabled={view.loading || !view.choice} onClick={() => void client.remote.action('preference')}>Salva modello ed effort preferiti</button>
+            <button type="button" disabled={view.loading || !view.choice} onClick={() => void client.remote.action('preference')}>Salva modello e ragionamento preferiti</button>
             <p>La preferenza non conserva accesso, consenso o disponibilità del modello.</p>
         </>}
         {(view.state || view.loading) && <button type="button" onClick={() => client.cancel()}>Annulla e chiudi preparazione</button>}
-        {view.completed && <p>Risultato restituito alla funzione. Il processo è chiuso: una nuova proposta richiede nuova preparazione.</p>}
         {needsReprepare && <div>
             <p>Riparti verificando la chiusura precedente e le impostazioni correnti. Contesto, consenso, accesso e modello saranno verificati di nuovo; nessun invio automatico.</p>
             <button type="button" disabled={!canReprepare} onClick={() => void client.reprepareRemote()}>Nuova preparazione</button>

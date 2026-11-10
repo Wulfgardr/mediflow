@@ -171,6 +171,7 @@ export class OllamaProviderAdapter implements ProviderAdapter {
                     latency: Date.now() - start,
                     tokensIn,
                     tokensOut,
+                    ...(data.done_reason === 'length' ? { truncated: true } : {}),
                 },
             };
         } catch (e: unknown) {

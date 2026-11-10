@@ -14,7 +14,9 @@ mod clinical_forms;
 mod document_curation;
 mod document_details;
 mod document_library;
+mod document_synthesis;
 mod dossier_import;
+mod generation;
 mod local_host;
 pub(crate) mod local_preferences;
 mod local_settings;
@@ -370,6 +372,10 @@ struct PatientData {
     document_curation: document_curation::DocumentCuration,
     dossier: dossier_import::DossierArea,
     insight: patient_insight::PatientInsightArea,
+    /// Richiesta della chat legata al Quadro di questa scheda (C-7).
+    #[cfg(unix)]
+    insight_chat: patient_insight::InsightChat,
+    synthesis: document_synthesis::DocumentSynthesisArea,
     document_details_id: Option<String>,
     document_original: Option<document_details::DocumentOriginal>,
 }
@@ -385,6 +391,9 @@ impl Default for PatientData {
             document_curation: document_curation::DocumentCuration::default(),
             dossier: dossier_import::DossierArea::default(),
             insight: patient_insight::PatientInsightArea::default(),
+            #[cfg(unix)]
+            insight_chat: patient_insight::InsightChat::default(),
+            synthesis: document_synthesis::DocumentSynthesisArea::default(),
             document_details_id: None,
             document_original: None,
         }
@@ -914,6 +923,7 @@ impl ClinicalApp {
     fn next_presentation_epoch(&mut self) {
         self.patient.dossier = dossier_import::DossierArea::default();
         self.interrupt_insight();
+        self.interrupt_synthesis();
         if matches!(self.ambulatories, Load::Loading) {
             self.ambulatories = Load::Idle;
         }

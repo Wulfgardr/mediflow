@@ -1,0 +1,7 @@
+{
+  "status": 403,
+  "body": {
+    "error": "La richiesta richiede una nuova verifica delle impostazioni.",
+    "code": "function_disabled"
+  }
+}
