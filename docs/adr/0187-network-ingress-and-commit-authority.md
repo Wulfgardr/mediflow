@@ -1,4 +1,6 @@
-# ADR 0167: ingresso paired e autorità corrente al commit
+# ADR 0187: ingresso paired e autorità corrente al commit
+
+> Numero precedente: 0167, assegnato per errore anche all'[ADR 0167](0167-first-ambulatory-host-bootstrap.md) (prima sede da GPUI). Rinumerato il 10 novembre 2026; il contenuto non cambia.
 
 Data: 2026-10-31
 Stato: Proposed

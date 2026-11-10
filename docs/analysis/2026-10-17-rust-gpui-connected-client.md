@@ -51,7 +51,7 @@ byte formattati del file. Le ricevute storiche restano immutate e datate.
 ## Canoni mantenuti e correzioni dell'interfaccia
 
 I riferimenti sono [DESIGN.md](../../DESIGN.md),
-[ADR 0144](../adr/0144-punto-inchiostro.md), la
+[ADR 0186](../adr/0186-punto-inchiostro.md), la
 [specifica Punto d'inchiostro](../design/punto-inchiostro/01-specifica.md) e
 la [mappa delle 17 schermate](../design/punto-inchiostro/02-piattaforme-e-schermate.md).
 Il tema Rust legge direttamente i token runtime
