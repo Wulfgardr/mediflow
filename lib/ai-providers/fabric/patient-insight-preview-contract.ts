@@ -1,3 +1,4 @@
+import { clinicalRichTextToPlainText } from '../../clinical-rich-text';
 import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
 import type { PatientInsightCanonicalHostSources } from './patient-insight-host-projection';
 
@@ -167,7 +168,8 @@ export function buildPatientInsightPreviewRequest(input: CaptureInput): PatientI
         return drug ? boundedText(`${drug}${dosage ? ` — ${dosage}` : ''}`) : null;
     });
     const recentEvents = Object.freeze(input.entries.slice(0, 12).flatMap((value) => {
-        const title = boundedText(value.title, 96); const content = boundedText(value.content, 220);
+        const title = boundedText(value.title, 96);
+        const content = typeof value.content === 'string' ? boundedText(clinicalRichTextToPlainText(value.content), 220) : null;
         const summary = title || content ? boundedText(`${title ?? 'Evento clinico'}${content ? `: ${content}` : ''}`) : null;
         return summary ? [Object.freeze({ summary })] : [];
     }));

@@ -133,7 +133,10 @@ test('il corpo di GPUI passa per handler, servizio e capacità reali e torna una
     assert.match(prompt, /\[S1\] Valutazione manuale del follow-up clinico attuale/u);
     assert.match(prompt, /\[S6\] Terapia corrente: Metformina/u);
     assert.match(prompt, /\[S9\] Evento clinico recente: Esami ematici/u);
-    assert.doesNotMatch(prompt, /\[S10\]/u);
+    // La voce di diario in testo ricco arriva al modello come testo semplice, senza tag né entità.
+    assert.match(prompt, /\[S10\] Evento clinico recente: Controllo pressorio: PA 150\/90 & FC 88, edemi <2\+> - Saturazione 96% in aria - Dolore 🩺 riferito Rivalutare fra 7 giorni\n?$/u);
+    assert.doesNotMatch(prompt, /<\/?(?:p|strong|ul|li)>|&(?:amp|lt|gt|nbsp);/u);
+    assert.doesNotMatch(prompt, /\[S11\]/u);
 });
 
 test('dinieghi e fallimenti reali arrivano a GPUI come codici senza proposta', async (t) => {
