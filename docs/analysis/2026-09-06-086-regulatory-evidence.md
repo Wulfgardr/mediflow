@@ -725,7 +725,7 @@ assente; dopo i fix la suite mirata passa **18/18**, senza skip.
 Comandi eseguiti nel worktree, con Node 24 nel `PATH`:
 
 ```bash
-export PATH="/Users/leonardopegollo/.nvm/versions/node/v24.19.0/bin:$PATH"
+export PATH="~/.nvm/versions/node/v24.19.0/bin:$PATH"
 node scripts/run-strip-types.mjs --test lib/compliance-evidence-inventory.test.ts lib/fhir/bundle-mapper.test.ts lib/fhir/clinical-adapter.test.ts lib/fhir/id.test.ts lib/report-service.test.ts
 npm run lint
 npm run typecheck

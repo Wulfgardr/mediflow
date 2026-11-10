@@ -171,7 +171,7 @@ di produzione proprio, sulla porta 38946:
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 node experiments/gpui-patient-pilot/comparison/prepare-runtime.mjs candidate \
   /tmp/mediflow-transition-846-delivery/candidate-private.json \
-  /Users/leonardopegollo/.t3/worktrees/medical-record-app/t3-1380bddb
+  ~/.t3/worktrees/medical-record-app/t3-1380bddb
 ```
 
 Il corpus originale non è modificato. SHA-256:

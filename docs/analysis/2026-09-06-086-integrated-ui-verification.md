@@ -41,7 +41,7 @@ integrare su quel possibile punto di sovrapposizione.
 
 Node `24.19.0`, ABI `137`, Next `16.3.4` webpack, Chromium Playwright su macOS.
 Ogni test/build ha ricevuto un ambiente `env -i` con PATH esplicito a
-`/Users/leonardopegollo/.nvm/versions/node/v24.19.0/bin`, HOME/USER/LANG,
+`~/.nvm/versions/node/v24.19.0/bin`, HOME/USER/LANG,
 `NEXT_TELEMETRY_DISABLED=1` e `MEDIFLOW_DATA_DIR` sintetica esplicita.
 `MEDIFLOW_RUNTIME_TWIN` e assente sia dalla build sia dal server/test ordinari.
 
