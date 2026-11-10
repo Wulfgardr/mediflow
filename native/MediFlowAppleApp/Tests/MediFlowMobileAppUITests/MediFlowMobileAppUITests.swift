@@ -1293,8 +1293,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let agendaTab = tab("Agenda")
         waitForUIReady(agendaTab, in: app)
         agendaTab.tap()
-        let agenda = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
+        let agenda = app.staticTexts["clinical-workspace-agenda-message"]
         waitForUIReady(agenda, in: app)
+        XCTAssertEqual(agenda.label, "Collega l'home-base.")
         try performAuditNamingElements(screen: "agenda")
     }
 
@@ -1310,8 +1311,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         for size in ["xsmall", "large", "accessibility5"] {
             launch(seedPatients: true, singlePatient: true, dynamicTypeSize: size)
             XCTAssertTrue(openSection("Agenda"), "the Agenda must open at \(size)")
-            let message = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
+            let message = app.staticTexts["clinical-workspace-agenda-message"]
             XCTAssertTrue(message.waitForExistence(timeout: 20), "the message must be shown at \(size)")
+            XCTAssertEqual(message.label, "Collega l'home-base.", "the unconnected state at \(size)")
             heights.append(message.frame.height)
             attachScreenshot(named: "agenda-message-\(size)")
             app.terminate()
@@ -1376,8 +1378,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
         openSection("Agenda")
         XCTAssertTrue(sectionView("clinical-workspace-agenda-view").waitForExistence(timeout: 15))
-        let agendaUnread = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
-        if agendaUnread.waitForExistence(timeout: 5) {
+        let agendaUnread = app.staticTexts["clinical-workspace-agenda-message"]
+        if agendaUnread.waitForExistence(timeout: 5), agendaUnread.label == "Collega l'home-base." {
             XCTAssertFalse(
                 app.staticTexts["Nessuna visita pianificata."].exists,
                 "L'agenda dichiara che non ci sono visite mentre dichiara anche di non avere letto l'archivio"
@@ -1386,8 +1388,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
         openSection("Diario")
         XCTAssertTrue(sectionView("clinical-workspace-diary-view").waitForExistence(timeout: 15))
-        let diaryUnread = app.staticTexts["Collega l'home-base prima di caricare il diario globale."]
-        if diaryUnread.waitForExistence(timeout: 5) {
+        let diaryUnread = app.staticTexts["clinical-workspace-diary-message"]
+        if diaryUnread.waitForExistence(timeout: 5), diaryUnread.label == "Collega l'home-base." {
             XCTAssertFalse(
                 app.staticTexts["Nessuna voce di diario."].exists,
                 "Il diario dichiara di essere vuoto mentre dichiara anche di non avere letto l'archivio"
@@ -1404,6 +1406,25 @@ final class MediFlowMobileAppUITests: XCTestCase {
         // steppers and no statement underneath them. Something must be said.
         let analyticsSaysSomething = app.staticTexts.count > 0
         XCTAssertTrue(analyticsSaysSomething, "Analytics non dice nulla sul perche non ci siano numeri")
+    }
+
+    /// Choosing the patient for a scale used to open an empty sheet when no
+    /// home-base was connected: the message existed in the model and was never
+    /// drawn. The sheet must say why it lists no patients.
+    func testScalePatientPickerSaysWhyItListsNoPatients() throws {
+        launch(seedPatients: true)
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(openSection("Scale"), "Scale must be reachable")
+        XCTAssertTrue(sectionView("clinical-workspace-scales-view").waitForExistence(timeout: 15))
+        let scale = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "ADL")).firstMatch
+        XCTAssertTrue(scale.waitForExistence(timeout: 10))
+        scale.tap()
+        XCTAssertTrue(app.navigationBars["Seleziona paziente"].waitForExistence(timeout: 10))
+        let message = app.staticTexts["scale-patient-picker-message"]
+        XCTAssertTrue(message.waitForExistence(timeout: 10), "the picker must state why it is empty")
+        XCTAssertEqual(message.label, "Collega l'home-base.")
+        XCTAssertFalse(app.buttons["scale-patient-picker-retry"].exists, "nothing to retry without a home-base")
+        attachScreenshot(named: "scale-patient-picker-unconnected")
     }
 
     func testTabBarNavigatesBetweenSections() throws {
@@ -2162,6 +2183,10 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.buttons["patient-cell-uitest-1"].tap()
         openPatientSection(.overview)
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
+        attachScreenshot(named: "clean-copy-chart-locked-top")
+        app.swipeUp()
+        attachScreenshot(named: "clean-copy-chart-locked-scrolled")
+        app.swipeDown()
 
         app.buttons["edit-patient-button"].tap()
         let address = app.textFields["edit-patient-address"]
@@ -2462,6 +2487,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.buttons["edit-patient-button"].tap()
         let icdSearch = app.textFields["icd-search-field"]
         XCTAssertTrue(scrollDown(to: icdSearch), "The in-app ICD search should be in the edit form")
+        attachScreenshot(named: "clean-copy-edit-icd-search")
         icdSearch.tap()
         icdSearch.typeText("ipertensione")
 
