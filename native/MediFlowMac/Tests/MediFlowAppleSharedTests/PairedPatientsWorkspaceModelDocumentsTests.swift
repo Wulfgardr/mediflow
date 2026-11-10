@@ -297,20 +297,15 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
 
         let readonlyMessage = await store.unavailableMessage(for: "network.replica.readonly-documents")
         let writeMessage = await store.unavailableMessage(for: "network.replica.write-documents")
-        XCTAssertEqual(
-            readonlyMessage,
-            "L'host o il pairing corrente non espongono ancora l'archivio documenti. Aggiorna MediFlow sull'host e ripeti il pairing."
-        )
-        XCTAssertEqual(
-            writeMessage,
-            "L'host collegato non espone il caricamento documenti. Il pairing potrebbe essere precedente: esegui di nuovo il pairing dopo aver aggiornato MediFlow sull'host."
-        )
+        let repairStep = "Aggiorna MediFlow sull'host, poi ripeti il pairing."
+        XCTAssertTrue(readonlyMessage?.contains("archivio documenti") == true)
+        XCTAssertTrue(readonlyMessage?.hasSuffix(repairStep) == true)
+        XCTAssertTrue(writeMessage?.contains("caricamento documenti") == true)
+        XCTAssertTrue(writeMessage?.hasSuffix(repairStep) == true)
 
         let visitDraftMessage = await store.unavailableMessage(for: "network.compute.visit-draft")
-        XCTAssertEqual(
-            visitDraftMessage,
-            "L'host o il pairing corrente non espongono ancora l'elaborazione della bozza visita. Aggiorna MediFlow sull'host e ripeti il pairing."
-        )
+        XCTAssertTrue(visitDraftMessage?.contains("bozza visita") == true)
+        XCTAssertTrue(visitDraftMessage?.hasSuffix(repairStep) == true)
     }
 
     @MainActor

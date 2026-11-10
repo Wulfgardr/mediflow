@@ -88,7 +88,7 @@ struct MobilePatientSectionNavigation: View {
         }
         .accessibilityLabel("Sezione clinica")
         .accessibilityValue(selection.title)
-        .accessibilityHint("Mostra tutte le sette sezioni della cartella.")
+        .accessibilityHint("Mostra tutte le sezioni della cartella.")
         .accessibilityIdentifier("patient-section-picker")
     }
 

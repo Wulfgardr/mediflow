@@ -88,6 +88,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
     @Published private(set) var entries: [HomeBaseEntrySummary] = []
+    /// The patient whose diary `entries` was read for. `nil` means the list has
+    /// not been read, which the diary must not present as an empty diary.
+    @Published private(set) var entriesPatientId: String?
+    var selectedPatientEntriesRead: Bool {
+        guard let id = selectedPatient?.id else { return false }
+        return entriesPatientId == id
+    }
     @Published private(set) var therapies: [HomeBaseTherapySummary] = []
     @Published private(set) var checkups: [HomeBaseCheckupSummary] = []
     @Published private(set) var observations: [HomeBaseObservationSummary] = []
@@ -577,6 +584,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         patients: [HomeBasePatientSummary] = [],
         selectedPatient: HomeBasePatientDetail? = nil,
         entries: [HomeBaseEntrySummary] = [],
+        entriesListLoaded: Bool = false,
         therapies: [HomeBaseTherapySummary] = [],
         attachments: [HomeBaseAttachmentSummary] = [],
         attachmentListLoaded: Bool = false
@@ -589,6 +597,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         self.patients = patients
         self.selectedPatient = selectedPatient
         self.entries = entries
+        self.entriesPatientId = (entriesListLoaded || !entries.isEmpty) ? selectedPatient?.id : nil
         self.therapies = therapies
         self.attachments = attachments
         let listRead = attachmentListLoaded || !attachments.isEmpty
@@ -1208,6 +1217,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             selectedPatientID = patient.id
             setSelectedPatient(detail)
             entries = Self.uiTestSeededEntries(patientId: patient.id)
+            entriesPatientId = patient.id
             therapies = Self.uiTestSeededTherapies(patientId: patient.id)
             checkups = Self.uiTestSeededCheckups(patientId: patient.id)
             observations = Self.uiTestSeededObservations(patientId: patient.id)
@@ -1450,6 +1460,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            self.entriesPatientId = patientId
             self.cancelEditingEntry()
             self.statusMessage = "\(self.entries.count) voci diario caricate."
         }
@@ -1534,6 +1545,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 )
                 guard isCurrent() else { return }
                 self.entries = entries
+                self.entriesPatientId = patientId
             } catch {
                 guard isCurrent() else { return }
                 // A confirmed save does not turn session expiry into a refresh-only warning.
@@ -1623,6 +1635,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 sessionCookie: connection.sessionCookie, ambulatoryId: connection.ambulatoryId)
             guard isCurrent(), self.selectedPatient?.id == patientID else { return }
             self.entries = entries
+            self.entriesPatientId = patientID
         }, canApplyFailure: isCurrent)
         return acknowledged
     }
@@ -2475,6 +2488,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             )
             self.selectedPatient = nil
             self.entries = []
+            self.entriesPatientId = nil
             self.therapies = []
             self.checkups = []
             self.observations = []
@@ -2783,6 +2797,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 )
                 guard isCurrent() else { return }
                 self.entries = entries
+                self.entriesPatientId = patientId
                 if self.editingEntryDraftID == editorID { self.prepareEditingEntryReview(from: entries) }
             } catch {
                 guard isCurrent() else { return }
@@ -2826,6 +2841,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            self.entriesPatientId = patientId
             self.statusMessage = "Voce diario annullata sull'home-base."
         }
     }
@@ -2861,6 +2877,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            self.entriesPatientId = patientId
             self.statusMessage = "Voce diario ripristinata sull'home-base."
         }
     }
@@ -4252,6 +4269,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             selectedPatient = nil
             selectedPatientID = nil
             entries = []
+            entriesPatientId = nil
             therapies = []
             checkups = []
             observations = []
@@ -4774,6 +4792,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
         setSelectedPatient(payload.detail, masterKey: context.masterKey)
         entries = payload.entries
+        entriesPatientId = payload.detail.id
         therapies = payload.therapies
         checkups = payload.checkups
         observations = payload.observations
@@ -5286,6 +5305,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             invalidatePatientBoundNewEntryState()
         }
         entries = []
+        entriesPatientId = nil
         therapies = []
         checkups = []
         observations = []
