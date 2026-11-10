@@ -25,14 +25,20 @@ test('fixed roster includes real production Mini, not only package-level transpo
 test('a partial checkout fails rather than silently discovering a smaller suite', () => {
   withMiniAcceptanceDataDir((directory) => {
     assert.throws(() => requireMiniAcceptanceFiles(directory), /Required acceptance file missing: .nvmrc/u);
+    const installed = 'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-9.9.9.tgz';
     for (const relative of ['.nvmrc', 'package.json', 'package-lock.json',
       'scripts/prepare-e2e-db.mjs', 'scripts/run-strip-types.mjs', 'scripts/register-strip-types-loader.mjs',
       'lib/security/portable-supervisor-production.ts', 'lib/security/web-auth-lifecycle-owner-test-fixture.ts',
+      // An older package left in the checkout never stands in for the installed one.
       'packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.7.tgz',
       ...MINI_DESKTOP_ACCEPTANCE_TESTS]) {
       fs.mkdirSync(path.dirname(path.join(directory, relative)), { recursive: true });
       fs.writeFileSync(path.join(directory, relative), 'fixture');
     }
+    assert.throws(() => requireMiniAcceptanceFiles(directory), /Required acceptance dependency is not a local package/u);
+    fs.writeFileSync(path.join(directory, 'package.json'), JSON.stringify({ dependencies: { '@mediflow/web-auth-lifecycle-owner': `file:${installed}` } }));
+    assert.throws(() => requireMiniAcceptanceFiles(directory), /Required acceptance file missing: packages\/web-auth-lifecycle-owner\/artifacts\/mediflow-web-auth-lifecycle-owner-9\.9\.9\.tgz/u);
+    fs.writeFileSync(path.join(directory, installed), 'fixture');
     assert.deepEqual(requireMiniAcceptanceFiles(directory), [...MINI_DESKTOP_ACCEPTANCE_TESTS]);
     const productionTest = path.join(directory, MINI_DESKTOP_ACCEPTANCE_TESTS.at(-1));
     fs.rmSync(productionTest);
