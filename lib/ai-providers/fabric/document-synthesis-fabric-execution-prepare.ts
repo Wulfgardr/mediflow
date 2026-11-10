@@ -4,6 +4,7 @@ import { types } from 'node:util';
 
 import { resolveDocumentSynthesisFabricExecutionHandoff, type DocumentSynthesisFabricExecutionCapability } from './document-synthesis-fabric-admission';
 import { parseDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope';
+import { runLocalGenerationAttempts } from './local-generation-attempts';
 import type { LocalProviderResolution } from '../registry';
 
 export type DocumentSynthesisFabricPreparedExecutionToken = object;
@@ -37,8 +38,18 @@ function invoke(entry: Entry, resolution: LocalProviderResolution, prompt: strin
     return outcome;
 }
 
-/** Resolves one B2ab handoff, invokes its fixed local binding once, and returns no provider output. */
-export async function prepareDocumentSynthesisFabricExecution(handoff: unknown): Promise<DocumentSynthesisFabricExecutionPrepareResult> {
+function truncatedResponse(value: unknown): boolean {
+    try { if (!value || typeof value !== 'object' || IsProxy(value)) return false; const stats = ObjectGetOwnPropertyDescriptor(value, 'stats'); const inner = stats && ObjectHasOwn(stats, 'value') ? stats.value : null; if (!inner || typeof inner !== 'object' || IsProxy(inner)) return false; const flag = ObjectGetOwnPropertyDescriptor(inner, 'truncated'); return !!flag && ObjectHasOwn(flag, 'value') && flag.value === true; } catch { return false; }
+}
+
+/**
+ * Resolves one B2ab handoff and invokes its fixed local binding; returns no provider output.
+ * Come il Quadro paziente (#891): se l'involucro della risposta non si legge o la risposta e'
+ * tagliata dal tetto di token, la stessa richiesta parte una seconda volta, mai di piu'. La
+ * validazione delle fonti chiude il lease e non si ritenta. `stillCurrent` (consenso e
+ * attualita' letti dal chiamante) e l'annullamento si rileggono prima del secondo tentativo.
+ */
+export async function prepareDocumentSynthesisFabricExecution(handoff: unknown, stillCurrent?: unknown): Promise<DocumentSynthesisFabricExecutionPrepareResult> {
     if (!opaque(handoff)) return denied('input_invalid');
     const retained = ReflectApply(WeakMapGet, handoffs, [handoff]) as Entry | undefined;
     if (retained) { abort(retained); return denied('canceled'); }
@@ -46,17 +57,34 @@ export async function prepareDocumentSynthesisFabricExecution(handoff: unknown):
     const entry: Entry = { state: 'running', handoff, execution: admission.execution, controller: new AbortControllerConstructor(), timer: null, settle: null, validation: null, envelope: null };
     ReflectApply(WeakMapSet, handoffs, [handoff, entry]);
     const input = entry.execution.takeProviderInput(); if (!input) { abort(entry); return denied('input_invalid'); }
-    const settled = await invoke(entry, admission.resolution, input.prompt);
-    if (entry.timer !== null) { ClearTimeout(entry.timer); entry.timer = null; } entry.settle = null;
-    if (entry.state !== 'running') return denied('canceled');
-    if (settled.kind === 'timeout') { abort(entry); return denied('provider_timeout'); }
-    if (settled.kind !== 'response') { abort(entry); return denied('provider_unavailable'); }
-    const parsed = parseDocumentSynthesisProviderEnvelope(responseContent(settled.value));
-    if (parsed.status !== 'available') { abort(entry); return denied('response_invalid'); }
-    const validation = entry.execution.validateProviderEnvelope(parsed.token);
+    const current = typeof stillCurrent === 'function' && !IsProxy(stillCurrent) ? stillCurrent as () => unknown : null;
+    const failure: { code: DenialCode } = { code: 'provider_unavailable' };
+    // L'ammissione accetta solo una ricevuta `local_process`: il luogo e' sempre il modello locale.
+    const outcome = await runLocalGenerationAttempts<object, DenialCode>({
+        venue: 'local_process',
+        attempt: async () => {
+            const settled = await invoke(entry, admission.resolution, input.prompt);
+            if (entry.timer !== null) { ClearTimeout(entry.timer); entry.timer = null; } entry.settle = null;
+            if (entry.state !== 'running') { failure.code = 'canceled'; return ObjectFreeze({ status: 'provider_failed' as const }); }
+            if (settled.kind === 'timeout') { failure.code = 'provider_timeout'; return ObjectFreeze({ status: 'provider_failed' as const }); }
+            if (settled.kind !== 'response') { failure.code = 'provider_unavailable'; return ObjectFreeze({ status: 'provider_failed' as const }); }
+            if (truncatedResponse(settled.value)) return ObjectFreeze({ status: 'rejected' as const, reason: 'truncated' as const });
+            const parsed = parseDocumentSynthesisProviderEnvelope(responseContent(settled.value));
+            return parsed.status === 'available' ? ObjectFreeze({ status: 'accepted' as const, value: parsed.token }) : ObjectFreeze({ status: 'rejected' as const, reason: 'invalid' as const });
+        },
+        between: async () => {
+            if (entry.state !== 'running') return 'canceled';
+            try { if (current && current() !== true) return 'canceled'; } catch { return 'canceled'; }
+            return entry.state === 'running' ? null : 'canceled';
+        },
+    });
+    if (outcome.status === 'stopped') { abort(entry); return denied(outcome.stop); }
+    if (outcome.status === 'provider_failed') { if (failure.code !== 'canceled') abort(entry); return denied(failure.code); }
+    if (outcome.status === 'rejected') { abort(entry); return denied('response_invalid'); }
+    const validation = entry.execution.validateProviderEnvelope(outcome.value);
     if (validation.status !== 'available') { abort(entry); return denied('validation_denied'); }
     const token = ObjectFreeze(ObjectCreate(null)) as DocumentSynthesisFabricPreparedExecutionToken;
-    entry.state = 'prepared'; entry.validation = validation; entry.envelope = parsed.token; ReflectApply(WeakMapDelete, handoffs, [handoff]); ReflectApply(WeakMapSet, prepared, [token, entry]);
+    entry.state = 'prepared'; entry.validation = validation; entry.envelope = outcome.value; ReflectApply(WeakMapDelete, handoffs, [handoff]); ReflectApply(WeakMapSet, prepared, [token, entry]);
     return frozen({ status: 'available' as const, code: null, preparedToken: token, ...COMMON }) as DocumentSynthesisFabricExecutionPrepareResult;
 }
 

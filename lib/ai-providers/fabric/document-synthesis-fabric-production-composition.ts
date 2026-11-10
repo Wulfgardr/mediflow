@@ -11,7 +11,7 @@ import { isServerSessionProjectionOwner } from '../../security/server-session-pr
 type Publication = ReturnType<typeof finalizeDocumentSynthesisFabricPreparedExecution>;
 type Binding = () => Promise<DocumentSynthesisProviderBindingResult>;
 type Configuration = Readonly<{ owner: object; session: object; capsule: object }>;
-export type DocumentSynthesisFabricProductionComposition = Readonly<{ execute(): Promise<Publication> }>;
+export type DocumentSynthesisFabricProductionComposition = Readonly<{ execute(stillCurrent?: () => boolean): Promise<Publication> }>;
 
 const OBJECT = Object.prototype; const ObjectAssign = Object.assign; const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectHasOwn = Object.hasOwn; const ObjectIsFrozen = Object.isFrozen; const ReflectOwnKeys = Reflect.ownKeys; const IsProxy = types.isProxy;
 const ProcessExecArgv = process.execArgv; const ProcessExecArgvLength = ProcessExecArgv.length; const StringStartsWith = String.prototype.startsWith;
@@ -25,7 +25,7 @@ function testBinding(value: unknown): Binding | null { try { if (typeof value !=
 function create(configurationValue: unknown, bind: Binding): DocumentSynthesisFabricProductionComposition | null {
     const input = configuration(configurationValue); if (!input) return null;
     let state: 'ready' | 'running' | 'terminal' = 'ready';
-    return frozen({ async execute(): Promise<Publication> {
+    return frozen({ async execute(stillCurrent?: () => boolean): Promise<Publication> {
         if (state !== 'ready') return null; state = 'running';
         let binding: DocumentSynthesisProviderBindingResult; try { binding = await bind(); } catch { state = 'terminal'; return null; }
         if (binding.status !== 'available') { state = 'terminal'; return null; }
@@ -33,7 +33,7 @@ function create(configurationValue: unknown, bind: Binding): DocumentSynthesisFa
         if (admitted.status !== 'available' || !admitted.token) { state = 'terminal'; return null; }
         const handoff = beginDocumentSynthesisFabricExecution(admitted.token);
         if (!handoff) { disposeDocumentSynthesisFabricAdmission(admitted.token); state = 'terminal'; return null; }
-        const prepared = await prepareDocumentSynthesisFabricExecution(handoff);
+        const prepared = await prepareDocumentSynthesisFabricExecution(handoff, stillCurrent);
         if (prepared.status !== 'available') { disposeDocumentSynthesisFabricAdmission(admitted.token); state = 'terminal'; return null; }
         state = 'terminal';
         return finalizeDocumentSynthesisFabricPreparedExecution(prepared.preparedToken);
