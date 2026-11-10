@@ -212,14 +212,19 @@ impl ClinicalApp {
     fn import_send(
         &mut self,
         access: Arc<LocalHostAccess>,
-        sent: SmartImportRequest,
+        mut sent: SmartImportRequest,
         cx: &mut Context<Self>,
     ) {
         let context = access.generation_context();
-        self.patient.smart_import.end(ImportPhase::Running {
-            request: Box::new(sent.clone()),
-            context: context.clone(),
-        });
+        if !self
+            .patient
+            .smart_import
+            .start(sent.clone(), context.clone())
+        {
+            sent.wipe();
+            cx.notify();
+            return;
+        }
         let ticket = self.patient.smart_import.ticket.clone();
         let patient_id = sent.patient_id.clone();
         self.run(

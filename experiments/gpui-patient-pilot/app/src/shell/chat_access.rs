@@ -2,7 +2,7 @@ use super::*;
 use crate::chat_access::references::{CommandReferences, ReferenceScan};
 use crate::chat_access::{
     self,
-    owner::{Pending, State},
+    owner::{Function, Pending, Stage, State},
 };
 use mediflow_runtime_client::{ChatWriteOutcome, ChatWriteResolution};
 use std::{collections::BTreeMap, time::Duration};
@@ -199,6 +199,179 @@ fn catalog_copy(prosthetics: bool) -> (&'static str, &'static str) {
 }
 
 impl ClinicalApp {
+    pub(super) fn open_chat_function(
+        &mut self,
+        pending: &Pending,
+        function: Function,
+        cx: &mut Context<Self>,
+    ) {
+        use super::generation::GenerationPhase;
+        let binding = self
+            .session
+            .as_ref()
+            .filter(|session| !session.is_locked())
+            .filter(|_| {
+                self.chat_access.pending.is_none()
+                    && !self.chat_access.voice.is_open()
+                    && !self.patient_document.is_open()
+                    && self.form.is_none()
+                    && !self.local_work_pending()
+                    && !self.privacy_shield
+            })
+            .and_then(|session| {
+                let scope = self.scope.as_deref()?;
+                let patient = self.patient.detail.ready()?;
+                if self.selected_id.as_deref() != Some(patient.id.as_str()) {
+                    return None;
+                }
+                Some((
+                    session.clone(),
+                    session.chat_access_context(scope, &patient.id).ok()?,
+                    patient.id.clone(),
+                ))
+            });
+        let Some((session, context, patient_id)) = binding else {
+            if let Ok(mut pending) = pending.lock() {
+                pending.withdraw();
+            }
+            cx.notify();
+            return;
+        };
+        if !pending.lock().is_ok_and(|mut pending| {
+            pending.function_requested(function) && pending.bind(session, context)
+        }) {
+            if let Ok(mut pending) = pending.lock() {
+                pending.withdraw();
+            }
+            cx.notify();
+            return;
+        }
+        let occupied = match function {
+            Function::Insight => self.patient.insight.occupied(),
+            Function::Synthesis => self.patient.synthesis.area.occupied(),
+        };
+        let access = self.local_host.access();
+        let early = if occupied {
+            Some(Stage::Busy)
+        } else if access.is_none() {
+            Some(Stage::Unavailable)
+        } else {
+            None
+        };
+        if let Some(stage) = early {
+            if let Ok(mut pending) = pending.lock() {
+                pending.finish_function_open(stage);
+            }
+            cx.notify();
+            return;
+        }
+        let ticket = match function {
+            Function::Insight => {
+                self.patient.insight.end(GenerationPhase::Checking);
+                self.patient.insight.chat.0 = Some(pending.clone());
+                self.patient.insight.ticket.clone()
+            }
+            Function::Synthesis => {
+                self.patient.synthesis.area.end(GenerationPhase::Checking);
+                self.patient.synthesis.area.chat.0 = Some(pending.clone());
+                self.patient.synthesis.area.ticket.clone()
+            }
+        };
+        let admitting = pending.clone();
+        let target = pending.clone();
+        self.run(
+            move || {
+                if !chat_access::owner::admit_function(&admitting) {
+                    return Ok(None);
+                }
+                let enabled = function == Function::Insight
+                    || access
+                        .unwrap()
+                        .document_synthesis_enabled()
+                        .unwrap_or(false);
+                Ok(Some(enabled))
+            },
+            move |this, admitted, cx| {
+                let current = match function {
+                    Function::Insight => {
+                        this.patient.insight.holds(&ticket)
+                            && this
+                                .patient
+                                .insight
+                                .chat
+                                .0
+                                .as_ref()
+                                .is_some_and(|chat| std::sync::Arc::ptr_eq(chat, &target))
+                    }
+                    Function::Synthesis => {
+                        this.patient.synthesis.area.holds(&ticket)
+                            && this
+                                .patient
+                                .synthesis
+                                .area
+                                .chat
+                                .0
+                                .as_ref()
+                                .is_some_and(|chat| std::sync::Arc::ptr_eq(chat, &target))
+                    }
+                } && this.selected_id.as_deref() == Some(patient_id.as_str());
+                if !current
+                    || !target
+                        .lock()
+                        .is_ok_and(|mut pending| pending.function_bound())
+                    || !matches!(admitted, Ok(Some(_)))
+                {
+                    if let Ok(mut pending) = target.lock() {
+                        pending.withdraw();
+                    }
+                    if current {
+                        match function {
+                            Function::Insight => {
+                                this.patient.insight.follow_chat();
+                            }
+                            Function::Synthesis => {
+                                this.patient.synthesis.area.follow_chat();
+                            }
+                        }
+                    }
+                    cx.notify();
+                    return;
+                }
+                if matches!(admitted, Ok(Some(false))) {
+                    if let Ok(mut pending) = target.lock() {
+                        pending.finish_function_open(Stage::Unavailable);
+                    }
+                    this.patient.synthesis.area.chat.0 = None;
+                    this.patient.synthesis.area.end(GenerationPhase::Idle);
+                    cx.notify();
+                    return;
+                }
+                match function {
+                    Function::Insight => {
+                        this.patient.insight.end(GenerationPhase::Idle);
+                        if this.patient_section != PatientSection::Overview {
+                            this.section_selected(PatientSection::Overview, cx);
+                        }
+                        this.insight_prepare(cx);
+                    }
+                    Function::Synthesis => {
+                        this.patient.synthesis.document = None;
+                        this.patient.synthesis.area.end(GenerationPhase::Idle);
+                        if this.patient_section != PatientSection::Documents {
+                            this.section_selected(PatientSection::Documents, cx);
+                        }
+                        if let Ok(mut pending) = target.lock() {
+                            pending.finish_function_open(Stage::Opened);
+                        }
+                    }
+                }
+                cx.notify();
+            },
+            cx,
+        );
+        cx.notify();
+    }
+
     pub(super) fn start_chat_access(&mut self, cx: &mut Context<Self>) {
         if self.chat_access.listener.is_none() {
             return;
@@ -220,7 +393,11 @@ impl ClinicalApp {
 
     fn poll_chat_access(&mut self, cx: &mut Context<Self>) {
         self.poll_chat_voice(cx);
-        self.poll_chat_insight(cx);
+        let insight_changed = self.patient.insight.follow_chat();
+        let synthesis_changed = self.patient.synthesis.area.follow_chat();
+        if insight_changed || synthesis_changed {
+            cx.notify();
+        }
         if self.chat_access.pending.is_some()
             && self
                 .session
@@ -266,9 +443,14 @@ impl ClinicalApp {
                 }
                 return;
             }
-            if pending.lock().is_ok_and(|mut p| p.insight_requested()) {
-                self.open_chat_insight(&pending, cx);
-                return;
+            for function in [Function::Insight, Function::Synthesis] {
+                if pending
+                    .lock()
+                    .is_ok_and(|mut p| p.function_requested(function))
+                {
+                    self.open_chat_function(&pending, function, cx);
+                    return;
+                }
             }
             if pending.lock().is_ok_and(|mut p| p.document_requested()) {
                 self.open_chat_patient_document(&pending, cx);
