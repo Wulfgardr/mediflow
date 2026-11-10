@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { installPlistTestTools } from './fixtures/plist-tool-test-support.mjs';
 import { appRoot, assetParts, fixture, repositoryRoot, snapshot, syntheticFiles, write } from './fixtures/mac-packaging-test-support.mjs';
+import { localImportClosure } from './fixtures/local-import-closure.mjs';
 
 function dependencies(web) {
   const arch = process.arch;
@@ -122,13 +123,14 @@ switch (command) {
 
 function buildFixture(t) {
   const input = fixture(t), root = path.join(input.directory, 'repo with spaces');
-  for (const file of ['package.json', 'scripts/build-input-metadata.mjs', 'scripts/build-apple-macos-app.sh', 'scripts/macos-native-artifact.py', 'scripts/check-macos-web-runtime-native-payload.sh',
+  // Gli ingressi; i moduli che importano si ricavano dagli import reali.
+  for (const file of localImportClosure(repositoryRoot, ['package.json', 'scripts/build-input-metadata.mjs', 'scripts/build-apple-macos-app.sh', 'scripts/macos-native-artifact.py', 'scripts/check-macos-web-runtime-native-payload.sh',
     'scripts/stage-chatgpt-execution-mac-assets.ts', 'scripts/run-strip-types.mjs',
     'scripts/local-api-tls-proxy.mjs', 'lib/security/loopback-ingress.mjs', 'lib/security/network-ingress-policy.mjs',
     'scripts/check-standalone-runtime-bundle.mjs', 'scripts/scheduled-backup-runtime-contract.mjs', 'scripts/anydoc-pdf-smoke-diagnostics.mjs',
     'scripts/native-first-install.mjs', 'scripts/native-first-install-contract.json', 'scripts/launcher-helpers.mjs', 'scripts/node-runtime-contract.mjs',
     'scripts/fixtures/mac-packaging-test-loader.mjs', 'scripts/fixtures/mac-packaging-test-support.mjs',
-    ...['execution-mac-assets.ts', 'execution-mac-config.ts', 'execution-mac-native.ts', 'execution-mac-state.ts', 'execution-sandbox.ts', 'execution-contract.ts'].map(name => 'lib/chatgpt-execution/' + name)]) {
+    ...['execution-mac-assets.ts', 'execution-mac-config.ts', 'execution-mac-native.ts', 'execution-mac-state.ts', 'execution-sandbox.ts', 'execution-contract.ts'].map(name => 'lib/chatgpt-execution/' + name)])) {
     const destination = path.join(root, file); fs.mkdirSync(path.dirname(destination), { recursive: true });
     fs.copyFileSync(path.join(repositoryRoot, file), destination); fs.chmodSync(destination, file.endsWith('.sh') ? 0o755 : 0o644);
   }
@@ -224,6 +226,20 @@ function prebuiltArtifact(input, overrides = {}) {
   fs.rmSync(path.join(input.root, 'events.jsonl'), { force: true });
   return archive;
 }
+
+// PR 910: buildFixture copiava a mano il checker senza standalone-ssr-chunks.mjs.
+test('fixture copies follow the real imports and a missing module is named', t => {
+  assert.ok(localImportClosure(repositoryRoot, ['scripts/check-standalone-runtime-bundle.mjs']).includes('scripts/standalone-ssr-chunks.mjs'));
+  const root = fs.mkdtempSync(path.join(fixture(t).directory, 'imports-'));
+  write(path.join(root, 'scripts/entry.mjs'), "import { used } from './used.mjs';\nimport type { Only } from './types-only';\nexport { again } from './again.ts';\n");
+  write(path.join(root, 'scripts/used.mjs'), "import data from './data.json' with { type: 'json' };\nexport const used = data;\n");
+  write(path.join(root, 'scripts/data.json'), '{}\n');
+  write(path.join(root, 'scripts/again.ts'), 'export const again = 1;\n');
+  assert.deepEqual(localImportClosure(root, ['scripts/entry.mjs']),
+    ['scripts/again.ts', 'scripts/data.json', 'scripts/entry.mjs', 'scripts/used.mjs']);
+  fs.rmSync(path.join(root, 'scripts/used.mjs'));
+  assert.throws(() => localImportClosure(root, ['scripts/entry.mjs']), /MISSING_LOCAL_IMPORT: scripts\/entry\.mjs imports \.\/used\.mjs/);
+});
 
 test('prebuilt native import skips Xcode and retains guards, helper pins, Headless staging and outer sealing', t => {
   const input = buildFixture(t), archive = prebuiltArtifact(input);
