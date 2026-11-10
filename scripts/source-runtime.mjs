@@ -129,9 +129,12 @@ async function buildSourceRuntime(root = ROOT, args = []) {
     throw new Error('Source changed during build');
   }
   const web = standaloneDirectory(root);
+  const { copyStandaloneSsrChunks } = await import('./standalone-ssr-chunks.mjs');
+  const distDir = path.basename(path.dirname(web));
+  copyStandaloneSsrChunks(path.dirname(web), path.join(web, distDir));
   fs.writeFileSync(path.join(web, 'mediflow-build-identity.json'), JSON.stringify({
     schemaVersion: 1, revision, branch, worktreeHash: 'clean', sourceFingerprint,
-    buildId: fs.readFileSync(path.join(web, path.basename(path.dirname(web)), 'BUILD_ID'), 'utf8').trim(),
+    buildId: fs.readFileSync(path.join(web, distDir, 'BUILD_ID'), 'utf8').trim(),
   }) + '\n');
 }
 
