@@ -1,0 +1,143 @@
+{
+  "status": 200,
+  "body": {
+    "schemaVersion": "mediflow.document-synthesis.preview-wire.v1",
+    "status": "available",
+    "publication": {
+      "output": {
+        "schemaVersion": "mediflow.ai.extract.v1",
+        "task": "document_synthesis",
+        "summary": "Controllo pressorio stabile; proseguire la terapia in corso.",
+        "qualityLevel": "green"
+      },
+      "citations": [
+        {
+          "label": "S1",
+          "quote": "Pressione arteriosa 130/80 mmHg, stabile rispetto al controllo precedente.",
+          "startByte": 102,
+          "endByte": 176,
+          "quoteSha256": "6f8fe0ee0c769efbe699fc1e89628c1579db76447197832ac675eceb349ed5a2"
+        }
+      ],
+      "receipt": {
+        "schemaVersion": "mediflow.document-synthesis.publication-receipt.v1",
+        "capability": "document_synthesis",
+        "outputSha256": "3aaaf51524422b12698fceb47977eb73c408bb598459bd8f0972bf6798fbff65",
+        "claimCitationsDigestSha256": [
+          46,
+          252,
+          103,
+          138,
+          49,
+          246,
+          63,
+          171,
+          58,
+          34,
+          240,
+          86,
+          141,
+          139,
+          110,
+          170,
+          222,
+          78,
+          127,
+          179,
+          105,
+          58,
+          94,
+          114,
+          154,
+          242,
+          246,
+          69,
+          120,
+          95,
+          70,
+          54
+        ],
+        "sourceSetDigestSha256": [
+          51,
+          190,
+          160,
+          13,
+          20,
+          174,
+          8,
+          232,
+          237,
+          234,
+          67,
+          196,
+          27,
+          32,
+          61,
+          55,
+          200,
+          169,
+          108,
+          151,
+          150,
+          36,
+          94,
+          212,
+          216,
+          198,
+          148,
+          200,
+          17,
+          135,
+          245,
+          63
+        ],
+        "providerBindingReceipt": {
+          "schemaVersion": "mediflow.document-synthesis.provider-binding.v1",
+          "capability": "document_synthesis",
+          "registryTask": "reasoning",
+          "provider": "ollama",
+          "model": "synthetic-document-synthesis:1",
+          "venue": "local_process",
+          "egress": "none",
+          "fallback": "none",
+          "runtimeReadiness": "required"
+        },
+        "reviewOnly": true,
+        "applyPolicy": "none",
+        "writesPerformed": 0
+      },
+      "provenance": {
+        "schemaVersion": "mediflow.document-synthesis.publication-provenance.v1",
+        "capability": "document_synthesis",
+        "sourceSetAuthority": "application_host",
+        "inputDigestScope": "ordered_normalized_provider_projection_set",
+        "citationSupport": "provider_declared_host_membership_and_locator_validated",
+        "modelCausality": "not_established",
+        "fabricProvenance": {
+          "schemaVersion": "mediflow.ai.fabric-provenance.v1",
+          "capability": "document_synthesis",
+          "venue": "local_process",
+          "provider": "ollama",
+          "model": "synthetic-document-synthesis:1",
+          "preprocessing": [
+            "context_minimization"
+          ],
+          "receipt": {
+            "schemaVersion": "mediflow.ai.fabric-resolution.v1",
+            "capability": "document_synthesis",
+            "class": "generative",
+            "venue": "local_process",
+            "egressProfile": {
+              "id": "local_only",
+              "version": "mediflow.ai.egress-profile.v1",
+              "egress": "none"
+            },
+            "provider": "ollama",
+            "model": "synthetic-document-synthesis:1",
+            "fallbackCount": 0
+          }
+        }
+      }
+    }
+  }
+}
