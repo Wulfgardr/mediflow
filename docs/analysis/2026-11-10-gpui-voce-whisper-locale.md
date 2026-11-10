@@ -15,12 +15,13 @@ rilevatore di voce **Silero** obbligatorio.
 | Motore | `app/src/local_voice/whisper.rs` | `WhisperDecoder` (whisper.cpp con Metal) e `SileroDetector` (Silero VAD di whisper.cpp, sulla CPU) dietro le due interfacce del ciclo; thread di lavoro; sorgente audio Swift. |
 | Modello | `app/src/local_voice/model.rs` | Nomi, URL con revisione fissata, SHA-256 e dimensione dei due file; verifica; installazione esplicita. |
 | Sessione | `app/src/local_voice/mod.rs` | Sceglie il motore, espone gli stati di sempre e i messaggi del motore in uso. |
-| Vista | `app/src/shell/local_voice.rs` | Mostra in grigio il testo stabile durante la registrazione; Review e trasferimento invariati. |
+| Vista | `app/src/shell/local_voice.rs` | Mostra durante la registrazione il provvisorio a matita e il confermato in grigio; Review e trasferimento invariati. |
 
 whisper.cpp arriva dal crate `whisper-rs-sys 0.15.0` (whisper.cpp 1.8.3, compilato con CMake, Metal con
 shader incorporati) tramite `whisper-rs 0.16.0`, con versione e checksum fissati nel `Cargo.lock`. La dipendenza
 è dichiarata solo per `target_os = "macos"`: Windows e Linux non la scaricano né la compilano. Il banco ha misurato
-whisper.cpp 1.9.5; la prova P2 qui sotto misura la 1.8.3 inclusa nel crate.
+whisper.cpp 1.9.5. **L'app usa whisper.cpp 1.8.3**, quella inclusa in `whisper-rs`: la prova P2 qui sotto misura la
+1.8.3, non la versione del banco.
 
 ## Thread e percorso dell'audio
 
@@ -33,8 +34,8 @@ whisper.cpp 1.9.5; la prova P2 qui sotto misura la 1.8.3 inclusa nel crate.
    guarda tutti; una frase chiusa (0,5 s di silenzio, o 20 s di durata) si decodifica subito e si accoda al testo
    da rivedere; la frase aperta si ridecodifica a ogni passo della griglia da 0,5 s, un solo parziale sull'audio più
    recente.
-5. Il thread pubblica in un `Mutex` lo stato e il testo stabile; la vista lo legge a ogni ridisegno e ridisegna solo
-   quando il testo stabile cambia.
+5. Il thread pubblica in un `Mutex` lo stato, il testo confermato e il provvisorio; la vista li legge a ogni
+   ridisegno e ridisegna solo quando cambiano.
 6. «Termina e trascrivi» manda `Stop`: la cattura si ferma, l'ultima frase diventa definitiva, lo stato passa a
    Review con il testo definitivo. Scarta o chiusura mandano `Cancel`: audio e testo si azzerano.
 
@@ -45,11 +46,19 @@ Il rilevatore di whisper.cpp riparte da zero a ogni chiamata: gli si ripassa 1 s
 
 ## Testo mentre si parla
 
-Le parole dei parziali cambiano circa 400 volte ogni 100 parole finali. A schermo va solo il prefisso che due parziali
-consecutivi confermano (accordo locale): le parole si confrontano senza maiuscole e punteggiatura, il prefisso
-mostrato non arretra, il definitivo lo sostituisce alla chiusura della frase. Il testo è in grigio, fuori da ogni
-campo di testo, non modificabile e non trasferibile: `transcript()` restituisce testo solo in Review, come prima.
-La fine della trascrizione non apre il compositore e non scrive nulla.
+Le parole dei parziali cambiano circa 400 volte ogni 100 parole finali. Si mostrano due inchiostri, nessuno dei due
+modificabile o trasferibile, fuori da ogni campo di testo:
+
+- **testo provvisorio**: l'ultimo parziale oltre il prefisso confermato, mostrato subito, a matita (il token
+  `pencil`, lo stesso inchiostro della «Proposta»: un tono più chiaro nei due registri);
+- **testo confermato**: le frasi definitive e il prefisso che due parziali consecutivi concordano, nel grigio della
+  vista (`secondary`). Le parole si confrontano senza maiuscole e punteggiatura; il confermato non torna mai
+  indietro, un parziale successivo non lo cambia.
+
+Alla chiusura della frase il provvisorio sparisce e il definitivo entra nel testo da rivedere. `transcript()`
+restituisce testo solo in Review, come prima: il provvisorio non è mai trasferibile e in Review entra solo come
+parte del definitivo della sua frase. La fine della trascrizione non apre il compositore e non scrive nulla.
+Nessuna stringa nuova: il colore distingue i due inchiostri, il testo stesso è l'etichetta.
 
 ## Vocabolario
 
@@ -69,7 +78,7 @@ Gli stati restano quelli di oggi. Cambiano solo i messaggi diventati falsi con w
 |---|---|
 | Disclosure | invariato: «L'audio viene trascritto sul Mac…» |
 | Preparing | «Verifica del permesso microfono e del modello vocale locale…» |
-| Recording | invariato, più il testo stabile in grigio |
+| Recording | invariato, più il testo provvisorio a matita e quello confermato in grigio |
 | Unavailable, modello alterato | «Il modello vocale locale è incompleto o diverso da quello atteso. Reinstallalo avviando MediFlow GPUI con --installa-modello-voce.» |
 | Unavailable, motore o cattura interrotti | «La dettatura locale si è interrotta e il testo non è stato conservato. Apri una nuova dettatura.» |
 | Unavailable, motore Apple senza modello | messaggio di oggi più l'indicazione di installare il modello vocale locale |
@@ -92,7 +101,7 @@ Gli hash coincidono con l'oid LFS di Hugging Face e con `motori/INVENTARIO.md` d
 - **Installazione** solo con il comando esplicito `mediflow-gpui-patient-pilot --installa-modello-voce`: `curl` di
   sistema, solo HTTPS, URL fissati; ogni file si scarica in `NOME.parziale`, si verifica e solo allora si rinomina;
   se l'hash non coincide il file si cancella. In questa fetta non c'è la pagina «Impostazioni, Voce locale» con il
-  pulsante: il comando la sostituisce finché Leonardo non sceglie dove metterla.
+  pulsante: arriverà in una fetta successiva (scelta di Leonardo), e fino ad allora vale il comando.
 - Nessun file di modello nel repository o nel pacchetto. Il rilevatore Silero (885 kB) si installa con il modello;
   le prove in CI usano un rilevatore finto.
 
@@ -139,18 +148,19 @@ authors), whisper-rs 0.16.0 (Unlicense), pesi whisper large-v3-turbo (MIT, OpenA
 whisper.cpp, Silero VAD (MIT, Silero Team) con conversione ggml. I testi di licenza dei crate (whisper.cpp incluso,
 dentro `whisper-rs-sys`) li raccoglie già `bundle_macos.py`: verificato su 470 pacchetti per `aarch64-apple-darwin`.
 
-## Domande per Leonardo
+## Scelte fatte
 
-0. **Primo testo stabile.** Con la regola di oggi compare in mediana dopo 2,3 s. Tre strade: (a) accettare il
-   ritardo, il testo comunque non lampeggia; (b) mostrare subito il primo parziale in un grigio più chiaro e
-   fissarlo quando due parziali concordano; (c) accordo fra il parziale nuovo e uno qualsiasi dei due precedenti
-   (più rapido, un po' meno stabile). Proposta: (b), da misurare con la tua voce nella seconda seduta.
+- **Testo mentre si parla** (domanda 0 della prima versione): provvisorio a matita subito, confermato in grigio
+  quando due parziali concordano. Scelta di Leonardo del 10 novembre; da giudicare con la sua voce nella seconda
+  seduta.
+- **Installazione del modello** (domanda 2): pulsante in «Impostazioni, Voce locale», come per il catalogo AIFA, in
+  una fetta successiva. In questa PR resta il comando esplicito `--installa-modello-voce`.
+
+## Domande per Leonardo
 
 1. **Due motori o uno.** Proposta: tenere il motore Apple solo come ripiego per chi non installa il modello, per
    una release, e toglierlo nella 0.9.2 se la seconda seduta con la tua voce conferma whisper. Toglierlo subito
    semplifica il ponte Swift (meno 600 righe condivise col client Apple) ma lascia senza voce chi non scarica 0,58 GB.
-2. **Dove si installa il modello.** Pulsante in «Impostazioni, Voce locale» come per il catalogo AIFA (ADR 0125),
-   oppure modello dentro il pacchetto firmato (0,58 GB in più per tutti). Proposta: il pulsante.
-3. **Aiuto sui farmaci in Review** descritto sopra: lo vuoi nella prossima fetta?
-4. **Tetto del testo.** `reviewed_text` accetta 12.000 caratteri: per una dettatura bastano, per l'ascolto
+2. **Aiuto sui farmaci in Review** descritto sopra: lo vuoi nella prossima fetta?
+3. **Tetto del testo.** `reviewed_text` accetta 12.000 caratteri: per una dettatura bastano, per l'ascolto
    ambientale di una visita intera no. Consegna a pezzi o tetto più alto?
