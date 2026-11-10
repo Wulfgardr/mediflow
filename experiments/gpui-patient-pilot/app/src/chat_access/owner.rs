@@ -480,7 +480,12 @@ impl Request {
     }
 
     fn current(&self, now: Instant) -> bool {
-        now.duration_since(self.created) < VIEW_IDLE
+        let awaiting_therapy = self.state == State::Consuming
+            && self
+                .therapy
+                .as_ref()
+                .is_some_and(|therapy| !therapy.is_booking());
+        (awaiting_therapy || now.duration_since(self.created) < VIEW_IDLE)
             && !native::screen_locked()
             && native::lock_epoch() == self.lock_epoch
             && self.peer.current(&self.stream)
@@ -2335,6 +2340,11 @@ pub(crate) mod tests {
             let references = pending.lock().unwrap().references.clone();
             let (_, _, attempt) = pending.lock().unwrap().begin().unwrap();
             host.therapy_fault.store(failure, Ordering::Release);
+            if failure == 5 {
+                pending.lock().unwrap().created =
+                    Instant::now() - VIEW_IDLE + Duration::from_secs(1);
+                assert_eq!(pending.lock().unwrap().status(), State::Approving);
+            }
             assert!(!execute_therapy(&pending, attempt, "2468"));
             let unknown = json!({"commandId":id,"outcome":"unknown"});
             assert_eq!(pending.lock().unwrap().safe_result().unwrap(), unknown);
