@@ -941,3 +941,21 @@ Confronto su 46dfd4274f2740930d5f266e13ec3a05348f20ad, poi sull'unione con main 
 CAS o audit delle terapie, e nessun codice delle terapie legge il testo degli
 errori di creazione. Aggiornate a mano l'impronta di `lib/db.ts` e `syncCommit`.
 Modello, configurazione, invarianti, limiti e mutanti TLC restano identici.
+
+## Raccordo del 10 novembre 2026: copy del collegamento clinico (PR #922)
+
+`components/therapy-manager.tsx` perde soltanto il paragrafo di testo sotto
+«Collegamento clinico» nel modulo della terapia («Indicazione: prevenzione.»,
+«La diagnosi selezionata viene mantenuta come contesto della terapia.»,
+«Opzionale: collega una diagnosi…»). La condizione su `selectedDiagnosis`
+sceglieva soltanto quale frase mostrare: nessuno stato, gestore, scrittura o
+lettura dipendeva da quel paragrafo. Confronto con `syncCommit`
+09642085a7c6efd9863a9b980a4e174116d86036, la cui impronta coincideva con il
+file di `origin/main` 35fea6183: nessuna modifica a transizioni, guardie,
+await, CAS, ledger, audit o ricevute delle terapie.
+
+È aggiornato il solo digest di `components/therapy-manager.tsx`; `syncCommit`
+resta invariato perché nessuna sorgente della terapia cambia comportamento.
+Modello, statechart, invarianti, limiti, testimoni e mutanti restano invariati;
+il comando completo `npm run verify:therapy-status` è rieseguito sul manifest
+aggiornato.

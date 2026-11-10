@@ -6,23 +6,51 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 const repository = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-function sourceFixture(t) {
+function sourceFixture(t, dist = '.next') {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-build-input-')));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const put = (name, value) => { const file = path.join(root, name); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, value); return file; };
   for (const name of ['source-runtime.mjs', 'windows-runtime-job-deadlines.mjs', 'node-runtime-contract.mjs', 'generate-runtime-payload-ledger.mjs',
-    'launch-bundled-headless-supervisor.mjs', 'build-input-metadata.mjs']) {
+    'launch-bundled-headless-supervisor.mjs', 'build-input-metadata.mjs', 'standalone-ssr-chunks.mjs']) {
     const source = path.join(repository, 'scripts', name);
     if (fs.existsSync(source)) put(`scripts/${name}`, fs.readFileSync(source));
   }
   put('package.json', '{"name":"synthetic-build-input","engines":{"node":">=24 <25"}}\n');
-  put('.nvmrc', '24\n'); put('.gitignore', 'node_modules/\n.next/\nnested/\n');
+  put('.nvmrc', '24\n'); put('.gitignore', 'node_modules/\n.next/\n.next-e2e/\nnested/\n');
   const marker = path.join(root, 'compiler-started');
   put('node_modules/next/dist/bin/next', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'compiler started');\n`);
   for (const args of [['init', '--initial-branch=main'], ['add', '.'], ['-c', 'user.name=Synthetic', '-c', 'user.email=synthetic@example.invalid', 'commit', '-m', 'synthetic build fixture']]) {
     const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' }); assert.equal(result.status, 0, result.stderr);
   }
-  return { root, put, marker, run: () => spawnSync(process.execPath, [path.join(root, 'scripts/source-runtime.mjs'), 'build', '--webpack'], { cwd: root, encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '' } }) };
+  return { root, put, marker, run: () => spawnSync(process.execPath, [path.join(root, 'scripts/source-runtime.mjs'), 'build', '--webpack'], { cwd: root, encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '', MEDIFLOW_NEXT_DIST_DIR: dist } }) };
+}
+
+for (const dist of ['.next', '.next-e2e']) {
+  test(`source build packages generated SSR chunks before stamping identity in ${dist}`, t => {
+    const f = sourceFixture(t, dist);
+    const chunk = 'server/chunks/ssr/nested/app-page.js';
+    const content = 'module.exports = "synthetic generated SSR chunk";\n';
+    // The compiler emits an untraced SSR chunk. No source map or unrelated
+    // intermediate file belongs in the final runtime.
+    f.put('node_modules/next/dist/bin/next', `
+      const fs = require('node:fs'), path = require('node:path');
+      const dist = process.env.MEDIFLOW_NEXT_DIST_DIR;
+      const put = (name, data) => { fs.mkdirSync(path.dirname(name), { recursive: true }); fs.writeFileSync(name, data); };
+      put(path.join(dist, ${JSON.stringify(chunk)}), ${JSON.stringify(content)});
+      put(path.join(dist, ${JSON.stringify(chunk + '.map')}), 'synthetic source map');
+      put(path.join(dist, 'unrelated.txt'), 'synthetic intermediate');
+      put(path.join(dist, 'standalone', dist, 'BUILD_ID'), 'synthetic-build-id');
+    `);
+    const result = f.run();
+    assert.equal(result.status, 0, result.stderr);
+    const web = path.join(f.root, dist, 'standalone');
+    const packaged = path.join(web, dist, chunk);
+    assert.equal(fs.existsSync(packaged), true, 'generated SSR chunk must reach the runtime through the build entry');
+    assert.equal(fs.readFileSync(packaged, 'utf8'), content);
+    assert.equal(fs.existsSync(packaged + '.map'), false);
+    assert.equal(fs.existsSync(path.join(web, dist, 'unrelated.txt')), false);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(web, 'mediflow-build-identity.json'))).buildId, 'synthetic-build-id');
+  });
 }
 for (const [profile, name] of [['source', 'nested/archive.sqlite3-wal'], ['dependencies', 'node_modules/synthetic/archive.DB-SHM'], ['payload', '.next/standalone/nested/archive.db-journal']]) {
   test(`${profile} protected input prevents the real source build entry from spawning its compiler`, t => {
