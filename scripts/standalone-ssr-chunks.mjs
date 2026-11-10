@@ -1,6 +1,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// Run only at the build boundary, after input metadata admission and Next's
+// compiler. Generated chunks omitted by route tracing still belong to this
+// build; source maps and other intermediate files do not belong in the runtime.
+export function copyStandaloneSsrChunks(buildDirectory, packagedBuildDirectory) {
+  const source = path.join(buildDirectory, 'server', 'chunks', 'ssr');
+  if (!fs.existsSync(source)) return; // Webpack does not use this directory.
+  const target = path.join(packagedBuildDirectory, 'server', 'chunks', 'ssr');
+  for (const relative of fs.readdirSync(source, { recursive: true })) {
+    if (!relative.endsWith('.js')) continue;
+    const original = path.join(source, relative);
+    if (!fs.statSync(original).isFile()) continue;
+    const packaged = path.join(target, relative);
+    fs.mkdirSync(path.dirname(packaged), { recursive: true });
+    fs.copyFileSync(original, packaged);
+  }
+}
+
 // Turbopack's route traces can omit a generated SSR chunk. Check the packaged
 // closure against the build output before accepting a standalone distribution.
 export function assertStandaloneSsrChunks(buildDirectory, packagedBuildDirectory) {

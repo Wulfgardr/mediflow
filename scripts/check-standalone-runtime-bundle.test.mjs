@@ -5,7 +5,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { assertStandaloneSsrChunks } from './standalone-ssr-chunks.mjs';
+import { assertStandaloneSsrChunks, copyStandaloneSsrChunks } from './standalone-ssr-chunks.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const checker = path.join(root, 'scripts', 'check-standalone-runtime-bundle.mjs');
@@ -23,15 +23,18 @@ test('standalone rejects a missing or altered generated SSR chunk, including the
     const relative = path.join('server', 'chunks', 'ssr', 'nested', 'app-page.js');
     const source = path.join(build, relative), target = path.join(packaged, relative);
     // Webpack has no SSR directory; a complete generated closure is accepted.
+    assert.doesNotThrow(() => copyStandaloneSsrChunks(build, packaged));
     assert.doesNotThrow(() => assertStandaloneSsrChunks(build, packaged));
     fs.mkdirSync(path.dirname(source), { recursive: true });
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(source, 'module.exports = "synthetic SSR chunk";\n');
     assert.throws(() => assertStandaloneSsrChunks(build, packaged), /Standalone SSR chunk missing/);
-    fs.copyFileSync(source, target);
+    copyStandaloneSsrChunks(build, packaged);
     assert.doesNotThrow(() => assertStandaloneSsrChunks(build, packaged));
     fs.writeFileSync(target, 'module.exports = "stale chunk";\n');
     assert.throws(() => assertStandaloneSsrChunks(build, packaged), /Standalone SSR chunk differs/);
+    copyStandaloneSsrChunks(build, packaged);
+    assert.doesNotThrow(() => assertStandaloneSsrChunks(build, packaged));
   }
 });
 
