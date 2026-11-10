@@ -93,6 +93,13 @@ impl ClinicalApp {
     /// Primo passo: verifica che la funzione sia accesa sull'host e raccoglie le fonti
     /// da mostrare. Nessun dato lascia GPUI qui.
     pub(super) fn import_prepare(&mut self, cx: &mut Context<Self>) {
+        // Durante l'ammissione della chat nessun clic prepara la richiesta.
+        if !self.patient.smart_import.chat_ready() {
+            #[cfg(unix)]
+            self.patient.smart_import.follow_chat();
+            cx.notify();
+            return;
+        }
         if self.patient.smart_import.phase.is_busy() {
             return;
         }
@@ -314,6 +321,38 @@ impl ClinicalApp {
         }
     }
 
+    /// La scheda non ha note, voci di diario o sintesi di documenti da inviare.
+    fn import_sources_missing(&self) -> bool {
+        let (Some(Ok(capture)), Some(patient)) =
+            (self.import_capture_now(), self.patient.detail.ready())
+        else {
+            return false;
+        };
+        match SmartImportRequest::new(patient, self.scope.as_deref(), capture) {
+            Ok(mut request) => {
+                request.wipe();
+                false
+            }
+            Err(error) => matches!(error, RuntimeError::Missing),
+        }
+    }
+
+    /// Il passo che la chat lascia al medico, in cima ai documenti.
+    pub(super) fn import_chat_notice(&self) -> Option<&'static str> {
+        #[cfg(unix)]
+        if self.patient.smart_import.chat.0.is_some()
+            && self.patient.smart_import.chat_ready()
+            && matches!(self.patient.smart_import.phase, ImportPhase::Idle)
+        {
+            return Some(if self.import_sources_missing() {
+                "Nessuna nota, voce di diario o sintesi di documento da cui proporre. Aggiungine una oppure revoca la richiesta dalla chat."
+            } else {
+                "Prepara la richiesta nell’import assistito."
+            });
+        }
+        None
+    }
+
     pub(super) fn smart_import_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let mut pane = div()
@@ -337,6 +376,14 @@ impl ClinicalApp {
             button("smart-import-prepare", label, theme, primary, true)
                 .on_click(cx.listener(|this, _, _, cx| this.import_prepare(cx)))
         };
+        if !self.patient.smart_import.chat_ready() {
+            return pane.child(notice(
+                "smart-import-chat-admission",
+                "Verifica dell’import assistito…",
+                theme,
+                false,
+            ));
+        }
         if self.local_host.access().is_none()
             && matches!(self.patient.smart_import.phase, ImportPhase::Idle)
         {
@@ -351,7 +398,9 @@ impl ClinicalApp {
             ImportPhase::Idle => {
                 pane = pane
                     .child(muted("Propone diagnosi, terapie e prestazioni trovate nelle note, nel diario e nelle sintesi dei documenti.".into()))
-                    .child(prepare("Prepara la richiesta", true));
+                    .when(!self.import_chat_empty(), |el| {
+                        el.child(prepare("Prepara la richiesta", true))
+                    });
             }
             ImportPhase::Checking => {
                 pane = pane.child(notice(
@@ -444,6 +493,16 @@ impl ClinicalApp {
             }
         }
         pane
+    }
+
+    /// Aperto dalla chat su una scheda senza fonti: resta aperto senza un invio
+    /// che non avrebbe nulla da mandare.
+    fn import_chat_empty(&self) -> bool {
+        #[cfg(unix)]
+        if self.patient.smart_import.chat.0.is_some() {
+            return self.import_sources_missing();
+        }
+        false
     }
 
     fn import_proposal_block(

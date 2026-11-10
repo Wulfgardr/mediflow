@@ -236,24 +236,14 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                 pending = Some(request);
                 State::Requested
             }
-            Ok(value) if pending.is_none() && is_insight_command(&value) => {
+            Ok(value) if pending.is_none() && generative_function(&value).is_some() => {
                 let Ok(copy) = stream.try_clone() else {
                     break;
                 };
-                let Some(request) = Request::for_insight(peer, copy) else {
+                let Some(function) = generative_function(&value) else {
                     break;
                 };
-                if incoming.try_send(request.clone()).is_err() {
-                    break;
-                }
-                pending = Some(request);
-                State::Requested
-            }
-            Ok(value) if pending.is_none() && is_synthesis_command(&value) => {
-                let Ok(copy) = stream.try_clone() else {
-                    break;
-                };
-                let Some(request) = Request::for_synthesis(peer, copy) else {
+                let Some(request) = Request::for_function(peer, copy, function) else {
                     break;
                 };
                 if incoming.try_send(request.clone()).is_err() {
@@ -379,14 +369,29 @@ pub(crate) fn reply(status: State, pending: Option<&Pending>, payload: Option<St
     }
 }
 
-/// Il comando del Quadro paziente non porta argomenti: la chat non sceglie paziente,
-/// ambulatorio, fonti o modello. Ogni altro campo chiude la connessione.
-fn is_insight_command(value: &Value) -> bool {
-    *value == json!({"command": "patient-insight"})
+/// I comandi delle funzioni generative non portano argomenti: la chat non sceglie
+/// paziente, ambulatorio, documento, fonti o modello. Ogni altro campo chiude la
+/// connessione.
+fn generative_function(value: &Value) -> Option<owner::Function> {
+    use owner::Function;
+    [
+        (Function::Insight, "patient-insight"),
+        (Function::Synthesis, "document-synthesis"),
+        (Function::Import, "smart-import"),
+    ]
+    .into_iter()
+    .find(|(_, command)| *value == json!({ "command": command }))
+    .map(|(function, _)| function)
 }
 
+#[cfg(test)]
+fn is_insight_command(value: &Value) -> bool {
+    generative_function(value) == Some(owner::Function::Insight)
+}
+
+#[cfg(test)]
 fn is_synthesis_command(value: &Value) -> bool {
-    *value == json!({"command": "document-synthesis"})
+    generative_function(value) == Some(owner::Function::Synthesis)
 }
 
 pub(crate) fn install_lock_observer() {

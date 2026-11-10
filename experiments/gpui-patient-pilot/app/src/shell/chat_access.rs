@@ -1,3 +1,4 @@
+use super::generation::ChatArea;
 use super::*;
 use crate::chat_access::references::{CommandReferences, ReferenceScan};
 use crate::chat_access::{
@@ -199,13 +200,22 @@ fn catalog_copy(prosthetics: bool) -> (&'static str, &'static str) {
 }
 
 impl ClinicalApp {
+    /// L'area della funzione generativa che la chat chiede: ogni funzione ha la sua,
+    /// con il suo legame.
+    fn chat_area(&mut self, function: Function) -> &mut dyn ChatArea {
+        match function {
+            Function::Insight => &mut self.patient.insight,
+            Function::Synthesis => &mut self.patient.synthesis.area,
+            Function::Import => &mut self.patient.smart_import,
+        }
+    }
+
     pub(super) fn open_chat_function(
         &mut self,
         pending: &Pending,
         function: Function,
         cx: &mut Context<Self>,
     ) {
-        use super::generation::GenerationPhase;
         let binding = self
             .session
             .as_ref()
@@ -246,10 +256,7 @@ impl ClinicalApp {
             cx.notify();
             return;
         }
-        let occupied = match function {
-            Function::Insight => self.patient.insight.occupied(),
-            Function::Synthesis => self.patient.synthesis.area.occupied(),
-        };
+        let occupied = self.chat_area(function).occupied();
         let access = self.local_host.access();
         let early = if occupied {
             Some(Stage::Busy)
@@ -265,18 +272,7 @@ impl ClinicalApp {
             cx.notify();
             return;
         }
-        let ticket = match function {
-            Function::Insight => {
-                self.patient.insight.end(GenerationPhase::Checking);
-                self.patient.insight.chat.0 = Some(pending.clone());
-                self.patient.insight.ticket.clone()
-            }
-            Function::Synthesis => {
-                self.patient.synthesis.area.end(GenerationPhase::Checking);
-                self.patient.synthesis.area.chat.0 = Some(pending.clone());
-                self.patient.synthesis.area.ticket.clone()
-            }
-        };
+        let ticket = self.chat_area(function).hold(pending.clone());
         let admitting = pending.clone();
         let target = pending.clone();
         self.run(
@@ -284,37 +280,17 @@ impl ClinicalApp {
                 if !chat_access::owner::admit_function(&admitting) {
                     return Ok(None);
                 }
-                let enabled = function == Function::Insight
-                    || access
-                        .unwrap()
-                        .document_synthesis_enabled()
-                        .unwrap_or(false);
+                let access = access.unwrap();
+                let enabled = match function {
+                    Function::Insight => true,
+                    Function::Synthesis => access.document_synthesis_enabled().unwrap_or(false),
+                    Function::Import => access.smart_import_enabled().unwrap_or(false),
+                };
                 Ok(Some(enabled))
             },
             move |this, admitted, cx| {
-                let current = match function {
-                    Function::Insight => {
-                        this.patient.insight.holds(&ticket)
-                            && this
-                                .patient
-                                .insight
-                                .chat
-                                .0
-                                .as_ref()
-                                .is_some_and(|chat| std::sync::Arc::ptr_eq(chat, &target))
-                    }
-                    Function::Synthesis => {
-                        this.patient.synthesis.area.holds(&ticket)
-                            && this
-                                .patient
-                                .synthesis
-                                .area
-                                .chat
-                                .0
-                                .as_ref()
-                                .is_some_and(|chat| std::sync::Arc::ptr_eq(chat, &target))
-                    }
-                } && this.selected_id.as_deref() == Some(patient_id.as_str());
+                let current = this.chat_area(function).holds_chat(&ticket, &target)
+                    && this.selected_id.as_deref() == Some(patient_id.as_str());
                 if !current
                     || !target
                         .lock()
@@ -325,14 +301,7 @@ impl ClinicalApp {
                         pending.withdraw();
                     }
                     if current {
-                        match function {
-                            Function::Insight => {
-                                this.patient.insight.follow_chat();
-                            }
-                            Function::Synthesis => {
-                                this.patient.synthesis.area.follow_chat();
-                            }
-                        }
+                        this.chat_area(function).follow_chat();
                     }
                     cx.notify();
                     return;
@@ -341,22 +310,22 @@ impl ClinicalApp {
                     if let Ok(mut pending) = target.lock() {
                         pending.finish_function_open(Stage::Unavailable);
                     }
-                    this.patient.synthesis.area.chat.0 = None;
-                    this.patient.synthesis.area.end(GenerationPhase::Idle);
+                    this.chat_area(function).release();
                     cx.notify();
                     return;
                 }
+                this.chat_area(function).admitted();
                 match function {
                     Function::Insight => {
-                        this.patient.insight.end(GenerationPhase::Idle);
                         if this.patient_section != PatientSection::Overview {
                             this.section_selected(PatientSection::Overview, cx);
                         }
                         this.insight_prepare(cx);
                     }
-                    Function::Synthesis => {
-                        this.patient.synthesis.document = None;
-                        this.patient.synthesis.area.end(GenerationPhase::Idle);
+                    Function::Synthesis | Function::Import => {
+                        if function == Function::Synthesis {
+                            this.patient.synthesis.document = None;
+                        }
                         if this.patient_section != PatientSection::Documents {
                             this.section_selected(PatientSection::Documents, cx);
                         }
@@ -393,9 +362,11 @@ impl ClinicalApp {
 
     fn poll_chat_access(&mut self, cx: &mut Context<Self>) {
         self.poll_chat_voice(cx);
-        let insight_changed = self.patient.insight.follow_chat();
-        let synthesis_changed = self.patient.synthesis.area.follow_chat();
-        if insight_changed || synthesis_changed {
+        let mut changed = false;
+        for function in Function::ALL {
+            changed |= self.chat_area(function).follow_chat();
+        }
+        if changed {
             cx.notify();
         }
         if self.chat_access.pending.is_some()
@@ -443,7 +414,7 @@ impl ClinicalApp {
                 }
                 return;
             }
-            for function in [Function::Insight, Function::Synthesis] {
+            for function in Function::ALL {
                 if pending
                     .lock()
                     .is_ok_and(|mut p| p.function_requested(function))
