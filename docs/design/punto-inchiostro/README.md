@@ -14,7 +14,7 @@ sceglie file, strutture e ordine; non deve ridecidere il disegno.
 
 Stato: **direzione recepita nel contratto e nelle superfici del prodotto.**
 La direzione scelta il 9 ottobre 2026 è anticipata su richiesta del
-14 ottobre; [ADR 0144](../../adr/0144-punto-inchiostro.md) aggiorna ADR 0078.
+14 ottobre; [ADR 0186](../../adr/0186-punto-inchiostro.md) aggiorna ADR 0078.
 Il banco resta un riferimento: conferme atomiche, rilettura delle scritture
 e capacità di ascolto seguono i rispettivi contratti, non una simulazione
 visiva. La qualificazione clinica della 0.9.0 resta separata.
