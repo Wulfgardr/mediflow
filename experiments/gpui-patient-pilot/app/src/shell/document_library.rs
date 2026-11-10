@@ -113,6 +113,7 @@ impl ClinicalApp {
                 .child(button("clinical-workspace-new-document", "Aggiungi documenti…", theme, true, writable && !self.document_imports.pending())
                     .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))))
             .child(self.dossier_import_view(cx))
+            .child(self.smart_import_view(cx))
             .child(self.document_imports_view(cx))
             .child(self.document_curation_view(cx))
             .child(div().text_color(theme.secondary).child(text!("Prima del salvataggio puoi annullare la copia cambiando scheda o bloccando la sessione. Una copia già avviata può completarsi anche dopo il blocco.")))

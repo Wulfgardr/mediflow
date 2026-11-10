@@ -31,6 +31,7 @@ mod patient_insight;
 pub(crate) mod rendered_command;
 mod scales;
 mod settings;
+mod smart_import;
 mod therapy_picker;
 mod threshold_actions;
 mod view_state;
@@ -373,6 +374,7 @@ struct PatientData {
     dossier: dossier_import::DossierArea,
     insight: patient_insight::PatientInsightArea,
     synthesis: document_synthesis::DocumentSynthesisArea,
+    smart_import: smart_import::SmartImportArea,
     document_details_id: Option<String>,
     document_original: Option<document_details::DocumentOriginal>,
 }
@@ -389,6 +391,7 @@ impl Default for PatientData {
             dossier: dossier_import::DossierArea::default(),
             insight: patient_insight::PatientInsightArea::default(),
             synthesis: document_synthesis::DocumentSynthesisArea::default(),
+            smart_import: smart_import::SmartImportArea::default(),
             document_details_id: None,
             document_original: None,
         }
@@ -919,6 +922,7 @@ impl ClinicalApp {
         self.patient.dossier = dossier_import::DossierArea::default();
         self.interrupt_insight();
         self.interrupt_synthesis();
+        self.interrupt_smart_import();
         if matches!(self.ambulatories, Load::Loading) {
             self.ambulatories = Load::Idle;
         }
