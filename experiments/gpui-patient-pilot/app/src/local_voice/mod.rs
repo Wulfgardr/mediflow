@@ -1,5 +1,21 @@
 use zeroize::Zeroizing;
 
+#[cfg(target_os = "macos")]
+pub(crate) mod listening;
+#[cfg(target_os = "macos")]
+pub(crate) mod model;
+#[cfg(target_os = "macos")]
+pub(crate) mod whisper;
+
+#[cfg(target_os = "macos")]
+const MODEL_INVALID: &str = "Il modello vocale locale è incompleto o diverso da quello atteso. Reinstallalo avviando MediFlow GPUI con --installa-modello-voce.";
+#[cfg(target_os = "macos")]
+const ENGINE_FAILED: &str = "La dettatura locale si è interrotta e il testo non è stato conservato. Apri una nuova dettatura.";
+#[cfg(target_os = "macos")]
+const WHISPER_PREPARING: &str = "Verifica del permesso microfono e del modello vocale locale…";
+#[cfg(target_os = "macos")]
+const APPLE_UNAVAILABLE_WITH_MODEL_HINT: &str = "Trascrizione Apple locale non disponibile. Servono macOS 26 o successivo e le risorse italiane già installate, oppure il modello vocale locale: avvia MediFlow GPUI con --installa-modello-voce. Non viene usato alcun servizio remoto.";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum State {
     Disclosure,
@@ -46,11 +62,38 @@ impl State {
     }
 }
 
+/// Testo mentre si parla, in due inchiostri: confermato (frasi definitive e
+/// prefisso confermato) e provvisorio (l'ultimo parziale oltre quel prefisso).
+/// Nessuno dei due è modificabile o trasferibile.
+pub(crate) struct LiveText {
+    pub(crate) confirmed: Zeroizing<String>,
+    pub(crate) provisional: Zeroizing<String>,
+}
+impl LiveText {
+    /// Testo intero e intervallo in byte del provvisorio.
+    pub(crate) fn joined(&self) -> (Zeroizing<String>, std::ops::Range<usize>) {
+        let mut text = Zeroizing::new(self.confirmed.as_str().to_owned());
+        if !text.is_empty() && !self.provisional.is_empty() {
+            text.push(' ');
+        }
+        let start = text.len();
+        text.push_str(&self.provisional);
+        let end = text.len();
+        (text, start..end)
+    }
+}
+
 pub(crate) struct Session {
     #[cfg(test)]
     synthetic: Option<(State, Zeroizing<String>)>,
+    /// Per le prove: testo dal vivo (confermato, provvisorio) deciso dal test.
+    #[cfg(test)]
+    synthetic_live: Option<std::sync::Arc<std::sync::Mutex<(String, String)>>>,
     #[cfg(local_voice_apple)]
     pointer: *mut std::ffi::c_void,
+    /// Motore whisper: si usa solo se il modello è installato.
+    #[cfg(target_os = "macos")]
+    whisper: Option<whisper::WhisperSession>,
 }
 #[cfg(local_voice_apple)]
 unsafe extern "C" {
@@ -61,38 +104,152 @@ unsafe extern "C" {
     fn MFVoiceRelease(pointer: *mut std::ffi::c_void);
 }
 impl Session {
-    pub(crate) fn new() -> Self {
+    /// `prompt`: nomi dei farmaci del paziente aperto, solo per il motore whisper.
+    pub(crate) fn new(prompt: Zeroizing<String>) -> Self {
+        #[cfg(local_voice_apple)]
+        if let Some(whisper) = Self::whisper(prompt) {
+            return Self {
+                #[cfg(test)]
+                synthetic: None,
+                #[cfg(test)]
+                synthetic_live: None,
+                pointer: std::ptr::null_mut(),
+                whisper: Some(whisper),
+            };
+        }
+        #[cfg(not(local_voice_apple))]
+        drop(prompt);
         Self {
             #[cfg(test)]
             synthetic: None,
+            #[cfg(test)]
+            synthetic_live: None,
             #[cfg(local_voice_apple)]
             pointer: unsafe { MFVoiceCreate() },
+            #[cfg(target_os = "macos")]
+            whisper: None,
         }
+    }
+    /// Se nella cartella dei modelli c'è un file del modello whisper si usa
+    /// whisper (e un file alterato rende la voce non disponibile); se la
+    /// cartella è vuota resta il motore Apple.
+    #[cfg(local_voice_apple)]
+    fn whisper(prompt: Zeroizing<String>) -> Option<whisper::WhisperSession> {
+        let directory = model::directory()?;
+        if model::quick_status(&directory, &model::FILES) == model::ModelStatus::Missing {
+            return None;
+        }
+        let capture = whisper::swift::SwiftCapture::new()?;
+        Some(whisper::WhisperSession::new(
+            whisper::Engine {
+                directory,
+                files: model::FILES,
+                prompt,
+            },
+            Box::new(capture),
+        ))
     }
     #[cfg(all(test, target_os = "macos"))]
     pub(crate) fn synthetic(state: State, text: &str) -> Self {
         Self {
             synthetic: Some((state, Zeroizing::new(text.to_owned()))),
+            synthetic_live: None,
             #[cfg(local_voice_apple)]
             pointer: std::ptr::null_mut(),
+            whisper: None,
+        }
+    }
+    #[cfg(all(test, target_os = "macos"))]
+    pub(crate) fn with_whisper(session: whisper::WhisperSession) -> Self {
+        Self {
+            synthetic: None,
+            synthetic_live: None,
+            #[cfg(local_voice_apple)]
+            pointer: std::ptr::null_mut(),
+            whisper: Some(session),
         }
     }
     pub(crate) fn start(&self) {
+        #[cfg(target_os = "macos")]
+        if let Some(whisper) = &self.whisper {
+            whisper.start();
+            return;
+        }
         #[cfg(local_voice_apple)]
         unsafe {
             MFVoiceCommand(self.pointer, 1)
         }
     }
     pub(crate) fn stop(&self) {
+        #[cfg(target_os = "macos")]
+        if let Some(whisper) = &self.whisper {
+            whisper.stop();
+            return;
+        }
         #[cfg(local_voice_apple)]
         unsafe {
             MFVoiceCommand(self.pointer, 2)
         }
     }
+    /// Messaggio dello stato per il motore in uso.
+    pub(crate) fn message(&self, state: State) -> &'static str {
+        #[cfg(target_os = "macos")]
+        match (&self.whisper, state) {
+            (Some(_), State::Preparing) => return WHISPER_PREPARING,
+            (Some(whisper), State::Unavailable) => {
+                return match whisper.problem() {
+                    Some(whisper::Problem::ModelInvalid) => MODEL_INVALID,
+                    _ => ENGINE_FAILED,
+                };
+            }
+            (None, State::Unavailable) => return APPLE_UNAVAILABLE_WITH_MODEL_HINT,
+            _ => {}
+        }
+        state.message()
+    }
+    /// Testo mentre si parla (solo whisper): da mostrare, mai modificabile né
+    /// trasferibile.
+    #[cfg(all(test, target_os = "macos"))]
+    pub(crate) fn synthetic_live(
+        state: State,
+        live: std::sync::Arc<std::sync::Mutex<(String, String)>>,
+    ) -> Self {
+        Self {
+            synthetic: Some((state, Zeroizing::default())),
+            synthetic_live: Some(live),
+            #[cfg(local_voice_apple)]
+            pointer: std::ptr::null_mut(),
+            whisper: None,
+        }
+    }
+    pub(crate) fn live_text(&self) -> Option<LiveText> {
+        #[cfg(test)]
+        if let Some(live) = &self.synthetic_live {
+            let (confirmed, provisional) = live.lock().unwrap().clone();
+            return Some(LiveText {
+                confirmed: Zeroizing::new(confirmed),
+                provisional: Zeroizing::new(provisional),
+            });
+        }
+        #[cfg(target_os = "macos")]
+        if let Some(whisper) = &self.whisper {
+            return matches!(self.state(), State::Recording | State::Finalizing)
+                .then(|| LiveText {
+                    confirmed: whisper.stable_text(),
+                    provisional: whisper.provisional_text(),
+                })
+                .filter(|live| !live.confirmed.is_empty() || !live.provisional.is_empty());
+        }
+        None
+    }
     pub(crate) fn state(&self) -> State {
         #[cfg(test)]
         if let Some((state, _)) = &self.synthetic {
             return *state;
+        }
+        #[cfg(target_os = "macos")]
+        if let Some(whisper) = &self.whisper {
+            return whisper.state();
         }
         #[cfg(local_voice_apple)]
         {
@@ -107,6 +264,12 @@ impl Session {
         #[cfg(test)]
         if let Some((state, text)) = &self.synthetic {
             return reviewed_text(*state, text);
+        }
+        #[cfg(target_os = "macos")]
+        if let Some(whisper) = &self.whisper {
+            return whisper
+                .transcript()
+                .and_then(|text| reviewed_text(whisper.state(), &text));
         }
         #[cfg(local_voice_apple)]
         {

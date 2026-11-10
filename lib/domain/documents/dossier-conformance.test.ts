@@ -28,3 +28,10 @@ test('Web: tutte le dieci falsificazioni sono bloccate dall’identità o dal ve
         assert.ok(accepted.length > 0, `${mutation.name}: controllo non vacuo`);
     }
 });
+
+test('GPUI: il worker incorporato nel client è la build corrente delle sue sorgenti', { skip: process.platform === 'win32' && 'i fine riga della checkout Windows cambiano i byte del bundle' }, async () => {
+    // Il client Rust incorpora questo file con include_str!: se le sorgenti cambiano e il bundle no, GPUI verifica con regole vecchie.
+    const { bundleDossierWorker } = await import('../../../scripts/build-dossier-worker.mjs');
+    const committed = readFileSync('experiments/gpui-patient-pilot/worker/dossier.bundle.mjs', 'utf8');
+    assert.equal(await bundleDossierWorker() === committed, true, 'bundle non allineato: esegui node scripts/build-dossier-worker.mjs');
+});

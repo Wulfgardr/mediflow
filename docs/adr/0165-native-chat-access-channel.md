@@ -175,6 +175,13 @@ microfono, audio persistito o dati reali. Verificano il raccordo e i dinieghi;
 non qualificano la cattura hardware, l'accuratezza del riconoscimento o i due host
 desktop. I claim crittografici e l'autorità del modello restano invariati.
 
+Aggiornamento del 10 novembre 2026 (C-9a): su macOS la dettatura può usare anche
+whisper large-v3-turbo q5_0 con whisper.cpp e il rilevatore Silero, se il modello è
+installato in modo esplicito e il suo SHA-256 coincide; altrimenti resta il motore
+Apple. Il ponte Swift cattura l'audio e lo passa a Rust; stati, Review e trasferimento
+restano quelli descritti sopra. Dettagli e misure:
+[nota di progetto](../analysis/2026-11-10-gpui-voce-whisper-locale.md).
+
 Riferimenti Apple: [SpeechTranscriber](https://developer.apple.com/documentation/speech/speechtranscriber)
 e [SpeechAnalyzer, WWDC25](https://developer.apple.com/videos/play/wwdc2025/277/).
 
