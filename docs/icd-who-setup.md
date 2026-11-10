@@ -374,7 +374,7 @@ La documentazione congelata registra la consultazione del 2026-09-06 delle fonti
 
 ### Gate UI aggiuntivo del candidato
 
-`components/settings/who-local-setup-guide.test.ts` unisce vincoli sui sorgenti e una fixture browser del componente reale con stati sintetici. La fixture è **NOT_RUN** nella consegna di riferimento: richiede l'opt-in esplicito `MEDIFLOW_WHO_UI_ACCEPTANCE=1`, le dipendenze del lockfile e un browser già disponibile. Senza opt-in i test non scaricano né avviano nulla.
+`components/settings/who-local-setup-guide.test.ts` unisce vincoli sui sorgenti e una fixture browser del componente reale con stati sintetici. La fixture gira nella suite unit (`npm run test:unit`, job Web Core) come gli altri test browser dei componenti: richiede le dipendenze del lockfile e Chromium già installato, e in locale parte con la sandbox e la rete limitata al loopback (`e2e/fixtures/secure-browser.ts`). Non scarica nulla.
 Le interazioni verificano comando comune e tre OS, nuovo consenso, clipboard, reset/focus e assenza di richieste/provider o disponibilità inventata; non provano backend o WHO. Il componente reale è montato in StrictMode, con promesse clipboard controllate per osservare completamenti tardivi, cambio passo/host, reset e smontaggio. La fixture parent `lib/reference-data/repertory-guides-ui.test.ts`, aggiornata entro D2, parte dal default Node e richiede poi la scelta esplicita macOS/Windows/Linux, conservando consenso, clipboard, reset, focus e zero richieste. I casi AIFA restano invariati e anche questa fixture browser è **NOT_RUN**. Il cleanup della UI è corretto senza sopprimere il warning; ESLint completo resta un gate parent da rieseguire.
 
 

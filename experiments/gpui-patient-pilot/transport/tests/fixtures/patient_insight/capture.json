@@ -1,0 +1,66 @@
+{
+  "patient": {
+    "id": "pi-gpui-synthetic-0001",
+    "ambulatoryId": "ambulatory-synthetic-01",
+    "version": 3,
+    "diagnoses": [
+      {
+        "code": "I10",
+        "description": "Ipertensione  arteriosa essenziale"
+      },
+      {
+        "description": "Diabete mellito tipo 2"
+      },
+      {
+        "code": "J44.9",
+        "description": "   "
+      },
+      {
+        "code": "E78.5",
+        "description": "Dislipidemia 🩺 in trattamento"
+      }
+    ]
+  },
+  "therapies": [
+    {
+      "drugName": "Ramipril",
+      "dosage": "5 mg una volta al giorno",
+      "status": "active"
+    },
+    {
+      "drugName": "Metformina",
+      "dosage": "",
+      "status": "active"
+    },
+    {
+      "drugName": "Amoxicillina",
+      "dosage": "1 g due volte al giorno",
+      "status": "suspended"
+    },
+    {
+      "drugName": "  ",
+      "dosage": "10 mg",
+      "status": "active"
+    }
+  ],
+  "entries": [
+    {
+      "title": "Visita domiciliare",
+      "content": "<p>Controllo domiciliare: pressione stabile, deambulazione con ausilio, alimentazione regolare. Controllo domiciliare: pressione stabile, deambulazione con ausilio, alimentazione regolare. Controllo domiciliare: pressione stabile, deambulazione con ausilio, alimentazione regolare. Controllo domiciliare: pressione stabile, deambulazione con ausilio, alimentazione regolare. </p>"
+    },
+    {
+      "title": "",
+      "content": "Telefonata con la figlia: nessuna novità."
+    },
+    {
+      "title": "Esami ematici",
+      "content": ""
+    },
+    {
+      "title": "   ",
+      "content": "   "
+    }
+  ],
+  "requestId": "pi_00000000-0000-4000-8000-000000000001",
+  "capturedAt": "2026-11-09T10:00:00.000Z"
+}

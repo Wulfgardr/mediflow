@@ -40,8 +40,8 @@ le tappe 0.9.0–1.0 definite nel
 [registro incrementale Linear](https://linear.app/wulfgardr/document/mediflow-incremental-release-ledger-090-to-10-ee0392f27b72).
 Il [contratto U0 approvato della 0.9.1](./releases/0.9.1-contract.md) registra
 le decisioni di Leonardo del 23 ottobre 2026: W=36, G=10, C/P/I/Q, soglia
-6/6 con al massimo un intervento e GPUI sul solo MacBook Pro M4 Max/36 GB,
-macOS 27.2. L'[emendamento del 30 ottobre 2026](./releases/0.9.1-contract.md#emendamento-del-30-ottobre-2026-athena-e-conservazione)
+6/6 con al massimo un intervento e GPUI sul solo Mac fissato (dal 9 novembre
+2026 MacBook Pro M5 Max/48 GB, macOS 27.3). L'[emendamento del 30 ottobre 2026](./releases/0.9.1-contract.md#emendamento-del-30-ottobre-2026-athena-e-conservazione)
 rinvia ATHENA e Treatment Reasoning oltre la 0.9.1: I-3, I-3b e I-7 escono dai
 requisiti e Treatment Reasoning resta non disponibile su ogni superficie, anche
 con i pesi presenti. Le decisioni ancora aperte sono nominate nel contratto; U0

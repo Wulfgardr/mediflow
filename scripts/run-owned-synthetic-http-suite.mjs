@@ -118,7 +118,7 @@ async function run() {
                             MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_NETWORK_WRITE_DATA_DIR: dataDir,
                             MEDIFLOW_NETWORK_SMOKE_DATA_DIR: dataDir, MEDIFLOW_CONCURRENCY_DATA_DIR: dataDir,
                             MEDIFLOW_API_V1_PUT_NEGATIVE_DATA_DIR: dataDir, MEDIFLOW_LEGACY_CLINICAL_WRITES_DATA_DIR: dataDir,
-                            MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', MEDIFLOW_THERAPY_HTTP_ONLY_PAIRED: '0',
+                            MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', MEDIFLOW_THERAPY_HTTP_ONLY_PAIRED: '0', MF085_SYNTHETIC_E2E: '1',
                             MEDIFLOW_PROVIDER_V2_ENABLED: '0', MEDIFLOW_PROVIDER_V2_NETWORK: '0',
                             TMPDIR: dataDir, E2E_BASE_URL: `http://127.0.0.1:${port}`,
                             MEDIFLOW_LOCAL_API_TOKEN: randomUUID(), E2E_USERNAME: 'admin', E2E_PIN: randomUUID(),
