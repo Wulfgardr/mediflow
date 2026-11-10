@@ -12,6 +12,7 @@ import type { HostLocalProviderReadinessResult } from '../host-local-provider-re
 import type { LocalProviderResolution } from '../registry';
 import type { FabricExecutionPolicy, FabricProvenanceRecord, FabricResolutionReceipt } from './contract';
 import { GENERATIVE_CAPABILITY_DESCRIPTORS } from './generative-catalog';
+import { runLocalGenerationAttempts } from './local-generation-attempts';
 import type { PatientInsightProjection } from './patient-insight-host-boundary';
 import type { routeHostResolvedCandidateCapability, HostResolvedCandidateRoutingInput } from './candidate-router';
 import type { ProviderLifecycleRead } from './provider-lifecycle-service';
@@ -211,25 +212,46 @@ export function createPatientInsightHostCapability(dependencies: Dependencies) {
             let provenance: FabricProvenanceRecord; let prompt: string;
             try { provenance = buildProvenanceRecord(resolution, ['context_minimization', 'envelope_validation']); prompt = sourcePrompt(request.projection); }
             catch { return deny('fabric_denied'); }
-            let response: string;
-            try {
-                const result = await routedBinding.adapter.chat([{ role: 'user', content: prompt }], undefined, 900, { responseFormat: 'patient_insight' });
-                if (typeof result.content !== 'string') throw new Error('invalid'); response = result.content;
-            } catch { return failed('provider_failed', receipt, provenance); }
-            let proposal: PatientInsightReviewProposal;
-            try {
-                validateGenerativeJson('patient_insight', response);
-                const parsed = parsePatientInsightExtractionResponse(response);
-                if (!isEnvelopeUsable(parsed) || !(parsed.value.summary || parsed.value.data.currentState.length
-                    || parsed.value.data.alerts.length || parsed.value.data.nextSteps.length || parsed.value.data.gaps.length)
-                    || !supportedExtraction(parsed.value, 1 + request.projection.activeConditions.length
-                        + request.projection.currentTherapies.length + request.projection.recentClinicalEvents.length)) throw new Error('invalid');
-                proposal = Object.freeze({ schemaVersion: 'mediflow.patient-insight.review-proposal.v2', reviewOnly: true,
-                    summary: parsed.value.summary, currentState: Object.freeze([...parsed.value.data.currentState]),
-                    alerts: Object.freeze([...parsed.value.data.alerts]), nextSteps: Object.freeze([...parsed.value.data.nextSteps]),
-                    gaps: Object.freeze([...parsed.value.data.gaps]), generatedAt: metadata.timestamp,
-                    currentness: Object.freeze({ ...request.currentness, verifiedAt: metadata.timestamp }) });
-            } catch { return failed('proposal_invalid', receipt, provenance); }
+            const sourceCount = 1 + request.projection.activeConditions.length
+                + request.projection.currentTherapies.length + request.projection.recentClinicalEvents.length;
+            // Stesso prompt, stesso contesto, stessa proiezione gia' consumata dal broker:
+            // al massimo un secondo tentativo, e solo sul modello locale.
+            const outcome = await runLocalGenerationAttempts<PatientInsightReviewProposal, PatientInsightHostCapabilityResult>({
+                venue: receipt.venue,
+                attempt: async () => {
+                    let response: string;
+                    try {
+                        const result = await routedBinding.adapter.chat([{ role: 'user', content: prompt }], undefined, 900, { responseFormat: 'patient_insight' });
+                        if (typeof result.content !== 'string') throw new Error('invalid');
+                        // Una risposta tagliata dal tetto di token non si pubblica, anche se per caso fosse leggibile.
+                        if (result.stats?.truncated === true) return Object.freeze({ status: 'rejected', reason: 'truncated' });
+                        response = result.content;
+                    } catch { return Object.freeze({ status: 'provider_failed' }); }
+                    try {
+                        validateGenerativeJson('patient_insight', response);
+                        const parsed = parsePatientInsightExtractionResponse(response);
+                        if (!isEnvelopeUsable(parsed) || !(parsed.value.summary || parsed.value.data.currentState.length
+                            || parsed.value.data.alerts.length || parsed.value.data.nextSteps.length || parsed.value.data.gaps.length)
+                            || !supportedExtraction(parsed.value, sourceCount)) throw new Error('invalid');
+                        return Object.freeze({ status: 'accepted', value: Object.freeze({ schemaVersion: 'mediflow.patient-insight.review-proposal.v2', reviewOnly: true,
+                            summary: parsed.value.summary, currentState: Object.freeze([...parsed.value.data.currentState]),
+                            alerts: Object.freeze([...parsed.value.data.alerts]), nextSteps: Object.freeze([...parsed.value.data.nextSteps]),
+                            gaps: Object.freeze([...parsed.value.data.gaps]), generatedAt: metadata.timestamp,
+                            currentness: Object.freeze({ ...request.currentness, verifiedAt: metadata.timestamp }) }) as PatientInsightReviewProposal });
+                    } catch { return Object.freeze({ status: 'rejected', reason: 'invalid' }); }
+                },
+                // Prima del secondo tentativo: consenso (kill switch) e attualita' (lease, selezione, revisione).
+                between: async () => {
+                    const revoked = await permissionDenial(); if (revoked) return revoked;
+                    try { if (dependencies.currentness.verify() !== true) return failed('source_stale', receipt, provenance); }
+                    catch { return failed('source_stale', receipt, provenance); }
+                    return null;
+                },
+            });
+            if (outcome.status === 'stopped') return outcome.stop;
+            if (outcome.status === 'provider_failed') return failed('provider_failed', receipt, provenance);
+            if (outcome.status === 'rejected') return failed('proposal_invalid', receipt, provenance);
+            const proposal = outcome.value;
             const denied = await permissionDenial(); if (denied) return denied;
             try { if (dependencies.currentness.verify() !== true) return failed('source_stale', receipt, provenance); }
             catch { return failed('source_stale', receipt, provenance); }

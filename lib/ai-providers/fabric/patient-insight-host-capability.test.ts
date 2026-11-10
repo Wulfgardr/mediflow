@@ -38,22 +38,30 @@ function resolution(chat: LocalProviderResolution['adapter']['chat']): LocalProv
     }) };
 }
 
-function capability(overrides: Readonly<{ response?: string; verify?: () => boolean }> = {}) {
+type ScriptedAnswer = string | Readonly<{ content: string; truncated: true }> | Error;
+function capability(overrides: Readonly<{ response?: string; answers?: readonly ScriptedAnswer[]; verify?: () => boolean; enabled?: () => boolean }> = {}) {
     const calls: string[] = [];
-    const provider = { prompt: '', maxTokens: 0, options: undefined as unknown };
+    const provider = { prompt: '', maxTokens: 0, options: undefined as unknown, prompts: [] as string[] };
+    let chats = 0;
     const binding = resolution(async (messages, _signal, maxTokens, options) => {
         calls.push('chat');
         provider.prompt = typeof messages[0].content === 'string' ? messages[0].content : JSON.stringify(messages[0].content);
+        provider.prompts.push(provider.prompt);
         provider.maxTokens = maxTokens ?? 0; provider.options = options;
-        return { content: overrides.response ?? response, stats: { latency: 1, tokensIn: 2, tokensOut: 3 } };
+        const answer = overrides.answers ? overrides.answers[Math.min(chats, overrides.answers.length - 1)] : overrides.response ?? response;
+        chats += 1;
+        if (answer instanceof Error) throw answer;
+        if (typeof answer !== 'string') return { content: answer.content, stats: { latency: 1, tokensIn: 2, tokensOut: 900, truncated: true } };
+        return { content: answer, stats: { latency: 1, tokensIn: 2, tokensOut: 3 } };
     });
     let checks = 0;
     return {
         calls,
         provider,
+        chats: () => chats,
         checks: () => checks,
         value: createPatientInsightHostCapability({
-            killSwitch: { read: async () => { calls.push('kill'); return { status: 'enabled' as const }; } },
+            killSwitch: { read: async () => { calls.push('kill'); return overrides.enabled?.() === false ? { status: 'denied' as const, code: 'disabled' as const } : { status: 'enabled' as const }; } },
             currentness: { verify: () => { calls.push('currentness'); checks += 1; return overrides.verify?.() ?? true; } },
             lifecycle: { read: () => { calls.push('lifecycle'); return { status: 'available' as const, record: lifecycleRecord }; } },
             binding: { readClinical: async () => { calls.push('binding'); return { status: 'available' as const, resolution: binding }; } },
@@ -118,4 +126,65 @@ test('fails closed before Fabric for stale or non-exact input and after Fabric f
         const fixture = capability(); const result = await fixture.value.preview(invalid);
         assert.equal(result.status, 'denied'); assert.equal(result.code, 'input_invalid'); assert.deepEqual(fixture.calls, []);
     }
+});
+
+// Secondo tentativo sul modello locale (Quadro paziente, 0.9.1): il validatore non cambia,
+// la richiesta si ripete al massimo una volta e mai dopo revoca o cambio di attualita'.
+const sentence = (length: number) => `${'Frase sintetica troppo lunga '.repeat(20).slice(0, length - 5)} [S1]`;
+const tooLong = JSON.stringify({
+    schemaVersion: 'mediflow.ai.extract.v1', task: 'patient_insight', summary: 'Synthetic summary [S1]',
+    data: { currentState: [sentence(230)], alerts: [], nextSteps: [], gaps: [] },
+});
+const truncated = Object.freeze({ content: response.slice(0, 80), truncated: true as const });
+
+test('local: a first answer with a 230 character sentence is retried once and the valid second answer is published', async () => {
+    assert.equal(sentence(230).length, 230);
+    const fixture = capability({ answers: [tooLong, response] });
+    const result = await fixture.value.preview({ requestId, projection, currentness });
+    assert.equal(result.status, 'available'); assert.equal(fixture.chats(), 2);
+    assert.equal(fixture.provider.prompts[0], fixture.provider.prompts[1], 'same prompt and same context on the second attempt');
+    assert.deepEqual(fixture.calls, ['kill', 'currentness', 'lifecycle', 'binding', 'readiness', 'router', 'clock', 'entropy',
+        'chat', 'kill', 'currentness', 'chat', 'kill', 'currentness']);
+    if (result.status === 'available') assert.equal(result.proposal.summary, 'Synthetic summary [S1]');
+});
+
+test('local: a first answer cut at the token ceiling is retried once and the valid second answer is published', async () => {
+    const fixture = capability({ answers: [truncated, response] });
+    const result = await fixture.value.preview({ requestId, projection, currentness });
+    assert.equal(result.status, 'available'); assert.equal(fixture.chats(), 2);
+});
+
+test('local: an answer flagged as truncated is not published even when it parses', async () => {
+    const fixture = capability({ answers: [{ content: response, truncated: true }] });
+    const result = await fixture.value.preview({ requestId, projection, currentness });
+    assert.equal(result.status, 'failed'); assert.equal(result.code, 'proposal_invalid'); assert.equal(fixture.chats(), 2);
+});
+
+test('local: two invalid answers fail with proposal_invalid after two calls, not three', async () => {
+    const fixture = capability({ answers: [tooLong, truncated, response] });
+    const result = await fixture.value.preview({ requestId, projection, currentness });
+    assert.equal(result.status, 'failed'); assert.equal(result.code, 'proposal_invalid'); assert.equal(result.proposal, null);
+    assert.equal(fixture.chats(), 2);
+});
+
+test('local: revoking the function between the attempts stops before the second call and publishes nothing', async () => {
+    let kills = 0;
+    const fixture = capability({ answers: [tooLong, response], enabled: () => { kills += 1; return kills < 2; } });
+    const result = await fixture.value.preview({ requestId, projection, currentness });
+    assert.equal(result.status, 'denied'); assert.equal(result.code, 'kill_switch_disabled'); assert.equal(result.proposal, null);
+    assert.equal(fixture.chats(), 1);
+});
+
+test('local: a selection or revision change between the attempts stops before the second call', async () => {
+    let verifies = 0;
+    const fixture = capability({ answers: [tooLong, response], verify: () => { verifies += 1; return verifies < 2; } });
+    const result = await fixture.value.preview({ requestId, projection, currentness });
+    assert.equal(result.status, 'failed'); assert.equal(result.code, 'source_stale'); assert.equal(result.proposal, null);
+    assert.equal(fixture.chats(), 1);
+});
+
+test('local: a provider error is not retried', async () => {
+    const fixture = capability({ answers: [new Error('synthetic transport failure'), response] });
+    const result = await fixture.value.preview({ requestId, projection, currentness });
+    assert.equal(result.status, 'failed'); assert.equal(result.code, 'provider_failed'); assert.equal(fixture.chats(), 1);
 });
