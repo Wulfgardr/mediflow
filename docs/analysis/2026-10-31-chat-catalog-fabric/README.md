@@ -37,6 +37,17 @@ desktop installati e i raccordi clinici chat dichiarati non collegati sotto.
 La tabella generata è una mappa dei riferimenti sorgente, non un grant né una
 qualifica runtime. Le sezioni successive conservano le evidenze delle tranche.
 
+## Raccordo del 10 novembre 2026: Quadro paziente
+
+Il Quadro paziente è collegato alla chat con il comando app-only
+`patient-insight`, senza argomenti. Il comando apre il Quadro del paziente
+selezionato nella finestra MediFlow; consenso, generazione, fonti, ricevuta e
+scarto restano lì. Alla chat tornano solo `insight-opened`,
+`insight-unavailable`, `insight-busy` o il ritiro. La
+[nota di progetto](raccordi-c7-funzioni-generative.md) descrive i tre raccordi,
+i negativi C-7 e dove si provano. Sintesi dei documenti e import assistito
+restano non collegati. I due host desktop non sono qualificati.
+
 ## Funzioni e azioni effettive
 
 Il trasporto MCP Apps corrente è lo stesso nei due host. La colonna prova indica
@@ -51,7 +62,8 @@ Il frame automatizzato a 390 e 1440 px non sostituisce queste due prove.
 | Terapie in lettura | Stesso broker | Massimo due terapie sintetiche | Stesso consenso della scheda | Stesse prove | Lettura terapie archivio non collegata |
 | Farmaci | `RuntimeSession.chat_drug_search` → `drug_count` / `search_drugs`, servizio AIFA comune | Ricerca AIC/nome/principio attivo, massimo 20 risultati, solo vista app | Sessione, scope e selezione correnti; revisione byte e conferma nativa monouso | Spec frame e test Rust catalogo | Data di aggiornamento non verificata; qualificare i due host, nessuna prescrizione |
 | Protesica | `RuntimeSession.chat_prosthetics_search` → `createProstheticsCatalog.search` | Ricerca repertorio locale, massimo 20 voci, solo vista app | Capability lettura protesica, sessione, scope, selezione e conferma nativa monouso | Spec frame, test route e Rust owner | Prescrizioni archivio non collegate; qualificare i due host |
-| Riassunto | Patient Insight, Document Synthesis | Nessuna generazione chat collegata | Nessun grant chat; proposta e consenso Fabric richiesti | Nessuna prova chat | Tre provider più ChatGPT per funzione, fonti e negativi C-7 |
+| Quadro paziente | Patient Insight: vista GPUI `patient_insight`, route Web `patient-insight/preview` | Comando `patient-insight`: apre il Quadro nella finestra; consenso, proposta, fonti e ricevuta restano lì; alla chat solo stati | Sessione abbinata, selezione corrente, riammissione sul server (account, archivio, epoca), host locale aperto, interruttore della funzione | Rust `chat_access::owner` e `chat_access::tests`, `shell::patient_insight::tests::chat`, `lib/chat-card/patient-insight.test.ts`, spec frame | Due host da qualificare; Ollama e ChatGPT reali; budget end-to-end |
+| Riassunto dei documenti | Document Synthesis | Nessuna generazione chat collegata | Nessun grant chat | Nessuna prova chat | Vista GPUI in lavorazione; raccordo previsto nella nota C-7 |
 | Stato terapia | `createChatTherapyStatusService`, `executeTherapyStatusInTransaction` | active/suspended/completed e rilettura ricevuta | Native admin, tre capability network, selezione/archivio correnti, CAS, PIN e conferma nativa | `chat-therapy-status.test.ts`, `native-chat-write-approval.test.ts`, spec frame, Rust owner | Due host reali, disponibilità controlli per ruolo/versione/capacità |
 | Nuovo paziente da PDF | `lib/native-patient-document.ts`, `lib/patient-document-create-command.ts` | Apre revisione nativa; nessun allegato chat usato | Selezione file e campi visti dal medico, revisione e conferma nativa, writer comune | `native-patient-document.test.ts`, `patient-document-create-command.test.ts`, spec frame | Due host reali; apertura non equivale a creazione |
 | Altri comandi clinici | Servizi applicativi esistenti | Non collegati | Nessun grant generico | Nessuna prova chat | Censire ogni comando prima del grant; nessuna esecuzione libera |
@@ -68,7 +80,7 @@ raccordo nei due host.
 
 | Capability | Servizio/entry point dal catalogo | Stato effettivo chat | Residuo |
 | --- | --- | --- | --- |
-| `patient_insight` | `app/api/ai/patient-insight/preview/route.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
+| `patient_insight` | `app/api/ai/patient-insight/preview/route.ts` | Collegata, app-only: apre il Quadro nella finestra, alla chat solo stati; prova di componente | Due host da qualificare; provider reali e budget end-to-end |
 | `smart_import` | `app/api/ai/smart-import/preview/route.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
 | `document_synthesis` | `app/api/ai/document-synthesis/preview/route.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
 | `ocr` | `nessuno` | Indisponibile nel catalogo | Mostrare indisponibilità, non sostituire AnyDoc/Apple Vision |
@@ -101,10 +113,10 @@ generazione ChatGPT o inferenza locale è eseguita da questa tranche.
 
 | Cella | Servizio comune da riusare | Vista/azione e permesso chat | Prova chat | Residuo |
 | --- | --- | --- | --- | --- |
-| `patient_insight/ollama` | `lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | Raccordo locale, identità modello, fonti e negativi C-7; I-2 non qualificata |
+| `patient_insight/ollama` | `lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts` / composizione provider della funzione | Comando `patient-insight`; il provider lo sceglie la configurazione della funzione | Componente con host sintetico e risposta Ollama registrata | Ollama reale e identità modello nei due host; I-2 non qualificata |
 | `patient_insight/openai.responses.v1` | `lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
 | `patient_insight/anthropic.messages.v1` | `lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
-| `patient_insight/chatgpt` | `lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | D-I1 e I-4 prima di generare; raccordo e negativi C-7 |
+| `patient_insight/chatgpt` | `lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts` / composizione provider della funzione | Stesso comando; il raccordo non dipende dal provider | Nessuna risposta ChatGPT nella prova chat | D-I1 e I-4 prima di generare; prova nei due host con ChatGPT come provider della funzione |
 | `smart_import/ollama` | `lib/domain/documents/patient-smart-import-fabric.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | Raccordo locale, identità modello, fonti e negativi C-7; I-2 non qualificata |
 | `smart_import/openai.responses.v1` | `lib/domain/documents/patient-smart-import-fabric.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
 | `smart_import/anthropic.messages.v1` | `lib/domain/documents/patient-smart-import-fabric.ts` / composizione provider della funzione | Non collegati; nessun grant | Nessuna | I-5/I-6 fermi; accesso e spesa da autorizzare, poi prove reali e negativi C-7 |
@@ -150,7 +162,7 @@ storica per concedere un'azione chat.
 | 16 | Archivio Intelligente / Document Insights (view estrazioni + delete) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
 | 17 | Smart Import (candidati diagnosi/terapie da documenti, applica in scheda) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
 | 18 | Referti recenti (Evidence Stack tile, view sintesi) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
-| 19 | AI Patient Insight (sintesi/follow-up/alert generati) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 19 | AI Patient Insight (sintesi/follow-up/alert generati) | Nessuno | Comando chat `patient-insight` app-only: apre il Quadro nella finestra; due host da qualificare |
 | 20 | Foglio sinottico / Identity Lens / Review Queue (viste sintetiche cockpit) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
 | 21 | Export FHIR paziente (con pre-check validazione FSE) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
 | 22 | Report PDF paziente | Nessuno | Servizio, azione, permesso e prova chat da risolvere |

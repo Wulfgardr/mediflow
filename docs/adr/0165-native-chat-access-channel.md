@@ -333,3 +333,26 @@ la tolleranza bloccherebbe parole ordinarie come «aria» o «fianchi». È una 
 di bilanciamento, non una copertura completa. Il medico vede i byte esatti e ne
 resta responsabile; il controllo è un aiuto e non è anonimizzazione.
 
+
+## Quadro paziente dalla chat, 10 novembre 2026
+
+Per la riga C-7 (emendamento del 9 novembre) il comando app-only
+`patient-insight` riusa la richiesta nativa e non porta argomenti: la chat non
+sceglie paziente, ambulatorio, fonti o modello. La GPUI lega la richiesta alla
+sessione abbinata e alla selezione mostrata, il server la riammette con
+`revalidate_chat_access_context` e solo dopo la GPUI apre il Quadro paziente in
+Panoramica e legge l'interruttore della funzione. Consenso, generazione,
+proposta, fonti, ricevuta e scarto restano nella vista G-5a; il provider lo
+sceglie la configurazione della funzione sull'host.
+
+Alla chat tornano soltanto `insight-opened`, `insight-unavailable` (funzione
+spenta, kill switch o host locale chiuso), `insight-busy` (un Quadro è già in
+preparazione, in generazione o mostrato e non viene sostituito) o `withdrawn`.
+Revoca, EOF, blocco della sessione, cambio di selezione o di scheda durante la
+preparazione o la generazione interrompono il Quadro legato alla chat; una
+risposta già in volo non compare. Una proposta mostrata appartiene alla
+finestra e non si lega più alla chat. Il frame rifiuta ogni risposta con campi
+oltre allo stato. Le prove sono di componente con host sintetici; i due host
+desktop, i provider reali e il budget end-to-end restano alla seconda seduta.
+La [nota C-7](../analysis/2026-10-31-chat-catalog-fabric/raccordi-c7-funzioni-generative.md)
+descrive anche i raccordi previsti per sintesi dei documenti e import assistito.
