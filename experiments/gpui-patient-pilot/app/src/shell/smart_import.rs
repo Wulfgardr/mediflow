@@ -322,6 +322,8 @@ impl ClinicalApp {
     }
 
     /// La scheda non ha note, voci di diario o sintesi di documenti da inviare.
+    /// Serve solo al legame con la chat, che esiste dove esiste il canale.
+    #[cfg(unix)]
     fn import_sources_missing(&self) -> bool {
         let (Some(Ok(capture)), Some(patient)) =
             (self.import_capture_now(), self.patient.detail.ready())
