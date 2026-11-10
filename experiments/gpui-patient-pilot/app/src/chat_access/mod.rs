@@ -236,6 +236,19 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                 pending = Some(request);
                 State::Requested
             }
+            Ok(value) if pending.is_none() && is_insight_command(&value) => {
+                let Ok(copy) = stream.try_clone() else {
+                    break;
+                };
+                let Some(request) = Request::for_insight(peer, copy) else {
+                    break;
+                };
+                if incoming.try_send(request.clone()).is_err() {
+                    break;
+                }
+                pending = Some(request);
+                State::Requested
+            }
             Ok(value) if pending.is_none() && value == json!({"command":"patient-document"}) => {
                 let Ok(copy) = stream.try_clone() else {
                     break;
@@ -329,16 +342,7 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
             last_activity = std::time::Instant::now();
         }
         bytes.clear();
-        let response = if let Some(receipt) = pending
-            .as_ref()
-            .and_then(|p| p.lock().ok().and_then(|p| p.safe_result()))
-        {
-            json!({"status":status.wire(), "receipt":receipt})
-        } else if let Some(payload) = payload {
-            json!({"status":status.wire(), "payload":payload})
-        } else {
-            json!({"status": status.wire()})
-        };
+        let response = reply(status, pending.as_ref(), payload);
         if writeln!(stream, "{response}").is_err() {
             break;
         }
@@ -348,6 +352,24 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
     {
         pending.withdraw();
     }
+}
+
+/// La riga restituita al socket della chat: stato finito, ricevuta di un comando
+/// di scrittura o payload di una lettura consumata. Nient'altro esce dalla GPUI.
+pub(crate) fn reply(status: State, pending: Option<&Pending>, payload: Option<String>) -> Value {
+    if let Some(receipt) = pending.and_then(|p| p.lock().ok().and_then(|p| p.safe_result())) {
+        json!({"status":status.wire(), "receipt":receipt})
+    } else if let Some(payload) = payload {
+        json!({"status":status.wire(), "payload":payload})
+    } else {
+        json!({"status": status.wire()})
+    }
+}
+
+/// Il comando del Quadro paziente non porta argomenti: la chat non sceglie paziente,
+/// ambulatorio, fonti o modello. Ogni altro campo chiude la connessione.
+fn is_insight_command(value: &Value) -> bool {
+    *value == json!({"command": "patient-insight"})
 }
 
 pub(crate) fn install_lock_observer() {

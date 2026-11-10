@@ -372,6 +372,9 @@ struct PatientData {
     document_curation: document_curation::DocumentCuration,
     dossier: dossier_import::DossierArea,
     insight: patient_insight::PatientInsightArea,
+    /// Richiesta della chat legata al Quadro di questa scheda (C-7).
+    #[cfg(unix)]
+    insight_chat: patient_insight::InsightChat,
     synthesis: document_synthesis::DocumentSynthesisArea,
     document_details_id: Option<String>,
     document_original: Option<document_details::DocumentOriginal>,
@@ -388,6 +391,8 @@ impl Default for PatientData {
             document_curation: document_curation::DocumentCuration::default(),
             dossier: dossier_import::DossierArea::default(),
             insight: patient_insight::PatientInsightArea::default(),
+            #[cfg(unix)]
+            insight_chat: patient_insight::InsightChat::default(),
             synthesis: document_synthesis::DocumentSynthesisArea::default(),
             document_details_id: None,
             document_original: None,

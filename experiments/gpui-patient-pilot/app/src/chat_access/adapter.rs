@@ -45,6 +45,10 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
             "requested",
             "document-opened",
             "voice-opened",
+            "insight-opened",
+            "insight-unavailable",
+            "insight-busy",
+            "insight-closed",
             "preparing",
             "selecting",
             "challenge",
@@ -142,7 +146,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["model"]}}},
                 {"name": CONTROL, "description":"Scheda sintetica monouso dopo consenso nella GPUI; payload riservato alla vista.",
-                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","clinical-profile","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","receipt","drugs","prosthetics","agenda","booking","booking-receipt"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
+                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","clinical-profile","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","patient-insight","receipt","drugs","prosthetics","agenda","booking","booking-receipt"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
                     "annotations":{"readOnlyHint":false,"destructiveHint":true,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["app"]}}}]}),
             "resources/list" => {
@@ -229,6 +233,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                             "booking",
                             "patient-document",
                             "local-voice",
+                            "patient-insight",
                             "status",
                             "consume",
                             "revoke",
@@ -288,6 +293,13 @@ mod tests {
         assert_eq!(
             wire_command(&format!("receipt-{id}")),
             json!({"command":"receipt", "commandId":id})
+        );
+    }
+    #[test]
+    fn insight_command_reaches_the_socket_without_arguments() {
+        assert_eq!(
+            wire_command("patient-insight"),
+            json!({"command":"patient-insight"})
         );
     }
     #[test]
