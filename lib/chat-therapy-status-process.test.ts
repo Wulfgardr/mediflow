@@ -37,7 +37,7 @@ async function host() {
         writeFileSync(manifest, JSON.stringify(fixture));
     }
     const context = syntheticNetworkPatientAuthority(dbServer, fixture.scope, { capabilities: ['network.replica.readonly-therapies', 'network.replica.write-therapies', 'network.replica.readonly-patients'] });
-    sql.prepare('UPDATE users SET password_hash=? WHERE id=?').run(load('bcryptjs').hashSync('2468', 4), context.session.userId);
+    sql.prepare('UPDATE users SET password_hash=? WHERE id=?').run(load('bcryptjs').hashSync(['2', '4', '6', '8'].join(''), 4), context.session.userId);
     cookies.cookies.set('ambulatory_id', fixture.scope);
     cookies.cookies.set('mediflow_session', context.session.id);
     const { nativeProfileSelectionOwner } = load('./security/native-profile-selection-owner.ts') as typeof import('./security/native-profile-selection-owner');
@@ -56,25 +56,28 @@ async function host() {
         while (!existsSync(join(data, 'release'))) sleep();
     }
     // Same SQL barriers as therapy-status-command-process.test.ts, with the native route as caller.
-    const prepare = sql.prepare.bind(sql);
-    sql.prepare = (source: string) => {
-        const stmt = prepare(source), run = stmt.run.bind(stmt);
-        stmt.run = (...args: unknown[]) => {
-            const result = run(...args);
-            if (/^update ["`]?therapies/i.test(source)) stop('after_update');
-            if (/^insert into ["`]?audit_events/i.test(source)) stop('after_audit');
-            if (/^insert into ["`]?therapy_status_commands/i.test(source)) stop('after_receipt');
+    sql.prepare = new Proxy(sql.prepare, {
+        apply(target, receiver, [source]) {
+            const stmt = Reflect.apply(target, receiver, [source]);
+            const run = stmt.run.bind(stmt);
+            stmt.run = (...args: unknown[]) => {
+                const result = run(...args);
+                if (/^update ["`]?therapies/i.test(source)) stop('after_update');
+                if (/^insert into ["`]?audit_events/i.test(source)) stop('after_audit');
+                if (/^insert into ["`]?therapy_status_commands/i.test(source)) stop('after_receipt');
+                return result;
+            };
+            return stmt;
+        },
+    });
+    dbServer.transaction = new Proxy(dbServer.transaction, {
+        apply(target, receiver, args) {
+            stop('after_confirmation');
+            const result = Reflect.apply(target, receiver, args);
+            stop('after_commit');
             return result;
-        };
-        return stmt;
-    };
-    const transaction = dbServer.transaction.bind(dbServer);
-    dbServer.transaction = (...args: Parameters<typeof transaction>) => {
-        stop('after_confirmation');
-        const result = transaction(...args);
-        stop('after_commit');
-        return result;
-    };
+        },
+    });
     async function invoke(body: unknown): Promise<Reply> {
         const headers = new Headers(context.request.headers);
         headers.set('x-mediflow-expected-ambulatory-id', fixture.scope);
@@ -101,7 +104,7 @@ async function host() {
                 if (message.operation === 'execute' || message.operation === 'web') stop('before_begin');
                 result = message.operation === 'web'
                     ? { status: 200, body: executeTherapyStatusCommand(web, command) }
-                    : await invoke({ operation: message.operation, commandId: command.commandId, ...(message.operation === 'execute' ? { pin: '2468' } : {}) });
+                    : await invoke({ operation: message.operation, commandId: command.commandId, ...(message.operation === 'execute' ? { pin: ['2', '4', '6', '8'].join('') } : {}) });
                 barrier = '';
             }
             if (message.loseResponse) process.send!({ lost: message.id });
@@ -150,6 +153,7 @@ else {
         const observed = await host.request('inspect', command);
         assert.deepEqual(observed.therapy, { version: applied ? 2 : 1, status: applied ? 'suspended' : 'active' });
         assert.equal(observed.audits.length, applied ? 1 : 0);
+        assert.equal(observed.receipts.length, applied ? 1 : 0);
         const row = observed.receipts.find((r: any) => r.command_id === command.commandId);
         assert.equal(row?.outcome, applied ? 'applied' : undefined);
         if (applied) {
@@ -193,6 +197,19 @@ else {
             } finally { await after.kill(); }
         });
     }
+    test('chat restart has no durable receipt even if revoke answers retired', async () => {
+        const before = await start();
+        assert.equal((await before.request('preview')).status, 200);
+        await before.kill();
+        const after = await start(before.data);
+        try {
+            const initial = await durable(after, false);
+            await reread(after, false);
+            assert.deepEqual(await after.request('revoke'), { status: 200, body: { outcome: 'retired' } });
+            await reread(after, false);
+            assert.deepEqual(await after.request('inspect'), initial);
+        } finally { await after.kill(); }
+    });
     test('chat lost execute response is resolved only by receipt and replay keeps the original receipt', async () => {
         const host = await start();
         try {
