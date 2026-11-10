@@ -33,8 +33,11 @@ for (const [name, state] of [
 
 test('local default and explicit local choice keep their own provider and persistence disclosure', () => {
     assert.match(content(render(), 'fixture-pickerProvider'), /Ollama.*locale.*Predefinito/u);
-    assert.match(content(render(), 'fixture-pickerDetailBody'), /Modello locale sintetico.*Usa il modello predefinito/u);
+    // the details name the model once; default or single-proposal scope is said beside the provider, not repeated.
+    assert.match(content(render(), 'fixture-pickerDetailBody'), /Modello locale sintetico · Ollama/u);
+    assert.doesNotMatch(content(render(), 'fixture-pickerDetailBody'), /predefinito|Scelta per una sola proposta|non prova la disponibilità/iu);
     const explicit = render(undefined, { modelOptionId: local.modelOptionId });
     assert.match(content(explicit, 'fixture-pickerProvider'), /Ollama.*Solo questa proposta/u);
-    assert.match(content(explicit, 'fixture-pickerDetailBody'), /Scelta per una sola proposta; non salvata/u);
+    assert.match(content(explicit, 'fixture-pickerDetailBody'), /Modello locale sintetico · Ollama/u);
+    assert.doesNotMatch(content(explicit, 'fixture-pickerDetailBody'), /Scelta per una sola proposta|Solo questa proposta/u);
 });

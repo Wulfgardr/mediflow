@@ -46,16 +46,16 @@ const actionStyle = { borderRadius: 'var(--lume-control-radius, 10px)', fontSize
 
 function safeError(preview: Exclude<PatientInsightPreviewWire, { status: 'available' }>): string {
     if (preview.code === 'kill_switch_disabled') {
-        return 'Patient Insight è disabilitata localmente. Riattivala in Impostazioni per generare una nuova bozza.';
+        return 'Patient Insight è disabilitata. Si riattiva in Impostazioni AI.';
     }
     if (preview.code === 'source_stale') {
-        return 'I dati clinici o la selezione sono cambiati durante la generazione. Riapri la scheda e riprova.';
+        return 'I dati clinici sono cambiati durante la generazione. Riprova.';
     }
     if (preview.code === 'model_unavailable' || preview.code === 'provider_unready' || preview.code === 'provider_binding_denied') {
         return 'Il modello clinico locale non è disponibile. Verifica le Impostazioni AI.';
     }
     if (preview.status === 'failed' && preview.code === 'provider_failed') {
-        return 'Il modello locale non ha completato la risposta, per esempio per un limite d’uso o un errore del servizio. Nessuna bozza creata: riprova più tardi o verifica le Impostazioni AI.';
+        return 'Il modello non ha completato la risposta. Riprova più tardi o verifica le Impostazioni AI.';
     }
     return preview.status === 'failed'
         ? 'La risposta del modello locale non ha superato i controlli clinici.'
@@ -118,7 +118,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
 
     const generateInsight = async () => {
         if (!enabled) {
-            setError('Patient Insight è disabilitata localmente. Riattivala in Impostazioni per generare una nuova bozza.');
+            setError('Patient Insight è disabilitata. Si riattiva in Impostazioni AI.');
             return;
         }
         const controller = new AbortController(); abortControllerRef.current = controller;
@@ -132,7 +132,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
                 requestId: `pi_${crypto.randomUUID()}`,
                 capturedAt: new Date().toISOString(),
             });
-            setProgress('Verifica autenticata di selezione e currentness…');
+            setProgress('Verifica della richiesta…');
             const response = await picker.client.fetch('/api/ai/patient-insight/preview', {
                 method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
                 headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
@@ -145,11 +145,11 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
             setProgress('Controllo della proposta clinica…');
             const root = parsePatientInsightPreviewWireRoot(await response.json());
             if (controller.signal.aborted || !picker.client.isCurrent(modelToken)) return;
-            if (!root) { setError('La risposta di Patient Insight non ha superato i controlli locali.'); return; }
+            if (!root) { setError('La risposta non ha superato i controlli locali.'); return; }
             const result = root.preview;
             if (result.status !== 'available') { setError(safeError(result)); return; }
             if (result.writesPerformed !== 0 || result.apply !== 'denied' || result.proposal.reviewOnly !== true) {
-                setError('La proposta non rispetta il formato di sola revisione.'); return;
+                setError('La risposta non ha superato i controlli locali.'); return;
             }
             setPreview({ patientId: patient.id, patientKey, sourceSignature: patientInsightSourceSignature(request), value: result });
         } catch {
@@ -172,7 +172,6 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
             /* a disabled function is a compact state with an explicit recovery action. */
             <section className="min-w-0 space-y-4 py-3 text-sm leading-relaxed text-[color:var(--lume-ink)]" data-testid="patient-insight-disabled-card">
                 <h3 className="text-base font-semibold">Patient Insight disabilitata</h3>
-                <p className="text-[color:var(--lume-ink-muted)]">La scheda resta consultabile. Riattiva la funzione per generare una nuova bozza.</p>
                 <Link href="/settings/ai/funzioni" className="ui-btn-secondary" style={actionStyle}>Apri Impostazioni AI</Link>
             </section>
         );
@@ -202,11 +201,11 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
                     <h3 className="text-base font-semibold">Supporto al ragionamento clinico</h3>
                     <p className="mt-1 text-[color:var(--lume-ink-muted)]">{picker.view.remote ? 'Generazione manuale · OpenAI con redazione locale' : 'Generazione manuale · proposta locale'}</p>
                 </div>
-                <button type="button" onClick={generateInsight} disabled={isGenerating || !enabled || !picker.canGenerate} className="ui-btn-secondary" style={actionStyle}><RefreshCw className="h-4 w-4" aria-hidden="true" />{isGenerating ? 'Analisi…' : enabled ? 'Nuova bozza' : 'Disabilitata'}</button>
+                <button type="button" onClick={generateInsight} disabled={isGenerating || !enabled || !picker.canGenerate} className="ui-btn-secondary" style={actionStyle}><RefreshCw className="h-4 w-4" aria-hidden="true" />{isGenerating ? 'Analisi…' : 'Nuova bozza'}</button>
             </header>
             <FunctionModelPicker picker={picker} />
             {error && <p role="alert" className="flex items-start gap-2 text-[color:var(--lume-signal-critical)]"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{error}</p>}
-            {!enabled && <p data-testid="patient-insight-disabled-banner" className="text-[color:var(--lume-ink-muted)]">La consultazione resta disponibile. La funzione è disabilitata per le nuove generazioni.</p>}
+            {!enabled && <p data-testid="patient-insight-disabled-banner" className="text-[color:var(--lume-ink-muted)]">La funzione è disabilitata per le nuove generazioni.</p>}
             {isGenerating && (
                 <div className="flex flex-wrap items-center justify-between gap-3 py-4" role="status">
                     <div><p className="font-semibold">Analisi in corso</p><p className="mt-1 text-[color:var(--lume-ink-muted)]">{progress}</p></div>
@@ -217,7 +216,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
             {!isGenerating && superseded && (
                 <section className="space-y-2" data-testid="patient-insight-superseded" role="status">
                     <h4 className="font-semibold">Proposta superata</h4>
-                    <p className="text-[color:var(--lume-ink-muted)]">Proposta superata: profilo, diario o terapie sono cambiati dopo la generazione. Non viene mostrata; puoi prepararne una nuova.</p>
+                    <p className="text-[color:var(--lume-ink-muted)]">Profilo, diario o terapie sono cambiati dopo la generazione.</p>
                 </section>
             )}
 
@@ -235,7 +234,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
                     {preview.proposal.gaps.length > 0 && <div><h4 className="font-semibold">Dati mancanti</h4><InsightList items={preview.proposal.gaps} /></div>}
                     <div>
                         <h4 className="font-semibold">Fonti della proposta</h4>
-                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">Scheda clinica, terapie attive e voci recenti del diario raccolte per questa generazione. Confronta la proposta con le informazioni in cartella.</p>
+                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">Scheda clinica, terapie attive e voci recenti del diario.</p>
                         <nav aria-label="Dati in cartella per la revisione" className="mt-2 flex flex-wrap gap-2">
                             <Link href={`/patients/${patient.id}/modules#quadro`} className="ui-btn-secondary" style={actionStyle}>Quadro clinico</Link>
                             <Link href={`/patients/${patient.id}/modules#terapie`} className="ui-btn-secondary" style={actionStyle}>Terapie</Link>
@@ -259,7 +258,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
 
             {!isGenerating && !shown && patient.aiSummary && (
                 <section className="space-y-3" data-testid="patient-insight-historical-summary">
-                    <h4 className="font-semibold">Riepilogo storico salvato · sola lettura</h4>
+                    <h4 className="font-semibold">Riepilogo storico salvato</h4>
                     {stale && <p className="text-[color:var(--lume-ink-muted)]">Dati modificati dopo la generazione</p>}
                     <div className="prose prose-sm max-w-none text-[color:var(--lume-ink)] prose-headings:text-[color:var(--lume-ink)] prose-strong:text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm"><ReactMarkdown>{patient.aiSummary}</ReactMarkdown></PrivacyBlur></div>
                     <p className="text-[color:var(--lume-ink-muted)]">Le nuove generazioni non sostituiscono né aggiornano automaticamente questo contenuto.</p>
