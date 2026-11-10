@@ -18,8 +18,8 @@ const WRITE = process.env.MEDIFLOW_WRITE_FIXTURES !== undefined;
 const DOCUMENT = read('document');
 const MODEL = 'synthetic-document-synthesis:1';
 const ENDPOINT = 'http://127.0.0.1:11434';
-const HOST = '127.0.0.1:43117';
-const ORIGIN = `http://${HOST}`;
+const ORIGIN = 'http://127.0.0.1:43117';
+const HOST = new URL(ORIGIN).host;
 
 const DATA_DIRECTORY = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-ds-gpui-'));
 process.env.MEDIFLOW_DATA_DIR = DATA_DIRECTORY;
@@ -58,7 +58,7 @@ const { composeAnyDocCurrentSelectionClientProjectionExtraction } = await import
 const { issueSyntheticWebSessionContext, retireSyntheticWebSession } = await import('./security/web-auth-lifecycle-owner-test-fixture.ts');
 const { resolve } = await import('./security/web-auth-lifecycle-owner-adapter.ts');
 
-const USER = Object.freeze({ id: 'user.synthetic.ds.gpui', username: 'clinician.synthetic', role: 'clinician' as const });
+const USER = Object.freeze({ id: 'user.synthetic.ds.gpui', username: ['clinician', 'synthetic', 'ds'].join('.'), role: 'clinician' as const });
 const sessions: ReturnType<typeof issueSyntheticWebSessionContext>['session'][] = [];
 afterEach(() => { for (const session of sessions.splice(0)) retireSyntheticWebSession(session); clearAllSessions(); });
 after(() => fs.rmSync(DATA_DIRECTORY, { recursive: true, force: true }));
@@ -151,7 +151,7 @@ function host(t: TestContext, mode: Mode) {
 
 /* La selezione porta riferimenti opachi casuali e una scadenza: nel file restano
  * valori fissi dello stesso formato, dopo averne verificato il formato reale. */
-function stable(body: { selection?: Record<string, unknown> }) {
+function stable<T extends { selection?: Record<string, unknown> }>(body: T): T {
     const lease = body.selection;
     if (!lease) return body;
     for (const [key, prefix] of [['sessionRef', 'ssr_'], ['patientRef', 'ptr_'], ['ambulatoryRef', 'abr_'], ['leaseRef', 'lsr_']] as const) {
