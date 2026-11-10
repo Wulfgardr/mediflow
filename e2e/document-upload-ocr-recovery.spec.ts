@@ -31,7 +31,7 @@ async function fixture(page: Page, bytes = RTF, extension = 'rtf') {
   await openArchive(page, url);
   const saved = page.waitForResponse((response) => response.request().method() === 'POST'
     && new URL(response.url()).pathname === '/api/attachments');
-  await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
+  await expectSettledList(page, 0);
   await page.locator('#documenti input[type="file"]').setInputFiles({ name, mimeType: type, buffer: bytes });
   const response = await saved;
   expect(response.status()).toBe(201);
@@ -39,6 +39,14 @@ async function fixture(page: Page, bytes = RTF, extension = 'rtf') {
   expect(uploaded.patientId).toBe(patientId);
   expect(uploaded.data).toMatch(/^ENC:/u);
   return { id: uploaded.id, name, patientId, url, endpoint: `**/api/attachments/${uploaded.id}/local-extraction` };
+}
+
+/** The list on screen is the upload precondition: it must be read and show the expected count.
+    aria-busy alone is still false in the moment between an upload response and its reread. */
+async function expectSettledList(page: Page, count: number) {
+  await expect(page.getByRole('status', { name: 'Stato elenco documenti', exact: true }))
+    .toHaveText(count === 1 ? '1 documento caricato.' : `${count} documenti caricati.`);
+  await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
 }
 
 async function openArchive(page: Page, url: string) {
@@ -183,7 +191,8 @@ test('OCR recovery UI: deleting a pending attachment releases the other extracti
   const file = await fixture(page);
   const saved = page.waitForResponse((response) => response.request().method() === 'POST'
     && new URL(response.url()).pathname === '/api/attachments');
-  await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
+  // The upload above rereads the list: a file chosen before that reread ends is held, by design.
+  await expectSettledList(page, 1);
   await page.locator('#documenti input[type="file"]').setInputFiles({ name: 'synthetic-second.rtf', mimeType: 'application/rtf', buffer: RTF });
   const response = await saved;
   expect(response.ok()).toBe(true);
@@ -220,4 +229,30 @@ test('OCR recovery UI: deleting a pending attachment releases the other extracti
     await second.click();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toContainText(TEXT);
   } finally { release.resolve(); }
+});
+
+// CI 9/11 (run 42698269227): the second file was chosen while the list was being reread and was held.
+// A slow page and a slow reread widen that moment; files chosen once the list settles are all saved.
+test('Documenti: a file chosen right after an upload waits for the reread, even on a slow page', async ({ page }) => {
+  await fixture(page);
+  await page.route('**/api/attachments?*', async (route) => {
+    if (route.request().method() === 'GET') await new Promise(resolve => setTimeout(resolve, 1_500));
+    await route.continue();
+  });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 20 });
+  try {
+    for (const [index, name] of ['synthetic-second.rtf', 'synthetic-third.rtf'].entries()) {
+      const saved = page.waitForResponse((response) => response.request().method() === 'POST'
+        && new URL(response.url()).pathname === '/api/attachments');
+      await expectSettledList(page, index + 1);
+      await page.locator('#documenti input[type="file"]').setInputFiles({ name, mimeType: 'application/rtf', buffer: RTF });
+      expect((await saved).status()).toBe(201);
+    }
+    await expectSettledList(page, 3);
+    await expect(page.getByTestId('document-upload-held')).toHaveCount(0);
+  } finally {
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }).catch(() => undefined);
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  }
 });
