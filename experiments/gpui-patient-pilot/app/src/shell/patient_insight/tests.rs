@@ -674,11 +674,13 @@ mod chat {
     }
     fn open(bench: &Bench, cx: &mut gpui::VisualTestContext) -> (Pending, UnixStream) {
         let (pending, remote) = insight_request();
-        bench
-            .view
-            .update(cx, |app, cx| app.open_chat_insight(&pending, cx));
+        bench.view.update(cx, |app, cx| {
+            app.open_chat_function(&pending, crate::chat_access::owner::Function::Insight, cx)
+        });
         cx.run_until_parked();
-        bench.view.update(cx, |app, cx| app.poll_chat_insight(cx));
+        bench.view.update(cx, |app, _| {
+            app.patient.insight.follow_chat();
+        });
         (pending, remote)
     }
     fn opened(bench: &Bench, cx: &mut gpui::VisualTestContext) -> (Pending, UnixStream) {
@@ -724,13 +726,15 @@ mod chat {
         bench.view.update(cx, |app, cx| app.insight_confirm(cx));
         cx.run_until_parked();
         assert!(answer.join().unwrap());
-        bench.view.update(cx, |app, cx| app.poll_chat_insight(cx));
+        bench.view.update(cx, |app, _| {
+            app.patient.insight.follow_chat();
+        });
         let lines = bench.view.read_with(cx, |app, _| {
             let InsightPhase::Proposal { proposal, .. } = &app.patient.insight.phase else {
                 panic!("proposta attesa nella finestra");
             };
             assert!(
-                app.patient.insight_chat.0.is_none(),
+                app.patient.insight.chat.0.is_none(),
                 "la proposta appartiene alla finestra"
             );
             let mut lines: Vec<String> = proposal
@@ -776,7 +780,7 @@ mod chat {
                 &app.patient.insight.phase,
                 InsightPhase::Proposal { proposal, .. } if proposal.summary == before
             ));
-            assert!(app.patient.insight_chat.0.is_none());
+            assert!(app.patient.insight.chat.0.is_none());
         });
     }
 
@@ -789,7 +793,7 @@ mod chat {
         let (pending, _remote) = insight_request();
         bench.view.update(cx, |app, cx| {
             app.insight_confirm(cx);
-            app.open_chat_insight(&pending, cx);
+            app.open_chat_function(&pending, crate::chat_access::owner::Function::Insight, cx);
             assert!(matches!(
                 app.patient.insight.phase,
                 InsightPhase::Running { .. }
@@ -834,7 +838,7 @@ mod chat {
                     "lock" => bench.host.session.lock(),
                     _ => drop(remote.take()),
                 }
-                app.poll_chat_insight(cx);
+                app.patient.insight.follow_chat();
             });
             cx.run_until_parked();
             assert!(!answer.join().unwrap(), "{change}: nessuna richiesta parte");
@@ -939,7 +943,7 @@ mod chat {
             app.insight_confirm(cx);
             app.next_presentation_epoch();
             show(app, "pi-gpui-synthetic-0002");
-            app.poll_chat_insight(cx);
+            app.patient.insight.follow_chat();
         });
         cx.run_until_parked();
         assert!(!answer.join().unwrap());
@@ -947,7 +951,7 @@ mod chat {
         assert_eq!(wire(&pending), json!({"status": "withdrawn"}));
         bench.view.read_with(cx, |app, _| {
             assert!(matches!(app.patient.insight.phase, InsightPhase::Idle));
-            assert!(app.patient.insight_chat.0.is_none());
+            assert!(app.patient.insight.chat.0.is_none());
         });
         bench.assert_no_clinical_write();
     }
@@ -1004,7 +1008,7 @@ mod chat {
                 "{scenario}: l'interruttore si legge solo dopo l'ammissione"
             );
             bench.view.read_with(cx, |app, _| {
-                assert!(app.patient.insight_chat.0.is_none(), "{scenario}");
+                assert!(app.patient.insight.chat.0.is_none(), "{scenario}");
                 assert!(
                     !matches!(
                         app.patient.insight.phase,
@@ -1022,26 +1026,34 @@ mod chat {
 
     #[gpui::test]
     fn chat_with_local_host_closed_is_unavailable_without_any_call(cx: &mut gpui::TestAppContext) {
-        let host = Host::new();
-        let (view, cx) =
-            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
-        let session = host.session.clone();
-        view.update(cx, |app, _| {
-            show(app, FIRST);
-            session
-                .select_profile_patient(app.scope.as_deref().unwrap(), FIRST)
-                .unwrap();
-            app.session = Some(session);
-        });
-        let routes = host.routes().len();
-        let (pending, _remote) = insight_request();
-        view.update(cx, |app, cx| app.open_chat_insight(&pending, cx));
-        cx.run_until_parked();
-        assert_eq!(wire(&pending), json!({"status": "insight-unavailable"}));
-        assert_eq!(host.routes().len(), routes);
-        assert_eq!(
-            pending.lock().unwrap().status(),
-            ChatState::InsightUnavailable
-        );
+        for function in [
+            crate::chat_access::owner::Function::Insight,
+            crate::chat_access::owner::Function::Synthesis,
+        ] {
+            let host = Host::new();
+            let (view, cx) =
+                cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+            let session = host.session.clone();
+            view.update(cx, |app, _| {
+                show(app, FIRST);
+                session
+                    .select_profile_patient(app.scope.as_deref().unwrap(), FIRST)
+                    .unwrap();
+                app.session = Some(session);
+            });
+            let routes = host.routes().len();
+            let (pending, _remote) = crate::chat_access::owner::tests::function_request(function);
+            view.update(cx, |app, cx| app.open_chat_function(&pending, function, cx));
+            cx.run_until_parked();
+            assert_eq!(
+                wire(&pending),
+                json!({"status": ChatState::Generative(function, crate::chat_access::owner::Stage::Unavailable).wire()})
+            );
+            assert_eq!(host.routes().len(), routes);
+            assert_eq!(
+                pending.lock().unwrap().status(),
+                ChatState::Generative(function, crate::chat_access::owner::Stage::Unavailable)
+            );
+        }
     }
 }

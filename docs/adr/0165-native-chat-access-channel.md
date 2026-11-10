@@ -368,3 +368,32 @@ oltre allo stato. Le prove sono di componente con host sintetici; i due host
 desktop, i provider reali e il budget end-to-end restano alla seconda seduta.
 La [nota C-7](../analysis/2026-10-31-chat-catalog-fabric/raccordi-c7-funzioni-generative.md)
 descrive anche i raccordi previsti per sintesi dei documenti e import assistito.
+
+
+## Sintesi dei documenti dalla chat, 10 novembre 2026
+
+Il comando app-only `document-synthesis` porta soltanto il nome del comando.
+Sessione e selezione sono quelle della finestra. L'ammissione sul server e
+il controllo dell'interruttore precedono `synthesis-opened`, che comprende
+la scelta del documento ed il consenso nella sezione Documenti. La scelta
+non può partire durante l'ammissione. Senza documenti la richiesta resta
+aperta e Revoca resta disponibile. Un'altra richiesta della stessa funzione
+restituisce `synthesis-busy` anche durante la scelta.
+
+Consenso, generazione, fonti, ricevuta e scarto riusano la sintesi GPUI,
+senza scritture. La chat riceve soltanto `status`: `requested`, `preparing`,
+`synthesis-opened`, `synthesis-unavailable`, `synthesis-busy`,
+`synthesis-closed` oppure `withdrawn`. Nessun documento o risultato passa
+al modello della chat.
+
+Quadro e sintesi condividono i controlli di ritiro in `GenerationArea`,
+con un legame distinto per funzione. `start` impedisce l'invio dopo il
+ritiro e cancella contesto e payload rifiutati. `take_running` impedisce
+la comparsa di una risposta ritirata. `follow_chat` lascia la scelta del
+documento aperta e rilascia la proprietà a proposta o termine della richiesta.
+La proposta dopo `synthesis-closed` appartiene alla finestra: revoca o EOF
+della chat non la tolgono, mentre il cambiamento del documento la rende
+superata secondo la validità nativa. Le stringhe `insight-*` non cambiano.
+
+Questo raccordo tecnico precisa gli stati già previsti da C-7. La qualifica
+dei due desktop, dei provider reali e dei tempi end-to-end resta separata.

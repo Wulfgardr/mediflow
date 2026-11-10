@@ -5,8 +5,6 @@
 
 use super::generation::{GenerationArea, GenerationPhase, Wipe, pencil_block};
 use super::*;
-#[cfg(unix)]
-use crate::chat_access::owner::{InsightOpen, Pending};
 use mediflow_runtime_client::{
     LocalHostAccess, PatientInsightOutcome, PatientInsightProposal, PatientInsightRequest,
     build_patient_insight_request, cited_sources, patient_insight_capture, patient_insight_message,
@@ -39,23 +37,6 @@ impl Wipe for PatientInsightRequest {
             source.text.zeroize();
         }
         self.body = Value::Null;
-    }
-}
-
-/// Richiesta della chat che ha aperto il Quadro di questa scheda, finché preparazione,
-/// consenso e generazione non finiscono. Resta fuori dall'area di generazione comune:
-/// riguarda solo il Quadro. Se la scheda cambia, la richiesta della chat è ritirata.
-#[cfg(unix)]
-#[derive(Default)]
-pub(super) struct InsightChat(pub(super) Option<Pending>);
-#[cfg(unix)]
-impl Drop for InsightChat {
-    fn drop(&mut self) {
-        if let Some(chat) = self.0.take()
-            && let Ok(mut chat) = chat.lock()
-        {
-            chat.withdraw();
-        }
     }
 }
 
@@ -195,15 +176,6 @@ impl ClinicalApp {
         let InsightPhase::Consent(consented) = &self.patient.insight.phase else {
             return;
         };
-        // La chat che ha aperto il Quadro lo ha ritirato fra un controllo periodico e
-        // l'altro: il consenso non vale più e nessun dato parte.
-        if self.insight_chat_withdrawn() {
-            self.patient
-                .insight
-                .end(InsightPhase::Ended(CHAT_WITHDRAWN.into()));
-            cx.notify();
-            return;
-        }
         let consented_sources = consented.sources.clone();
         let consented_revision = consented.patient_revision;
         let Some(access) = self.local_host.access() else {
@@ -250,11 +222,12 @@ impl ClinicalApp {
         cx: &mut Context<Self>,
     ) {
         let context = access.generation_context();
-        let sent = request.clone();
-        self.patient.insight.end(InsightPhase::Running {
-            request: Box::new(request),
-            context: context.clone(),
-        });
+        let mut sent = request.clone();
+        if !self.patient.insight.start(request, context.clone()) {
+            sent.wipe();
+            cx.notify();
+            return;
+        }
         let ticket = self.patient.insight.ticket.clone();
         let patient_id = sent.patient_id.clone();
         self.run(
@@ -277,15 +250,6 @@ impl ClinicalApp {
             return;
         }
         if !matches!(self.patient.insight.phase, InsightPhase::Running { .. }) {
-            return;
-        }
-        // La chat che ha chiesto questo Quadro lo ha ritirato mentre la risposta era in
-        // volo: la proposta non compare, anche se il controllo periodico non è ancora passato.
-        if self.insight_chat_withdrawn() {
-            self.patient
-                .insight
-                .end(InsightPhase::Ended(CHAT_WITHDRAWN.into()));
-            cx.notify();
             return;
         }
         let Some(request) = self.patient.insight.take_running() else {
@@ -528,194 +492,6 @@ impl ClinicalApp {
             }
         }
         pane
-    }
-}
-
-const CHAT_WITHDRAWN: &str = "La chat ha ritirato la richiesta. Nessuna proposta.";
-
-impl ClinicalApp {
-    /// Vero se il Quadro è legato a una richiesta della chat che non vale più.
-    fn insight_chat_withdrawn(&self) -> bool {
-        #[cfg(unix)]
-        if let Some(chat) = &self.patient.insight_chat.0 {
-            return !chat
-                .lock()
-                .is_ok_and(|mut p| p.insight_bound() || p.insight_open());
-        }
-        false
-    }
-}
-
-#[cfg(unix)]
-/// Il Quadro sta lavorando o mostra una proposta: una richiesta della chat non lo sostituisce.
-fn insight_busy(phase: &InsightPhase) -> bool {
-    matches!(
-        phase,
-        InsightPhase::Checking
-            | InsightPhase::Consent(_)
-            | InsightPhase::Running { .. }
-            | InsightPhase::Proposal { .. }
-    )
-}
-
-#[cfg(unix)]
-impl ClinicalApp {
-    /// Comando app-only della chat: apre il Quadro del paziente selezionato nella
-    /// finestra. Consenso, generazione, fonti, ricevuta e scarto restano qui; la chat
-    /// riceve `insight-opened`, `insight-unavailable`, `insight-busy` o un ritiro.
-    pub(super) fn open_chat_insight(&mut self, pending: &Pending, cx: &mut Context<Self>) {
-        let binding = self
-            .session
-            .as_ref()
-            .filter(|session| !session.is_locked())
-            .filter(|_| {
-                self.chat_access.pending.is_none()
-                    && !self.chat_access.voice.is_open()
-                    && !self.patient_document.is_open()
-                    && self.form.is_none()
-                    && !self.local_work_pending()
-                    && !self.privacy_shield
-            })
-            .and_then(|session| {
-                let scope = self.scope.as_deref()?;
-                let patient = self.insight_patient()?;
-                Some((
-                    session.clone(),
-                    session.chat_access_context(scope, &patient.id).ok()?,
-                    patient.id.clone(),
-                ))
-            });
-        let Some((session, context, patient_id)) = binding else {
-            if let Ok(mut p) = pending.lock() {
-                p.withdraw();
-            }
-            cx.notify();
-            return;
-        };
-        if !pending
-            .lock()
-            .is_ok_and(|mut p| p.insight_requested() && p.bind(session, context))
-        {
-            if let Ok(mut p) = pending.lock() {
-                p.withdraw();
-            }
-            cx.notify();
-            return;
-        }
-        let early =
-            if self.patient.insight_chat.0.is_some() || insight_busy(&self.patient.insight.phase) {
-                Some(InsightOpen::Busy)
-            } else if self.local_host.access().is_none() {
-                Some(InsightOpen::Unavailable)
-            } else {
-                None
-            };
-        if let Some(outcome) = early {
-            if let Ok(mut p) = pending.lock() {
-                p.finish_insight_open(outcome);
-            }
-            cx.notify();
-            return;
-        }
-        // Un esito precedente (scarto, errore) lascia il posto alla richiesta della chat.
-        self.patient.insight.end(InsightPhase::Idle);
-        self.patient.insight_chat.0 = Some(pending.clone());
-        let admitting = pending.clone();
-        let target = pending.clone();
-        self.run(
-            move || Ok(crate::chat_access::owner::admit_insight(&admitting)),
-            move |this, admitted, cx| {
-                let current = this
-                    .patient
-                    .insight_chat
-                    .0
-                    .as_ref()
-                    .is_some_and(|chat| Arc::ptr_eq(chat, &target))
-                    && this.selected_id.as_deref() == Some(patient_id.as_str());
-                if !current || !matches!(admitted, Ok(true)) {
-                    if let Ok(mut p) = target.lock() {
-                        p.withdraw();
-                    }
-                    if current {
-                        this.patient.insight_chat.0 = None;
-                    }
-                    return;
-                }
-                if insight_busy(&this.patient.insight.phase) {
-                    if let Ok(mut p) = target.lock() {
-                        p.finish_insight_open(InsightOpen::Busy);
-                    }
-                    this.patient.insight_chat.0 = None;
-                    return;
-                }
-                if this.patient_section != PatientSection::Overview {
-                    this.section_selected(PatientSection::Overview, cx);
-                }
-                this.insight_prepare(cx);
-            },
-            cx,
-        );
-        cx.notify();
-    }
-
-    /// Segue la richiesta della chat legata al Quadro: comunica l'apertura quando la
-    /// richiesta è pronta per il consenso e interrompe preparazione o generazione se la
-    /// chat ritira, la sessione si chiude o la selezione cambia. Una proposta già
-    /// mostrata appartiene alla finestra e non viene più legata alla chat.
-    pub(super) fn poll_chat_insight(&mut self, cx: &mut Context<Self>) {
-        let Some(chat) = self.patient.insight_chat.0.clone() else {
-            return;
-        };
-        let (bound, open) = chat
-            .lock()
-            .map(|mut p| (p.insight_bound(), p.insight_open()))
-            .unwrap_or((false, false));
-        if !bound && !open {
-            self.patient.insight_chat.0 = None;
-            match self.patient.insight.phase {
-                InsightPhase::Checking
-                | InsightPhase::Consent(_)
-                | InsightPhase::Running { .. } => {
-                    self.patient
-                        .insight
-                        .end(InsightPhase::Ended(CHAT_WITHDRAWN.into()));
-                    cx.notify();
-                }
-                _ => {}
-            }
-            return;
-        }
-        if bound {
-            let outcome = match &self.patient.insight.phase {
-                // Ammissione sul server o lettura dell'interruttore ancora in corso.
-                InsightPhase::Idle | InsightPhase::Checking => return,
-                InsightPhase::Consent(_) => Some(InsightOpen::Opened),
-                InsightPhase::Unavailable(_) => Some(InsightOpen::Unavailable),
-                _ => None,
-            };
-            if let Ok(mut p) = chat.lock() {
-                match outcome {
-                    Some(outcome) => p.finish_insight_open(outcome),
-                    None => p.withdraw(),
-                }
-            }
-            if outcome != Some(InsightOpen::Opened) {
-                self.patient.insight_chat.0 = None;
-            }
-            cx.notify();
-            return;
-        }
-        // Proposta, scarto, errore o indisponibilità: la proprietà della chat finisce qui.
-        if !matches!(
-            self.patient.insight.phase,
-            InsightPhase::Consent(_) | InsightPhase::Running { .. }
-        ) {
-            if let Ok(mut p) = chat.lock() {
-                p.close_insight();
-            }
-            self.patient.insight_chat.0 = None;
-            cx.notify();
-        }
     }
 }
 
