@@ -108,13 +108,15 @@ ritirata senza rinnovo, anche durante consenso o generazione.
 - **Comando previsto:** `{"command":"smart-import"}`, senza argomenti.
 - **Permessi e capability:** gli stessi del Quadro, più l'interruttore
   dell'importazione assistita e, per applicare, le capability di scrittura di
-  diagnosi e terapie. Prerequisito: la vista GPUI dell'import assistito in
-  `main`; oggi GPUI ne mostra solo l'interruttore.
+  diagnosi e terapie. Prerequisito: la vista GPUI dell'import assistito, che
+  arriva con la #901 come sola anteprima (candidati con la loro fonte, nessun
+  comando di applicazione). L'applicazione dei candidati aspetta il contratto
+  G-6j, in GPUI come dalla chat.
 - **Stati alla chat:** `import-opened`, `import-unavailable`, `import-busy`,
   `import-closed`, `withdrawn`. Nessuna ricevuta di scrittura alla chat: l'esito di ogni
   candidato applicato resta nella finestra.
-- **Nella finestra:** candidati (diagnosi, terapie) con fonti nel documento;
-  ogni applicazione è un gesto esplicito per candidato, con revisione e
+- **Nella finestra:** candidati (diagnosi, terapie, prestazioni) con la fonte
+  della scheda da cui vengono; dopo G-6j, ogni applicazione sarà un gesto esplicito per candidato, con revisione e
   conferma nativa e il writer comune. È l'unica delle tre funzioni che può
   scrivere nella scheda.
 - **Negativi C-7:** gli stessi otto, più: nessuna applicazione senza gesto per

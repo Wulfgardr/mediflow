@@ -14,6 +14,7 @@ mod patient_insight;
 mod references;
 mod retention;
 mod security;
+mod smart_import;
 mod territorial;
 mod who_administration;
 mod work_profile;
@@ -45,6 +46,7 @@ pub use retention::*;
 pub use security::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+pub use smart_import::*;
 use std::sync::{
     Arc, Mutex, Weak,
     atomic::{AtomicBool, Ordering},
