@@ -480,6 +480,21 @@ pub fn plain_text(source: &str) -> String {
 }
 
 pub fn display_date(value: Option<&str>) -> String {
+    display_date_in_zone(value, &chrono::Local)
+}
+
+/// Giorno da mostrare nel fuso della postazione, come fa il Web con `new Date`.
+/// Un istante con ora (`2026-11-04T23:30:00.000Z`) cade nel giorno locale
+/// (05/11 a Roma). Una data pura resta il suo giorno di calendario in ogni
+/// fuso: sia `AAAA-MM-GG` sia la mezzanotte UTC con cui l'host salva nascita,
+/// inizio e fine terapia e le date scritte senza ora.
+pub fn display_date_in_zone<T: chrono::TimeZone>(value: Option<&str>, zone: &T) -> String
+where
+    T::Offset: std::fmt::Display,
+{
+    if let Some(local) = value.and_then(|value| clinical_instant_in_zone(value, zone)) {
+        return local.format("%d/%m/%Y").to_string();
+    }
     match value {
         Some(value)
             if value.len() >= 10
@@ -492,6 +507,38 @@ pub fn display_date(value: Option<&str>) -> String {
         Some(value) if !value.trim().is_empty() => value.to_owned(),
         _ => "Non indicata".into(),
     }
+}
+
+/// Istante con ora portato nel fuso indicato; `None` per le date pure (vedi
+/// [`display_date_in_zone`]) e per i testi che non sono un istante RFC 3339.
+fn clinical_instant_in_zone<T: chrono::TimeZone>(
+    value: &str,
+    zone: &T,
+) -> Option<chrono::DateTime<T>> {
+    let instant = chrono::DateTime::parse_from_rfc3339(value).ok()?;
+    let calendar_day = instant.offset().local_minus_utc() == 0
+        && instant.naive_utc().time() == chrono::NaiveTime::MIN;
+    (!calendar_day).then(|| instant.with_timezone(zone))
+}
+
+/// Data e ora di un istante tecnico (ricevute, raccolte, verifiche) nel fuso
+/// della postazione. Qui la mezzanotte UTC è un istante vero e si sposta.
+pub fn display_instant(value: &str) -> String {
+    display_instant_in_zone(value, &chrono::Local)
+}
+
+pub fn display_instant_in_zone<T: chrono::TimeZone>(value: &str, zone: &T) -> String
+where
+    T::Offset: std::fmt::Display,
+{
+    chrono::DateTime::parse_from_rfc3339(value)
+        .map(|instant| {
+            instant
+                .with_timezone(zone)
+                .format("%d/%m/%Y %H:%M")
+                .to_string()
+        })
+        .unwrap_or_else(|_| value.to_owned())
 }
 
 #[cfg(test)]
