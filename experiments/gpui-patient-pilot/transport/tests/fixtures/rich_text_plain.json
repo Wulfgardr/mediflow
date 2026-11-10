@@ -1,0 +1,52 @@
+[
+  {
+    "name": "paragrafi e grassetto",
+    "input": "<p><strong>PA</strong> 150/90 &amp; FC 88</p><p>Rivalutare fra 7 giorni</p>",
+    "plain": "PA 150/90 & FC 88\nRivalutare fra 7 giorni"
+  },
+  {
+    "name": "elenco con entità",
+    "input": "<ul><li>Edemi declivi &lt;2+&gt;</li><li>Saturazione 96%&nbsp;in aria</li></ul><p>Fine &quot;visita&quot; &#39;ok&#39;</p>",
+    "plain": "- Edemi declivi <2+>\n- Saturazione 96% in aria\nFine \"visita\" 'ok'"
+  },
+  {
+    "name": "emoji e piano astrale",
+    "input": "<p>Dolore 🩺 riferito 𝐀𝐁 e 👩🏽‍⚕️ presente</p><br><br><br><br><p>dopo</p>",
+    "plain": "Dolore 🩺 riferito 𝐀𝐁 e 👩🏽‍⚕️ presente\n\ndopo"
+  },
+  {
+    "name": "alias div b i strike",
+    "input": "<div class=\"x\"><b>Allergia</b> <i>penicillina</i> <strike>amoxicillina</strike> <del>vecchia</del></div><div>riga due</div>",
+    "plain": "Allergia penicillina amoxicillina vecchia\nriga due"
+  },
+  {
+    "name": "script e tag non ammessi",
+    "input": "<p>Testo<script>alert(1)</script> utile <span style=\"c\">qui</span><img/src=x onerror=y></p><style>p{}</style>",
+    "plain": "Testo utile qui"
+  },
+  {
+    "name": "maiuscole e br",
+    "input": "<P>Uno<BR/>Due<br />Tre</P><H2>Titolo</H2><blockquote> citazione </blockquote>",
+    "plain": "Uno\nDue\nTre\nTitolo\ncitazione"
+  },
+  {
+    "name": "tag non chiuso",
+    "input": "<p>Valore <140 e x < y</p><p>fine <strong",
+    "plain": "Valore fine <strong"
+  },
+  {
+    "name": "testo senza html",
+    "input": "  Pressione <140> e &amp; &#233; restano   così  ",
+    "plain": "Pressione  e & &#233; restano   così"
+  },
+  {
+    "name": "elenchi annidati e vuoti",
+    "input": "<p></p><ol><li>Uno</li><li>Due<ul><li>Due.a</li></ul></li></ol><p>  </p><h1> </h1>",
+    "plain": "- Uno\n- Due\n- Due.a"
+  },
+  {
+    "name": "vuoto",
+    "input": "   ",
+    "plain": ""
+  }
+]

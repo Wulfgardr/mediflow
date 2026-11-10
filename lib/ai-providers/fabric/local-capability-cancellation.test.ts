@@ -174,8 +174,24 @@ test('patient_insight/ollama: cancelling the request between the attempts sends 
     const result = await work; assert.equal(result.status, 401); assert.doesNotMatch(await result.text(), /Synthetic technical result/u);
     assert.equal(f.observation().chats, 1);
 });
-test('smart_import/ollama: a malformed answer is still not retried (correction scoped to Patient Insight)', async t => {
+// Lo stesso secondo tentativo per l'import assistito.
+test('smart_import/ollama: a malformed answer then a valid one publishes after two identical chat requests', async t => {
+    const f = fixture(t, 'smart_import', 'valid', { bodies: [{ content: '{malformed' }, { content: response('smart_import') }] });
+    const work = f.run(new AbortController()); await f.entered; f.release();
+    const result = await work; assert.equal(result.status, 200);
+    const value = await result.json(); assert.equal(value.status, 'available'); assert.equal(value.writesPerformed, 0);
+    assert.equal(f.observation().chats, 2); assert.equal(f.bodies[0], f.bodies[1]);
+});
+test('smart_import/ollama: two malformed answers keep proposal_invalid and stop at two chat requests', async t => {
     const f = fixture(t, 'smart_import', 'malformed'), work = f.run(new AbortController());
     await f.entered; f.release();
-    const value = await (await work).json(); assert.equal(value.code, 'proposal_invalid'); assert.equal(f.observation().chats, 1);
+    const value = await (await work).json(); assert.equal(value.code, 'proposal_invalid'); assert.equal(f.observation().chats, 2);
+});
+test('smart_import/ollama: cancelling the request between the attempts sends no second chat and publishes nothing', async t => {
+    const controller = new AbortController();
+    const f = fixture(t, 'smart_import', 'valid', { bodies: [{ content: '{malformed' }, { content: response('smart_import') }],
+        onKillRead: read => { if (read === 2) controller.abort(); } });
+    const work = f.run(controller); await f.entered; f.release();
+    const result = await work; assert.equal(result.status, 401); assert.doesNotMatch(await result.text(), /Synthetic technical result/u);
+    assert.equal(f.observation().chats, 1);
 });

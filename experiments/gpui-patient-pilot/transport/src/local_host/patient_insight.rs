@@ -154,7 +154,11 @@ pub fn build_patient_insight_request(capture: &Value) -> Result<PatientInsightRe
         .take(MAX_ITEMS)
         .filter_map(|value| {
             let title = text_field(value, "title", 96);
-            let content = text_field(value, "content", 220);
+            // Le voci di diario sono testo ricco: al modello va il testo semplice del Web,
+            // tagliato dopo la conversione.
+            let content = value["content"]
+                .as_str()
+                .and_then(|text| bounded_text(&rich_text_plain(text), 220));
             if title.is_none() && content.is_none() {
                 return None;
             }
