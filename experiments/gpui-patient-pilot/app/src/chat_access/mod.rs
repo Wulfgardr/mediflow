@@ -384,12 +384,13 @@ fn generative_function(value: &Value) -> Option<owner::Function> {
     .map(|(function, _)| function)
 }
 
-#[cfg(test)]
+// Usate soltanto dai test dell'owner, che girano su macOS.
+#[cfg(all(test, target_os = "macos"))]
 fn is_insight_command(value: &Value) -> bool {
     generative_function(value) == Some(owner::Function::Insight)
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 fn is_synthesis_command(value: &Value) -> bool {
     generative_function(value) == Some(owner::Function::Synthesis)
 }
