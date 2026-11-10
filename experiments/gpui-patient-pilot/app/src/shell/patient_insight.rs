@@ -3,6 +3,7 @@
 //! chiede il consenso all'invio, mostra proposta, fonti e ricevuta e permette di
 //! interromperla o scartarla. Nessuna azione scrive nella scheda.
 
+use super::generation::{GenerationArea, GenerationPhase, Wipe, pencil_block};
 use super::*;
 use mediflow_runtime_client::{
     LocalHostAccess, PatientInsightOutcome, PatientInsightProposal, PatientInsightRequest,
@@ -13,79 +14,30 @@ use serde_json::Value;
 use std::sync::Arc;
 use zeroize::Zeroize;
 
-#[derive(Default)]
-pub(super) enum InsightPhase {
-    #[default]
-    Idle,
-    Checking,
-    Unavailable(String),
-    Consent(Box<PatientInsightRequest>),
-    Running {
-        request: Box<PatientInsightRequest>,
-        context: RequestContext,
-    },
-    Proposal {
-        request: Box<PatientInsightRequest>,
-        proposal: Box<PatientInsightProposal>,
-    },
-    /// Fine senza proposta per scelta di chi usa la scheda (scarto, interruzione, rinuncia).
-    Ended(String),
-    Error(String),
-}
-
+pub(super) type InsightPhase = GenerationPhase<PatientInsightRequest, PatientInsightProposal>;
 /// Stato del Quadro paziente, legato a una sola scheda: cambia con `PatientData`.
-#[derive(Default)]
-pub(super) struct PatientInsightArea {
-    ticket: Arc<()>,
-    pub(super) phase: InsightPhase,
-}
-impl PatientInsightArea {
-    fn renew(&mut self) -> Arc<()> {
-        self.ticket = Arc::new(());
-        self.ticket.clone()
-    }
-    fn end(&mut self, phase: InsightPhase) {
-        if let InsightPhase::Running { context, .. } = &self.phase {
-            context.cancel();
+pub(super) type PatientInsightArea = GenerationArea<PatientInsightRequest, PatientInsightProposal>;
+
+impl Wipe for PatientInsightProposal {
+    fn wipe(&mut self) {
+        for text in [&mut self.summary, &mut self.model]
+            .into_iter()
+            .chain(self.current_state.iter_mut())
+            .chain(self.alerts.iter_mut())
+            .chain(self.next_steps.iter_mut())
+            .chain(self.gaps.iter_mut())
+        {
+            text.zeroize();
         }
-        wipe_phase(&mut self.phase);
-        self.renew();
-        self.phase = phase;
     }
 }
-impl Drop for PatientInsightArea {
-    fn drop(&mut self) {
-        if let InsightPhase::Running { context, .. } = &self.phase {
-            context.cancel();
+impl Wipe for PatientInsightRequest {
+    fn wipe(&mut self) {
+        for source in &mut self.sources {
+            source.text.zeroize();
         }
-        wipe_phase(&mut self.phase);
+        self.body = Value::Null;
     }
-}
-fn wipe_phase(phase: &mut InsightPhase) {
-    match phase {
-        InsightPhase::Proposal { proposal, request } => {
-            for text in [&mut proposal.summary, &mut proposal.model]
-                .into_iter()
-                .chain(proposal.current_state.iter_mut())
-                .chain(proposal.alerts.iter_mut())
-                .chain(proposal.next_steps.iter_mut())
-                .chain(proposal.gaps.iter_mut())
-            {
-                text.zeroize();
-            }
-            wipe_request(request);
-        }
-        InsightPhase::Consent(request) | InsightPhase::Running { request, .. } => {
-            wipe_request(request)
-        }
-        _ => {}
-    }
-}
-fn wipe_request(request: &mut PatientInsightRequest) {
-    for source in &mut request.sources {
-        source.text.zeroize();
-    }
-    request.body = Value::Null;
 }
 
 /// Una riga mostrata: sezione, testo, fonti citate risolte nel testo inviato.
@@ -146,10 +98,7 @@ impl ClinicalApp {
     /// Primo passo: verifica che la funzione sia accesa sull'host e prepara la
     /// richiesta da mostrare. Nessun dato clinico lascia GPUI in questo passo.
     pub(super) fn insight_prepare(&mut self, cx: &mut Context<Self>) {
-        if matches!(
-            self.patient.insight.phase,
-            InsightPhase::Checking | InsightPhase::Running { .. }
-        ) {
+        if self.patient.insight.phase.is_busy() {
             return;
         }
         let Some(access) = self.local_host.access() else {
@@ -185,7 +134,7 @@ impl ClinicalApp {
                 build_patient_insight_request(&capture).map(Some)
             },
             move |this, result, cx| {
-                if !Arc::ptr_eq(&ticket, &this.patient.insight.ticket)
+                if !this.patient.insight.holds(&ticket)
                     || this.selected_id.as_deref() != Some(patient_id.as_str())
                 {
                     return;
@@ -296,16 +245,10 @@ impl ClinicalApp {
         cx: &mut Context<Self>,
     ) {
         // Una risposta tardiva non appartiene a un'altra scheda né a una richiesta interrotta.
-        if !Arc::ptr_eq(ticket, &self.patient.insight.ticket)
-            || self.selected_id.as_deref() != Some(patient_id)
-        {
+        if !self.patient.insight.holds(ticket) || self.selected_id.as_deref() != Some(patient_id) {
             return;
         }
-        if !matches!(self.patient.insight.phase, InsightPhase::Running { .. }) {
-            return;
-        }
-        let InsightPhase::Running { request, .. } = std::mem::take(&mut self.patient.insight.phase)
-        else {
+        let Some(request) = self.patient.insight.take_running() else {
             return;
         };
         let shown = match result {
@@ -338,7 +281,7 @@ impl ClinicalApp {
             Err(phase) => {
                 // Senza proposta il testo inviato non serve più: non resta in memoria.
                 let mut request = request;
-                wipe_request(&mut request);
+                request.wipe();
                 phase
             }
         };
@@ -482,14 +425,7 @@ impl ClinicalApp {
                 }
                 pane = pane
                     .child(
-                        div()
-                            .min_w_0()
-                            .border_l_2()
-                            .border_color(theme.pencil)
-                            .pl(px(14.))
-                            .flex()
-                            .flex_col()
-                            .gap(px(10.))
+                        pencil_block(theme)
                             .child(line("Proposta da rivedere. La scheda resta invariata.".into()))
                             .children(insight_lines(request, proposal).into_iter().enumerate().map(
                                 |(index, row)| {
