@@ -139,6 +139,16 @@ for (const mutation of ['outside position', 'other output', 'unhashed name', 'wr
       payloadRoot: f.payloadRoot, allowPayloadAliases: false }), /Build input metadata:/u));
   });
 }
+test('a rejection names the path to clear: the alias a Swift build leaves in the source', { skip: process.platform === 'win32' && 'Directory symlinks need a privilege on Windows' }, t => {
+  const f = metadataFixture(t), build = path.join(f.sourceRoot, 'native/MediFlowMac/.build');
+  fs.mkdirSync(path.join(build, 'out/Products/Debug'), { recursive: true });
+  fs.symlinkSync('out/Products/Debug', path.join(build, 'debug'));
+  assert.throws(f.inspect, { message: 'Build input metadata: unadmitted alias: "native/MediFlowMac/.build/debug"' });
+  f.put(path.join(f.sourceRoot, 'nested/archive.db'));
+  fs.rmSync(build, { recursive: true });
+  assert.throws(f.inspect, { message: 'Build input metadata: private file is reachable: "nested/archive.db"' });
+});
+
 test('explicit owned data root is denied even with a name outside the directory conventions', t => {
   const f = metadataFixture(t), data = path.join(f.sourceRoot, 'innocent'); fs.mkdirSync(data);
   withoutContentAccess(f, () => assert.throws(() => assertBuildInputMetadata({ sourceRoot: f.sourceRoot, protectedRoots: [data] }), /data directory/u));

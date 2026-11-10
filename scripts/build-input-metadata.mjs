@@ -24,9 +24,9 @@ function physical(file, directory, linkedDependency = false) {
     current = path.join(current, parts[index]);
     const stat = fs.lstatSync(current);
     if (stat.isSymbolicLink() || (index < parts.length - 1 || directory
-      ? !stat.isDirectory() : !stat.isFile() || !linkedDependency && stat.nlink !== 1)) fail('nonphysical or multiply linked input');
+      ? !stat.isDirectory() : !stat.isFile() || !linkedDependency && stat.nlink !== 1)) fail(`nonphysical or multiply linked input: ${JSON.stringify(current)}`);
   }
-  if (fs.realpathSync(file) !== file) fail('aliased path');
+  if (fs.realpathSync(file) !== file) fail(`aliased path: ${JSON.stringify(file)}`);
 }
 
 export function macDerivedDataDirectory(sourceRoot, env = process.env) {
@@ -59,19 +59,21 @@ export function assertBuildInputMetadata({ sourceRoot, dependencyRoot, payloadRo
   function inspect(file, root) {
     root = roots.filter(value => inside(value, file)).sort((a, b) => b.length - a.length)[0] ?? root;
     const relative = path.relative(root, file).split(path.sep).join('/');
-    if (protectedPaths.some(value => inside(value, file))) fail('data directory is reachable');
-    if (privateDatabaseDependency(file) || /(?:^|\/)\.env(?:\.[^/]*)?$/iu.test(relative)) fail('private file is reachable');
+    // Chi si vede rifiutare la build deve sapere che cosa togliere: il motivo porta il percorso, mai il contenuto.
+    const reject = reason => fail(`${reason}: ${JSON.stringify(path.relative(sourceRoot, file).split(path.sep).join('/') || '.')}`);
+    if (protectedPaths.some(value => inside(value, file))) reject('data directory is reachable');
+    if (privateDatabaseDependency(file) || /(?:^|\/)\.env(?:\.[^/]*)?$/iu.test(relative)) reject('private file is reachable');
     const stat = fs.lstatSync(file);
     if (stat.isDirectory()) {
-      if (privateDirectory(relative)) fail('data or environment directory is reachable');
-      if (active.has(file)) fail('cyclic payload alias');
+      if (privateDirectory(relative)) reject('data or environment directory is reachable');
+      if (active.has(file)) reject('cyclic payload alias');
       if (visited.has(file)) return;
       visited.add(file); active.add(file);
       for (const name of fs.readdirSync(file)) inspect(path.join(file, name), root);
       active.delete(file);
     } else if (stat.isSymbolicLink()) {
       const inPayload = payloadRoot && inside(path.resolve(payloadRoot), file);
-      if (inPayload && !allowPayloadAliases) fail('materialized payload contains an alias');
+      if (inPayload && !allowPayloadAliases) reject('materialized payload contains an alias');
       const target = fs.realpathSync(file);
       const nodeModules = file.slice(0, file.lastIndexOf(`${path.sep}node_modules${path.sep}`) + '/node_modules'.length);
       const bin = /(?:^|\/)node_modules\/(?:.*\/)?\.bin\/[^/]+$/u.test(file.split(path.sep).join('/'));
@@ -85,16 +87,16 @@ export function assertBuildInputMetadata({ sourceRoot, dependencyRoot, payloadRo
       if (bin && roots.some(value => inside(value, nodeModules)) && inside(nodeModules, target)) physical(target, false, inside(dependencyRoot, target));
       else if (inPayload && inside(path.resolve(payloadRoot), target)) physical(target, fs.lstatSync(target).isDirectory());
       else if (packageAlias || intermediateAlias) physical(target, true);
-      else fail('unadmitted alias');
+      else reject('unadmitted alias');
       aliases.push({ link: file, target });
       inspect(target, packageAlias || intermediateAlias ? dependencyRoot : nodeModules);
-    } else if (!stat.isFile()) fail('special file');
+    } else if (!stat.isFile()) reject('special file');
     else if (stat.nlink !== 1) {
-      if (!inside(dependencyRoot, file) || payloadRoot && inside(path.resolve(payloadRoot), file)) fail('multiply linked source or payload file');
-      if (![stat.dev, stat.ino, stat.nlink].every(Number.isSafeInteger) || stat.ino <= 0 || stat.nlink < 2) fail('unverifiable dependency hardlink group');
+      if (!inside(dependencyRoot, file) || payloadRoot && inside(path.resolve(payloadRoot), file)) reject('multiply linked source or payload file');
+      if (![stat.dev, stat.ino, stat.nlink].every(Number.isSafeInteger) || stat.ino <= 0 || stat.nlink < 2) reject('unverifiable dependency hardlink group');
       const key = `${stat.dev}:${stat.ino}`;
       const group = linkedGroups.get(key) ?? { links: stat.nlink, peers: new Set() };
-      if (group.links !== stat.nlink) fail('dependency hardlink group changed');
+      if (group.links !== stat.nlink) reject('dependency hardlink group changed');
       group.peers.add(file); linkedGroups.set(key, group);
     }
   }
