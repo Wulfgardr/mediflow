@@ -11,7 +11,7 @@ senza diagnostiche. In questo campione locale, la mediana di `tsc-ts` è
 baseline 5.9.3. Il riferimento ufficiale TS7 consente di confrontare due
 implementazioni native sul medesimo grafo effettivamente risolto.
 
-La [ricevuta compatta](../../experiments/gpui-patient-pilot/evidence/connected/tsc-ts-typecheck-validation.json)
+La [ricevuta compatta](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/tsc-ts-typecheck-validation.json)
 contiene i nove campioni, exit code, tempi CPU, RSS, integrità dei quattro
 pacchetti, hash dei motori, degli ingressi e dei manifest completi.
 Il [driver pubblicato](../../experiments/gpui-patient-pilot/comparison/typecheck-benchmark.py)
