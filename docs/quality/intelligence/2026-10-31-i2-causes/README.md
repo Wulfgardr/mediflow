@@ -36,6 +36,6 @@ Restano conservati: primo tentativo diagnostico fallito per precaricamento; riav
 
 22 test mirati dei controller e adapter HTTP, 2 test del registro, never-regress, database import boundary e selezione test superati. Nessuna modifica al contratto: contractSha256 invariato. Nessuna prova I-5/I-6. Treatment Reasoning e ATHENA rimangono rinviate oltre 0.9.1 e non sono state invocate. Claim su cifratura e zero-knowledge invariati.
 
-Dossier esterno: `/Users/leonardopegollo/Antigravity/mf-coord-091/fix-i2-causes-evidence-20261031`. Contiene banco, ricevute, risposte, screenshot, log, campioni e manifest SHA-256. Testo generato e archivi sintetici restano fuori da Git. Server dedicati e figli posseduti terminati, `/api/ps` finale vuoto. Nessun merge e nessuna attesa della CI.
+Dossier esterno: `~/Antigravity/mf-coord-091/fix-i2-causes-evidence-20261031`. Contiene banco, ricevute, risposte, screenshot, log, campioni e manifest SHA-256. Testo generato e archivi sintetici restano fuori da Git. Server dedicati e figli posseduti terminati, `/api/ps` finale vuoto. Nessun merge e nessuna attesa della CI.
 
 Sviluppo assistito: GPT 6.1 Sol, effort high, senza delega. Rilavorazioni del solo banco descritte sopra; consumi non attribuibili.

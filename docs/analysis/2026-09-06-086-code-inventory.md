@@ -3,7 +3,7 @@
 Snapshot date: 2026-09-06
 Baseline: `c160bdce250c0120682f45e3dd1a9d587f7b9935`
 Branch: `codex/WUL-683-086-deslop`
-Worktree: `/Users/leonardopegollo/.codex/worktrees/mediflow-086-deslop`
+Worktree: `~/.codex/worktrees/mediflow-086-deslop`
 
 This is a bounded inventory and evidence-backed debt classification for the
 deslop section of [`docs/roadmap-086-consolidamento.md`](../roadmap-086-consolidamento.md#6-deslop-globale-del-codice--essenziale).

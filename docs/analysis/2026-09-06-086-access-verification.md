@@ -62,7 +62,7 @@ contract or a real data dependency.
 ## Commands and results
 
 All commands below used Node `v24.19.0` from
-`/Users/leonardopegollo/.nvm/versions/node/v24.19.0/bin`.
+`~/.nvm/versions/node/v24.19.0/bin`.
 
 1. Focused auth matrix:
 

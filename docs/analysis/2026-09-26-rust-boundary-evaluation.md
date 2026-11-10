@@ -14,7 +14,7 @@ da conservare come materiale di confronto. Nessuna issue è chiusa o modificata.
 
 ## Provenienza e responsabilità
 
-Il worktree dedicato è `/Users/leonardopegollo/.codex/worktrees/94d6/medical-record-app`,
+Il worktree dedicato è `~/.codex/worktrees/94d6/medical-record-app`,
 branch `codex/WUL-706-rust-boundary-20260926`, base
 `6c212221a98f9b8e45cc1d243226d0adb41770bd`. La lettura di Linear è del
 26 settembre 2026; lo snapshot originale è in
