@@ -48,6 +48,7 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
             "insight-opened",
             "insight-unavailable",
             "insight-busy",
+            "insight-closed",
             "preparing",
             "selecting",
             "challenge",

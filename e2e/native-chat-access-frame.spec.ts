@@ -249,6 +249,7 @@ for (const width of [390, 1440]) for (const [status, text] of [
     ['insight-opened', 'Quadro paziente aperto nella finestra MediFlow'],
     ['insight-unavailable', 'Quadro paziente non disponibile'],
     ['insight-busy', 'già in uso nella finestra MediFlow'],
+    ['insight-closed', 'concluso nella finestra MediFlow'],
 ]) test(`patient insight ${status} returns only the state at ${width}`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 1000 });
     await page.evaluate(status => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = status; }, status);
@@ -258,10 +259,27 @@ for (const width of [390, 1440]) for (const [status, text] of [
     await expect(frame.locator('#card')).toBeHidden();
     await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeDisabled();
     await expect(frame.getByRole('button', { name: 'Apri il Quadro paziente in MediFlow' })).toBeDisabled();
+    // La chat possiede la richiesta solo finché la finestra attende il consenso o genera.
+    if (status === 'insight-opened') await expect(frame.getByRole('button', { name: 'Revoca' })).toBeEnabled();
+    else await expect(frame.getByRole('button', { name: 'Revoca' })).toBeDisabled();
     const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: unknown }[] } }).accessFixture.calls);
-    expect(calls.map(call => call.arguments)).toEqual([{ command: 'attach' }, { command: 'patient-insight' }]);
+    // Solo comando e rinnovi di stato, mai altri argomenti.
+    expect(calls.map(call => call.arguments).slice(0, 2)).toEqual([{ command: 'attach' }, { command: 'patient-insight' }]);
+    expect(calls.slice(2).every(call => JSON.stringify(call.arguments) === '{"command":"status"}')).toBe(true);
     expect(await frame.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     await page.screenshot({ path: info.outputPath(`insight-${status}.png`), fullPage: true });
+});
+
+test('patient insight can be revoked from the chat while the native window owns consent and generation', async ({ page }) => {
+    await page.evaluate(() => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = 'insight-opened'; });
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Apri il Quadro paziente in MediFlow' }).click();
+    await expect(frame.getByRole('status')).toContainText('Quadro paziente aperto');
+    await frame.getByRole('button', { name: 'Revoca' }).click();
+    await expect(frame.getByRole('status')).toContainText('Richiesta ritirata');
+    await expect(frame.getByRole('button', { name: 'Revoca' })).toBeDisabled();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: { command: string } }[] } }).accessFixture.calls);
+    expect(calls.at(-1)?.arguments).toEqual({ command: 'revoke' });
 });
 
 test('patient insight refuses a reply that carries anything beyond the state', async ({ page }) => {

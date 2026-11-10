@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-8adbP0hMnQ2s1w4pALU/1QOfXITChxE9Sk47mVOap+c='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
+<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-iO72QSellijjYyFsnZY/5U8LMmpUrCJ1b5GTMf/IU3U='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
 <style>html{color-scheme:light dark;font:17px system-ui}body{margin:24px;max-width:40rem}h1{font-size:1.4rem;font-weight:500}button{font:inherit;margin:8px 8px 8px 0;padding:10px 16px}p{line-height:1.5}section{overflow-wrap:anywhere;border-top:1px solid GrayText;margin-top:20px}h2{font-size:1.15rem}li{margin-block:12px;line-height:1.5}</style></head>
 <body><h1>MediFlow</h1><p>Conferma l’accesso nella finestra MediFlow già sbloccata. La selezione clinica viene redatta localmente e condivisa dopo la tua revisione nella finestra nativa. Il rilevatore può sbagliare: il medico è responsabile di controllare i byte prima della conferma.</p>
 <p id="status" role="status" aria-live="polite">Collegamento alla chat…</p>
@@ -31,7 +31,7 @@
     let clinicalMode = false;
     let sequence = 0, ready = false, started = false, terminal = false, generation = 0, timer, expiry, therapyMode = false, documentMode = false, voiceMode = false, insightMode = false, drugMode = false, prostheticsMode = false, agendaMode = false, bookingMode = false;
     const bookingLabels = { requested: 'Richiesta inviata. Scegli data e ora nella finestra MediFlow.', challenge: 'Scegli data e ora e conferma con PIN nella finestra MediFlow entro 30 secondi.', retired: 'Ritiro confermato. Nessun controllo prenotato.', applied: 'Controllo prenotato e auditato. Il ritiro non annulla la prenotazione.', 'applied-historical': 'Controllo presente in agenda, da un archivio ripristinato. La ricevuta di audit originale non è disponibile qui. Non ripetere la prenotazione.', rejected: 'Prenotazione respinta: l’agenda è cambiata prima della conferma. Nessun controllo prenotato.' };
-    const insightLabels = { requested: 'Richiesta inviata alla finestra MediFlow.', preparing: 'Verifica nella finestra MediFlow…', 'insight-opened': 'Quadro paziente aperto nella finestra MediFlow. La proposta resta lì e non arriva alla chat.', 'insight-unavailable': 'Quadro paziente non disponibile: funzione spenta o host locale chiuso.', 'insight-busy': 'Il Quadro paziente è già in uso nella finestra MediFlow. Concludi lì e riprova.' };
+    const insightLabels = { requested: 'Richiesta inviata alla finestra MediFlow.', preparing: 'Verifica nella finestra MediFlow…', 'insight-opened': 'Quadro paziente aperto nella finestra MediFlow. La proposta resta lì e non arriva alla chat.', 'insight-unavailable': 'Quadro paziente non disponibile: funzione spenta o host locale chiuso.', 'insight-busy': 'Il Quadro paziente è già in uso nella finestra MediFlow. Concludi lì e riprova.', 'insight-closed': 'Quadro paziente concluso nella finestra MediFlow.' };
     const pending = new Map(), element = id => document.getElementById(id);
     const labels = { 'voice-opened': 'Continua in MediFlow: consenti la cattura locale, rivedi il testo e prepara la bozza. Nessun audio o testo viene restituito alla chat.', 'document-opened': 'Continua nella finestra MediFlow: scegli il PDF, rivedi i dati e conferma con PIN. L’apertura non conferma la creazione.', selecting: 'Scegli diagnosi e passi nella finestra MediFlow.', preparing: 'Redazione locale della scheda sintetica…', requested: 'Richiesta inviata alla finestra MediFlow.', challenge: 'Conferma nella finestra MediFlow entro 30 secondi.', approving: 'Conferma nativa in corso…', consuming: 'Verifica dell’accesso in corso…', approved: 'Accesso monouso autorizzato.', consumed: 'Scheda condivisa. Autorizzazione consumata.', uncertain: 'Esito da verificare. Rileggi nella finestra MediFlow; non ripetere la scrittura.', retired: 'Ritiro confermato. Nessuna modifica alla terapia.', applied: 'Modifica registrata e auditata. Il ritiro non annulla il salvataggio.', 'applied-historical': 'Presente nell’archivio, ripristinato da un altro archivio. La ricevuta di audit originale non è disponibile qui. Non ripetere la scrittura.', rejected: 'Scrittura respinta. Nessuna modifica.', closed: 'Comando chiuso senza modifica.', withdrawn: 'Accesso ritirato. Apri una nuova vista per richiederlo di nuovo.' };
     function rpc(method, params) { return new Promise((resolve, reject) => { const id = ++sequence; const timeout = setTimeout(() => { pending.delete(id); reject(new Error('timeout')); }, 10000); pending.set(id, { resolve, reject, timeout }); window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*'); }); }
@@ -204,9 +204,13 @@
     function applyResult(value, command) {
         let state = value?._meta?.status;
         if (insightMode) {
-            if (Object.hasOwn(insightLabels, state) && Object.keys(value?._meta || {}).length === 1) {
+            if (command === 'revoke') {
+                element('status').textContent = 'Richiesta ritirata. Nella finestra MediFlow il Quadro si interrompe senza proposta.';
+                stop();
+            } else if (Object.hasOwn(insightLabels, state) && Object.keys(value?._meta || {}).length === 1) {
                 element('status').textContent = insightLabels[state];
-                if (['requested', 'preparing'].includes(state)) timer = setTimeout(commandStatus, 1000);
+                // Finché la chat possiede la richiesta (consenso e generazione) si può revocare.
+                if (['requested', 'preparing', 'insight-opened'].includes(state)) { element('revoke').disabled = false; timer = setTimeout(commandStatus, 1000); }
                 else stop();
             } else {
                 element('status').textContent = 'Apertura non confermata. Controlla la finestra MediFlow.';

@@ -28,6 +28,9 @@ pub(crate) enum State {
     InsightUnavailable,
     /// Un Quadro è già in preparazione, in generazione o mostrato: non viene sostituito.
     InsightBusy,
+    /// Il Quadro aperto dalla chat è arrivato a proposta, scarto, errore o indisponibilità:
+    /// la chat non lo possiede più e non può più ritirarlo.
+    InsightClosed,
     Preparing,
     Selecting,
     Challenge,
@@ -47,6 +50,7 @@ impl State {
             Self::InsightOpened => "insight-opened",
             Self::InsightUnavailable => "insight-unavailable",
             Self::InsightBusy => "insight-busy",
+            Self::InsightClosed => "insight-closed",
             Self::Preparing => "preparing",
             Self::Selecting => "selecting",
             Self::Challenge => "challenge",
@@ -297,6 +301,15 @@ impl Request {
     /// cambio di selezione, archivio o blocco la ritirano.
     pub(crate) fn insight_open(&mut self) -> bool {
         self.insight && self.status() == State::InsightOpened
+    }
+    /// Fine della proprietà della chat: senza autorità residua, solo lo stato finale.
+    pub(crate) fn close_insight(&mut self) {
+        if !self.insight_open() {
+            self.withdraw();
+            return;
+        }
+        self.state = State::InsightClosed;
+        self.binding = None;
     }
     pub(crate) fn finish_insight_open(&mut self, outcome: InsightOpen) {
         if !self.insight_bound() {
@@ -1545,12 +1558,13 @@ pub(crate) mod tests {
     }
 
     /// Solo questi stati possono tornare alla chat dal comando del Quadro paziente.
-    const INSIGHT_WIRE: [&str; 5] = [
+    const INSIGHT_WIRE: [&str; 6] = [
         "requested",
         "preparing",
         "insight-opened",
         "insight-unavailable",
         "insight-busy",
+        "insight-closed",
     ];
     fn insight_reply(pending: &Pending) -> Value {
         let status = pending.lock().unwrap().status();
@@ -1689,6 +1703,31 @@ pub(crate) mod tests {
                 "{change}"
             );
         }
+    }
+
+    #[test]
+    fn closing_ends_chat_ownership_only_for_an_opened_insight() {
+        let (session, _host) = native_session();
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        let (pending, _remote) = insight_request();
+        assert!(pending.lock().unwrap().bind(session.clone(), context));
+        assert!(admit_insight(&pending));
+        pending
+            .lock()
+            .unwrap()
+            .finish_insight_open(InsightOpen::Opened);
+        pending.lock().unwrap().close_insight();
+        assert_eq!(insight_reply(&pending), json!({"status": "insight-closed"}));
+        {
+            let mut p = pending.lock().unwrap();
+            assert!(p.binding.is_none() && !p.insight_open() && !p.insight_bound());
+        }
+        // Una richiesta non ancora aperta non si chiude: si ritira.
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        let (early, _other) = insight_request();
+        assert!(early.lock().unwrap().bind(session, context));
+        early.lock().unwrap().close_insight();
+        assert_eq!(insight_reply(&early), json!({"status": "withdrawn"}));
     }
 
     #[test]
