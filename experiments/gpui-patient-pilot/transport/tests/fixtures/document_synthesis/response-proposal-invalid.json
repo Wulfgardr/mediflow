@@ -1,0 +1,7 @@
+{
+  "status": 503,
+  "body": {
+    "error": "Document Synthesis non disponibile.",
+    "code": "operation_unavailable"
+  }
+}

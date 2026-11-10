@@ -1,9 +1,11 @@
 mod archives;
 mod chatgpt;
 mod controls;
+mod document_synthesis;
 mod documents;
 mod dossier;
 mod drug_catalog;
+mod generation;
 mod governance;
 mod models;
 mod network;
@@ -24,9 +26,11 @@ use crate::{
 pub use archives::*;
 pub use chatgpt::*;
 pub use controls::*;
+pub use document_synthesis::*;
 pub use documents::*;
 pub use dossier::*;
 pub use drug_catalog::*;
+pub use generation::*;
 pub use governance::*;
 pub use models::*;
 pub use network::*;

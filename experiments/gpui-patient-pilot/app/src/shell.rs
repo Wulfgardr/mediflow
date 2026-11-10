@@ -15,6 +15,7 @@ mod document_curation;
 mod document_details;
 mod document_library;
 mod dossier_import;
+mod generation;
 mod local_host;
 pub(crate) mod local_preferences;
 mod local_settings;
