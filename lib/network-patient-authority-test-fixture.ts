@@ -21,8 +21,7 @@ export function installNetworkPatientCookieFixture(dataDir: string, state: {
     const source = `const s=globalThis[Symbol.for(${JSON.stringify(key)})];
 exports.headers=async()=>s.headers??new Headers();
 exports.cookies=async()=>{await s.onCookies?.();return {get:(name)=>s.cookies.has(name)?{name,value:s.cookies.get(name)}:undefined}};`;
-    const load = createRequire(import.meta.url);
-    const { registerHooks } = load('node:module') as { registerHooks: (hooks: {
+    const { registerHooks } = createRequire(import.meta.url)('node:module') as { registerHooks: (hooks: {
         resolve: (specifier: string, context: unknown, next: (specifier: string, context: unknown) => { url: string }) => { url: string; shortCircuit?: boolean };
         load: (url: string, context: unknown, next: (url: string, context: unknown) => unknown) => unknown;
     }) => { deregister: () => void } };
