@@ -18,6 +18,8 @@ pub(super) enum SettingsPage {
     Host,
     Danger,
     Retention,
+    #[cfg(target_os = "macos")]
+    VoiceLocal,
 }
 
 impl SettingsPage {
@@ -38,7 +40,25 @@ impl SettingsPage {
             Self::Host => 12,
             Self::Danger => 13,
             Self::Retention => 14,
+            #[cfg(target_os = "macos")]
+            Self::VoiceLocal => 15,
         }
+    }
+}
+
+/// Voce locale compare solo su macOS, dove c'è il motore whisper.
+fn voice_settings_row() -> Option<(SettingsPage, &'static str, &'static str)> {
+    #[cfg(target_os = "macos")]
+    {
+        Some((
+            SettingsPage::VoiceLocal,
+            "Voce locale",
+            "Modello per la dettatura sul Mac",
+        ))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        None
     }
 }
 
@@ -85,6 +105,10 @@ impl ClinicalApp {
         }
         if page == SettingsPage::Functions {
             self.load_ai_status(cx);
+        }
+        #[cfg(target_os = "macos")]
+        if page == SettingsPage::VoiceLocal {
+            self.open_voice_model(cx);
         }
         if page == SettingsPage::AiPreferences {
             self.load_ai_preferences(cx);
@@ -177,6 +201,8 @@ impl ClinicalApp {
             SettingsPage::Models => view
                 .child(heading("clinical-workspace-settings-heading", "Modelli e hardware", theme))
                 .child(self.models_view(cx)),
+            #[cfg(target_os = "macos")]
+            SettingsPage::VoiceLocal => view.child(self.voice_model_view(cx)),
             SettingsPage::Overview => {
                 let origin = self.session.as_ref().map(|session| session.base_url().to_owned()).unwrap_or_default();
                 view.child(heading("clinical-workspace-settings-heading", "Impostazioni", theme))
@@ -198,7 +224,7 @@ impl ClinicalApp {
                         (SettingsPage::Models, "Modelli", "Stato della configurazione sull’host"),
                         (SettingsPage::Functions, "Funzioni AI", "Preferenze e scelta del modello per funzione"),
                         (SettingsPage::Governance, "Governo Fabric", "Registro, sedi e verifiche salvate"),
-                    ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)))
+                    ].into_iter().chain(voice_settings_row()).map(|(page, label, description)| self.settings_item(page, label, description, cx)))
                     .child(section("clinical-workspace-connection-heading", "Archivio collegato", theme))
                     .child(text!(origin))
                     .child(button("clinical-workspace-settings-lock", "Blocca e nascondi i dati", theme, false, true)
@@ -279,7 +305,7 @@ mod tests {
                 window.draw(cx).clear(cx);
             });
             let nodes = rendered_command::take_text_nodes();
-            assert_eq!(nodes.len(), 13);
+            assert_eq!(nodes.len(), if cfg!(target_os = "macos") { 14 } else { 13 });
             let mut unique = HashSet::new();
             for (id, node) in nodes {
                 assert!(
@@ -313,6 +339,8 @@ mod tests {
                     SettingsPage::Governance,
                     SettingsPage::Controls,
                     SettingsPage::Retention,
+                    #[cfg(target_os = "macos")]
+                    SettingsPage::VoiceLocal,
                 ] {
                     app.settings_page = page;
                     let layout = Layout::for_window(1200., 1.);

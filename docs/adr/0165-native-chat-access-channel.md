@@ -179,7 +179,9 @@ Aggiornamento del 10 novembre 2026 (C-9a): su macOS la dettatura può usare anch
 whisper large-v3-turbo q5_0 con whisper.cpp e il rilevatore Silero, se il modello è
 installato in modo esplicito e il suo SHA-256 coincide; altrimenti resta il motore
 Apple. Il ponte Swift cattura l'audio e lo passa a Rust; stati, Review e trasferimento
-restano quelli descritti sopra. Dettagli e misure:
+restano quelli descritti sopra. L'installazione parte soltanto dal pulsante «Installa»
+in Impostazioni, Voce locale; aprire la pagina non apre connessioni, e
+`MEDIFLOW_NETWORK_DISABLED` la impedisce come per il catalogo AIFA (ADR 0125). Dettagli e misure:
 [nota di progetto](../analysis/2026-11-10-gpui-voce-whisper-locale.md).
 
 Riferimenti Apple: [SpeechTranscriber](https://developer.apple.com/documentation/speech/speechtranscriber)

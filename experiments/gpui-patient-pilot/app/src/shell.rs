@@ -35,6 +35,8 @@ mod smart_import;
 mod therapy_picker;
 mod threshold_actions;
 mod view_state;
+#[cfg(target_os = "macos")]
+mod voice_model;
 mod who_lookup;
 
 use crate::theme::{TypeRole, TypeStyle};
@@ -463,7 +465,9 @@ pub struct ClinicalApp {
     ai_refresh_target: ScrollTarget,
     ai_preferences: AiPreferences,
     settings_page: SettingsPage,
-    settings_targets: [ScrollTarget; 15],
+    settings_targets: [ScrollTarget; 16],
+    #[cfg(target_os = "macos")]
+    voice_model: voice_model::VoiceModelArea,
     local_host: local_host::LocalAdministration,
     account_profile: AccountProfile,
     who: WhoLookup,
@@ -731,6 +735,8 @@ impl ClinicalApp {
             ai_preferences: AiPreferences::new(&area_scroll, cx),
             settings_page: SettingsPage::Overview,
             settings_targets: ScrollTarget::group(&area_scroll, cx),
+            #[cfg(target_os = "macos")]
+            voice_model: voice_model::VoiceModelArea::default(),
             local_host: local_host::LocalAdministration::new(
                 theme,
                 &area_scroll,
@@ -809,6 +815,8 @@ impl ClinicalApp {
         #[cfg(unix)]
         app.start_chat_access(cx);
         let quit = cx.on_app_quit(|this, cx| {
+            #[cfg(target_os = "macos")]
+            this.voice_model.shutdown();
             let local_access = this.local_host.withdraw(cx);
             #[cfg(unix)]
             this.chat_access.detach(cx);
