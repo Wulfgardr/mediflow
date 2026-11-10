@@ -124,6 +124,9 @@ async function expectPatientIdentityPrivate(header: Locator, patient: { name: st
 }
 
 async function expectPatientHeaderCommands(page: Page, header: Locator, patientId: string): Promise<void> {
+  // Il colore a riposo si misura con il puntatore lontano: un clic precedente può lasciarlo
+  // sopra «Nuova voce», che allora mostra il colore di :hover.
+  await page.mouse.move(0, 0);
   const primary = header.getByRole('link', { name: 'Nuova voce', exact: true });
   const actions = header.getByRole('button', { name: 'Azioni', exact: true });
   await expect(header.locator('.mf-button-primary')).toHaveCount(1);
