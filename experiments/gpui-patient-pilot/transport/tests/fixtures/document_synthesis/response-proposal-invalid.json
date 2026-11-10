@@ -1,7 +1,7 @@
 {
-  "status": 503,
+  "status": 502,
   "body": {
     "error": "Document Synthesis non disponibile.",
-    "code": "operation_unavailable"
+    "code": "model_response_invalid"
   }
 }
