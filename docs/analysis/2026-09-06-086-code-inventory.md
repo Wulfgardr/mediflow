@@ -100,10 +100,10 @@ fixture UI tests and real app/host runs remain distinct. See
 
 Evidence:
 
-- [`hooks/use-patient-clipboard.ts:14-76`](../../hooks/use-patient-clipboard.ts)
+- [`hooks/use-patient-clipboard.ts:14-76`](https://github.com/Wulfgardr/mediflow/blob/70cd3c5a66c6a70f5dd3f90cd06549a8f22eab5f/hooks/use-patient-clipboard.ts)
   exports the React hook, but a first-party search found no runtime component
   importing `usePatientClipboard`.
-- [`lib/patient-clipboard.ts:21-70`](../../lib/patient-clipboard.ts) contains
+- [`lib/patient-clipboard.ts:21-70`](https://github.com/Wulfgardr/mediflow/blob/70cd3c5a66c6a70f5dd3f90cd06549a8f22eab5f/lib/patient-clipboard.ts) contains
   the corresponding copy/cut/paste transport and calls the bulk patient routes.
   Its observed consumers are its unit test and source-shape assertions in
   [`lib/live-query-scoped-invalidation.test.ts:72-80`](../../lib/live-query-scoped-invalidation.test.ts).

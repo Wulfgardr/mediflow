@@ -200,7 +200,7 @@ richiede prove proprie e non permette di chiamare unico il writer Node
 su tutte le superfici. La scelta non viene simulata da un flag o da test HTTP.
 
 Riutilizzare i registri esistenti senza attribuire loro un'operatività
-inesistente: [`lib/headless/application-operation-registry.ts`](../../lib/headless/application-operation-registry.ts)
+inesistente: [`lib/headless/application-operation-registry.ts`](https://github.com/Wulfgardr/mediflow/blob/1b83aded0a21db635b2854e30bd467610b666bd3/lib/headless/application-operation-registry.ts)
 è un catalogo statico `denied/unavailable`, con `operationId` e
 `applicationServiceRef` null. La separazione dei registri e il contratto
 clinico operativo di WUL-582 restano da qualificare.
