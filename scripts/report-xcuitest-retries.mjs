@@ -25,7 +25,18 @@ function errors(node) {
 function infrastructure(message) {
   if (/XCTAssert|XCTFail|Expectation failed|Assertion Failure/iu.test(message)) return false;
   return /(?:^|: )Failed to get background assertion\b/u.test(message)
-    || /(?:^|: )(?:Failed to boot simulator|Unable to boot (?:the )?Simulator)\b/iu.test(message);
+    || /(?:^|: )(?:Failed to boot simulator|Unable to boot (?:the )?Simulator)\b/iu.test(message)
+    || launchTimeout(message);
+}
+
+// Su un simulatore appena azzerato XCTest a volte non vede partire l'app entro
+// il suo tempo massimo: misurato il 9/11/2026, 5 avvii su 42 a freddo, prima di
+// qualunque asserzione del test. Vale come infrastruttura soltanto il tempo
+// scaduto, e soltanto se il tentativo successivo riesce (vedi `accepted`): un
+// avvio fallito per un altro motivo, per esempio un crash, resta bloccante.
+function launchTimeout(message) {
+  return /(?:^|: )Failed to get launch progress for <XCUIApplicationImpl: [^>]+>: Timed out while requesting launch progress\.?$/u.test(message)
+    || /(?:^|: )Failed to launch <XCUIApplicationImpl: [^>]+> via Xcode: Timed out while launching application via Xcode\.?$/u.test(message);
 }
 
 function cell(value) {

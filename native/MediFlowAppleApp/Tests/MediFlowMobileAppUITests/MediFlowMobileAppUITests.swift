@@ -203,11 +203,22 @@ final class MediFlowMobileAppUITests: XCTestCase {
                 XCTAssertTrue(row.waitForExistence(timeout: 15))
                 row.tap()
                 if expanded {
-                    for label in ["Strumenti con IA", "Altre sezioni della cartella"] {
-                        let header = app.staticTexts[label].firstMatch
-                        positionInChart(header)
-                        header.tap()
-                    }
+                    // Each disclosure is brought to mid-screen and must be open
+                    // before the chart is left. Tapping the label as soon as it
+                    // was hittable could land under the floating "Nuova voce"
+                    // button, and the return was then blamed for a disclosure
+                    // that had never opened.
+                    let aiTools = app.buttons["patient-ai-tools-disclosure"]
+                    positionInChart(aiTools)
+                    aiTools.tap()
+                    let firstVenue = app.descendants(matching: .any).matching(
+                        NSPredicate(format: "label BEGINSWITH %@", "Esegui la funzione")).firstMatch
+                    XCTAssertTrue(firstVenue.waitForExistence(timeout: 5), "The AI tools must be open before leaving the chart")
+                    let contents = app.buttons["patient-chart-contents-disclosure"]
+                    positionInChart(contents)
+                    contents.tap()
+                    XCTAssertTrue(app.buttons["patient-open-section-diary"].waitForExistence(timeout: 5),
+                                  "The collection summary must be open before leaving the chart")
                 }
                 let anchor = app.buttons["patient-summary-scales"]
                 positionInChart(anchor)
@@ -1275,7 +1286,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(ambulatoryScopePicker.waitForExistence(timeout: 5))
         XCTAssertTrue(ambulatoryScopePicker.isHittable)
         attachScreenshot(named: "audit-worklist")
-        try app.performAccessibilityAudit()
+        try performAuditNamingElements(screen: "worklist")
 
         app.terminate()
         launch(seedPatients: true, singlePatient: true)
@@ -1284,7 +1295,66 @@ final class MediFlowMobileAppUITests: XCTestCase {
         agendaTab.tap()
         let agenda = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
         waitForUIReady(agenda, in: app)
-        try app.performAccessibilityAudit()
+        try performAuditNamingElements(screen: "agenda")
+    }
+
+    /// The Agenda's "home-base not connected" message must grow with the text
+    /// size. XCTest's accessibility audit reports this very text as "Dynamic
+    /// Type font sizes are partially unsupported" on about one cold run in
+    /// four, while 238 real changes of the system text size always resized it
+    /// (CI run 42725915422, 10 November 2026). This measures the behaviour
+    /// directly, at the smallest, the default and the largest size.
+    func testAgendaUnavailableMessageGrowsWithTextSize() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
+        var heights: [CGFloat] = []
+        for size in ["xsmall", "large", "accessibility5"] {
+            launch(seedPatients: true, singlePatient: true, dynamicTypeSize: size)
+            XCTAssertTrue(openSection("Agenda"), "the Agenda must open at \(size)")
+            let message = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
+            XCTAssertTrue(message.waitForExistence(timeout: 20), "the message must be shown at \(size)")
+            heights.append(message.frame.height)
+            attachScreenshot(named: "agenda-message-\(size)")
+            app.terminate()
+        }
+        XCTAssertGreaterThanOrEqual(heights[1], heights[0], "the default size must not be shorter than the smallest")
+        XCTAssertGreaterThan(heights[2], heights[1] * 2,
+                             "at the largest accessibility size the message must take more than twice the default height, got \(heights)")
+    }
+
+    /// Runs the accessibility audit without ignoring anything, but attaches what
+    /// XCTest's own failure message leaves out: which element the issue is on.
+    /// Without this a CI failure reads "Text clipped" and nothing else.
+    private func performAuditNamingElements(screen: String) throws {
+        var index = 0
+        try app.performAccessibilityAudit { issue in
+            index += 1
+            var lines = [
+                "screen: \(screen)",
+                "audit type: \(issue.auditType)",
+                "compact: \(issue.compactDescription)",
+                "detailed: \(issue.detailedDescription)",
+            ]
+            if let element = issue.element {
+                lines.append("identifier: \(element.identifier)")
+                lines.append("label: \(element.label)")
+                lines.append("element type: \(element.elementType.rawValue)")
+                lines.append("frame: \(element.frame)")
+                lines.append("debug: \(element.debugDescription)")
+                if element.exists, !element.frame.isEmpty {
+                    let shot = XCTAttachment(screenshot: element.screenshot())
+                    shot.name = "audit-\(screen)-\(index)-element"
+                    shot.lifetime = .keepAlways
+                    self.add(shot)
+                }
+            } else {
+                lines.append("element: none reported")
+            }
+            let text = XCTAttachment(string: lines.joined(separator: "\n"))
+            text.name = "audit-\(screen)-\(index)-issue"
+            text.lifetime = .keepAlways
+            self.add(text)
+            return false
+        }
     }
 
     /// The three cross-patient views must say something true about themselves,
