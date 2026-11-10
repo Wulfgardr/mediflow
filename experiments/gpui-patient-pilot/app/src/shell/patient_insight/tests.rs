@@ -606,3 +606,442 @@ fn proposal_stays_current_when_reread_without_changes(cx: &mut gpui::TestAppCont
     });
     assert!(proposal_is_current(&bench, cx));
 }
+
+/// Comando della chat (C-7): il Quadro si apre nella finestra, alla chat tornano solo stati.
+#[cfg(target_os = "macos")]
+mod chat {
+    use super::*;
+    use crate::chat_access::owner::{Pending, State as ChatState, tests::insight_request};
+    use std::os::unix::net::UnixStream;
+
+    const ELIGIBILITY: &str = "GET /api/auth/native/chat-access-confirmation";
+    const EPOCH: &str = "GET /api/v1/network/patient-profile/selection-epoch";
+    const FIRST: &str = "pi-gpui-synthetic-0001";
+    const SCOPE: &str = "ambulatory-synthetic-01";
+
+    /// L'host sintetico conferma l'ambulatorio della scheda per ogni richiesta con scope.
+    fn identity(bench: &Bench) {
+        bench
+            .host
+            .plan("GET /api/v1/network/identity")
+            .send((
+                200,
+                json!({"scope": {"effectiveAmbulatoryId": SCOPE, "requestBinding": "expected-ambulatory-id-v1"},
+                    "operator": {"userId": "synthetic-user", "authChannel": "native"}}),
+            ))
+            .unwrap();
+    }
+
+    /// La GPUI è abbinata e la selezione della sessione è la scheda mostrata.
+    fn paired(bench: &Bench, cx: &mut gpui::VisualTestContext) {
+        let session = bench.host.session.clone();
+        bench
+            .host
+            .plan("GET /api/v1/network/ambulatories")
+            .send((
+                200,
+                json!([{"id": SCOPE, "name": "Ambulatorio sintetico", "isDefault": true, "version": 1}]),
+            ))
+            .unwrap();
+        session.list_ambulatories().unwrap();
+        bench.view.update(cx, |app, _| {
+            session
+                .select_profile_patient(app.scope.as_deref().unwrap(), FIRST)
+                .unwrap();
+            app.session = Some(session);
+        });
+    }
+    /// Risposte del server all'ammissione: account idoneo e stessa epoca di selezione.
+    fn admission(bench: &Bench, eligible: bool) {
+        let status = if eligible { "eligible" } else { "ineligible" };
+        identity(bench);
+        identity(bench);
+        bench
+            .host
+            .plan(ELIGIBILITY)
+            .send((200, json!({ "status": status })))
+            .unwrap();
+        bench
+            .host
+            .plan(EPOCH)
+            .send((200, json!({"contractVersion": 1, "selectionEpoch": 0})))
+            .unwrap();
+    }
+    /// La riga che il socket restituirebbe alla chat in questo momento.
+    fn wire(pending: &Pending) -> Value {
+        let status = pending.lock().unwrap().status();
+        crate::chat_access::reply(status, Some(pending), None)
+    }
+    fn open(bench: &Bench, cx: &mut gpui::VisualTestContext) -> (Pending, UnixStream) {
+        let (pending, remote) = insight_request();
+        bench
+            .view
+            .update(cx, |app, cx| app.open_chat_insight(&pending, cx));
+        cx.run_until_parked();
+        bench.view.update(cx, |app, cx| app.poll_chat_insight(cx));
+        (pending, remote)
+    }
+    fn opened(bench: &Bench, cx: &mut gpui::VisualTestContext) -> (Pending, UnixStream) {
+        paired(bench, cx);
+        bench.switch("enabled");
+        admission(bench, true);
+        let (pending, remote) = open(bench, cx);
+        assert_eq!(wire(&pending), json!({"status": "insight-opened"}));
+        (pending, remote)
+    }
+    fn position(bench: &Bench, route: &str) -> Option<usize> {
+        bench
+            .host
+            .routes()
+            .iter()
+            .position(|seen| seen.starts_with(route))
+    }
+
+    #[gpui::test]
+    fn chat_opens_the_selected_patient_quadro_and_receives_only_states(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (bench, cx) = bench(cx);
+        bench.view.update(cx, |app, _| {
+            app.patient_section = PatientSection::Therapies;
+        });
+        let (pending, _remote) = opened(&bench, cx);
+        // Il server ammette la richiesta prima che GPUI legga l'interruttore.
+        assert!(position(&bench, ELIGIBILITY) < position(&bench, SETTING));
+        assert!(position(&bench, EPOCH) < position(&bench, SETTING));
+        bench.view.read_with(cx, |app, _| {
+            let InsightPhase::Consent(request) = &app.patient.insight.phase else {
+                panic!("il Quadro attende il consenso nella finestra");
+            };
+            assert_eq!(request.patient_id, FIRST);
+            assert_eq!(app.patient_section, PatientSection::Overview);
+        });
+        assert!(
+            bench.host.bodies(PREVIEW).is_empty(),
+            "il consenso nella finestra precede l'invio"
+        );
+        let answer = bench.answer("response-available");
+        bench.view.update(cx, |app, cx| app.insight_confirm(cx));
+        cx.run_until_parked();
+        assert!(answer.join().unwrap());
+        bench.view.update(cx, |app, cx| app.poll_chat_insight(cx));
+        let lines = bench.view.read_with(cx, |app, _| {
+            let InsightPhase::Proposal { proposal, .. } = &app.patient.insight.phase else {
+                panic!("proposta attesa nella finestra");
+            };
+            assert!(
+                app.patient.insight_chat.0.is_none(),
+                "la proposta appartiene alla finestra"
+            );
+            let mut lines: Vec<String> = proposal
+                .lines()
+                .into_iter()
+                .map(|(_, text)| text.to_owned())
+                .collect();
+            lines.extend([proposal.model.clone(), proposal.review_ref.clone()]);
+            lines
+        });
+        // Con la proposta mostrata la chat non possiede più il Quadro.
+        let reply = wire(&pending);
+        assert_eq!(reply, json!({"status": "insight-closed"}));
+        let text = reply.to_string();
+        for line in lines.iter().filter(|line| line.len() > 3) {
+            assert!(!text.contains(line.as_str()), "testo clinico verso la chat");
+        }
+        assert!(!text.contains(FIRST) && !text.contains("Ipertensione"));
+        bench.assert_no_clinical_write();
+    }
+
+    #[gpui::test]
+    fn chat_never_replaces_a_shown_proposal(cx: &mut gpui::TestAppContext) {
+        let (bench, cx) = bench(cx);
+        paired(&bench, cx);
+        shown_proposal(&bench, cx);
+        let before = bench
+            .view
+            .read_with(cx, |app, _| match &app.patient.insight.phase {
+                InsightPhase::Proposal { proposal, .. } => proposal.summary.clone(),
+                _ => unreachable!(),
+            });
+        let routes = bench.host.routes().len();
+        let (pending, _remote) = open(&bench, cx);
+        assert_eq!(wire(&pending), json!({"status": "insight-busy"}));
+        assert_eq!(
+            bench.host.routes().len(),
+            routes,
+            "nessuna chiamata all'host"
+        );
+        bench.view.read_with(cx, |app, _| {
+            assert!(matches!(
+                &app.patient.insight.phase,
+                InsightPhase::Proposal { proposal, .. } if proposal.summary == before
+            ));
+            assert!(app.patient.insight_chat.0.is_none());
+        });
+    }
+
+    #[gpui::test]
+    fn chat_never_replaces_a_running_generation(cx: &mut gpui::TestAppContext) {
+        let (bench, cx) = bench(cx);
+        paired(&bench, cx);
+        prepare(&bench, cx);
+        let answer = bench.answer("response-available");
+        let (pending, _remote) = insight_request();
+        bench.view.update(cx, |app, cx| {
+            app.insight_confirm(cx);
+            app.open_chat_insight(&pending, cx);
+            assert!(matches!(
+                app.patient.insight.phase,
+                InsightPhase::Running { .. }
+            ));
+        });
+        assert_eq!(wire(&pending), json!({"status": "insight-busy"}));
+        cx.run_until_parked();
+        assert!(answer.join().unwrap());
+        // La generazione chiesta dalla finestra arriva alla sua proposta.
+        assert!(bench.phase(cx, |phase| matches!(phase, InsightPhase::Proposal { .. })));
+        assert_eq!(bench.host.bodies(PREVIEW).len(), 1);
+    }
+
+    #[gpui::test]
+    fn second_chat_request_is_busy_while_the_first_waits_for_consent(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (bench, cx) = bench(cx);
+        let (first, _remote) = opened(&bench, cx);
+        let (second, _other) = open(&bench, cx);
+        assert_eq!(wire(&second), json!({"status": "insight-busy"}));
+        assert_eq!(wire(&first), json!({"status": "insight-opened"}));
+        assert!(bench.phase(cx, |phase| matches!(phase, InsightPhase::Consent(_))));
+    }
+
+    /// Revoca, sessione chiusa o chat chiusa durante la generazione: nessuna proposta.
+    #[gpui::test]
+    fn chat_withdrawal_during_generation_leaves_no_proposal(cx: &mut gpui::TestAppContext) {
+        for change in ["revoke", "lock", "eof"] {
+            let (bench, cx) = bench(cx);
+            let (pending, remote) = opened(&bench, cx);
+            let mut remote = Some(remote);
+            let answer = bench.answer("response-available");
+            bench.view.update(cx, |app, cx| {
+                app.insight_confirm(cx);
+                assert!(matches!(
+                    app.patient.insight.phase,
+                    InsightPhase::Running { .. }
+                ));
+                match change {
+                    "revoke" => pending.lock().unwrap().revoke(),
+                    "lock" => bench.host.session.lock(),
+                    _ => drop(remote.take()),
+                }
+                app.poll_chat_insight(cx);
+            });
+            cx.run_until_parked();
+            assert!(!answer.join().unwrap(), "{change}: nessuna richiesta parte");
+            assert!(bench.host.bodies(PREVIEW).is_empty(), "{change}");
+            // Con la sessione bloccata la finestra torna anche all'accesso: il Quadro si azzera.
+            assert!(
+                bench.phase(cx, |phase| match phase {
+                    InsightPhase::Ended(m) => m.contains("La chat ha ritirato"),
+                    InsightPhase::Idle => change == "lock",
+                    _ => false,
+                }),
+                "{change}"
+            );
+            assert_eq!(wire(&pending), json!({"status": "withdrawn"}), "{change}");
+            bench.assert_no_clinical_write();
+        }
+    }
+
+    /// Rilievo Codex su #896: la chat ritira mentre la finestra mostra il consenso e il
+    /// medico conferma prima del controllo periodico. Nessun dato deve partire.
+    #[gpui::test]
+    fn chat_withdrawn_before_consent_sends_nothing(cx: &mut gpui::TestAppContext) {
+        for change in ["revoke", "eof"] {
+            let (bench, cx) = bench(cx);
+            let (pending, remote) = opened(&bench, cx);
+            let mut remote = Some(remote);
+            let answer = bench.answer("response-available");
+            bench.view.update(cx, |app, cx| {
+                match change {
+                    "revoke" => pending.lock().unwrap().revoke(),
+                    _ => drop(remote.take()),
+                }
+                // Stesso intervallo di 250 ms: nessun `poll_chat_insight` in mezzo.
+                app.insight_confirm(cx);
+            });
+            cx.run_until_parked();
+            assert!(!answer.join().unwrap(), "{change}: nessuna richiesta parte");
+            assert!(bench.host.bodies(PREVIEW).is_empty(), "{change}");
+            assert!(
+                bench.phase(cx, |phase| matches!(
+                    phase,
+                    InsightPhase::Ended(m) if m.contains("La chat ha ritirato")
+                )),
+                "{change}"
+            );
+            assert_eq!(wire(&pending), json!({"status": "withdrawn"}), "{change}");
+        }
+    }
+
+    /// La risposta è già in volo quando la chat ritira, prima del controllo periodico.
+    #[gpui::test]
+    fn late_answer_after_chat_revocation_is_not_shown(cx: &mut gpui::TestAppContext) {
+        let (bench, cx) = bench(cx);
+        let (pending, _remote) = opened(&bench, cx);
+        let sender = bench.host.plan(PREVIEW);
+        let requests = bench.host.requests_handle();
+        let revoking = pending.clone();
+        let responder = std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while !requests.lock().unwrap().iter().any(|(r, _)| r == PREVIEW) {
+                assert!(Instant::now() < deadline, "la richiesta non è partita");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            revoking.lock().unwrap().revoke();
+            let response = fixture("response-available");
+            let mut body = response["body"].clone();
+            let sent = requests
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|(r, _)| r == PREVIEW)
+                .unwrap()
+                .1
+                .clone();
+            if let Some(currentness) = body
+                .pointer_mut("/preview/proposal/currentness")
+                .and_then(Value::as_object_mut)
+            {
+                currentness.insert("capturedAt".into(), sent["capturedAt"].clone());
+            }
+            sender.send((200, body)).unwrap();
+        });
+        bench.view.update(cx, |app, cx| app.insight_confirm(cx));
+        cx.run_until_parked();
+        responder.join().unwrap();
+        assert_eq!(bench.host.bodies(PREVIEW).len(), 1);
+        assert!(bench.phase(cx, |phase| matches!(
+            phase,
+            InsightPhase::Ended(m) if m.contains("La chat ha ritirato")
+        )));
+        assert_eq!(wire(&pending), json!({"status": "withdrawn"}));
+        bench.assert_no_clinical_write();
+    }
+
+    /// Cambio paziente dopo l'apertura dalla chat: la risposta tardiva non compare.
+    #[gpui::test]
+    fn patient_change_withdraws_the_chat_and_drops_the_late_answer(cx: &mut gpui::TestAppContext) {
+        let (bench, cx) = bench(cx);
+        let (pending, _remote) = opened(&bench, cx);
+        let answer = bench.answer("response-available");
+        bench.view.update(cx, |app, cx| {
+            app.insight_confirm(cx);
+            app.next_presentation_epoch();
+            show(app, "pi-gpui-synthetic-0002");
+            app.poll_chat_insight(cx);
+        });
+        cx.run_until_parked();
+        assert!(!answer.join().unwrap());
+        assert!(bench.host.bodies(PREVIEW).is_empty());
+        assert_eq!(wire(&pending), json!({"status": "withdrawn"}));
+        bench.view.read_with(cx, |app, _| {
+            assert!(matches!(app.patient.insight.phase, InsightPhase::Idle));
+            assert!(app.patient.insight_chat.0.is_none());
+        });
+        bench.assert_no_clinical_write();
+    }
+
+    /// Ogni diniego: alla chat solo uno stato, nessuna generazione, nessun dato inviato.
+    #[gpui::test]
+    fn chat_denials_return_a_state_and_never_generate(cx: &mut gpui::TestAppContext) {
+        for scenario in [
+            "no-session",
+            "selection",
+            "privacy",
+            "ineligible",
+            "kill-switch",
+            "switch-unreadable",
+            "locked",
+        ] {
+            let (bench, cx) = bench(cx);
+            paired(&bench, cx);
+            match scenario {
+                "no-session" => bench.view.update(cx, |app, _| app.session = None),
+                "selection" => bench
+                    .host
+                    .session
+                    .select_profile_patient(SCOPE, "pi-gpui-synthetic-0002")
+                    .unwrap(),
+                "privacy" => bench.view.update(cx, |app, _| app.privacy_shield = true),
+                "ineligible" => admission(&bench, false),
+                "kill-switch" => {
+                    admission(&bench, true);
+                    bench.switch("disabled");
+                }
+                "switch-unreadable" => {
+                    admission(&bench, true);
+                    bench
+                        .host
+                        .plan(SETTING)
+                        .send((500, json!({"error": "unavailable"})))
+                        .unwrap();
+                }
+                _ => bench.host.session.lock(),
+            }
+            let (pending, _remote) = open(&bench, cx);
+            let expected = if scenario == "kill-switch" {
+                "insight-unavailable"
+            } else {
+                "withdrawn"
+            };
+            assert_eq!(wire(&pending), json!({ "status": expected }), "{scenario}");
+            assert!(bench.host.bodies(PREVIEW).is_empty(), "{scenario}");
+            let read_switch = position(&bench, SETTING).is_some();
+            assert_eq!(
+                read_switch,
+                matches!(scenario, "kill-switch" | "switch-unreadable"),
+                "{scenario}: l'interruttore si legge solo dopo l'ammissione"
+            );
+            bench.view.read_with(cx, |app, _| {
+                assert!(app.patient.insight_chat.0.is_none(), "{scenario}");
+                assert!(
+                    !matches!(
+                        app.patient.insight.phase,
+                        InsightPhase::Consent(_) | InsightPhase::Proposal { .. }
+                    ),
+                    "{scenario}"
+                );
+            });
+            if scenario == "kill-switch" {
+                assert!(bench.phase(cx, |phase| matches!(phase, InsightPhase::Unavailable(_))));
+            }
+            bench.assert_no_clinical_write();
+        }
+    }
+
+    #[gpui::test]
+    fn chat_with_local_host_closed_is_unavailable_without_any_call(cx: &mut gpui::TestAppContext) {
+        let host = Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let session = host.session.clone();
+        view.update(cx, |app, _| {
+            show(app, FIRST);
+            session
+                .select_profile_patient(app.scope.as_deref().unwrap(), FIRST)
+                .unwrap();
+            app.session = Some(session);
+        });
+        let routes = host.routes().len();
+        let (pending, _remote) = insight_request();
+        view.update(cx, |app, cx| app.open_chat_insight(&pending, cx));
+        cx.run_until_parked();
+        assert_eq!(wire(&pending), json!({"status": "insight-unavailable"}));
+        assert_eq!(host.routes().len(), routes);
+        assert_eq!(
+            pending.lock().unwrap().status(),
+            ChatState::InsightUnavailable
+        );
+    }
+}
