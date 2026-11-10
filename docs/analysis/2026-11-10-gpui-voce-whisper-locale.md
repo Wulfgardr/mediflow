@@ -17,7 +17,8 @@ rilevatore di voce **Silero** obbligatorio.
 | Sessione | `app/src/local_voice/mod.rs` | Sceglie il motore, espone gli stati di sempre e i messaggi del motore in uso. |
 | Vista | `app/src/shell/local_voice.rs` | Mostra durante la registrazione il provvisorio a matita e il confermato in grigio; Review e trasferimento invariati. |
 
-whisper.cpp arriva dal crate `whisper-rs-sys 0.15.0` (whisper.cpp 1.8.3, compilato con CMake, Metal con
+whisper.cpp gira con GPU e flash attention accese, come nel banco (`whisper-rs` la spegne per impostazione;
+un test fissa i due parametri). whisper.cpp arriva dal crate `whisper-rs-sys 0.15.0` (whisper.cpp 1.8.3, compilato con CMake, Metal con
 shader incorporati) tramite `whisper-rs 0.16.0`, con versione e checksum fissati nel `Cargo.lock`. La dipendenza
 è dichiarata solo per `target_os = "macos"`: Windows e Linux non la scaricano né la compilano. Il banco ha misurato
 whisper.cpp 1.9.5. **L'app usa whisper.cpp 1.8.3**, quella inclusa in `whisper-rs`: la prova P2 qui sotto misura la
@@ -120,26 +121,53 @@ Gli hash coincidono con l'oid LFS di Hugging Face e con `motori/INVENTARIO.md` d
 ## Misure con il modello (P2)
 
 Test ignorato in CI `real_model_on_bench_files_through_the_microphone_path`: 12 WAV del banco (`d01`-`d12`, voce
-Eddy, lenta, degradata) entrano dalla stessa sorgente del microfono e dallo stesso ciclo `listen`, a ritmo reale,
-con 2 s di silenzio in coda. WER con la normalizzazione del banco; tempi rispetto a inizio e fine del parlato.
+Eddy, lenta, degradata) e la seduta lunga `s1` (570 s, 31 battute) entrano dalla stessa sorgente del microfono e
+dallo stesso ciclo `listen`, a ritmo reale, con 2 s di silenzio in coda ai file. Il modo di riferimento sono i pezzi
+da 85 ms, come li consegna il tap del microfono; i blocchi da 0,5 s restano come confronto. WER con la
+normalizzazione del banco. Per ogni frase del riferimento, con le definizioni di `latenze` del banco: **primo
+parziale** (primo testo a schermo, provvisorio o confermato) dall'inizio della frase, soglia 1,5 s di mediana;
+**primo confermato** (prefisso concordato o definitivo), senza soglia; **definitivo** dalla fine della frase, soglia
+1,0 s di mediana. Carico medio a un minuto (`vm.loadavg`) campionato ogni 15 s.
 
-| Variante | WER app | WER banco | Primo testo stabile, mediana (max) | Definitivo, mediana (max) |
-|---|---|---|---|---|
-| pezzi da 85 ms, come il tap del microfono | 10,2% (31/304) | 9,5% (29/304) | 2,32 s (5,34 s) | 1,00 s (1,25 s) |
-| blocchi da 0,5 s | 10,2% | 9,5% | 2,27 s (3,78 s) | 1,12 s (1,43 s) |
+### Esito sull'ultimo codice (head della PR)
 
-Seduta lunga `s1` (570 s, velocità 4, pezzi da 85 ms): 31 frasi definitive, **zero frasi inventate nei silenzi**,
-WER 6,5% (banco 7,5%).
+| Misura | Carico medio | WER app / banco | Primo parziale, mediana (peggiore) | Primo confermato | Definitivo |
+|---|---|---|---|---|---|
+| 12 file, pezzi da 85 ms | 4,0 | 9,5% / 9,5% | **0,84 s** (0,95) | 2,29 s (5,27) | **0,95 s** (1,11) |
+| seduta s1, pezzi da 85 ms | 2,5 | 6,5% (banco 7,5%) | **0,78 s** (1,06) | 1,48 s (2,47) | **0,97 s** (1,13) |
+| 12 file, blocchi da 0,5 s (confronto) | 1,5 | 9,5% / 9,5% | 1,25 s (1,27) | 2,25 s (2,76) | 1,10 s (1,42) |
 
-- **WER**: entro 3 punti dal banco (0,7 punti). Undici file su dodici hanno gli stessi errori; `d09` ne ha due in
-  più (whisper.cpp 1.8.3 contro 1.9.5 del banco).
-- **Definitivo**: la mediana sta alla soglia di 1,0 s solo se il rilevatore vede l'audio a pezzi piccoli, come
-  arriva dal microfono; a blocchi da 0,5 s la chiusura della frase aspetta il blocco e si perde un quarto di secondo.
-- **Primo testo stabile: la soglia di 1,5 s non è rispettata.** Il primo parziale arriva come nel banco (circa
-  0,6 s), ma whisper cambia le prime parole fra un parziale e l'altro («pazienti», «paziente di 80», «di 84», «il
-  paziente di 84 anni», «paciente…»): con la regola dell'accordo fra due parziali consecutivi il testo compare solo
-  quando l'inizio smette di cambiare, in mediana dopo 2,3 s. Il banco misurava il primo parziale, non il primo testo
-  stabile. Le strade sono nelle domande qui sotto.
+Seduta lunga: **zero frasi inventate nei silenzi**, 31 frasi definitive per 31 battute. Con i pezzi del microfono
+le due soglie di mediana sono rispettate sui file e sulla seduta; a blocchi da 0,5 s il definitivo resta oltre il
+secondo perché la chiusura della frase aspetta il blocco.
+
+### Tutte le misure, in ordine
+
+Nessuna misura è stata ripetuta a parità di codice per sceglierne una; ogni riga cambia il codice o il modo di
+misura, e il motivo è scritto. «-» = non misurato in quella versione dello strumento.
+
+| # | Ora | Che cosa cambia rispetto alla precedente, e perché | Carico medio | Primo parziale | Primo confermato | Definitivo |
+|---|---|---|---|---|---|---|
+| 1 | 06:00 | primo codice: rilevatore solo a blocchi interi, accordo esatto con la punteggiatura; blocchi da 0,5 s | non registrato, circa 35 (altra lane) | - | 2,27 s (3,27) | 1,13 s (1,43) |
+| 2a | 06:08 | rilevatore su ogni campione, parziale sulla griglia da 0,5 s, accordo senza maiuscole e punteggiatura (il primo testo arrivava tardi); blocchi da 0,5 s | circa 35 | - | 2,27 s (3,78) | 1,12 s (1,43) |
+| 2b | 06:12 | stesso codice di 2a, pezzi da 85 ms come il microfono | circa 35 | - | 2,32 s (5,34) | 1,00 s (1,25) |
+| 3 | 06:33 | due inchiostri (scelta b) e tempi per frase; seduta a ritmo reale (prima era a velocità 4, che gonfiava i tempi) | 3,3 file; 2,8 seduta | 0,87 s (0,90); seduta 0,80 s (1,07) | 2,33 s (5,31); seduta 1,50 s (3,16) | 1,01 s (1,18); seduta 1,01 s (1,19) |
+| 4 | 06:58 | silenzio contato come in sherpa-onnx del banco (anche fra 0,35 e 0,5) | 4,3 file; 14,0 seduta | 0,88 s (0,90); seduta 0,86 s (1,07) | 2,34 s (5,31); seduta 1,50 s (3,16) | 1,02 s (1,29); seduta 1,02 s (1,45) |
+| 5 | 07:15 | flash attention accesa come nel banco: senza, una decodifica della frase prendeva circa 0,28 s contro 0,15 s di mediana nel banco (tempo dopo la modifica non misurato a parte) | 4,0 | 0,84 s (0,95) | 2,29 s (5,27) | 0,95 s (1,11) |
+| 5b | 08:02 | stesso codice di 5 integrato con `main`; seduta e blocchi, interrotti dalla fine della sessione nella 5 | 2,5 seduta; 1,5 blocchi | seduta 0,78 s (1,06) | seduta 1,48 s (2,47) | seduta 0,97 s (1,13) |
+
+Righe 3-5b: pezzi da 85 ms salvo dove indicato; i blocchi da 0,5 s delle misure 3 e 4 (definitivo 1,19 s e 1,13 s)
+sono nei dati grezzi. Un tentativo alle 06:54 non ha prodotto numeri (percorso del modello sbagliato nello script).
+Le misure 1 e 2 sono state prese sotto il carico di un'altra lane; la 3, a macchina scarica, dà quasi gli stessi
+tempi: la decodifica sta sulla GPU e il carico della CPU pesa poco. La differenza vera l'ha fatta la flash attention.
+
+- **WER**: entro 3 punti dal banco. Fino alla misura 4 `d09` aveva due errori in più (10,2% contro 9,5%); con la
+  flash attention, come nel banco, gli errori coincidono su tutti i file.
+- **Primo testo confermato**: whisper cambia le prime parole fra un parziale e l'altro («pazienti», «paziente di
+  80», «di 84», «il paziente di 84 anni», «paciente…»), quindi il confermato arriva in mediana dopo 1,5-2,3 s. Per
+  questo si mostra subito il provvisorio.
+- **whisper.cpp 1.8.3 contro 1.9.5**: l'app usa la 1.8.3 di `whisper-rs`, il banco la 1.9.5. Con gli stessi
+  parametri del banco (flash attention accesa) WER e tempi coincidono con quelli del banco entro i limiti sopra.
 
 ## Attribuzioni
 
