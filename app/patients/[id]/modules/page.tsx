@@ -310,7 +310,7 @@ export default function PatientDetailPage() {
             <Kree8WorkspaceShell
                 eyebrow="Scheda clinica"
                 title="Scheda paziente"
-                subtitle="Recupero dei dati dalla cartella locale prima di aprire la scheda."
+                subtitle=""
                 backHref="/?area=incarico"
                 backLabel="Pazienti"
             >
@@ -496,7 +496,7 @@ export default function PatientDetailPage() {
         if (validation.hasWarnings) {
             const { confirmed } = await confirm({
                 title: 'Controllo locale dell\'esportazione: avvisi',
-                message: `${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
+                message: `${buildValidationMessage(validation)}\n\nVuoi esportare comunque?`,
                 confirmLabel: 'Esporta comunque',
             });
             if (!confirmed) return null;
@@ -619,7 +619,6 @@ export default function PatientDetailPage() {
                         <div>
                             {!proposal ? <p className={workspaceStyles.sectionLabel}>Attenzione</p> : null}
                             <h2 id="attention-title" className={workspaceStyles.sectionTitle}>{proposal ? 'Da rivedere' : 'Cosa fare adesso'}</h2>
-                            {!proposal ? <p className={workspaceStyles.sectionCopy}>Decisioni e attese aperte prima del resto della scheda.</p> : null}
                         </div>
                     </div>
                     <div className={workspaceStyles.attentionContent}>
@@ -703,11 +702,12 @@ export default function PatientDetailPage() {
                     id="timeline"
                     kicker="Timeline"
                     title="Timeline clinica"
-                    count={formatCountLabel(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length, 'evento', 'eventi')}
+                    count={entries !== undefined && checkups !== undefined ? formatCountLabel(nonScaleEntries.length + checkups.length + documentInsights.length, 'evento', 'eventi') : undefined}
                     summary="Diario, controlli e referti in ordine cronologico."
                     surfaceClassName={workspaceStyles.clinicalSection}
                 >
-                    <ClinicalRiverTimeline entries={nonScaleEntries} checkups={checkups ?? []} documentInsights={documentInsights} />
+                    <ClinicalRiverTimeline entries={entries === undefined ? undefined : nonScaleEntries} checkups={checkups}
+                        checkupsUnavailable={Boolean(checkupsError) && checkups === undefined} documentInsights={documentInsights} />
                 </CollapsibleSection>
 
                 <Timeline entries={timelineEntries} patientDiary composer={writing ? <PatientEntryComposer key={id} embedded /> : undefined} section={{
@@ -715,7 +715,7 @@ export default function PatientDetailPage() {
                     kicker: 'Diario',
                     title: 'Diario clinico',
                     count: entries !== undefined ? formatCountLabel(nonScaleEntries.length, 'voce', 'voci') : undefined,
-                    summary: entries !== undefined ? nonScaleEntries.length === 0 ? 'Nessuna voce clinica registrata.' : 'Apri le voci attive del diario.' : undefined,
+                    summary: entries !== undefined ? nonScaleEntries.length === 0 ? 'Nessuna voce clinica registrata.' : undefined : undefined,
                     surfaceClassName: workspaceStyles.clinicalSection,
                     keepMounted: true,
                 }} />
@@ -757,9 +757,9 @@ export default function PatientDetailPage() {
                     kicker="Documenti"
                     title="Archivio documenti ed evidenze"
                     count={attachmentsError || attachments === undefined ? undefined : `${attachments.length} file`}
-                    summary={attachmentsError ? 'Conteggio non disponibile. Apri Documenti per consultare o rileggere l’elenco.'
+                    summary={attachmentsError ? 'Conteggio non disponibile.'
                         : attachments === undefined ? 'Caricamento documenti…'
-                        : attachments.length > 0 ? 'Carica, consulta e rivedi i documenti.' : 'Nessun documento ancora caricato.'}
+                        : attachments.length > 0 ? undefined : 'Nessun documento ancora caricato.'}
                     surfaceClassName={workspaceStyles.clinicalSection}
                     defaultOpen={!documentSynthesisKillSwitchLoading
                         && !patientInsightKillSwitchLoading
@@ -794,7 +794,6 @@ export default function PatientDetailPage() {
                         icon={Activity}
                         surfaceClassName={workspaceStyles.clinicalSection}
                         count={entries !== undefined ? formatCountLabel(scaleEntries.length, 'valutazione', 'valutazioni') : undefined}
-                        summary="Risultati registrati e nuove valutazioni."
                     >
                         {/* Read stored results without rescoring historical instruments. */}
                         <div className="mb-8 space-y-4">

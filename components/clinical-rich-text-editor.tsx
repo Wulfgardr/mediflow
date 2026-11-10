@@ -45,8 +45,8 @@ const BLOCK_ACTIONS: Array<ToolbarAction & { icon: typeof Heading1 }> = [
     { command: 'formatBlock', label: 'Titolo', value: '<h2>', icon: Heading1 },
     { command: 'formatBlock', label: 'Sezione', value: '<h3>', icon: Heading2 },
     { command: 'formatBlock', label: 'Paragrafo', value: '<p>', icon: Pilcrow },
-    { command: 'insertUnorderedList', label: 'Bullet', icon: List },
-    { command: 'insertOrderedList', label: 'Numero', icon: ListOrdered },
+    { command: 'insertUnorderedList', label: 'Elenco puntato', icon: List },
+    { command: 'insertOrderedList', label: 'Elenco numerato', icon: ListOrdered },
 ];
 
 interface ClinicalRichTextEditorProps {

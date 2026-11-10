@@ -45,12 +45,12 @@ async function forceSyntheticDraftError(page: Page): Promise<void> {
     contentType: 'application/json',
     body: JSON.stringify({ error: 'fixture-synthetic-failure' }),
   }));
-  await page.getByRole('textbox', { name: 'Bozza o transcript', exact: true }).fill(
+  await page.getByRole('textbox', { name: 'Bozza o trascrizione', exact: true }).fill(
     `${SYNTHETIC_ENTRY} Testo esteso per verificare wrapping, leggibilità e stato di errore senza dati reali.`,
   );
   await page.getByRole('button', { name: 'Elabora bozza', exact: true }).click();
   await expect(page.getByRole('alert').filter({
-    hasText: 'Elaborazione non riuscita. Il transcript resta modificabile manualmente.',
+    hasText: 'Elaborazione non riuscita. La trascrizione resta modificabile.',
   })).toBeVisible();
 }
 
@@ -74,7 +74,7 @@ async function attachVisualProof(
   await page.setViewportSize(viewport);
   await setRegister(page, register);
   const draftError = page.getByRole('alert').filter({
-    hasText: 'Elaborazione non riuscita. Il transcript resta modificabile manualmente.',
+    hasText: 'Elaborazione non riuscita. La trascrizione resta modificabile.',
   });
   await expect(draftError).toBeVisible();
   await draftError.scrollIntoViewIfNeeded();
@@ -186,17 +186,15 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
     await openNewEntry(page, patient);
 
     const dateInput = page.getByLabel('Data e ora della voce clinica');
-    await expect(dateInput).toHaveAttribute('aria-describedby', 'entry-date-description');
-    await expect(page.locator('#entry-date-description')).toHaveText(
-      'Puoi retrodatare la voce quando ricostruisci il diario.',
-    );
+    await expect(dateInput).toBeEditable();
+    await expect(dateInput).not.toHaveAttribute('aria-describedby', /.+/u);
 
     /* #75 */
     const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
     await expect(editor).toHaveAttribute('aria-multiline', 'true');
     await expect(editor).toHaveAttribute('aria-required', 'true');
     await expect(editor).toHaveAccessibleDescription(
-      'Usa la barra per formattare il testo. Tab passa al controllo successivo.',
+      'Tab passa al controllo successivo.',
     );
     const toolbar = page.getByRole('group', { name: 'Strumenti del resoconto clinico', exact: true });
     const moreTools = toolbar.getByRole('button', { name: /^(Altri|Riduci) strumenti di formattazione$/u });
@@ -207,8 +205,8 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
         - button "Titolo"
         - button "Sezione"
         - button "Paragrafo"
-        - button "Bullet"
-        - button "Numero"
+        - button "Elenco puntato"
+        - button "Elenco numerato"
         - button "Grassetto"
         - button "Corsivo"
         - button "Sottolinea"
