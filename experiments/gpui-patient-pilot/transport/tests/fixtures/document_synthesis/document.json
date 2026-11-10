@@ -1,6 +1,6 @@
 {
   "patientId": "pt-gpui-ds-0001",
-  "ambulatoryId": "amb-gpui-ds-01",
+  "ambulatoryId": "scope-a",
   "attachmentId": "doc-gpui-ds-0001",
   "name": "Referto sintetico.pdf",
   "mimeType": "application/pdf",

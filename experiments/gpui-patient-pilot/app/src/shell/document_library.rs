@@ -148,7 +148,7 @@ impl ClinicalApp {
                     .when(original_open, |el| el.child(self.document_original_view(cx)))
                     .child(button(format!("clinical-workspace-delete-document-{delete_id}"), "Elimina documento…", theme, false, can_delete)
                         .when(can_delete,|el|el.on_click(cx.listener(move |this,_,window,cx|this.prepare_document_deletion(&delete_id,window,cx)))))
-                    .when(details_open, |el| el.child(self.document_details_view(row, cx)))
+                    .when(details_open, |el| el.child(self.document_details_view(row, cx)).child(self.document_synthesis_view(row, cx)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
             .child(notice("clinical-workspace-documents-native-limits", "Anteprima delle immagini diverse da PNG e JPEG, nuova estrazione dagli allegati, revisione agentica e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI.", theme, false))
