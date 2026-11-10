@@ -63,7 +63,7 @@ non certifica che tutti i testi correnti lo rispettino già.
 
 ## Una lingua condivisa
 
-Punto d'inchiostro è l'evoluzione attiva di Lume (ADR 0144). Web e implementazioni Apple condividono
+Punto d'inchiostro è l'evoluzione attiva di Lume (ADR 0186). Web e implementazioni Apple condividono
 il significato dei controlli, pur adattandone la forma alla piattaforma:
 
 - terminologia clinica e significato dei controlli;

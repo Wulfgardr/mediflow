@@ -4,7 +4,9 @@ read_when:
   - "Modificando una superficie MediFlow o i token condivisi."
 ---
 
-# ADR 0144: Punto d'inchiostro, evoluzione di Lume
+# ADR 0186: Punto d'inchiostro, evoluzione di Lume
+
+> Numero precedente: 0144, assegnato per errore anche all'[ADR 0144](0144-archive-generation.md) (generazione dell'archivio). Rinumerato il 10 novembre 2026; il contenuto non cambia.
 
 Date: 2026-10-14
 
