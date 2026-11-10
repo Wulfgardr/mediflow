@@ -10,7 +10,7 @@ type Sources = Readonly<{
 export type DocumentSynthesisBrowserOrchestratorErrorCode = 'input_invalid' | 'session_unavailable' | 'capture_unavailable'
     | 'capture_outcome_unknown' | 'unsupported_local_extraction' | 'ingest_unavailable'
     | 'ingest_outcome_unknown' | 'preview_unavailable' | 'preview_outcome_unknown'
-    | 'response_invalid' | 'operation_superseded';
+    | 'response_invalid' | 'operation_superseded' | 'model_response_invalid';
 
 export class DocumentSynthesisBrowserOrchestratorError extends Error {
     constructor(readonly code: DocumentSynthesisBrowserOrchestratorErrorCode) {
@@ -44,17 +44,18 @@ async function post(request: typeof fetch, url: string, body: unknown, unknownCo
     } catch { return fail(unknownCode); }
     if (response.status === 401) return fail('session_unavailable');
     if (!response.ok) {
-        let unsupported = false;
+        let code: unknown = null;
         try {
             const value = await response.json();
             if (typeof value === 'object' && value !== null && !Array.isArray(value)
                 && Object.getPrototypeOf(value) === Object.prototype && Reflect.ownKeys(value).length === 2
-                && Object.hasOwn(value, 'error') && Object.hasOwn(value, 'code')
-                && (value as { code?: unknown }).code === 'unsupported_local_extraction') {
-                unsupported = true;
+                && Object.hasOwn(value, 'error') && Object.hasOwn(value, 'code')) {
+                code = (value as { code?: unknown }).code;
             }
         } catch { /* stable unavailable code below */ }
-        if (unsupported) return fail('unsupported_local_extraction');
+        if (code === 'unsupported_local_extraction') return fail('unsupported_local_extraction');
+        // Il modello ha risposto, ma l'host ha scartato la risposta due volte: un nuovo tentativo puo' riuscire.
+        if (code === 'model_response_invalid' && response.status === 502) return fail('model_response_invalid');
         return fail(unavailableCode);
     }
     try { return await response.json(); } catch { return fail('response_invalid'); }
@@ -121,4 +122,11 @@ export function createDocumentSynthesisBrowserOrchestrator(sources: Sources = {}
             return preview;
         },
     });
+}
+
+/** Frase a schermo per l'esito terminale della sintesi; il codice resta nei dettagli. */
+export function documentSynthesisFailureHeadline(code: string | null): string {
+    if (code === 'unsupported_local_extraction') return 'Testo locale non disponibile. È necessaria la revisione manuale del documento.';
+    if (code === 'model_response_invalid') return 'La risposta del modello non era valida. Riprova.';
+    return 'Sintesi non disponibile. La cartella rimane invariata.';
 }

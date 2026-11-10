@@ -559,3 +559,22 @@ retry. La receipt dichiara `reviewOnly`, zero scritture e nessun apply; la
 rilettura indipendente delle quattro tabelle cliniche presenti conferma
 conteggi e digest invariati. Questo esito riguarda quel caso su host macOS,
 non ogni documento, modello o sistema operativo.
+
+### Tetto della risposta e risposta scartata (collaudo dell'11 novembre 2026)
+
+Al collaudo a schermo della 0.9.1 il limite di 1400 token tagliava l'involucro
+v2 di un referto ordinario: con `qwen3.5:35b-a3b` e JSON indentato la risposta
+completa chiedeva 1306 e 1911 token sul referto cardiologico sintetico (prompt
+di 5544 caratteri) e 1156-1387 sugli esami (5302 caratteri); 8 chiamate su 10
+finivano con `done_reason: length`. Il tetto ora dipende dal prompt: mezzo
+token per carattere, mai meno di 2560 e mai più di 8192. Citazioni ed evidenze
+copiano testo del documento, quindi la risposta cresce con esso; le misure
+stanno fra 0,22 e 0,35 token per carattere. Deadline, secondo tentativo unico e
+validatori restano invariati: una risposta troncata è ancora scartata.
+
+Una risposta troncata o illeggibile anche al secondo tentativo non diventa più
+`operation_unavailable` 503: l'anteprima risponde `model_response_invalid` 502,
+e Web e GPUI dicono «La risposta del modello non era valida. Riprova.». Le
+citazioni non riscontrate restano nel codice generico, perché lo stesso
+diniego nasce anche da selezione cambiata o sessione chiusa durante la
+generazione.

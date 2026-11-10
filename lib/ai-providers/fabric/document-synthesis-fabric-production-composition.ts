@@ -11,11 +11,20 @@ import { isServerSessionProjectionOwner } from '../../security/server-session-pr
 type Publication = ReturnType<typeof finalizeDocumentSynthesisFabricPreparedExecution>;
 type Binding = () => Promise<DocumentSynthesisProviderBindingResult>;
 type Configuration = Readonly<{ owner: object; session: object; capsule: object }>;
-export type DocumentSynthesisFabricProductionComposition = Readonly<{ execute(stillCurrent?: () => boolean): Promise<Publication> }>;
+export type DocumentSynthesisFabricProductionComposition = Readonly<{ execute(stillCurrent?: () => boolean): Promise<Publication | DocumentSynthesisModelResponseRejected> }>;
 
 const OBJECT = Object.prototype; const ObjectAssign = Object.assign; const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectHasOwn = Object.hasOwn; const ObjectIsFrozen = Object.isFrozen; const ReflectOwnKeys = Reflect.ownKeys; const IsProxy = types.isProxy;
 const ProcessExecArgv = process.execArgv; const ProcessExecArgvLength = ProcessExecArgv.length; const StringStartsWith = String.prototype.startsWith;
 const TEST_HARNESS = (() => { for (let index = 0; index < ProcessExecArgvLength; index += 1) { const argument = ProcessExecArgv[index]; if (argument === '--test' || (typeof argument === 'string' && (StringStartsWith.call(argument, '--test=') || StringStartsWith.call(argument, '--test-')))) return true; } return false; })();
+
+/** Esito senza pubblicazione per una risposta del modello tagliata dal tetto di token o illeggibile
+ * anche al secondo tentativo: il chiamante la distingue da modello non pronto o guasto. Non porta
+ * testo del modello. Le citazioni non riscontrate restano `null`: lo stesso diniego nasce anche da
+ * selezione cambiata o sessione chiusa durante la generazione. */
+declare const modelResponseRejected: unique symbol;
+export type DocumentSynthesisModelResponseRejected = Readonly<{ [modelResponseRejected]: true }>;
+export const DOCUMENT_SYNTHESIS_MODEL_RESPONSE_REJECTED = ObjectFreeze(ObjectCreate(null)) as DocumentSynthesisModelResponseRejected;
+export function isDocumentSynthesisModelResponseRejected(value: unknown): value is DocumentSynthesisModelResponseRejected { return value === DOCUMENT_SYNTHESIS_MODEL_RESPONSE_REJECTED; }
 
 function frozen<T extends Record<string, unknown>>(value: T): Readonly<T> { return ObjectFreeze(ObjectAssign(ObjectCreate(null) as T, value)); }
 function configuration(value: unknown): Configuration | null {
@@ -25,7 +34,7 @@ function testBinding(value: unknown): Binding | null { try { if (typeof value !=
 function create(configurationValue: unknown, bind: Binding): DocumentSynthesisFabricProductionComposition | null {
     const input = configuration(configurationValue); if (!input) return null;
     let state: 'ready' | 'running' | 'terminal' = 'ready';
-    return frozen({ async execute(stillCurrent?: () => boolean): Promise<Publication> {
+    return frozen({ async execute(stillCurrent?: () => boolean): Promise<Publication | DocumentSynthesisModelResponseRejected> {
         if (state !== 'ready') return null; state = 'running';
         let binding: DocumentSynthesisProviderBindingResult; try { binding = await bind(); } catch { state = 'terminal'; return null; }
         if (binding.status !== 'available') { state = 'terminal'; return null; }
@@ -34,7 +43,7 @@ function create(configurationValue: unknown, bind: Binding): DocumentSynthesisFa
         const handoff = beginDocumentSynthesisFabricExecution(admitted.token);
         if (!handoff) { disposeDocumentSynthesisFabricAdmission(admitted.token); state = 'terminal'; return null; }
         const prepared = await prepareDocumentSynthesisFabricExecution(handoff, stillCurrent);
-        if (prepared.status !== 'available') { disposeDocumentSynthesisFabricAdmission(admitted.token); state = 'terminal'; return null; }
+        if (prepared.status !== 'available') { disposeDocumentSynthesisFabricAdmission(admitted.token); state = 'terminal'; return prepared.code === 'response_invalid' ? DOCUMENT_SYNTHESIS_MODEL_RESPONSE_REJECTED : null; }
         state = 'terminal';
         return finalizeDocumentSynthesisFabricPreparedExecution(prepared.preparedToken);
     } }) as DocumentSynthesisFabricProductionComposition;
