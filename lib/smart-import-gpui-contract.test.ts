@@ -224,6 +224,26 @@ test('note oltre 900 unità UTF-16: il Web le accorcia entro il limite e il norm
     assert.deepEqual(capture, read('capture-input-limit'));
 });
 
+test('testo ricco nel diario e note vicino a 900 unità: GPUI riceve dal Web le stesse fonti', () => {
+    const rich = read('chart-rich-text');
+    const capture = JSON.parse(JSON.stringify(webCapture(rich)));
+    const sources = capture.sources as { kind: string; label: string; content: string }[];
+    const notes = sources.filter((source) => source.kind === 'patient-notes');
+    assert.deepEqual(notes.slice(0, 2).map((source) => source.content.length), [900, 899], 'il primo segmento resta intero, il secondo si accorcia prima della coppia surrogata');
+    for (const source of sources) {
+        assert.doesNotMatch(source.content, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u, `${source.label}: nessuna coppia surrogata spezzata`);
+    }
+    const entries = sources.filter((source) => source.kind === 'clinical-entry');
+    assert.ok(entries.length > 1);
+    for (const source of entries) {
+        assert.doesNotMatch(source.content, /<\/?[a-z]+>|&(?:amp|lt|gt|quot|nbsp);|\*\*|\[barrato:/u, `${source.label}: testo semplice`);
+    }
+    const normalizer = createSmartImportProjectionAttachmentBrowserNormalizer({ clock: () => new Date(CHART.capturedAt) });
+    assert.doesNotThrow(() => normalizer.capture(webCapture(rich), true), 'la cattura Web passa il normalizzatore');
+    if (WRITE) writeFixture('capture-input-rich-text', capture);
+    assert.deepEqual(capture, read('capture-input-rich-text'));
+});
+
 test('i corpi di GPUI passano per selezione, ingest e capacità reali fino a una proposta con fonti', async (t) => {
     const fixture = host(t, 'valid');
     const response = await untilPreview(fixture, true);
