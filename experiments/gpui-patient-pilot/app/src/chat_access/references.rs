@@ -22,11 +22,18 @@ pub(crate) struct CommandReferences {
 }
 impl Default for CommandReferences {
     fn default() -> Self {
+        // Il contatore rende unica la cartella di ogni store di test nel processo:
+        // l'orologio da solo non basta, su macOS avanza di un microsecondo alla volta.
         #[cfg(test)]
         return Self::new(Some(std::env::temp_dir().canonicalize().unwrap().join(
             format!(
-                "mf-chat-commands-{}-{}",
+                "mf-chat-commands-{}-{}-{}",
                 std::process::id(),
+                {
+                    static NEXT: std::sync::atomic::AtomicU64 =
+                        std::sync::atomic::AtomicU64::new(0);
+                    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                },
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
@@ -254,6 +261,27 @@ mod tests {
         );
         worker.join().unwrap();
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Due test in parallelo non devono mai condividere la cartella dei riferimenti:
+    /// l'orologio di sistema su macOS ha passo di un microsecondo, quindi più store
+    /// creati nello stesso istante devono restare distinti.
+    #[test]
+    fn default_stores_created_at_the_same_instant_never_share_a_directory() {
+        const STORES: usize = 64;
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(STORES));
+        let workers: Vec<_> = (0..STORES)
+            .map(|_| {
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    CommandReferences::default().root.unwrap()
+                })
+            })
+            .collect();
+        let roots: std::collections::BTreeSet<_> =
+            workers.into_iter().map(|w| w.join().unwrap()).collect();
+        assert_eq!(roots.len(), STORES, "due store condividono una cartella");
     }
 
     #[test]

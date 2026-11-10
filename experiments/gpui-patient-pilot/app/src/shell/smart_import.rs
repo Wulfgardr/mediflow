@@ -58,10 +58,6 @@ pub(super) enum ImportCurrency {
 
 const HOST_CLOSED: &str = "Host locale chiuso. L’import assistito si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.";
 
-fn plain(text: &str) -> String {
-    crate::clinical_text::plain_text(text)
-}
-
 impl ClinicalApp {
     /// La cattura che una richiesta fatta adesso invierebbe; `None` se una parte
     /// della scheda non è letta.
@@ -76,7 +72,6 @@ impl ClinicalApp {
             therapies: self.patient.therapies.ready()?,
             entries: self.patient.entries.ready()?,
             attachments: self.patient.attachments.ready()?,
-            plain: &plain,
         }))
     }
 
@@ -139,7 +134,6 @@ impl ClinicalApp {
                     therapies: &therapies,
                     entries: &entries,
                     attachments: &attachments,
-                    plain: &plain,
                 })?;
                 SmartImportRequest::new(&patient, scope.as_deref(), capture).map(Some)
             },

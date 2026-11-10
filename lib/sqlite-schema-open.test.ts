@@ -528,3 +528,13 @@ test('autore: errore dopo il DDL v10 ripristina schema, dati e versione e permet
         assert.equal(retried.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION); retried.close();
     } finally { w.cleanup(); }
 });
+
+test('ADR 0080 elenca ogni versione dello schema fino a quella corrente', () => {
+    const adr = fs.readFileSync(path.resolve('docs/adr/0080-serialize-sqlite-schema-guards-at-bootstrap.md'), 'utf8');
+    const start = adr.indexOf('### Versioni dello schema');
+    const table = adr.slice(start, adr.indexOf('\n### ', start + 1));
+    const listed = [...table.matchAll(/^\| (\d+) \|/gmu)].map(match => Number(match[1]));
+    assert.deepEqual(listed, Array.from({ length: CURRENT_SQLITE_SCHEMA_VERSION }, (_, index) => index + 1));
+    assert.doesNotMatch(table, /\|\n\n\|/u, 'una riga vuota spezza la tabella');
+    assert.ok(adr.includes(`La versione SQLite corrente è \`user_version=${CURRENT_SQLITE_SCHEMA_VERSION}\``));
+});

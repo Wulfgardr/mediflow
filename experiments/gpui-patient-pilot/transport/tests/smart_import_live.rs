@@ -25,10 +25,6 @@ const ENTRIES: [(&str, &str); 2] = [
     ),
 ];
 
-fn plain(text: &str) -> String {
-    text.to_owned()
-}
-
 #[test]
 #[ignore = "richiede un host locale sintetico avviato dal chiamante"]
 fn smart_import_against_a_real_host() {
@@ -100,7 +96,6 @@ fn smart_import_against_a_real_host() {
         therapies: &therapies,
         entries: &entries,
         attachments: &attachments,
-        plain: &plain,
     })
     .unwrap();
     let mut request = SmartImportRequest::new(&patient, Some(&scope), capture).unwrap();
