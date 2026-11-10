@@ -1,5 +1,5 @@
 //! Stato comune alle funzioni che generano tramite l'host locale (G-5): Quadro
-//! paziente, sintesi dei documenti e, in seguito, import assistito.
+//! paziente, sintesi dei documenti e import assistito.
 //!
 //! Ogni area ha un biglietto: una risposta arrivata per un biglietto vecchio
 //! (richiesta interrotta, scartata, cambio di scheda) non entra nello stato. Le
@@ -203,6 +203,51 @@ impl<R: Wipe, P: Wipe> GenerationArea<R, P> {
         }
     }
 }
+/// Ciò che il canale della chat fa con l'area di una funzione generativa, uguale per
+/// tutte: verifica di occupazione, legame durante l'ammissione, controllo del legame.
+#[cfg(unix)]
+pub(super) trait ChatArea {
+    fn occupied(&self) -> bool;
+    fn follow_chat(&mut self) -> bool;
+    /// Lega la richiesta all'area in verifica e restituisce il biglietto dell'ammissione.
+    fn hold(&mut self, chat: Pending) -> Arc<()>;
+    /// Il biglietto è ancora quello dell'ammissione e il legame è con questa richiesta.
+    fn holds_chat(&self, ticket: &Arc<()>, chat: &Pending) -> bool;
+    /// Funzione non disponibile: il legame cade senza ritirare la risposta già data.
+    fn release(&mut self);
+    /// Ammissione riuscita: la scelta torna alla finestra.
+    fn admitted(&mut self);
+}
+#[cfg(unix)]
+impl<R: Wipe, P: Wipe> ChatArea for GenerationArea<R, P> {
+    fn occupied(&self) -> bool {
+        GenerationArea::occupied(self)
+    }
+    fn follow_chat(&mut self) -> bool {
+        GenerationArea::follow_chat(self)
+    }
+    fn hold(&mut self, chat: Pending) -> Arc<()> {
+        self.end(GenerationPhase::Checking);
+        self.chat.0 = Some(chat);
+        self.ticket.clone()
+    }
+    fn holds_chat(&self, ticket: &Arc<()>, chat: &Pending) -> bool {
+        self.holds(ticket)
+            && self
+                .chat
+                .0
+                .as_ref()
+                .is_some_and(|held| Arc::ptr_eq(held, chat))
+    }
+    fn release(&mut self) {
+        self.chat.0 = None;
+        self.end(GenerationPhase::Idle);
+    }
+    fn admitted(&mut self) {
+        self.end(GenerationPhase::Idle);
+    }
+}
+
 impl<R: Wipe, P: Wipe> Drop for GenerationArea<R, P> {
     fn drop(&mut self) {
         if let GenerationPhase::Running { context, .. } = &self.phase {
@@ -254,7 +299,7 @@ mod tests {
 
     #[test]
     fn rejected_start_cancels_context_and_wipes_both_requests() {
-        for function in [Function::Insight, Function::Synthesis] {
+        for function in Function::ALL {
             let (session, _host) = native_session();
             let (pending, _remote) = function_request(function);
             let context = session.chat_access_context("scope-a", "patient-a").unwrap();
@@ -277,7 +322,7 @@ mod tests {
 
     #[test]
     fn choices_keep_the_same_chat_hold() {
-        for function in [Function::Insight, Function::Synthesis] {
+        for function in Function::ALL {
             let (session, _host) = native_session();
             let (pending, _remote) = function_request(function);
             let context = session.chat_access_context("scope-a", "patient-a").unwrap();
@@ -309,7 +354,7 @@ mod tests {
     #[test]
     fn take_running_rechecks_chat_and_cancels_and_wipes_a_withdrawn_request() {
         for revoked in [false, true] {
-            for function in [Function::Insight, Function::Synthesis] {
+            for function in Function::ALL {
                 let (session, _host) = native_session();
                 let (pending, _remote) = function_request(function);
                 let context = session.chat_access_context("scope-a", "patient-a").unwrap();

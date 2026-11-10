@@ -113,6 +113,7 @@ impl ClinicalApp {
                 .child(button("clinical-workspace-new-document", "Aggiungi documenti…", theme, true, writable && !self.document_imports.pending())
                     .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))))
             .when_some(self.synthesis_chat_notice(), |el, message| el.child(notice("document-synthesis-chat-selection", message, theme, false)))
+            .when_some(self.import_chat_notice(), |el, message| el.child(notice("smart-import-chat-step", message, theme, false)))
             .child(self.dossier_import_view(cx))
             .child(self.smart_import_view(cx))
             .child(self.document_imports_view(cx))
