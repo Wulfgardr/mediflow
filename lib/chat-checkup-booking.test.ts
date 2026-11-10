@@ -191,21 +191,26 @@ test('the portable backup still exports and validates after a chat booking and a
 test('the native view shows the agenda read with the same revision: dates and states only, no free text', async () => {
     const f = await fixture();
     const db = dbServer.$client;
-    // Un solo istante per scritture e attese: letto due volte, a cavallo di un secondo i due valori divergono.
-    const now = Math.floor(Date.now() / 1000);
-    const at = (days: number) => now + days * 86_400;
-    db.prepare("INSERT INTO checkups (id,patient_id,date,title,notes,status,version) VALUES (?,?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(9), 'Testo libero da non mostrare', 'ENC:a:b', 'done');
-    db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version,deleted_at) VALUES (?,?,?,?,?,1,?)").run(randomUUID(), f.patientId, at(3), 'Eliminato', 'pending', at(0));
-    db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(2), 'Altro', 'pending');
-    const view = await f.service.open(f.context, f.patientId, f.epoch);
-    assert.deepEqual(view.rows, [{ date: new Date(at(2) * 1000).toISOString(), status: 'pending' }, { date: new Date(at(9) * 1000).toISOString(), status: 'completed' }]);
-    assert.equal(view.omitted, 0);
-    assert.equal(JSON.stringify(view).includes('Testo libero'), false);
-    assert.notEqual(view.agendaRevision, f.command.expectedAgendaRevision);
-    await assert.rejects(f.service.preview(f.context, f.command, f.epoch, view.viewId));
-    for (let i = 0; i < 20; i++) db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(10 + i), 'Serie', 'pending');
-    const full = await f.service.open(f.context, f.patientId, f.epoch);
-    assert.deepEqual([full.rows.length, full.omitted], [20, 2]);
+    // One clock read for the whole test: the clock below ticks across a second boundary on every read.
+    const real = Date.now;
+    let ticking = Math.floor(real() / 1000) * 1000 + 999;
+    Date.now = () => ticking++;
+    try {
+        const now = Math.floor(Date.now() / 1000);
+        const at = (days: number) => now + days * 86_400;
+        db.prepare("INSERT INTO checkups (id,patient_id,date,title,notes,status,version) VALUES (?,?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(9), 'Testo libero da non mostrare', 'ENC:a:b', 'done');
+        db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version,deleted_at) VALUES (?,?,?,?,?,1,?)").run(randomUUID(), f.patientId, at(3), 'Eliminato', 'pending', at(0));
+        db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(2), 'Altro', 'pending');
+        const view = await f.service.open(f.context, f.patientId, f.epoch);
+        assert.deepEqual(view.rows, [{ date: new Date(at(2) * 1000).toISOString(), status: 'pending' }, { date: new Date(at(9) * 1000).toISOString(), status: 'completed' }]);
+        assert.equal(view.omitted, 0);
+        assert.equal(JSON.stringify(view).includes('Testo libero'), false);
+        assert.notEqual(view.agendaRevision, f.command.expectedAgendaRevision);
+        await assert.rejects(f.service.preview(f.context, f.command, f.epoch, view.viewId));
+        for (let i = 0; i < 20; i++) db.prepare("INSERT INTO checkups (id,patient_id,date,title,status,version) VALUES (?,?,?,?,?,1)").run(randomUUID(), f.patientId, at(10 + i), 'Serie', 'pending');
+        const full = await f.service.open(f.context, f.patientId, f.epoch);
+        assert.deepEqual([full.rows.length, full.omitted], [20, 2]);
+    } finally { Date.now = real; }
 });
 
 test('a long history does not hide the upcoming agenda: only checkups from today, nearest first, with the count left out', async () => {
