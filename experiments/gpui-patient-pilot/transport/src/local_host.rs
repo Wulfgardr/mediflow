@@ -13,6 +13,7 @@ mod parameters;
 mod patient_insight;
 mod references;
 mod retention;
+mod rich_text;
 mod security;
 mod smart_import;
 mod territorial;
@@ -43,6 +44,7 @@ use reqwest::{
     header::{COOKIE, HeaderMap},
 };
 pub use retention::*;
+pub use rich_text::*;
 pub use security::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
