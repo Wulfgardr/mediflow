@@ -1298,6 +1298,29 @@ final class MediFlowMobileAppUITests: XCTestCase {
         try performAuditNamingElements(screen: "agenda")
     }
 
+    /// The Agenda's "home-base not connected" message must grow with the text
+    /// size. XCTest's accessibility audit reports this very text as "Dynamic
+    /// Type font sizes are partially unsupported" on about one cold run in
+    /// four, while 238 real changes of the system text size always resized it
+    /// (CI run 42725915422, 10 November 2026). This measures the behaviour
+    /// directly, at the smallest, the default and the largest size.
+    func testAgendaUnavailableMessageGrowsWithTextSize() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
+        var heights: [CGFloat] = []
+        for size in ["xsmall", "large", "accessibility5"] {
+            launch(seedPatients: true, singlePatient: true, dynamicTypeSize: size)
+            XCTAssertTrue(openSection("Agenda"), "the Agenda must open at \(size)")
+            let message = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
+            XCTAssertTrue(message.waitForExistence(timeout: 20), "the message must be shown at \(size)")
+            heights.append(message.frame.height)
+            attachScreenshot(named: "agenda-message-\(size)")
+            app.terminate()
+        }
+        XCTAssertGreaterThanOrEqual(heights[1], heights[0], "the default size must not be shorter than the smallest")
+        XCTAssertGreaterThan(heights[2], heights[1] * 2,
+                             "at the largest accessibility size the message must take more than twice the default height, got \(heights)")
+    }
+
     /// Runs the accessibility audit without ignoring anything, but attaches what
     /// XCTest's own failure message leaves out: which element the issue is on.
     /// Without this a CI failure reads "Text clipped" and nothing else.
