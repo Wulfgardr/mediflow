@@ -22,6 +22,12 @@ pub(crate) enum State {
     Requested,
     DocumentOpened,
     VoiceOpened,
+    /// Quadro paziente aperto nella finestra: consenso, proposta e fonti restano lì.
+    InsightOpened,
+    /// Funzione spenta sull'host, kill switch o host locale chiuso.
+    InsightUnavailable,
+    /// Un Quadro è già in preparazione, in generazione o mostrato: non viene sostituito.
+    InsightBusy,
     Preparing,
     Selecting,
     Challenge,
@@ -38,6 +44,9 @@ impl State {
             Self::Requested => "requested",
             Self::DocumentOpened => "document-opened",
             Self::VoiceOpened => "voice-opened",
+            Self::InsightOpened => "insight-opened",
+            Self::InsightUnavailable => "insight-unavailable",
+            Self::InsightBusy => "insight-busy",
             Self::Preparing => "preparing",
             Self::Selecting => "selecting",
             Self::Challenge => "challenge",
@@ -49,6 +58,14 @@ impl State {
             Self::Write(resolution) => resolution.wire(),
         }
     }
+}
+
+/// Esito dell'apertura del Quadro paziente chiesta dalla chat. Solo stati: mai testo clinico.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InsightOpen {
+    Opened,
+    Unavailable,
+    Busy,
 }
 
 struct Binding {
@@ -158,6 +175,7 @@ pub(crate) struct Request {
     therapy: Option<TherapyWrite>,
     document: bool,
     voice: bool,
+    insight: bool,
     recovery: Option<ChatWriteRecovery>,
     catalog: Option<(String, String, String)>,
     catalog_query: Option<String>,
@@ -195,6 +213,7 @@ impl Request {
             therapy: None,
             document: false,
             voice: false,
+            insight: false,
             recovery: None,
             catalog: None,
             catalog_query: None,
@@ -259,6 +278,39 @@ impl Request {
             return;
         }
         self.state = State::VoiceOpened;
+    }
+    /// Quadro paziente: nessun argomento dalla chat. Paziente, ambulatorio e modello
+    /// vengono dalla finestra e dalla configurazione della funzione sull'host.
+    pub(super) fn for_insight(peer: Peer, stream: UnixStream) -> Option<Pending> {
+        let request = Self::new(peer, stream)?;
+        request.lock().ok()?.insight = true;
+        Some(request)
+    }
+    pub(crate) fn insight_requested(&mut self) -> bool {
+        self.insight && self.status() == State::Requested
+    }
+    /// Legata alla sessione e alla selezione correnti, in attesa dell'apertura.
+    pub(crate) fn insight_bound(&mut self) -> bool {
+        self.insight && self.status() == State::Preparing && self.binding.is_some()
+    }
+    /// Ancora legata a sessione e selezione dopo l'apertura: sessione chiusa, revoca,
+    /// cambio di selezione, archivio o blocco la ritirano.
+    pub(crate) fn insight_open(&mut self) -> bool {
+        self.insight && self.status() == State::InsightOpened
+    }
+    pub(crate) fn finish_insight_open(&mut self, outcome: InsightOpen) {
+        if !self.insight_bound() {
+            self.withdraw();
+            return;
+        }
+        self.state = match outcome {
+            InsightOpen::Opened => State::InsightOpened,
+            InsightOpen::Unavailable => State::InsightUnavailable,
+            InsightOpen::Busy => State::InsightBusy,
+        };
+        if outcome != InsightOpen::Opened {
+            self.binding = None;
+        }
     }
     pub(super) fn for_therapy(peer: Peer, stream: UnixStream, target: &str) -> Option<Pending> {
         let request = Self::new(peer, stream)?;
@@ -702,6 +754,33 @@ pub(crate) fn execute_therapy(pending: &Pending, attempt: Attempt, pin: &str) ->
         }
     }
     result.is_ok()
+}
+
+/// Il server conferma sessione, ammissibilità dell'account, archivio e selezione
+/// prima che il Quadro si apra per la chat. Un esito negativo ritira la richiesta.
+pub(crate) fn admit_insight(pending: &Pending) -> bool {
+    let Some((session, context)) = pending.lock().ok().and_then(|mut p| {
+        if !p.insight_bound() {
+            return None;
+        }
+        p.binding
+            .as_ref()
+            .map(|b| (b.session.clone(), b.context.clone()))
+    }) else {
+        if let Ok(mut p) = pending.lock() {
+            p.withdraw();
+        }
+        return false;
+    };
+    let admitted = session.revalidate_chat_access_context(&context).is_ok();
+    let Ok(mut p) = pending.lock() else {
+        return false;
+    };
+    if !admitted || !p.insight_bound() {
+        p.withdraw();
+        return false;
+    }
+    true
 }
 
 pub(crate) fn prepare_card(pending: &Pending) {
@@ -1272,7 +1351,11 @@ pub(crate) mod tests {
                         _ => panic!("unexpected native test operation"),
                     }
                 } else if first.starts_with("GET /api/auth/native/chat-access-confirmation ") {
-                    (200, json!({"status":"eligible"}))
+                    if current.load(Ordering::Acquire) == 11 {
+                        (200, json!({"status":"ineligible"}))
+                    } else {
+                        (200, json!({"status":"eligible"}))
+                    }
                 } else if first.starts_with("GET /api/v1/network/patient-profile/selection-epoch ")
                 {
                     (
@@ -1454,6 +1537,204 @@ pub(crate) mod tests {
             p.state = State::Write(ChatWriteResolution::Uncertain);
         }
         (pending, remote)
+    }
+
+    pub(crate) fn insight_request() -> (Pending, UnixStream) {
+        let (a, b) = UnixStream::pair().unwrap();
+        (Request::for_insight(Peer::test_peer(), a).unwrap(), b)
+    }
+
+    /// Solo questi stati possono tornare alla chat dal comando del Quadro paziente.
+    const INSIGHT_WIRE: [&str; 5] = [
+        "requested",
+        "preparing",
+        "insight-opened",
+        "insight-unavailable",
+        "insight-busy",
+    ];
+    fn insight_reply(pending: &Pending) -> Value {
+        let status = pending.lock().unwrap().status();
+        let value = super::super::reply(status, Some(pending), None);
+        let object = value.as_object().unwrap();
+        assert_eq!(
+            object.keys().collect::<Vec<_>>(),
+            ["status"],
+            "solo lo stato torna alla chat: {value}"
+        );
+        assert!(
+            INSIGHT_WIRE.contains(&value["status"].as_str().unwrap())
+                || value["status"] == "withdrawn",
+            "{value}"
+        );
+        value
+    }
+
+    #[test]
+    fn insight_command_carries_no_patient_scope_model_or_foreign_token() {
+        use super::super::is_insight_command;
+        assert!(is_insight_command(&json!({"command": "patient-insight"})));
+        for value in [
+            json!({"command": "patient-insight", "patientId": "patient-b"}),
+            json!({"command": "patient-insight", "scope": "scope-b"}),
+            json!({"command": "patient-insight", "provider": "chatgpt"}),
+            json!({"command": "patient-insight", "token": "pph_foreign"}),
+            json!({"command": "patient-insight", "query": "riassumi"}),
+            json!({"command": "Patient-Insight"}),
+            json!({"command": ["patient-insight"]}),
+        ] {
+            assert!(!is_insight_command(&value), "{value}");
+        }
+    }
+
+    #[test]
+    fn insight_opens_only_with_paired_session_current_selection_and_server_admission() {
+        for scenario in [
+            "admitted",
+            "other-session",
+            "selection",
+            "selection-aba",
+            "archive",
+            "host-epoch",
+            "lock",
+            "ineligible",
+            "revoked",
+        ] {
+            let (session, host) = native_session();
+            let (other, _other_host) = native_session();
+            let context = if scenario == "other-session" {
+                other.chat_access_context("scope-a", "patient-a").unwrap()
+            } else {
+                session.chat_access_context("scope-a", "patient-a").unwrap()
+            };
+            let (pending, _remote) = insight_request();
+            assert!(pending.lock().unwrap().insight_requested());
+            assert_eq!(insight_reply(&pending), json!({"status":"requested"}));
+            let bound = pending.lock().unwrap().bind(session.clone(), context);
+            assert_eq!(bound, scenario != "other-session", "{scenario}");
+            match scenario {
+                "selection" => session
+                    .select_profile_patient("scope-a", "patient-b")
+                    .unwrap(),
+                "selection-aba" => {
+                    session
+                        .select_profile_patient("scope-a", "patient-b")
+                        .unwrap();
+                    session
+                        .select_profile_patient("scope-a", "patient-a")
+                        .unwrap();
+                }
+                "archive" => host.state.store(1, Ordering::Release),
+                "host-epoch" => host.state.store(3, Ordering::Release),
+                "lock" => session.lock(),
+                "ineligible" => host.state.store(11, Ordering::Release),
+                "revoked" => pending.lock().unwrap().revoke(),
+                _ => {}
+            }
+            let admitted = admit_insight(&pending);
+            assert_eq!(admitted, scenario == "admitted", "{scenario}");
+            pending
+                .lock()
+                .unwrap()
+                .finish_insight_open(InsightOpen::Opened);
+            let expected = if scenario == "admitted" {
+                "insight-opened"
+            } else {
+                "withdrawn"
+            };
+            assert_eq!(
+                insight_reply(&pending),
+                json!({"status": expected}),
+                "{scenario}"
+            );
+            if scenario == "archive" {
+                assert!(
+                    session.is_locked(),
+                    "l'archivio sostituito chiude la sessione"
+                );
+            }
+            // Nessuna lettura monouso, conferma o ricevuta nasce da questo comando.
+            let mut p = pending.lock().unwrap();
+            assert!(p.review().is_none() && p.safe_result().is_none());
+            assert!(p.begin_confirmation(true).is_none());
+            drop(p);
+            assert_eq!(consume_card(&pending), (State::Withdrawn, None));
+        }
+    }
+
+    #[test]
+    fn opened_insight_is_withdrawn_when_selection_session_or_chat_changes() {
+        for change in ["selection", "lock", "revoke", "eof"] {
+            let (session, _host) = native_session();
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            let (pending, remote) = insight_request();
+            assert!(pending.lock().unwrap().bind(session.clone(), context));
+            assert!(admit_insight(&pending));
+            pending
+                .lock()
+                .unwrap()
+                .finish_insight_open(InsightOpen::Opened);
+            assert!(pending.lock().unwrap().insight_open());
+            match change {
+                "selection" => session
+                    .select_profile_patient("scope-a", "patient-b")
+                    .unwrap(),
+                "lock" => session.lock(),
+                "revoke" => pending.lock().unwrap().revoke(),
+                _ => drop(remote),
+            }
+            assert!(!pending.lock().unwrap().insight_open(), "{change}");
+            assert_eq!(
+                insight_reply(&pending),
+                json!({"status":"withdrawn"}),
+                "{change}"
+            );
+        }
+    }
+
+    #[test]
+    fn unavailable_or_busy_insight_answers_once_and_keeps_no_authority() {
+        for (outcome, wire) in [
+            (InsightOpen::Unavailable, "insight-unavailable"),
+            (InsightOpen::Busy, "insight-busy"),
+        ] {
+            let (session, _host) = native_session();
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            let (pending, _remote) = insight_request();
+            assert!(pending.lock().unwrap().bind(session.clone(), context));
+            pending.lock().unwrap().finish_insight_open(outcome);
+            assert_eq!(insight_reply(&pending), json!({"status": wire}));
+            let mut p = pending.lock().unwrap();
+            assert!(p.binding.is_none(), "nessuna autorità resta legata");
+            assert!(!p.insight_bound() && !p.insight_open());
+            // Un secondo esito non cambia la risposta già data.
+            p.finish_insight_open(InsightOpen::Opened);
+            assert_eq!(p.status(), State::Withdrawn);
+        }
+    }
+
+    #[test]
+    fn only_a_bound_insight_request_can_report_opened() {
+        // Senza legame alla sessione, o con un altro comando, l'apertura non esiste.
+        let (pending, _remote) = insight_request();
+        pending
+            .lock()
+            .unwrap()
+            .finish_insight_open(InsightOpen::Opened);
+        assert_eq!(insight_reply(&pending), json!({"status":"withdrawn"}));
+        let (session, _host) = native_session();
+        for other in [voice_request().0, document_request().0] {
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            let mut p = other.lock().unwrap();
+            assert!(!p.insight_requested());
+            assert!(p.bind(session.clone(), context));
+            p.finish_insight_open(InsightOpen::Opened);
+            assert_eq!(p.status(), State::Withdrawn);
+        }
+        let (session, _host) = native_session();
+        let (pending, _remote) = insight_request();
+        assert!(!admit_insight(&pending), "non legata: nessuna ammissione");
+        assert_eq!(insight_reply(&pending), json!({"status":"withdrawn"}));
+        drop(session);
     }
 
     pub(crate) fn voice_request() -> (Pending, UnixStream) {
