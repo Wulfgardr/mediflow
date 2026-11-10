@@ -44,6 +44,16 @@ pub(crate) fn vocabulary_prompt<'a>(names: impl IntoIterator<Item = &'a str>) ->
     prompt
 }
 
+/// Parametri del contesto come quelli del banco (whisper.cpp con i valori
+/// predefiniti della libreria C): GPU e flash attention. `whisper-rs` spegne la
+/// flash attention per impostazione, e la decodifica raddoppiava.
+fn context_parameters() -> WhisperContextParameters<'static> {
+    let mut parameters = WhisperContextParameters::default();
+    parameters.use_gpu(true);
+    parameters.flash_attn(true);
+    parameters
+}
+
 pub(crate) struct WhisperDecoder {
     state: WhisperState,
     prompt: Zeroizing<String>,
@@ -52,10 +62,8 @@ pub(crate) struct WhisperDecoder {
 impl WhisperDecoder {
     pub(crate) fn load(path: &Path, prompt: Zeroizing<String>) -> Result<Self, EngineFailure> {
         whisper_rs::install_logging_hooks();
-        let mut parameters = WhisperContextParameters::default();
-        parameters.use_gpu(true);
-        let context =
-            WhisperContext::new_with_params(path, parameters).map_err(|_| EngineFailure)?;
+        let context = WhisperContext::new_with_params(path, context_parameters())
+            .map_err(|_| EngineFailure)?;
         let state = context.create_state().map_err(|_| EngineFailure)?;
         Ok(Self { state, prompt })
     }
@@ -669,6 +677,16 @@ pub(crate) mod tests {
         assert_eq!(session.problem(), Some(Problem::ModelInvalid));
         assert!(session.transcript().is_none());
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn context_matches_the_bench_gpu_and_flash_attention() {
+        let parameters = context_parameters();
+        assert!(parameters.use_gpu);
+        assert!(
+            parameters.flash_attn,
+            "whisper-rs default would halve the decoding speed"
+        );
     }
 
     #[test]
