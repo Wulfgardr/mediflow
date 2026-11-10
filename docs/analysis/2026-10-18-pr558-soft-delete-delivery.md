@@ -62,9 +62,9 @@ geometrie. Il merge CI finale deve continuare a includere `main` e le PR
 
 Il guard finale ha SHA-256
 `5c4981cad467d5c7c60ab4c104ae284b009ffefd0919d25a1b2b6735da714117`.
-La [ricevuta](../../experiments/gpui-patient-pilot/evidence/connected/patient-profile-tombstone-guard-validation.json)
+La [ricevuta](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/patient-profile-tombstone-guard-validation.json)
 registra sorgenti, hash dei log, comandi, tempi, risultati, ripristino del
-runtime e tentativi non qualificanti. Il [log statico completo](../../experiments/gpui-patient-pilot/evidence/connected/patient-profile-tombstone-static.log)
+runtime e tentativi non qualificanti. Il [log statico completo](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/patient-profile-tombstone-static.log)
 è pubblicato separatamente.
 
 | Verifica locale | Esito osservato | Interpretazione |

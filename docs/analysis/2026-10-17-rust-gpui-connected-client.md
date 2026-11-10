@@ -41,8 +41,8 @@ supervisore, IPC/FFI o il passaggio dell'intero core a Rust.
 | Fixture scritture risorse | SHA-256 canonico `5a3bbfa8fb1b4054afaaa1dfa5ba5f4ee04f2d615626c6d18abe803f168e5103` |
 | Fixture anagrafica | SHA-256 canonico `cc896ab2e91df4843dedb8acbd27eea4ade19031e6c50ab7c462e2f4df6eb3b4` |
 
-La [ricevuta completa](../../experiments/gpui-patient-pilot/evidence/connected/paired-v3-final-run/receipt.json)
-e il relativo [manifest dei sorgenti del servizio](../../experiments/gpui-patient-pilot/evidence/connected/paired-v3-final-run/source-manifest.json)
+La [ricevuta completa](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/paired-v3-final-run/receipt.json)
+e il relativo [manifest dei sorgenti del servizio](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/paired-v3-final-run/source-manifest.json)
 registrano hash del probe ottimizzato, sorgenti copiati, dipendenze,
 protocollo, risultati, ordine delle misure e ritiro dell'archivio temporaneo.
 Gli hash canonici ordinano ricorsivamente le chiavi JSON; non sono hash dei
@@ -148,7 +148,7 @@ GitHub. Il checkout della CI è il merge `8e0a4e9bde7cc2d115c627cd5f25142091aa1b
 il suo tree `13a1cf283dc18dbf06a0dad3f55d48f741e326e7` è identico a quello
 della release `9c7b3adf…`. Origine, viewport, fixture, scroll e risultato del
 test sono documentati nel
-[manifest delle immagini originali](../../experiments/gpui-patient-pilot/evidence/connected/release-v0.9.0-ui/manifest.json).
+[manifest delle immagini originali](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/release-v0.9.0-ui/manifest.json).
 
 Il riferimento copre elenco, quadro chiaro/scuro, diario, nuova voce e
 impostazioni; comprende desktop e viewport 390 × 844. I test selezionati sono
@@ -163,7 +163,7 @@ usa scorrimento verticale e un menu completo. Il conteggio delle funzioni
 ancora esterne rimane nella matrice sopra, anche quando la destinazione è
 raggiungibile dalla nuova interfaccia.
 
-Il [manifest della finestra GPUI](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/manifest.json)
+Il [manifest della finestra GPUI](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/manifest.json)
 registra 21 immagini e nove verifiche dichiarate, con hash del binario,
 manifest dei sorgenti, viewport e limiti. Le immagini appartengono a tre
 build successive identificate singolarmente: il confronto della tipografia
@@ -173,15 +173,15 @@ binario. Le prove usano X11/Xvfb e rendering software; il fuso del processo
 
 | Superficie | Immagine osservata |
 | --- | --- |
-| Quadro Giorno desktop | [Scheda sintetica](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/patient-quadro-light-desktop.png) |
-| Quadro Grafite desktop | [Stessa scheda](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/patient-quadro-dark-desktop.png) |
-| Quadro a 390 × 844 | [Identità, azioni e navigazione](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/patient-quadro-light-compact.png) |
-| Agenda, intervallo e data invalida | [Intervallo applicato](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/agenda-compact.png), [errore con risultati conservati](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/agenda-invalid-date-compact.png) |
-| Menu al 400% | [Focus su Impostazioni](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/menu-400-settings-focus.png), [focus sul blocco](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/menu-400-lock-focus.png) |
-| Ricerca e riga paziente al 400% | [Ctrl+K](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/patient-search-400-focus.png), [Tab sulla riga](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/patient-row-400-focus.png) |
-| Intestazioni cliniche al 400% | [Agenda](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/agenda-search-400-focus.png), [Diario generale](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/diary-search-400-focus.png) |
-| Repertori al 400% | [Ricerca a larghezza piena](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/references-input-400-focus.png), [focus del comando principale](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/references-search-400-focus.png) |
-| Registrazione da tastiera | [Cursore nella bozza](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/notes-draft-caret-400.png), [revisione](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/notes-review-400.png), [registrazione e rilettura](../../experiments/gpui-patient-pilot/evidence/connected/gpui-ui/notes-verified-400-desktop.png) |
+| Quadro Giorno desktop | [Scheda sintetica](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/patient-quadro-light-desktop.png) |
+| Quadro Grafite desktop | [Stessa scheda](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/patient-quadro-dark-desktop.png) |
+| Quadro a 390 × 844 | [Identità, azioni e navigazione](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/patient-quadro-light-compact.png) |
+| Agenda, intervallo e data invalida | [Intervallo applicato](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/agenda-compact.png), [errore con risultati conservati](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/agenda-invalid-date-compact.png) |
+| Menu al 400% | [Focus su Impostazioni](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/menu-400-settings-focus.png), [focus sul blocco](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/menu-400-lock-focus.png) |
+| Ricerca e riga paziente al 400% | [Ctrl+K](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/patient-search-400-focus.png), [Tab sulla riga](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/patient-row-400-focus.png) |
+| Intestazioni cliniche al 400% | [Agenda](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/agenda-search-400-focus.png), [Diario generale](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/diary-search-400-focus.png) |
+| Repertori al 400% | [Ricerca a larghezza piena](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/references-input-400-focus.png), [focus del comando principale](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/references-search-400-focus.png) |
+| Registrazione da tastiera | [Cursore nella bozza](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/notes-draft-caret-400.png), [revisione](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/notes-review-400.png), [registrazione e rilettura](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/gpui-ui/notes-verified-400-desktop.png) |
 
 La QA al 400% ha trovato etichette tagliate, una ricerca focalizzata fuori
 dalla viewport e intestazioni cliniche senza larghezza utile. I testi dei
@@ -233,12 +233,12 @@ il nuovo client nativo v3.
 | Anagrafica | Nuovi pazienti distinti per client: creazione v1, modifica sparsa v2, stale PUT 409 con rilettura invariata, svuotamento esplicito di nascita/telefono e rilettura v3. Tutti i sette campi condivisi confrontati. |
 | Archivio temporaneo | Creato dal runner, account e abbinamenti sintetici espliciti; processi e dati posseduti ritirati al termine. |
 
-La [ricevuta delle risorse](../../experiments/gpui-patient-pilot/evidence/connected/paired-v3-final-run/resources-comparison.json)
+La [ricevuta delle risorse](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/paired-v3-final-run/resources-comparison.json)
 registra gli hash delle proiezioni create e aggiornate. Le versioni, gli
 esiti HTTP e il contenuto riletto vengono verificati prima di produrre un
 risultato positivo. Gli ID generati e i nonce della cifratura non devono
 coincidere fra due registrazioni equivalenti. La
-[ricevuta anagrafica](../../experiments/gpui-patient-pilot/evidence/connected/paired-v3-final-run/patient-profiles-comparison.json)
+[ricevuta anagrafica](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/paired-v3-final-run/patient-profiles-comparison.json)
 controlla separatamente codice fiscale e identità di ciascun client. Dopo la
 creazione le liste globali hanno dimensioni diverse per costruzione: quella
 fase omette lo snapshot e non lo presenta come una parità fallita o superata.
@@ -271,14 +271,14 @@ precedenti restano conservate con i propri tempi, fuori da questa tabella.
 
 ## Protezioni e regressioni verificate
 
-La [ricevuta Rust](../../experiments/gpui-patient-pilot/evidence/connected/rust-gates.json)
+La [ricevuta Rust](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/rust-gates.json)
 registra **89 test distinti superati**: 40 dell'applicazione, 20 del client
 del pilota e 29 del trasporto collegato, senza errori o test ignorati.
 Formattazione, Clippy su tutti i target con warning negati e build della
 finestra passano su Linux. Le ripetizioni dopo le correzioni dell'interfaccia
 non aumentano il conteggio dei test distinti.
 
-La [ricevuta JavaScript](../../experiments/gpui-patient-pilot/evidence/connected/javascript-gates.json)
+La [ricevuta JavaScript](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/javascript-gates.json)
 registra typecheck, lint, **115/115** test del selettore, inventario completo
 (1.031 file selezionati e 29 esclusioni preesistenti motivate su 1.060),
 never-regress, diff OpenAPI effettivo contro la base e guard delle
@@ -287,7 +287,7 @@ riconosce le 18 violazioni e le 11 regressioni di mascheramento sintetiche.
 Sono prove locali sul delta identificato dai manifest, separate dalla CI
 del commit pubblicato.
 
-La [review del trasporto e del roster](../../experiments/gpui-patient-pilot/evidence/connected-review.md)
+La [review del trasporto e del roster](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected-review.md)
 riporta vettori dorati v3 Web/Swift, decrittazione dei campi, origini ammesse,
 identificativi opachi, cookie di scopo, versioni intere sicure, gate di un
 solo invio e risposte tardive. La suite TCP esercita perdita della risposta,

@@ -286,7 +286,7 @@ e non produce una nuova osservazione dell'interfaccia. Le ricevute di provenienz
 identificano i sorgenti e i binari misurati. Un nuovo confronto HTTP richiede
 nuovi runtime preparati con i rispettivi protocolli di autenticazione.
 
-Le [schermate CI storiche della release](../evidence/connected/release-v0.9.0-ui/README.md)
+Le [schermate CI storiche della release](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/release-v0.9.0-ui/README.md)
 costituiscono un riferimento visivo distinto, con PNG originali e manifest
 di provenienza. Le fixture e le date di quelle catture differiscono dal
 corpus di questo harness; non sono una nuova esecuzione UI.
