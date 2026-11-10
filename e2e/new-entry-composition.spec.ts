@@ -56,7 +56,7 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
                         if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-quadro.png`, animations: 'disabled' });
                         const resume = page.getByRole('button', { name: 'Riprendi la bozza', exact: true }); await resume.focus(); await page.keyboard.press('Enter');
                         await expect(editor).toBeFocused(); await expect(editor).toContainText('Resoconto originale sintetico W16.');
-                        await expect(page.getByRole('textbox', { name: 'Bozza o transcript', exact: true })).toHaveValue('Testo dettato manualmente W16.');
+                        await expect(page.getByRole('textbox', { name: 'Bozza o trascrizione', exact: true })).toHaveValue('Testo dettato manualmente W16.');
                         await expect(page.getByRole('checkbox', { name: 'Ho rivisto questa proposta prima di usarla nel resoconto.', exact: true })).toBeChecked();
                         await expect(form).toContainText('fonte-inventata-W16.txt');
                         await expect(page.getByLabel('Data e ora della voce clinica')).toHaveValue('2026-10-21T09:30');
@@ -78,7 +78,7 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
         await page.getByLabel('Data e ora della voce clinica').fill('2026-10-21T09:30');
         await page.locator('input[type="file"]').setInputFiles({ name: 'fonte-inventata-W16.txt', mimeType: 'text/plain', buffer: Buffer.from('Originale sintetico W16, da conservare con la voce.') });
         const session = page.locator('details#sessione-visita'); await session.locator(':scope > summary').click();
-        const transcript = page.getByRole('textbox', { name: 'Bozza o transcript', exact: true }); await transcript.fill('Testo dettato manualmente W16.');
+        const transcript = page.getByRole('textbox', { name: 'Bozza o trascrizione', exact: true }); await transcript.fill('Testo dettato manualmente W16.');
         const reviewed = page.getByRole('checkbox', { name: 'Ho rivisto questa proposta prima di usarla nel resoconto.', exact: true });
         const insert = page.getByRole('button', { name: 'Inserisci nel resoconto', exact: true }); await expect(insert).toBeDisabled(); await reviewed.check(); await expect(insert).toBeEnabled();
         await capture('bozza', editor);

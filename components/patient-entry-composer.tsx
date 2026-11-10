@@ -267,7 +267,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
             setIsDictatedDraftReviewed(false);
             setVisitSessionState('processed');
         } catch (_error) {
-            setVisitDraftError('Elaborazione non riuscita. Il transcript resta modificabile manualmente.');
+            setVisitDraftError('Elaborazione non riuscita. La trascrizione resta modificabile.');
             setVisitSessionState(visitSessionEvents.some((event) => event.type === 'stop') ? 'stopped' : 'idle');
         }
     };
@@ -446,10 +446,8 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                     value={entryDate}
                     onChange={(event) => { setEditState('dirty'); setDateSource('user'); setEntryDate(event.target.value); }}
                     aria-label="Data e ora della voce clinica"
-                    aria-describedby="entry-date-description"
                     required
                 />
-                <span id="entry-date-description" className="sr-only">Puoi retrodatare la voce quando ricostruisci il diario.</span>
             </label>
         </div>
     ) : (
@@ -468,13 +466,9 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                             onChange={(e) => { setEditState('dirty'); setDateSource('user'); setEntryDate(e.target.value); }}
                             className="w-full rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] py-3 pl-12 pr-4 text-sm font-medium text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] focus:shadow-[var(--lume-focus-ring)] dark:[color-scheme:dark]"
                             aria-label="Data e ora della voce clinica"
-                            aria-describedby="entry-date-description"
                             required
                         />
                     </div>
-                    <p id="entry-date-description" className="text-xs leading-5 text-[color:var(--lume-ink-muted)]">
-                        Puoi retrodatare la voce quando ricostruisci il diario.
-                    </p>
                 </div>
 
                 <div className="space-y-2">
@@ -583,9 +577,9 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                         </div>
                         <div className="min-w-0">
                             <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{proposal ? 'Solo testo · nessun audio' : 'Transcript locale'}</p>
-                            <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
-                                {proposal ? 'Inserisci o incolla il testo. I comandi segnano avvio, pause e fine della sessione.' : 'Il backend elabora testo ed eventi pausa; nessun audio viene acquisito da questa vista.'}
-                            </p>
+                            {proposal ? null : <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
+                                Il backend elabora testo ed eventi pausa; nessun audio viene acquisito da questa vista.
+                            </p>}
                         </div>
                     </div>
                     <div className={proposal ? composerStyles.sessionMetrics : "grid gap-2 text-xs"}>
@@ -675,7 +669,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                     <div className="space-y-2">
                         <label htmlFor="dictated-draft" className="section-kicker flex items-center gap-2">
                             {!proposal && visitSessionState === 'recording' ? <Mic className="h-3.5 w-3.5" /> : <ClipboardList className="h-3.5 w-3.5" />}
-                            {proposal ? 'Bozza o transcript' : 'Bozza dettata o transcript'}
+                            {proposal ? 'Bozza o trascrizione' : 'Bozza dettata o transcript'}
                         </label>
                         <textarea
                             id="dictated-draft"
@@ -728,7 +722,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                                         <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                                             {candidate.match
                                                 ? `${candidate.match.name}${candidate.match.atc ? ` · ATC ${candidate.match.atc}` : ''}`
-                                                : 'Match catalogo non trovato'}
+                                                : 'Non trovato nel catalogo'}
                                         </p>
                                     </div>
                                 ))}
@@ -797,12 +791,12 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
 
             <ClinicalRichTextEditor
                 className={proposal ? composerStyles.editor : undefined}
-                description={proposal ? "Usa la barra per formattare il testo. Tab passa al controllo successivo." : undefined}
+                description={proposal ? "Tab passa al controllo successivo." : undefined}
                 value={content}
                 onChange={value => { setEditState('dirty'); setContent(value); }}
                 placeholder={'S: Sintomi e motivo della visita\nO: Parametri, esame obiettivo, dati oggettivi\nA: Valutazione clinica e ipotesi\nP: Piano, follow-up, indicazioni'}
             />
-            <p className="type-meta mt-3" role="status" data-testid="local-draft-status">{localDraft.error || (!localDraft.hasDraft ? 'Nessuna bozza da conservare.' : localDraft.state === 'recovered'
+            <p className="type-meta mt-3" role="status" data-testid="local-draft-status">{localDraft.error || (!localDraft.hasDraft ? '' : localDraft.state === 'recovered'
                 ? 'Bozza recuperata. Rivedi il testo prima di registrarlo. Gli allegati vanno selezionati di nuovo.'
                 : !localDraft.saved ? 'Conservazione della bozza in corso…' : 'Testo e dati della bozza conservati cifrati in questo browser. Gli allegati vanno selezionati di nuovo.')}</p>
         </section>
