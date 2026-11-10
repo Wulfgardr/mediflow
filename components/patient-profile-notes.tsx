@@ -9,12 +9,12 @@ import { createPatientProfileScopedBrowserAdapter, PatientProfileBrowserAdapterE
 type NotesState = Readonly<{ state: 'pending' }> | Readonly<{ state: 'available'; notes: string | null }>
     | Readonly<{ state: 'unavailable'; message: string }>;
 function message(error: unknown): string {
-    if (!(error instanceof PatientProfileBrowserAdapterError)) return 'Note non disponibili. Riapri la lettura per riprovare.';
+    if (!(error instanceof PatientProfileBrowserAdapterError)) return 'Note non disponibili.';
     if (error.code === 'output_too_large') return 'Le note superano il limite di questa vista. Nessun contenuto è stato troncato e nessuna bozza è stata modificata.';
     if (error.code === 'session_unavailable') return 'Sblocca MediFlow per leggere le note.';
     if (error.code === 'scope_denied') return 'La sessione corrente non consente di leggere queste note.';
     if (error.code === 'selection_conflict' || error.code === 'operation_superseded') return 'La selezione è cambiata. Riapri le note del paziente che stai consultando.';
-    return 'Lettura delle note non più valida. Riapri le note per ottenere un nuovo riferimento.';
+    return 'Lettura delle note non più valida.';
 }
 export function PatientProfileNotesView({ value }: Readonly<{ value: NotesState }>) {
     return <>

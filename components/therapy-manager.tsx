@@ -617,11 +617,6 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                                     onSelect={(code, title) => setSelectedDiagnosis({ code, title })}
                                     initialValue={selectedDiagnosis}
                                 />
-                                <p className="text-xs leading-5 text-[color:var(--lume-ink-muted)]">
-                                    {selectedDiagnosis?.code === 'PREV'
-                                        ? 'Indicazione: prevenzione.'
-                                        : (selectedDiagnosis ? 'La diagnosi selezionata viene mantenuta come contesto della terapia.' : 'Opzionale: collega una diagnosi o lascia la terapia senza indicazione codificata.')}
-                                </p>
                             </div>
                         </fieldset>
 

@@ -1,7 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { bindSessionToArchive } from './security/archive-session-generation';
 import { createRequire } from 'node:module';
-import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { dbServer } from './db-server';
@@ -16,17 +15,24 @@ export function installNetworkPatientCookieFixture(dataDir: string, state: {
 }) {
     const key = `network-patient-cookies-${dataDir}`;
     (globalThis as unknown as Record<symbol, unknown>)[Symbol.for(key)] = state;
-    const file = join(dataDir, 'synthetic-cookies.cjs');
-    writeFileSync(file, `const s=globalThis[Symbol.for(${JSON.stringify(key)})];
+    // Lo stub resta in memoria: un file nella cartella dati condivisa verrebbe
+    // troncato da un altro processo che installa la stessa fixture.
+    const url = pathToFileURL(join(dataDir, `synthetic-next-headers-${process.pid}.cjs`)).href;
+    const source = `const s=globalThis[Symbol.for(${JSON.stringify(key)})];
 exports.headers=async()=>s.headers??new Headers();
-exports.cookies=async()=>{await s.onCookies?.();return {get:(name)=>s.cookies.has(name)?{name,value:s.cookies.get(name)}:undefined}};`);
-    const load = createRequire(import.meta.url);
-    const { registerHooks } = load('node:module') as { registerHooks: (hooks: {
+exports.cookies=async()=>{await s.onCookies?.();return {get:(name)=>s.cookies.has(name)?{name,value:s.cookies.get(name)}:undefined}};`;
+    const { registerHooks } = createRequire(import.meta.url)('node:module') as { registerHooks: (hooks: {
         resolve: (specifier: string, context: unknown, next: (specifier: string, context: unknown) => { url: string }) => { url: string; shortCircuit?: boolean };
+        load: (url: string, context: unknown, next: (url: string, context: unknown) => unknown) => unknown;
     }) => { deregister: () => void } };
-    const hook = registerHooks({ resolve(specifier, context, next) {
-        return specifier === 'next/headers' ? { url: pathToFileURL(file).href, shortCircuit: true } : next(specifier, context);
-    } });
+    const hook = registerHooks({
+        resolve(specifier, context, next) {
+            return specifier === 'next/headers' ? { url, shortCircuit: true } : next(specifier, context);
+        },
+        load(target, context, next) {
+            return target === url ? { format: 'commonjs', source, shortCircuit: true } : next(target, context);
+        },
+    });
     return () => { hook.deregister(); delete (globalThis as unknown as Record<symbol, unknown>)[Symbol.for(key)]; };
 }
 
