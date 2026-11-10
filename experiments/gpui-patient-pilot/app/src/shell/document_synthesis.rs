@@ -93,6 +93,12 @@ impl ClinicalApp {
     /// Primo passo: verifica che la funzione sia accesa sull'host, rilegge il
     /// documento e prepara la richiesta da mostrare. Nessun dato lascia GPUI qui.
     pub(super) fn synthesis_prepare(&mut self, document: &str, cx: &mut Context<Self>) {
+        if !self.patient.synthesis.area.chat_ready() {
+            #[cfg(unix)]
+            self.patient.synthesis.area.follow_chat();
+            cx.notify();
+            return;
+        }
         if self.patient.synthesis.area.phase.is_busy()
             && self.patient.synthesis.belongs_to(document)
         {
@@ -212,17 +218,18 @@ impl ClinicalApp {
     fn synthesis_send(
         &mut self,
         access: Arc<LocalHostAccess>,
-        sent: DocumentSynthesisRequest,
+        mut sent: DocumentSynthesisRequest,
         cx: &mut Context<Self>,
     ) {
         let context = access.generation_context();
         // Lo stato tiene il riferimento al documento; i byte viaggiano solo con l'invio.
         let mut kept = sent.clone();
         kept.wipe();
-        self.patient.synthesis.area.end(GenerationPhase::Running {
-            request: Box::new(kept),
-            context: context.clone(),
-        });
+        if !self.patient.synthesis.area.start(kept, context.clone()) {
+            sent.wipe();
+            cx.notify();
+            return;
+        }
         let ticket = self.patient.synthesis.area.ticket.clone();
         let patient_id = sent.patient_id.clone();
         let document = sent.attachment_id.clone();
@@ -319,6 +326,26 @@ impl ClinicalApp {
         }
     }
 
+    pub(super) fn synthesis_chat_notice(&self) -> Option<&'static str> {
+        #[cfg(unix)]
+        if self.patient.synthesis.area.chat.0.is_some() {
+            return match self.patient.synthesis.area.phase {
+                GenerationPhase::Checking if !self.patient.synthesis.area.chat_ready() => {
+                    Some("Verifica della sintesi dei documenti…")
+                }
+                GenerationPhase::Idle => Some(
+                    if self.patient.attachments.ready().is_some_and(Vec::is_empty) {
+                        "Nessun documento da sintetizzare. Aggiungi un documento oppure revoca la richiesta dalla chat."
+                    } else {
+                        "Scegli un documento e apri Sintesi e fonte."
+                    },
+                ),
+                _ => None,
+            };
+        }
+        None
+    }
+
     pub(super) fn document_synthesis_view(&self, row: &Attachment, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let id = row.id.clone();
@@ -345,6 +372,14 @@ impl ClinicalApp {
             button("document-synthesis-prepare", label, theme, primary, true)
                 .on_click(cx.listener(move |this, _, _, cx| this.synthesis_prepare(&document, cx)))
         };
+        if !self.patient.synthesis.area.chat_ready() {
+            return pane.child(notice(
+                "document-synthesis-chat-admission",
+                "Verifica della sintesi dei documenti…",
+                theme,
+                false,
+            ));
+        }
         let synthesis = &self.patient.synthesis;
         if !synthesis.belongs_to(&id) {
             if self.local_host.access().is_none() {

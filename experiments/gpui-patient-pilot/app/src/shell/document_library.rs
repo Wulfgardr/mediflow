@@ -112,6 +112,7 @@ impl ClinicalApp {
                 .child(heading("clinical-workspace-documents-heading", "Documenti", theme))
                 .child(button("clinical-workspace-new-document", "Aggiungi documenti…", theme, true, writable && !self.document_imports.pending())
                     .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))))
+            .when_some(self.synthesis_chat_notice(), |el, message| el.child(notice("document-synthesis-chat-selection", message, theme, false)))
             .child(self.dossier_import_view(cx))
             .child(self.smart_import_view(cx))
             .child(self.document_imports_view(cx))
@@ -122,7 +123,7 @@ impl ClinicalApp {
             .when(self.patient.attachments.ready().is_some_and(Vec::is_empty), |el| el.child(text!("Nessun documento presente nella scheda.")))
             .children(self.patient.attachments.ready().into_iter().flatten().map(|row| {
                 let name = if row.locked_fields.iter().any(|field| field == "name") { "Nome del documento non leggibile".into() } else { row.name.clone() };
-                let can_open = self.document_operation == DocumentOperation::Idle && self.form.is_none();
+                let can_open = self.document_operation == DocumentOperation::Idle && self.form.is_none() && self.patient.synthesis.area.chat_ready();
                 let available = can_open && !self.copy_state.is_some_and(documents::CopyState::is_writing) && documents::original_readable(row);
                 let details_open = self.patient.document_details_id.as_deref() == Some(row.id.as_str());
                 let details_id = row.id.clone();

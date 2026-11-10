@@ -644,3 +644,6 @@ fn late_answer_never_lands_on_the_next_patient(cx: &mut gpui::TestAppContext) {
     });
     bench.assert_no_clinical_write();
 }
+
+#[cfg(target_os = "macos")]
+mod chat;
