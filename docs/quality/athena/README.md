@@ -6,7 +6,7 @@ non derivano da cartelle reali e non sono un holdout cieco: sono visibili nel re
 
 ## Corpus approvato
 
-La revisione approvata comprende ogni caso in [`corpus.json`](../../../scripts/athena-quality/corpus.json):
+La revisione approvata comprende ogni caso in [`corpus.json`](https://github.com/Wulfgardr/mediflow/blob/710561000a8a481719c0badf55e25c93544aff3a/scripts/athena-quality/corpus.json):
 plausibilità, sufficienza delle fonti, negazione, incertezza, soggetto, tempo e
 risultato atteso. Le pagine sono inventate: `entry:synthetic.<caso>.p2` indica
 pagina 2 della nota inventata; il caso contraddittorio aggiunge pagina 3.
@@ -27,7 +27,7 @@ senza cambiare il metodo o aggiungere un secondo prompt.
 | contesto | Diniego al commit | Revisione sintetica cambiata durante la Promise del runner |
 
 Tutte le righe delle [soglie approvate](soglie-proposte.md) sono approvate.
-La versione macchina è [`thresholds.json`](../../../scripts/athena-quality/thresholds.json).
+La versione macchina è [`thresholds.json`](https://github.com/Wulfgardr/mediflow/blob/710561000a8a481719c0badf55e25c93544aff3a/scripts/athena-quality/thresholds.json).
 Ogni modifica richiede nuovi hash nel manifest e una nuova approvazione.
 L’approvazione non attesta una misura superata o l’ammissione clinica.
 Dopo la decisione, conservare fuori Git una ricevuta con queste chiavi esatte:
