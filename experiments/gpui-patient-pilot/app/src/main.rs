@@ -107,6 +107,10 @@ fn main() {
         }
         return;
     }
+    #[cfg(target_os = "macos")]
+    if std::env::args().nth(1).as_deref() == Some("--installa-modello-voce") {
+        std::process::exit(local_voice::model::run_install_command());
+    }
     if std::env::args().nth(1).as_deref() == Some("--verify-bundled-assets") {
         println!("{}", components::verify_bundled_brand_assets());
         return;
