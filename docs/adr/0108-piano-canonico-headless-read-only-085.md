@@ -66,7 +66,7 @@ riservato alla sola scrittura SOAP da ADR 0097 e ADR 0103.
 
 L'OpenAPI primario censisce ora 39 `GET` network: i 32 candidati originali e
 7 ingressi con autorita separata, enumerati esattamente dal
-[test del piano](../../lib/headless/canonical-read-plan.test.ts).
+[test del piano](https://github.com/Wulfgardr/mediflow/blob/1b83aded0a21db635b2854e30bd467610b666bd3/lib/headless/canonical-read-plan.test.ts).
 `GET /api/v1/network/scales` (`readNetworkScaleCatalog`, ADR 0153) appartiene
 all'ammissione paired e resta escluso dai candidati Headless. Anche
 `GET /api/v1/network/analytics/demographics` (`readPopulationDemographics`,

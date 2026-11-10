@@ -10,7 +10,7 @@ Issues: [GitHub #279](https://github.com/Wulfgardr/mediflow/issues/279),
 
 Related: [ADR 0065](./0065-intended-purpose-and-claims-guard.md),
 [ADR 0077](./0077-ai-provider-abstraction-and-egress-anonymization-boundary.md),
-[ADR 0089](./0089-intelligence-fabric-provider-control-plane.md),
+[ADR 0089](./0089-contratto-intelligence-fabric-e-venue-esecutive.md),
 [ADR 0094](./0094-intelligence-fabric-headless-contract-085.md) e
 [ADR 0110](./0110-riapertura-governata-programma-intelligente-085.md).
 

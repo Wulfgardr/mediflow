@@ -228,7 +228,7 @@ revisione verificata.
 | Patient Insight | `app/api/ai/patient-insight/preview/route.ts`, `lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts` |
 | Smart Import | `app/api/ai/smart-import/preview/route.ts`, `lib/security/server-session-authenticated-smart-import-preview-production.ts` |
 | Sintesi documentale | `app/api/ai/document-synthesis/preview/route.ts`, `lib/ai-providers/fabric/document-synthesis-production-operation.ts` |
-| Treatment Reasoning | `app/api/ai/treatment-reasoning/preview/route.ts`, `lib/ai-providers/fabric/treatment-reasoning-production-root.ts` |
+| Treatment Reasoning (non disponibile, ADR 0180) | `app/api/ai/treatment-reasoning/preview/route.ts`, `lib/ai-function-unavailable-http.ts` |
 | Lifecycle Ollama e ATHENA | `lib/ai-providers/fabric/provider-lifecycle-service.ts`, `lib/ai-providers/fabric/provider-lifecycle-store.ts` |
 | OCR Fabric non eseguibile | `lib/ai-providers/fabric/generative-catalog.ts`, `lib/ocr-production-retirement.test.ts` |
 | AnyDoc + Apple Vision local-only | `lib/domain/documents/anydoc-local-extraction-runner.ts`, `lib/domain/documents/anydoc-apple-vision-ocr-composition.ts`, `scripts/check-anydoc-local-only.mjs` |

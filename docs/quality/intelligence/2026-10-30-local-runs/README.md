@@ -59,7 +59,7 @@ egress o scritture cliniche, nessun avvio di server o uso della porta 3000.
 
 ## Revisione per Leonardo
 
-Il [corpus](../../../../scripts/athena-quality/corpus.json) contiene tutte le
+Il [corpus](https://github.com/Wulfgardr/mediflow/blob/710561000a8a481719c0badf55e25c93544aff3a/scripts/athena-quality/corpus.json) contiene tutte le
 fonti sintetiche e le pagine attese. Non esistono nuovi output da rivedere.
 Dopo lo sblocco, la revisione deve confrontare per ogni caso le due colonne
 `direct` e `fabric` del report reale, inclusi dinieghi e binding, senza
