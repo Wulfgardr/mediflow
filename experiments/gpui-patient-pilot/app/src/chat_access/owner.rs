@@ -1,5 +1,4 @@
 use super::native::{self, Peer};
-#[cfg(all(test, target_os = "macos"))]
 use mediflow_runtime_client::ChatWriteOutcome;
 use mediflow_runtime_client::{
     ChatAccessContext, ChatWriteKind, ChatWriteRecovery, ChatWriteResolution, RuntimeSession,
@@ -402,12 +401,71 @@ impl Request {
     }
     pub(crate) fn revoke(&mut self) {
         if self.state == State::Write(ChatWriteResolution::Uncertain) {
-            self.reconcile_therapy();
+            self.retire_therapy();
         } else {
             self.withdraw();
         }
     }
+    fn read_therapy_receipt(&mut self) {
+        let receipt = self.binding.as_ref().and_then(|binding| {
+            let (_, id) = self.therapy.as_ref()?.selected.as_ref()?;
+            binding
+                .session
+                .chat_therapy_request(
+                    &binding.context,
+                    &serde_json::json!({"operation":"receipt", "commandId":id}),
+                )
+                .ok()
+        });
+        let outcome = receipt.as_ref().and_then(|value| {
+            let (_, id) = self.therapy.as_ref()?.selected.as_ref()?;
+            if value["outcome"] != "terminal" || value["receipt"]["commandId"] != *id {
+                return None;
+            }
+            match value["receipt"]["outcome"].as_str()? {
+                "applied" if value["receipt"]["historical"] == true => {
+                    Some(ChatWriteOutcome::AppliedHistorical)
+                }
+                "applied" => Some(ChatWriteOutcome::Applied),
+                "rejected" => Some(ChatWriteOutcome::Rejected),
+                "closed" => Some(ChatWriteOutcome::Closed),
+                _ => None,
+            }
+        });
+        self.state = State::Write(outcome.map_or(
+            ChatWriteResolution::Uncertain,
+            ChatWriteResolution::Confirmed,
+        ));
+        self.deadline = None;
+        if let Some(therapy) = self.therapy.as_mut() {
+            therapy.result = receipt;
+            if let Some(outcome) = outcome
+                && let Some((_, id)) = &therapy.selected
+            {
+                let _ = self.references.confirm(id, outcome);
+            }
+        }
+    }
     pub(crate) fn reconcile_therapy(&mut self) {
+        if self.therapy.as_ref().is_some_and(|therapy| {
+            therapy.target == "receipt"
+                && therapy
+                    .selected
+                    .as_ref()
+                    .is_some_and(|(_, id)| match self.references.kind(id) {
+                        Some(ChatWriteKind::TherapyStatus) => true,
+                        Some(ChatWriteKind::CheckupBooking) => false,
+                        None => self.binding.as_ref().is_some_and(|binding| {
+                            !binding.session.can_write("network.replica.write-checkups")
+                        }),
+                    })
+        }) {
+            self.read_therapy_receipt();
+            return;
+        }
+        self.retire_therapy();
+    }
+    fn retire_therapy(&mut self) {
         self.state = State::Write(
             self.recovery
                 .as_ref()
@@ -745,6 +803,9 @@ pub(crate) fn execute_therapy(pending: &Pending, attempt: Attempt, pin: &str) ->
         p.references.remember_kind(id, kind).ok()?;
         let result = (b.session.clone(), b.context.clone(), id.clone(), booking);
         p.state = State::Consuming;
+        if !booking {
+            p.deadline = None;
+        }
         Some(result)
     });
     let Some((session, context, id, booking)) = binding else {
@@ -758,13 +819,19 @@ pub(crate) fn execute_therapy(pending: &Pending, attempt: Attempt, pin: &str) ->
         }
     };
     let result = request(serde_json::json!({"operation":"execute","commandId":id,"pin":pin}));
-    let receipt = request(serde_json::json!({"operation":"receipt","commandId":id})).ok();
+    let receipt = booking
+        .then(|| request(serde_json::json!({"operation":"receipt","commandId":id})).ok())
+        .flatten();
     if let Ok(mut p) = pending.lock()
         && p.status() == State::Consuming
     {
-        p.reconcile_therapy();
-        if let Some(t) = p.therapy.as_mut() {
-            t.result = receipt;
+        if booking {
+            p.reconcile_therapy();
+            if let Some(t) = p.therapy.as_mut() {
+                t.result = receipt;
+            }
+        } else {
+            p.read_therapy_receipt();
         }
     }
     result.is_ok()
@@ -1133,6 +1200,8 @@ pub(crate) mod tests {
         /// 3 both announced by discovery while the host denies therapies.
         grants: Arc<AtomicUsize>,
         worker: Option<std::thread::JoinHandle<()>>,
+        therapy_fault: Arc<AtomicUsize>,
+        therapy_calls: Arc<Mutex<Vec<Value>>>,
     }
     impl Drop for Host {
         fn drop(&mut self) {
@@ -1153,7 +1222,12 @@ pub(crate) mod tests {
         let current = state.clone();
         let grants = Arc::new(AtomicUsize::new(0));
         let granted = grants.clone();
+        let therapy_fault = Arc::new(AtomicUsize::new(0));
+        let fault = therapy_fault.clone();
+        let therapy_calls = Arc::new(Mutex::new(Vec::new()));
+        let calls = therapy_calls.clone();
         let worker = std::thread::spawn(move || {
+            let mut silent = Vec::new();
             let vector: Value = serde_json::from_str(include_str!(
                 "../../../../../native/contracts/crypto-golden-vectors.v3.json"
             ))
@@ -1276,7 +1350,37 @@ pub(crate) mod tests {
                 } else if first.starts_with("POST /api/auth/native/therapy-status ") {
                     let end = bytes.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
                     let body: Value = serde_json::from_slice(&bytes[end + 4..]).unwrap();
-                    let result = match body["operation"].as_str().unwrap() {
+                    calls.lock().unwrap().push(body.clone());
+                    let failure = fault.load(Ordering::Acquire);
+                    let operation = body["operation"].as_str().unwrap();
+                    if failure != 0 && ["execute", "receipt", "revoke"].contains(&operation) {
+                        if operation == "execute" && failure == 1 {
+                            current.store(4, Ordering::Release);
+                        }
+                        if failure == 4 || (failure == 1 && operation == "execute") {
+                            continue;
+                        }
+                        if failure == 5 && operation == "execute" {
+                            silent.push(socket);
+                            continue;
+                        }
+                        let (status, payload) = if [5, 6].contains(&failure)
+                            && operation == "receipt"
+                        {
+                            (200, json!({"outcome":"unknown"}))
+                        } else if [5, 6].contains(&failure) && operation == "revoke" {
+                            (200, json!({"outcome":"retired"}))
+                        } else {
+                            (
+                                if failure == 2 { 403 } else { 503 },
+                                json!({"outcome":"terminal", "receipt":{"commandId":body["commandId"],"outcome":"applied"}}),
+                            )
+                        };
+                        let bytes = payload.to_string();
+                        write!(socket, "HTTP/1.1 {status} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{bytes}", bytes.len()).unwrap();
+                        continue;
+                    }
+                    let result = match operation {
                         "open" => json!({"viewId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}),
                         "preview" => {
                             json!({"commandId":body["command"]["commandId"],"status":"preview"})
@@ -1293,7 +1397,7 @@ pub(crate) mod tests {
                             json!({"outcome":"unknown"})
                         }
                         "receipt" => {
-                            json!({"outcome":"terminal", "receipt":{"outcome":"applied"},"current":{"version":2,"status":"suspended"}})
+                            json!({"outcome":"terminal", "receipt":{"commandId":body["commandId"],"outcome":"applied"},"current":{"version":2,"status":"suspended"}})
                         }
                         "revoke"
                             if body["commandId"]
@@ -1408,6 +1512,8 @@ pub(crate) mod tests {
                 state,
                 grants,
                 worker: Some(worker),
+                therapy_fault,
+                therapy_calls,
             },
         )
     }
@@ -2208,6 +2314,93 @@ pub(crate) mod tests {
         assert_eq!(safe.as_object().unwrap().len(), 2);
         assert!(!execute_therapy(&pending, attempt, "2468"));
         assert!(pending.lock().unwrap().begin().is_none());
+    }
+
+    #[test]
+    fn therapy_transport_failure_keeps_identity_and_never_retries() {
+        for failure in [1, 2, 3, 4, 5, 6] {
+            let (session, host) = native_session();
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            let (a, _remote) = UnixStream::pair().unwrap();
+            let pending = Request::for_therapy(Peer::test_peer(), a, "suspended").unwrap();
+            assert!(
+                pending
+                    .lock()
+                    .unwrap()
+                    .bind(session.clone(), context.clone())
+            );
+            prepare_card(&pending);
+            choose_therapy(&pending, 0);
+            let id = pending.lock().unwrap().safe_result().unwrap()["commandId"].clone();
+            let references = pending.lock().unwrap().references.clone();
+            let (_, _, attempt) = pending.lock().unwrap().begin().unwrap();
+            host.therapy_fault.store(failure, Ordering::Release);
+            assert!(!execute_therapy(&pending, attempt, "2468"));
+            let unknown = json!({"commandId":id,"outcome":"unknown"});
+            assert_eq!(pending.lock().unwrap().safe_result().unwrap(), unknown);
+            assert_eq!(references.scan().unwrap().ids, [id.as_str().unwrap()]);
+            assert!(!execute_therapy(&pending, attempt, "2468"));
+            assert!(pending.lock().unwrap().begin().is_none());
+            let (a, _recovery_remote) = UnixStream::pair().unwrap();
+            let recovered_id = references.scan().unwrap().ids.into_iter().next().unwrap();
+            let recovered = Request::for_receipt(Peer::test_peer(), a, &recovered_id).unwrap();
+            recovered.lock().unwrap().references = references.clone();
+            assert!(recovered.lock().unwrap().bind(session, context));
+            prepare_card(&recovered);
+            assert_eq!(recovered.lock().unwrap().safe_result().unwrap(), unknown);
+            if failure == 1 {
+                host.therapy_fault.store(0, Ordering::Release);
+                recovered.lock().unwrap().reconcile_therapy();
+                assert_eq!(
+                    recovered.lock().unwrap().safe_result().unwrap(),
+                    json!({"commandId":id,"outcome":"applied"})
+                );
+                assert!(references.scan().unwrap().ids.is_empty());
+            }
+            let calls = host.therapy_calls.lock().unwrap();
+            assert_eq!(
+                calls.iter().filter(|c| c["operation"] == "execute").count(),
+                1,
+                "automatic retry after failure {failure}"
+            );
+            assert_eq!(
+                calls.iter().filter(|c| c["operation"] == "preview").count(),
+                1
+            );
+            for call in calls.iter().filter(|c| {
+                ["execute", "receipt", "revoke"].contains(&c["operation"].as_str().unwrap())
+            }) {
+                assert_eq!(call["commandId"], id, "identity changed during recovery");
+            }
+        }
+    }
+
+    #[test]
+    fn therapy_unknown_receipt_survives_recovery_without_retirement() {
+        let (session, host) = native_session();
+        host.therapy_fault.store(6, Ordering::Release);
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        let id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+        let (a, _remote) = UnixStream::pair().unwrap();
+        let pending = Request::for_receipt(Peer::test_peer(), a, id).unwrap();
+        assert!(pending.lock().unwrap().bind(session, context));
+        prepare_card(&pending);
+        let mut p = pending.lock().unwrap();
+        assert_eq!(
+            p.safe_result().unwrap(),
+            json!({"commandId":id,"outcome":"unknown"})
+        );
+        assert_eq!(p.references.scan().unwrap().ids, [id]);
+        p.reconcile_therapy();
+        assert_eq!(p.safe_result().unwrap()["outcome"], "unknown");
+        assert!(p.begin().is_none());
+        let calls = host.therapy_calls.lock().unwrap();
+        assert!(!calls.is_empty());
+        assert!(
+            calls
+                .iter()
+                .all(|call| call == &json!({"operation":"receipt","commandId":id}))
+        );
     }
 
     #[test]
