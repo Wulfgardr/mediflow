@@ -1,0 +1,7 @@
+{
+  "status": 410,
+  "body": {
+    "error": "Ingest Smart Import non disponibile.",
+    "code": "projection_stale"
+  }
+}

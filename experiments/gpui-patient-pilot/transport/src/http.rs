@@ -697,6 +697,9 @@ impl RuntimeClient {
         } else if path == crate::local_host::PATIENT_INSIGHT_PATH {
             // Quadro paziente: fino a 37 righe di contesto da 240 caratteri.
             AUTH_LIMIT
+        } else if path == crate::local_host::SMART_IMPORT_INGEST_PATH {
+            // Import assistito: fino a 32 fonti da 900 caratteri, diagnosi e terapie in corso.
+            JSON_LIMIT
         } else if path == ["api", "attachments"] {
             25 * 1024 * 1024
         } else if archive
@@ -745,6 +748,7 @@ impl RuntimeClient {
                 }
                 if path == crate::local_host::PATIENT_INSIGHT_PATH
                     || path == crate::local_host::DOCUMENT_SYNTHESIS_PREVIEW_PATH
+                    || path == crate::local_host::SMART_IMPORT_PREVIEW_PATH
                 {
                     // L'host concede al modello locale fino a 300 s.
                     request = request.timeout(Duration::from_secs(330));
@@ -775,6 +779,10 @@ impl RuntimeClient {
                         // Sintesi documenti: cattura e anteprima rifiutano con un codice.
                         || ((path == crate::local_host::DOCUMENT_SYNTHESIS_CAPTURE_PATH
                             || path == crate::local_host::DOCUMENT_SYNTHESIS_PREVIEW_PATH)
+                            && matches!(raw.status, 400 | 403 | 409 | 410 | 503))
+                        // Import assistito: ingest e anteprima rifiutano con un codice.
+                        || ((path == crate::local_host::SMART_IMPORT_INGEST_PATH
+                            || path == crate::local_host::SMART_IMPORT_PREVIEW_PATH)
                             && matches!(raw.status, 400 | 403 | 409 | 410 | 503))
                         || (path == ["api", "icd", "proxy"]
                             && query.is_empty()
@@ -1513,6 +1521,8 @@ fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
         ["api", "prosthetics", "catalog", "search"] => JSON_LIMIT,
         // Fino a 32 citazioni di 12 000 caratteri.
         ["api", "ai", "document-synthesis", "preview"] => JSON_LIMIT,
+        // Fino a 25 candidati, ognuno con 20 voci.
+        ["api", "ai", "smart-import", "preview"] => JSON_LIMIT,
         ["api", "system", "backup-scheduler"] => JSON_LIMIT,
         // These reports carry their full Markdown beside the fields the panel reads.
         ["api", "system", "ai-parliament" | "ai-rollout-readiness"] => JSON_LIMIT,
