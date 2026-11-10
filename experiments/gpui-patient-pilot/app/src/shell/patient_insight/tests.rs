@@ -741,8 +741,9 @@ mod chat {
             lines.extend([proposal.model.clone(), proposal.review_ref.clone()]);
             lines
         });
+        // Con la proposta mostrata la chat non possiede più il Quadro.
         let reply = wire(&pending);
-        assert_eq!(reply, json!({"status": "insight-opened"}));
+        assert_eq!(reply, json!({"status": "insight-closed"}));
         let text = reply.to_string();
         for line in lines.iter().filter(|line| line.len() > 3) {
             assert!(!text.contains(line.as_str()), "testo clinico verso la chat");
@@ -849,6 +850,37 @@ mod chat {
             );
             assert_eq!(wire(&pending), json!({"status": "withdrawn"}), "{change}");
             bench.assert_no_clinical_write();
+        }
+    }
+
+    /// Rilievo Codex su #896: la chat ritira mentre la finestra mostra il consenso e il
+    /// medico conferma prima del controllo periodico. Nessun dato deve partire.
+    #[gpui::test]
+    fn chat_withdrawn_before_consent_sends_nothing(cx: &mut gpui::TestAppContext) {
+        for change in ["revoke", "eof"] {
+            let (bench, cx) = bench(cx);
+            let (pending, remote) = opened(&bench, cx);
+            let mut remote = Some(remote);
+            let answer = bench.answer("response-available");
+            bench.view.update(cx, |app, cx| {
+                match change {
+                    "revoke" => pending.lock().unwrap().revoke(),
+                    _ => drop(remote.take()),
+                }
+                // Stesso intervallo di 250 ms: nessun `poll_chat_insight` in mezzo.
+                app.insight_confirm(cx);
+            });
+            cx.run_until_parked();
+            assert!(!answer.join().unwrap(), "{change}: nessuna richiesta parte");
+            assert!(bench.host.bodies(PREVIEW).is_empty(), "{change}");
+            assert!(
+                bench.phase(cx, |phase| matches!(
+                    phase,
+                    InsightPhase::Ended(m) if m.contains("La chat ha ritirato")
+                )),
+                "{change}"
+            );
+            assert_eq!(wire(&pending), json!({"status": "withdrawn"}), "{change}");
         }
     }
 

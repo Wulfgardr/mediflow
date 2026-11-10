@@ -43,7 +43,9 @@ Il Quadro paziente è collegato alla chat con il comando app-only
 `patient-insight`, senza argomenti. Il comando apre il Quadro del paziente
 selezionato nella finestra MediFlow; consenso, generazione, fonti, ricevuta e
 scarto restano lì. Alla chat tornano solo `insight-opened`,
-`insight-unavailable`, `insight-busy` o il ritiro. La
+`insight-unavailable`, `insight-busy`, `insight-closed` o il ritiro; «Revoca»
+resta attivo nella carta finché la finestra prepara, attende il consenso o
+genera. La
 [nota di progetto](raccordi-c7-funzioni-generative.md) descrive i tre raccordi,
 i negativi C-7 e dove si provano. Sintesi dei documenti e import assistito
 restano non collegati. I due host desktop non sono qualificati.

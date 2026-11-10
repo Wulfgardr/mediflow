@@ -36,7 +36,24 @@ Stati restituiti alla chat, per tutti e tre i comandi:
 | `<funzione>-opened` | La vista è aperta e attende il consenso nella finestra |
 | `<funzione>-unavailable` | Funzione spenta, kill switch o host locale chiuso |
 | `<funzione>-busy` | Nella finestra c'è già un lavoro della stessa funzione: non viene sostituito |
+| `<funzione>-closed` | La finestra ha concluso il lavoro aperto dalla chat (proposta, scarto, errore, indisponibilità) |
 | `withdrawn` | Ogni altro diniego: sessione, selezione, archivio, blocco, revoca, idoneità. Il motivo tecnico resta nella finestra |
+
+### Quando finisce la proprietà della chat
+
+Come nel flusso ordinario di ADR 0165, dove «Revoca» resta disponibile finché
+la richiesta non è consumata o ritirata, la chat possiede la richiesta dal
+comando fino a quando la finestra conclude il lavoro che la richiesta ha
+aperto: per il Quadro, finché la finestra prepara, attende il consenso o
+genera. In queste fasi la carta lascia attivo «Revoca» e la revoca interrompe
+il lavoro nella finestra senza proposta; il ritiro si controlla anche al
+confine fra consenso e invio, così nessun dato parte dopo una revoca. La
+proprietà finisce quando la finestra mostra la proposta, o arriva a scarto,
+errore o indisponibilità: la GPUI risponde allora `<funzione>-closed`, la
+richiesta perde ogni legame con sessione e selezione e la carta spegne
+«Revoca». Una proposta già mostrata appartiene alla finestra. Resta il limite
+del canale: una richiesta vive al massimo cinque minuti dalla creazione, poi è
+ritirata senza rinnovo, anche durante consenso o generazione.
 
 ## Quadro paziente (Patient Insight): collegato
 
@@ -47,7 +64,7 @@ Stati restituiti alla chat, per tutti e tre i comandi:
   l'ammissione. Nessun'altra vista nativa aperta (bozza, dettatura, PDF,
   un'altra richiesta della chat), schermo privacy spento.
 - **Stati alla chat:** `insight-opened`, `insight-unavailable`,
-  `insight-busy`, `withdrawn`.
+  `insight-busy`, `insight-closed`, `withdrawn`.
 - **Nella finestra:** il Quadro del paziente selezionato in Panoramica, al passo
   del consenso: quante condizioni, terapie e voci di diario verranno inviate.
   Poi il percorso di G-5a: un invio, proposta con fonti e ricevuta, scarto,
@@ -61,7 +78,7 @@ Stati restituiti alla chat, per tutti e tre i comandi:
 | Funzione indisponibile | `chat_denials_return_a_state_and_never_generate` (kill switch, interruttore illeggibile), `chat_with_local_host_closed_is_unavailable_without_any_call` |
 | Output malformato o token estraneo | Prove G-5a (risposta alterata); comando con campi in più rifiutato (`insight_command_carries_no_patient_scope_model_or_foreign_token`); contesto di un'altra sessione negato (`insight_opens_only_with_paired_session_current_selection_and_server_admission`); frame che rifiuta campi oltre allo stato (`lib/chat-card/patient-insight.test.ts`, spec frame) |
 | Contesto scaduto | Selezione cambiata, A→B→A, epoca dell'host, archivio sostituito, blocco, account non idoneo: test owner e GPUI sopra |
-| Revoca durante l'operazione | `chat_withdrawal_during_generation_leaves_no_proposal`, `late_answer_after_chat_revocation_is_not_shown` |
+| Revoca durante l'operazione | `chat_withdrawal_during_generation_leaves_no_proposal`, `late_answer_after_chat_revocation_is_not_shown`, `chat_withdrawn_before_consent_sends_nothing`; dalla carta: `revocation stays available while the chat owns the insight and retires the request` (Node) e spec frame |
 | Cambio paziente o selezione | `patient_change_withdraws_the_chat_and_drops_the_late_answer`, `opened_insight_is_withdrawn_when_selection_session_or_chat_changes` |
 | Nessun ripiego e nessuna applicazione silenziosa | Il Quadro non scrive (prove G-5a, `assert_no_clinical_write`); proposta o generazione in corso non sostituite (`chat_never_replaces_*`); nessun motore alternativo quando la funzione è spenta |
 
@@ -79,7 +96,7 @@ Stati restituiti alla chat, per tutti e tre i comandi:
   del paziente e l'interruttore della sintesi dei documenti. Prerequisito: la
   vista GPUI della sintesi in `main` (ramo `claude/gpui-sintesi-documenti`).
 - **Stati alla chat:** `synthesis-opened`, `synthesis-unavailable`,
-  `synthesis-busy`, `withdrawn`.
+  `synthesis-busy`, `synthesis-closed`, `withdrawn`.
 - **Nella finestra:** la vista della sintesi del documento scelto, con consenso,
   proposta, fonti nel documento, ricevuta e scarto.
 - **Negativi C-7:** gli stessi otto del Quadro, più documento cambiato o
@@ -94,7 +111,7 @@ Stati restituiti alla chat, per tutti e tre i comandi:
   diagnosi e terapie. Prerequisito: la vista GPUI dell'import assistito in
   `main`; oggi GPUI ne mostra solo l'interruttore.
 - **Stati alla chat:** `import-opened`, `import-unavailable`, `import-busy`,
-  `withdrawn`. Nessuna ricevuta di scrittura alla chat: l'esito di ogni
+  `import-closed`, `withdrawn`. Nessuna ricevuta di scrittura alla chat: l'esito di ogni
   candidato applicato resta nella finestra.
 - **Nella finestra:** candidati (diagnosi, terapie) con fonti nel documento;
   ogni applicazione è un gesto esplicito per candidato, con revisione e

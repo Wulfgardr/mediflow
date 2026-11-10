@@ -347,7 +347,10 @@ sceglie la configurazione della funzione sull'host.
 
 Alla chat tornano soltanto `insight-opened`, `insight-unavailable` (funzione
 spenta, kill switch o host locale chiuso), `insight-busy` (un Quadro è già in
-preparazione, in generazione o mostrato e non viene sostituito) o `withdrawn`.
+preparazione, in generazione o mostrato e non viene sostituito),
+`insight-closed` (la finestra ha concluso il Quadro aperto dalla chat) o
+`withdrawn`. Fino a `insight-closed` la carta lascia attivo «Revoca»; il ritiro
+si controlla anche fra consenso e invio, così nessun dato parte dopo una revoca.
 Revoca, EOF, blocco della sessione, cambio di selezione o di scheda durante la
 preparazione o la generazione interrompono il Quadro legato alla chat; una
 risposta già in volo non compare. Una proposta mostrata appartiene alla

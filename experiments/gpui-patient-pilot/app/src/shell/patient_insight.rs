@@ -240,6 +240,15 @@ impl ClinicalApp {
         let InsightPhase::Consent(consented) = &self.patient.insight.phase else {
             return;
         };
+        // La chat che ha aperto il Quadro lo ha ritirato fra un controllo periodico e
+        // l'altro: il consenso non vale più e nessun dato parte.
+        if self.insight_chat_withdrawn() {
+            self.patient
+                .insight
+                .end(InsightPhase::Ended(CHAT_WITHDRAWN.into()));
+            cx.notify();
+            return;
+        }
         let consented_sources = consented.sources.clone();
         let consented_revision = consented.patient_revision;
         let Some(access) = self.local_host.access() else {
@@ -751,11 +760,16 @@ impl ClinicalApp {
             cx.notify();
             return;
         }
+        // Proposta, scarto, errore o indisponibilità: la proprietà della chat finisce qui.
         if !matches!(
             self.patient.insight.phase,
             InsightPhase::Consent(_) | InsightPhase::Running { .. }
         ) {
+            if let Ok(mut p) = chat.lock() {
+                p.close_insight();
+            }
             self.patient.insight.chat = None;
+            cx.notify();
         }
     }
 }
