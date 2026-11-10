@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-OwNUiXLdbg3DPC/YwS/tl6DGraBg7pHVApSpabs2Hw4='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
+<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-eDObcjqPafIMxrFRvdPThXTCHexavAyrPz/8iMb7xJg='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
 <style>html{color-scheme:light dark;font:17px system-ui}body{margin:24px;max-width:40rem}h1{font-size:1.4rem;font-weight:500}button{font:inherit;margin:8px 8px 8px 0;padding:10px 16px}p{line-height:1.5}section{overflow-wrap:anywhere;border-top:1px solid GrayText;margin-top:20px}h2{font-size:1.15rem}li{margin-block:12px;line-height:1.5}</style></head>
 <body><h1>MediFlow</h1><p>Conferma l’accesso nella finestra MediFlow già sbloccata. La selezione clinica viene redatta localmente e condivisa dopo la tua revisione nella finestra nativa. Il rilevatore può sbagliare: il medico è responsabile di controllare i byte prima della conferma.</p>
 <p id="status" role="status" aria-live="polite">Collegamento alla chat…</p>
@@ -12,6 +12,7 @@
 <tr><td>Protesica</td><td>Ricerca catalogo locale in sola lettura con conferma nativa. Prescrizioni archivio non collegate.</td></tr>
 <tr><th scope="row">Quadro paziente</th><td>Consenso, proposta e fonti nella finestra MediFlow. Alla chat torna solo lo stato.</td></tr>
 <tr><td>Sintesi documenti</td><td>Scelta del documento, consenso, proposta e fonti nella finestra MediFlow. Alla chat torna solo lo stato.</td></tr>
+<tr><td>Import assistito</td><td>Consenso, proposta e fonti nella finestra MediFlow, in sola anteprima. Alla chat torna solo lo stato.</td></tr>
 <tr><td>Treatment Reasoning</td><td>Non disponibile in questa versione.</td></tr>
 <tr><th scope="row">Altre funzioni e comandi</th><td>Non collegati alla chat. Continua in MediFlow.</td></tr>
 </tbody></table></details>
@@ -26,6 +27,7 @@
 <p>Puoi dettare nella finestra MediFlow, rivedere il testo e preparare una voce di diario. Audio e identificativi restano nella finestra nativa.</p><button id="local-voice" disabled>Detta in MediFlow</button>
 <button id="patient-insight" disabled>Apri il Quadro paziente in MediFlow</button>
 <button id="document-synthesis" disabled>Sintetizza un documento in MediFlow</button>
+<button id="smart-import" disabled>Apri l’import assistito in MediFlow</button>
 <button id="request" disabled>Richiedi accesso</button><button id="consume" disabled>Mostra scheda monouso</button><button id="revoke" disabled>Revoca</button>
 <script>
 (() => {
@@ -34,10 +36,12 @@
     const bookingLabels = { requested: 'Richiesta inviata. Scegli data e ora nella finestra MediFlow.', challenge: 'Scegli data e ora e conferma con PIN nella finestra MediFlow entro 30 secondi.', retired: 'Ritiro confermato. Nessun controllo prenotato.', applied: 'Controllo prenotato e auditato. Il ritiro non annulla la prenotazione.', 'applied-historical': 'Controllo presente in agenda, da un archivio ripristinato. La ricevuta di audit originale non è disponibile qui. Non ripetere la prenotazione.', rejected: 'Prenotazione respinta: l’agenda è cambiata prima della conferma. Nessun controllo prenotato.' };
     const insightLabels = { requested: 'Richiesta inviata alla finestra MediFlow.', preparing: 'Verifica nella finestra MediFlow…', 'insight-opened': 'Quadro paziente aperto nella finestra MediFlow. La proposta resta lì e non arriva alla chat.', 'insight-unavailable': 'Quadro paziente non disponibile: funzione spenta o host locale chiuso.', 'insight-busy': 'Il Quadro paziente è già in uso nella finestra MediFlow. Concludi lì e riprova.', 'insight-closed': 'Quadro paziente concluso nella finestra MediFlow.' };
     const synthesisLabels = { requested: 'Richiesta inviata alla finestra MediFlow.', preparing: 'Verifica nella finestra MediFlow…', 'synthesis-opened': 'Scegli il documento nella finestra MediFlow.', 'synthesis-unavailable': 'Sintesi dei documenti non disponibile.', 'synthesis-busy': 'Sintesi dei documenti già in uso nella finestra MediFlow. Concludi lì e riprova.', 'synthesis-closed': 'Sintesi conclusa nella finestra MediFlow.' };
+    const importLabels = { requested: 'Richiesta inviata alla finestra MediFlow.', preparing: 'Verifica nella finestra MediFlow…', 'import-opened': 'Prepara la richiesta nella finestra MediFlow.', 'import-unavailable': 'Import assistito non disponibile.', 'import-busy': 'Import assistito già in uso nella finestra MediFlow. Concludi lì e riprova.', 'import-closed': 'Import assistito concluso nella finestra MediFlow.' };
+    const generationModes = { insight: [insightLabels, 'insight-opened', 'Richiesta ritirata. Nella finestra MediFlow il Quadro si interrompe senza proposta.'], synthesis: [synthesisLabels, 'synthesis-opened', 'Richiesta ritirata.'], import: [importLabels, 'import-opened', 'Richiesta ritirata.'] };
     const pending = new Map(), element = id => document.getElementById(id);
     const labels = { 'voice-opened': 'Continua in MediFlow: consenti la cattura locale, rivedi il testo e prepara la bozza. Nessun audio o testo viene restituito alla chat.', 'document-opened': 'Continua nella finestra MediFlow: scegli il PDF, rivedi i dati e conferma con PIN. L’apertura non conferma la creazione.', selecting: 'Scegli diagnosi e passi nella finestra MediFlow.', preparing: 'Redazione locale della scheda sintetica…', requested: 'Richiesta inviata alla finestra MediFlow.', challenge: 'Conferma nella finestra MediFlow entro 30 secondi.', approving: 'Conferma nativa in corso…', consuming: 'Verifica dell’accesso in corso…', approved: 'Accesso monouso autorizzato.', consumed: 'Scheda condivisa. Autorizzazione consumata.', uncertain: 'Esito da verificare. Rileggi nella finestra MediFlow; non ripetere la scrittura.', retired: 'Ritiro confermato. Nessuna modifica alla terapia.', applied: 'Modifica registrata e auditata. Il ritiro non annulla il salvataggio.', 'applied-historical': 'Presente nell’archivio, ripristinato da un altro archivio. La ricevuta di audit originale non è disponibile qui. Non ripetere la scrittura.', rejected: 'Scrittura respinta. Nessuna modifica.', closed: 'Comando chiuso senza modifica.', withdrawn: 'Accesso ritirato. Apri una nuova vista per richiederlo di nuovo.' };
     function rpc(method, params) { return new Promise((resolve, reject) => { const id = ++sequence; const timeout = setTimeout(() => { pending.delete(id); reject(new Error('timeout')); }, 10000); pending.set(id, { resolve, reject, timeout }); window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*'); }); }
-    function stop() { element('drug-query').disabled = true; terminal = true; generation++; clearTimeout(timer); for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document', 'request', 'consume', 'revoke', 'therapy-active', 'therapy-suspended', 'therapy-completed', 'receipt','booking','booking-receipt'])
+    function stop() { element('drug-query').disabled = true; terminal = true; generation++; clearTimeout(timer); for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document', 'request', 'consume', 'revoke', 'therapy-active', 'therapy-suspended', 'therapy-completed', 'receipt','booking','booking-receipt'])
         element(id).disabled = true; }
     function show(state) {
         if (state !== 'consumed' || therapyMode || documentMode) { element('card').replaceChildren(); element('card').hidden = true; clearTimeout(expiry); }
@@ -206,14 +210,14 @@
     function applyResult(value, command) {
         let state = value?._meta?.status;
         if (generationMode) {
-            const activeLabels = generationMode === 'synthesis' ? synthesisLabels : insightLabels;
+            const [activeLabels, opened, retired] = generationModes[generationMode];
             if (command === 'revoke' && state === 'withdrawn' && Object.keys(value?._meta || {}).length === 1) {
-                element('status').textContent = generationMode === 'synthesis' ? 'Richiesta ritirata.' : 'Richiesta ritirata. Nella finestra MediFlow il Quadro si interrompe senza proposta.';
+                element('status').textContent = retired;
                 stop();
             } else if (Object.hasOwn(activeLabels, state) && Object.keys(value?._meta || {}).length === 1) {
                 element('status').textContent = activeLabels[state];
                 // Finché la chat possiede la richiesta (consenso e generazione) si può revocare.
-                if (['requested', 'preparing', generationMode === 'synthesis' ? 'synthesis-opened' : 'insight-opened'].includes(state)) { element('revoke').disabled = false; timer = setTimeout(commandStatus, 1000); }
+                if (['requested', 'preparing', opened].includes(state)) { element('revoke').disabled = false; timer = setTimeout(commandStatus, 1000); }
                 else stop();
             } else {
                 element('status').textContent = 'Apertura non confermata. Controlla la finestra MediFlow.';
@@ -303,7 +307,7 @@
     element('agenda').onclick = () => {
         if (!ready || started || terminal) return;
         agendaMode = true; started = true;
-        for (const id of ['agenda','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
+        for (const id of ['agenda','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
         command('agenda');
     };
     for (const catalog of ['drugs','prosthetics']) element(catalog).onclick = () => {
@@ -311,67 +315,73 @@
         if (!ready || started || terminal || query.length < 2 || query.length > 80 || /[\u0000-\u001f\u007f]/u.test(query)) return;
         element('drug-query').value = query; element('drug-query').disabled = true;
         drugMode = true; prostheticsMode = catalog === 'prosthetics'; started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
         command(catalog, undefined, query);
     };
     element('local-voice').onclick = () => {
         if (!ready || started || terminal) return;
         voiceMode = true; started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request','consume']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request','consume']) element(id).disabled = true;
         command('local-voice');
     };
     element('patient-insight').onclick = () => {
         if (!ready || started || terminal) return;
         generationMode = 'insight'; started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request','consume']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request','consume']) element(id).disabled = true;
         command('patient-insight');
     };
     element('document-synthesis').onclick = () => {
         if (!ready || started || terminal) return;
         generationMode = 'synthesis'; started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request','consume']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request','consume']) element(id).disabled = true;
         command('document-synthesis');
+    };
+    element('smart-import').onclick = () => {
+        if (!ready || started || terminal) return;
+        generationMode = 'import'; started = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request','consume']) element(id).disabled = true;
+        command('smart-import');
     };
     element('patient-document').onclick = () => {
         if (!ready || started || terminal) return;
         documentMode = true; started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request','consume']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request','consume']) element(id).disabled = true;
         command('patient-document');
     };
     element('clinical-profile').onclick = () => { if (!ready || started || terminal) return;
         clinicalMode = true; started = true;
-        for (const id of ['clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
+        for (const id of ['clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
         command('clinical-profile');
     };
     element('request').onclick = () => { if (ready && !terminal) {
         started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = true;
         command('request');
     } };
     for (const target of ['active','suspended','completed']) element('therapy-' + target).onclick = () => {
         if (!ready || started || terminal) return;
         therapyMode = true; started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(id).disabled = true;
         command('therapy-' + target);
     };
     element('booking').onclick = () => {
         if (!ready || started || terminal) return;
         therapyMode = true; bookingMode = true; started = true;
-        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(id).disabled = true;
+        for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(id).disabled = true;
         command('booking');
     };
     element('booking-receipt').onclick = () => {
         const id = element('command-id').value;
         if (!ready || started || terminal || !/^[0-9a-f-]{36}$/.test(id)) return;
         therapyMode = true; bookingMode = true; started = true;
-        for (const key of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(key).disabled = true;
+        for (const key of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(key).disabled = true;
         command('booking-receipt', id);
     };
     element('receipt').onclick = () => {
         const id = element('command-id').value;
         if (!ready || started || terminal || !/^[0-9a-f-]{36}$/.test(id)) return;
         therapyMode = true; started = true;
-        for (const key of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(key).disabled = true;
+        for (const key of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt','request']) element(key).disabled = true;
         command('receipt', id);
     };
     element('consume').onclick = () => { clearTimeout(timer); element('consume').disabled = true; command('consume'); };
@@ -384,7 +394,7 @@
         ready = true;
         if (attach?._meta?.status === 'ready') {
             element('status').textContent = 'MediFlow richiede una conferma nella finestra nativa.';
-            for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = false;
+            for (const id of ['agenda','clinical-profile','prosthetics','drugs','local-voice','patient-insight','document-synthesis','smart-import','patient-document','request','therapy-active','therapy-suspended','therapy-completed','receipt','booking','booking-receipt']) element(id).disabled = false;
         } else {
             therapyMode = true; started = true;
             applyResult(attach, 'attach');
