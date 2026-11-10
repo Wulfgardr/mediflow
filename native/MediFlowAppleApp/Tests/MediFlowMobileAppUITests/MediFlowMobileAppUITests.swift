@@ -1287,6 +1287,41 @@ final class MediFlowMobileAppUITests: XCTestCase {
         try performAuditNamingElements(screen: "agenda")
     }
 
+    /// DIAGNOSTICA (ramo da non unire): mentre il workflow cambia la dimensione
+    /// del testo di sistema ogni due secondi, registra che cosa mostra l'Agenda.
+    func testDiagnosticAgendaAcrossTextSizeChanges() throws {
+        launch(seedPatients: true, singlePatient: true)
+        let agendaTab = tab("Agenda")
+        waitForUIReady(agendaTab, in: app)
+        agendaTab.tap()
+        let message = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
+        XCTAssertTrue(message.waitForExistence(timeout: 30))
+        let idle = app.staticTexts["Agenda non ancora letta."]
+        var timeline: [String] = []
+        var last = ""
+        let start = Date()
+        while Date().timeIntervalSince(start) < 150 {
+            let state: String
+            if message.exists {
+                state = "messaggio, altezza \(Int(message.frame.height))"
+            } else if idle.exists {
+                state = "NON ANCORA LETTA"
+            } else {
+                state = "ASSENTE"
+            }
+            if state != last {
+                timeline.append(String(format: "%.1f s: %@", Date().timeIntervalSince(start), state))
+                last = state
+            }
+        }
+        let text = timeline.joined(separator: "\n")
+        print("DIAG-AGENDA-INIZIO\n" + text + "\nDIAG-AGENDA-FINE")
+        let attachment = XCTAttachment(string: text)
+        attachment.name = "diag-agenda-timeline"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     /// Runs the accessibility audit without ignoring anything, but attaches what
     /// XCTest's own failure message leaves out: which element the issue is on.
     /// Without this a CI failure reads "Text clipped" and nothing else.
