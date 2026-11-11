@@ -294,10 +294,10 @@ pub fn document_synthesis_message(code: &str) -> &'static str {
         }
         "fabric_denied" => "L'host non ha autorizzato l'esecuzione sul modello locale.",
         "currentness_mismatch" | "selection_changed" => {
-            "Il documento o la selezione sono cambiati durante la richiesta. Nessuna proposta creata: riprova."
+            "Il documento o la selezione sono cambiati durante la richiesta. Riprova."
         }
         "capture_consumed" | "preview_consumed" | "capture_expired" | "preview_expired" => {
-            "La richiesta è scaduta sull'host. Nessuna proposta creata: riprova."
+            "La richiesta è scaduta sull'host. Riprova."
         }
         "binding_stale" | "catalog_stale" | "session_stale" | "revision_conflict"
         | "command_conflict" => {
@@ -307,13 +307,11 @@ pub fn document_synthesis_message(code: &str) -> &'static str {
             "La sessione dell'host locale non è più valida. Riapri l'accesso locale."
         }
         "operation_unavailable" => {
-            "L'host non ha prodotto una sintesi: modello locale non pronto, risposta del modello scartata dai controlli o guasto. Nessuna proposta creata."
+            "L'host non ha prodotto una sintesi: modello locale non pronto, risposta del modello scartata dai controlli o guasto."
         }
         "model_response_invalid" => "La risposta del modello non era valida. Riprova.",
-        "response_invalid" => {
-            "La risposta dell'host non ha superato i controlli di GPUI. Nessuna proposta mostrata."
-        }
-        _ => "L'host ha rifiutato la richiesta. Nessuna proposta creata.",
+        "response_invalid" => "La risposta dell'host non ha superato i controlli dell'app.",
+        _ => "L'host ha rifiutato la richiesta.",
     }
 }
 
@@ -899,5 +897,48 @@ mod tests {
             request.matches(&row),
             "senza byte la richiesta riconosce ancora il documento"
         );
+    }
+
+    /// Un errore senza proposta lo dice col solo motivo: la proposta mancante si vede.
+    #[test]
+    fn refusal_messages_state_only_the_reason() {
+        for (code, expected) in [
+            (
+                "currentness_mismatch",
+                "Il documento o la selezione sono cambiati durante la richiesta. Riprova.",
+            ),
+            (
+                "preview_expired",
+                "La richiesta è scaduta sull'host. Riprova.",
+            ),
+            (
+                "operation_unavailable",
+                "L'host non ha prodotto una sintesi: modello locale non pronto, risposta del modello scartata dai controlli o guasto.",
+            ),
+            (
+                "response_invalid",
+                "La risposta dell'host non ha superato i controlli dell'app.",
+            ),
+            ("codice-sconosciuto", "L'host ha rifiutato la richiesta."),
+        ] {
+            assert_eq!(document_synthesis_message(code), expected, "{code}");
+        }
+        for code in [
+            "lane_disabled",
+            "provider_unavailable",
+            "unsupported_local_extraction",
+            "fabric_denied",
+            "selection_changed",
+            "capture_consumed",
+            "binding_stale",
+            "session_unavailable",
+            "operation_unavailable",
+            "response_invalid",
+            "codice-sconosciuto",
+        ] {
+            let message = document_synthesis_message(code);
+            assert!(!message.contains("Nessuna proposta"), "{code}: {message}");
+            assert!(!message.contains("GPUI"), "{code}: {message}");
+        }
     }
 }

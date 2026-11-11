@@ -934,10 +934,8 @@ pub fn smart_import_message(code: &str) -> &'static str {
             "Il modello locale dell’host non è disponibile. Verifica Impostazioni, Modelli locali."
         }
         "fabric_denied" => "L’host non ha autorizzato l’esecuzione sul modello locale.",
-        "provider_failed" => "Il modello locale non ha risposto. Nessuna proposta creata.",
-        "proposal_invalid" => {
-            "La risposta del modello non ha superato i controlli dell’host. Nessuna proposta creata."
-        }
+        "provider_failed" => "Il modello locale non ha risposto.",
+        "proposal_invalid" => "La risposta del modello non ha superato i controlli dell’host.",
         "projection_unavailable"
         | "projection_stale"
         | "lease_expired"
@@ -947,16 +945,12 @@ pub fn smart_import_message(code: &str) -> &'static str {
         | "request_replayed"
         | "broker_revoked"
         | "selection_busy"
-        | "owner_unavailable" => {
-            "La selezione sull’host è cambiata durante la richiesta. Nessuna proposta creata: riprova."
-        }
+        | "owner_unavailable" => "La selezione sull’host è cambiata durante la richiesta. Riprova.",
         "session_unavailable" | "session_ineligible" => {
             "La sessione dell’host locale non è più valida. Riapri l’accesso locale."
         }
-        "response_invalid" => {
-            "La risposta dell’host non ha superato i controlli di GPUI. Nessuna proposta mostrata."
-        }
-        _ => "L’host ha rifiutato la richiesta. Nessuna proposta creata.",
+        "response_invalid" => "La risposta dell’host non ha superato i controlli dell’app.",
+        _ => "L’host ha rifiutato la richiesta.",
     }
 }
 

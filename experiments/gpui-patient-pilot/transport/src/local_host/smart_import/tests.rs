@@ -367,3 +367,42 @@ fn notes_over_the_limit_are_shortened_like_the_web() {
     }
     assert_eq!(fixture("capture-input-limit"), chart.capture().unwrap());
 }
+
+/// Un errore senza proposta lo dice col solo motivo: la proposta mancante si vede.
+#[test]
+fn refusal_messages_state_only_the_reason() {
+    for (code, expected) in [
+        ("provider_failed", "Il modello locale non ha risposto."),
+        (
+            "proposal_invalid",
+            "La risposta del modello non ha superato i controlli dell’host.",
+        ),
+        (
+            "selection_changed",
+            "La selezione sull’host è cambiata durante la richiesta. Riprova.",
+        ),
+        (
+            "response_invalid",
+            "La risposta dell’host non ha superato i controlli dell’app.",
+        ),
+        ("codice-sconosciuto", "L’host ha rifiutato la richiesta."),
+    ] {
+        assert_eq!(smart_import_message(code), expected, "{code}");
+    }
+    for code in [
+        "kill_switch_disabled",
+        "kill_switch_unavailable",
+        "model_unavailable",
+        "fabric_denied",
+        "provider_failed",
+        "proposal_invalid",
+        "lease_expired",
+        "session_unavailable",
+        "response_invalid",
+        "codice-sconosciuto",
+    ] {
+        let message = smart_import_message(code);
+        assert!(!message.contains("Nessuna proposta"), "{code}: {message}");
+        assert!(!message.contains("GPUI"), "{code}: {message}");
+    }
+}

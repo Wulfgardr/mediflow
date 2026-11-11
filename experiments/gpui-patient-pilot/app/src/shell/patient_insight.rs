@@ -275,10 +275,7 @@ impl ClinicalApp {
             Err(RuntimeError::InvalidResponse) => Err(InsightPhase::Error(
                 patient_insight_message("response_invalid").into(),
             )),
-            Err(error) => Err(InsightPhase::Error(format!(
-                "{} Nessuna proposta creata.",
-                ui_error(error)
-            ))),
+            Err(error) => Err(InsightPhase::Error(ui_error(error))),
         };
         self.patient.insight.phase = match shown {
             Ok(proposal) => InsightPhase::Proposal { request, proposal },
@@ -417,7 +414,7 @@ impl ClinicalApp {
                     return pane
                         .child(notice(
                             "patient-insight-obsolete",
-                            "Proposta superata: profilo, diario o terapie sono cambiati dopo la generazione, oppure la scheda è in rilettura. Non viene mostrata; puoi prepararne una nuova.",
+                            "Proposta superata: profilo, diario o terapie sono cambiati dopo la generazione, oppure la scheda è in rilettura.",
                             theme,
                             false,
                         ))
