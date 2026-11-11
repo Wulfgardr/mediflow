@@ -987,3 +987,23 @@ terapia cambia comportamento. Modello, statechart, invarianti, limiti, testimoni
 e mutanti restano invariati; il comando completo `npm run verify:therapy-status`
 è rieseguito sul manifest aggiornato. Il nuovo comportamento è provato nel
 banco `tests/ui06/component-browser.test.mjs` (fixture `/panel/therapy`).
+
+## Raccordo dell'11 novembre 2026: data di collaudo delle protesiche
+
+`lib/clinical-status-transitions.ts` cambia soltanto dentro
+`planProstheticStatusChange`: su una protesica che non è o non diventa
+`tested`, una data di collaudo richiesta viene azzerata invece che salvata
+(rischio #6 del censimento delle macchine a stati). Il resto del file,
+comprese `THERAPY_TRANSITIONS`, `isTherapyTransitionAllowed` e
+`planTherapyStatusChange`, è identico byte per byte a `origin/main`
+08e02162c, la cui impronta coincideva con quella registrata. Nessuna sorgente
+della terapia importa la funzione protesica.
+
+Non cambiano stati, passaggi, await, guardie, marker, CAS, audit o ricevute
+della terapia. È aggiornato il solo digest di
+`lib/clinical-status-transitions.ts`; `syncCommit` resta invariato, come nei
+raccordi precedenti senza cambi di comportamento della terapia. Modello,
+statechart, invarianti, limiti, testimoni e mutanti restano invariati; i test
+`therapy-status-transitions`, `therapy-required-audit`,
+`therapy-status-confirmation` e `therapy-status-command` passano e il comando
+completo `npm run verify:therapy-status` è rieseguito sul manifest aggiornato.
