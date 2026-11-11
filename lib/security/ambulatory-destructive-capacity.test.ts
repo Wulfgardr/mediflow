@@ -48,6 +48,8 @@ test('flow scaduti e abbandonati non esauriscono il tetto di 128 comandi ambulat
         const opened = begin();
         assert.equal(opened.status, 200, `flow ${i}: ${JSON.stringify(opened.value)}`);
     }
+    const full = begin();
+    assert.deepEqual({ status: full.status, value: full.value }, { status: 503, value: { code: 'AMBULATORY_COMMAND_CAPACITY' } }, 'con 128 flow ancora validi il tetto resta');
     clock += AMBULATORY_COMMAND_PREPARATION_MS + 1;
     const after = begin();
     assert.equal(after.status, 200, `dopo la scadenza dei 128 flow abbandonati: ${JSON.stringify(after.value)}`);
