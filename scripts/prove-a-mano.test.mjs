@@ -4,7 +4,12 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import path from 'node:path';
-import { runProof, validateEnvironment, reservedPorts, writeReport } from './prove-a-mano.mjs';
+import { runProof, validateEnvironment, reservedPorts, writeReport, browserEnv } from './prove-a-mano.mjs';
+test('la HOME isolata non nasconde il browser di Playwright installato', () => {
+ assert.deepEqual(browserEnv({}, '/Users/medico', 'darwin'), { PLAYWRIGHT_BROWSERS_PATH: '/Users/medico/Library/Caches/ms-playwright' });
+ assert.deepEqual(browserEnv({}, '/home/medico', 'linux'), { PLAYWRIGHT_BROWSERS_PATH: '/home/medico/.cache/ms-playwright' });
+ assert.deepEqual(browserEnv({ PLAYWRIGHT_BROWSERS_PATH: '/opt/pw', E2E_BROWSER_CHANNEL: 'chrome' }, '/Users/medico', 'darwin'), { PLAYWRIGHT_BROWSERS_PATH: '/opt/pw', E2E_BROWSER_CHANNEL: 'chrome' });
+});
 test('tre stati osservabili e skip non dichiarato verde', async () => {
  const output = mkdtempSync(path.join(tmpdir(), 'proof-test-'));
  try {
