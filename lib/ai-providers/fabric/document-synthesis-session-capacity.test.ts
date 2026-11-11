@@ -19,7 +19,7 @@ bootstrap.close();
 (await import('../../db-server.ts')).openDbServer();
 const { createFullPortProjectionOwnerFactory } = await import('../../security/server-session-projection-owner.ts');
 const { clearAllSessions } = await import('../../security/server-session.ts');
-const { createDocumentSynthesisProductionOperationForTest } = await import('./document-synthesis-production-operation.ts');
+const { createDocumentSynthesisProductionOperationForTest, discardDocumentSynthesisPreparation } = await import('./document-synthesis-production-operation.ts');
 import { issueSyntheticWebSessionContext, retireSyntheticWebSession } from '../../security/web-auth-lifecycle-owner-test-fixture.ts';
 
 const USER = Object.freeze({ id: 'user.synthetic.ds.capacity', username: 'clinician.synthetic', role: 'clinician' as const });
@@ -70,4 +70,44 @@ test('una sessione che ha completato 128 sintesi può avviarne un\'altra', async
     }
     const next = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
     assert.deepEqual({ status: next.status, code: next.code }, { status: 'available', code: null }, 'la 129ª sintesi della stessa sessione');
+});
+
+test('le preparazioni scartate prima dell\'uso non occupano il tetto della sessione', async () => {
+    const registry = createFullPortProjectionOwnerFactory({
+        clock: () => Date.now(),
+        entropy: () => Uint8Array.from({ length: 16 }, (_, index) => index + 1),
+        resolve: (_session, pair) => Object.freeze({ ...pair, patientVersion: 1 }),
+    });
+    web = issueSyntheticWebSessionContext(USER, 'ds-capacity');
+    const owner = registry.acquire(web.session);
+    owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const selected = Object.freeze({ session: web.session, owner });
+    let entropy = 0;
+    const factory = createDocumentSynthesisProductionOperationForTest(Object.freeze({
+        acquireContext: async () => selected,
+        readCurrentness: () => CURRENT,
+        readLaneEnabled: () => true,
+        extract: async (_session: unknown, attachmentId: string) => extracted(attachmentId),
+        execute: async () => Object.freeze({ publication: 'synthetic' }),
+        entropy: () => { entropy += 1; const bytes = new Uint8Array(16); new DataView(bytes.buffer).setUint32(0, entropy); return bytes; },
+        registerResource: () => () => undefined,
+    }));
+    const operation = await factory.acquire(); assert.ok(operation);
+    for (let index = 0; index < 200; index += 1) {
+        const captured = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
+        assert.equal(captured.status, 'available', `giro ${index}: cattura`);
+        if (index % 2 === 0) {
+            discardDocumentSynthesisPreparation(operation, { captureHandle: captured.captureHandle });
+            const replay = await operation.ingest({ captureHandle: captured.captureHandle });
+            assert.equal(replay.code, 'capture_consumed', `giro ${index}: una cattura scartata non si ingerisce`);
+            continue;
+        }
+        const ingested = await operation.ingest({ captureHandle: captured.captureHandle });
+        assert.equal(ingested.status, 'available', `giro ${index}: ingestione`);
+        discardDocumentSynthesisPreparation(operation, { previewHandle: ingested.previewHandle });
+        const replay = await operation.preview({ previewHandle: ingested.previewHandle });
+        assert.equal(replay.code, 'preview_consumed', `giro ${index}: un'anteprima scartata non si pubblica`);
+    }
+    const next = await operation.capture({ attachmentId: 'attachment.synthetic.document' });
+    assert.deepEqual({ status: next.status, code: next.code }, { status: 'available', code: null });
 });
