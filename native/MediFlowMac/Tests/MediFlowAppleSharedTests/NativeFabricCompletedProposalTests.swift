@@ -66,4 +66,32 @@ final class NativeFabricCompletedProposalTests: XCTestCase {
         XCTAssertNotNil(model.proposal, "la proposta resta sotto gli occhi del medico")
         model.invalidate()
     }
+    /// Confine: oltre il lease la proposta si chiude ancora con `invalidate()`, lo stesso gesto che
+    /// `observe` collega al cambio paziente e a «Chiudi proposta»: proposta cancellata, attempt chiuso sull'host.
+    func testCompletedProposalPastLeaseIsStillWithdrawnByInvalidate() async throws {
+        let lease = Date().timeIntervalSince1970 * 1000 + 400
+        var pollGate: CheckedContinuation<Void, Error>?, cancels = 0
+        var services = NativeFabricModel.Services(prepare: { _, _ in try CompletedFabricFixture.response("ready", expiresAt: lease) }, command: { command, _ in
+            if command.path == "generate" { return try CompletedFabricFixture.response("completed", expiresAt: lease) }
+            cancels += 1; return try CompletedFabricFixture.response("closed", expiresAt: lease)
+        }, status: { id, _ in try CompletedFabricFixture.response(id == nil ? "closed" : "current", expiresAt: lease) })
+        services.waitForStatusPoll = { try await withCheckedThrowingContinuation { pollGate = $0 } }
+        let model = NativeFabricModel(function: .patientInsight, snapshot: { self.source() }, services: services)
+
+        model.prepare()
+        for _ in 0..<500 where model.phase != .ready { await Task.yield() }
+        model.generate()
+        for _ in 0..<500 where model.phase != .completed { await Task.yield() }
+        try await Task.sleep(nanoseconds: 600_000_000)
+        for _ in 0..<500 where pollGate == nil { await Task.yield() }
+        pollGate?.resume(); pollGate = nil
+        for _ in 0..<500 { await Task.yield() }
+        XCTAssertEqual(model.phase, .completed)
+
+        model.invalidate()
+        for _ in 0..<500 where model.phase != .idle { await Task.yield() }
+        XCTAssertEqual(model.phase, .idle)
+        XCTAssertNil(model.proposal)
+        XCTAssertEqual(cancels, 1, "l'attempt viene chiuso sull'host")
+    }
 }
