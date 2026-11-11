@@ -13,6 +13,7 @@ import type { LocalProviderResolution } from '../registry';
 import type { FabricExecutionPolicy, FabricProvenanceRecord, FabricResolutionReceipt } from './contract';
 import { GENERATIVE_CAPABILITY_DESCRIPTORS } from './generative-catalog';
 import { runLocalGenerationAttempts } from './local-generation-attempts';
+import { proposalFidelityFindings } from './patient-insight-fidelity';
 import type { PatientInsightProjection } from './patient-insight-host-boundary';
 import type { routeHostResolvedCandidateCapability, HostResolvedCandidateRoutingInput } from './candidate-router';
 import type { ProviderLifecycleRead } from './provider-lifecycle-service';
@@ -118,12 +119,15 @@ function policy(requestId: string): FabricExecutionPolicy {
         allowedVenues: Object.freeze(['local_process'] as const), egressProfileId: descriptor.egressProfileId,
         consentRef: null, retention: 'not_persisted', review: descriptor.review, provenanceRequired: true, fallback: 'none' });
 }
-function sourcePrompt(value: PatientInsightProjection): string {
-    let index = 1; const lines = [`[S${index++}] ${value.clinicalFocus}`];
-    for (const item of value.activeConditions) lines.push(`[S${index++}] Condizione attiva: ${item}`);
-    for (const item of value.currentTherapies) lines.push(`[S${index++}] Terapia corrente: ${item}`);
-    for (const item of value.recentClinicalEvents) lines.push(`[S${index++}] Evento clinico recente: ${item}`);
-    return buildPatientInsightExtractionPrompt(lines.join('\n'));
+/* Testi delle fonti nell'ordine [S1], [S2], ...: gli stessi che il modello riceve. */
+function sourceTexts(value: PatientInsightProjection): readonly string[] {
+    return Object.freeze([value.clinicalFocus,
+        ...value.activeConditions.map((item) => `Condizione attiva: ${item}`),
+        ...value.currentTherapies.map((item) => `Terapia corrente: ${item}`),
+        ...value.recentClinicalEvents.map((item) => `Evento clinico recente: ${item}`)]);
+}
+function sourcePrompt(sources: readonly string[]): string {
+    return buildPatientInsightExtractionPrompt(sources.map((item, index) => `[S${index + 1}] ${item}`).join('\n'));
 }
 function supportedClaim(value: string, sourceCount: number): boolean {
     const groups = value.match(/\[(?:S\d+|DATI-INCOMPLETI)(?:,\s*(?:S\d+|DATI-INCOMPLETI))*\]/gu) ?? [];
@@ -134,9 +138,12 @@ function supportedClaim(value: string, sourceCount: number): boolean {
         return /^S\d+$/u.test(token) && Number.isSafeInteger(index) && index >= 1 && index <= sourceCount;
     });
 }
-function supportedExtraction(value: ReturnType<typeof parsePatientInsightExtractionResponse>['value'], sourceCount: number): boolean {
-    const claims = [value.summary, ...value.data.currentState, ...value.data.alerts, ...value.data.nextSteps, ...value.data.gaps]
+function extractionClaims(value: ReturnType<typeof parsePatientInsightExtractionResponse>['value']): readonly string[] {
+    return [value.summary, ...value.data.currentState, ...value.data.alerts, ...value.data.nextSteps, ...value.data.gaps]
         .filter((claim) => claim.length > 0);
+}
+function supportedExtraction(value: ReturnType<typeof parsePatientInsightExtractionResponse>['value'], sourceCount: number): boolean {
+    const claims = extractionClaims(value);
     return claims.length > 0 && claims.every((claim) => supportedClaim(claim, sourceCount));
 }
 function generatedMetadata(sources: Sources): Readonly<{ timestamp: string; reviewRef: string }> | null {
@@ -209,11 +216,12 @@ export function createPatientInsightHostCapability(dependencies: Dependencies) {
                 || routed.decision.receipt !== resolution.receipt || routedBinding !== binding) return deny('fabric_denied');
             const receipt = resolution.receipt;
             const metadata = generatedMetadata(sources); if (!metadata) return deny('source_invalid');
-            let provenance: FabricProvenanceRecord; let prompt: string;
-            try { provenance = buildProvenanceRecord(resolution, ['context_minimization', 'envelope_validation']); prompt = sourcePrompt(request.projection); }
-            catch { return deny('fabric_denied'); }
-            const sourceCount = 1 + request.projection.activeConditions.length
-                + request.projection.currentTherapies.length + request.projection.recentClinicalEvents.length;
+            let provenance: FabricProvenanceRecord; let prompt: string; let sourceLines: readonly string[];
+            try {
+                provenance = buildProvenanceRecord(resolution, ['context_minimization', 'envelope_validation']);
+                sourceLines = sourceTexts(request.projection); prompt = sourcePrompt(sourceLines);
+            } catch { return deny('fabric_denied'); }
+            const sourceCount = sourceLines.length;
             // Stesso prompt, stesso contesto, stessa proiezione gia' consumata dal broker:
             // al massimo un secondo tentativo, e solo sul modello locale.
             const outcome = await runLocalGenerationAttempts<PatientInsightReviewProposal, PatientInsightHostCapabilityResult>({
@@ -233,6 +241,10 @@ export function createPatientInsightHostCapability(dependencies: Dependencies) {
                         if (!isEnvelopeUsable(parsed) || !(parsed.value.summary || parsed.value.data.currentState.length
                             || parsed.value.data.alerts.length || parsed.value.data.nextSteps.length || parsed.value.data.gaps.length)
                             || !supportedExtraction(parsed.value, sourceCount)) throw new Error('invalid');
+                        // ADR 0189: nessuna decisione data per presa, nessuna urgenza, che le fonti citate non contengono.
+                        if (proposalFidelityFindings(extractionClaims(parsed.value), sourceLines).length > 0) {
+                            return Object.freeze({ status: 'rejected', reason: 'unfaithful' });
+                        }
                         return Object.freeze({ status: 'accepted', value: Object.freeze({ schemaVersion: 'mediflow.patient-insight.review-proposal.v2', reviewOnly: true,
                             summary: parsed.value.summary, currentState: Object.freeze([...parsed.value.data.currentState]),
                             alerts: Object.freeze([...parsed.value.data.alerts]), nextSteps: Object.freeze([...parsed.value.data.nextSteps]),
@@ -250,7 +262,9 @@ export function createPatientInsightHostCapability(dependencies: Dependencies) {
             });
             if (outcome.status === 'stopped') return outcome.stop;
             if (outcome.status === 'provider_failed') return failed('provider_failed', receipt, provenance);
-            if (outcome.status === 'rejected') return failed('proposal_invalid', receipt, provenance);
+            if (outcome.status === 'rejected') {
+                return failed(outcome.rejections.at(-1) === 'unfaithful' ? 'proposal_unfaithful' : 'proposal_invalid', receipt, provenance);
+            }
             const proposal = outcome.value;
             const denied = await permissionDenial(); if (denied) return denied;
             try { if (dependencies.currentness.verify() !== true) return failed('source_stale', receipt, provenance); }
