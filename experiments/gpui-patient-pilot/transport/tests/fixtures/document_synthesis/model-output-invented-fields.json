@@ -1,0 +1,221 @@
+{
+  "description": "Busta reale di qwen3.5:35b-a3b (misura dell'11/11/2026, scambi 12 e 13), solo output, con nome e date tolti dal riassunto. I campi strutturati contengono valori inventati dal modello: l'host li toglie prima di rispondere e i client rifiutano una risposta che li contenga.",
+  "cases": [
+    {
+      "name": "P1 referto cardiologico",
+      "output": {
+        "schemaVersion": "mediflow.ai.extract.v1",
+        "task": "document_synthesis",
+        "summary": "Referto di visita cardiologica. Motivo: ipertensione arteriosa in terapia e dispnea da sforzo moderato. Esame obiettivo mostra PA 152/94 mmHg, FC 78 bpm e lieve edema perimalleolare. ECG evidenzia ritmo sinusale con segni di ipertrofia ventricolare sinistra. Ecocardiogramma: FE 55%, ipertrofia concentrica lieve, disfunzione diastolica di grado I. Conclusioni: ipertensione arteriosa non a target e cardiopatia ipertensiva iniziale. Terapia consigliata: aumentare ramipril a 10 mg/die e aggiungere amlodipina 5 mg/die.",
+        "data": {
+          "qualityLevel": "yellow",
+          "qualityReason": "Documento sintetico con dati clinici limitati e struttura non standardizzata per codifica automatica completa.",
+          "medications": [
+            "ramipril 10 mg/die",
+            "amlodipina 5 mg/die"
+          ],
+          "diagnoses": [
+            {
+              "code": "I10",
+              "description": "Ipertensione arteriosa essenziale",
+              "system": "ICD-10",
+              "evidence": "Conclusioni: ipertensione arteriosa non a target.",
+              "confidence": "high"
+            },
+            {
+              "code": "I50.1",
+              "description": "Insufficienza cardiaca sinistra (cardiopatia ipertensiva iniziale)",
+              "system": "ICD-10",
+              "evidence": "Conclusioni: cardiopatia ipertensiva iniziale; ECG segni di ipertrofia ventricolare sinistra.",
+              "confidence": "medium"
+            },
+            {
+              "code": "I51.7",
+              "description": "Cardiomegalia (ipertrofia concentrica lieve)",
+              "system": "ICD-10",
+              "evidence": "Ecocardiogramma: ipertrofia concentrica lieve.",
+              "confidence": "medium"
+            }
+          ],
+          "problemStatements": [
+            {
+              "label": "Ipertensione arteriosa non a target",
+              "icdQuery": "I10",
+              "confidence": "high",
+              "evidence": "Esame obiettivo: PA 152/94 mmHg; Conclusioni: ipertensione arteriosa non a target."
+            },
+            {
+              "label": "Dispnea da sforzo moderato",
+              "icdQuery": "R06.02",
+              "confidence": "high",
+              "evidence": "Motivo: dispnea da sforzo moderato."
+            },
+            {
+              "label": "Disfunzione diastolica di grado I",
+              "icdQuery": "I50.1",
+              "confidence": "medium",
+              "evidence": "Ecocardiogramma: disfunzione diastolica di grado I.",
+              "explicitCode": "I50.1"
+            }
+          ],
+          "therapyCandidates": [
+            {
+              "drugMention": "ramipril 10 mg/die",
+              "drugQuery": "ramipril",
+              "confidence": "high",
+              "evidence": "Terapia consigliata: aumentare ramipril a 10 mg/die.",
+              "activePrinciple": "ramipril",
+              "dosage": "10 mg/die",
+              "motivation": "Controllo ipertensione non a target (PA 152/94 mmHg).",
+              "therapyState": "transition"
+            },
+            {
+              "drugMention": "amlodipina 5 mg/die",
+              "drugQuery": "amlodipina",
+              "confidence": "high",
+              "evidence": "Terapia consigliata: aggiungere amlodipina 5 mg/die.",
+              "activePrinciple": "amlodipina",
+              "dosage": "5 mg/die",
+              "motivation": "Controllo ipertensione in associazione.",
+              "therapyState": "transition"
+            }
+          ],
+          "servicePrescriptions": [
+            {
+              "serviceName": "Controllo creatinina e potassio",
+              "confidence": "high",
+              "evidence": "Controlli: creatinina e potassio entro 2 settimane.",
+              "category": "lab",
+              "priority": "alta",
+              "clinicalQuestion": "Monitoraggio funzionalità renale ed elettroliti sotto terapia ACE-inibitore e calcio-antagonista."
+            },
+            {
+              "serviceName": "Controllo cardiologico",
+              "confidence": "high",
+              "evidence": "Controlli: controllo cardiologico tra 6 mesi.",
+              "category": "visit",
+              "priority": "media",
+              "clinicalQuestion": "Valutazione risposta terapeutica e progressione cardiopatia ipertensiva."
+            }
+          ]
+        }
+      },
+      "invented": [
+        "I50.1",
+        "I51.7",
+        "R06.02",
+        "Insufficienza cardiaca",
+        "Cardiomegalia",
+        "\"alta\"",
+        "\"media\"",
+        "\"transition\"",
+        "Documento sintetico con dati clinici limitati",
+        "Monitoraggio funzionalit",
+        "ACE-inibitore"
+      ]
+    },
+    {
+      "name": "P2 esami ematici",
+      "output": {
+        "schemaVersion": "mediflow.ai.extract.v1",
+        "task": "document_synthesis",
+        "summary": "Referto di laboratorio che evidenzia un controllo glicemico insufficiente. I valori mostrano glicemia a digiuno elevata (162 mg/dL) e HbA1c al 8,1%, indicativi di diabete non controllato. Sono presenti dislipidemia (LDL 138 mg/dL, trigliceridi 190 mg/dL), riduzione della funzione renale (eGFR 58 mL/min/1.73m2) e microalbuminuria positiva (45 mg/g).",
+        "data": {
+          "qualityLevel": "yellow",
+          "qualityReason": "Valori anomali multipli indicativi di diabete non controllato, dislipidemia e danno renale precoce.",
+          "medications": [],
+          "diagnoses": [
+            {
+              "code": "E11.9",
+              "description": "Diabete mellito di tipo 2 senza complicazioni",
+              "system": "ICD-10",
+              "evidence": "Glicemia a digiuno 162 mg/dL e HbA1c 8,1% indicano diabete non controllato.",
+              "confidence": "high"
+            },
+            {
+              "code": "E78.5",
+              "description": "Dislipidemia non specificata",
+              "system": "ICD-10",
+              "evidence": "Colesterolo LDL 138 mg/dL e trigliceridi 190 mg/dL superiori ai valori normali.",
+              "confidence": "high"
+            },
+            {
+              "code": "N08.3",
+              "description": "Disturbi glomerulari nel diabete mellito",
+              "system": "ICD-10",
+              "evidence": "Microalbuminuria positiva a 45 mg/g creatinina con eGFR ridotto a 58 mL/min/1.73m2.",
+              "confidence": "high"
+            }
+          ],
+          "problemStatements": [
+            {
+              "label": "Controllo glicemico insufficiente",
+              "icdQuery": "Diabete mellito tipo 2 non controllato",
+              "confidence": "high",
+              "evidence": "HbA1c 8,1% e glicemia a digiuno 162 mg/dL."
+            },
+            {
+              "label": "Riduzione della funzione renale",
+              "icdQuery": "Insufficienza renale cronica stadio 3a",
+              "confidence": "medium",
+              "evidence": "eGFR 58 mL/min/1.73m2 e microalbuminuria positiva."
+            }
+          ],
+          "therapyCandidates": [
+            {
+              "drugMention": "Metformina",
+              "drugQuery": "Metformina per diabete tipo 2",
+              "confidence": "high",
+              "evidence": "Indicata per controllo glicemico in presenza di HbA1c >7% e resistenza insulinica.",
+              "activePrinciple": "Metformina",
+              "motivation": "Riduzione HbA1c e miglioramento sensibilità insulinica."
+            },
+            {
+              "drugMention": "Statine",
+              "drugQuery": "Statine per dislipidemia",
+              "confidence": "high",
+              "evidence": "LDL 138 mg/dL e trigliceridi elevati richiedono intervento lipidico.",
+              "activePrinciple": "Atorvastatina o Simvastatina",
+              "motivation": "Riduzione rischio cardiovascolare."
+            },
+            {
+              "drugMention": "ACE inibitori",
+              "drugQuery": "ACE inibitori per nefropatia diabetica",
+              "confidence": "medium",
+              "evidence": "Microalbuminuria positiva suggerisce protezione renale.",
+              "activePrinciple": "Enalapril o Lisinopril",
+              "motivation": "Riduzione proteinuria e protezione glomerulare."
+            }
+          ],
+          "servicePrescriptions": [
+            {
+              "serviceName": "Monitoraggio glicemico continuo",
+              "confidence": "high",
+              "evidence": "Necessario per valutare controllo glicemico in paziente con HbA1c elevata.",
+              "category": "lab"
+            },
+            {
+              "serviceName": "Ecografia renale",
+              "confidence": "medium",
+              "evidence": "Valutare anatomia renale in presenza di eGFR ridotto e microalbuminuria.",
+              "category": "imaging"
+            }
+          ]
+        }
+      },
+      "invented": [
+        "N08.3",
+        "E11.9",
+        "E78.5",
+        "Metformina",
+        "Statine",
+        "ACE inibitori",
+        "Atorvastatina",
+        "Enalapril",
+        "Insufficienza renale cronica",
+        "Ecografia renale",
+        "Valori anomali multipli"
+      ]
+    }
+  ]
+}

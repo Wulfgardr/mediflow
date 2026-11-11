@@ -858,6 +858,41 @@ mod tests {
         );
     }
 
+    /// Risposta reale del modello con campi strutturati inventati (codici ICD,
+    /// priorità, farmaci): l'host li toglie; se arrivassero, GPUI rifiuta tutto.
+    #[test]
+    fn structured_fields_from_the_model_are_refused_whole() {
+        let invented = fixture("model-output-invented-fields")["cases"][0].clone();
+        let base = fixture("response-available-invented-fields")["body"].clone();
+        let check = |change: &dyn Fn(&mut Value)| {
+            let mut body = base.clone();
+            change(&mut body);
+            document_synthesis_outcome(200, body.to_string().as_bytes())
+        };
+        let Ok(GenerationOutcome::Proposal(proposal)) = check(&|_| {}) else {
+            panic!("la risposta senza campi strutturati è una proposta");
+        };
+        assert_eq!(proposal.summary, invented["output"]["summary"]);
+        assert_eq!(
+            proposal.quality_level,
+            invented["output"]["data"]["qualityLevel"]
+        );
+        let data = invented["output"]["data"].clone();
+        assert!(
+            data.to_string().contains("I50.1"),
+            "la fixture porta i codici inventati"
+        );
+        for change in [
+            &(|b: &mut Value| b["publication"]["output"]["data"] = data.clone())
+                as &dyn Fn(&mut Value),
+            &|b| b["publication"]["output"] = invented["output"].clone(),
+            &|b| b["publication"]["data"] = data.clone(),
+            &|b| b["data"] = data.clone(),
+        ] {
+            assert_eq!(check(change), Err(RuntimeError::InvalidResponse));
+        }
+    }
+
     /// La richiesta nasce solo se elenco e lettura descrivono lo stesso documento.
     #[test]
     fn request_requires_the_same_document_and_currentness() {

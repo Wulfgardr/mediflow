@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -6,7 +7,20 @@ import {
     serializeDocumentSynthesisPreviewWire,
 } from './document-synthesis-preview-wire.ts';
 
-function publication() {
+/* Risposte reali del modello locale con campi strutturati inventati (codici ICD,
+ * priorità, farmaci): file condiviso con il client Rust di GPUI. */
+const INVENTED = JSON.parse(fs.readFileSync(new URL('../../../experiments/gpui-patient-pilot/transport/tests/fixtures/document_synthesis/model-output-invented-fields.json', import.meta.url), 'utf8')) as {
+    cases: { name: string; output: { summary: string; data: { qualityLevel: string } }; invented: string[] }[];
+};
+const STRUCTURED_KEYS = ['data', 'qualityReason', 'medications', 'diagnoses', 'problemStatements', 'therapyCandidates', 'servicePrescriptions', 'claims', 'priority', 'explicitCode', 'code'];
+
+function keysOf(value: unknown, into = new Set<string>()): Set<string> {
+    if (Array.isArray(value)) for (const item of value) keysOf(item, into);
+    else if (typeof value === 'object' && value !== null) for (const [key, item] of Object.entries(value)) { into.add(key); keysOf(item, into); }
+    return into;
+}
+
+function publication(output?: unknown) {
     const providerReceipt = Object.freeze({
         schemaVersion: 'mediflow.document-synthesis.provider-binding.v1',
         capability: 'document_synthesis', registryTask: 'reasoning', provider: 'ollama',
@@ -21,7 +35,7 @@ function publication() {
     });
     return Object.freeze({
         schemaVersion: 'mediflow.document-synthesis.publication.v1',
-        output: Object.freeze({
+        output: output ?? Object.freeze({
             schemaVersion: 'mediflow.ai.extract.v1', task: 'document_synthesis', summary: 'Sintesi sintetica.',
             data: Object.freeze({ qualityLevel: 'green', medications: Object.freeze([]), diagnoses: Object.freeze([]), problemStatements: Object.freeze([]), therapyCandidates: Object.freeze([]), servicePrescriptions: Object.freeze([]) }),
         }),
@@ -80,3 +94,30 @@ test('rejects drift, forged writes, unavailable citations, and provider/venue ch
         assert.equal(parseDocumentSynthesisPreviewWire(hostile), null);
     }
 });
+
+for (const sample of INVENTED.cases) {
+    test(`campi strutturati inventati dal modello restano fuori dal filo dell'anteprima (${sample.name})`, () => {
+        // La fixture porta davvero i valori inventati: senza, il test non proverebbe nulla.
+        const source = JSON.stringify(sample.output);
+        for (const needle of sample.invented) assert.ok(source.includes(needle), `fixture senza ${needle}`);
+        const wire = serializeDocumentSynthesisPreviewWire(publication(sample.output));
+        assert.ok(wire, 'l\'host accetta la proposta con campi strutturati pieni');
+        const text = JSON.stringify(wire);
+        for (const needle of sample.invented) assert.ok(!text.includes(needle), `${needle} arriva al client`);
+        for (const key of STRUCTURED_KEYS) assert.ok(!keysOf(wire).has(key), `chiave ${key} sul filo`);
+        assert.deepEqual(Reflect.ownKeys(wire.publication), ['output', 'citations', 'receipt', 'provenance']);
+        assert.deepEqual(Reflect.ownKeys(wire.publication.output), ['schemaVersion', 'task', 'summary', 'qualityLevel']);
+        assert.equal(wire.publication.output.summary, sample.output.summary);
+        assert.equal(wire.publication.output.qualityLevel, sample.output.data.qualityLevel);
+
+        // Il parser del Web rifiuta per intero un filo che porti anche i campi strutturati.
+        const base = JSON.parse(text);
+        assert.ok(parseDocumentSynthesisPreviewWire(structuredClone(base)));
+        const withData = structuredClone(base); withData.publication.output.data = sample.output.data;
+        assert.equal(parseDocumentSynthesisPreviewWire(withData), null);
+        const sourceShape = structuredClone(base); sourceShape.publication.output = sample.output;
+        assert.equal(parseDocumentSynthesisPreviewWire(sourceShape), null);
+        const besideOutput = structuredClone(base); besideOutput.publication.data = sample.output.data;
+        assert.equal(parseDocumentSynthesisPreviewWire(besideOutput), null);
+    });
+}
