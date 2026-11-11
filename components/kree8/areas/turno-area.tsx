@@ -28,7 +28,7 @@ const AI_QUEUE: Kree8DecisionCard[] = [
     title: 'Follow-up suggerito',
     body:
       'Paziente AB-2026-014 · ultima visita 14 mesi fa, profilo cronicità incompleto.',
-    pill: 'AI',
+    pill: 'IA',
     pillVariant: 'plum',
     action: 'Apri quadro',
     target: 'scheda',
@@ -118,8 +118,8 @@ function TurnoArea({
       },
       {
         title: 'Revisione e codifiche',
-        body: 'Usa la scheda paziente per rivedere documenti, suggerimenti AI e codifiche prima di applicare aggiornamenti clinici.',
-        pill: 'AI',
+        body: 'Usa la scheda paziente per rivedere documenti, suggerimenti IA e codifiche prima di applicare aggiornamenti clinici.',
+        pill: 'IA',
         pillVariant: 'plum',
         action: 'Apri revisione',
         target: 'revisione',

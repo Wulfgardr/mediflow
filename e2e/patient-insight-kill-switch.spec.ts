@@ -73,7 +73,7 @@ test('patient insight kill switch disables generation on patient detail', async 
   const disabledCard = page.getByTestId('patient-insight-disabled-card');
   await expect(disabledCard).toBeVisible();
   await expect(disabledCard).toContainText('Patient Insight disabilitata');
-  await expect(disabledCard).toContainText('Apri Impostazioni AI');
+  await expect(disabledCard).toContainText('Apri Impostazioni IA');
   // Generation was renamed ("Aggiorna" / "Disabilitata"); the legacy "Genera Insight"
   // action no longer exists.
   await expect(page.getByRole('button', { name: 'Genera Insight' })).toHaveCount(0);

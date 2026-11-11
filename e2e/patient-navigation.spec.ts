@@ -72,7 +72,7 @@ test('Azioni restituisce il fuoco dopo Report PDF e lo cede ai dialoghi', async 
 for (const count of [0, 1, 12]) test(`segmenti stabili con ${count} record sintetici e quindici destinazioni`, async ({ page }) => {
     await seed(page, count);
     const nav = navigation(page);
-    await expect(nav.locator(':scope > a')).toHaveText(count ? ['Riepilogo', `Terapie${count}`, `Misure${count}`, `Documenti${count}`] : ['Riepilogo', 'Terapie', 'Misure', 'Documenti']);
+    await expect(nav.locator(':scope > a')).toHaveText(count ? ['Riepilogo', `Terapie${count}`, `Parametri${count}`, `Documenti${count}`] : ['Riepilogo', 'Terapie', 'Parametri', 'Documenti']);
     expect(await nav.locator(':scope > a').evaluateAll(links => links.map(link => link.getAttribute('href')))).toEqual(primaryHrefs);
     const trigger = nav.getByRole('button', { name: 'Altro', exact: true });
     await trigger.click();

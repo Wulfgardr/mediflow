@@ -78,21 +78,21 @@ export const PATIENT_INSIGHT_UNFAITHFUL_MESSAGE = 'Il modello ha dato per presa 
     + 'o per urgente qualcosa che la scheda non segnala come urgente.';
 export function patientInsightFailureMessage(preview: Exclude<PatientInsightPreviewWire, { status: 'available' }>): string {
     if (preview.code === 'kill_switch_disabled') {
-        return 'Patient Insight è disabilitata. Si riattiva in Impostazioni AI.';
+        return 'Quadro paziente è disabilitato. Si riattiva in Impostazioni IA.';
     }
     if (preview.code === 'source_stale') {
         return 'I dati clinici sono cambiati durante la generazione. Riprova.';
     }
     if (preview.code === 'model_unavailable' || preview.code === 'provider_unready' || preview.code === 'provider_binding_denied') {
-        return 'Il modello clinico locale non è disponibile. Verifica le Impostazioni AI.';
+        return 'Il modello clinico locale non è disponibile. Verifica le Impostazioni IA.';
     }
     if (preview.status === 'failed' && preview.code === 'provider_failed') {
-        return 'Il modello non ha completato la risposta. Riprova più tardi o verifica le Impostazioni AI.';
+        return 'Il modello non ha completato la risposta. Riprova più tardi o verifica le Impostazioni IA.';
     }
     if (preview.status === 'failed' && preview.code === 'proposal_unfaithful') return PATIENT_INSIGHT_UNFAITHFUL_MESSAGE;
     return preview.status === 'failed'
         ? 'La risposta del modello locale non ha superato i controlli clinici.'
-        : 'Patient Insight non è disponibile in questo momento.';
+        : 'Quadro paziente non è disponibile in questo momento.';
 }
 
 type CaptureInput = Readonly<{

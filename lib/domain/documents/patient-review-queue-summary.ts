@@ -1,6 +1,6 @@
 import { formatCountLabel } from '../../format-count';
 /* WUL-262 review-queue summary for patient detail.
-   Pure view model: aggregates EXISTING panel statuses (Patient Insight,
+   Pure view model: aggregates EXISTING panel statuses (Quadro paziente,
    evidence stack, Smart Import, document archive) into compact review-first
    rows. No persistence, no pipeline, no automatic clinical write. */
 
@@ -117,7 +117,7 @@ function buildInsightRow(input: PatientReviewQueueInput['insight']): PatientRevi
     if (!input.enabled) {
         return row(
             'insight',
-            'Patient Insight',
+            'Quadro paziente',
             'bloccato',
             input.hasSummary
                 ? "L'ultimo insight salvato resta consultabile, ma la rigenerazione è ferma."
@@ -125,7 +125,7 @@ function buildInsightRow(input: PatientReviewQueueInput['insight']): PatientRevi
             {
                 anchor,
                 blockedReason:
-                    "Interruttore AI locale spento: il sistema non genera né scrive nulla finché non lo riattivi in Impostazioni.",
+                    "Interruttore IA locale spento: il sistema non genera né scrive nulla finché non lo riattivi in Impostazioni.",
             },
         );
     }
@@ -133,7 +133,7 @@ function buildInsightRow(input: PatientReviewQueueInput['insight']): PatientRevi
     if (!input.hasSummary) {
         return row(
             'insight',
-            'Patient Insight',
+            'Quadro paziente',
             'vuoto',
             'Nessun insight generato: si avvia solo manualmente dal pannello.',
             { anchor },
@@ -143,7 +143,7 @@ function buildInsightRow(input: PatientReviewQueueInput['insight']): PatientRevi
     if (input.readable === false) {
         return row(
             'insight',
-            'Patient Insight',
+            'Quadro paziente',
             'da-rivedere',
             'Insight salvato non leggibile: rigeneralo dal pannello.',
             { anchor },
@@ -153,7 +153,7 @@ function buildInsightRow(input: PatientReviewQueueInput['insight']): PatientRevi
     if (input.stale) {
         return row(
             'insight',
-            'Patient Insight',
+            'Quadro paziente',
             'da-rivedere',
             'Insight non aggiornato: dati clinici modificati dopo la generazione. Rigeneralo dal pannello.',
             { anchor },
@@ -162,7 +162,7 @@ function buildInsightRow(input: PatientReviewQueueInput['insight']): PatientRevi
 
     return row(
         'insight',
-        'Patient Insight',
+        'Quadro paziente',
         'disponibile',
         'Ultimo insight salvato pronto alla lettura nel pannello.',
         { anchor },
