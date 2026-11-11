@@ -10,7 +10,7 @@ import styles from './clinical-register.module.css';
 import { clientArchiveGeneration } from '@/lib/security/client-auth-api';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createTherapyDeleteRecovery, type DeleteRecovery } from '@/lib/therapy-delete-recovery';
-import { useLiveQuery } from '@/lib/live-query';
+import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
 import { ApiConflictError, db, Therapy } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
 import { useForm } from 'react-hook-form';
@@ -148,7 +148,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
     useRuntimeTwinPendingForm(isAdding || !!deleteRecovery || !!statusConfirmation);
     useEffect(() => { if (deleteRecovery && !deleteBusy) deleteRef.current?.focus(); }, [deleteRecovery, deleteBusy]);
 
-    const therapies = useLiveQuery(
+    const { data: therapies, error: therapiesError, refresh: refreshTherapies } = useLiveQueryState(
         async () => {
             const items = await db.therapies.query({ patientId }).toArray();
             return items
@@ -660,7 +660,10 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                 </div>
             )}
 
-            {therapies === undefined ? <div className={styles.loading} role="status" aria-label="Caricamento terapie"><span className="sr-only">Caricamento terapie…</span>{[0,1,2].map(row => <div key={row} className="mf-skeleton" aria-hidden />)}</div> : <>
+            {therapies !== undefined && therapiesError ? <ViewState state="error" title="Impossibile aggiornare le terapie." action={{ label: 'Riprova', onClick: refreshTherapies }} /> : null}
+            {therapies === undefined ? (therapiesError
+                ? <ViewState state="error" title="Impossibile leggere le terapie." action={{ label: 'Riprova', onClick: refreshTherapies }} />
+                : <div className={styles.loading} role="status" aria-label="Caricamento terapie"><span className="sr-only">Caricamento terapie…</span>{[0,1,2].map(row => <div key={row} className="mf-skeleton" aria-hidden />)}</div>) : <>
                 {visibleTherapies.length === 0 && <ViewState state="empty" title="Nessuna terapia registrata." />}
                 {[
                     { title: 'Attive', rows: activeTherapies, status: 'active' },

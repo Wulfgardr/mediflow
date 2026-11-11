@@ -22,6 +22,8 @@ import { notifyDbChange, useLiveQueryState } from '../../lib/live-query';
 import ServicePrescriptionManager from '../../components/service-prescription-manager';
 import ProstheticPrescriptionManager from '../../components/prosthetic-prescription-manager';
 import SissHandoffDiary from '../../components/siss-handoff-diary';
+import TherapyManager from '../../components/therapy-manager';
+import { observeArchiveGeneration } from '../../lib/security/client-auth-api';
 
 const scaleState = { calls: 0, cancelled: 0, results: [] as ScaleResult[], settle: null as null | ((failure: boolean) => void) };
 /* Each diary read takes the next outcome from ?reads=fail,ok,...; once the list is spent, reads succeed. */
@@ -103,15 +105,18 @@ function DiaryFixture() {
 /* The panels below read through the real ApiTable; only window.fetch is replaced.
    Each read of the panel's list takes the next outcome from ?reads=fail,ok,...; once the list is spent, reads succeed. */
 const panelState = { calls: 0, unexpected: [] as string[], plan: (new URLSearchParams(window.location.search).get('reads') ?? '').split(',').filter(Boolean) };
-const panelRows: Record<string, { endpoint: string; row: Record<string, unknown> }> = {
+const panelRows: Record<string, { endpoint: string; row: Record<string, unknown>; extra?: Record<string, unknown> }> = {
     '/panel/service': { endpoint: '/api/service-prescriptions', row: { id: 'ui06-service', patientId: 'ui06-patient', serviceName: 'Ecografia sintetica UI06',
         status: 'prescribed', prescribedAt: '2026-01-01T12:00:00.000Z', version: 1 } },
     '/panel/prosthetic': { endpoint: '/api/prosthetic-prescriptions', row: { id: 'ui06-prosthetic', patientId: 'ui06-patient', description: 'Deambulatore sintetico UI06',
         category: 'mobility', status: 'prescribed', prescribedAt: '2026-01-01T12:00:00.000Z', version: 1 } },
     '/panel/siss': { endpoint: '/api/siss-handoffs', row: { id: 'ui06-siss', patientId: 'ui06-patient', moduleLabel: 'Passaggio sintetico UI06',
         outcome: 'completed', startedAt: '2026-01-01T12:00:00.000Z', version: 1 } },
+    '/panel/therapy': { endpoint: '/api/therapies', row: { id: 'ui06-therapy', patientId: 'ui06-patient', drugName: 'Farmaco sintetico UI06',
+        dosage: '1 compressa al giorno', status: 'active', createdAt: '2026-01-01T12:00:00.000Z', version: 1 },
+        extra: { '/api/patients/ui06-patient': { id: 'ui06-patient', firstName: 'Paziente', lastName: 'Inventato', birthDate: '1950-01-01T00:00:00.000Z', version: 1 } } },
 };
-function installPanelFetch(endpoint: string, row: Record<string, unknown>) {
+function installPanelFetch(endpoint: string, row: Record<string, unknown>, extra: Record<string, unknown> = {}) {
     window.fetch = async (input: RequestInfo | URL) => {
         const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, window.location.origin);
         if (url.pathname === endpoint) {
@@ -119,6 +124,7 @@ function installPanelFetch(endpoint: string, row: Record<string, unknown>) {
             if (panelState.plan.shift() === 'fail') return new Response('{}', { status: 500 });
             return Response.json([row]);
         }
+        if (url.pathname in extra) return Response.json(extra[url.pathname]);
         if (url.pathname.startsWith('/api/')) return Response.json([]);
         panelState.unexpected.push(url.pathname);
         throw new Error(`UI06: unexpected fetch ${url.pathname}`);
@@ -126,8 +132,11 @@ function installPanelFetch(endpoint: string, row: Record<string, unknown>) {
 }
 function PanelFixture({ pathname }: { pathname: string }) {
     const target = panelRows[pathname];
-    installPanelFetch(target.endpoint, target.row);
+    installPanelFetch(target.endpoint, target.row, target.extra);
+    /* The therapy manager recovers status commands from the real journal (empty storage) under a synthetic archive generation. */
+    if (pathname === '/panel/therapy') observeArchiveGeneration('00000000-0000-4000-8000-000000000006');
     const panel = pathname === '/panel/service' ? <ServicePrescriptionManager patientId="ui06-patient" />
+        : pathname === '/panel/therapy' ? <TherapyManager patientId="ui06-patient" />
         : pathname === '/panel/prosthetic' ? <ProstheticPrescriptionManager patientId="ui06-patient" />
         : <SissHandoffDiary patientId="ui06-patient" />;
     return <RuntimeTwinDesignProvider><ConfirmProvider>
