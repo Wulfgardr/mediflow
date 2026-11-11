@@ -21,13 +21,14 @@ import type { PatientSmartImportHostKillSwitchResult } from './patient-smart-imp
 import {
     buildPatientSmartImportCapabilityPrompt,
     parsePatientSmartImportCapabilityProposal,
+    smartImportResponseTokenLimit,
     type PatientSmartImportCapabilityProposal,
 } from './patient-smart-import-capability-contract';
 export type PatientSmartImportHostDenialCode =
     | 'input_invalid' | 'kill_switch_disabled' | 'kill_switch_unavailable'
     | 'projection_unavailable' | 'lifecycle_missing' | 'lifecycle_corrupt' | 'lifecycle_unavailable'
     | 'provider_binding_denied' | 'provider_unready' | 'model_unavailable' | 'fabric_denied' | 'source_invalid';
-export type PatientSmartImportHostFailureCode = 'provider_failed' | 'proposal_invalid';
+export type PatientSmartImportHostFailureCode = 'provider_failed' | 'proposal_invalid' | 'response_truncated';
 type Common = Readonly<{ writesPerformed: 0; apply: 'denied' }>;
 export type PatientSmartImportHostCapabilityResult =
     | (Common & Readonly<{ status: 'available'; code: null; proposal: PatientSmartImportCapabilityProposal;
@@ -171,7 +172,7 @@ export function createPatientSmartImportHostCapability(dependencies: Dependencie
                     let response: string;
                     try {
                         const providerResult = await routedBinding.adapter.chat(
-                            [{ role: 'user', content: prompt }], undefined, 1_100, { responseFormat: 'smart_import' },
+                            [{ role: 'user', content: prompt }], undefined, smartImportResponseTokenLimit(prompt), { responseFormat: 'smart_import' },
                         );
                         if (typeof providerResult.content !== 'string') throw new Error('invalid');
                         // Una risposta tagliata dal tetto di token non si pubblica, anche se per caso fosse leggibile.
@@ -188,7 +189,10 @@ export function createPatientSmartImportHostCapability(dependencies: Dependencie
             });
             if (outcome.status === 'stopped') return outcome.stop;
             if (outcome.status === 'provider_failed') return failed('provider_failed', receipt, provenance);
-            if (outcome.status === 'rejected') return failed('proposal_invalid', receipt, provenance);
+            // Decide l'ultimo tentativo, come proposal_unfaithful del Quadro (ADR 0189): una risposta troncata ha un codice suo.
+            if (outcome.status === 'rejected') {
+                return failed(outcome.rejections.at(-1) === 'truncated' ? 'response_truncated' : 'proposal_invalid', receipt, provenance);
+            }
             const proposal = outcome.value;
 
             const denied = await permissionDenial(); if (denied) return denied;

@@ -69,6 +69,20 @@ export function buildPatientSmartImportCapabilityPlan(projection: SmartImportPro
             || path[0] === 'therapyCandidateHints' && path[2] === 'sourceId')));
 }
 
+/*
+ * Tetto della risposta (ADR 0012, misura dell'11 novembre 2026). Evidenze e prestazioni crescono con
+ * le fonti, quindi il tetto segue il prompt: un quarto di token per carattere, una volta e mezza il
+ * massimo misurato con la fonte su ogni item (0,17; risposta piu' lunga 1695 token). Il minimo e' quasi
+ * il doppio della risposta completa piu' lunga misurata col tetto fisso (1093 token);
+ * il massimo e' quello della sintesi documenti (ADR 0102), circa 70 s di generazione a 120 token/s.
+ */
+export const SMART_IMPORT_RESPONSE_TOKENS_FLOOR = 2048;
+export const SMART_IMPORT_RESPONSE_TOKENS_CEILING = 8192;
+export function smartImportResponseTokenLimit(prompt: string): number {
+    const proportional = Math.ceil(prompt.length / 4);
+    return Math.min(SMART_IMPORT_RESPONSE_TOKENS_CEILING, Math.max(SMART_IMPORT_RESPONSE_TOKENS_FLOOR, proportional));
+}
+
 function validIso(value: string): boolean {
     return Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 }

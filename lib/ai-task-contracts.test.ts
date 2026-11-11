@@ -633,7 +633,7 @@ test('smart import prompt prioritizes current pathology coding and active therap
     assert.match(prompt, /fattori di rischio, stili di vita, counselling o sospetti generici/i);
     assert.match(prompt, /label deve restare in italiano clinico sintetico/i);
     assert.match(prompt, /icdQuery deve essere una query breve e specifica in inglese/i);
-    assert.match(prompt, /sourceId deve coincidere esattamente con un id presente nelle fonti/i);
+    assert.match(prompt, /ogni diagnosi, terapia, prestazione e item ha il suo sourceId, che deve coincidere esattamente con un id presente nelle fonti/i);
     assert.match(prompt, /prestazioni sanitarie, visite specialistiche, esami, controlli, consulenze, impegnative o referral/i);
     assert.match(prompt, /chiave breve per ricerca catalogo AIFA/i);
     assert.match(prompt, /preferendo brand o principio attivo con strength se esplicita/i);
@@ -649,8 +649,8 @@ test('smart import prompt stays byte-identical through the compatible barrel', (
     const prompt = buildSmartImportExtractionPrompt(payload);
 
     assert.equal(prompt, buildSmartImportPromptDirect(payload));
-    assert.equal(Buffer.byteLength(prompt, 'utf8'), 5382);
-    assert.equal(createHash('sha256').update(prompt).digest('hex'), 'e0a67ae602f10e8d5e68b4dacfca678bdca72993a0597ebfe77b9bb038c6e430');
+    assert.equal(Buffer.byteLength(prompt, 'utf8'), 5488);
+    assert.equal(createHash('sha256').update(prompt).digest('hex'), 'e2e7d57dba85312bee8a675532c674b047c0e69e38d7997ddedb0b9e74286e94');
 });
 
 test('document synthesis prompt stays byte-identical through the compatible barrel', () => {
