@@ -40,7 +40,7 @@
     "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
     "lib/locked-field-guard.ts": "a4b64b4db1968423169937a2b491add2d2a19b6fba2489b1515e37b358a55d3a",
     "lib/therapy-status-command-service.ts": "7b3c04d18b3f504d4a78b48466787a81d09cd75a07ebb8f793edd611eca57238",
-    "lib/therapy-status-command-confirmation.ts": "3e85eb1cef3d2ff16d28568218bff2dba24482418c400c9c81f9f92f19d370b1",
+    "lib/therapy-status-command-confirmation.ts": "86682b47ca7eeadaa91065511e44c72951414e5bfe7a5d7b2001224bb424db1e",
     "lib/therapy-status-command-contract.ts": "3432124d9b5f8b3113265d9779fa12e1411e508b0964cfd2e1bc532f49f4a7fe",
     "lib/therapy-status-command-client.ts": "e2f833b062db819108f9ffddc6443e4bfce321a7d8a359666b84bc6b9b4ad30f",
     "lib/therapy-status-command-http.ts": "7b0a7a7780d5c98973a14f17fba32b722a3cb962cc2787c7e5edcf9789b43423",
