@@ -119,9 +119,17 @@ dopo «non inventare diagnosi, esami, terapie o fonti»:
 È l'unica modifica al prompt. Vale anche per il percorso in rete, che usa lo
 stesso prompt (la golden della preparazione cambia nella sola voce
 `patient_insight`). GPUI non costruisce il prompt: manda all'host la richiesta
-minimizzata, quindi non c'è un gemello Rust da allineare. La riga entra solo
-se la misura col modello locale reale riduce gli scarti per infedeltà senza
-aumentare `proposal_invalid` (rapporto `quadro-fedelta-misura.md` della 0.9.1).
+minimizzata, quindi non c'è un gemello Rust da allineare.
+
+Misura dell'11/11/2026 col modello locale reale (`qwen3.5:35b-a3b`, stesso
+Ollama, fonti dei due pazienti del collaudo, ordine alternato, 20 richieste
+per variante e paziente): sul paziente 1 le richieste finite in
+`proposal_unfaithful` scendono da 12 su 20 a 3 su 20, i primi tentativi
+infedeli da 15 su 20 a 8 su 20; sul paziente 2 gli scarti per infedeltà
+scendono da 2 a 0 e `proposal_invalid` da 1 a 0. Restano le forme implicite:
+nelle proposte accettate il modello scrive ancora come da fare una visita
+cardiologica già avvenuta e «necessario intensificare» dove la fonte dice
+«valutare intensificazione».
 
 ## Limiti
 
