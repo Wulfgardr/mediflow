@@ -19,6 +19,9 @@ import { boundaryState } from './browser-boundaries';
 import Timeline from '../../components/timeline';
 import type { TimelineEntryData } from '../../components/timeline-entry-card';
 import { notifyDbChange, useLiveQueryState } from '../../lib/live-query';
+import ServicePrescriptionManager from '../../components/service-prescription-manager';
+import ProstheticPrescriptionManager from '../../components/prosthetic-prescription-manager';
+import SissHandoffDiary from '../../components/siss-handoff-diary';
 
 const scaleState = { calls: 0, cancelled: 0, results: [] as ScaleResult[], settle: null as null | ((failure: boolean) => void) };
 /* Each diary read takes the next outcome from ?reads=fail,ok,...; once the list is spent, reads succeed. */
@@ -97,8 +100,45 @@ function DiaryFixture() {
             section={{ id: 'diario', kicker: 'Diario', title: 'Diario clinico', keepMounted: true, defaultOpen: true }} />
     </ConfirmProvider></RuntimeTwinDesignProvider>;
 }
+/* The panels below read through the real ApiTable; only window.fetch is replaced.
+   Each read of the panel's list takes the next outcome from ?reads=fail,ok,...; once the list is spent, reads succeed. */
+const panelState = { calls: 0, unexpected: [] as string[], plan: (new URLSearchParams(window.location.search).get('reads') ?? '').split(',').filter(Boolean) };
+const panelRows: Record<string, { endpoint: string; row: Record<string, unknown> }> = {
+    '/panel/service': { endpoint: '/api/service-prescriptions', row: { id: 'ui06-service', patientId: 'ui06-patient', serviceName: 'Ecografia sintetica UI06',
+        status: 'prescribed', prescribedAt: '2026-01-01T12:00:00.000Z', version: 1 } },
+    '/panel/prosthetic': { endpoint: '/api/prosthetic-prescriptions', row: { id: 'ui06-prosthetic', patientId: 'ui06-patient', description: 'Deambulatore sintetico UI06',
+        category: 'mobility', status: 'prescribed', prescribedAt: '2026-01-01T12:00:00.000Z', version: 1 } },
+    '/panel/siss': { endpoint: '/api/siss-handoffs', row: { id: 'ui06-siss', patientId: 'ui06-patient', moduleLabel: 'Passaggio sintetico UI06',
+        outcome: 'completed', startedAt: '2026-01-01T12:00:00.000Z', version: 1 } },
+};
+function installPanelFetch(endpoint: string, row: Record<string, unknown>) {
+    window.fetch = async (input: RequestInfo | URL) => {
+        const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, window.location.origin);
+        if (url.pathname === endpoint) {
+            panelState.calls += 1;
+            if (panelState.plan.shift() === 'fail') return new Response('{}', { status: 500 });
+            return Response.json([row]);
+        }
+        if (url.pathname.startsWith('/api/')) return Response.json([]);
+        panelState.unexpected.push(url.pathname);
+        throw new Error(`UI06: unexpected fetch ${url.pathname}`);
+    };
+}
+function PanelFixture({ pathname }: { pathname: string }) {
+    const target = panelRows[pathname];
+    installPanelFetch(target.endpoint, target.row);
+    const panel = pathname === '/panel/service' ? <ServicePrescriptionManager patientId="ui06-patient" />
+        : pathname === '/panel/prosthetic' ? <ProstheticPrescriptionManager patientId="ui06-patient" />
+        : <SissHandoffDiary patientId="ui06-patient" />;
+    return <RuntimeTwinDesignProvider><ConfirmProvider>
+        <button onClick={() => notifyDbChange()}>Rileggi il pannello fixture</button>
+        <section aria-label="Pannello fixture">{panel}</section>
+    </ConfirmProvider></RuntimeTwinDesignProvider>;
+}
+Object.assign((window as unknown as { ui06: object }).ui06, { panel: panelState });
 function App() {
     const pathname = window.location.pathname;
+    if (pathname in panelRows) return <PanelFixture pathname={pathname} />;
     if (pathname === '/sections') return <SectionsFixture />;
     if (pathname === '/diary') return <DiaryFixture />;
     if (pathname.startsWith('/settings')) return <SettingsFixture />;

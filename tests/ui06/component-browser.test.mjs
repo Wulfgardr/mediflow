@@ -415,3 +415,67 @@ test('the patient sheet wires the diary read error and retry into the diary, sca
     assert.match(source, /entriesError \? <ViewState state="error" title="Impossibile leggere le valutazioni\." action=\{\{ label: 'Riprova', onClick: refreshEntries \}\} \/>/u);
     assert.match(source, /entriesUnavailable=\{Boolean\(entriesError\) && entries === undefined\}/u);
 });
+
+/* Same defect in the panels with their own read: a failed read must not stay on the loading state forever. */
+const panelReadFailure = /^useLiveQueryState failed/u;
+const panels = [
+    { route: '/panel/service', loading: 'Caricamento prescrizioni…', row: 'Ecografia sintetica UI06',
+        readError: 'Impossibile leggere le prestazioni prescritte.', refreshError: 'Impossibile aggiornare le prestazioni prescritte.' },
+    { route: '/panel/prosthetic', loading: 'Caricamento prescrizioni…', row: 'Deambulatore sintetico UI06',
+        readError: 'Impossibile leggere le prescrizioni protesiche.', refreshError: 'Impossibile aggiornare le prescrizioni protesiche.' },
+    { route: '/panel/siss', loading: 'Caricamento del diario locale…', row: 'Passaggio sintetico UI06',
+        readError: 'Impossibile leggere i passaggi SISS.', refreshError: 'Impossibile aggiornare i passaggi SISS.' },
+];
+async function panelPage(t, route, reads) {
+    const page = await pageFor(t, `${route}?reads=${reads}`, { width: 1280, height: 900 }, panelReadFailure);
+    t.after(async () => { if (!page.isClosed()) assert.deepEqual(await page.evaluate(() => window.ui06.panel.unexpected), []); });
+    return page;
+}
+const panelCalls = page => page.evaluate(() => window.ui06.panel.calls);
+
+for (const panel of panels) {
+    test(`${panel.route}: read failure shows an error with Riprova, never a permanent loading state`, async t => {
+        const page = await panelPage(t, panel.route, 'fail');
+        const expect = harness.expect;
+        const section = page.getByRole('region', { name: 'Pannello fixture' });
+        await expect(section.locator('[data-view-state=error]')).toHaveAttribute('role', 'alert');
+        await expect(section.locator('[data-view-state=error]')).toContainText(panel.readError);
+        await expect(section.getByText(panel.loading)).toHaveCount(0);
+        await expect(section.getByRole('button', { name: 'Riprova', exact: true })).toBeVisible();
+    });
+
+    test(`${panel.route}: Riprova with a successful second read shows the data`, async t => {
+        const page = await panelPage(t, panel.route, 'fail,ok');
+        const expect = harness.expect;
+        const section = page.getByRole('region', { name: 'Pannello fixture' });
+        await section.getByRole('button', { name: 'Riprova', exact: true }).click();
+        await expect(section.getByText(panel.row).first()).toBeVisible();
+        await expect(section.locator('[data-view-state=error]')).toHaveCount(0);
+        assert.equal(await panelCalls(page), 2);
+    });
+
+    test(`${panel.route}: Riprova with a failed second read keeps the error`, async t => {
+        const page = await panelPage(t, panel.route, 'fail,fail');
+        const expect = harness.expect;
+        const section = page.getByRole('region', { name: 'Pannello fixture' });
+        await section.getByRole('button', { name: 'Riprova', exact: true }).click();
+        await expect.poll(() => panelCalls(page)).toBe(2);
+        await expect(section.locator('[data-view-state=error]')).toContainText(panel.readError);
+        await expect(section.getByRole('button', { name: 'Riprova', exact: true })).toBeVisible();
+        await expect(section.getByText(panel.loading)).toHaveCount(0);
+    });
+
+    test(`${panel.route}: a failed refresh keeps the rows already shown and offers Riprova`, async t => {
+        const page = await panelPage(t, panel.route, 'ok,fail,ok');
+        const expect = harness.expect;
+        const section = page.getByRole('region', { name: 'Pannello fixture' });
+        await expect(section.getByText(panel.row).first()).toBeVisible();
+        await page.getByRole('button', { name: 'Rileggi il pannello fixture', exact: true }).click();
+        await expect(section.locator('[data-view-state=error]')).toContainText(panel.refreshError);
+        await expect(section.getByText(panel.row).first()).toBeVisible();
+        await section.getByRole('button', { name: 'Riprova', exact: true }).click();
+        await expect(section.locator('[data-view-state=error]')).toHaveCount(0);
+        await expect(section.getByText(panel.row).first()).toBeVisible();
+        assert.equal(await panelCalls(page), 3);
+    });
+}
