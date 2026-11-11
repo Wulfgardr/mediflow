@@ -61,7 +61,7 @@ for (let round = 0; round < Number(limit); round++) {
     const result = await capability.preview({ handle: `prj_${'1'.repeat(32)}`, requestId: `request.wul832.${item.id}.${String(round).padStart(3, '0')}` });
     append('results.jsonl', { arm, ...trial, milliseconds: Date.now() - started, result });
     console.log(JSON.stringify({ arm, patient: item.id, round, status: result.status, code: result.code, attempts: trial.attempt, milliseconds: Date.now() - started }));
-    if (result.status === 'denied') throw new Error(`Banco negato: ${result.code}`);
+    if (result.status === 'denied' || result.code === 'provider_failed') throw new Error(`Banco interrotto: ${result.code}`);
   }
 }
 fs.writeFileSync(path.join(evidenceDir, 'complete.json'), JSON.stringify({ completedAt: new Date().toISOString(), requests: Number(limit) * corpus.cases.length }) + '\n');
