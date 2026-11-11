@@ -107,7 +107,7 @@ export default function PatientDetailPage() {
     const { showToast } = useToast();
 
     const { data: patient, loading: patientLoading, error: patientError, refresh: refreshPatient } = useLiveQueryState(() => db.patients.get(id), [id], undefined, ['patients']);
-    const entries = useLiveQuery(
+    const { data: entries, error: entriesError, refresh: refreshEntries } = useLiveQueryState(
         async () => {
             const items = await db.entries.query({ patientId: id, includeDeleted: true }).toArray();
             return items.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
@@ -707,10 +707,11 @@ export default function PatientDetailPage() {
                     surfaceClassName={workspaceStyles.clinicalSection}
                 >
                     <ClinicalRiverTimeline entries={entries === undefined ? undefined : nonScaleEntries} checkups={checkups}
-                        checkupsUnavailable={Boolean(checkupsError) && checkups === undefined} documentInsights={documentInsights} />
+                        checkupsUnavailable={Boolean(checkupsError) && checkups === undefined}
+                        entriesUnavailable={Boolean(entriesError) && entries === undefined} documentInsights={documentInsights} />
                 </CollapsibleSection>
 
-                <Timeline entries={timelineEntries} patientDiary composer={writing ? <PatientEntryComposer key={id} embedded /> : undefined} section={{
+                <Timeline entries={timelineEntries} readFailed={Boolean(entriesError)} onRetry={refreshEntries} patientDiary composer={writing ? <PatientEntryComposer key={id} embedded /> : undefined} section={{
                     id: 'diario',
                     kicker: 'Diario',
                     title: 'Diario clinico',
@@ -803,8 +804,11 @@ export default function PatientDetailPage() {
                                     label="Storico delle scale del paziente"
                                     heading="Valutazioni registrate"
                                     emptyMessage="Nessuna valutazione registrata."
+                                    readFailed={Boolean(entriesError)}
+                                    onRetry={refreshEntries}
                                 />
-                            ) : <ViewState state="loading" title="Valutazioni in caricamento." />}
+                            ) : entriesError ? <ViewState state="error" title="Impossibile leggere le valutazioni." action={{ label: 'Riprova', onClick: refreshEntries }} />
+                            : <ViewState state="loading" title="Valutazioni in caricamento." />}
                         </div>
                         {/* WUL-678: one target per scale, with explicit spacing. */}
                         <div className={scaleStyles.quickStart}>

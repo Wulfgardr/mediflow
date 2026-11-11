@@ -65,3 +65,9 @@ test('eventi presenti: elenco senza stato vuoto né lettura', async () => {
     assert.match(html, /Controllo sintetico/u);
     assert.doesNotMatch(html, new RegExp(`${EMPTY_TEXT}|Lettura degli eventi in corso`, 'u'));
 });
+
+test('diario illeggibile: errore esplicito, né lettura in corso né stato vuoto', async () => {
+    const html = await render({ entries: undefined, checkups: [], entriesUnavailable: true, documentInsights: [] });
+    assert.match(html, /role="alert"[^>]*>Impossibile leggere il diario: timeline non disponibile\./u);
+    assert.doesNotMatch(html, new RegExp(`${EMPTY_TEXT}|Lettura degli eventi in corso`, 'u'));
+});
