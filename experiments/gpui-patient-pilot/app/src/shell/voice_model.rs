@@ -273,11 +273,11 @@ impl ClinicalApp {
         let (message, error) = match area.status {
             Status::Checking => ("Verifica dei file del modello…".to_owned(), false),
             Status::Missing => (
-                "Modello non installato: la dettatura usa la trascrizione Apple.".to_owned(),
+                "Modello non installato: la dettatura non è disponibile.".to_owned(),
                 false,
             ),
             Status::Verified => (
-                "Modello installato e verificato: la dettatura usa whisper.".to_owned(),
+                "Modello installato e verificato.".to_owned(),
                 false,
             ),
             Status::Invalid => (
@@ -490,7 +490,7 @@ mod tests {
         assert!(
             has(
                 &labels,
-                "Modello non installato: la dettatura usa la trascrizione Apple."
+                "Modello non installato: la dettatura non è disponibile."
             ),
             "{labels:?}"
         );
@@ -531,10 +531,7 @@ mod tests {
         let (ids, labels) = rendered(&view, cx);
         assert_eq!(ids, ["voice-model-remove"]);
         assert!(
-            has(
-                &labels,
-                "Modello installato e verificato: la dettatura usa whisper."
-            ),
+            has(&labels, "Modello installato e verificato."),
             "{labels:?}"
         );
 
@@ -551,12 +548,92 @@ mod tests {
         assert_eq!(status(&view, cx), Status::Verified);
         assert_eq!(f.server.connections(), 2);
 
-        // Rimuovi: i file spariscono, la dettatura torna alla trascrizione Apple.
+        // Rimuovi: i file spariscono e la dettatura non è più disponibile.
         cx.update(|_, cx| view.update(cx, |app, cx| app.remove_voice_model(cx)));
         assert_eq!(status(&view, cx), Status::Missing);
         assert!(!f.catalog.directory.exists());
         let (ids, _) = rendered(&view, cx);
         assert_eq!(ids, ["voice-model-install"]);
+        std::fs::remove_dir_all(&f.root).unwrap();
+    }
+
+    #[gpui::test]
+    fn wrong_hash_is_refused_then_retry_shows_progress_and_completes(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use crate::local_voice::model::tests::Reply;
+        let f = fixture("riprova");
+        let content = invented(4_000_000, 21);
+        let model = f.server.file("grande.bin", &content);
+        let mut altered = content.clone();
+        altered[0] ^= 1;
+        f.server.set(
+            "/grande.bin",
+            vec![
+                Reply::Serve(altered),
+                Reply::Stall(content.clone()),
+                Reply::Serve(content),
+            ],
+        );
+        let catalog = loopback_catalog(f.catalog.directory.clone(), vec![model]);
+        let (view, cx) = open(catalog.clone(), cx);
+        assert_eq!(status(&view, cx), Status::Missing);
+
+        // Primo tentativo: byte diversi dall'impronta fissata, scartati.
+        cx.update(|_, cx| view.update(cx, |app, cx| app.install_voice_model(cx)));
+        wait_until(&view, cx, |area| area.download.is_none());
+        assert_eq!(
+            status(&view, cx),
+            Status::Failed(InstallError::HashMismatch)
+        );
+        assert!(!catalog.directory.exists(), "refused bytes left on disk");
+        let (ids, labels) = rendered(&view, cx);
+        assert_eq!(ids, ["voice-model-install"]);
+        assert!(
+            has(
+                &labels,
+                "I file arrivati sono diversi da quelli attesi e sono stati scartati."
+            ),
+            "{labels:?}"
+        );
+        assert!(has(&labels, "Riprova"), "{labels:?}");
+
+        // «Riprova»: l'avanzamento si vede mentre i byte arrivano.
+        cx.update(|_, cx| view.update(cx, |app, cx| app.install_voice_model(cx)));
+        // Il server manda un quarto dei byte e si ferma.
+        wait_until(&view, cx, |area| {
+            area.download
+                .as_ref()
+                .is_some_and(|d| d.progress().0 >= 500_000)
+        });
+        let (ids, labels) = rendered(&view, cx);
+        assert_eq!(ids, ["voice-model-cancel"]);
+        let shown = labels
+            .iter()
+            .find_map(|l| l.strip_prefix("Scaricamento: "))
+            .unwrap_or_else(|| panic!("no progress: {labels:?}"));
+        let percent: u64 = shown
+            .split_once(" di 4 MB (")
+            .and_then(|(_, rest)| rest.strip_suffix("%)."))
+            .and_then(|p| p.parse().ok())
+            .unwrap_or_else(|| panic!("progress label: {shown}"));
+        assert!((12..=25).contains(&percent), "{shown}");
+        cx.update(|_, cx| view.update(cx, |app, cx| app.cancel_voice_model(cx)));
+        wait_until(&view, cx, |area| area.download.is_none());
+        assert_eq!(status(&view, cx), Status::Missing);
+
+        // Nuovo tentativo: file verificato al suo posto, installazione completata.
+        cx.update(|_, cx| view.update(cx, |app, cx| app.install_voice_model(cx)));
+        wait_until(&view, cx, |area| area.download.is_none());
+        assert_eq!(status(&view, cx), Status::Verified);
+        assert_eq!(catalog.verify(), ModelStatus::Verified);
+        let (ids, labels) = rendered(&view, cx);
+        assert_eq!(ids, ["voice-model-remove"]);
+        assert!(
+            has(&labels, "Modello installato e verificato."),
+            "{labels:?}"
+        );
+        assert_eq!(f.server.connections(), 3);
         std::fs::remove_dir_all(&f.root).unwrap();
     }
 

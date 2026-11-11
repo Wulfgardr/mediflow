@@ -6,15 +6,22 @@ un modello locale integrato. Il motore scelto dalla misura su dieci motori è
 **whisper large-v3-turbo q5_0 con whisper.cpp** (MIT, 0,57 GB), con il
 rilevatore di voce **Silero** obbligatorio.
 
+**Aggiornamento dell'11 novembre 2026 (WUL-828, punto 1).** Leonardo ha scelto
+whisper come unico motore: la trascrizione Apple esce dal prodotto. Senza il
+modello installato la dettatura non c'è; la vista lo dice («Modello vocale non
+installato.») e il pulsante «Installa il modello» porta a Impostazioni, Voce
+locale. Con il modello alterato il pulsante è «Reinstalla il modello». Le righe
+qui sotto sono aggiornate; le misure restano quelle del 10 novembre.
+
 ## Componenti
 
 | Parte | Dove | Che cosa fa |
 |---|---|---|
-| Cattura | `app/src/local_voice/bridge.swift`, classe `WhisperVoiceCapture` | Microfono con `AVAudioEngine`, conversione a 16 kHz mono Float32, campioni in un buffer preallocato di 30 s protetto da lock. Nessun file audio. |
+| Cattura | `app/src/local_voice/bridge.swift`, classe `WhisperVoiceCapture` | Microfono con `AVAudioEngine`, conversione a 16 kHz mono Float32, campioni in un buffer preallocato di 30 s protetto da lock. Nessun file audio. È l'unico codice Swift della voce: il ponte non compila più i sorgenti del client Apple. |
 | Ciclo di ascolto | `app/src/local_voice/listening.rs` | Rilevatore di voce finestra per finestra (512 campioni), frase aperta e chiusa dal rilevatore, parziale sulla griglia da 0,5 s, definitivo alla chiusura, accordo locale dei parziali. Codice puro, provato senza modello. |
 | Motore | `app/src/local_voice/whisper.rs` | `WhisperDecoder` (whisper.cpp con Metal) e `SileroDetector` (Silero VAD di whisper.cpp, sulla CPU) dietro le due interfacce del ciclo; thread di lavoro; sorgente audio Swift. |
 | Modello | `app/src/local_voice/model.rs` | Nomi, URL con revisione fissata, SHA-256 e dimensione dei due file; verifica; installazione esplicita. |
-| Sessione | `app/src/local_voice/mod.rs` | Sceglie il motore, espone gli stati di sempre e i messaggi del motore in uso. |
+| Sessione | `app/src/local_voice/mod.rs` | Apre whisper se il modello è installato, altrimenti lo stato «modello non installato»; espone stati e messaggi. |
 | Vista | `app/src/shell/local_voice.rs` | Mostra durante la registrazione il provvisorio a matita e il confermato in grigio; Review e trasferimento invariati. |
 
 whisper.cpp gira con GPU e flash attention accese, come nel banco (`whisper-rs` la spegne per impostazione;
@@ -28,8 +35,8 @@ whisper.cpp 1.9.5. **L'app usa whisper.cpp 1.8.3**, quella inclusa in `whisper-r
 
 1. Il gesto «Consenti e avvia» manda `Start` al thread di lavoro `mediflow-voce-locale`.
 2. Il thread verifica dimensione e SHA-256 dei due file (stato Preparing), carica whisper e Silero, poi avvia la
-   cattura Swift. Il permesso del microfono usa la stessa richiesta del motore Apple
-   (`AVAudioApplication.requestRecordPermission`); il flusso dei permessi esistente non cambia.
+   cattura Swift. Il permesso del microfono si chiede con
+   `AVAudioApplication.requestRecordPermission`; il flusso dei permessi esistente non cambia.
 3. Il tap di `AVAudioEngine` consegna circa 85 ms alla volta; Swift converte a 16 kHz e accoda.
 4. Ogni 20 ms il thread legge i campioni arrivati (`MFVoiceCaptureRead`) e li passa al ciclo: il rilevatore li
    guarda tutti; una frase chiusa (0,5 s di silenzio, o 20 s di durata) si decodifica subito e si accoda al testo
@@ -75,16 +82,15 @@ medico, mai applicata da sola.
 
 ## Stati e messaggi
 
-Gli stati restano quelli di oggi. Cambiano solo i messaggi diventati falsi con whisper.
-
-| Stato | Messaggio con whisper |
-|---|---|
-| Disclosure | invariato: «L'audio viene trascritto sul Mac…» |
-| Preparing | «Verifica del permesso microfono e del modello vocale locale…» |
-| Recording | invariato, più il testo provvisorio a matita e quello confermato in grigio |
-| Unavailable, modello alterato | «Il modello vocale locale è incompleto o diverso da quello atteso. Reinstallalo da Impostazioni, Voce locale.» |
-| Unavailable, motore o cattura interrotti | «La dettatura locale si è interrotta e il testo non è stato conservato. Apri una nuova dettatura.» |
-| Unavailable, motore Apple senza modello | messaggio di oggi più l'indicazione di installare il modello vocale locale da Impostazioni, Voce locale |
+| Stato | Messaggio | Pulsante |
+|---|---|---|
+| Modello non installato (nuovo, 11/11) | «Modello vocale non installato.» | «Installa il modello»: Impostazioni, Voce locale |
+| Disclosure | «L'audio viene trascritto sul Mac…» | «Consenti e avvia» |
+| Preparing | «Verifica del permesso microfono e del modello vocale locale…» | |
+| Recording | invariato, più il testo provvisorio a matita e quello confermato in grigio | «Termina e trascrivi» |
+| Unavailable, modello alterato | «Il modello vocale locale è incompleto o diverso da quello atteso.» | «Reinstalla il modello»: Impostazioni, Voce locale |
+| Unavailable, motore o cattura interrotti | «La dettatura locale si è interrotta e il testo non è stato conservato. Apri una nuova dettatura.» | |
+| Unavailable, computer senza cattura (Windows, Linux) | «La dettatura locale non è disponibile su questo computer.» | |
 
 ## Dove sta il modello e come si verifica
 
@@ -97,8 +103,8 @@ Cartella: `~/Library/Application Support/MediFlow GPUI/modelli-voce/`, accanto a
 
 Gli hash coincidono con l'oid LFS di Hugging Face e con `motori/INVENTARIO.md` del banco.
 
-- **Scelta del motore** all'apertura della dettatura, con un controllo rapido di presenza e dimensione: cartella
-  vuota, motore Apple come oggi; almeno un file presente, whisper.
+- **Apertura della dettatura**, con un controllo rapido di presenza e dimensione: cartella vuota, stato «modello
+  non installato» senza microfono; almeno un file presente, whisper.
 - **Verifica completa** dello SHA-256 nel thread di lavoro a ogni avvio (Preparing). Un file mancante, troncato o
   con hash diverso dà Unavailable con il messaggio che dice come reinstallarlo.
 - **Installazione** solo dal pulsante «Installa» di Impostazioni, Voce locale (solo macOS). Prima del clic la
@@ -110,7 +116,7 @@ Gli hash coincidono con l'oid LFS di Hugging Face e con `motori/INVENTARIO.md` d
   thread ferma `curl` entro 20 ms e cancella i parziali. Errore, hash diverso o annullamento, anche a metà del
   secondo file, non lasciano file nuovi. All'uscita dall'app (Cmd-Q) il gestore d'uscita ferma il `curl` (SIGKILL
   al suo PID e `wait`) e toglie i parziali in pochi millisecondi, dentro i 200 ms che GPUI concede; all'avvio un
-  parziale rimasto da un'uscita brusca si toglie. Un secondo clic non avvia un secondo scaricamento. «Rimuovi» toglie i file e la dettatura torna alla trascrizione Apple. Il comando
+  parziale rimasto da un'uscita brusca si toglie. Un secondo clic non avvia un secondo scaricamento. «Rimuovi» toglie i file e la dettatura non è più disponibile. Il comando
   `--installa-modello-voce` della prima fetta è stato tolto: il pulsante è l'unico percorso.
 - **Uscite di rete**: `network.mode` governa la LAN e non autorizza Internet (ADR 0125); vale l'interruttore
   `MEDIFLOW_NETWORK_DISABLED` (presente e diverso da `0`), ricontrollato prima di ogni richiesta: con le uscite
@@ -198,9 +204,7 @@ dentro `whisper-rs-sys`) li raccoglie già `bundle_macos.py`: verificato su 470 
 
 ## Domande per Leonardo
 
-1. **Due motori o uno.** Proposta: tenere il motore Apple solo come ripiego per chi non installa il modello, per
-   una release, e toglierlo nella 0.9.2 se la seconda seduta con la tua voce conferma whisper. Toglierlo subito
-   semplifica il ponte Swift (meno 600 righe condivise col client Apple) ma lascia senza voce chi non scarica 0,58 GB.
+1. **Due motori o uno.** Decisa l'11 novembre: solo whisper da subito (WUL-828, punto 1).
 2. **Aiuto sui farmaci in Review** descritto sopra: lo vuoi nella prossima fetta?
 3. **Tetto del testo.** `reviewed_text` accetta 12.000 caratteri: per una dettatura bastano, per l'ascolto
    ambientale di una visita intera no. Consegna a pezzi o tetto più alto?

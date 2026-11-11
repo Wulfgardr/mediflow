@@ -180,6 +180,30 @@ pub(crate) struct Engine {
     pub(crate) directory: PathBuf,
     pub(crate) files: [&'static ModelFile; 2],
     pub(crate) prompt: Zeroizing<String>,
+    /// In produzione [`load_whisper`]; nelle prove un motore finto sugli
+    /// stessi file verificati.
+    pub(crate) load: Loader,
+}
+
+/// Ciclo di ascolto con rilevatore e decodificatore già caricati.
+pub(crate) type Listener =
+    Box<dyn FnOnce(&mut dyn AudioSource, &Receiver<Command>, &Mutex<Shared>)>;
+/// Carica il motore dai file della cartella, dopo la verifica dello SHA-256.
+pub(crate) type Loader =
+    fn(&Path, &[&'static ModelFile; 2], Zeroizing<String>) -> Result<Listener, EngineFailure>;
+
+/// whisper.cpp con Metal e Silero sulla CPU.
+pub(crate) fn load_whisper(
+    directory: &Path,
+    files: &[&'static ModelFile; 2],
+    prompt: Zeroizing<String>,
+) -> Result<Listener, EngineFailure> {
+    let detector = SileroDetector::load(&directory.join(files[1].name))?;
+    let decoder = WhisperDecoder::load(&directory.join(files[0].name), prompt)?;
+    let dictation = Dictation::new(detector, decoder);
+    Ok(Box::new(move |source, commands, shared| {
+        listen(dictation, source, commands, shared)
+    }))
 }
 
 /// Per le prove: stato, lunghezza del provvisorio e del confermato della
@@ -373,19 +397,14 @@ fn run(
     if retired(&shared) {
         return;
     }
-    let loaded =
-        SileroDetector::load(&engine.directory.join(engine.files[1].name)).and_then(|detector| {
-            WhisperDecoder::load(&engine.directory.join(engine.files[0].name), engine.prompt)
-                .map(|decoder| Dictation::new(detector, decoder))
-        });
-    let Ok(dictation) = loaded else {
+    let Ok(listener) = (engine.load)(&engine.directory, &engine.files, engine.prompt) else {
         fail(&shared, State::Unavailable, Some(Problem::EngineFailed));
         return;
     };
     if retired(&shared) {
         return;
     }
-    listen(dictation, source.as_mut(), &commands, &shared);
+    listener(source.as_mut(), &commands, &shared);
 }
 
 /// Ciclo del thread: lo stesso per il microfono e per le prove su file.
@@ -486,7 +505,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
     let _ = commands.recv();
 }
 
-#[cfg(local_voice_apple)]
+#[cfg(local_voice_capture)]
 pub(crate) mod swift {
     use super::{AudioSource, SourcePhase};
     use std::ffi::c_void;
@@ -756,6 +775,7 @@ pub(crate) mod tests {
                 directory: directory.clone(),
                 files: model::FILES,
                 prompt: Zeroizing::default(),
+                load: load_whisper,
             },
             Box::new(InjectedSource::new(tone(1.0))),
         );
@@ -818,6 +838,60 @@ pub(crate) mod tests {
             at += 8 + size + size % 2;
         }
         panic!("no data chunk in {path}");
+    }
+
+    /// Dettatura vera dal modello installato: un file del banco al posto del
+    /// microfono, attraverso la sessione che sceglie whisper e verifica lo
+    /// SHA-256 dei file. Solo a mano: in CI il modello non c'è e i test non
+    /// scaricano nulla.
+    #[test]
+    #[ignore = "richiede MEDIFLOW_VOCE_WHISPER, MEDIFLOW_VOCE_VAD, MEDIFLOW_VOCE_FILE, MEDIFLOW_VOCE_EXPECT"]
+    fn real_model_dictates_through_the_session() {
+        let var = |name: &str| std::env::var(name).unwrap_or_else(|_| panic!("{name}"));
+        let directory = std::env::temp_dir().join(format!(
+            "mediflow-voce-vera-{}-{:?}",
+            std::process::id(),
+            std::time::SystemTime::now()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        for (path, file) in [
+            (var("MEDIFLOW_VOCE_WHISPER"), &model::WHISPER),
+            (var("MEDIFLOW_VOCE_VAD"), &model::VAD),
+        ] {
+            std::os::unix::fs::symlink(path, directory.join(file.name)).unwrap();
+        }
+        let mut audio = read_wav(&var("MEDIFLOW_VOCE_FILE"));
+        audio.extend(silence(2.0));
+        let session = super::super::Session::open(
+            Engine {
+                directory: directory.clone(),
+                files: model::FILES,
+                prompt: Zeroizing::default(),
+                load: load_whisper,
+            },
+            move || Some(Box::new(InjectedSource::new(audio)) as Box<dyn AudioSource>),
+        );
+        assert_eq!(session.state(), State::Disclosure, "whisper chosen");
+        session.start();
+        let started = std::time::Instant::now();
+        while !matches!(
+            session.state(),
+            State::Review | State::Unavailable | State::Cancelled
+        ) {
+            assert!(started.elapsed() < Duration::from_secs(300), "no review");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let text = session.transcript().expect("review text");
+        println!("trascrizione ({:?}): {}", started.elapsed(), text.as_str());
+        let lower = text.to_lowercase();
+        for word in var("MEDIFLOW_VOCE_EXPECT").split(',') {
+            assert!(
+                lower.contains(&word.to_lowercase()),
+                "{word:?} missing: {lower}"
+            );
+        }
+        drop(session);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     /// P2: modello vero, file del banco iniettati a blocchi da 0,5 s al posto

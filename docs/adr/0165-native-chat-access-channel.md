@@ -184,6 +184,11 @@ in Impostazioni, Voce locale; aprire la pagina non apre connessioni, e
 `MEDIFLOW_NETWORK_DISABLED` la impedisce come per il catalogo AIFA (ADR 0125). Dettagli e misure:
 [nota di progetto](../analysis/2026-11-10-gpui-voce-whisper-locale.md).
 
+Aggiornamento dell'11 novembre 2026 (WUL-828): il motore Apple esce dal prodotto.
+La dettatura usa solo whisper; senza il modello installato la vista dice che manca e
+porta a Impostazioni, Voce locale. Il ponte Swift resta solo per la cattura del
+microfono.
+
 Riferimenti Apple: [SpeechTranscriber](https://developer.apple.com/documentation/speech/speechtranscriber)
 e [SpeechAnalyzer, WWDC25](https://developer.apple.com/videos/play/wwdc2025/277/).
 
