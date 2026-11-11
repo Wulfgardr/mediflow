@@ -21,7 +21,7 @@ test('prepares one fixed lease-bound prompt with no output leakage or finalizati
 
 test('denies replay and hostile inputs without a second provider call', { concurrency: false }, async () => { let calls = 0; const fixture = await handoff(async () => { calls += 1; return { content: body(), stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }; }); try { const first = prepareDocumentSynthesisFabricExecution(fixture.value); exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'canceled'); exact(await first, 'canceled'); assert.equal(calls, 1); for (const value of [{}, { ...fixture.value }, structuredClone(fixture.value), Object.freeze(Object.defineProperty({}, 'then', { value() {} }))]) exact(await prepareDocumentSynthesisFabricExecution(value), 'handoff_unavailable'); exact(await prepareDocumentSynthesisFabricExecution(new Proxy(fixture.value, {})), 'input_invalid'); } finally { fixture.restore(); } });
 
-test('burns the handoff after timeout, malformed envelope, or source validation denial', { concurrency: false }, async () => { for (const [content, code, expectedCalls] of [[null, 'response_invalid', 2], [body('Different synthetic source.'), 'validation_denied', 1]] as const) { let calls = 0; const fixture = await handoff(async () => { calls += 1; return { content: content as string, stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }; }); try { const result = await prepareDocumentSynthesisFabricExecution(fixture.value); exact(result, code); exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable'); assert.equal(calls, expectedCalls); } finally { fixture.restore(); } } });
+test('burns the handoff after timeout, malformed envelope, or source validation denial', { concurrency: false }, async () => { for (const [content, code, expectedCalls] of [[null, 'response_invalid', 2], [body('Different synthetic source.'), 'citation_not_literal', 2], [body().replace(',{"claimPath":"data.qualityLevel","labels":["S1"]}', ''), 'validation_denied', 1]] as const) { let calls = 0; const fixture = await handoff(async () => { calls += 1; return { content: content as string, stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }; }); try { const result = await prepareDocumentSynthesisFabricExecution(fixture.value); exact(result, code); exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable'); assert.equal(calls, expectedCalls); } finally { fixture.restore(); } } });
 
 test('aborts timeout or cancellation, burns the handoff, absorbs late rejection, and skips parse validation after return', { concurrency: false }, async () => { let rejectLate!: (reason: unknown) => void; const fixture = await handoff(async () => new Promise((_, reject) => { rejectLate = reject; })); const restore = setDocumentSynthesisFabricExecutionPrepareTimeoutForTest(0); const unhandled: unknown[] = []; const listener = (reason: unknown) => { unhandled.push(reason); }; process.on('unhandledRejection', listener); try { exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'provider_timeout'); exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable'); rejectLate(new Error('late')); await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []); } finally { process.off('unhandledRejection', listener); restore?.(); fixture.restore(); } });
 
@@ -140,5 +140,92 @@ test('local: the measured 1911-token envelope of an ordinary report fits the res
         if (result.status !== 'available') return;
         const publication = finalizeDocumentSynthesisFabricPreparedExecution(result.preparedToken);
         assert.ok(publication); assert.equal(publication.output.data.therapyCandidates.length, 2); assert.equal(publication.receipt.writesPerformed, 0);
+    } finally { fixture.restore(); }
+});
+
+// Risposte reali di qwen3.5:35b-a3b (misura dell'11/11/2026 su main): riassunti in inglese accettati
+// e citazioni scartate col messaggio generico. Sorgenti e citazioni sono quelli veri, con il
+// codice fiscale finto tolto.
+const REAL = JSON.parse(await readFile('lib/ai-providers/fabric/fixtures/document-synthesis-real-answers.json', 'utf8')) as {
+    summaries: Array<{ run: string; outcomeOnMain: string; english: boolean; summary: string }>;
+    citations: Record<'referto' | 'esami' | 'fusedNewlines' | 'fusedNewlinesLab' | 'omittedMmolMol' | 'omittedRows', string>;
+};
+const ITALIAN_SUMMARY = REAL.summaries.find((item) => !item.english)!.summary;
+function realBody(summary: string, quote: string) { return JSON.stringify({ schemaVersion: 'mediflow.document-synthesis.provider-envelope.v2', output: { schemaVersion: 'mediflow.ai.extract.v1', task: 'document_synthesis', summary, data: { qualityLevel: 'green', medications: [], diagnoses: [], problemStatements: [], therapyCandidates: [], servicePrescriptions: [] } }, citations: [{ label: 'S1', quote }], claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] }); }
+const EXACT_LAB_QUOTE = 'Emoglobina glicata HbA1c: 8,1% (65 mmol/mol)';
+
+test('local: the six English summaries accepted on main are retried once and never prepared', { concurrency: false }, async () => {
+    const english = REAL.summaries.filter((item) => item.english && item.outcomeOnMain === 'proposta');
+    assert.equal(english.length, 6);
+    for (const item of english) {
+        const twice: string[] = [];
+        const refused = await handoff(scriptedChat([realBody(item.summary, EXACT_LAB_QUOTE)], twice), undefined, REAL.citations.esami);
+        try {
+            exact(await prepareDocumentSynthesisFabricExecution(refused.value), 'response_invalid');
+            assert.equal(twice.length, 2, item.run);
+            assert.match(twice[0]!, /Write summary in Italian/u);
+        } finally { refused.restore(); }
+        const prompts: string[] = [];
+        const fixture = await handoff(scriptedChat([realBody(item.summary, EXACT_LAB_QUOTE), realBody(ITALIAN_SUMMARY, EXACT_LAB_QUOTE)], prompts), undefined, REAL.citations.esami);
+        try {
+            const result = await prepareDocumentSynthesisFabricExecution(fixture.value);
+            assert.equal(result.status, 'available', item.run); assert.equal(prompts.length, 2);
+            if (result.status !== 'available') continue;
+            const publication = finalizeDocumentSynthesisFabricPreparedExecution(result.preparedToken);
+            assert.equal(publication?.output.summary, ITALIAN_SUMMARY, item.run);
+        } finally { fixture.restore(); }
+    }
+});
+
+test('local: the 32 real Italian summaries pass the language check at the first attempt', { concurrency: false }, async () => {
+    const italian = REAL.summaries.filter((item) => !item.english);
+    assert.equal(italian.length, 32);
+    for (const item of italian) {
+        const prompts: string[] = [];
+        const fixture = await handoff(scriptedChat([realBody(item.summary, EXACT_LAB_QUOTE)], prompts), undefined, REAL.citations.esami);
+        try {
+            const result = await prepareDocumentSynthesisFabricExecution(fixture.value);
+            assert.equal(result.status, 'available', item.run); assert.equal(prompts.length, 1, item.run);
+            if (result.status === 'available') disposeDocumentSynthesisFabricPreparedExecution(result.preparedToken);
+        } finally { fixture.restore(); }
+    }
+});
+
+test('local: a real quote with the title line breaks fused is accepted as the exact source text', { concurrency: false }, async () => {
+    for (const [quote, source] of [[REAL.citations.fusedNewlines, REAL.citations.referto], [REAL.citations.fusedNewlinesLab, REAL.citations.esami]] as const) {
+        assert.equal(source.includes(quote), false, 'su main la citazione non e’ letterale');
+        const prompts: string[] = [];
+        const fixture = await handoff(scriptedChat([realBody(ITALIAN_SUMMARY, quote)], prompts), undefined, source);
+        try {
+            const result = await prepareDocumentSynthesisFabricExecution(fixture.value);
+            assert.equal(result.status, 'available'); assert.equal(prompts.length, 1);
+            if (result.status !== 'available') continue;
+            const publication = finalizeDocumentSynthesisFabricPreparedExecution(result.preparedToken);
+            const citation = publication!.citations[0]!;
+            assert.notEqual(citation.quote, quote, 'la citazione mostrata e’ il testo della fonte, non quello del modello');
+            assert.equal(citation.quote.replace(/\s+/gu, ' '), quote.replace(/\s+/gu, ' '));
+            assert.equal(Buffer.from(source, 'utf8').subarray(citation.startByte, citation.endByte).toString('utf8'), citation.quote);
+            assert.match(citation.quote, /\(documento sintetico\)\n\nPaziente/u);
+        } finally { fixture.restore(); }
+    }
+});
+
+test('local: a real quote that leaves out «(65 mmol/mol)» stays refused with its own code after two calls', { concurrency: false }, async () => {
+    for (const quote of [REAL.citations.omittedMmolMol, REAL.citations.omittedRows]) {
+        assert.equal(quote.includes('8,1% (valore desiderabile'), true);
+        const prompts: string[] = [];
+        const fixture = await handoff(scriptedChat([realBody(ITALIAN_SUMMARY, quote)], prompts), undefined, REAL.citations.esami);
+        try {
+            exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'citation_not_literal');
+            exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable');
+            assert.equal(prompts.length, 2);
+        } finally { fixture.restore(); }
+    }
+    const prompts: string[] = [];
+    const fixture = await handoff(scriptedChat([realBody(ITALIAN_SUMMARY, REAL.citations.omittedMmolMol), realBody(ITALIAN_SUMMARY, EXACT_LAB_QUOTE)], prompts), undefined, REAL.citations.esami);
+    try {
+        const result = await prepareDocumentSynthesisFabricExecution(fixture.value);
+        assert.equal(result.status, 'available'); assert.equal(prompts.length, 2, 'il secondo tentativo con la citazione letterale passa');
+        if (result.status === 'available') disposeDocumentSynthesisFabricPreparedExecution(result.preparedToken);
     } finally { fixture.restore(); }
 });

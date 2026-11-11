@@ -4,6 +4,7 @@ import test from 'node:test';
 import { types } from 'node:util';
 
 import { bindDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope-binding';
+import { locateDocumentSynthesisQuote } from './document-synthesis-quote-locator';
 import { parseDocumentSynthesisProviderEnvelope, resolveDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope';
 import { captureDocumentSynthesisSourceSet } from './document-synthesis-source-set-contract';
 
@@ -82,12 +83,12 @@ test('requires an exact unique quote and closed v2 citation without repairing ou
     const sources = sourceSet();
     available({ sourceSet: sources, envelopeToken: token() });
     for (const citation of [
-        { label: 'S1', quote: '' }, { label: 'S1', quote: 'alpha' }, { label: 'S1', quote: ' Alpha' },
+        { label: 'S1', quote: '' }, { label: 'S1', quote: 'alpha' }, { label: 'S1', quote: 'Al pha' },
         { label: 'S1', quote: 'Beta' }, { label: 'S1', quote: '\ud800' }, { label: 'S1', quote: 1 },
         { label: 'S1', text: 'Alpha' }, { label: 'S1', quote: 'Alpha', startOffset: 0 },
         { label: 'S1', quote: 'Alpha', startByte: 0, endByte: 5, quoteSha256: 'b1a96dd646bccaa24cef7a3db22a6f995f05658f4f1c3272913e258c03e6fb24' },
     ]) denied({ sourceSet: sources, envelopeToken: token(body({ citations: [citation, { label: 'S2', quote: 'Beta' }] })) });
-    for (const [text, quote] of [['Alpha Alpha', 'Alpha'], ['aaaa', 'aaa'], ['Café', 'Cafe\u0301'], ['Alpha\nBeta', 'Alpha\r\nBeta']]) {
+    for (const [text, quote] of [['Alpha Alpha', 'Alpha'], ['aaaa', 'aaa'], ['Café', 'Cafe\u0301']]) {
         const captured = captureDocumentSynthesisSourceSet({ sources: [source('quote', text!)], sourceSetEpoch: BigInt(3), revocationGeneration: BigInt(4) });
         assert.equal(captured.status, 'available');
         denied({ sourceSet: captured.sourceSet, envelopeToken: token(body({ citations: [{ label: 'S1', quote }], claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] })) });
@@ -104,4 +105,24 @@ test('derives one citation per source through the 32-source bound without cross-
         assert.equal(result.citations!.length, count);
         assert.deepEqual(result.citations!.map((citation) => [citation.label, citation.startByte, citation.endByte, citation.quoteSha256]), labels.map((label) => [label, 0, 5, 'b1a96dd646bccaa24cef7a3db22a6f995f05658f4f1c3272913e258c03e6fb24']));
     }
+});
+
+test('rilievo bot #937: il limite sulla citazione vale dopo gli spazi, uguale al controllo del tentativo locale', () => {
+    const text = 'Pressione arteriosa 120/80 mmHg.';
+    const captured = captureDocumentSynthesisSourceSet({ sources: [source('spazi', text)], sourceSetEpoch: BigInt(3), revocationGeneration: BigInt(4) });
+    assert.equal(captured.status, 'available');
+    const bind = (quote: string) => bindDocumentSynthesisProviderEnvelope({ sourceSet: captured.sourceSet, envelopeToken: token(body({ citations: [{ label: 'S1', quote }], claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] })) });
+    // L'intera fonte con gli spazi raddoppiati supera la lunghezza della fonte ma è la stessa citazione.
+    const widened = bind('Pressione  arteriosa  120/80  mmHg.');
+    assert.equal(widened.status, 'available');
+    assert.equal(widened.citations![0]!.quote, text);
+    for (const [quote, expected] of [[' Pressione arteriosa', 'Pressione arteriosa'], ['arteriosa\r\n120/80', 'arteriosa 120/80']] as const) {
+        const result = bind(quote);
+        assert.equal(result.status, 'available', quote);
+        assert.equal(result.citations![0]!.quote, expected);
+    }
+    // Oltre il doppio della fonte la citazione è rifiutata da entrambi i controlli.
+    const tooLong = text.split(' ').join(' '.repeat(40));
+    assert.equal(locateDocumentSynthesisQuote(tooLong, text), null);
+    denied({ sourceSet: captured.sourceSet, envelopeToken: token(body({ citations: [{ label: 'S1', quote: tooLong }], claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] })) });
 });

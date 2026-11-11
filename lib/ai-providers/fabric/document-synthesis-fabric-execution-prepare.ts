@@ -3,18 +3,21 @@ import 'server-only';
 import { types } from 'node:util';
 
 import { resolveDocumentSynthesisFabricExecutionHandoff, type DocumentSynthesisFabricExecutionCapability } from './document-synthesis-fabric-admission';
-import { parseDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope';
+import { readDocumentSynthesisPromptSources } from './document-synthesis-multi-source-prompt';
+import { parseDocumentSynthesisProviderEnvelope, resolveDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope';
+import { locateDocumentSynthesisQuote } from './document-synthesis-quote-locator';
+import { documentSynthesisSummaryLanguage } from './document-synthesis-summary-language';
 import { runLocalGenerationAttempts } from './local-generation-attempts';
 import type { LocalProviderResolution } from '../registry';
 
 export type DocumentSynthesisFabricPreparedExecutionToken = object;
-type DenialCode = 'input_invalid' | 'handoff_unavailable' | 'binding_invalid' | 'provider_unavailable' | 'provider_timeout' | 'response_invalid' | 'validation_denied' | 'canceled';
+type DenialCode = 'input_invalid' | 'handoff_unavailable' | 'binding_invalid' | 'provider_unavailable' | 'provider_timeout' | 'response_invalid' | 'citation_not_literal' | 'validation_denied' | 'canceled';
 export type DocumentSynthesisFabricExecutionPrepareResult = Readonly<{ status: 'available'; code: null; preparedToken: DocumentSynthesisFabricPreparedExecutionToken; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none'; fallback: 'denied_by_contract' }>
     | Readonly<{ status: 'denied'; code: DenialCode; preparedToken: null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none'; fallback: 'denied_by_contract' }>;
 
 type Entry = { state: 'running' | 'prepared' | 'aborted'; handoff: object; execution: DocumentSynthesisFabricExecutionCapability; controller: AbortController; timer: ReturnType<typeof setTimeout> | null; settle: ((outcome: Outcome) => void) | null; validation: unknown; envelope: object | null };
 type Outcome = Readonly<{ kind: 'response'; value: unknown }> | Readonly<{ kind: 'failure' | 'timeout' }>;
-const OBJECT = Object.prototype; const ObjectAssign = Object.assign; const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectHasOwn = Object.hasOwn; const ReflectApply = Reflect.apply; const ReflectOwnKeys = Reflect.ownKeys; const IsProxy = types.isProxy;
+const OBJECT = Object.prototype; const ObjectAssign = Object.assign; const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectHasOwn = Object.hasOwn; const ArrayIsArray = Array.isArray; const ReflectApply = Reflect.apply; const ReflectOwnKeys = Reflect.ownKeys; const IsProxy = types.isProxy;
 const WeakMapConstructor = WeakMap; const WeakMapGet = WeakMap.prototype.get; const WeakMapSet = WeakMap.prototype.set; const WeakMapDelete = WeakMap.prototype.delete; const PromiseConstructor = Promise; const PromiseThen = Promise.prototype.then; const AbortControllerConstructor = AbortController; const SetTimeout = setTimeout; const ClearTimeout = clearTimeout;
 const handoffs = new WeakMapConstructor<object, Entry>(); const prepared = new WeakMapConstructor<object, Entry>(); const COMMON = ObjectFreeze({ reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const, fallback: 'denied_by_contract' as const });
 let timeoutMs = 300_000;
@@ -50,10 +53,38 @@ function truncatedResponse(value: unknown): boolean {
     try { if (!value || typeof value !== 'object' || IsProxy(value)) return false; const stats = ObjectGetOwnPropertyDescriptor(value, 'stats'); const inner = stats && ObjectHasOwn(stats, 'value') ? stats.value : null; if (!inner || typeof inner !== 'object' || IsProxy(inner)) return false; const flag = ObjectGetOwnPropertyDescriptor(inner, 'truncated'); return !!flag && ObjectHasOwn(flag, 'value') && flag.value === true; } catch { return false; }
 }
 
+function own(value: unknown, key: string): unknown {
+    if (!value || typeof value !== 'object' || IsProxy(value)) return undefined;
+    const descriptor = ObjectGetOwnPropertyDescriptor(value, key);
+    return descriptor && ObjectHasOwn(descriptor, 'value') ? descriptor.value : undefined;
+}
+
+/**
+ * Controlli locali sulla risposta gia' letta, prima della validazione autorevole del lease (che
+ * resta invariata e non si ritenta). Un riassunto non in italiano e' una risposta non valida; una
+ * citazione che non si ritrova nella sua fonte, neppure ignorando la forma degli spazi, e' una
+ * citazione non letterale. In entrambi i casi la richiesta puo' partire una seconda volta.
+ */
+function localCheck(envelope: object, sources: readonly string[] | null): 'invalid' | 'unfaithful' | null {
+    try {
+        const snapshot = resolveDocumentSynthesisProviderEnvelope(envelope);
+        const summary = own(own(snapshot, 'output'), 'summary');
+        if (typeof summary === 'string' && !documentSynthesisSummaryLanguage(summary).acceptable) return 'invalid';
+        const citations = own(snapshot, 'citations');
+        if (!sources || !ArrayIsArray(citations) || citations.length !== sources.length) return null;
+        for (let index = 0; index < sources.length; index += 1) {
+            const quote = own(citations[index], 'quote');
+            if (typeof quote === 'string' && own(citations[index], 'label') === `S${index + 1}` && !locateDocumentSynthesisQuote(quote, sources[index]!)) return 'unfaithful';
+        }
+        return null;
+    } catch { return null; }
+}
+
 /**
  * Resolves one B2ab handoff and invokes its fixed local binding; returns no provider output.
- * Come il Quadro paziente (#891): se l'involucro della risposta non si legge o la risposta e'
- * tagliata dal tetto di token, la stessa richiesta parte una seconda volta, mai di piu'. La
+ * Come il Quadro paziente (#891): se l'involucro della risposta non si legge, la risposta e'
+ * tagliata dal tetto di token, il riassunto non e' in italiano o una citazione non e' letterale,
+ * la stessa richiesta parte una seconda volta, mai di piu'. La
  * validazione delle fonti chiude il lease e non si ritenta. `stillCurrent` (consenso e
  * attualita' letti dal chiamante) e l'annullamento si rileggono prima del secondo tentativo.
  */
@@ -67,6 +98,7 @@ export async function prepareDocumentSynthesisFabricExecution(handoff: unknown, 
     const input = entry.execution.takeProviderInput(); if (!input) { abort(entry); return denied('input_invalid'); }
     const current = typeof stillCurrent === 'function' && !IsProxy(stillCurrent) ? stillCurrent as () => unknown : null;
     const failure: { code: DenialCode } = { code: 'provider_unavailable' };
+    const sources = readDocumentSynthesisPromptSources(input.prompt);
     // L'ammissione accetta solo una ricevuta `local_process`: il luogo e' sempre il modello locale.
     const outcome = await runLocalGenerationAttempts<object, DenialCode>({
         venue: 'local_process',
@@ -78,7 +110,9 @@ export async function prepareDocumentSynthesisFabricExecution(handoff: unknown, 
             if (settled.kind !== 'response') { failure.code = 'provider_unavailable'; return ObjectFreeze({ status: 'provider_failed' as const }); }
             if (truncatedResponse(settled.value)) return ObjectFreeze({ status: 'rejected' as const, reason: 'truncated' as const });
             const parsed = parseDocumentSynthesisProviderEnvelope(responseContent(settled.value));
-            return parsed.status === 'available' ? ObjectFreeze({ status: 'accepted' as const, value: parsed.token }) : ObjectFreeze({ status: 'rejected' as const, reason: 'invalid' as const });
+            if (parsed.status !== 'available') return ObjectFreeze({ status: 'rejected' as const, reason: 'invalid' as const });
+            const rejected = localCheck(parsed.token, sources);
+            return rejected ? ObjectFreeze({ status: 'rejected' as const, reason: rejected }) : ObjectFreeze({ status: 'accepted' as const, value: parsed.token });
         },
         between: async () => {
             if (entry.state !== 'running') return 'canceled';
@@ -88,7 +122,8 @@ export async function prepareDocumentSynthesisFabricExecution(handoff: unknown, 
     });
     if (outcome.status === 'stopped') { abort(entry); return denied(outcome.stop); }
     if (outcome.status === 'provider_failed') { if (failure.code !== 'canceled') abort(entry); return denied(failure.code); }
-    if (outcome.status === 'rejected') { abort(entry); return denied('response_invalid'); }
+    // L'ultimo tentativo decide il codice: citazione non letterale o risposta non valida.
+    if (outcome.status === 'rejected') { abort(entry); return denied(outcome.rejections[outcome.rejections.length - 1] === 'unfaithful' ? 'citation_not_literal' : 'response_invalid'); }
     const validation = entry.execution.validateProviderEnvelope(outcome.value);
     if (validation.status !== 'available') { abort(entry); return denied('validation_denied'); }
     const token = ObjectFreeze(ObjectCreate(null)) as DocumentSynthesisFabricPreparedExecutionToken;

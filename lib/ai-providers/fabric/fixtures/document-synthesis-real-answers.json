@@ -1,0 +1,253 @@
+{
+ "_note": "Risposte reali di qwen3.5:35b-a3b sulla sintesi documenti, misura dell'11/11/2026 su main 529f42ca8 (Persona000001 referto cardiologico, Persona000002 esami ematici). Dati sintetici; codice fiscale finto sostituito con [omesso].",
+ "summaries": [
+  {
+   "run": "P1 giro1",
+   "outcomeOnMain": "operation_unavailable",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01, nato il 26/07/1985, presenta ipertensione arteriosa non a target (PA 152/94 mmHg) e dispnea da sforzo moderato. L'ecocardiogramma evidenzia ipertrofia ventricolare sinistra lieve con disfunzione diastolica di grado I. Si consiglia l'aumento del ramipril a 10 mg/die e l'aggiunta di amlodipina 5 mg/die, con monitoraggio di creatinina e potassio entro due settimane."
+  },
+  {
+   "run": "P2 giro1",
+   "outcomeOnMain": "operation_unavailable",
+   "english": true,
+   "summary": "Patient Persona000002 Sintetica02 (DOB: 26/07/1984) underwent lab tests on 28/10/2026. Results indicate insufficient glycemic control with fasting glucose of 162 mg/dL and HbA1c of 8.1%. Renal function shows reduced eGFR (58 mL/min) and positive microalbuminuria (45 mg/g). Dyslipidemia is present with elevated LDL (138 mg/dL) and triglycerides (190 mg/dL). The laboratory notes confirm insufficient glycemic compensation and positive microalbuminuria."
+  },
+  {
+   "run": "P1 giro2",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01, nato il 26/07/1985, presenta ipertensione arteriosa non a target (PA 152/94 mmHg) e dispnea da sforzo moderato. L'esame obiettivo evidenzia lieve edema perimalleolare. ECG mostra segni di ipertrofia ventricolare sinistra; l'ecocardiogramma rileva FE 55%, ipertrofia concentrica lieve e disfunzione diastolica di grado I. La diagnosi è cardiopatia ipertensiva iniziale. Si consiglia di aumentare il ramipril a 10 mg/die e aggiungere amlodipina 5 mg/die, con controlli di creatinina e potassio entro 2 settimane."
+  },
+  {
+   "run": "P2 giro2",
+   "outcomeOnMain": "proposta",
+   "english": true,
+   "summary": "Patient Persona000002 Sintetica02 (DOB: 26/07/1984) underwent lab tests on 28/10/2026. Results indicate insufficient glycemic control with fasting glucose of 162 mg/dL and HbA1c of 8.1%. Renal function shows reduced eGFR at 58 mL/min/1.73m2 with positive microalbuminuria (45 mg/g). Lipid profile reveals elevated LDL (138 mg/dL) and triglycerides (190 mg/dL). The laboratory notes confirm insufficient glycemic compensation and positive microalbuminuria."
+  },
+  {
+   "run": "P1 giro3",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Referto cardiologico del 02/11/2026 per paziente Persona000001 Sintetica01 (n. 26/07/1985). Motivo: ipertensione in terapia e dispnea da sforzo moderato. Esame obiettivo mostra PA 152/94 mmHg, FC 78 bpm, lieve edema perimalleolare. ECG evidenzia ritmo sinusale con segni di ipertrofia ventricolare sinistra. Ecocardiogramma: FE 55%, ipertrofia concentrica lieve, disfunzione diastolica grado I. Conclusioni: ipertensione non a target e cardiopatia ipertensiva iniziale. Terapia consigliata: aumento ramipril a 10 mg/die e aggiunta amlodipina 5 mg/die."
+  },
+  {
+   "run": "P2 giro3",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Il paziente Persona000002 Sintetica02, nato il 26/07/1984, presenta un quadro clinico di diabete mellito non compensato con HbA1c all'8,1% e glicemia a digiuno elevata a 162 mg/dL. Si rilevano dislipidemia (LDL 138 mg/dL, trigliceridi 190 mg/dL) e segni precoci di danno renale con microalbuminuria (45 mg/g) e riduzione della funzione renale (eGFR 58 mL/min). Il referto evidenzia un compenso glicemico insufficiente e microalbuminuria positiva."
+  },
+  {
+   "run": "P1 giro4",
+   "outcomeOnMain": "operation_unavailable",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01 (nato il 26/07/1985) presenta ipertensione arteriosa non a target (PA 152/94 mmHg) e dispnea da sforzo moderato. L'esame obiettivo evidenzia lieve edema perimalleolare. ECG mostra segni di ipertrofia ventricolare sinistra; l'ecocardiogramma conferma FE 55%, ipertrofia concentrica lieve e disfunzione diastolica grado I. Si raccomanda l'aumento di ramipril a 10 mg/die e l'aggiunta di amlodipina 5 mg/die, con monitoraggio di creatinina e potassio entro 2 settimane."
+  },
+  {
+   "run": "P2 giro4",
+   "outcomeOnMain": "proposta",
+   "english": true,
+   "summary": "Patient Persona000002 Sintetica02 (DOB: 26/07/1984) underwent lab tests on 28/10/2026. Results indicate insufficient glycemic control with fasting glucose at 162 mg/dL and HbA1c at 8.1%. Renal function shows reduced eGFR (58 mL/min/1.73m2) with elevated creatinine. Lipid profile reveals high LDL (138 mg/dL) and triglycerides (190 mg/dL). Microalbuminuria is positive at 45 mg/g. Laboratory notes confirm insufficient glycemic compensation and positive microalbuminuria."
+  },
+  {
+   "run": "P1 giro5",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01 (nato il 26/07/1985) si presenta per ipertensione arteriosa in terapia e dispnea da sforzo moderato. Esame obiettivo: PA 152/94 mmHg, FC 78 bpm, lieve edema perimalleolare. ECG mostra ritmo sinusale con segni di ipertrofia ventricolare sinistra. Ecocardiogramma: FE 55%, ipertrofia concentrica lieve, disfunzione diastolica di grado I. Diagnosi: ipertensione arteriosa non a target e cardiopatia ipertensiva iniziale. Terapia consigliata: aumento ramipril a 10 mg/die e aggiunta amlodipina 5 mg/die."
+  },
+  {
+   "run": "P2 giro5",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Referto di laboratorio del 28/10/2026 per la paziente Persona000002 Sintetica02 (nata il 26/07/1984). Glicemia a digiuno elevata a 162 mg/dL e HbA1c al 8,1%, indicanti un compenso glicemico insufficiente. Si rilevano dislipidemia con LDL a 138 mg/dL e trigliceridi a 190 mg/dL. La funzionalità renale mostra una creatinina di 1,1 mg/dL con eGFR ridotto a 58 mL/min/1,73m2 e microalbuminuria positiva (45 mg/g), suggerendo danno renale precoce."
+  },
+  {
+   "run": "P1 giro6",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Referto di visita cardiologica del 02/11/2026 per Paziente Persona000001 Sintetica01 (nato il 26/07/1985). Motivo: ipertensione arteriosa in terapia e dispnea da sforzo moderato. Esame obiettivo mostra PA 152/94 mmHg, FC 78 bpm e lieve edema perimalleolare. ECG evidenzia ritmo sinusale con segni di ipertrofia ventricolare sinistra. Ecocardiogramma: FE 55%, ipertrofia concentrica lieve, disfunzione diastolica di grado I. Conclusioni: ipertensione arteriosa non a target e cardiopatia ipertensiva iniziale. Terapia consigliata: aumentare ramipril a 10 mg/die e aggiungere amlodipina 5 mg/die."
+  },
+  {
+   "run": "P2 giro6",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000002 Sintetica02 (nata il 26/07/1984) con referto del 28/10/2026 che evidenzia un controllo glicemico insufficiente. I valori mostrano glicemia a digiuno elevata (162 mg/dL) e HbA1c al 8,1%, indicativi di diabete non controllato. Sono presenti dislipidemia (LDL 138 mg/dL, trigliceridi 190 mg/dL), riduzione della funzione renale (eGFR 58 mL/min/1.73m2) e microalbuminuria positiva (45 mg/g)."
+  },
+  {
+   "run": "P1 giro7",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01, nato il 26/07/1985, presenta ipertensione arteriosa non a target (PA 152/94 mmHg) e dispnea da sforzo moderato. L'esame obiettivo evidenzia lieve edema perimalleolare; l'ECG mostra segni di ipertrofia ventricolare sinistra. L'ecocardiogramma conferma FE 55%, ipertrofia concentrica lieve e disfunzione diastolica di grado I, indicando una cardiopatia ipertensiva iniziale. Si raccomanda l'aumento di ramipril a 10 mg/die e l'aggiunta di amlodipina 5 mg/die, con monitoraggio di creatinina e potassio entro 2 settimane."
+  },
+  {
+   "run": "P2 giro7",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Referto di laboratorio del 28/10/2026 per la paziente Persona000002 Sintetica02 (nata il 26/07/1984). Glicemia a digiuno elevata a 162 mg/dL e HbA1c al 8,1%, indicanti un compenso glicemico insufficiente. Si rilevano dislipidemia con LDL a 138 mg/dL e trigliceridi a 190 mg/dL. La funzionalità renale mostra una riduzione dell'eGFR a 58 mL/min/1,73m2 con creatinina a 1,1 mg/dL. È presente microalbuminuria positiva (45 mg/g)."
+  },
+  {
+   "run": "P1 giro8",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01, nato il 26/07/1985, presenta ipertensione arteriosa non a target (PA 152/94 mmHg) e dispnea da sforzo moderato. L'esame mostra segni di ipertrofia ventricolare sinistra ed ecocardiogramma con FE 55%, ipertrofia concentrica lieve e disfunzione diastolica di grado I. La terapia viene modificata aumentando il ramipril a 10 mg/die e aggiungendo amlodipina 5 mg/die. Sono previsti controlli di creatinina e potassio entro 2 settimane."
+  },
+  {
+   "run": "P2 giro8",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Il paziente Persona000002 Sintetica02 (nato il 26/07/1984) presenta un quadro di dismetabolismo glicolipidico e alterazione della funzione renale. La glicemia a digiuno è elevata (162 mg/dL) e l'HbA1c è del 8,1%, indicando un controllo glicemico insufficiente. Si rilevano ipertrigliceridemia (190 mg/dL) e colesterolo LDL elevato (138 mg/dL). La creatinina è di 1,1 mg/dL con un eGFR ridotto a 58 mL/min/1,73m2. È presente microalbuminuria significativa (45 mg/g). Il laboratorio segnala compenso glicemico insufficiente e microalbuminuria positiva."
+  },
+  {
+   "run": "P1 giro9",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01 (nato il 26/07/1985) presenta ipertensione arteriosa non a target con PA 152/94 mmHg e dispnea da sforzo moderato. L'esame obiettivo evidenzia lieve edema perimalleolare. ECG mostra segni di ipertrofia ventricolare sinistra. Ecocardiogramma rileva FE 55%, ipertrofia concentrica lieve e disfunzione diastolica di grado I. Si conclude con cardiopatia ipertensiva iniziale. La terapia prevede l'aumento di ramipril a 10 mg/die e l'aggiunta di amlodipina 5 mg/die, con monitoraggio di creatinina e potassio entro 2 settimane."
+  },
+  {
+   "run": "P2 giro9",
+   "outcomeOnMain": "proposta",
+   "english": true,
+   "summary": "Patient Persona000002 Sintetica02 (DOB: 26/07/1984) underwent lab tests on 28/10/2026. Results indicate insufficient glycemic control with fasting glucose of 162 mg/dL and HbA1c of 8.1%. Renal function shows reduced eGFR (58 mL/min/1.73m2) and positive microalbuminuria (45 mg/g). Dyslipidemia is present with elevated LDL (138 mg/dL) and triglycerides (190 mg/dL). The laboratory notes confirm insufficient glycemic compensation and positive microalbuminuria."
+  },
+  {
+   "run": "P1 giro10",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01, nato il 26/07/1985, presenta ipertensione arteriosa non a target (PA 152/94 mmHg) e dispnea da sforzo moderato. L'esame obiettivo evidenzia lieve edema perimalleolare. ECG mostra segni di ipertrofia ventricolare sinistra; l'ecocardiogramma rileva FE 55%, ipertrofia concentrica lieve e disfunzione diastolica di grado I. Conclusione: cardiopatia ipertensiva iniziale. Si consiglia aumento ramipril a 10 mg/die e aggiunta amlodipina 5 mg/die, con controllo creatinina/potassio entro 2 settimane."
+  },
+  {
+   "run": "P2 giro10",
+   "outcomeOnMain": "proposta",
+   "english": true,
+   "summary": "Patient Persona000002 Sintetica02 (DOB: 26/07/1984) presented with insufficient glycemic control. Fasting glucose is 162 mg/dL and HbA1c is 8.1%, exceeding the desirable threshold of <7%. Renal function shows eGFR of 58 mL/min/1.73m2 with positive microalbuminuria (45 mg/g). Lipid profile reveals elevated LDL (138 mg/dL) and triglycerides (190 mg/dL). Laboratory notes indicate insufficient glycemic compensation and positive microalbuminuria."
+  },
+  {
+   "run": "P1 giro11",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01, nato il 26/07/1985, presenta ipertensione arteriosa non a target (PA 152/94 mmHg) e dispnea da sforzo moderato. L'ECG mostra segni di ipertrofia ventricolare sinistra e l'ecocardiogramma rivela FE 55%, ipertrofia concentrica lieve e disfunzione diastolica grado I, indicando una cardiopatia ipertensiva iniziale. Si consiglia di aumentare il ramipril a 10 mg/die e aggiungere amlodipina 5 mg/die, con monitoraggio di creatinina e potassio entro 2 settimane."
+  },
+  {
+   "run": "P2 giro11",
+   "outcomeOnMain": "proposta",
+   "english": true,
+   "summary": "Patient Persona000002 Sintetica02 (DOB: 26/07/1984) underwent lab tests on 28/10/2026. Results indicate insufficient glycemic control with fasting glucose of 162 mg/dL and HbA1c at 8.1%. Renal function shows reduced eGFR (58 mL/min/1.73m2) alongside elevated LDL cholesterol (138 mg/dL), high triglycerides (190 mg/dL), and positive microalbuminuria (45 mg/g). The laboratory notes confirm insufficient glycemic compensation and positive microalbuminuria."
+  },
+  {
+   "run": "P1 giro12",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01, nato il 26/07/1985, presenta ipertensione arteriosa non a target (PA 152/94 mmHg) e dispnea da sforzo moderato. L'esame obiettivo rivela lieve edema perimalleolare. ECG mostra segni di ipertrofia ventricolare sinistra; l'ecocardiogramma conferma FE 55%, ipertrofia concentrica lieve e disfunzione diastolica grado I. Si consiglia l'aumento di ramipril a 10 mg/die e l'aggiunta di amlodipina 5 mg/die, con monitoraggio di creatinina e potassio entro 2 settimane."
+  },
+  {
+   "run": "P2 giro12",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Referto di laboratorio del 28/10/2026 per la paziente Persona000002 Sintetica02 (nata il 26/07/1984). Glicemia a digiuno elevata a 162 mg/dL e HbA1c al 8,1%, indicanti un compenso glicemico insufficiente. Si rilevano alterazioni lipidiche con LDL a 138 mg/dL e trigliceridi a 190 mg/dL. La funzionalità renale mostra una riduzione (eGFR 58 mL/min) con microalbuminuria positiva (45 mg/g)."
+  },
+  {
+   "run": "P1 giro13",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01, nato il 26/07/1985, visita cardiologica del 02/11/2026 per ipertensione arteriosa in terapia e dispnea da sforzo. PA 152/94 mmHg, ECG con segni di ipertrofia ventricolare sinistra, ecocardiogramma mostra FE 55% e disfunzione diastolica grado I. Diagnosi: ipertensione non a target e cardiopatia ipertensiva iniziale. Piano terapeutico: aumentare ramipril a 10 mg/die e aggiungere amlodipina 5 mg/die. Controlli creatinina/potassio in 2 settimane, controllo cardiologico tra 6 mesi."
+  },
+  {
+   "run": "P2 giro13",
+   "outcomeOnMain": "operation_unavailable",
+   "english": false,
+   "summary": "Referto di laboratorio del 28/10/2026 per paziente Persona000002 Sintetica02 (n. 26/07/1984). Glicemia a digiuno elevata a 162 mg/dL e HbA1c al 8,1%, indicante compenso glicemico insufficiente. Creatinina 1,1 mg/dL con eGFR ridotto a 58 mL/min/1,73m2. Colesterolo LDL 138 mg/dL e trigliceridi 190 mg/dL. Microalbuminuria positiva a 45 mg/g creatinina."
+  },
+  {
+   "run": "P1 giro14",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Referto di visita cardiologica del 02/11/2026 per paziente Persona000001 Sintetica01. Motivo: ipertensione arteriosa in terapia e dispnea da sforzo moderato. Esame obiettivo mostra PA 152/94 mmHg, FC 78 bpm, lieve edema perimalleolare. ECG evidenzia ritmo sinusale con segni di ipertrofia ventricolare sinistra. Ecocardiogramma: FE 55%, ipertrofia concentrica lieve, disfunzione diastolica grado I. Conclusioni: ipertensione non a target e cardiopatia ipertensiva iniziale. Terapia consigliata: aumentare ramipril a 10 mg/die e aggiungere amlodipina 5 mg/die."
+  },
+  {
+   "run": "P2 giro14",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Il referto del 28/10/2026 per la paziente Persona000002 Sintetica02 evidenzia un compenso glicemico insufficiente con glicemia a digiuno di 162 mg/dL e HbA1c all'8,1%. Si rilevano alterazioni metaboliche (colesterolo LDL 138 mg/dL, trigliceridi 190 mg/dL) e un danno renale precoce con microalbuminuria positiva (45 mg/g). La funzionalità renale è ridotta (eGFR 58 mL/min/1,73m2)."
+  },
+  {
+   "run": "P1 giro15",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Referto di visita cardiologica del 02/11/2026 per Paziente Persona000001 Sintetica01. Motivo: ipertensione arteriosa in terapia e dispnea da sforzo moderato. Esame obiettivo rileva PA 152/94 mmHg, FC 78 bpm, lieve edema perimalleolare. ECG mostra ritmo sinusale con segni di ipertrofia ventricolare sinistra. Ecocardiogramma: FE 55%, ipertrofia concentrica lieve, disfunzione diastolica grado I. Conclusioni: ipertensione arteriosa non a target e cardiopatia ipertensiva iniziale. Terapia consigliata: aumentare ramipril a 10 mg/die e aggiungere amlodipina 5 mg/die. Controlli richiesti: creatinina e potassio entro 2 settimane."
+  },
+  {
+   "run": "P2 giro15",
+   "outcomeOnMain": "operation_unavailable",
+   "english": true,
+   "summary": "The patient (born 26/07/1984) underwent laboratory tests on 28/10/2026. Results indicate insufficient glycemic control with fasting glucose of 162 mg/dL and HbA1c at 8.1%. Renal function shows reduced eGFR (58 mL/min/1.73m2) with positive microalbuminuria (45 mg/g). Lipid profile reveals elevated LDL (138 mg/dL) and triglycerides (190 mg/dL). Laboratory notes confirm insufficient glycemic compensation and positive microalbuminuria."
+  },
+  {
+   "run": "P1 giro16",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01 (n. 26/07/1985) in visita cardiologica il 02/11/2026 per ipertensione arteriosa non a target e dispnea da sforzo. Esame obiettivo: PA 152/94 mmHg, FC 78 bpm, lieve edema perimalleolare. ECG mostra segni di ipertrofia ventricolare sinistra; ecocardiogramma evidenzia FE 55%, ipertrofia concentrica lieve e disfunzione diastolica grado I. Conclusioni: cardiopatia ipertensiva iniziale. Si consiglia aumento ramipril a 10 mg/die e aggiunta amlodipina 5 mg/die, con controllo creatinina/potassio entro 2 settimane."
+  },
+  {
+   "run": "P2 giro16",
+   "outcomeOnMain": "operation_unavailable",
+   "english": false,
+   "summary": "Referto di laboratorio del paziente Persona000002 Sintetica02 (nato il 26/07/1984), prelievo effettuato il 28/10/2026. I risultati mostrano glicemia a digiuno elevata (162 mg/dL) e HbA1c al 8,1%, indicando un compenso glicemico insufficiente. Sono presenti ipertrigliceridemia (190 mg/dL), colesterolo LDL elevato (138 mg/dL) e ridotta funzionalità renale con eGFR a 58 mL/min/1,73m2. Si rileva microalbuminuria positiva (45 mg/g)."
+  },
+  {
+   "run": "P1 giro17",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01 (nato 26/07/1985) in visita cardiologica il 02/11/2026 per ipertensione arteriosa non a target e dispnea da sforzo. PA 152/94 mmHg, ECG con ipertrofia ventricolare sinistra ed ecocardiogramma che mostra FE 55% e disfunzione diastolica grado I. Si raccomanda l'aumento di ramipril a 10 mg/die e l'aggiunta di amlodipina 5 mg/die, con monitoraggio di creatinina e potassio entro 2 settimane."
+  },
+  {
+   "run": "P2 giro17",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Il referto di laboratorio del paziente Persona000002 Sintetica02, datato 28/10/2026, evidenzia un quadro clinico preoccupante caratterizzato da diabete non compensato (HbA1c 8,1%, glicemia a digiuno 162 mg/dL) e dislipidemia (LDL 138 mg/dL, trigliceridi 190 mg/dL). Si rileva una compromissione della funzione renale con eGFR di 58 mL/min/1,73m2 e presenza di microalbuminuria (45 mg/g), indicativa di danno renale precoce. Il laboratorio segnala un compenso glicemico insufficiente."
+  },
+  {
+   "run": "P1 giro18",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01, nato il 26/07/1985, presenta ipertensione arteriosa non a target (PA 152/94 mmHg) e dispnea da sforzo moderato. L'ECG mostra segni di ipertrofia ventricolare sinistra e l'ecocardiogramma evidenzia FE 55%, ipertrofia concentrica lieve e disfunzione diastolica grado I. La terapia attuale richiede modifiche: aumento ramipril a 10 mg/die e aggiunta amlodipina 5 mg/die. Sono previsti controlli creatinina/potassio entro 2 settimane e visita cardiologica tra 6 mesi."
+  },
+  {
+   "run": "P2 giro18",
+   "outcomeOnMain": "proposta",
+   "english": true,
+   "summary": "Patient Persona000002 Sintetica02 (DOB: 26/07/1984) presents with insufficient glycemic compensation and positive microalbuminuria based on lab results from 28/10/2026. Key findings include elevated fasting glucose at 162 mg/dL, HbA1c of 8.1%, reduced eGFR (58 mL/min), hyperlipidemia with LDL 138 mg/dL and triglycerides 190 mg/dL, and microalbuminuria at 45 mg/g creatinine."
+  },
+  {
+   "run": "P1 giro19",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Paziente Persona000001 Sintetica01, nato il 26/07/1985, presenta ipertensione arteriosa non a target (PA 152/94 mmHg) e dispnea da sforzo moderato. L'esame obiettivo mostra lieve edema perimalleolare; ECG evidenzia segni di ipertrofia ventricolare sinistra. L'ecocardiogramma rileva FE 55%, ipertrofia concentrica lieve e disfunzione diastolica di grado I, confermando una cardiopatia ipertensiva iniziale. Si consiglia l'aumento del ramipril a 10 mg/die e l'aggiunta di amlodipina 5 mg/die."
+  },
+  {
+   "run": "P2 giro19",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Il paziente Persona000002 Sintetica02, nato il 26/07/1984, presenta dati di laboratorio del 28/10/2026 che indicano un controllo glicemico insufficiente. La glicemia a digiuno è elevata (162 mg/dL) e l'emoglobina glicata HbA1c è al 8,1%, superando il valore desiderabile del 7%. Si rilevano anche dislipidemia con LDL a 138 mg/dL e trigliceridi a 190 mg/dL. La funzionalità renale mostra una riduzione dell'eGFR (58 mL/min/1,73m2) associata a microalbuminuria positiva (45 mg/g)."
+  },
+  {
+   "run": "P1 giro20",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Referto di visita cardiologica del 02/11/2026 per Paziente Persona000001 Sintetica01 (nato il 26/07/1985). Motivo: ipertensione arteriosa in terapia e dispnea da sforzo moderato. Esame obiettivo: PA 152/94 mmHg, FC 78 bpm ritmica, lieve edema perimalleolare. ECG mostra ritmo sinusale con segni di ipertrofia ventricolare sinistra. Ecocardiogramma: FE 55%, ipertrofia concentrica lieve, disfunzione diastolica di grado I. Conclusioni: ipertensione arteriosa non a target e cardiopatia ipertensiva iniziale. Terapia consigliata: aumentare ramipril a 10 mg/die e aggiungere amlodipina 5 mg/die."
+  },
+  {
+   "run": "P2 giro20",
+   "outcomeOnMain": "proposta",
+   "english": false,
+   "summary": "Referto di laboratorio del 28/10/2026 per la paziente Persona000002 Sintetica02 (nata il 26/07/1984). La glicemia a digiuno è elevata a 162 mg/dL e l'emoglobina glicata HbA1c è al 8,1%, indicando un compenso glicemico insufficiente. Si rilevano ipertrigliceridemia (190 mg/dL) e colesterolo LDL elevato (138 mg/dL). La funzionalità renale mostra una riduzione dell'eGFR a 58 mL/min/1,73m2 con microalbuminuria positiva (45 mg/g), suggerendo danno renale precoce."
+  }
+ ],
+ "citations": {
+  "referto": "## Referto di visita cardiologica (documento sintetico)\n\nPaziente: Persona000001 Sintetica01, data di nascita 26/07/1985, CF [omesso] Data visita: 02/11/2026. Ambulatorio di cardiologia (struttura inventata). Motivo: ipertensione arteriosa in terapia, dispnea da sforzo moderato. Esame obiettivo: PA 152/94 mmHg, FC 78 bpm ritmica, lieve edema perimalleolare. ECG: ritmo sinusale, segni di ipertrofia ventricolare sinistra. Ecocardiogramma: FE 55%, ipertrofia concentrica lieve, disfunzione diastolica di grado I. Conclusioni: ipertensione arteriosa non a target; cardiopatia ipertensiva iniziale. Terapia consigliata: aumentare ramipril a 10 mg/die; aggiungere amlodipina 5 mg/die. Controlli: creatinina e potassio entro 2 settimane; controllo cardiologico tra 6 mesi. Firma: medico cardiologo (nome inventato). Documento esclusivamente sintetico.",
+  "esami": "## Referto esami di laboratorio (documento sintetico)\n\nPaziente: Persona000002 Sintetica02, data di nascita 26/07/1984, CF [omesso] Data prelievo: 28/10/2026. Laboratorio analisi (struttura inventata). Glicemia a digiuno: 162 mg/dL (70-99) Emoglobina glicata HbA1c: 8,1% (65 mmol/mol) (valore desiderabile < 7%) Creatinina: 1,1 mg/dL; eGFR (CKD-EPI): 58 mL/min/1,73m2 Colesterolo LDL: 138 mg/dL; Trigliceridi: 190 mg/dL Microalbuminuria: 45 mg/g creatinina (v.n. < 30) Note del laboratorio: compenso glicemico insufficiente; microalbuminuria positiva. Documento esclusivamente sintetico, nessun dato reale.",
+  "fusedNewlines": "## Referto di visita cardiologica (documento sintetico) Paziente: Persona000001 Sintetica01, data di nascita 26/07/1985, CF [omesso] Data visita: 02/11/2026. Ambulatorio di cardiologia (struttura inventata). Motivo: ipertensione arteriosa in terapia, dispnea da sforzo moderato. Esame obiettivo: PA 152/94 mmHg, FC 78 bpm ritmica, lieve edema perimalleolare. ECG: ritmo sinusale, segni di ipertrofia ventricolare sinistra. Ecocardiogramma: FE 55%, ipertrofia concentrica lieve, disfunzione diastolica di grado I. Conclusioni: ipertensione arteriosa non a target; cardiopatia ipertensiva iniziale. Terapia consigliata: aumentare ramipril a 10 mg/die; aggiungere amlodipina 5 mg/die. Controlli: creatinina e potassio entro 2 settimane; controllo cardiologico tra 6 mesi. Firma: medico cardiologo (nome inventato). Documento esclusivamente sintetico.",
+  "fusedNewlinesLab": "## Referto esami di laboratorio (documento sintetico) Paziente: Persona000002 Sintetica02, data di nascita 26/07/1984, CF [omesso] Data prelievo: 28/10/2026. Laboratorio analisi (struttura inventata). Glicemia a digiuno: 162 mg/dL (70-99) Emoglobina glicata HbA1c: 8,1% (65 mmol/mol) (valore desiderabile < 7%) Creatinina: 1,1 mg/dL; eGFR (CKD-EPI): 58 mL/min/1,73m2 Colesterolo LDL: 138 mg/dL; Trigliceridi: 190 mg/dL Microalbuminuria: 45 mg/g creatinina (v.n. < 30) Note del laboratorio: compenso glicemico insufficiente; microalbuminuria positiva.",
+  "omittedMmolMol": "Glicemia a digiuno: 162 mg/dL (70-99) Emoglobina glicata HbA1c: 8,1% (valore desiderabile < 7%) Creatinina: 1,1 mg/dL; eGFR (CKD-EPI): 58 mL/min/1,73m2 Colesterolo LDL: 138 mg/dL; Trigliceridi: 190 mg/dL Microalbuminuria: 45 mg/g creatinina (v.n. < 30) Note del laboratorio: compenso glicemico insufficiente; microalbuminuria positiva.",
+  "omittedRows": "Glicemia a digiuno: 162 mg/dL (70-99) Emoglobina glicata HbA1c: 8,1% (valore desiderabile < 7%) Microalbuminuria: 45 mg/g creatinina (v.n. < 30) Note del laboratorio: compenso glicemico insufficiente; microalbuminuria positiva."
+ }
+}
