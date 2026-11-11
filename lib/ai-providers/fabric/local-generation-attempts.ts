@@ -19,7 +19,7 @@ import type { FabricVenue } from './contract';
 
 export const LOCAL_GENERATION_MAX_ATTEMPTS = 2;
 
-export type LocalGenerationRejection = 'truncated' | 'invalid';
+export type LocalGenerationRejection = 'truncated' | 'invalid' | 'unfaithful';
 
 export type LocalGenerationAttempt<Value> =
     | Readonly<{ status: 'accepted'; value: Value }>

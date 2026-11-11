@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 
-import { buildPatientInsightPreviewRequest, parsePatientInsightPreviewRequest, parsePatientInsightPreviewWireRoot } from './ai-providers/fabric/patient-insight-preview-contract.ts';
+import { buildPatientInsightPreviewRequest, parsePatientInsightPreviewRequest, parsePatientInsightPreviewWireRoot, patientInsightFailureMessage } from './ai-providers/fabric/patient-insight-preview-contract.ts';
 import { createAuthenticatedPatientInsightPreviewService, createPatientInsightPreviewHttpHandler } from './ai-providers/fabric/patient-insight-authenticated-preview.ts';
 import { createPatientInsightHostCapability } from './ai-providers/fabric/patient-insight-host-capability.ts';
 import { routeHostResolvedCandidateCapability } from './ai-providers/fabric/candidate-router.ts';
@@ -37,7 +37,10 @@ const MODEL_REPLY = JSON.stringify({
     },
 });
 
-type Mode = 'valid' | 'malformed' | 'provider_failed' | 'kill_switch' | 'stale' | 'function_disabled';
+/* ADR 0189: stessa forma valida, ma una frase aggiunge un'urgenza che la fonte S9 non contiene. */
+const UNFAITHFUL_REPLY = MODEL_REPLY.replace('Ricontrollare gli esami ematici al prossimo accesso. [S9]', 'Ricontrollare con urgenza gli esami ematici. [S9]');
+
+type Mode = 'valid' | 'malformed' | 'unfaithful' | 'provider_failed' | 'kill_switch' | 'stale' | 'function_disabled';
 const lifecycle: Extract<ProviderLifecycleRead, { status: 'available' }> = { status: 'available', record: {
     schemaVersion: 'mediflow.ai.provider-lifecycle-record.v1', lifecycle: { schemaVersion: 'mediflow.ai.provider-lifecycle.v1', provider: 'ollama', credentialClass: 'local_model', status: 'available_unqualified' },
     actorClass: 'host_service', actorRef: `actor_${'a'.repeat(32)}`, version: 1, hostTimestamp: VERIFIED_AT, receiptRef: `receipt_${'b'.repeat(32)}` } };
@@ -55,7 +58,7 @@ function route(t: TestContext, mode: Mode, revision = 3) {
         assert.equal(url.pathname, '/api/chat');
         const payload = JSON.parse(String(init?.body)); prompts.push(String(payload.messages?.[0]?.content ?? ''));
         if (mode === 'provider_failed') throw new Error('Synthetic provider failure');
-        return Response.json({ model: MODEL, message: { content: mode === 'malformed' ? '{"schemaVersion":"mediflow.ai.extract.v1"' : MODEL_REPLY }, prompt_eval_count: 3, eval_count: 4 });
+        return Response.json({ model: MODEL, message: { content: mode === 'malformed' ? '{"schemaVersion":"mediflow.ai.extract.v1"' : mode === 'unfaithful' ? UNFAITHFUL_REPLY : MODEL_REPLY }, prompt_eval_count: 3, eval_count: 4 });
     };
     t.after(() => { globalThis.fetch = previousFetch; });
 
@@ -142,6 +145,7 @@ test('il corpo di GPUI passa per handler, servizio e capacità reali e torna una
 test('dinieghi e fallimenti reali arrivano a GPUI come codici senza proposta', async (t) => {
     for (const [mode, name, status] of [
         ['malformed', 'response-proposal-invalid', 200],
+        ['unfaithful', 'response-proposal-unfaithful', 200],
         ['provider_failed', 'response-provider-failed', 200],
         ['kill_switch', 'response-kill-switch', 200],
         ['stale', 'response-stale', 200],
@@ -171,4 +175,25 @@ test('controprova: un corpo alterato è rifiutato dalla route', async (t) => {
     // Revisione diversa da quella dell'archivio: nessuna generazione.
     const stale = await route(t, 'valid', 4).send(request);
     assert.equal((await stale.json()).preview.code, 'source_stale');
+});
+
+test('una proposta infedele alle fonti arriva al Web e a GPUI con la sua causa, dopo due tentativi', async (t) => {
+    assert.notEqual(UNFAITHFUL_REPLY, MODEL_REPLY);
+    const fixture = route(t, 'unfaithful');
+    const value = await record('response-proposal-unfaithful', await fixture.send(read('request')));
+    assert.equal(fixture.prompts.length, 2, 'secondo tentativo locale, poi scarto');
+    const root = parsePatientInsightPreviewWireRoot(value.body);
+    assert.ok(root, 'il Web legge la risposta');
+    assert.equal(root.preview.status, 'failed');
+    if (root.preview.status !== 'failed') return;
+    assert.equal(root.preview.code, 'proposal_unfaithful');
+    assert.equal(root.preview.proposal, null);
+    const message = patientInsightFailureMessage(root.preview);
+    assert.match(message, /decisione ancora aperta/u);
+    assert.match(message, /urgente/u);
+    assert.doesNotMatch(message, /\u2014/u);
+    // Lo scarto per citazioni resta distinto.
+    const invalid = parsePatientInsightPreviewWireRoot(read('response-proposal-invalid').body);
+    assert.ok(invalid && invalid.preview.status === 'failed');
+    if (invalid?.preview.status === 'failed') assert.doesNotMatch(patientInsightFailureMessage(invalid.preview), /decisione ancora aperta/u);
 });

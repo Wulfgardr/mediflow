@@ -314,6 +314,11 @@ fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppCon
             "non ha superato i controlli dell'host",
         ),
         (
+            "response-proposal-unfaithful",
+            false,
+            "decisione ancora aperta nella scheda",
+        ),
+        (
             "response-provider-failed",
             false,
             "non ha completato la risposta",

@@ -57,13 +57,35 @@ export type PatientInsightDenialCode =
     | 'input_invalid' | 'kill_switch_disabled' | 'kill_switch_unavailable' | 'projection_unavailable'
     | 'source_stale' | 'lifecycle_missing' | 'lifecycle_corrupt' | 'lifecycle_unavailable'
     | 'provider_binding_denied' | 'provider_unready' | 'model_unavailable' | 'fabric_denied' | 'source_invalid';
-export type PatientInsightFailureCode = 'provider_failed' | 'proposal_invalid' | 'source_stale';
+export type PatientInsightFailureCode = 'provider_failed' | 'proposal_invalid' | 'proposal_unfaithful' | 'source_stale';
 type Common = Readonly<{ writesPerformed: 0; apply: 'denied' }>;
 export type PatientInsightPreviewWire =
     | (Common & Readonly<{ status: 'available'; code: null; proposal: PatientInsightReviewProposal; receipt: PatientInsightReceiptWire; provenance: PatientInsightProvenanceWire; reviewRef: string }>)
     | (Common & Readonly<{ status: 'denied'; code: PatientInsightDenialCode; proposal: null; receipt: null; provenance: null; reviewRef: null }>)
     | (Common & Readonly<{ status: 'failed'; code: PatientInsightFailureCode; proposal: null; receipt: PatientInsightReceiptWire; provenance: PatientInsightProvenanceWire; reviewRef: null }>);
 export type PatientInsightPreviewWireRoot = Readonly<{ preview: PatientInsightPreviewWire }>;
+
+/** Testo a schermo di un esito senza proposta; GPUI usa le stesse frasi (`patient_insight_message`). */
+export const PATIENT_INSIGHT_UNFAITHFUL_MESSAGE = 'Il modello ha dato per presa una decisione ancora aperta nella scheda, '
+    + 'o per urgente qualcosa che la scheda non segnala come urgente. Nessuna proposta creata.';
+export function patientInsightFailureMessage(preview: Exclude<PatientInsightPreviewWire, { status: 'available' }>): string {
+    if (preview.code === 'kill_switch_disabled') {
+        return 'Patient Insight è disabilitata. Si riattiva in Impostazioni AI.';
+    }
+    if (preview.code === 'source_stale') {
+        return 'I dati clinici sono cambiati durante la generazione. Riprova.';
+    }
+    if (preview.code === 'model_unavailable' || preview.code === 'provider_unready' || preview.code === 'provider_binding_denied') {
+        return 'Il modello clinico locale non è disponibile. Verifica le Impostazioni AI.';
+    }
+    if (preview.status === 'failed' && preview.code === 'provider_failed') {
+        return 'Il modello non ha completato la risposta. Riprova più tardi o verifica le Impostazioni AI.';
+    }
+    if (preview.status === 'failed' && preview.code === 'proposal_unfaithful') return PATIENT_INSIGHT_UNFAITHFUL_MESSAGE;
+    return preview.status === 'failed'
+        ? 'La risposta del modello locale non ha superato i controlli clinici.'
+        : 'Patient Insight non è disponibile in questo momento.';
+}
 
 type CaptureInput = Readonly<{
     patient: Readonly<{ id?: string; ambulatoryId?: string; version?: number; diagnoses?: readonly Readonly<{ code?: string; description?: string }>[] }>;
@@ -79,7 +101,7 @@ const DIGEST = /^sha256_[0-9a-f]{64}$/u;
 const REVIEW_REF = /^review_[0-9a-f]{32}$/u;
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,127}$/u;
 const DENIAL_CODES: readonly PatientInsightDenialCode[] = ['input_invalid', 'kill_switch_disabled', 'kill_switch_unavailable', 'projection_unavailable', 'source_stale', 'lifecycle_missing', 'lifecycle_corrupt', 'lifecycle_unavailable', 'provider_binding_denied', 'provider_unready', 'model_unavailable', 'fabric_denied', 'source_invalid'];
-const FAILURE_CODES: readonly PatientInsightFailureCode[] = ['provider_failed', 'proposal_invalid', 'source_stale'];
+const FAILURE_CODES: readonly PatientInsightFailureCode[] = ['provider_failed', 'proposal_invalid', 'proposal_unfaithful', 'source_stale'];
 
 function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
