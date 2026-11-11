@@ -1,0 +1,276 @@
+{
+  "schema": "wul832.measurement.v2",
+  "decision": "passes_precommitted_aggregate_rule",
+  "protocolCommit": "d3b285e20",
+  "corpusSha256": "469f876ca016c377b4ca89cf0cc0a543b405a0c7a845a6286f18eef03b985ca9",
+  "baseMain": "11cb03ea55fa2ae4dadaae0be517615dec74f0b2",
+  "arms": {
+    "main": {
+      "metadata": {
+        "arm": "main-v2",
+        "head": "4145a471b0985402f3d01ad81636d917230a3947",
+        "startedAt": "2026-11-11T23:07:23.696Z",
+        "node": "v24.18.0",
+        "version": {
+          "version": "0.40.6"
+        },
+        "model": {
+          "name": "qwen3.5:35b-a3b",
+          "model": "qwen3.5:35b-a3b",
+          "modified_at": "2026-11-07T23:19:01.34+01:00",
+          "size": 21909194238,
+          "digest": "26025611beeb3fe9e4850b1fdae686bebba7cdfa7f13ddb04955f19872ee022a",
+          "details": {
+            "parent_model": "",
+            "format": "safetensors",
+            "family": "",
+            "families": null,
+            "parameter_size": "",
+            "quantization_level": "nvfp4",
+            "runner": "mlx"
+          },
+          "capabilities": [
+            "completion",
+            "vision",
+            "thinking",
+            "tools"
+          ]
+        },
+        "corpusSha256": "469f876ca016c377b4ca89cf0cc0a543b405a0c7a845a6286f18eef03b985ca9",
+        "rounds": 20,
+        "endpoint": "http://127.0.0.1:64812",
+        "sourceRuntime": "host capability + real Ollama adapter; synthetic dependency fixtures"
+      },
+      "total": {
+        "requests": 100,
+        "opportunities": 100,
+        "attempts": 108,
+        "successful": 96,
+        "provider_failed": 0,
+        "new": 84,
+        "other_diagnoses_outside_reference": 6,
+        "visible_sbagliata": 26,
+        "visible_letterale": 481,
+        "visible_non_risolta": 16,
+        "raw_new": 95,
+        "raw_sbagliata": 50,
+        "raw_letterale": 541,
+        "raw_non_risolta": 20,
+        "failure_proposal_invalid": 4
+      },
+      "patients": {
+        "P1": {
+          "requests": 20,
+          "opportunities": 20,
+          "attempts": 20,
+          "successful": 20,
+          "provider_failed": 0,
+          "new": 13,
+          "other_diagnoses_outside_reference": 1,
+          "visible_sbagliata": 19,
+          "visible_letterale": 103,
+          "visible_non_risolta": 3,
+          "raw_new": 13,
+          "raw_sbagliata": 19,
+          "raw_letterale": 103,
+          "raw_non_risolta": 3
+        },
+        "P2": {
+          "requests": 20,
+          "opportunities": 20,
+          "attempts": 24,
+          "successful": 17,
+          "provider_failed": 0,
+          "new": 12,
+          "other_diagnoses_outside_reference": 5,
+          "visible_sbagliata": 6,
+          "visible_letterale": 99,
+          "failure_proposal_invalid": 3,
+          "raw_new": 18,
+          "raw_sbagliata": 25,
+          "raw_letterale": 138,
+          "raw_non_risolta": 2
+        },
+        "P3": {
+          "requests": 20,
+          "opportunities": 20,
+          "attempts": 21,
+          "successful": 20,
+          "provider_failed": 0,
+          "new": 20,
+          "other_diagnoses_outside_reference": 0,
+          "visible_letterale": 86,
+          "visible_sbagliata": 1,
+          "visible_non_risolta": 2,
+          "raw_new": 21,
+          "raw_letterale": 89,
+          "raw_sbagliata": 2,
+          "raw_non_risolta": 2
+        },
+        "P4": {
+          "requests": 20,
+          "opportunities": 20,
+          "attempts": 23,
+          "successful": 19,
+          "provider_failed": 0,
+          "new": 19,
+          "other_diagnoses_outside_reference": 0,
+          "visible_letterale": 95,
+          "visible_non_risolta": 11,
+          "failure_proposal_invalid": 1,
+          "raw_new": 23,
+          "raw_letterale": 113,
+          "raw_non_risolta": 13,
+          "raw_sbagliata": 4
+        },
+        "P5": {
+          "requests": 20,
+          "opportunities": 20,
+          "attempts": 20,
+          "successful": 20,
+          "provider_failed": 0,
+          "new": 20,
+          "other_diagnoses_outside_reference": 0,
+          "visible_letterale": 98,
+          "raw_new": 20,
+          "raw_letterale": 98
+        }
+      }
+    },
+    "pr938": {
+      "metadata": {
+        "arm": "pr938-v2",
+        "head": "8d466b895e4834c69c96535ddbc5986c21e7d2f7",
+        "startedAt": "2026-11-11T23:31:58.629Z",
+        "node": "v24.18.0",
+        "version": {
+          "version": "0.40.6"
+        },
+        "model": {
+          "name": "qwen3.5:35b-a3b",
+          "model": "qwen3.5:35b-a3b",
+          "modified_at": "2026-11-07T23:19:01.34+01:00",
+          "size": 21909194238,
+          "digest": "26025611beeb3fe9e4850b1fdae686bebba7cdfa7f13ddb04955f19872ee022a",
+          "details": {
+            "parent_model": "",
+            "format": "safetensors",
+            "family": "",
+            "families": null,
+            "parameter_size": "",
+            "quantization_level": "nvfp4",
+            "runner": "mlx"
+          },
+          "capabilities": [
+            "completion",
+            "vision",
+            "thinking",
+            "tools"
+          ]
+        },
+        "corpusSha256": "469f876ca016c377b4ca89cf0cc0a543b405a0c7a845a6286f18eef03b985ca9",
+        "rounds": 20,
+        "endpoint": "http://127.0.0.1:64812",
+        "sourceRuntime": "host capability + real Ollama adapter; synthetic dependency fixtures"
+      },
+      "total": {
+        "requests": 100,
+        "opportunities": 100,
+        "attempts": 100,
+        "successful": 100,
+        "provider_failed": 0,
+        "new": 82,
+        "other_diagnoses_outside_reference": 6,
+        "visible_sbagliata": 18,
+        "visible_letterale": 427,
+        "visible_non_risolta": 33,
+        "raw_new": 82,
+        "raw_sbagliata": 18,
+        "raw_letterale": 429,
+        "raw_non_risolta": 34
+      },
+      "patients": {
+        "P1": {
+          "requests": 20,
+          "opportunities": 20,
+          "attempts": 20,
+          "successful": 20,
+          "provider_failed": 0,
+          "new": 19,
+          "other_diagnoses_outside_reference": 5,
+          "visible_sbagliata": 18,
+          "visible_letterale": 106,
+          "visible_non_risolta": 21,
+          "raw_new": 19,
+          "raw_sbagliata": 18,
+          "raw_letterale": 108,
+          "raw_non_risolta": 22
+        },
+        "P2": {
+          "requests": 20,
+          "opportunities": 20,
+          "attempts": 20,
+          "successful": 20,
+          "provider_failed": 0,
+          "new": 3,
+          "other_diagnoses_outside_reference": 1,
+          "visible_letterale": 68,
+          "raw_new": 3,
+          "raw_letterale": 68
+        },
+        "P3": {
+          "requests": 20,
+          "opportunities": 20,
+          "attempts": 20,
+          "successful": 20,
+          "provider_failed": 0,
+          "new": 20,
+          "other_diagnoses_outside_reference": 0,
+          "visible_letterale": 66,
+          "visible_non_risolta": 3,
+          "raw_new": 20,
+          "raw_letterale": 66,
+          "raw_non_risolta": 3
+        },
+        "P4": {
+          "requests": 20,
+          "opportunities": 20,
+          "attempts": 20,
+          "successful": 20,
+          "provider_failed": 0,
+          "new": 20,
+          "other_diagnoses_outside_reference": 0,
+          "visible_letterale": 95,
+          "visible_non_risolta": 9,
+          "raw_new": 20,
+          "raw_letterale": 95,
+          "raw_non_risolta": 9
+        },
+        "P5": {
+          "requests": 20,
+          "opportunities": 20,
+          "attempts": 20,
+          "successful": 20,
+          "provider_failed": 0,
+          "new": 20,
+          "other_diagnoses_outside_reference": 0,
+          "visible_letterale": 92,
+          "raw_new": 20,
+          "raw_letterale": 92
+        }
+      }
+    }
+  },
+  "criteria": {
+    "newMinimum": 56,
+    "newObserved": 82,
+    "newLossFraction": 0.023809523809523808,
+    "rawWrongBefore": 50,
+    "rawWrongAfter": 18,
+    "visibleWrongBefore": 26,
+    "visibleWrongAfter": 18,
+    "unresolvedVisibleBefore": 16,
+    "unresolvedVisibleAfter": 33,
+    "pass": true
+  }
+}

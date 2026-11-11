@@ -256,3 +256,10 @@ richieste (Persona000001 perde l'ipertrofia ventricolare sinistra in 12
 proposte su 39 con la seconda, in 5 su 40 con la prima). La regola completa
 propone meno doppioni della scheda. Il richiamo delle diagnosi nuove resta
 una questione aperta, da misurare con un riferimento delle voci attese.
+
+
+### Esito WUL-832, 12 novembre 2026
+
+Il [confronto su cinque pazienti sintetici](../verification/smart-import-wul-832/README.md), con 20 richieste per paziente e braccio e qwen3.5:35b-a3b locale, supera la regola aggregata fissata prima della misura decisiva. Le attribuzioni errate rilevate passano da 50 a 18 nei tentativi grezzi e da 26 a 18 nelle proposte accettate. Le diagnosi nuove attese proposte passano da 84 a 82 su 100 occasioni (perdita del 2,4%, sotto il limite di un terzo), le proposte accettate da 96 a 100.
+
+Restano 18 attribuzioni errate su P1, con valori presi da fonti diverse sotto un solo ID. Su P2 la microalbuminuria scende da 12 a 3 proposte su 20. Gli excerpt finali non risolti salgono da 16 a 33 e non sono dichiarati verificati. Il protocollo v2 e i semi sono congelati prima delle nuove inferenze. La calibrazione v1, che segnava come errate anche citazioni letterali corrette, è esclusa dalla decisione e conservata. La tabella, le definizioni, le revisioni ed i limiti sono nel rapporto collegato. Nessuna applicazione clinica o prova UI è inclusa in questa misura.
