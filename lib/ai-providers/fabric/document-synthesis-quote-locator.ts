@@ -13,6 +13,13 @@
  * della fonte, mai il testo del modello: e' quello che il medico vede e che la ricevuta firma.
  */
 
+/**
+ * Limite sulla citazione grezza, uguale per il controllo del tentativo locale e per il legame
+ * dell'envelope: fino al doppio della fonte, perché gli spazi in più non contano. Il tratto
+ * restituito non supera mai la fonte.
+ */
+export function documentSynthesisQuoteRawLimit(sourceText: string): number { return sourceText.length * 2; }
+
 export type DocumentSynthesisQuoteLocation = Readonly<{ start: number; end: number; quote: string; exact: boolean }>;
 
 const StringCharCodeAt = String.prototype.charCodeAt;
@@ -44,7 +51,7 @@ function uniqueIndex(needle: string, haystack: string): number | null {
 }
 
 export function locateDocumentSynthesisQuote(quote: string, sourceText: string): DocumentSynthesisQuoteLocation | null {
-    if (typeof quote !== 'string' || typeof sourceText !== 'string' || quote.length === 0) return null;
+    if (typeof quote !== 'string' || typeof sourceText !== 'string' || quote.length === 0 || quote.length > documentSynthesisQuoteRawLimit(sourceText)) return null;
     const exact = uniqueIndex(quote, sourceText);
     if (exact !== null) return ObjectFreeze({ start: exact, end: exact + quote.length, quote, exact: true });
     const needle = collapse(quote).text; const source = collapse(sourceText);
