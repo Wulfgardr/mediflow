@@ -11,6 +11,7 @@ interface ClinicalRiverTimelineProps {
     entries: ClinicalEntry[] | undefined;
     checkups: Checkup[] | undefined;
     checkupsUnavailable?: boolean;
+    entriesUnavailable?: boolean;
     documentInsights: DocumentInsight[];
 }
 
@@ -116,10 +117,14 @@ export function ClinicalRiverTimeline({
     entries,
     checkups,
     checkupsUnavailable = false,
+    entriesUnavailable = false,
     documentInsights,
 }: ClinicalRiverTimelineProps) {
     if (checkupsUnavailable) {
         return <div className={styles.timeline}><HistoryAccess /><p className={styles.notice} role="alert">Impossibile leggere i controlli: timeline non disponibile.</p></div>;
+    }
+    if (entriesUnavailable) {
+        return <div className={styles.timeline}><HistoryAccess /><p className={styles.notice} role="alert">Impossibile leggere il diario: timeline non disponibile.</p></div>;
     }
     if (entries === undefined || checkups === undefined) {
         return <div className={styles.timeline}><HistoryAccess /><p className={styles.notice} role="status">Lettura degli eventi in corso…</p></div>;

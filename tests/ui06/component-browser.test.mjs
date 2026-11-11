@@ -7,7 +7,7 @@ let harness;
 before(async () => { harness = await createHarness(); });
 after(async () => { await harness?.close(); });
 
-async function pageFor(t, route, viewport = { width: 1280, height: 900 }) {
+async function pageFor(t, route, viewport = { width: 1280, height: 900 }, expectedConsole = null) {
     const context = await harness.browser.newContext({ viewport });
     const errors = [];
     await context.route('**/*', async interception => {
@@ -19,7 +19,11 @@ async function pageFor(t, route, viewport = { width: 1280, height: 900 }) {
     });
     const page = await context.newPage();
     page.on('pageerror', error => errors.push(error.message));
-    page.on('console', message => { if (message.type() === 'error' || message.type() === 'warning') errors.push(message.text()); });
+    page.on('console', message => {
+        if (message.type() !== 'error' && message.type() !== 'warning') return;
+        if (expectedConsole?.test(message.text())) return;
+        errors.push(message.text());
+    });
     t.after(async () => { try { assert.deepEqual(errors, [], 'No React/DOM errors or unexpected transports'); } finally { await context.close(); } });
     await page.goto(harness.origin + route);
     await harness.expect(page).toHaveTitle('MediFlow UI06 — component fixture');
@@ -348,4 +352,66 @@ for (const width of [1440, 768, 390]) test(`section header, unique creation and 
     await state.getByRole('button').click();
     await expect(section.getByLabel('Bozza sintetica')).toHaveValue('terapia sintetica');
     await noHorizontalOverflow(page);
+});
+
+/* A failed diary read must not leave the sheet on «Diario in caricamento.» forever. */
+const diaryReadFailure = /^useLiveQueryState failed/u;
+async function diaryPage(t, reads) {
+    return pageFor(t, `/diary?reads=${reads}`, { width: 1280, height: 900 }, diaryReadFailure);
+}
+const diaryCalls = page => page.evaluate(() => window.ui06.diary.calls);
+
+test('diary read failure shows an error with Riprova, never a permanent loading state', async t => {
+    const page = await diaryPage(t, 'fail');
+    const expect = harness.expect;
+    const section = page.locator('#diario');
+    await expect(section.locator('[data-view-state=error]')).toHaveAttribute('role', 'alert');
+    await expect(section.locator('[data-view-state=error]')).toContainText('Impossibile leggere il diario.');
+    await expect(section.getByText('Diario in caricamento.')).toHaveCount(0);
+    await expect(section.getByRole('button', { name: 'Riprova', exact: true })).toBeVisible();
+});
+
+test('Riprova re-reads: a successful second read shows the entries', async t => {
+    const page = await diaryPage(t, 'fail,ok');
+    const expect = harness.expect;
+    const section = page.locator('#diario');
+    await section.getByRole('button', { name: 'Riprova', exact: true }).click();
+    await expect(section.getByText('Visita sintetica UI06')).toBeVisible();
+    await expect(section.locator('[data-view-state=error]')).toHaveCount(0);
+    assert.equal(await diaryCalls(page), 2);
+});
+
+test('Riprova re-reads: a failed second read keeps the error', async t => {
+    const page = await diaryPage(t, 'fail,fail');
+    const expect = harness.expect;
+    const section = page.locator('#diario');
+    await section.getByRole('button', { name: 'Riprova', exact: true }).click();
+    await expect.poll(() => diaryCalls(page)).toBe(2);
+    await expect(section.locator('[data-view-state=error]')).toContainText('Impossibile leggere il diario.');
+    await expect(section.getByRole('button', { name: 'Riprova', exact: true })).toBeVisible();
+    await expect(section.getByText('Diario in caricamento.')).toHaveCount(0);
+});
+
+test('a failed refresh keeps the entries already shown and offers Riprova', async t => {
+    const page = await diaryPage(t, 'ok,fail,ok');
+    const expect = harness.expect;
+    const section = page.locator('#diario');
+    await expect(section.getByText('Visita sintetica UI06')).toBeVisible();
+    await page.getByRole('button', { name: 'Rileggi il diario fixture', exact: true }).click();
+    await expect(section.locator('[data-view-state=error]')).toContainText('Impossibile aggiornare il diario.');
+    await expect(section.getByText('Visita sintetica UI06')).toBeVisible();
+    await section.getByRole('button', { name: 'Riprova', exact: true }).click();
+    await expect(section.locator('[data-view-state=error]')).toHaveCount(0);
+    await expect(section.getByText('Visita sintetica UI06')).toBeVisible();
+    assert.equal(await diaryCalls(page), 3);
+});
+
+test('the patient sheet wires the diary read error and retry into the diary, scales and timeline', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(new URL('../../app/patients/[id]/modules/page.tsx', import.meta.url), 'utf8');
+    assert.match(source, /const \{ data: entries, error: entriesError, refresh: refreshEntries \} = useLiveQueryState\(\s*async \(\) => \{\s*const items = await db\.entries\.query/u);
+    assert.match(source, /<Timeline entries=\{timelineEntries\} readFailed=\{Boolean\(entriesError\)\} onRetry=\{refreshEntries\}/u);
+    assert.match(source, /entries=\{scaleHistoryEntries\}[\s\S]{0,400}readFailed=\{Boolean\(entriesError\)\}\s*onRetry=\{refreshEntries\}/u);
+    assert.match(source, /entriesError \? <ViewState state="error" title="Impossibile leggere le valutazioni\." action=\{\{ label: 'Riprova', onClick: refreshEntries \}\} \/>/u);
+    assert.match(source, /entriesUnavailable=\{Boolean\(entriesError\) && entries === undefined\}/u);
 });

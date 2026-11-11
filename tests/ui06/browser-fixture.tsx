@@ -16,9 +16,14 @@ import type { Patient } from '../../lib/db';
 import type { ScaleResult } from '../../lib/scale-validation';
 import { syntheticScale } from './synthetic-scale';
 import { boundaryState } from './browser-boundaries';
+import Timeline from '../../components/timeline';
+import type { TimelineEntryData } from '../../components/timeline-entry-card';
+import { notifyDbChange, useLiveQueryState } from '../../lib/live-query';
 
 const scaleState = { calls: 0, cancelled: 0, results: [] as ScaleResult[], settle: null as null | ((failure: boolean) => void) };
-Object.assign(window, { ui06: { scale: scaleState, document: boundaryState } });
+/* Each diary read takes the next outcome from ?reads=fail,ok,...; once the list is spent, reads succeed. */
+const diaryState = { calls: 0, plan: (new URLSearchParams(window.location.search).get('reads') ?? '').split(',').filter(Boolean) };
+Object.assign(window, { ui06: { scale: scaleState, document: boundaryState, diary: diaryState } });
 function CompositionControl() {
     const { composition, setComposition, pendingForms } = useRuntimeTwinDesign();
     return <div><button onClick={() => setComposition(composition === 'stream' ? 'workbench' : 'stream')}>Cambia composizione fixture</button><output aria-label="Bozza pendente">{String(pendingForms)}</output></div>;
@@ -77,9 +82,25 @@ function SectionsFixture() {
         </main>
     </RuntimeTwinFolderContext.Provider></RuntimeTwinDesignProvider>;
 }
+const syntheticDiaryEntry = { id: 'ui06-entry', patientId: 'ui06-patient', type: 'visit', title: 'Visita sintetica UI06',
+    content: '<p>Testo inventato UI06</p>', date: new Date(2026, 0, 1, 12), attachments: [], version: 1 } as unknown as TimelineEntryData;
+/* Same wiring as the patient sheet: useLiveQueryState feeds entries, error and refresh to Timeline. */
+function DiaryFixture() {
+    const { data: entries, error, refresh } = useLiveQueryState(async () => {
+        diaryState.calls += 1;
+        if (diaryState.plan.shift() === 'fail') throw new Error('Lettura sintetica del diario non riuscita');
+        return [syntheticDiaryEntry];
+    }, [], undefined, ['entries']);
+    return <RuntimeTwinDesignProvider><ConfirmProvider>
+        <button onClick={() => notifyDbChange('entries')}>Rileggi il diario fixture</button>
+        <Timeline entries={entries} readFailed={Boolean(error)} onRetry={refresh} patientDiary
+            section={{ id: 'diario', kicker: 'Diario', title: 'Diario clinico', keepMounted: true, defaultOpen: true }} />
+    </ConfirmProvider></RuntimeTwinDesignProvider>;
+}
 function App() {
     const pathname = window.location.pathname;
     if (pathname === '/sections') return <SectionsFixture />;
+    if (pathname === '/diary') return <DiaryFixture />;
     if (pathname.startsWith('/settings')) return <SettingsFixture />;
     if (pathname === '/confirm') return <ConfirmProvider><ConfirmationFixture /></ConfirmProvider>;
     if (pathname === '/signals') return <SignalsFixture />;
