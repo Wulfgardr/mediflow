@@ -959,3 +959,31 @@ resta invariato perché nessuna sorgente della terapia cambia comportamento.
 Modello, statechart, invarianti, limiti, testimoni e mutanti restano invariati;
 il comando completo `npm run verify:therapy-status` è rieseguito sul manifest
 aggiornato.
+
+## Raccordo dell'11 novembre 2026: errore di lettura dell'elenco terapie
+
+`components/therapy-manager.tsx` legge l'elenco delle terapie con
+`useLiveQueryState` invece di `useLiveQuery`. Prima, una lettura fallita
+lasciava lo scheletro «Caricamento terapie…» per sempre. Ora, senza righe
+lette, compare «Impossibile leggere le terapie.» con «Riprova»; con righe già a
+schermo e una rilettura fallita, le righe restano e sopra compare «Impossibile
+aggiornare le terapie.» con «Riprova».
+
+L'elenco alimenta soltanto le righe, il conteggio e
+`statusChange.recover(therapies, …)`, cioè l'azione `Recover` del modello, che
+TLC già considera abilitata in qualunque momento con fase `idle` e marker
+presente. I due hook aggiornano il dato negli stessi casi (lettura riuscita e
+ancora corrente) e lo conservano invariato in caso d'errore, quindi
+`recover` riceve la stessa sequenza di valori. «Riprova» incrementa la stessa
+revisione che `notifyDbChange('therapies')` già incrementa (evento `storage`,
+`refreshed`, `succeeded`): è una lettura in più, non una nuova transizione.
+Il pulsante non scrive, non tocca marker, journal, lock, CAS, audit o ricevute
+e non sblocca nessun pulsante di stato. Confronto con `origin/main` 529f42ca8,
+la cui impronta del manager coincideva con quella registrata.
+
+È aggiornato il solo digest di `components/therapy-manager.tsx`; `syncCommit`
+resta invariato, come nel raccordo precedente, perché nessuna sorgente della
+terapia cambia comportamento. Modello, statechart, invarianti, limiti, testimoni
+e mutanti restano invariati; il comando completo `npm run verify:therapy-status`
+è rieseguito sul manifest aggiornato. Il nuovo comportamento è provato nel
+banco `tests/ui06/component-browser.test.mjs` (fixture `/panel/therapy`).
