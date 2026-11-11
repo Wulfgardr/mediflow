@@ -511,7 +511,10 @@ where
 
 /// Istante con ora portato nel fuso indicato; `None` per le date pure (vedi
 /// [`display_date_in_zone`]) e per i testi che non sono un istante RFC 3339.
-fn clinical_instant_in_zone<T: chrono::TimeZone>(
+/// Vale per i campi di calendario (terapia, nascita): l'editor delle date
+/// (`editing.rs`) usa la stessa regola. Per i campi che sono sempre istanti
+/// c'è [`display_instant_date_in_zone`].
+pub(crate) fn clinical_instant_in_zone<T: chrono::TimeZone>(
     value: &str,
     zone: &T,
 ) -> Option<chrono::DateTime<T>> {
@@ -519,6 +522,23 @@ fn clinical_instant_in_zone<T: chrono::TimeZone>(
     let calendar_day = instant.offset().local_minus_utc() == 0
         && instant.naive_utc().time() == chrono::NaiveTime::MIN;
     (!calendar_day).then(|| instant.with_timezone(zone))
+}
+
+/// Giorno di un campo che è sempre un istante (voce di diario, misura,
+/// controllo) nel fuso della postazione, come fa il Web. Qui la mezzanotte UTC
+/// è un istante qualunque: decide il campo, non il valore. Un testo che non è
+/// un istante RFC 3339 segue [`display_date`].
+pub fn display_instant_date(value: &str) -> String {
+    display_instant_date_in_zone(value, &chrono::Local)
+}
+
+pub fn display_instant_date_in_zone<T: chrono::TimeZone>(value: &str, zone: &T) -> String
+where
+    T::Offset: std::fmt::Display,
+{
+    chrono::DateTime::parse_from_rfc3339(value)
+        .map(|instant| instant.with_timezone(zone).format("%d/%m/%Y").to_string())
+        .unwrap_or_else(|_| display_date_in_zone(Some(value), zone))
 }
 
 /// Data e ora di un istante tecnico (ricevute, raccolte, verifiche) nel fuso
