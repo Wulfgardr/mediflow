@@ -18,6 +18,8 @@ use std::sync::OnceLock;
 
 pub const PATIENT_INSIGHT_PATH: &[&str] = &["api", "ai", "patient-insight", "preview"];
 pub const PATIENT_INSIGHT_FOCUS: &str = "Valutazione manuale del follow-up clinico attuale";
+/// Riga sopra ogni proposta, stesso testo del Web (`PATIENT_INSIGHT_REVIEW_NOTICE`) e dell'app Apple.
+pub const PATIENT_INSIGHT_REVIEW_NOTICE: &str = "Controlla ogni frase sulla fonte che cita: il modello può scambiare ciò che è fatto con ciò che è da fare.";
 const REQUEST_SCHEMA: &str = "mediflow.patient-insight.preview-request.v1";
 const PROPOSAL_SCHEMA: &str = "mediflow.patient-insight.review-proposal.v2";
 const MAX_ITEMS: usize = 12;
@@ -330,6 +332,9 @@ pub struct PatientInsightProposal {
     pub venue: String,
     pub egress: String,
     pub preprocessing: Vec<String>,
+    /// Chiamate al modello locale registrate dall'host (1 o 2). `None` per la ricevuta
+    /// di un host precedente, che non lo registrava: nessun numero inventato.
+    pub attempts: Option<u8>,
     pub review_ref: String,
     pub writes_performed: u64,
 }
@@ -483,18 +488,29 @@ fn local_receipt(value: &Value) -> Option<(String, String, String, String)> {
         })
 }
 
-fn local_provenance(value: &Value, model: &str) -> Option<Vec<String>> {
-    let provenance = exact_object(
-        value,
-        &[
-            "schemaVersion",
-            "capability",
-            "venue",
-            "provider",
-            "model",
-            "preprocessing",
-        ],
-    )?;
+/// Specchio di `provenanceWire`: passi di preprocessing e tentativi. La ricevuta di un
+/// host precedente non ha `attempts` e si legge ancora; un valore diverso da 1 o 2 no.
+fn local_provenance(value: &Value, model: &str) -> Option<(Vec<String>, Option<u8>)> {
+    const KEYS: [&str; 6] = [
+        "schemaVersion",
+        "capability",
+        "venue",
+        "provider",
+        "model",
+        "preprocessing",
+    ];
+    let (provenance, attempts) = match exact_object(value, &KEYS) {
+        Some(provenance) => (provenance, None),
+        None => {
+            let mut keys = KEYS.to_vec();
+            keys.push("attempts");
+            let provenance = exact_object(value, &keys)?;
+            let attempts = provenance["attempts"]
+                .as_u64()
+                .filter(|count| matches!(count, 1 | 2))? as u8;
+            (provenance, Some(attempts))
+        }
+    };
     let steps = string_array(&provenance["preprocessing"], 2)?;
     (steps == ["context_minimization", "envelope_validation"]
         && provenance["schemaVersion"] == "mediflow.ai.fabric-provenance.v1"
@@ -502,7 +518,7 @@ fn local_provenance(value: &Value, model: &str) -> Option<Vec<String>> {
         && provenance["venue"] == "local_process"
         && provenance["provider"] == "ollama"
         && provenance["model"] == model)
-        .then_some(steps)
+        .then_some((steps, attempts))
 }
 
 fn safe_integer(value: &Value) -> Option<u64> {
@@ -561,7 +577,8 @@ pub fn parse_patient_insight_root(value: &Value) -> Result<PatientInsightOutcome
             }
             let (provider, model, venue, egress) =
                 local_receipt(&preview["receipt"]).ok_or(invalid)?;
-            let preprocessing = local_provenance(&preview["provenance"], &model).ok_or(invalid)?;
+            let (preprocessing, attempts) =
+                local_provenance(&preview["provenance"], &model).ok_or(invalid)?;
             let review = preview["reviewRef"]
                 .as_str()
                 .filter(|r| review_ref(r))
@@ -630,6 +647,7 @@ pub fn parse_patient_insight_root(value: &Value) -> Result<PatientInsightOutcome
                     venue,
                     egress,
                     preprocessing,
+                    attempts,
                     review_ref: review.to_owned(),
                     writes_performed: 0,
                 },
@@ -886,6 +904,8 @@ mod tests {
         assert_eq!(proposal.writes_performed, 0);
         assert_eq!(proposal.provider, "ollama");
         assert_eq!(proposal.egress, "none");
+        // Caso normale: una sola chiamata al modello, registrata dall'host.
+        assert_eq!(proposal.attempts, Some(1));
         assert!(!proposal.lines().is_empty());
         assert!(
             proposal
@@ -926,6 +946,66 @@ mod tests {
         assert_eq!(
             outcome("response-stale"),
             Ok(PatientInsightOutcome::Failed("source_stale".into()))
+        );
+    }
+
+    /// Primo tentativo scartato, secondo valido: la provenienza registra 2 chiamate.
+    #[test]
+    fn a_discarded_first_attempt_is_recorded_in_the_provenance() {
+        let Ok(PatientInsightOutcome::Proposal(proposal)) =
+            outcome("response-available-second-attempt")
+        else {
+            panic!("the second attempt is a proposal");
+        };
+        assert_eq!(proposal.attempts, Some(2));
+        // Il numero sta nella provenienza, non fra le righe mostrate.
+        assert!(
+            proposal
+                .lines()
+                .iter()
+                .all(|(_, line)| !line.contains("tentativ"))
+        );
+    }
+
+    /// La risposta registrata prima di questo campo (host precedente) si legge ancora,
+    /// senza un numero inventato; un numero fuori contratto invece no.
+    #[test]
+    fn a_receipt_without_attempts_from_an_older_host_is_still_read() {
+        let before = fixture("response-available-before-attempts");
+        assert!(
+            before["body"]["preview"]["provenance"]
+                .get("attempts")
+                .is_none()
+        );
+        let Ok(PatientInsightOutcome::Proposal(proposal)) =
+            outcome("response-available-before-attempts")
+        else {
+            panic!("the older receipt is still a proposal");
+        };
+        assert_eq!(proposal.attempts, None);
+        let Ok(PatientInsightOutcome::Proposal(current)) = outcome("response-available") else {
+            panic!("the current receipt is a proposal");
+        };
+        assert_eq!(proposal.lines(), current.lines());
+        let request = request();
+        for attempts in [json!(0), json!(3), json!("2"), Value::Null, json!(1.5)] {
+            let mut body = before["body"].clone();
+            body["preview"]["provenance"]["attempts"] = attempts.clone();
+            assert_eq!(
+                patient_insight_outcome(&request, 200, body.to_string().as_bytes()),
+                Err(RuntimeError::InvalidResponse),
+                "attempts {attempts}"
+            );
+        }
+        // Anche uno scarto di un host precedente resta un esito leggibile.
+        let mut failed = fixture("response-proposal-unfaithful")["body"].clone();
+        failed["preview"]["provenance"]
+            .as_object_mut()
+            .unwrap()
+            .remove("attempts");
+        assert_eq!(
+            patient_insight_outcome(&request, 200, failed.to_string().as_bytes()),
+            Ok(PatientInsightOutcome::Failed("proposal_unfaithful".into()))
         );
     }
 

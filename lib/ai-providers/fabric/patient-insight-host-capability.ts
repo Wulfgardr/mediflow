@@ -21,15 +21,18 @@ import { buildProvenanceRecord } from './resolver';
 import type {
     PatientInsightDenialCode,
     PatientInsightFailureCode,
+    PatientInsightGenerationAttempts,
     PatientInsightProposalCurrentness,
     PatientInsightReviewProposal,
 } from './patient-insight-preview-contract';
 
 type Common = Readonly<{ writesPerformed: 0; apply: 'denied' }>;
+/** Provenienza locale del Quadro: quante chiamate al modello sono servite (registro, non schermo). */
+export type PatientInsightFabricProvenance = FabricProvenanceRecord & Readonly<{ attempts: PatientInsightGenerationAttempts }>;
 export type PatientInsightHostCapabilityResult =
-    | (Common & Readonly<{ status: 'available'; code: null; proposal: PatientInsightReviewProposal; receipt: FabricResolutionReceipt | OrdinaryRemoteReceipt; provenance: FabricProvenanceRecord | OrdinaryRemoteProvenance; reviewRef: string }>)
+    | (Common & Readonly<{ status: 'available'; code: null; proposal: PatientInsightReviewProposal; receipt: FabricResolutionReceipt | OrdinaryRemoteReceipt; provenance: PatientInsightFabricProvenance | OrdinaryRemoteProvenance; reviewRef: string }>)
     | (Common & Readonly<{ status: 'denied'; code: PatientInsightDenialCode; proposal: null; receipt: null; provenance: null; reviewRef: null }>)
-    | (Common & Readonly<{ status: 'failed'; code: PatientInsightFailureCode; proposal: null; receipt: FabricResolutionReceipt | OrdinaryRemoteReceipt; provenance: FabricProvenanceRecord | OrdinaryRemoteProvenance; reviewRef: null }>);
+    | (Common & Readonly<{ status: 'failed'; code: PatientInsightFailureCode; proposal: null; receipt: FabricResolutionReceipt | OrdinaryRemoteReceipt; provenance: PatientInsightFabricProvenance | OrdinaryRemoteProvenance; reviewRef: null }>);
 
 type Sources = Readonly<{ clock(): unknown; entropy(): unknown }>;
 type Dependencies = Readonly<{
@@ -52,8 +55,12 @@ const digestPattern = /^sha256_[0-9a-f]{64}$/u;
 function deny(code: PatientInsightDenialCode): PatientInsightHostCapabilityResult {
     return Object.freeze({ ...common, status: 'denied', code, proposal: null, receipt: null, provenance: null, reviewRef: null });
 }
-function failed(code: PatientInsightFailureCode, receipt: FabricResolutionReceipt, provenance: FabricProvenanceRecord): PatientInsightHostCapabilityResult {
-    return Object.freeze({ ...common, status: 'failed', code, proposal: null, receipt, provenance, reviewRef: null });
+function recorded(provenance: FabricProvenanceRecord, count: number): PatientInsightFabricProvenance {
+    if (count !== 1 && count !== 2) throw new Error('Patient Insight attempt count outside the contract.');
+    return Object.freeze({ ...provenance, attempts: count });
+}
+function failed(code: PatientInsightFailureCode, receipt: FabricResolutionReceipt, provenance: FabricProvenanceRecord, attempts: number): PatientInsightHostCapabilityResult {
+    return Object.freeze({ ...common, status: 'failed', code, proposal: null, receipt, provenance: recorded(provenance, attempts), reviewRef: null });
 }
 function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
@@ -224,7 +231,7 @@ export function createPatientInsightHostCapability(dependencies: Dependencies) {
             const sourceCount = sourceLines.length;
             // Stesso prompt, stesso contesto, stessa proiezione gia' consumata dal broker:
             // al massimo un secondo tentativo, e solo sul modello locale.
-            const outcome = await runLocalGenerationAttempts<PatientInsightReviewProposal, PatientInsightHostCapabilityResult>({
+            const outcome = await runLocalGenerationAttempts<PatientInsightReviewProposal, PatientInsightHostCapabilityResult | 'source_stale'>({
                 venue: receipt.venue,
                 attempt: async () => {
                     let response: string;
@@ -255,21 +262,24 @@ export function createPatientInsightHostCapability(dependencies: Dependencies) {
                 // Prima del secondo tentativo: consenso (kill switch) e attualita' (lease, selezione, revisione).
                 between: async () => {
                     const revoked = await permissionDenial(); if (revoked) return revoked;
-                    try { if (dependencies.currentness.verify() !== true) return failed('source_stale', receipt, provenance); }
-                    catch { return failed('source_stale', receipt, provenance); }
+                    try { if (dependencies.currentness.verify() !== true) return 'source_stale'; }
+                    catch { return 'source_stale'; }
                     return null;
                 },
             });
-            if (outcome.status === 'stopped') return outcome.stop;
-            if (outcome.status === 'provider_failed') return failed('provider_failed', receipt, provenance);
+            // Ogni esito locale con provenienza registra quante chiamate al modello ci sono state.
+            if (outcome.status === 'stopped') {
+                return outcome.stop === 'source_stale' ? failed('source_stale', receipt, provenance, outcome.attempts) : outcome.stop;
+            }
+            if (outcome.status === 'provider_failed') return failed('provider_failed', receipt, provenance, outcome.attempts);
             if (outcome.status === 'rejected') {
-                return failed(outcome.rejections.at(-1) === 'unfaithful' ? 'proposal_unfaithful' : 'proposal_invalid', receipt, provenance);
+                return failed(outcome.rejections.at(-1) === 'unfaithful' ? 'proposal_unfaithful' : 'proposal_invalid', receipt, provenance, outcome.attempts);
             }
             const proposal = outcome.value;
             const denied = await permissionDenial(); if (denied) return denied;
-            try { if (dependencies.currentness.verify() !== true) return failed('source_stale', receipt, provenance); }
-            catch { return failed('source_stale', receipt, provenance); }
-            return Object.freeze({ ...common, status: 'available', code: null, proposal, receipt, provenance, reviewRef: metadata.reviewRef });
+            try { if (dependencies.currentness.verify() !== true) return failed('source_stale', receipt, provenance, outcome.attempts); }
+            catch { return failed('source_stale', receipt, provenance, outcome.attempts); }
+            return Object.freeze({ ...common, status: 'available', code: null, proposal, receipt, provenance: recorded(provenance, outcome.attempts), reviewRef: metadata.reviewRef });
         },
     });
 }
