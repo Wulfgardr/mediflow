@@ -1,0 +1,143 @@
+{
+  "status": 200,
+  "body": {
+    "schemaVersion": "mediflow.document-synthesis.preview-wire.v1",
+    "status": "available",
+    "publication": {
+      "output": {
+        "schemaVersion": "mediflow.ai.extract.v1",
+        "task": "document_synthesis",
+        "summary": "Referto di visita cardiologica. Motivo: ipertensione arteriosa in terapia e dispnea da sforzo moderato. Esame obiettivo mostra PA 152/94 mmHg, FC 78 bpm e lieve edema perimalleolare. ECG evidenzia ritmo sinusale con segni di ipertrofia ventricolare sinistra. Ecocardiogramma: FE 55%, ipertrofia concentrica lieve, disfunzione diastolica di grado I. Conclusioni: ipertensione arteriosa non a target e cardiopatia ipertensiva iniziale. Terapia consigliata: aumentare ramipril a 10 mg/die e aggiungere amlodipina 5 mg/die.",
+        "qualityLevel": "yellow"
+      },
+      "citations": [
+        {
+          "label": "S1",
+          "quote": "Pressione arteriosa 130/80 mmHg, stabile rispetto al controllo precedente.",
+          "startByte": 102,
+          "endByte": 176,
+          "quoteSha256": "6f8fe0ee0c769efbe699fc1e89628c1579db76447197832ac675eceb349ed5a2"
+        }
+      ],
+      "receipt": {
+        "schemaVersion": "mediflow.document-synthesis.publication-receipt.v1",
+        "capability": "document_synthesis",
+        "outputSha256": "c94a31352a32948117d27047e17f577ea597749c42b54f90063f84b2832f34a1",
+        "claimCitationsDigestSha256": [
+          164,
+          175,
+          164,
+          199,
+          191,
+          205,
+          255,
+          26,
+          49,
+          206,
+          30,
+          231,
+          236,
+          110,
+          48,
+          120,
+          183,
+          112,
+          126,
+          187,
+          130,
+          181,
+          118,
+          77,
+          110,
+          205,
+          24,
+          26,
+          179,
+          28,
+          219,
+          176
+        ],
+        "sourceSetDigestSha256": [
+          51,
+          190,
+          160,
+          13,
+          20,
+          174,
+          8,
+          232,
+          237,
+          234,
+          67,
+          196,
+          27,
+          32,
+          61,
+          55,
+          200,
+          169,
+          108,
+          151,
+          150,
+          36,
+          94,
+          212,
+          216,
+          198,
+          148,
+          200,
+          17,
+          135,
+          245,
+          63
+        ],
+        "providerBindingReceipt": {
+          "schemaVersion": "mediflow.document-synthesis.provider-binding.v1",
+          "capability": "document_synthesis",
+          "registryTask": "reasoning",
+          "provider": "ollama",
+          "model": "synthetic-document-synthesis:1",
+          "venue": "local_process",
+          "egress": "none",
+          "fallback": "none",
+          "runtimeReadiness": "required"
+        },
+        "reviewOnly": true,
+        "applyPolicy": "none",
+        "writesPerformed": 0
+      },
+      "provenance": {
+        "schemaVersion": "mediflow.document-synthesis.publication-provenance.v1",
+        "capability": "document_synthesis",
+        "sourceSetAuthority": "application_host",
+        "inputDigestScope": "ordered_normalized_provider_projection_set",
+        "citationSupport": "provider_declared_host_membership_and_locator_validated",
+        "modelCausality": "not_established",
+        "fabricProvenance": {
+          "schemaVersion": "mediflow.ai.fabric-provenance.v1",
+          "capability": "document_synthesis",
+          "venue": "local_process",
+          "provider": "ollama",
+          "model": "synthetic-document-synthesis:1",
+          "preprocessing": [
+            "context_minimization"
+          ],
+          "receipt": {
+            "schemaVersion": "mediflow.ai.fabric-resolution.v1",
+            "capability": "document_synthesis",
+            "class": "generative",
+            "venue": "local_process",
+            "egressProfile": {
+              "id": "local_only",
+              "version": "mediflow.ai.egress-profile.v1",
+              "egress": "none"
+            },
+            "provider": "ollama",
+            "model": "synthetic-document-synthesis:1",
+            "fallbackCount": 0
+          }
+        }
+      }
+    }
+  }
+}
