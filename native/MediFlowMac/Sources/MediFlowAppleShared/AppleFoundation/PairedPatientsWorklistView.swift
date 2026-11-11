@@ -98,7 +98,7 @@ struct PairedHomeBaseCredentialsView: View {
                 Button("Dissocia") {
                     confirmsClearingPairing = true
                 }
-                .tint(.red)
+                .tint(PlatformColors.signal(.critical))
                 .accessibilityIdentifier("homebase-clear-pairing-button")
                 .disabled(model.isWorking)
                 .frame(maxWidth: .infinity, alignment: .leading)
