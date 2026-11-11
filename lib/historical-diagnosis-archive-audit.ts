@@ -3,9 +3,12 @@
  * MediFlow (WUL-831), in sola lettura.
  *
  * Protocollo: impronte SHA-256 dell'archivio (e di -wal/-shm se ci sono), copia in una
- * cartella temporanea privata, apertura della copia in sola lettura, decifratura con il PIN
+ * cartella temporanea privata, apertura della copia in sola lettura, decifratura con il segreto
  * dato dall'utente, controllo, cancellazione della copia, impronte di nuovo. L'originale non
  * si apre mai: si legge solo per copiarlo.
+ *
+ * Il segreto è quello che apre la chiave master dell'archivio, come nella schermata di sblocco:
+ * il PIN se la chiave è avvolta in versione 1 o 2, la passphrase se è in versione 3 (ADR 0143).
  *
  * Il risultato restituito contiene solo conteggi e impronte. L'elenco nominativo va in un
  * file separato con permessi 600, che non sovrascrive mai un file esistente.
@@ -15,14 +18,25 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import Database from 'better-sqlite3';
 import type { DocumentInsight } from './db';
-import { decryptData, unwrapMasterKeyVersioned } from './security/security';
+import { decryptData, KDF_ITERATIONS, parseWrappedMasterKey, unwrapMasterKeyVersioned } from './security/security';
+import { deriveUnlockMaterial, openUnlockWrapping, UNLOCK_KDF_VERSION } from './security/unlock-credential';
 import {
     auditHistoricalDiagnoses,
     type HistoricalDiagnosisAuditRow,
     type HistoricalDiagnosisAuditTotals,
 } from './domain/documents/historical-diagnosis-grounding';
+
+/**
+ * Il driver SQLite lo passa chi chiama (lo script CLI o il test): lib/ non importa driver di
+ * database (guard di confine). Questa funzione decide comunque che cosa aprire e come: solo la
+ * copia, solo in lettura.
+ */
+export interface ReadOnlySqlite {
+    prepare(sql: string): { get(...params: unknown[]): unknown; all(...params: unknown[]): unknown[] };
+    close(): void;
+}
+export type SqliteDriver = new (file: string, options: { readonly: true; fileMustExist: true }) => ReadOnlySqlite;
 
 export interface ArchiveFingerprint { file: string; sha256: string; size: number; mtimeMs: number }
 
@@ -60,6 +74,28 @@ async function readInsights(stored: string, key: CryptoKey): Promise<unknown> {
     return typeof value === 'string' ? JSON.parse(value) : value;
 }
 
+/**
+ * Apre la chiave master come la schermata di sblocco (components/security-provider.tsx):
+ * versione 3 con la passphrase, versioni 1 e 2 con il PIN. Una versione sconosciuta si
+ * dichiara tale, non come segreto sbagliato.
+ */
+async function openMasterKey(encryptedMasterKey: string, secret: string, salt: Uint8Array): Promise<CryptoKey> {
+    const { version } = parseWrappedMasterKey(encryptedMasterKey);
+    if (version === UNLOCK_KDF_VERSION) {
+        try {
+            return await openUnlockWrapping(encryptedMasterKey, (await deriveUnlockMaterial(secret, salt)).kek);
+        } catch {
+            throw new Error(`Passphrase non valida per questo archivio (chiave in versione ${version}: serve la passphrase).`);
+        }
+    }
+    if (!(version in KDF_ITERATIONS)) throw new Error(`Versione di avvolgimento della chiave non supportata: ${version}.`);
+    try {
+        return await unwrapMasterKeyVersioned(encryptedMasterKey, secret, salt);
+    } catch {
+        throw new Error(`PIN non valido per questo archivio (chiave in versione ${version}: serve il PIN).`);
+    }
+}
+
 function cell(value: string): string {
     return value.replace(/\s+/gu, ' ').replace(/\|/gu, '/').trim() || '-';
 }
@@ -88,7 +124,7 @@ function privateList(rows: readonly HistoricalDiagnosisAuditRow[], names: Readon
     ].join('\n');
 }
 
-export async function runHistoricalDiagnosisArchiveAudit(input: { dbPath: string; pin: string; privateOut: string; workParent?: string }): Promise<HistoricalDiagnosisArchiveAuditResult> {
+export async function runHistoricalDiagnosisArchiveAudit(input: { dbPath: string; secret: string; privateOut: string; workParent?: string; driver: SqliteDriver }): Promise<HistoricalDiagnosisArchiveAuditResult> {
     const dbPath = path.resolve(input.dbPath);
     const privateOut = path.resolve(input.privateOut);
     if (fs.existsSync(privateOut)) throw new Error(`Il file privato esiste già, non lo sovrascrivo: ${privateOut}`);
@@ -103,12 +139,11 @@ export async function runHistoricalDiagnosisArchiveAudit(input: { dbPath: string
         for (const suffix of SIDE_FILES) {
             if (fs.existsSync(`${dbPath}${suffix}`)) fs.copyFileSync(`${dbPath}${suffix}`, `${copy}${suffix}`, fs.constants.COPYFILE_EXCL);
         }
-        const db = new Database(copy, { readonly: true, fileMustExist: true });
+        const db = new input.driver(copy, { readonly: true, fileMustExist: true });
         try {
             const user = db.prepare('select encrypted_master_key, salt from users order by created_at asc limit 1').get() as { encrypted_master_key?: string; salt?: string } | undefined;
             if (!user?.encrypted_master_key || !user.salt) throw new Error('Nessun utente con chiave nell\'archivio.');
-            const key = await unwrapMasterKeyVersioned(user.encrypted_master_key, input.pin, new Uint8Array(Buffer.from(user.salt, 'base64')))
-                .catch(() => { throw new Error('PIN non valido per questo archivio.'); });
+            const key = await openMasterKey(user.encrypted_master_key, input.secret, new Uint8Array(Buffer.from(user.salt, 'base64')));
             const stored = db.prepare(`select id, first_name, last_name, document_insights from patients
                 where document_insights is not null and document_insights not in ('', '[]', 'null') order by id`).all() as { id: string; first_name: string | null; last_name: string | null; document_insights: string }[];
             const names = new Map<string, string>();

@@ -6,10 +6,15 @@ import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { encryptData, generateMasterKey, wrapMasterKeyVersioned } from './security/security';
+import { createUnlockWrapping } from './security/unlock-credential';
 import { runHistoricalDiagnosisArchiveAudit } from './historical-diagnosis-archive-audit';
 
 const PIN = '2468';
 const WRONG_PIN = '0000';
+const PASSPHRASE = 'cavallo batteria graffetta sintetica';
+
+type Wrapping = 'v1' | 'v2' | 'v3';
+const SECRET: Record<Wrapping, string> = { v1: PIN, v2: PIN, v3: PASSPHRASE };
 
 function digest(file: string): string {
     return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -25,7 +30,7 @@ function insights(rawMarkdown: string, diagnoses: { code: string; description: s
 }
 
 /** Archivio sintetico cifrato come quello reale; l'ultima riga resta nel WAL, con la connessione aperta. */
-async function syntheticArchive() {
+async function syntheticArchive(wrapping: Wrapping = 'v1') {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wul831-archivio-'));
     const archiveDir = path.join(root, 'MediFlow');
     const workParent = path.join(root, 'lavoro');
@@ -41,7 +46,12 @@ async function syntheticArchive() {
     db.pragma('wal_autocheckpoint = 0');
     db.exec(`create table users (id text primary key, encrypted_master_key text, salt text, created_at integer);
         create table patients (id text primary key, first_name text, last_name text, document_insights text);`);
-    db.prepare('insert into users values (?, ?, ?, ?)').run('u1', await wrapMasterKeyVersioned(key, PIN, salt, 1), salt.toString('base64'), 1);
+    // v1 e v2 avvolgono la chiave con il PIN, v3 con la passphrase (ADR 0143), con il salt in users.salt.
+    const user = wrapping === 'v3'
+        ? await createUnlockWrapping(key, PASSPHRASE)
+        : { encryptedMasterKey: await wrapMasterKeyVersioned(key, PIN, salt, wrapping === 'v1' ? 1 : 2), salt: salt.toString('base64') };
+    assert.ok(user.encryptedMasterKey.startsWith(`${wrapping}:`) || wrapping === 'v1');
+    db.prepare('insert into users values (?, ?, ?, ?)').run('u1', user.encryptedMasterKey, user.salt, 1);
     const insert = db.prepare('insert into patients values (?, ?, ?, ?)');
     insert.run('p-a', 'Prova', 'Sintetica', await seal(insights(
         'Diagnosi: riacutizzazione di BPCO in paziente con ipertensione arteriosa. Ecocardiogramma nei limiti.',
@@ -57,12 +67,12 @@ async function syntheticArchive() {
     return { root, archiveDir, workParent, dbPath, close: () => db.close() };
 }
 
-test('controlla le diagnosi di un archivio cifrato senza toccarlo e tiene i nomi fuori dal risultato', async () => {
-    const archive = await syntheticArchive();
+for (const wrapping of ['v2', 'v3'] as const) test(`controlla le diagnosi di un archivio cifrato (chiave ${wrapping}) senza toccarlo e tiene i nomi fuori dal risultato`, async () => {
+    const archive = await syntheticArchive(wrapping);
     try {
         const before = snapshot(archive.archiveDir);
         const privateOut = path.join(archive.root, 'elenco-privato.md');
-        const result = await runHistoricalDiagnosisArchiveAudit({ dbPath: archive.dbPath, pin: PIN, privateOut, workParent: archive.workParent });
+        const result = await runHistoricalDiagnosisArchiveAudit({ dbPath: archive.dbPath, secret: SECRET[wrapping], privateOut, workParent: archive.workParent, driver: Database });
 
         assert.deepEqual(snapshot(archive.archiveDir), before, 'archivio, WAL e SHM identici byte per byte');
         assert.equal(result.fingerprintsUnchanged, true);
@@ -101,12 +111,53 @@ test('con il PIN sbagliato si ferma, non scrive l\'elenco e cancella la copia', 
         const before = snapshot(archive.archiveDir);
         const privateOut = path.join(archive.root, 'elenco-privato.md');
         await assert.rejects(
-            runHistoricalDiagnosisArchiveAudit({ dbPath: archive.dbPath, pin: WRONG_PIN, privateOut, workParent: archive.workParent }),
+            runHistoricalDiagnosisArchiveAudit({ dbPath: archive.dbPath, secret: WRONG_PIN, privateOut, workParent: archive.workParent, driver: Database }),
             /PIN non valido/u,
         );
         assert.equal(fs.existsSync(privateOut), false);
         assert.deepEqual(fs.readdirSync(archive.workParent), []);
         assert.deepEqual(snapshot(archive.archiveDir), before);
+    } finally {
+        archive.close();
+        fs.rmSync(archive.root, { recursive: true, force: true });
+    }
+});
+
+test('con la passphrase sbagliata su una chiave v3 dice passphrase, non PIN', async () => {
+    const archive = await syntheticArchive('v3');
+    try {
+        const privateOut = path.join(archive.root, 'elenco-privato.md');
+        await assert.rejects(
+            runHistoricalDiagnosisArchiveAudit({ dbPath: archive.dbPath, secret: `${PASSPHRASE} errata`, privateOut, workParent: archive.workParent, driver: Database }),
+            /^Error: Passphrase non valida per questo archivio \(chiave in versione 3: serve la passphrase\)\.$/u,
+        );
+        // Il PIN su una chiave a passphrase non apre nulla e non si scambia per un PIN sbagliato.
+        await assert.rejects(
+            runHistoricalDiagnosisArchiveAudit({ dbPath: archive.dbPath, secret: PIN, privateOut, workParent: archive.workParent, driver: Database }),
+            /serve la passphrase/u,
+        );
+        assert.equal(fs.existsSync(privateOut), false);
+        assert.deepEqual(fs.readdirSync(archive.workParent), []);
+    } finally {
+        archive.close();
+        fs.rmSync(archive.root, { recursive: true, force: true });
+    }
+});
+
+test('una versione di avvolgimento sconosciuta si dichiara tale, non come segreto sbagliato', async () => {
+    const archive = await syntheticArchive();
+    try {
+        const changed = path.join(archive.root, 'versione-sconosciuta.db');
+        const writer = new Database(changed);
+        writer.exec(`create table users (id text, encrypted_master_key text, salt text, created_at integer);
+            create table patients (id text, first_name text, last_name text, document_insights text);`);
+        writer.prepare('insert into users values (?, ?, ?, ?)').run('u1', 'v9:AAAA', crypto.randomBytes(16).toString('base64'), 1);
+        writer.close();
+        await assert.rejects(
+            runHistoricalDiagnosisArchiveAudit({ dbPath: changed, secret: PIN, privateOut: path.join(archive.root, 'elenco.md'), workParent: archive.workParent, driver: Database }),
+            /^Error: Versione di avvolgimento della chiave non supportata: 9\.$/u,
+        );
+        assert.deepEqual(fs.readdirSync(archive.workParent), []);
     } finally {
         archive.close();
         fs.rmSync(archive.root, { recursive: true, force: true });
@@ -119,7 +170,7 @@ test('non sovrascrive un elenco privato già presente', async () => {
         const privateOut = path.join(archive.root, 'elenco-privato.md');
         fs.writeFileSync(privateOut, 'precedente', { mode: 0o600 });
         await assert.rejects(
-            runHistoricalDiagnosisArchiveAudit({ dbPath: archive.dbPath, pin: PIN, privateOut, workParent: archive.workParent }),
+            runHistoricalDiagnosisArchiveAudit({ dbPath: archive.dbPath, secret: PIN, privateOut, workParent: archive.workParent, driver: Database }),
             /esiste già/u,
         );
         assert.equal(fs.readFileSync(privateOut, 'utf8'), 'precedente');
