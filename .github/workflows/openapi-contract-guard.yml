@@ -108,3 +108,6 @@ jobs:
       - name: Audit quality gate
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:audit-quality-gate
+
+      - name: Local operation protocol notifications
+        run: MEDIFLOW_DATA_DIR="$RUNNER_TEMP/local-operation-protocol" node scripts/run-strip-types.mjs --test packages/mcp/src/local-operation-protocol.test.ts
