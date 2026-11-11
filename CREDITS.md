@@ -57,11 +57,13 @@ sono inclusi codice ClinSeek, dati MIMIC o modelli ClinSeek.
 ## Motore di registrazione della visita
 
 La dettatura fluida e la successiva elaborazione della visita hanno questi
-riferimenti, mentre cattura e trascrizione della 0.8.5 sono un'implementazione
-propria, basata su Apple on-device per macOS 26+. Il percorso richiede consenso,
-limita l'audio alla RAM entro i confini previsti e sottopone il testo a revisione.
-Non integra codice Fluid o scritture cliniche automatiche; le prove di release
-non includono l'uso di un microfono reale.
+riferimenti. La trascrizione usa whisper large-v3-turbo con whisper.cpp e il
+rilevatore di voce Silero, in locale sul Mac (MIT; attribuzioni nel `NOTICE` del
+client GPUI); dall'11 novembre 2026 è l'unico motore, al posto della trascrizione
+Apple on-device della 0.8.5. Il percorso richiede consenso, limita l'audio alla
+RAM entro i confini previsti e sottopone il testo a revisione. Non integra codice
+Fluid o scritture cliniche automatiche; le prove di release non includono l'uso
+di un microfono reale.
 
 ### Fluid
 
