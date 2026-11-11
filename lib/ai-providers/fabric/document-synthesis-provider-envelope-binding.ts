@@ -5,7 +5,7 @@ import { types } from 'node:util';
 
 import { bindDocumentSynthesisClaimsToCitations, type DocumentSynthesisClaimCitationsResult } from './document-synthesis-claim-citations';
 import { resolveDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope';
-import { locateDocumentSynthesisQuote } from './document-synthesis-quote-locator';
+import { documentSynthesisQuoteRawLimit, locateDocumentSynthesisQuote } from './document-synthesis-quote-locator';
 import { composeDocumentSynthesisProviderProjection } from './document-synthesis-source-set-contract';
 
 const OBJECT = Object.prototype;
@@ -147,7 +147,7 @@ function canonicalCitations(sourceSet: object, value: unknown): readonly Citatio
         const source = projection.sources[index];
         const label = `S${index + 1}`;
         if (!descriptor || !descriptor.enumerable || !ObjectHasOwn(descriptor, 'value') || !source || source.label !== label) return null;
-        const declared = declaredQuote(descriptor.value, label, source.sourceText.length);
+        const declared = declaredQuote(descriptor.value, label, documentSynthesisQuoteRawLimit(source.sourceText));
         if (declared === null) return null;
         const sourceBytes = ReflectApply(TextEncoderEncode, encoder, [source.sourceText]) as Uint8Array;
         let quote = declared;
