@@ -117,7 +117,7 @@ impl Record {
                     f(
                         "clinical-workspace-edit-entry-date",
                         "Data (AAAA-MM-GG)",
-                        day(&row.date),
+                        day_in_zone(&row.date, zone),
                         false,
                     ),
                     f(
@@ -149,7 +149,7 @@ impl Record {
                     f(
                         "clinical-workspace-edit-therapy-start",
                         "Data di inizio (AAAA-MM-GG)",
-                        day(&row.start_date),
+                        day_in_zone(&row.start_date, zone),
                         false,
                     ),
                     f(
@@ -167,7 +167,10 @@ impl Record {
                     f(
                         "clinical-workspace-edit-therapy-end",
                         "Data di fine, se presente (AAAA-MM-GG)",
-                        row.end_date.as_deref().map(day).unwrap_or_default(),
+                        row.end_date
+                            .as_deref()
+                            .map(|end| day_in_zone(end, zone))
+                            .unwrap_or_default(),
                         false,
                     ),
                 ];
@@ -213,7 +216,7 @@ impl Record {
                 f(
                     "clinical-workspace-edit-observation-date",
                     "Data (AAAA-MM-GG)",
-                    day(&row.observed_at),
+                    day_in_zone(&row.observed_at, zone),
                     false,
                 ),
                 f(
@@ -359,12 +362,12 @@ impl Record {
                 entry_type: row.entry_type.clone(),
                 title: values[0].clone(),
                 content: values[2].clone(),
-                date: edited_date(&values[1], &row.date)?,
+                date: edited_date(&values[1], &row.date, zone)?,
                 setting: row.setting.clone(),
             }),
             Self::Therapy(row) => {
-                let start_date = edited_date(&values[2], &row.start_date)?;
-                let end_date = edited_optional_date(&values[5], row.end_date.as_deref())?;
+                let start_date = edited_date(&values[2], &row.start_date, zone)?;
+                let end_date = edited_optional_date(&values[5], row.end_date.as_deref(), zone)?;
                 if let Some(end) = &end_date
                     && parse_instant(end)? < parse_instant(&start_date)?
                 {
@@ -402,7 +405,7 @@ impl Record {
                     // qualified results such as "<5". Punctuation and reference
                     // text are clinical content, never a numeric coercion.
                     value: edited_trimmed_string(&values[2], &row.value),
-                    observed_at: edited_date(&values[4], &row.observed_at)?,
+                    observed_at: edited_date(&values[4], &row.observed_at, zone)?,
                     notes: optional(&values[5], row.notes.as_ref()),
                     ref_low: optional(&values[6], row.ref_low.as_ref()),
                     ref_high: optional(&values[7], row.ref_high.as_ref()),
@@ -576,8 +579,21 @@ fn day(value: &str) -> String {
         .unwrap_or(value)
         .to_owned()
 }
-fn edited_date(value: &str, original: &str) -> Result<String, String> {
-    if value == day(original) {
+/// Day shown in a «Data (AAAA-MM-GG)» field: the workstation's local day of an
+/// instant with a time, as in the list (#925); a calendar date (`AAAA-MM-GG`
+/// or midnight UTC) keeps its own day in every zone.
+fn day_in_zone<T: chrono::TimeZone>(value: &str, zone: &T) -> String {
+    crate::components::clinical_instant_in_zone(value, zone)
+        .map(|local| local.date_naive().to_string())
+        .unwrap_or_else(|| day(value))
+}
+fn edited_date<T: chrono::TimeZone>(
+    value: &str,
+    original: &str,
+    zone: &T,
+) -> Result<String, String> {
+    if value == day_in_zone(original, zone) {
+        // The day the doctor saw is unchanged: the instant stays byte for byte.
         return Ok(original.to_owned());
     }
     let value = value.trim();
@@ -591,24 +607,49 @@ fn edited_date(value: &str, original: &str) -> Result<String, String> {
         return Ok(format!("{value}T00:00:00.000Z"));
     }
     parse_instant(original)?;
+    if let Some(local) = crate::components::clinical_instant_in_zone(original, zone) {
+        // An instant with a time moves by whole local days and keeps its local
+        // clock time, across a change of time too (10:00 stays 10:00). A clock
+        // time that does not exist or occurs twice on the chosen day is
+        // refused: never pick an offset on the doctor's behalf.
+        let moved = parsed.and_time(local.naive_local().time());
+        let instant = zone.from_local_datetime(&moved).single().ok_or_else(|| {
+            "Nel giorno scelto l'ora registrata cade nel cambio dell'ora legale e non è univoca. Scegli un altro giorno.".to_owned()
+        })?;
+        let precision = if instant.timestamp_subsec_nanos() % 1_000_000 == 0 {
+            chrono::SecondsFormat::Millis
+        } else {
+            chrono::SecondsFormat::AutoSi
+        };
+        return Ok(instant
+            .with_timezone(&chrono::Utc)
+            .to_rfc3339_opts(precision, true));
+    }
     let suffix = original
         .get(10..)
         .ok_or_else(|| "Rileggi la data e l'ora dell'elemento prima di modificarlo.".to_owned())?;
-    // This field edits a calendar day only. Retain the original clock time,
-    // subsecond precision and explicit offset; never assume the workstation's
-    // timezone or silently change the time to midnight.
+    // A calendar date (midnight UTC) edits its calendar day only: retain the
+    // rest of the original string, never the workstation's timezone.
     let updated = format!("{value}{suffix}");
     parse_instant(&updated)?;
     Ok(updated)
 }
-fn edited_optional_date(value: &str, original: Option<&str>) -> Result<Option<String>, String> {
-    if value == original.map(day).unwrap_or_default() {
+fn edited_optional_date<T: chrono::TimeZone>(
+    value: &str,
+    original: Option<&str>,
+    zone: &T,
+) -> Result<Option<String>, String> {
+    if value
+        == original
+            .map(|original| day_in_zone(original, zone))
+            .unwrap_or_default()
+    {
         return Ok(original.map(str::to_owned));
     }
     if value.trim().is_empty() {
         Ok(None)
     } else {
-        edited_date(value, original.unwrap_or_default()).map(Some)
+        edited_date(value, original.unwrap_or_default(), zone).map(Some)
     }
 }
 fn parse_instant(value: &str) -> Result<chrono::DateTime<chrono::FixedOffset>, String> {
@@ -828,39 +869,251 @@ mod tests {
             "a lossy plain replacement must not erase existing formatting"
         );
     }
+    fn entry_at(date: &str) -> Record {
+        let mut row = entry();
+        row.date = date.into();
+        Record::Entry(row)
+    }
+    fn observation_at(observed_at: &str) -> Record {
+        Record::Observation(
+            serde_json::from_value(serde_json::json!({
+                "id":"observation-day", "patientId":"patient-1", "codeSystem":"LOINC",
+                "code":"SYN-DAY", "display":"Parametro sintetico", "unitSystem":"UCUM",
+                "unitCode":"mg/L", "value":"5", "observedAt": observed_at,
+                "source":"manual", "version":2
+            }))
+            .unwrap(),
+        )
+    }
+    fn therapy_from(start_date: &str) -> Record {
+        Record::Therapy(
+            serde_json::from_value(serde_json::json!({
+                "id":"therapy-day", "patientId":"patient-1", "version":4,
+                "drugName":"Farmaco sintetico", "dosage":"1 cp", "status":"active",
+                "startDate": start_date
+            }))
+            .unwrap(),
+        )
+    }
+    fn values_in<T: chrono::TimeZone>(record: &Record, zone: &T) -> Vec<String> {
+        record
+            .fields_in_zone(zone)
+            .into_iter()
+            .map(|field| field.value)
+            .collect()
+    }
+    /// Date written by the editor for a record after the given field edits.
+    fn written_date<T: chrono::TimeZone>(
+        record: &Record,
+        edits: &[(usize, &str)],
+        zone: &T,
+    ) -> Result<String, String> {
+        let mut values = values_in(record, zone);
+        for (index, value) in edits {
+            values[*index] = (*value).into();
+        }
+        Ok(match record.draft_in_zone(&values, None, zone)? {
+            Draft::Entry(draft) => draft.date,
+            Draft::Observation(draft) => draft.observed_at,
+            Draft::Therapy(draft) => draft.start_date,
+            Draft::Checkup(draft) => draft.date,
+        })
+    }
+
+    #[test]
+    fn diary_editor_proposes_the_day_the_list_shows_in_the_workstation_zone() {
+        // P1: the list (after #925) shows 05/11 00:30 in Rome for 23:30Z; the
+        // editor must propose the same day, not the UTC one.
+        let rome = chrono_tz::Europe::Rome;
+        for (instant, day) in [
+            ("2026-11-04T23:30:00.000Z", "2026-11-05"),
+            ("2026-09-11T22:15:00.000Z", "2026-09-12"),
+            ("2026-11-04T23:00:00.000Z", "2026-11-05"),
+            ("2026-11-05T09:30:00.000Z", "2026-11-05"),
+            ("2026-10-17T00:25:40.125+02:00", "2026-10-17"),
+        ] {
+            assert_eq!(values_in(&entry_at(instant), &rome)[1], day, "{instant}");
+            assert_eq!(
+                values_in(&observation_at(instant), &rome)[4],
+                day,
+                "{instant}"
+            );
+            assert_eq!(
+                values_in(&entry_at(instant), &rome)[1],
+                crate::components::display_date_in_zone(Some(instant), &rome)
+                    .split('/')
+                    .rev()
+                    .collect::<Vec<_>>()
+                    .join("-"),
+                "editor and list agree for {instant}"
+            );
+        }
+        assert_eq!(
+            values_in(
+                &entry_at("2026-11-05T03:30:00.000Z"),
+                &chrono_tz::America::New_York
+            )[1],
+            "2026-11-04"
+        );
+        // Calendar dates keep their day in every zone, as in #925.
+        for zone in [
+            chrono_tz::Europe::Rome,
+            chrono_tz::America::New_York,
+            chrono_tz::Pacific::Kiritimati,
+            chrono_tz::Pacific::Pago_Pago,
+        ] {
+            assert_eq!(
+                values_in(&therapy_from("2026-10-18T00:00:00.000Z"), &zone)[2],
+                "2026-10-18",
+                "{zone}"
+            );
+        }
+    }
+
+    #[test]
+    fn saving_without_touching_the_day_keeps_the_instant_byte_for_byte() {
+        // P2: summer, winter, local midnight, 23:30Z, explicit offset and a
+        // calendar date; only an unrelated field changes.
+        for zone in [
+            chrono_tz::Europe::Rome,
+            chrono_tz::America::New_York,
+            chrono_tz::Pacific::Kiritimati,
+        ] {
+            for original in [
+                "2026-07-15T08:00:00.000Z",
+                "2026-01-15T09:30:00.000Z",
+                "2026-07-14T22:00:00.000Z",
+                "2026-11-04T23:00:00.000Z",
+                "2026-11-04T23:30:00.000Z",
+                "2026-10-17T00:25:40.125+02:00",
+                "2026-10-25T00:30:00.000Z",
+                "2026-10-18T00:00:00.000Z",
+            ] {
+                assert_eq!(
+                    written_date(&entry_at(original), &[(0, "Titolo modificato")], &zone),
+                    Ok(original.to_owned()),
+                    "{zone} entry {original}"
+                );
+                assert_eq!(
+                    written_date(&observation_at(original), &[(2, "6")], &zone),
+                    Ok(original.to_owned()),
+                    "{zone} observation {original}"
+                );
+                assert_eq!(
+                    written_date(&therapy_from(original), &[(1, "2 cp")], &zone),
+                    Ok(original.to_owned()),
+                    "{zone} therapy {original}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn moving_the_day_keeps_the_local_clock_across_the_change_of_time() {
+        // P3: 10:00 in Rome on 24/10 (CEST, 08:00Z) moved to 26/10 (CET) stays
+        // 10:00 local, i.e. 09:00Z; the spring change works the same way.
+        let rome = chrono_tz::Europe::Rome;
+        for (original, day, expected, local) in [
+            (
+                "2026-10-24T08:00:00.000Z",
+                "2026-10-26",
+                "2026-10-26T09:00:00.000Z",
+                "10:00",
+            ),
+            (
+                "2026-03-28T09:00:00.000Z",
+                "2026-03-30",
+                "2026-03-30T08:00:00.000Z",
+                "10:00",
+            ),
+            (
+                "2026-11-04T23:30:00.000Z",
+                "2026-11-06",
+                "2026-11-05T23:30:00.000Z",
+                "00:30",
+            ),
+            (
+                "2026-11-04T23:30:00.000Z",
+                "2026-11-04",
+                "2026-11-03T23:30:00.000Z",
+                "00:30",
+            ),
+            (
+                "2026-10-17T00:25:40.125+02:00",
+                "2026-10-18",
+                "2026-10-17T22:25:40.125Z",
+                "00:25:40.125",
+            ),
+        ] {
+            for record in [entry_at(original), observation_at(original)] {
+                let index = if record.kind() == Kind::Entry { 1 } else { 4 };
+                let written = written_date(&record, &[(index, day)], &rome).unwrap();
+                assert_eq!(written, expected, "{original} -> {day}");
+                assert_eq!(
+                    appointments::fields(&written, &rome).unwrap(),
+                    (day.to_owned(), local.to_owned())
+                );
+            }
+        }
+        // A local time that does not exist (March) or occurs twice (October)
+        // on the chosen day is refused, never silently shifted.
+        for (original, day) in [
+            ("2026-03-28T01:30:00.000Z", "2026-03-29"),
+            ("2026-10-24T00:30:00.000Z", "2026-10-25"),
+        ] {
+            assert!(
+                written_date(&entry_at(original), &[(1, day)], &rome).is_err(),
+                "{original} -> {day}"
+            );
+        }
+        // Calendar dates keep the midnight UTC contract in every zone.
+        for zone in [chrono_tz::Europe::Rome, chrono_tz::America::New_York] {
+            assert_eq!(
+                written_date(
+                    &therapy_from("2026-10-18T00:00:00.000Z"),
+                    &[(2, "2026-10-20")],
+                    &zone
+                ),
+                Ok("2026-10-20T00:00:00.000Z".to_owned()),
+                "{zone}"
+            );
+        }
+    }
+
     #[test]
     fn dates_and_nullable_values_change_only_when_explicitly_edited() {
+        let rome = chrono_tz::Europe::Rome;
         assert_eq!(
-            edited_date("2026-10-17", "2026-10-17T13:25:40.000Z").unwrap(),
+            edited_date("2026-10-17", "2026-10-17T13:25:40.000Z", &rome).unwrap(),
             "2026-10-17T13:25:40.000Z"
         );
         assert_eq!(
-            edited_date("2026-10-18", "2026-10-17T13:25:40.000Z").unwrap(),
+            edited_date("2026-10-18", "2026-10-17T13:25:40.000Z", &rome).unwrap(),
             "2026-10-18T13:25:40.000Z"
         );
         let original_time = "2026-10-17T00:25:40.125+02:00";
-        let changed = edited_date("2026-10-18", original_time).unwrap();
-        assert_eq!(changed, "2026-10-18T00:25:40.125+02:00");
+        let changed = edited_date("2026-10-18", original_time, &rome).unwrap();
+        // Same local clock (00:25:40.125 in Rome) on the next day, written in UTC.
+        assert_eq!(changed, "2026-10-17T22:25:40.125Z");
         assert_eq!(
-            edited_optional_date("2026-10-18", Some(original_time)).unwrap(),
+            edited_optional_date("2026-10-18", Some(original_time), &rome).unwrap(),
             Some(changed.clone())
         );
-        assert_eq!(edited_optional_date("", Some(original_time)).unwrap(), None);
         assert_eq!(
-            edited_optional_date("2026-10-18", None).unwrap(),
+            edited_optional_date("", Some(original_time), &rome).unwrap(),
+            None
+        );
+        assert_eq!(
+            edited_optional_date("2026-10-18", None, &rome).unwrap(),
             Some("2026-10-18T00:00:00.000Z".into())
         );
         let mut original = entry();
         original.title = "  Titolo conservato  ".into();
         original.date = original_time.into();
         let record = Record::Entry(original.clone());
-        let mut values = record
-            .fields()
-            .into_iter()
-            .map(|field| field.value)
-            .collect::<Vec<_>>();
+        let mut values = values_in(&record, &rome);
         values[1] = "2026-10-18".into();
-        let draft = record.draft(&values, None).unwrap();
+        let draft = record.draft_in_zone(&values, None, &rome).unwrap();
         original.date = "2026-10-17T22:25:40.125Z".into();
         assert!(
             draft.matches(&Record::Entry(original.clone())),
@@ -871,8 +1124,8 @@ mod tests {
             !draft.matches(&Record::Entry(original)),
             "a readback at midnight must not confirm the retained clock time"
         );
-        assert!(edited_date("2026-02-31", "2026-10-17T13:25:40.000Z").is_err());
-        assert!(edited_date("2026-10-18", "2026-10-17").is_err());
+        assert!(edited_date("2026-02-31", "2026-10-17T13:25:40.000Z", &rome).is_err());
+        assert!(edited_date("2026-10-18", "2026-10-17", &rome).is_err());
         assert_eq!(optional("", None), None);
         assert_eq!(optional("", Some(&String::new())), Some(String::new()));
         assert_eq!(optional("", Some(&"prima".into())), None);
