@@ -10,10 +10,8 @@ import { ChoiceField } from '@/components/choice-field';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import PrivacyBlur from '@/components/privacy-blur';
 import disclosure from '@/components/patient-disclosure.module.css';
-import {
-    DocumentSynthesisBrowserOrchestratorError,
-    documentSynthesisFailureHeadline,
-} from '@/lib/ai-providers/fabric/document-synthesis-browser-orchestrator';
+import { DocumentSynthesisBrowserOrchestratorError } from '@/lib/ai-providers/fabric/document-synthesis-browser-orchestrator';
+import { documentSynthesisFailureHeadline } from '@/lib/ai-providers/fabric/document-synthesis-failure-headline';
 import { useSecurity } from '@/components/security-provider';
 import { db } from '@/lib/db';
 import { createDocumentSynthesisReviewBrowserController, DocumentSynthesisReviewBrowserControllerError, type DocumentSynthesisContextProposal, type DocumentSynthesisAmbulatoryChoice } from '@/lib/ai-providers/fabric/document-synthesis-review-browser-controller';
