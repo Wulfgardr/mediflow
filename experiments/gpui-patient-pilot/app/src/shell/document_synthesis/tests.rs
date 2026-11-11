@@ -367,7 +367,12 @@ fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppCon
         (
             "response-proposal-invalid",
             false,
-            "non ha prodotto una sintesi",
+            "La risposta del modello non era valida. Riprova.",
+        ),
+        (
+            "response-proposal-truncated",
+            false,
+            "La risposta del modello non era valida. Riprova.",
         ),
         (
             "response-preview-stale",
