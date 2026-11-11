@@ -140,15 +140,22 @@ final class NativeFabricModel: ObservableObject {
         watchdog = Task {
             while !Task.isCancelled {
                 do { try await services.waitForStatusPoll() } catch { return }
+                if completedLeaseEnded(epoch) { return }
                 guard current(epoch, source), let id = attemptId else { if generation == epoch { invalidate() }; return }
                 do {
                     let response = try await services.status(id, source.connection)
+                    if completedLeaseEnded(epoch) { return }
                     guard current(epoch, source) else { if generation == epoch { invalidate() }; return }
                     try response.validate(function: function, attempt: id)
                     guard response.phase == "current", response.selection == selection else { throw NativeOrdinaryContractError.stale }
-                } catch { if generation == epoch { fail(error, source) }; return }
+                } catch { if generation == epoch, !completedLeaseEnded(epoch) { fail(error, source) }; return }
             }
         }
+    }
+    /// A completed proposal outlives the attempt lease: the watchdog stops and the proposal stays until
+    /// the clinician closes it or the context changes (both still go through `invalidate`).
+    private func completedLeaseEnded(_ epoch: UInt) -> Bool {
+        generation == epoch && phase == .completed && Date().timeIntervalSince1970 * 1000 >= expiry
     }
     func invalidate() {
         proposal = nil; selection = nil
