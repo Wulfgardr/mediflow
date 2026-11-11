@@ -6,13 +6,19 @@
 use super::generation::{GenerationArea, GenerationPhase, Wipe, pencil_block};
 use super::*;
 use mediflow_runtime_client::{
-    LocalHostAccess, PatientInsightOutcome, PatientInsightProposal, PatientInsightRequest,
-    build_patient_insight_request, cited_sources, patient_insight_capture, patient_insight_message,
-    patient_insight_sources,
+    LocalHostAccess, PATIENT_INSIGHT_REVIEW_NOTICE, PatientInsightOutcome, PatientInsightProposal,
+    PatientInsightRequest, build_patient_insight_request, cited_sources, patient_insight_capture,
+    patient_insight_message, patient_insight_sources,
 };
 use serde_json::Value;
 use std::sync::Arc;
 use zeroize::Zeroize;
+
+// Nei test i testi dipinti del Quadro si leggono nell'ordine in cui compaiono.
+#[cfg(test)]
+macro_rules! text {
+    ($($args:tt)*) => { crate::shell::rendered_command::observe_ink(gpui::text!($($args)*)) };
+}
 
 pub(super) type InsightPhase = GenerationPhase<PatientInsightRequest, PatientInsightProposal>;
 /// Stato del Quadro paziente, legato a una sola scheda: cambia con `PatientData`.
@@ -428,6 +434,9 @@ impl ClinicalApp {
                     .child(
                         pencil_block(theme)
                             .child(line("Proposta da rivedere. La scheda resta invariata.".into()))
+                            // Il modello può scambiare ciò che è fatto con ciò che è da fare:
+                            // ogni frase si rilegge sulla sua fonte.
+                            .child(line(PATIENT_INSIGHT_REVIEW_NOTICE.into()))
                             .children(insight_lines(request, proposal).into_iter().enumerate().map(
                                 |(index, row)| {
                                     let warning = row.section == "Attenzioni proposte";

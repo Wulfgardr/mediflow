@@ -248,6 +248,56 @@ fn proposal_is_shown_with_its_sources_and_receipt(cx: &mut gpui::TestAppContext)
     bench.assert_no_clinical_write();
 }
 
+/// WUL-826: sopra le righe della proposta, una sola riga chiede di controllare ogni
+/// frase sulla sua fonte. I tentativi (qui 2) restano nella provenienza, non a schermo.
+#[gpui::test]
+fn review_notice_is_painted_above_the_proposal_lines(cx: &mut gpui::TestAppContext) {
+    let (bench, cx) = bench(cx);
+    prepare(&bench, cx);
+    let answer = bench.answer("response-available-second-attempt");
+    bench.view.update(cx, |app, cx| app.insight_confirm(cx));
+    cx.run_until_parked();
+    assert!(answer.join().unwrap());
+    let first = bench.view.read_with(cx, |app, _| {
+        let InsightPhase::Proposal { request, proposal } = &app.patient.insight.phase else {
+            panic!("la risposta disponibile è una proposta");
+        };
+        assert!(app.insight_is_current(request, proposal));
+        assert_eq!(proposal.attempts, Some(2));
+        insight_lines(request, proposal)[0].text.clone()
+    });
+    // Con una sessione e la scheda aperta («Apri scheda») si vede la panoramica con il Quadro.
+    bench.view.update(cx, |app, _| {
+        app.session = Some(bench.host.session.clone());
+        app.directory = false;
+    });
+    cx.simulate_resize(gpui::size(px(1440.), px(4000.)));
+    let _probe = crate::shell::rendered_command::begin_inks();
+    crate::shell::notes_recovery_tests::draw(cx);
+    let labels: Vec<String> = crate::shell::rendered_command::take_inks()
+        .into_iter()
+        .map(|ink| ink.label)
+        .collect();
+    let position = |text: &str| labels.iter().position(|label| label == text);
+    let notice = position(mediflow_runtime_client::PATIENT_INSIGHT_REVIEW_NOTICE)
+        .unwrap_or_else(|| panic!("riga di controllo non dipinta: {labels:#?}"));
+    assert_eq!(
+        labels
+            .iter()
+            .filter(|label| *label == mediflow_runtime_client::PATIENT_INSIGHT_REVIEW_NOTICE)
+            .count(),
+        1
+    );
+    let heading = position("Proposta da rivedere. La scheda resta invariata.").unwrap();
+    let sentence = position(&first).unwrap_or_else(|| panic!("prima riga: {labels:#?}"));
+    assert!(heading < notice && notice < sentence, "{labels:#?}");
+    assert!(
+        labels.iter().all(|label| !label.contains("tentativ")),
+        "i tentativi non vanno a schermo"
+    );
+    bench.assert_no_clinical_write();
+}
+
 #[gpui::test]
 fn declined_consent_sends_nothing(cx: &mut gpui::TestAppContext) {
     let (bench, cx) = bench(cx);
