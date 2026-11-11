@@ -18,7 +18,7 @@ import { archiveGenerationForSession } from './archive-session-generation';
 import { isCurrentServerSession, type PairedNativeBinding } from './current-session-authority';
 import type { ServerSession } from './server-session';
 import { resolve, type WebSessionProjection } from './web-auth-lifecycle-owner-adapter';
-import { bootstrapWebAuthControl, webAuthControlIdFromRequest, webAuthSessionIdFromRequest } from './web-auth-control-transport';
+import { bootstrapWebAuthControl, retireWebAuthControlForLock, webAuthControlIdFromRequest, webAuthSessionIdFromRequest } from './web-auth-control-transport';
 import { completeExactWebP3Logout } from './web-auth-logout-server';
 
 export const AMBULATORY_COMMAND_REFERENCE_HEADER = 'x-mediflow-ambulatory-command-reference';
@@ -49,6 +49,22 @@ export function createAmbulatoryDestructiveService(options: { now?: () => number
         if (denial) return { status: denial.status, value: denial.value };
         const user = tx.select().from(users).where(eq(users.id, flow.native.userId)).get();
         return user?.role === 'admin' && user.username === flow.native.username && flow.native.role === 'admin' ? null : denied();
+    }
+    /* A dedicated control can carry an active web session before flow.webId records it. The owner's lock fences only an idle
+       control and burns its pending logins, so an expired flow leaves only once no session born from its control can still need retire. */
+    function controlIsIdle(controlId: string): boolean {
+        const current = bootstrapWebAuthControl(controlId);
+        if (!current) return false;
+        if (current.controlId !== controlId) return true;
+        const lock = retireWebAuthControlForLock(null, Object.freeze({ controlId, ifMatch: current.etag, idempotencyKey: randomUUID() }));
+        return lock?.outcome === 'completed';
+    }
+    /* A full table first drops flows that can no longer authorize anything and whose dedicated control holds no session. */
+    function pruneExpired(): void {
+        for (const [reference, flow] of flows) {
+            if (!flow.expired && now() >= flow.createdAt && now() < flow.expiresAt) continue;
+            if (controlIsIdle(flow.controlId)) flows.delete(reference);
+        }
     }
     function locate(request: Request): Flow | null {
         const reference = request.headers.get(AMBULATORY_COMMAND_REFERENCE_HEADER);
@@ -124,6 +140,7 @@ export function createAmbulatoryDestructiveService(options: { now?: () => number
                 if (!marker) return { ...denied(400), control: null };
                 identity = Object.fromEntries(markerKeys.filter(key => key !== 'planDigest').map(key => [key, marker![key]])) as Identity;
             }
+            if (flows.size >= 128) pruneExpired();
             if (flows.size >= 128) return { ...denied(503, 'AMBULATORY_COMMAND_CAPACITY'), control: null };
             const denial = dbServer.transaction(tx => {
                 const denial = peer(tx, { native, device, request, generation }); if (denial) return denial;
