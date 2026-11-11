@@ -85,6 +85,17 @@ def analyze(directory):
     metadata = json.loads((directory / 'metadata.json').read_text())
     results = readlines(directory / 'results.jsonl')
     captures = readlines(directory / 'cattura.jsonl')
+    expected_rounds = metadata['rounds']
+    expected_keys = {(pid, r) for pid in CASES for r in range(expected_rounds)}
+    assert len(results) == len(expected_keys) and {(r['patient'], r['round']) for r in results} == expected_keys
+    for row in captures:
+        index = list(CASES).index(row['patient'])
+        assert row['seed'] == CORPUS['seedBase'] + index * 1000 + row['round'] * 10 + row['attempt']
+        request = json.loads(row['request'])
+        context = json.loads(request['messages'][0]['content'].split('CONTESTO STRUTTURATO:\n', 1)[1])
+        assert context == {k: CASES[row['patient']]['projection'][k] for k in ('currentDiagnoses', 'currentActiveTherapies', 'therapyCandidateHints', 'sources')}
+        assert request['model'] == 'qwen3.5:35b-a3b' and request['think'] is False
+        assert request['options']['temperature'] == 0.4 and request['options']['seed'] == row['seed']
     details = []
     stats = {}
     for pid, case in CASES.items():
@@ -141,6 +152,10 @@ if __name__ == '__main__':
         print(json.dumps({'arm': result['metadata']['arm'], 'total': result['total']}, ensure_ascii=False))
     if len(analyzed) > 1:
         baseline = analyzed[0]['total']
+        for result in analyzed[1:]:
+            assert result['metadata']['corpusSha256'] == analyzed[0]['metadata']['corpusSha256']
+            assert result['metadata']['model']['digest'] == analyzed[0]['metadata']['model']['digest']
+            assert result['metadata']['version'] == analyzed[0]['metadata']['version']
         for result in analyzed[1:]:
             current = result['total']
             complete = baseline['requests'] == current['requests'] == 100
