@@ -148,8 +148,13 @@ export function createDurableTherapyStatusConfirmation<T extends StatusTherapy>(
             const request = new AbortController();
             const abort = () => request.abort(); signal.addEventListener('abort', abort, { once: true });
             try {
-                if (!await ports.journal.claim(command)) { if (current(token, signal)) unavailable('admission'); return; }
-                if (late(token, signal)) return;
+                if (!await ports.journal.claim(command)) { if (owns(token)) unavailable('admission'); return; }
+                if (!current(token, signal)) {
+                    /* claimed but never dispatched: the marker would block every retry as «uncertain». */
+                    await ports.journal.remove(command);
+                    if (owns(token)) unavailable('admission');
+                    return;
+                }
                 sent = true;
                 const response = await Promise.race([ports.request('execute', { ...command, target: context.target }, request.signal),
                     new Promise<never>((_, reject) => { timer = setTimeout(() => { request.abort(); reject(new Error('Unconfirmed command')); }, ports.timeoutMs ?? 15000); })]);
