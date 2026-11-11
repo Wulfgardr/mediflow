@@ -281,14 +281,9 @@ struct VisitDraftComposerView: View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Bozza da trascrizione", systemImage: "waveform")
                 .font(.caption.weight(.semibold))
-            Text("Detta col microfono della tastiera di sistema nel campo qui sotto, poi elabora la bozza. Nessun salvataggio automatico: la bozza va rivista prima di essere inserita nella voce.")
+            Text("Nessun salvataggio automatico: la bozza va rivista prima di essere inserita nella voce.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-#if os(macOS)
-            VisitRecordingLumeShell(model: model) { transcript in
-                model.newEntryVisitTranscript = transcript
-            }
-#endif
             TextEditor(text: $model.newEntryVisitTranscript)
                 #if os(macOS)
                 .inkRegister()
@@ -326,7 +321,7 @@ struct VisitDraftComposerView: View {
 
     private var isTranscriptWithinLimits: Bool {
         model.newEntryVisitTranscript.count <= PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars
-            && model.newEntryVisitTranscript.utf8.count <= VisitRecordingLimits.standard.maxTranscriptUTF8Bytes
+            && model.newEntryVisitTranscript.utf8.count <= PairedPatientsWorkspaceModel.maxVisitDraftTranscriptUTF8Bytes
     }
 
 

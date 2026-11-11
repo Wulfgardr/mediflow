@@ -627,7 +627,7 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         let oversizedSingleGrapheme = "a" + String(repeating: "\u{0301}", count: 140_000)
         let maxCharacters = await PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars
         XCTAssertLessThanOrEqual(oversizedSingleGrapheme.count, maxCharacters)
-        XCTAssertGreaterThan(oversizedSingleGrapheme.utf8.count, VisitRecordingLimits.standard.maxTranscriptUTF8Bytes)
+        XCTAssertGreaterThan(oversizedSingleGrapheme.utf8.count, PairedPatientsWorkspaceModel.maxVisitDraftTranscriptUTF8Bytes)
 
         await MainActor.run { model.newEntryVisitTranscript = oversizedSingleGrapheme }
         let canCompute = await model.canComputeVisitDraft

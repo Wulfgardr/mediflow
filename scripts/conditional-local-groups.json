@@ -90,13 +90,6 @@
       "condition": "Bind existing Apple lane to the same recipes/default Swift selection. Record platform skips; do not claim Xcode modes from default Swift invocation."
     },
     {
-      "file": "scripts/run-visit-recording-synthetic-benchmark.mjs",
-      "owner": "@Wulfgardr",
-      "status": "proposed-condition-not-approved-exclusion",
-      "reason": "Requires macOS say voices and the local transcription runtime/assets; synthetic input does not remove those runtime prerequisites.",
-      "condition": "Use an explicitly provisioned Apple/model lane or per-file owner-approved exclusion; dry-run alone does not remove MLX imports."
-    },
-    {
       "file": "scripts/anydoc-desktop-ocr-real.test.ts",
       "owner": "@Wulfgardr",
       "status": "proposed-condition-not-approved-exclusion",
