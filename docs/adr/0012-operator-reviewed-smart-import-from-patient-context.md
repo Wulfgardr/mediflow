@@ -220,3 +220,39 @@ reale, e l'evidenza può non stare in quel testo. Il caso esiste già oggi senza
 descrizione della diagnosi in scheda sotto una fonte reale) e il presidio resta
 lo stesso: il medico vede la fonte accanto alla proposta prima di applicarla.
 La misura dopo la correzione conta questi casi a parte.
+
+### Misura (11 novembre 2026)
+
+Stesso metodo della misura precedente (`qwen3.5:35b-a3b`, archivio sintetico,
+20 richieste per paziente, percorso dell'host chiamato dal trasporto GPUI),
+due corse con questa decisione:
+
+| | Persona000001 | Persona000002 |
+| --- | --- | --- |
+| Proposte | 40 su 40 | 40 su 40 |
+| Tentativi scartati | 0 | 0 |
+| `sourceId` fuori dalle fonti | 0 | 0 |
+| Diagnosi con evidenza copiata dalla scheda | 0 | 0 |
+
+Il prezzo è nel richiamo di Persona000002. «Microalbuminuria», l'unica
+diagnosi che le fonti aggiungono alla scheda, compare in 11 proposte su 40;
+nella misura precedente compariva in 13 delle 16 proposte arrivate al medico
+su 20 richieste. Le prove con un'altra formulazione non lo recuperano senza
+riaprire l'attribuzione sbagliata:
+
+| Variante | Proposte P1 / P2 | Microalbuminuria | Evidenza copiata dalla scheda sotto una fonte reale |
+| --- | --- | --- | --- |
+| Prima (misura dopo #936, schema statico) | 20/20 e 16/20 | 13 su 16 proposte | 4 diagnosi in 31 tentativi |
+| Solo `enum`, prompt invariato | 20/20 e 20/20 | 10 su 20 | 13 diagnosi in 20 tentativi |
+| `enum` e «non citarli come sourceId», senza «non riproporli» | 39/40 e 40/40 | 16 su 40 | 0 |
+| `enum` e regola completa (questa decisione) | 40/40 e 40/40 | 11 su 40 | 0 |
+| `enum`, regola e «proponi comunque le diagnosi nuove» | 20/20 e 20/20 | 1 su 20 | 0 |
+
+Con il solo `enum` il modello scrive ancora le diagnosi in scheda, ma sotto
+una fonte reale con l'evidenza presa dalla scheda: l'errore non sparisce, si
+nasconde. Per questo il prompt resta parte della decisione. Fra la regola
+completa e quella senza «non riproporli» la differenza sta nel rumore di 40
+richieste (Persona000001 perde l'ipertrofia ventricolare sinistra in 12
+proposte su 39 con la seconda, in 5 su 40 con la prima). La regola completa
+propone meno doppioni della scheda. Il richiamo delle diagnosi nuove resta
+una questione aperta, da misurare con un riferimento delle voci attese.
