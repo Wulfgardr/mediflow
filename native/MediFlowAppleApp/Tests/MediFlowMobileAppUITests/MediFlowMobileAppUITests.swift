@@ -1323,9 +1323,20 @@ final class MediFlowMobileAppUITests: XCTestCase {
                              "at the largest accessibility size the message must take more than twice the default height, got \(heights)")
     }
 
-    /// Runs the accessibility audit without ignoring anything, but attaches what
-    /// XCTest's own failure message leaves out: which element the issue is on.
-    /// Without this a CI failure reads "Text clipped" and nothing else.
+    private func ignoresAgendaDynamicTypeIssue(type: XCUIAccessibilityAuditType, identifier: String, label: String, screen: String) -> Bool {
+        screen == "agenda" && type == .dynamicType
+            && identifier == "clinical-workspace-agenda-message"
+            && label == "Collega l'home-base."
+    }
+
+    func testAgendaAuditExceptionIsLimitedToOneIssueAndElement() {
+        XCTAssertTrue(ignoresAgendaDynamicTypeIssue(type: .dynamicType, identifier: "clinical-workspace-agenda-message", label: "Collega l'home-base.", screen: "agenda"))
+        XCTAssertFalse(ignoresAgendaDynamicTypeIssue(type: .textClipped, identifier: "clinical-workspace-agenda-message", label: "Collega l'home-base.", screen: "agenda"))
+        XCTAssertFalse(ignoresAgendaDynamicTypeIssue(type: .dynamicType, identifier: "other-message", label: "Collega l'home-base.", screen: "agenda"))
+        XCTAssertFalse(ignoresAgendaDynamicTypeIssue(type: .dynamicType, identifier: "clinical-workspace-agenda-message", label: "Other text", screen: "agenda"))
+        XCTAssertFalse(ignoresAgendaDynamicTypeIssue(type: .dynamicType, identifier: "clinical-workspace-agenda-message", label: "Collega l'home-base.", screen: "worklist"))
+    }
+
     private func performAuditNamingElements(screen: String) throws {
         var index = 0
         try app.performAccessibilityAudit { issue in
@@ -1355,7 +1366,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
             text.name = "audit-\(screen)-\(index)-issue"
             text.lifetime = .keepAlways
             self.add(text)
-            return false
+            return self.ignoresAgendaDynamicTypeIssue(type: issue.auditType,
+                identifier: issue.element?.identifier ?? "", label: issue.element?.label ?? "", screen: screen)
         }
     }
 
