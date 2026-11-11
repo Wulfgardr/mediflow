@@ -67,7 +67,7 @@ export type PatientInsightPreviewWireRoot = Readonly<{ preview: PatientInsightPr
 
 /** Testo a schermo di un esito senza proposta; GPUI usa le stesse frasi (`patient_insight_message`). */
 export const PATIENT_INSIGHT_UNFAITHFUL_MESSAGE = 'Il modello ha dato per presa una decisione ancora aperta nella scheda, '
-    + 'o per urgente qualcosa che la scheda non segnala come urgente. Nessuna proposta creata.';
+    + 'o per urgente qualcosa che la scheda non segnala come urgente.';
 export function patientInsightFailureMessage(preview: Exclude<PatientInsightPreviewWire, { status: 'available' }>): string {
     if (preview.code === 'kill_switch_disabled') {
         return 'Patient Insight è disabilitata. Si riattiva in Impostazioni AI.';
