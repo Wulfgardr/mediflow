@@ -64,10 +64,10 @@ afterEach(() => { for (const session of sessions.splice(0)) retireSyntheticWebSe
 after(() => fs.rmSync(DATA_DIRECTORY, { recursive: true, force: true }));
 
 /* Risposta deterministica del modello finto: una citazione letterale del documento. */
-function modelReply(quote: string) {
+function modelReply(quote: string, summary = 'Controllo pressorio stabile; proseguire la terapia in corso.') {
     return JSON.stringify({ schemaVersion: 'mediflow.document-synthesis.provider-envelope.v2',
         output: { schemaVersion: 'mediflow.ai.extract.v1', task: 'document_synthesis',
-            summary: 'Controllo pressorio stabile; proseguire la terapia in corso.',
+            summary,
             data: { qualityLevel: 'green', medications: [], diagnoses: [], problemStatements: [], therapyCandidates: [], servicePrescriptions: [] } },
         citations: [{ label: 'S1', quote }],
         claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] });
@@ -85,7 +85,22 @@ function inventedReply(quote: string) {
     return JSON.stringify({ schemaVersion: 'mediflow.document-synthesis.provider-envelope.v2', output: INVENTED.output, citations: [{ label: 'S1', quote }], claims });
 }
 
-type Mode = 'valid' | 'invented' | 'malformed' | 'truncated' | 'provider_failed' | 'function_disabled' | 'lane_disabled' | 'unsupported';
+type Mode = 'valid' | 'invented' | 'malformed' | 'truncated' | 'provider_failed' | 'function_disabled' | 'lane_disabled' | 'unsupported'
+    | 'unfaithful' | 'spaced' | 'english';
+
+/* Misura dell'11/11/2026 con qwen3.5:35b-a3b: citazioni con un tratto omesso, citazioni con gli a
+ * capo fusi in uno spazio, riassunti in inglese. Qui sul documento sintetico del contratto. */
+const OMITTED_QUOTE = DOCUMENT.quote.replace(' mmHg', '');
+const SPACED_QUOTE = DOCUMENT.quote.replace('arteriosa ', 'arteriosa\n\n').replace(', stabile', ',  stabile');
+const ENGLISH_SUMMARY = 'Patient underwent a blood pressure check. Results indicate stable values and the current therapy should be continued.';
+function reply(mode: Mode): string {
+    if (mode === 'malformed') return '{"schemaVersion":';
+    if (mode === 'invented') return inventedReply(DOCUMENT.quote);
+    if (mode === 'unfaithful') return modelReply(OMITTED_QUOTE);
+    if (mode === 'spaced') return modelReply(SPACED_QUOTE);
+    if (mode === 'english') return modelReply(DOCUMENT.quote, ENGLISH_SUMMARY);
+    return modelReply(DOCUMENT.quote);
+}
 
 function host(t: TestContext, mode: Mode) {
     const previousFetch = globalThis.fetch;
@@ -104,7 +119,7 @@ function host(t: TestContext, mode: Mode) {
         // Come Ollama al tetto di token (collaudo dell'11/11/2026): JSON interrotto e `done_reason: length`.
         if (mode === 'truncated') return Response.json({ model: MODEL, message: { content: modelReply(DOCUMENT.quote).slice(0, 120) },
             prompt_eval_count: 3, eval_count: payload.options.num_predict, done_reason: 'length' });
-        return Response.json({ model: MODEL, message: { content: mode === 'malformed' ? '{"schemaVersion":' : mode === 'invented' ? inventedReply(DOCUMENT.quote) : modelReply(DOCUMENT.quote) },
+        return Response.json({ model: MODEL, message: { content: reply(mode) },
             prompt_eval_count: 3, eval_count: 4 });
     };
     t.after(() => { globalThis.fetch = previousFetch; });
@@ -235,6 +250,7 @@ test('dinieghi e fallimenti reali arrivano a GPUI come codici senza proposta', a
     for (const [mode, name, status] of [
         ['truncated', 'response-proposal-truncated', 502],
         ['malformed', 'response-proposal-invalid', 502],
+        ['unfaithful', 'response-proposal-citation-not-literal', 502],
         ['provider_failed', 'response-provider-failed', 503],
         ['function_disabled', 'response-function-disabled', 403],
     ] as const) {
@@ -246,6 +262,11 @@ test('dinieghi e fallimenti reali arrivano a GPUI come codici senza proposta', a
         // `operation_unavailable`, cosi' lo schermo dice la causa invece di tre ipotesi.
         if (mode === 'malformed' || mode === 'truncated') {
             assert.equal(value.body.code, 'model_response_invalid', mode);
+            assert.equal(fixture.prompts.length, 2, mode);
+        }
+        // Citazione con una parte omessa anche al secondo tentativo: un codice che dice la causa.
+        if (mode === 'unfaithful') {
+            assert.equal(value.body.code, 'citation_not_literal', mode);
             assert.equal(fixture.prompts.length, 2, mode);
         }
     }
@@ -263,6 +284,25 @@ test('dinieghi e fallimenti reali arrivano a GPUI come codici senza proposta', a
     const refused = await unsupported.ingest(ingest.captureHandle, ingest.base64);
     assert.equal(refused.status, 409);
     await record('response-ingest-unsupported', refused);
+});
+
+test('riassunto in inglese: secondo tentativo, poi la risposta non valida e nessuna proposta', async (t) => {
+    const fixture = host(t, 'english');
+    const response = await untilPreview(fixture, false);
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), read('response-proposal-invalid').body);
+    assert.equal(fixture.prompts.length, 2);
+    assert.match(fixture.prompts[0], /Write summary and qualityReason in Italian/u, 'il prompt chiede il riassunto in italiano');
+});
+
+test('citazione che differisce solo negli spazi: proposta accettata con il testo esatto del documento', async (t) => {
+    const fixture = host(t, 'spaced');
+    const response = await untilPreview(fixture, false);
+    assert.equal(response.status, 200);
+    const value = await response.json();
+    assert.equal(fixture.prompts.length, 1);
+    assert.equal(value.publication.citations[0].quote, DOCUMENT.quote, 'a schermo va il tratto della fonte, non il testo del modello');
+    assert.notEqual(value.publication.citations[0].quote, SPACED_QUOTE);
 });
 
 test('documento cambiato dopo la cattura: l\'host nega l\'anteprima e il modello non parte', async (t) => {

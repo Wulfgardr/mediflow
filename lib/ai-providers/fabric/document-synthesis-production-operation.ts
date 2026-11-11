@@ -19,7 +19,7 @@ import {
     type LocalExtractionReceipt,
     type LocalExtractionResult,
 } from '@/lib/domain/documents/anydoc-local-extraction-contract';
-import { createDocumentSynthesisFabricProductionComposition, DOCUMENT_SYNTHESIS_MODEL_RESPONSE_REJECTED } from './document-synthesis-fabric-production-composition';
+import { createDocumentSynthesisFabricProductionComposition, DOCUMENT_SYNTHESIS_CITATION_NOT_LITERAL, DOCUMENT_SYNTHESIS_MODEL_RESPONSE_REJECTED } from './document-synthesis-fabric-production-composition';
 import { resolveDocumentSynthesisHostProjection } from './document-synthesis-host-projection';
 import { captureDocumentSynthesisSourceSet } from './document-synthesis-source-set-contract';
 import { createDocumentSynthesisSourceSetCurrentnessOwner } from './document-synthesis-source-set-currentness-owner';
@@ -31,7 +31,7 @@ type Preview = Capture & Readonly<{ sourceText: string; sourceSetEpoch: bigint }
 type Broker = { captures: Map<string, Capture>; previews: Map<string, Preview>; handles: Set<string>; discarded: Set<string>; nextEpoch: bigint; dispose(): void };
 
 type DenialCode = 'input_invalid' | 'operation_unavailable' | 'capture_consumed' | 'preview_consumed'
-    | 'selection_changed' | 'currentness_mismatch' | 'lane_disabled' | 'unsupported_local_extraction' | 'model_response_invalid';
+    | 'selection_changed' | 'currentness_mismatch' | 'lane_disabled' | 'unsupported_local_extraction' | 'model_response_invalid' | 'citation_not_literal';
 type CaptureResult = Readonly<{ status: 'available'; code: null; captureHandle: string }>
     | Readonly<{ status: 'denied'; code: DenialCode; captureHandle: null }>;
 type IngestResult = Readonly<{ status: 'available'; code: null; previewHandle: string }>
@@ -240,6 +240,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                 const publication = remote ? await executeDocumentSynthesisChatGpt(configuration, sourceSet, stillCurrent) : await dependencies.execute(configuration, stillCurrent);
                 if (dependencies.readLaneEnabled() !== true) return previewDenied('lane_disabled');
                 if (publication === DOCUMENT_SYNTHESIS_MODEL_RESPONSE_REJECTED) return previewDenied('model_response_invalid');
+                if (publication === DOCUMENT_SYNTHESIS_CITATION_NOT_LITERAL) return previewDenied('citation_not_literal');
                 if (!publication) return previewDenied('operation_unavailable');
                 const current = context.owner.withLeaseCriticalSection(context.session, (selection) => selectionAgrees(context, preview, selection) && sameCurrentness(preview.currentness, read(preview)));
                 if (!current) return previewDenied('currentness_mismatch');

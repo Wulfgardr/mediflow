@@ -88,10 +88,18 @@ test('every field required by the static envelope/output/data schema is denied w
 
 test('verbatim citations are not paraphrased, case-corrected or moved to a different source', () => {
     const f = fixture();
-    for (const quote of [QUOTE.replace('quantità', 'Quantità'), QUOTE.replace('25 mg', 'venticinque milligrammi'), ' ' + QUOTE]) {
+    // Uno spazio tolto fra due parole le fonde: resta un cambiamento del testo, non solo della forma degli spazi.
+    for (const quote of [QUOTE.replace('quantità', 'Quantità'), QUOTE.replace('25 mg', 'venticinque milligrammi'), QUOTE.replace('25 mg', '25mg'), QUOTE.replace('25 mg', '25 mg mg')]) {
         const candidate = structuredClone(f.envelope); candidate.citations[1]!.quote = quote;
-        assert.equal(f.bind(candidate).status, 'denied');
+        assert.equal(f.bind(candidate).status, 'denied', quote);
         assert.equal(candidate.citations[1]!.quote, quote);
+    }
+    // Solo la forma degli spazi diversa (misura dell'11/11/2026): accettata, ma la citazione e' il testo della fonte.
+    for (const quote of [' ' + QUOTE, QUOTE.replace('25 mg', '25\n\n mg') + '\n']) {
+        const candidate = structuredClone(f.envelope); candidate.citations[1]!.quote = quote;
+        const bound = f.bind(candidate);
+        assert.equal(bound.status, 'available', JSON.stringify(quote));
+        assert.equal(bound.citations?.[1]?.quote, QUOTE);
     }
     const wrongSource = structuredClone(f.envelope);
     wrongSource.citations[1]!.quote = NATIVE;

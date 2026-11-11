@@ -101,6 +101,7 @@ test('a rejected model answer reaches the card as its own retry message, distinc
     for (const [name, code, headline] of [
         ['response-proposal-truncated', 'model_response_invalid', 'La risposta del modello non era valida. Riprova.'],
         ['response-proposal-invalid', 'model_response_invalid', 'La risposta del modello non era valida. Riprova.'],
+        ['response-proposal-citation-not-literal', 'citation_not_literal', 'Il modello non ha citato il documento parola per parola. Riprova.'],
         ['response-provider-failed', 'preview_unavailable', 'Sintesi non disponibile. La cartella rimane invariata.'],
     ] as const) {
         const recorded = JSON.parse(await readFile(`${fixtures}/${name}.json`, 'utf8')) as { status: number; body: unknown };
@@ -125,6 +126,13 @@ test('a rejected model answer reaches the card as its own retry message, distinc
                 : Response.json({ error: 'x', code: 'model_response_invalid' }, { status: 503 })) as typeof fetch,
     });
     await assert.rejects(() => forged.run('attachment.synthetic.1', async () => ({ id: 'attachment.synthetic.1', data: 'U3ludGhldGljLg==' })),
+        (error: unknown) => error instanceof DocumentSynthesisBrowserOrchestratorError && error.code === 'preview_unavailable');
+    const forgedCitation = createDocumentSynthesisBrowserOrchestrator({
+        fetch: (async (input: RequestInfo | URL) => String(input).endsWith('/capture') ? response({ captureHandle: `dsc_${'1'.repeat(32)}` })
+            : String(input).endsWith('/ingest') ? response({ previewHandle: `dsp_${'2'.repeat(32)}` })
+                : Response.json({ error: 'x', code: 'citation_not_literal' }, { status: 503 })) as typeof fetch,
+    });
+    await assert.rejects(() => forgedCitation.run('attachment.synthetic.1', async () => ({ id: 'attachment.synthetic.1', data: 'U3ludGhldGljLg==' })),
         (error: unknown) => error instanceof DocumentSynthesisBrowserOrchestratorError && error.code === 'preview_unavailable');
     assert.equal(documentSynthesisFailureHeadline('unsupported_local_extraction'), 'Testo locale non disponibile. È necessaria la revisione manuale del documento.');
 });

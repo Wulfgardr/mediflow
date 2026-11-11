@@ -10,7 +10,7 @@ type Sources = Readonly<{
 export type DocumentSynthesisBrowserOrchestratorErrorCode = 'input_invalid' | 'session_unavailable' | 'capture_unavailable'
     | 'capture_outcome_unknown' | 'unsupported_local_extraction' | 'ingest_unavailable'
     | 'ingest_outcome_unknown' | 'preview_unavailable' | 'preview_outcome_unknown'
-    | 'response_invalid' | 'operation_superseded' | 'model_response_invalid';
+    | 'response_invalid' | 'operation_superseded' | 'model_response_invalid' | 'citation_not_literal';
 
 export class DocumentSynthesisBrowserOrchestratorError extends Error {
     constructor(readonly code: DocumentSynthesisBrowserOrchestratorErrorCode) {
@@ -56,6 +56,7 @@ async function post(request: typeof fetch, url: string, body: unknown, unknownCo
         if (code === 'unsupported_local_extraction') return fail('unsupported_local_extraction');
         // Il modello ha risposto, ma l'host ha scartato la risposta due volte: un nuovo tentativo puo' riuscire.
         if (code === 'model_response_invalid' && response.status === 502) return fail('model_response_invalid');
+        if (code === 'citation_not_literal' && response.status === 502) return fail('citation_not_literal');
         return fail(unavailableCode);
     }
     try { return await response.json(); } catch { return fail('response_invalid'); }

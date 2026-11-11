@@ -375,6 +375,11 @@ fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppCon
             "La risposta del modello non era valida. Riprova.",
         ),
         (
+            "response-proposal-citation-not-literal",
+            false,
+            "Il modello non ha citato il documento parola per parola. Riprova.",
+        ),
+        (
             "response-preview-stale",
             false,
             "sono cambiati durante la richiesta",

@@ -780,7 +780,8 @@ impl RuntimeClient {
                         || ((path == crate::local_host::DOCUMENT_SYNTHESIS_CAPTURE_PATH
                             || path == crate::local_host::DOCUMENT_SYNTHESIS_PREVIEW_PATH)
                             && matches!(raw.status, 400 | 403 | 409 | 410 | 503))
-                        // Risposta del modello scartata due volte: 502 `model_response_invalid`.
+                        // Risposta del modello scartata due volte: 502 `model_response_invalid`
+                        // o `citation_not_literal`.
                         || (path == crate::local_host::DOCUMENT_SYNTHESIS_PREVIEW_PATH
                             && raw.status == 502)
                         // Import assistito: ingest e anteprima rifiutano con un codice.

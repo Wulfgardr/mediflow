@@ -73,6 +73,8 @@ function denied(code: string): NextResponse {
     if (code === 'capture_expired' || code === 'preview_expired') return failure(code, 410);
     // Il modello locale ha risposto, ma la risposta e' stata scartata due volte: si puo' riprovare.
     if (code === 'model_response_invalid') return failure(code, 502);
+    // Una citazione del modello non si ritrova nel documento, anche al secondo tentativo: si puo' riprovare.
+    if (code === 'citation_not_literal') return failure(code, 502);
     return failure('operation_unavailable', 503);
 }
 
