@@ -92,7 +92,7 @@ function modelReply() {
         } });
 }
 
-type Mode = 'valid' | 'malformed' | 'provider_failed' | 'kill_switch_disabled' | 'function_disabled' | 'provider_unready';
+type Mode = 'valid' | 'malformed' | 'truncated' | 'provider_failed' | 'kill_switch_disabled' | 'function_disabled' | 'provider_unready';
 
 function host(t: TestContext, mode: Mode, now = NOW) {
     t.mock.timers.enable({ apis: ['Date'], now });
@@ -103,7 +103,8 @@ function host(t: TestContext, mode: Mode, now = NOW) {
         chat: async (messages: { content: string }[]) => {
             prompts.push(messages.map((message) => message.content).join('\n'));
             if (mode === 'provider_failed') throw new Error('Synthetic provider failure');
-            return { content: mode === 'malformed' ? '{"schemaVersion":' : modelReply(), stats: { latency: 1, tokensIn: 1, tokensOut: 1 } };
+            // Troncata: risposta leggibile ma tagliata dal tetto di token (done_reason length di Ollama).
+            return { content: mode === 'malformed' ? '{"schemaVersion":' : modelReply(), stats: { latency: 1, tokensIn: 1, tokensOut: 1, ...(mode === 'truncated' ? { truncated: true } : {}) } };
         } }) };
     const web = issueSyntheticWebSessionContext(USER, `si-gpui-${mode}-${sessions.length}`);
     sessions.push(web.session);
@@ -273,6 +274,8 @@ test('dinieghi e fallimenti reali arrivano a GPUI come codici senza proposta', a
         ['provider_failed', 'response-provider-failed', 200, 1],
         // Il modello locale ha un solo secondo tentativo quando la proposta non è valida.
         ['malformed', 'response-proposal-invalid', 200, 2],
+        // Troncata anche al secondo tentativo: un codice suo, non proposal_invalid (ADR 0012).
+        ['truncated', 'response-proposal-truncated', 200, 2],
     ] as const) {
         const fixture = host(t, mode);
         const response = await untilPreview(fixture, false);

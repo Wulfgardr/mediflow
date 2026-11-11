@@ -6,6 +6,7 @@ import type { SmartImportProjection } from '../../smart-import-projection';
 import type { ProviderLifecycleRead } from './provider-lifecycle-service';
 import { createPatientInsightHostCapability } from './patient-insight-host-capability';
 import { createPatientSmartImportHostCapability } from '../../domain/documents/patient-smart-import-host-capability';
+import { smartImportResponseTokenLimit } from '../../domain/documents/patient-smart-import-capability-contract';
 import { routeHostResolvedCandidateCapability } from './candidate-router';
 import { localProviderRegistry } from '../registry';
 import { createFunctionModelDispatch, functionModelBindingSettings, guardFunctionModelResolution } from './function-model-dispatch';
@@ -49,7 +50,7 @@ function fixture(t: TestContext, id: 'patient_insight' | 'smart_import', mode: '
         if (url.pathname === '/api/generate') return Response.json({ model: model.model });
         assert.equal(url.pathname, '/api/chat'); const index = chats++;
         const payload = JSON.parse(String(init?.body)); assert.equal(payload.model, model.model);
-        assert.equal(payload.options.num_predict, id === 'patient_insight' ? 900 : 1100);
+        assert.equal(payload.options.num_predict, id === 'patient_insight' ? 900 : smartImportResponseTokenLimit(payload.messages[0].content));
         bodies.push(String(init?.body));
         signal = init?.signal ?? undefined;
         const scripted = script.bodies?.[Math.min(index, script.bodies.length - 1)];
