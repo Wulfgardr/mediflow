@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, realpathSync, existsSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -65,6 +65,13 @@ export function writeReport(output, results) {
     writeFileSync(path.join(output, 'esito.json'), JSON.stringify({ output, results }, null, 2));
     writeFileSync(path.join(output, 'esito.md'), '# Prove locali di rilascio\n\n| Prova | Esito | Motivo | Durata ms |\n|---|---|---|---|\n' + results.map(r => `| ${r.id} | ${r.status} | ${r.reason.replaceAll('|', '/')} | ${r.durationMs} |`).join('\n') + '\n');
 }
+// HOME isolata: il browser di Playwright resta quello installato dall'utente.
+export function browserEnv(source, realHome, platform = process.platform) {
+  const cache = platform === 'darwin' ? 'Library/Caches/ms-playwright' : '.cache/ms-playwright';
+  const env = { PLAYWRIGHT_BROWSERS_PATH: source.PLAYWRIGHT_BROWSERS_PATH || path.join(realHome, cache) };
+  if (source.E2E_BROWSER_CHANNEL) env.E2E_BROWSER_CHANNEL = source.E2E_BROWSER_CHANNEL;
+  return env;
+}
 export async function main() {
   validateEnvironment(process.env);
   if (process.env.CI) throw new Error('Comando riservato alle prove locali');
@@ -76,7 +83,7 @@ export async function main() {
   const env = { PATH: process.env.PATH, HOME: home, TMPDIR: temporary, LANG: 'it_IT.UTF-8',
     DEVELOPER_DIR: '/Applications/Xcode-beta.app/Contents/Developer',
     MEDIFLOW_DATA_DIR: data, MEDIFLOW_E2E_DATA_DIR: data, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1',
-    VISUAL_091_OUTPUT: path.join(output, 'visuale') };
+    VISUAL_091_OUTPUT: path.join(output, 'visuale'), ...browserEnv(process.env, homedir()) };
   const results = [];
   for (const proof of catalog(output)) {
     const result = await runProof(proof, env, output); results.push(result);
