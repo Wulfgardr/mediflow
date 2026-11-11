@@ -163,7 +163,7 @@ test('local: the six English summaries accepted on main are retried once and nev
         try {
             exact(await prepareDocumentSynthesisFabricExecution(refused.value), 'response_invalid');
             assert.equal(twice.length, 2, item.run);
-            assert.match(twice[0]!, /Write summary and qualityReason in Italian/u);
+            assert.match(twice[0]!, /Write summary in Italian/u);
         } finally { refused.restore(); }
         const prompts: string[] = [];
         const fixture = await handoff(scriptedChat([realBody(item.summary, EXACT_LAB_QUOTE), realBody(ITALIAN_SUMMARY, EXACT_LAB_QUOTE)], prompts), undefined, REAL.citations.esami);
