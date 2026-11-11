@@ -81,10 +81,14 @@ export function prepareEntryUpdate(body: Record<string, unknown>, surface: Entry
     }
     const normalized = normalizeEntryUpdateInput(body);
     if (!normalized.ok) return invalid(normalized.error);
-    const changedFields = Object.entries(normalized.values)
+    // Eliminazione logica: deletedAt valorizzato se e solo se c'è un motivo, come nella DELETE.
+    const reason = normalized.values.deletionReason;
+    if (normalized.values.deletedAt instanceof Date && !(typeof reason === 'string' && reason.trim())) return invalid('Invalid deletionReason');
+    const values = normalized.values.deletedAt === null ? { ...normalized.values, deletionReason: null } : normalized.values;
+    const changedFields = Object.entries(values)
         .filter(([name, value]) => value !== undefined && (name !== 'updatedAt' || hasOwn(body, 'updatedAt')))
         .map(([name]) => name);
-    return { ok: true as const, expectedVersion, values: normalized.values, changedFields };
+    return { ok: true as const, expectedVersion, values, changedFields };
 }
 
 /* DELETE keeps the legacy empty-body default, then validates only its own three fields. */

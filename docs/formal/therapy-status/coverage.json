@@ -55,7 +55,7 @@
     "lib/sqlite-schema-open.ts": "de253e0e3f0b33c49c1f5f61894a2f421ef96640cedd958f7c7c7ce83963f1b5",
     "lib/backup-restore-executor.ts": "830d9e11fb3d14be07e1901de74e1000ec466ef488133a788b3350bf73c80086",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
-    "lib/clinical-status-transitions.ts": "67d92e79e1123a3e79399e5907177255f56f9794f9c775b86c67fdade287441f",
+    "lib/clinical-status-transitions.ts": "787915f339911dd4846d29d1fe3232be373242287390989d6a97d7a5dcea460f",
     "lib/status-normalization.ts": "fa2bbdeef55384ed1bf4a851f09a5d899d56e6331cde018f68f3d8a74d3a4e51",
     "docs/domain/clinical-status-transitions.json": "70233eaac55960b999f25768bb9f8897dcce27197ed99c1a692a2d98a0582f04",
     "lib/recovery-backup-server.ts": "f4489e8956912faef321076891f83736c9129a6d31db2cd089a4458d124ee6fd"
