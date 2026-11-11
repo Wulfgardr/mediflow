@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createDocumentSynthesisBrowserOrchestrator, DocumentSynthesisBrowserOrchestratorError } from './document-synthesis-browser-orchestrator.ts';
+import { readFile } from 'node:fs/promises';
+
+import { createDocumentSynthesisBrowserOrchestrator, DocumentSynthesisBrowserOrchestratorError, documentSynthesisFailureHeadline } from './document-synthesis-browser-orchestrator.ts';
 import { serializeDocumentSynthesisPreviewWire } from './document-synthesis-preview-wire.ts';
 
 function response(body: unknown, ok = true): Response {
@@ -90,4 +92,39 @@ test('preserves session unavailability without continuing to ingest or inference
     } });
     await assert.rejects(orchestrator.run('synthetic-attachment', async () => ({ id: 'synthetic-attachment', data: 'U3ludGhldGljLg==' })), { code: 'session_unavailable' });
     assert.equal(calls, 1);
+});
+
+// Le risposte vere dell'host all'anteprima (fixture condivise con GPUI, scritte dal test di contratto):
+// la risposta del modello scartata ha un codice e una frase propri, non quelli del modello non pronto.
+test('a rejected model answer reaches the card as its own retry message, distinct from an unavailable host', async () => {
+    const fixtures = 'experiments/gpui-patient-pilot/transport/tests/fixtures/document_synthesis';
+    for (const [name, code, headline] of [
+        ['response-proposal-truncated', 'model_response_invalid', 'La risposta del modello non era valida. Riprova.'],
+        ['response-proposal-invalid', 'model_response_invalid', 'La risposta del modello non era valida. Riprova.'],
+        ['response-provider-failed', 'preview_unavailable', 'Sintesi non disponibile. La cartella rimane invariata.'],
+    ] as const) {
+        const recorded = JSON.parse(await readFile(`${fixtures}/${name}.json`, 'utf8')) as { status: number; body: unknown };
+        const orchestrator = createDocumentSynthesisBrowserOrchestrator({
+            fetch: (async (input: RequestInfo | URL) => {
+                const url = String(input);
+                if (url.endsWith('/capture')) return response({ captureHandle: `dsc_${'1'.repeat(32)}` });
+                if (url.endsWith('/ingest')) return response({ previewHandle: `dsp_${'2'.repeat(32)}` });
+                return Response.json(recorded.body, { status: recorded.status });
+            }) as typeof fetch,
+        });
+        let caught: unknown = null;
+        try { await orchestrator.run('attachment.synthetic.1', async () => ({ id: 'attachment.synthetic.1', data: 'U3ludGhldGljLg==' })); } catch (error) { caught = error; }
+        assert.ok(caught instanceof DocumentSynthesisBrowserOrchestratorError, name);
+        assert.equal(caught.code, code, name);
+        assert.equal(documentSynthesisFailureHeadline(caught.code), headline, name);
+    }
+    // Lo stesso codice con uno stato diverso da 502 non e' creduto: resta «non disponibile».
+    const forged = createDocumentSynthesisBrowserOrchestrator({
+        fetch: (async (input: RequestInfo | URL) => String(input).endsWith('/capture') ? response({ captureHandle: `dsc_${'1'.repeat(32)}` })
+            : String(input).endsWith('/ingest') ? response({ previewHandle: `dsp_${'2'.repeat(32)}` })
+                : Response.json({ error: 'x', code: 'model_response_invalid' }, { status: 503 })) as typeof fetch,
+    });
+    await assert.rejects(() => forged.run('attachment.synthetic.1', async () => ({ id: 'attachment.synthetic.1', data: 'U3ludGhldGljLg==' })),
+        (error: unknown) => error instanceof DocumentSynthesisBrowserOrchestratorError && error.code === 'preview_unavailable');
+    assert.equal(documentSynthesisFailureHeadline('unsupported_local_extraction'), 'Testo locale non disponibile. È necessaria la revisione manuale del documento.');
 });

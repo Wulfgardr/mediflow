@@ -18,6 +18,14 @@ const OBJECT = Object.prototype; const ObjectAssign = Object.assign; const Objec
 const WeakMapConstructor = WeakMap; const WeakMapGet = WeakMap.prototype.get; const WeakMapSet = WeakMap.prototype.set; const WeakMapDelete = WeakMap.prototype.delete; const PromiseConstructor = Promise; const PromiseThen = Promise.prototype.then; const AbortControllerConstructor = AbortController; const SetTimeout = setTimeout; const ClearTimeout = clearTimeout;
 const handoffs = new WeakMapConstructor<object, Entry>(); const prepared = new WeakMapConstructor<object, Entry>(); const COMMON = ObjectFreeze({ reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const, fallback: 'denied_by_contract' as const });
 let timeoutMs = 300_000;
+// Tetto dei token di risposta. Collaudo dell'11/11/2026 (qwen3.5:35b-a3b, JSON indentato): sul
+// referto cardiologico sintetico (prompt di 5544 caratteri) l'involucro completo chiedeva 1306 e
+// 1911 token, sugli esami (5302 caratteri) 1156-1387; il vecchio tetto di 1400 tagliava 8 risposte
+// su 10. Citazioni ed evidenze copiano testo del documento, quindi l'involucro cresce col prompt:
+// mezzo token per carattere (le misure stanno fra 0,22 e 0,35) e mai meno di 2560 (1911 piu' un
+// terzo). Il soffitto copre il prompt piu' lungo ammesso (12 000 unita' di testo piu' le istruzioni).
+const RESPONSE_TOKENS_FLOOR = 2560; const RESPONSE_TOKENS_CEILING = 8192; const MathCeil = Math.ceil;
+function documentSynthesisResponseTokenLimit(prompt: string): number { const proportional = MathCeil(prompt.length / 2); return proportional < RESPONSE_TOKENS_FLOOR ? RESPONSE_TOKENS_FLOOR : proportional > RESPONSE_TOKENS_CEILING ? RESPONSE_TOKENS_CEILING : proportional; }
 
 function frozen<T extends Record<string, unknown>>(value: T): Readonly<T> { return ObjectFreeze(ObjectAssign(ObjectCreate(null) as T, value)); }
 function denied(code: DenialCode): DocumentSynthesisFabricExecutionPrepareResult { return frozen({ status: 'denied' as const, code, preparedToken: null, ...COMMON }) as DocumentSynthesisFabricExecutionPrepareResult; }
@@ -30,7 +38,7 @@ function invoke(entry: Entry, resolution: LocalProviderResolution, prompt: strin
     let resolveOutcome!: (value: Outcome) => void;
     const outcome = new PromiseConstructor<Outcome>((resolve) => { resolveOutcome = resolve; }); entry.settle = resolveOutcome;
     entry.timer = SetTimeout(() => { if (entry.state === 'running') { try { entry.controller.abort(); } catch { /* Internal timeout only. */ } resolveOutcome(frozen({ kind: 'timeout' as const })); } }, timeoutMs);
-    let returned: unknown; try { returned = resolution.adapter.chat([{ role: 'user', content: prompt }], entry.controller.signal, 1400, ObjectFreeze({ responseFormat: 'document_synthesis_v2' })); } catch { resolveOutcome(frozen({ kind: 'failure' as const })); return outcome; }
+    let returned: unknown; try { returned = resolution.adapter.chat([{ role: 'user', content: prompt }], entry.controller.signal, documentSynthesisResponseTokenLimit(prompt), ObjectFreeze({ responseFormat: 'document_synthesis_v2' })); } catch { resolveOutcome(frozen({ kind: 'failure' as const })); return outcome; }
     try {
         if (opaque(returned) && ObjectGetPrototypeOf(returned) === PromiseConstructor.prototype) { const observed = ReflectApply(PromiseThen, returned, [(value: unknown) => resolveOutcome(frozen({ kind: 'response' as const, value })), () => resolveOutcome(frozen({ kind: 'failure' as const }))]); ReflectApply(PromiseThen, observed, [() => undefined, () => undefined]); }
         else { const then = opaque(returned) ? ObjectGetOwnPropertyDescriptor(returned, 'then') : null; if (then && ObjectHasOwn(then, 'value') && typeof then.value === 'function') { const tail = ReflectApply(then.value, returned, [(value: unknown) => resolveOutcome(frozen({ kind: 'response' as const, value })), () => resolveOutcome(frozen({ kind: 'failure' as const }))]); if (opaque(tail) && ObjectGetPrototypeOf(tail) === PromiseConstructor.prototype) ReflectApply(PromiseThen, tail, [() => undefined, () => undefined]); } else resolveOutcome(frozen({ kind: 'response' as const, value: returned })); }

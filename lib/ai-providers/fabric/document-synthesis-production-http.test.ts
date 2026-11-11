@@ -59,3 +59,16 @@ test('rejects a binary ingress with a non-local Host before the capture can reac
     assert.equal(response.status, 400);
     assert.equal(ingests, 0);
 });
+
+test('a model answer rejected twice keeps its own code instead of operation_unavailable', async () => {
+    for (const [code, status, wire] of [['model_response_invalid', 502, 'model_response_invalid'], ['provider_timeout', 503, 'operation_unavailable']] as const) {
+        const handler = createDocumentSynthesisPreviewHttpHandler({ acquireOperation: async () => Object.freeze({
+            capture: async () => ({ status: 'denied' as const, code: 'input_invalid', captureHandle: null }),
+            ingest: async () => ({ status: 'denied' as const, code: 'input_invalid', previewHandle: null }),
+            preview: async () => ({ status: 'denied' as const, code, publication: null }),
+        }) });
+        const response = await handler(request({ previewHandle: `dsp_${'2'.repeat(32)}` }, []));
+        assert.equal(response.status, status, code);
+        assert.deepEqual(await response.json(), { error: 'Document Synthesis non disponibile.', code: wire });
+    }
+});

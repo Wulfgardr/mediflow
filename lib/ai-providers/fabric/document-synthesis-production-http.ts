@@ -71,6 +71,8 @@ function denied(code: string): NextResponse {
     if (code === 'capture_consumed' || code === 'preview_consumed' || code === 'selection_changed' || code === 'currentness_mismatch'
         || code === 'lane_disabled' || code === 'unsupported_local_extraction') return failure(code, 409);
     if (code === 'capture_expired' || code === 'preview_expired') return failure(code, 410);
+    // Il modello locale ha risposto, ma la risposta e' stata scartata due volte: si puo' riprovare.
+    if (code === 'model_response_invalid') return failure(code, 502);
     return failure('operation_unavailable', 503);
 }
 
