@@ -19,6 +19,8 @@ export interface AIStats {
 
 export interface AIChatOptions {
     responseFormat?: 'json' | 'document_synthesis_v2' | 'patient_insight' | 'smart_import';
+    // Solo con smart_import: id delle fonti inviate nel prompt, diventano l'enum di sourceId nello schema (ADR 0012).
+    sourceIds?: ReadonlyArray<string>;
     numCtx?: number;
 }
 
