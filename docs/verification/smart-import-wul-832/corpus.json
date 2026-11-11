@@ -1,0 +1,541 @@
+{
+  "schema": "wul832.synthetic-corpus.v1",
+  "frozenAt": "2026-11-11T22:14:19.025124+00:00",
+  "trialsPerPatient": 20,
+  "seedBase": 832000,
+  "cases": [
+    {
+      "id": "P1",
+      "expected": [
+        {
+          "id": "lvh",
+          "pattern": "ipertrofia.*(?:ventricol|sinistr)|left ventricular hypertroph",
+          "sourceIds": [
+            "source.local.00000000001.02"
+          ]
+        }
+      ],
+      "recordPatterns": [
+        "ipertension|hypertension|\\bi10\\b",
+        "ipercolesterol|hypercholesterol|\\be78\\b"
+      ],
+      "projection": {
+        "schemaVersion": "mediflow.smart-import.projection.v1",
+        "capability": "smart_import",
+        "selectionEpoch": 1,
+        "patientRevision": 1,
+        "sourceRevision": 1,
+        "capturedAt": "2026-11-11T18:00:00.000Z",
+        "patientRef": "patient.synthetic.wul832.p1",
+        "currentDiagnoses": [
+          {
+            "system": "ICD-10",
+            "code": "I10",
+            "description": "Ipertensione essenziale"
+          },
+          {
+            "system": "ICD-10",
+            "code": "E78.0",
+            "description": "Ipercolesterolemia pura"
+          }
+        ],
+        "currentActiveTherapies": [
+          {
+            "drugName": "Atorvastatina 20 mg",
+            "activePrinciple": null,
+            "dosage": "1 compressa la sera",
+            "aic": null,
+            "atc": null
+          },
+          {
+            "drugName": "Ramipril 5 mg",
+            "activePrinciple": null,
+            "dosage": "1 compressa al mattino",
+            "aic": null,
+            "atc": null
+          }
+        ],
+        "therapyCandidateHints": [
+          {
+            "sourceId": "source.local.00000000001.03",
+            "label": "VISIT 05/11/2026 · segmento 2",
+            "excerpt": "Da decidere: aumento ramipril a 10 mg e aggiunta di amlodipina 5 mg come suggerito."
+          },
+          {
+            "sourceId": "source.local.00000000001.04",
+            "label": "EXAM 20/10/2026",
+            "excerpt": "Creatinina 0,9 mg/dL"
+          },
+          {
+            "sourceId": "source.local.00000000001.04",
+            "label": "EXAM 20/10/2026",
+            "excerpt": "colesterolo LDL 162 mg/dL"
+          },
+          {
+            "sourceId": "source.local.00000000001.04",
+            "label": "EXAM 20/10/2026",
+            "excerpt": "glicemia 94 mg/dL."
+          },
+          {
+            "sourceId": "source.local.00000000001.04",
+            "label": "EXAM 20/10/2026",
+            "excerpt": "potassio 4,4 mmol/L"
+          },
+          {
+            "sourceId": "source.local.00000000001.05",
+            "label": "EXAM 20/10/2026 · segmento 2",
+            "excerpt": "Iniziata atorvastatina 20 mg la sera."
+          },
+          {
+            "sourceId": "source.local.00000000001.08",
+            "label": "VISIT 12/09/2026",
+            "excerpt": "In terapia con ramipril 5 mg/die, buona aderenza riferita."
+          }
+        ],
+        "sources": [
+          {
+            "id": "source.local.00000000001.01",
+            "kind": "patient-notes",
+            "label": "Note paziente",
+            "date": null,
+            "content": "Nota clinica sintetica ripetibile per il benchmark locale."
+          },
+          {
+            "id": "source.local.00000000001.02",
+            "kind": "clinical-entry",
+            "label": "VISIT 05/11/2026",
+            "date": "2026-11-05T09:30:00.000Z",
+            "content": "Visto il referto cardiologico del 02/11: ipertrofia ventricolare sinistra lieve, FE 55%. PA 150/94 mmHg. Lieve edema perimalleolare serale."
+          },
+          {
+            "id": "source.local.00000000001.03",
+            "kind": "clinical-entry",
+            "label": "VISIT 05/11/2026 · segmento 2",
+            "date": "2026-11-05T09:30:00.000Z",
+            "content": "Da decidere: aumento ramipril a 10 mg e aggiunta di amlodipina 5 mg come suggerito. Controllo creatinina e potassio fra 2 settimane."
+          },
+          {
+            "id": "source.local.00000000001.04",
+            "kind": "clinical-entry",
+            "label": "EXAM 20/10/2026",
+            "date": "2026-10-20T08:15:00.000Z",
+            "content": "Creatinina 0,9 mg/dL, potassio 4,4 mmol/L, colesterolo LDL 162 mg/dL, glicemia 94 mg/dL."
+          },
+          {
+            "id": "source.local.00000000001.05",
+            "kind": "clinical-entry",
+            "label": "EXAM 20/10/2026 · segmento 2",
+            "date": "2026-10-20T08:15:00.000Z",
+            "content": "Iniziata atorvastatina 20 mg la sera."
+          },
+          {
+            "id": "source.local.00000000001.06",
+            "kind": "clinical-entry",
+            "label": "PHONE 01/10/2026",
+            "date": "2026-10-01T10:30:00.000Z",
+            "content": "Diario pressorio domiciliare: media 150/95 mmHg. Dispnea da sforzo moderato (due rampe di scale). Nessun dolore toracico."
+          },
+          {
+            "id": "source.local.00000000001.07",
+            "kind": "clinical-entry",
+            "label": "PHONE 01/10/2026 · segmento 2",
+            "date": "2026-10-01T10:30:00.000Z",
+            "content": "Richiesto ecocardiogramma e visita cardiologica."
+          },
+          {
+            "id": "source.local.00000000001.08",
+            "kind": "clinical-entry",
+            "label": "VISIT 12/09/2026",
+            "date": "2026-09-12T09:00:00.000Z",
+            "content": "PA 148/92 mmHg in due misurazioni, FC 76. Riferisce cefalea mattutina occasionale. In terapia con ramipril 5 mg/die, buona aderenza riferita."
+          },
+          {
+            "id": "source.local.00000000001.09",
+            "kind": "clinical-entry",
+            "label": "VISIT 12/09/2026 · segmento 2",
+            "date": "2026-09-12T09:00:00.000Z",
+            "content": "Piano: automisurazione domiciliare per 2 settimane, rivalutare."
+          },
+          {
+            "id": "source.local.00000000001.0a",
+            "kind": "clinical-entry",
+            "label": "VISIT 14/07/2026",
+            "date": "2026-07-14T21:00:00.000Z",
+            "content": "Contenuto clinico sintetico con lunghezza stabile per la baseline."
+          },
+          {
+            "id": "source.local.00000000001.0b",
+            "kind": "clinical-entry",
+            "label": "PHONE 30/06/2026",
+            "date": "2026-06-30T21:00:00.000Z",
+            "content": "Contenuto clinico sintetico con lunghezza stabile per la baseline."
+          },
+          {
+            "id": "source.local.00000000001.0c",
+            "kind": "attachment-summary",
+            "label": "Allegato referto-sintetico-1.pdf",
+            "date": "2026-07-14T21:00:00.000Z",
+            "content": "Sintesi documentale sintetica, sempre soggetta a revisione."
+          },
+          {
+            "id": "source.local.00000000001.0d",
+            "kind": "attachment-summary",
+            "label": "Allegato referto-sintetico-2.pdf",
+            "date": "2026-07-07T21:00:00.000Z",
+            "content": "Sintesi documentale sintetica, sempre soggetta a revisione."
+          }
+        ]
+      }
+    },
+    {
+      "id": "P2",
+      "expected": [
+        {
+          "id": "microalbuminuria",
+          "pattern": "microalbuminuri",
+          "sourceIds": [
+            "source.local.00000000001.04",
+            "source.local.00000000001.03"
+          ]
+        }
+      ],
+      "recordPatterns": [
+        "diabet|\\be11",
+        "ipertension|hypertension|\\bi10\\b"
+      ],
+      "projection": {
+        "schemaVersion": "mediflow.smart-import.projection.v1",
+        "capability": "smart_import",
+        "selectionEpoch": 1,
+        "patientRevision": 1,
+        "sourceRevision": 1,
+        "capturedAt": "2026-11-11T18:00:00.000Z",
+        "patientRef": "patient.synthetic.wul832.p2",
+        "currentDiagnoses": [
+          {
+            "system": "ICD-10",
+            "code": "E11.9",
+            "description": "Diabete mellito di tipo 2 senza complicanze"
+          },
+          {
+            "system": "ICD-10",
+            "code": "I10",
+            "description": "Ipertensione essenziale"
+          }
+        ],
+        "currentActiveTherapies": [
+          {
+            "drugName": "Amlodipina 5 mg",
+            "activePrinciple": null,
+            "dosage": "1 compressa al mattino",
+            "aic": null,
+            "atc": null
+          },
+          {
+            "drugName": "Metformina 1000 mg",
+            "activePrinciple": null,
+            "dosage": "1 compressa due volte al giorno ai pasti",
+            "aic": null,
+            "atc": null
+          }
+        ],
+        "therapyCandidateHints": [
+          {
+            "sourceId": "source.local.00000000001.03",
+            "label": "NOTE 04/11/2026 · segmento 2",
+            "excerpt": "Valutare intensificazione della terapia (SGLT2 inibitore considerando eGFR e microalbuminuria)."
+          },
+          {
+            "sourceId": "source.local.00000000001.04",
+            "label": "EXAM 28/10/2026",
+            "excerpt": "HbA1c 8,1% (in aumento da 7,4% di aprile)"
+          },
+          {
+            "sourceId": "source.local.00000000001.04",
+            "label": "EXAM 28/10/2026",
+            "excerpt": "eGFR 58 mL/min"
+          },
+          {
+            "sourceId": "source.local.00000000001.04",
+            "label": "EXAM 28/10/2026",
+            "excerpt": "glicemia a digiuno 162 mg/dL"
+          },
+          {
+            "sourceId": "source.local.00000000001.04",
+            "label": "EXAM 28/10/2026",
+            "excerpt": "microalbuminuria 45 mg/g."
+          },
+          {
+            "sourceId": "source.local.00000000001.05",
+            "label": "VISIT 30/08/2026",
+            "excerpt": "In terapia con metformina 1000 mg due volte al giorno."
+          }
+        ],
+        "sources": [
+          {
+            "id": "source.local.00000000001.01",
+            "kind": "patient-notes",
+            "label": "Note paziente",
+            "date": null,
+            "content": "Nota clinica sintetica ripetibile per il benchmark locale."
+          },
+          {
+            "id": "source.local.00000000001.02",
+            "kind": "clinical-entry",
+            "label": "NOTE 04/11/2026",
+            "date": "2026-11-04T16:00:00.000Z",
+            "content": "Esame del piede: sensibilita conservata al monofilamento, polsi periferici presenti. Ultimo fundus oculi oltre 2 anni fa: da prenotare."
+          },
+          {
+            "id": "source.local.00000000001.03",
+            "kind": "clinical-entry",
+            "label": "NOTE 04/11/2026 · segmento 2",
+            "date": "2026-11-04T16:00:00.000Z",
+            "content": "Valutare intensificazione della terapia (SGLT2 inibitore considerando eGFR e microalbuminuria)."
+          },
+          {
+            "id": "source.local.00000000001.04",
+            "kind": "clinical-entry",
+            "label": "EXAM 28/10/2026",
+            "date": "2026-10-28T08:00:00.000Z",
+            "content": "HbA1c 8,1% (in aumento da 7,4% di aprile), glicemia a digiuno 162 mg/dL, eGFR 58 mL/min, microalbuminuria 45 mg/g."
+          },
+          {
+            "id": "source.local.00000000001.05",
+            "kind": "clinical-entry",
+            "label": "VISIT 30/08/2026",
+            "date": "2026-08-30T11:00:00.000Z",
+            "content": "Peso 92 kg, BMI 31. PA 138/86 mmHg. In terapia con metformina 1000 mg due volte al giorno. Dieta seguita con difficolta, poca attivita fisica."
+          },
+          {
+            "id": "source.local.00000000001.06",
+            "kind": "clinical-entry",
+            "label": "VISIT 15/07/2026",
+            "date": "2026-07-14T22:00:00.000Z",
+            "content": "Contenuto clinico sintetico con lunghezza stabile per la baseline."
+          },
+          {
+            "id": "source.local.00000000001.07",
+            "kind": "clinical-entry",
+            "label": "PHONE 01/07/2026",
+            "date": "2026-06-30T22:00:00.000Z",
+            "content": "Contenuto clinico sintetico con lunghezza stabile per la baseline."
+          },
+          {
+            "id": "source.local.00000000001.08",
+            "kind": "clinical-entry",
+            "label": "EXAM 17/06/2026",
+            "date": "2026-06-16T22:00:00.000Z",
+            "content": "Contenuto clinico sintetico con lunghezza stabile per la baseline."
+          },
+          {
+            "id": "source.local.00000000001.09",
+            "kind": "attachment-summary",
+            "label": "Allegato referto-sintetico-1.pdf",
+            "date": "2026-07-14T22:00:00.000Z",
+            "content": "Sintesi documentale sintetica, sempre soggetta a revisione."
+          },
+          {
+            "id": "source.local.00000000001.0a",
+            "kind": "attachment-summary",
+            "label": "Allegato referto-sintetico-2.pdf",
+            "date": "2026-07-07T22:00:00.000Z",
+            "content": "Sintesi documentale sintetica, sempre soggetta a revisione."
+          }
+        ]
+      }
+    },
+    {
+      "id": "P3",
+      "expected": [
+        {
+          "id": "anemia_sideropenica",
+          "pattern": "anemi.*(?:sideropen|ferro|iron)|iron.*(?:deficien|anemi)",
+          "sourceIds": [
+            "source.synthetic.p3.01"
+          ]
+        }
+      ],
+      "recordPatterns": [
+        "ipotiroid|hypothyroid|\\be03"
+      ],
+      "projection": {
+        "schemaVersion": "mediflow.smart-import.projection.v1",
+        "capability": "smart_import",
+        "selectionEpoch": 1,
+        "patientRevision": 1,
+        "sourceRevision": 1,
+        "capturedAt": "2026-11-11T18:00:00.000Z",
+        "patientRef": "patient.synthetic.wul832.p3",
+        "currentDiagnoses": [
+          {
+            "system": "ICD-10",
+            "code": "E03.9",
+            "description": "Ipotiroidismo non specificato"
+          }
+        ],
+        "currentActiveTherapies": [
+          {
+            "drugName": "Levotiroxina 50 microgrammi",
+            "activePrinciple": "Levotiroxina",
+            "dosage": "al mattino",
+            "aic": null,
+            "atc": null
+          }
+        ],
+        "therapyCandidateHints": [],
+        "sources": [
+          {
+            "id": "source.synthetic.p3.01",
+            "kind": "clinical-entry",
+            "label": "Referto ematologico sintetico",
+            "date": "2026-11-10T09:00:00.000Z",
+            "content": "Diagnosi attuale: anemia sideropenica. Hb 10,2 g/dL, ferritina 8 ng/mL. Si prescrive solfato ferroso 105 mg una compressa al giorno. Controllo emocromo e ferritina fra 6 settimane."
+          },
+          {
+            "id": "source.synthetic.p3.02",
+            "kind": "clinical-entry",
+            "label": "Controllo sintetico",
+            "date": "2026-11-10T09:00:00.000Z",
+            "content": "TSH 2,1 mUI/L. Prosegue levotiroxina 50 microgrammi al mattino. Nessun sanguinamento evidente."
+          },
+          {
+            "id": "source.synthetic.p3.03",
+            "kind": "clinical-entry",
+            "label": "Anamnesi sintetica",
+            "date": "2026-11-10T09:00:00.000Z",
+            "content": "Pregressa polmonite nel 2019, risolta. Familiarita per diabete mellito. Non segni di infezione attuale."
+          }
+        ]
+      }
+    },
+    {
+      "id": "P4",
+      "expected": [
+        {
+          "id": "bronchiectasie",
+          "pattern": "bronchiecta",
+          "sourceIds": [
+            "source.synthetic.p4.01"
+          ]
+        }
+      ],
+      "recordPatterns": [
+        "broncopneumopatia|bpco|copd|chronic obstruct|\\bj44"
+      ],
+      "projection": {
+        "schemaVersion": "mediflow.smart-import.projection.v1",
+        "capability": "smart_import",
+        "selectionEpoch": 1,
+        "patientRevision": 1,
+        "sourceRevision": 1,
+        "capturedAt": "2026-11-11T18:00:00.000Z",
+        "patientRef": "patient.synthetic.wul832.p4",
+        "currentDiagnoses": [
+          {
+            "system": "ICD-10",
+            "code": "J44.9",
+            "description": "Broncopneumopatia cronica ostruttiva"
+          }
+        ],
+        "currentActiveTherapies": [
+          {
+            "drugName": "Tiotropio 18 microgrammi",
+            "activePrinciple": "Tiotropio",
+            "dosage": "una inalazione al giorno",
+            "aic": null,
+            "atc": null
+          }
+        ],
+        "therapyCandidateHints": [],
+        "sources": [
+          {
+            "id": "source.synthetic.p4.01",
+            "kind": "clinical-entry",
+            "label": "TC torace sintetica",
+            "date": "2026-11-10T09:00:00.000Z",
+            "content": "Diagnosi: bronchiectasie cilindriche bilaterali, attualmente sintomatiche con tosse produttiva. Non addensamenti polmonari. Indicata visita pneumologica e fisioterapia respiratoria."
+          },
+          {
+            "id": "source.synthetic.p4.02",
+            "kind": "clinical-entry",
+            "label": "Controllo respiratorio sintetico",
+            "date": "2026-11-10T09:00:00.000Z",
+            "content": "SpO2 95% in aria ambiente. Prosegue tiotropio 18 microgrammi una inalazione al giorno. Nessuna riacutizzazione infettiva in atto."
+          },
+          {
+            "id": "source.synthetic.p4.03",
+            "kind": "clinical-entry",
+            "label": "Anamnesi sintetica",
+            "date": "2026-11-10T09:00:00.000Z",
+            "content": "Ex fumatore. Padre con asma. Pregressa frattura del radio consolidata, senza esiti."
+          }
+        ]
+      }
+    },
+    {
+      "id": "P5",
+      "expected": [
+        {
+          "id": "fibrillazione_atriale",
+          "pattern": "fibrillazion.*atrial|atrial fibrillat",
+          "sourceIds": [
+            "source.synthetic.p5.01"
+          ]
+        }
+      ],
+      "recordPatterns": [
+        "ipertension|hypertension|\\bi10"
+      ],
+      "projection": {
+        "schemaVersion": "mediflow.smart-import.projection.v1",
+        "capability": "smart_import",
+        "selectionEpoch": 1,
+        "patientRevision": 1,
+        "sourceRevision": 1,
+        "capturedAt": "2026-11-11T18:00:00.000Z",
+        "patientRef": "patient.synthetic.wul832.p5",
+        "currentDiagnoses": [
+          {
+            "system": "ICD-10",
+            "code": "I10",
+            "description": "Ipertensione essenziale"
+          }
+        ],
+        "currentActiveTherapies": [
+          {
+            "drugName": "Losartan 50 mg",
+            "activePrinciple": "Losartan",
+            "dosage": "al mattino",
+            "aic": null,
+            "atc": null
+          }
+        ],
+        "therapyCandidateHints": [],
+        "sources": [
+          {
+            "id": "source.synthetic.p5.01",
+            "kind": "clinical-entry",
+            "label": "ECG e visita sintetici",
+            "date": "2026-11-10T09:00:00.000Z",
+            "content": "Diagnosi attuale: fibrillazione atriale persistente, documentata all ECG. Frequenza ventricolare media 82 bpm. Iniziato apixaban 5 mg due volte al giorno. Richiesto controllo cardiologico tra un mese."
+          },
+          {
+            "id": "source.synthetic.p5.02",
+            "kind": "clinical-entry",
+            "label": "Diario sintetico",
+            "date": "2026-11-10T09:00:00.000Z",
+            "content": "PA domiciliare 132/78 mmHg. Prosegue losartan 50 mg al mattino. Assenza di dolore toracico e di segni di scompenso."
+          },
+          {
+            "id": "source.synthetic.p5.03",
+            "kind": "clinical-entry",
+            "label": "Anamnesi sintetica",
+            "date": "2026-11-10T09:00:00.000Z",
+            "content": "Colecistectomia nel 2010 senza complicanze. Madre con diabete tipo 2. Nessuna cardiopatia ischemica documentata."
+          }
+        ]
+      }
+    }
+  ]
+}
