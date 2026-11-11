@@ -411,9 +411,7 @@ pub fn patient_insight_message(code: &str) -> &'static str {
         "source_stale" => {
             "I dati della scheda sono cambiati durante la generazione. Rileggi la scheda e riprova."
         }
-        "provider_failed" => {
-            "Il modello locale non ha completato la risposta. Nessuna proposta creata."
-        }
+        "provider_failed" => "Il modello locale non ha completato la risposta.",
         "proposal_invalid" => {
             "La risposta del modello non ha superato i controlli dell'host. Nessuna proposta creata."
         }
@@ -430,7 +428,7 @@ pub fn patient_insight_message(code: &str) -> &'static str {
         "response_invalid" => {
             "La risposta dell'host non ha superato i controlli di GPUI. Nessuna proposta mostrata."
         }
-        _ => "L'host ha rifiutato la richiesta. Nessuna proposta creata.",
+        _ => "L'host ha rifiutato la richiesta.",
     }
 }
 
@@ -964,5 +962,18 @@ mod tests {
         ] {
             assert_eq!(check(change), Err(RuntimeError::InvalidResponse));
         }
+    }
+
+    /// Un errore senza proposta lo dice col solo motivo: la proposta mancante si vede.
+    #[test]
+    fn refusal_messages_state_only_the_reason() {
+        assert_eq!(
+            patient_insight_message("provider_failed"),
+            "Il modello locale non ha completato la risposta."
+        );
+        assert_eq!(
+            patient_insight_message("codice-sconosciuto"),
+            "L'host ha rifiutato la richiesta."
+        );
     }
 }

@@ -268,7 +268,7 @@ impl ClinicalApp {
                 ImportPhase::Proposal { request, proposal }
             }
             Ok(GenerationOutcome::Proposal(_)) => ImportPhase::Error(
-                "Le fonti della scheda sono cambiate durante la richiesta. Nessuna proposta creata: riprova.".into(),
+                "Le fonti della scheda sono cambiate durante la richiesta. Riprova.".into(),
             ),
             Ok(GenerationOutcome::Unavailable(code)) => {
                 ImportPhase::Unavailable(smart_import_message(&code).into())
@@ -282,7 +282,7 @@ impl ClinicalApp {
             Err(RuntimeError::Conflict) => {
                 ImportPhase::Error(smart_import_message("selection_changed").into())
             }
-            Err(error) => ImportPhase::Error(format!("{} Nessuna proposta creata.", ui_error(error))),
+            Err(error) => ImportPhase::Error(ui_error(error)),
         };
         cx.notify();
     }

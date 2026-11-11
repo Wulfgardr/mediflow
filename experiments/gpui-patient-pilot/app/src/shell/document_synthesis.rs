@@ -267,9 +267,9 @@ impl ClinicalApp {
             Ok(GenerationOutcome::Proposal(proposal)) if current => {
                 GenerationPhase::Proposal { request, proposal }
             }
-            Ok(GenerationOutcome::Proposal(_)) => GenerationPhase::Error(
-                document_synthesis_message("currentness_mismatch").into(),
-            ),
+            Ok(GenerationOutcome::Proposal(_)) => {
+                GenerationPhase::Error(document_synthesis_message("currentness_mismatch").into())
+            }
             Ok(GenerationOutcome::Unavailable(code)) => {
                 GenerationPhase::Unavailable(document_synthesis_message(&code).into())
             }
@@ -280,11 +280,9 @@ impl ClinicalApp {
                 GenerationPhase::Error(document_synthesis_message("response_invalid").into())
             }
             Err(RuntimeError::Conflict) => GenerationPhase::Error(
-                "La selezione sull’host è cambiata durante la richiesta. Nessuna proposta creata: riprova.".into(),
+                "La selezione sull’host è cambiata durante la richiesta. Riprova.".into(),
             ),
-            Err(error) => {
-                GenerationPhase::Error(format!("{} Nessuna proposta creata.", ui_error(error)))
-            }
+            Err(error) => GenerationPhase::Error(ui_error(error)),
         };
         cx.notify();
     }
@@ -471,7 +469,7 @@ impl ClinicalApp {
                                 if currency == SynthesisCurrency::Reading {
                                     "Documenti in rilettura: la proposta torna visibile se il documento non è cambiato."
                                 } else {
-                                    "Proposta superata: il documento è cambiato o è stato tolto dopo la generazione. Non viene mostrata; puoi prepararne una nuova."
+                                    "Proposta superata: il documento è cambiato o è stato tolto dopo la generazione."
                                 },
                                 theme,
                                 false,

@@ -443,7 +443,7 @@ fn altered_response_is_an_error_not_a_proposal(cx: &mut gpui::TestAppContext) {
     cx.run_until_parked();
     assert!(bench.phase(
         cx,
-        |phase| matches!(phase, GenerationPhase::Error(m) if m.contains("controlli di GPUI"))
+        |phase| matches!(phase, GenerationPhase::Error(m) if m == "La risposta dell'host non ha superato i controlli dell'app.")
     ));
     bench.assert_no_clinical_write();
 }
