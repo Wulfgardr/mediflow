@@ -17,7 +17,7 @@ export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProp
     return <div className={styles.summary} data-testid="patient-proposals-summary">
         <span>{count === 0 ? 'Nessuna proposta da rivedere' : `${count} ${count === 1 ? 'proposta' : 'proposte'} da rivedere`}</span>
         <span className={styles.links}>
-            <a href="#patient-insight" className="mf-button-text">Patient Insight</a>
+            <a href="#patient-insight" className="mf-button-text">Quadro paziente</a>
             {smartImportAvailable ? <a href="#smart-import" className="mf-button-text">Smart Import</a> : null}
         </span>
     </div>;
@@ -29,8 +29,8 @@ export function PatientClinicalSupport({ patient, stale, onProposalChange }: {
     onProposalChange?: (patientKey: string | null) => void;
 }) {
     const folder = useRuntimeTwinFolder();
-    return <section className={styles.section} aria-label="Patient Insight" hidden={folder !== null && folder !== 'attenzione'}>
-        <h3>Patient Insight</h3>
+    return <section className={styles.section} aria-label="Quadro paziente" hidden={folder !== null && folder !== 'attenzione'}>
+        <h3>Quadro paziente</h3>
         <Disclosure id="patient-insight" className={disclosure.disclosure} title="Proposte">
             <AIPatientInsight patient={patient} stale={stale} onProposalChange={onProposalChange} />
         </Disclosure>

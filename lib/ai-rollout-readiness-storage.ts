@@ -52,7 +52,7 @@ const AI_ROLLOUT_LOCAL_CONTROL_META: Record<RolloutReadinessLocalControlLane, {
     resolveEnabled: (value: unknown) => boolean;
 }> = {
     patient_insight: {
-        label: 'Patient Insight',
+        label: 'Quadro paziente',
         key: AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
         resolveEnabled: isAiPatientInsightEnabledValue,
     },

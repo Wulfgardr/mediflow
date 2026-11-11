@@ -1,0 +1,379 @@
+[
+  {
+    "file": "app/mockups/scheda/page.tsx",
+    "removed": [
+      "Sintesi AI"
+    ],
+    "added": [
+      "Quadro paziente"
+    ]
+  },
+  {
+    "file": "app/settings/ai/fabric/page.tsx",
+    "removed": [
+      "Ollama segue la configurazione e l’ammissione locali. Le preferenze mostrano soltanto le opzioni del catalogo host; salvarle non prova che una funzione sia pronta."
+    ],
+    "added": [
+      "Ollama segue la configurazione e l’ammissione locali. Le preferenze mostrano soltanto le opzioni del catalogo home-base; salvarle non prova che una funzione sia pronta."
+    ]
+  },
+  {
+    "file": "app/settings/ai/funzioni/page.tsx",
+    "removed": [
+      "Budget AI"
+    ],
+    "added": [
+      "Budget IA"
+    ]
+  },
+  {
+    "file": "app/settings/page.tsx",
+    "removed": [
+      "Pairing e sessione non sono verificabili finché i dettagli del nodo non tornano disponibili."
+    ],
+    "added": [
+      "Abbinamento e sessione non sono verificabili finché i dettagli del nodo non tornano disponibili."
+    ]
+  },
+  {
+    "file": "components/ai-patient-insight.tsx",
+    "removed": [
+      "Apri Impostazioni AI",
+      "Avvia supporto",
+      "Genera una proposta da revisionare",
+      "La cartella resta invariata.",
+      "Nuova bozza",
+      "Patient Insight disabilitata",
+      "Patient Insight non è disponibile in questo momento.",
+      "Patient Insight è disabilitata. Si riattiva in Impostazioni AI.",
+      "Quadro attuale",
+      "Receipt, provenance e currentness",
+      "Supporto al ragionamento clinico",
+      "Un riepilogo temporaneo da confrontare con i dati in cartella. Nessun aggiornamento automatico.",
+      "· egress"
+    ],
+    "added": [
+      "Apri Impostazioni IA",
+      "Genera proposta",
+      "La cartella non cambia.",
+      "Nuova proposta",
+      "Quadro paziente disabilitato",
+      "Quadro paziente non è disponibile in questo momento.",
+      "Quadro paziente è disabilitato. Si riattiva in Impostazioni IA.",
+      "Ricevuta, provenienza e validità",
+      "Riduzione del contesto",
+      "Stato attuale",
+      "verifica del formato",
+      "· processo locale · nessuna uscita dati"
+    ]
+  },
+  {
+    "file": "components/diagnostic-hub.tsx",
+    "removed": [
+      "Controlla la risposta alla richiesta delle impostazioni del provider AI.",
+      "Impostazioni AI",
+      "Provider AI"
+    ],
+    "added": [
+      "Controlla la risposta alla richiesta delle impostazioni del provider IA.",
+      "Impostazioni IA",
+      "Provider IA"
+    ]
+  },
+  {
+    "file": "components/function-models/function-model-picker.tsx",
+    "removed": [
+      "Consenti OpenAI su questo host (disattivato per default)",
+      "Consenti per questo contesto",
+      "Contesto preparato e redatto:",
+      "Genera questa proposta",
+      "Identità del contesto preparato",
+      "Il contesto scelto viene minimizzato e redatto sul computer host. OpenAI riceve il testo redatto solo dopo il consenso. Restano applicabili le condizioni e la conservazione del servizio ChatGPT; non è garantita conservazione zero.",
+      "byte. Questa proposta non modifica la cartella."
+    ],
+    "added": [
+      "Abilita OpenAI su questo home-base (disattivato per default)",
+      "Consenti invio a OpenAI per questo contesto",
+      "Contesto preparato ed oscurato:",
+      "Genera proposta",
+      "Il contesto scelto viene minimizzato ed oscurato sull’home-base. OpenAI riceve il testo redatto solo dopo il consenso. Restano applicabili le condizioni e la conservazione del servizio ChatGPT; non è garantita conservazione zero.",
+      "Impronta del contesto"
+    ]
+  },
+  {
+    "file": "components/function-models/function-preferences-panel.tsx",
+    "removed": [
+      "Questa modifica riguarda solo l’interruttore condiviso della funzione; non seleziona né ammette un modello locale. La preferenza locale resta invariata. Per ogni proposta scegli OpenAI nella funzione: restano necessari opt-in dell’host, contesto corrente, consenso, accesso dedicato e catalogo del tentativo."
+    ],
+    "added": [
+      "Questa modifica riguarda solo l’interruttore condiviso della funzione; non seleziona né ammette un modello locale. La preferenza locale resta invariata. Per ogni proposta scegli OpenAI nella funzione: restano necessari opt-in dell’home-base, contesto corrente, consenso, accesso dedicato e catalogo del tentativo."
+    ]
+  },
+  {
+    "file": "components/kree8/areas/governance-area.tsx",
+    "removed": [
+      "Account, funzioni AI, rete, backup, repertori e controlli locali restano raggiungibili da qui.",
+      "Funzioni AI",
+      "Le funzioni AI restano spente o attive per area, con controlli rapidi.",
+      "Modelli AI",
+      "· accessi, AI e backup"
+    ],
+    "added": [
+      "Account, funzioni IA, rete, backup, repertori e controlli locali restano raggiungibili da qui.",
+      "Funzioni IA",
+      "Le funzioni IA restano spente o attive per area, con controlli rapidi.",
+      "Modelli IA",
+      "· accessi, IA e backup"
+    ]
+  },
+  {
+    "file": "components/kree8/areas/live-governance-area.tsx",
+    "removed": [
+      "Modelli AI locali"
+    ],
+    "added": [
+      "Modelli IA locali"
+    ]
+  },
+  {
+    "file": "components/kree8/areas/turno-area.tsx",
+    "removed": [
+      "AI",
+      "Usa la scheda paziente per rivedere documenti, suggerimenti AI e codifiche prima di applicare aggiornamenti clinici."
+    ],
+    "added": [
+      "Usa la scheda paziente per rivedere documenti, suggerimenti IA e codifiche prima di applicare aggiornamenti clinici."
+    ]
+  },
+  {
+    "file": "components/kree8/cockpit-shared.tsx",
+    "removed": [
+      "AI",
+      "Coda decisioni AI · 7 casi"
+    ],
+    "added": [
+      "Coda decisioni IA · 7 casi"
+    ]
+  },
+  {
+    "file": "components/observation-manager.tsx",
+    "removed": [
+      "Misure"
+    ],
+    "added": [
+      "Parametri"
+    ]
+  },
+  {
+    "file": "components/patient-clinical-support.tsx",
+    "removed": [
+      "Patient Insight"
+    ],
+    "added": [
+      "Quadro paziente"
+    ]
+  },
+  {
+    "file": "components/patient-form.tsx",
+    "removed": [
+      "Caregiver o riferimento",
+      "Conosco solo l’anno (stima)"
+    ],
+    "added": [
+      "Caregiver",
+      "Conosco solo l’anno"
+    ]
+  },
+  {
+    "file": "components/patient-profile-access-action.tsx",
+    "removed": [
+      "Autorizza una lettura del paziente selezionato. Non consente modifiche né abilita provider AI."
+    ],
+    "added": [
+      "Autorizza una lettura del paziente selezionato. Non consente modifiche né abilita provider IA."
+    ]
+  },
+  {
+    "file": "components/patient-profile-review-pilot.tsx",
+    "removed": [
+      "La revisione è scaduta. La bozza è conservata: preparala di nuovo e verifica il contenuto.",
+      "Revisione non ammessa. Nessuna modifica salvata. La bozza è conservata: verifica la sessione e il PIN, poi prepara una nuova revisione."
+    ],
+    "added": [
+      "La bozza è intatta."
+    ]
+  },
+  {
+    "file": "components/runtime-twin-workspace.tsx",
+    "removed": [
+      "Misure"
+    ],
+    "added": [
+      "Parametri"
+    ]
+  },
+  {
+    "file": "components/settings/ai-model-parliament-panel.tsx",
+    "removed": [
+      "Aree AI",
+      "Confronto modelli AI",
+      "Copertura per area AI"
+    ],
+    "added": [
+      "Aree IA",
+      "Confronto modelli IA",
+      "Copertura per area IA"
+    ]
+  },
+  {
+    "file": "components/settings/local-provider-onboarding-panel.tsx",
+    "removed": [
+      "Se il caricamento non termina nel limite della verifica, prepara il modello con gli strumenti dell’host. Poi riprendi dalla lettura dello stato: non sono previsti tentativi automatici.",
+      "Verifica locale e possibile caricamento del modello in memoria in corso. La verifica host ha un limite di 60 secondi."
+    ],
+    "added": [
+      "Se il caricamento non termina nel limite della verifica, prepara il modello con gli strumenti dell’home-base. Poi riprendi dalla lettura dello stato: non sono previsti tentativi automatici.",
+      "Verifica locale e possibile caricamento del modello in memoria in corso. La verifica home-base ha un limite di 60 secondi."
+    ]
+  },
+  {
+    "file": "components/settings/who-local-setup-guide.tsx",
+    "removed": [
+      "Chiudere questa guida non interrompe un’installazione già avviata sul computer host. Non è disponibile un arresto dal browser.",
+      "Configura WHO su questo host",
+      "Controlla per prima cosa il servizio sul computer host. Questo comando legge lo stato; non scarica e non avvia WHO:",
+      "Installa e avvia dal computer host",
+      "Nella cartella MediFlow del computer host, usa il comando selezionato in Prepara. Windows usa PowerShell senza bypass della policy; Linux e macOS usano il terminale locale:",
+      "Per il primo download serve una connessione. Controlla sul computer host lo spazio libero per immagine, catalogo e copie di recupero: questa pagina non lo misura e non dichiara i prerequisiti soddisfatti.",
+      "Questa conferma non viene salvata né inviata al server e non sostituisce il consenso nel terminale host. Per una nuova installazione, la procedura locale richiede di scrivere"
+    ],
+    "added": [
+      "Chiudere questa guida non interrompe un’installazione già avviata sul home-base. Non è disponibile un arresto dal browser.",
+      "Configura WHO su questo home-base",
+      "Controlla per prima cosa il servizio sul home-base. Questo comando legge lo stato; non scarica e non avvia WHO:",
+      "Installa e avvia dal home-base",
+      "Nella cartella MediFlow del home-base, usa il comando selezionato in Prepara. Windows usa PowerShell senza bypass della policy; Linux e macOS usano il terminale locale:",
+      "Per il primo download serve una connessione. Controlla sul home-base lo spazio libero per immagine, catalogo e copie di recupero: questa pagina non lo misura e non dichiara i prerequisiti soddisfatti.",
+      "Questa conferma non viene salvata né inviata al server e non sostituisce il consenso nel terminale home-base. Per una nuova installazione, la procedura locale richiede di scrivere"
+    ]
+  },
+  {
+    "file": "components/settings/who-setup-panel.tsx",
+    "removed": [
+      "Il setup host conserva manifesto, consenso, snapshot e prove nella cartella privata MediFlow/WHO. Non espone Docker al Web. Per controllare o riprendere le verifiche del solo servizio creato dalla procedura:"
+    ],
+    "added": [
+      "Il setup home-base conserva manifesto, consenso, snapshot e prove nella cartella privata MediFlow/WHO. Non espone Docker al Web. Per controllare o riprendere le verifiche del solo servizio creato dalla procedura:"
+    ]
+  },
+  {
+    "file": "components/treatment-reasoning-panel.tsx",
+    "removed": [
+      "Ragionamento terapeutico"
+    ],
+    "added": []
+  },
+  {
+    "file": "components/work-profile-onboarding.tsx",
+    "removed": [
+      "Configurazione AI facoltativa",
+      "Raccomandazione calcolata con regole locali dalle tue risposte, senza un modello AI.",
+      "Scegli da dove iniziare. Puoi usare la cartella senza AI."
+    ],
+    "added": [
+      "Configurazione IA facoltativa",
+      "Raccomandazione calcolata con regole locali dalle tue risposte, senza un modello IA.",
+      "Scegli da dove iniziare. Puoi usare la cartella senza IA."
+    ]
+  },
+  {
+    "file": "lib/ai-providers/fabric/patient-insight-preview-contract.ts",
+    "removed": [
+      "Il modello clinico locale non è disponibile. Verifica le Impostazioni AI.",
+      "Il modello non ha completato la risposta. Riprova più tardi o verifica le Impostazioni AI.",
+      "Patient Insight non è disponibile in questo momento.",
+      "Patient Insight è disabilitata. Si riattiva in Impostazioni AI."
+    ],
+    "added": [
+      "Il modello clinico locale non è disponibile. Verifica le Impostazioni IA.",
+      "Il modello non ha completato la risposta. Riprova più tardi o verifica le Impostazioni IA.",
+      "Quadro paziente non è disponibile in questo momento.",
+      "Quadro paziente è disabilitato. Si riattiva in Impostazioni IA."
+    ]
+  },
+  {
+    "file": "lib/ai-rollout-model-guard.ts",
+    "removed": [
+      "Patient Insight"
+    ],
+    "added": [
+      "Quadro paziente"
+    ]
+  },
+  {
+    "file": "lib/ai-rollout-readiness-storage.ts",
+    "removed": [
+      "Patient Insight"
+    ],
+    "added": [
+      "Quadro paziente"
+    ]
+  },
+  {
+    "file": "lib/domain/documents/patient-review-queue-summary.ts",
+    "removed": [
+      "Interruttore AI locale spento: il sistema non genera né scrive nulla finché non lo riattivi in Impostazioni.",
+      "Patient Insight"
+    ],
+    "added": [
+      "Interruttore IA locale spento: il sistema non genera né scrive nulla finché non lo riattivi in Impostazioni.",
+      "Quadro paziente"
+    ]
+  },
+  {
+    "file": "lib/fabric-settings-view.ts",
+    "removed": [
+      "Registro capability Fabric incompleto o duplicato.",
+      "Registro capability Fabric non conforme.",
+      "Sintesi del quadro paziente"
+    ],
+    "added": [
+      "Quadro paziente",
+      "Registro delle funzioni Fabric incompleto o duplicato.",
+      "Registro delle funzioni Fabric non conforme."
+    ]
+  },
+  {
+    "file": "lib/network-operating-mode.ts",
+    "removed": [
+      "AI locale",
+      "Benchmark per area AI e governance prima dell attivazione reale",
+      "Fallback automatico negato: se l AI non e disponibile, la richiesta fallisce",
+      "Fallback non riconosciuto: AI non disponibile",
+      "Il nodo dichiara una configurazione AI locale. Lo stato non autorizza esecuzione AI dai dispositivi associati.",
+      "Il nodo usa il runtime AI solo in locale e non promette inferenza remota o pairing AI.",
+      "Il pairing del device non sostituisce il login operatore",
+      "La modalita rete e attiva, ma la configurazione AI locale del nodo non e pronta. Nessuna esecuzione paired e autorizzata.",
+      "Pairing richiesto",
+      "Patient Insight",
+      "Serve pairing",
+      "Stato AI host disponibile",
+      "Stato AI host non disponibile"
+    ],
+    "added": [
+      "Abbinamento richiesto",
+      "Benchmark per area IA e governance prima dell attivazione reale",
+      "Fallback automatico negato: se l IA non e disponibile, la richiesta fallisce",
+      "Fallback non riconosciuto: IA non disponibile",
+      "IA locale",
+      "Il nodo dichiara una configurazione IA locale. Lo stato non autorizza esecuzione IA dai dispositivi associati.",
+      "Il nodo usa il runtime IA solo in locale e non promette inferenza remota o abbinamento IA.",
+      "La modalita rete e attiva, ma la configurazione IA locale del nodo non e pronta. Nessuna esecuzione paired e autorizzata.",
+      "L’abbinamento del device non sostituisce il login operatore",
+      "Quadro paziente",
+      "Serve abbinamento",
+      "Stato IA home-base disponibile",
+      "Stato IA home-base non disponibile"
+    ]
+  }
+]
