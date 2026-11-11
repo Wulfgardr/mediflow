@@ -24,7 +24,8 @@
         "preprocessing": [
           "context_minimization",
           "envelope_validation"
-        ]
+        ],
+        "attempts": 1
       },
       "reviewRef": null
     }
