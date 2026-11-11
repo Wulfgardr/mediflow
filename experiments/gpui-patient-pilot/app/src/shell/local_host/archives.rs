@@ -437,7 +437,9 @@ impl ClinicalApp {
                 this.local_host.archives.status = Some(match result {
                     Ok(receipt) => format!(
                         "Ricevuta riletta: ripristino completato il {}. Archivio {}. Impronta {}.",
-                        receipt.completed_at, receipt.archive_generation, receipt.source_checksum
+                        crate::components::display_instant(&receipt.completed_at),
+                        receipt.archive_generation,
+                        receipt.source_checksum
                     ),
                     Err(error) => format!(
                         "Ricevuta non confermata: {} Conserva il registro e il backup.",
