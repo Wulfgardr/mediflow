@@ -19,6 +19,7 @@ import {
 import {
     buildDocumentSynthesisExtractionPrompt as buildDocumentSynthesisPromptDirect,
     buildSmartImportExtractionPrompt as buildSmartImportPromptDirect,
+    PATIENT_INSIGHT_DECISION_FIDELITY_RULE,
 } from './ai-task-contract-prompts';
 
 /* WUL-362 R5: il contatore misura visite di caratteri, non tempo. */
@@ -96,6 +97,20 @@ test('patient insight extraction prompt enforces recency, neutral tone, and evid
     assert.match(prompt, /evita etichette inferite o enfatiche/i);
     assert.match(prompt, /non trasformare da soli codici storici, fattori sociali o stili di vita/i);
     assert.match(prompt, /italiano clinico neutro e non moralizzante/i);
+});
+
+test('patient insight prompt tells the model to keep decision state and urgency as written (ADR 0189)', () => {
+    const lines = buildPatientInsightExtractionPrompt('contesto sintetico').split('\n');
+    const rule = '- mantieni lo stato delle decisioni come scritto nelle fonti (cio che e da decidere o proposto resta aperto, '
+        + 'non scriverlo come deciso o avviato) e non aggiungere urgenze o priorita che le fonti non scrivono';
+    assert.equal(`- ${PATIENT_INSIGHT_DECISION_FIDELITY_RULE}`, rule);
+    assert.equal(lines.filter((line) => line === rule).length, 1);
+    // Una sola riga nuova, subito dopo il divieto di inventare: il resto delle regole resta com'era.
+    assert.equal(lines[lines.indexOf(rule) - 1], '- non inventare diagnosi, esami, terapie o fonti');
+    assert.match(PATIENT_INSIGHT_DECISION_FIDELITY_RULE, /^[\x20-\x7e]+$/u);
+    // Solo il Quadro: import assistito e sintesi dei documenti non cambiano.
+    assert.equal(buildSmartImportExtractionPrompt({ x: 1 }).includes(PATIENT_INSIGHT_DECISION_FIDELITY_RULE), false);
+    assert.equal(buildDocumentSynthesisExtractionPrompt('testo').includes(PATIENT_INSIGHT_DECISION_FIDELITY_RULE), false);
 });
 
 test('smart import extraction keeps only valid structured suggestions', () => {
