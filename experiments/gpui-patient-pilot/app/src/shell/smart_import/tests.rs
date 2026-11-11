@@ -462,7 +462,7 @@ fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppCon
     cx.run_until_parked();
     assert!(bench.phase(
         cx,
-        |phase| matches!(phase, GenerationPhase::Error(m) if m.contains("selezione sull’host è cambiata"))
+        |phase| matches!(phase, GenerationPhase::Error(m) if m == "La selezione sull’host è cambiata durante la richiesta. Riprova.")
     ));
     assert_eq!(bench.host.bodies(PREVIEW).len(), previews);
     bench.assert_no_clinical_write();
@@ -487,7 +487,7 @@ fn altered_or_foreign_response_is_an_error_not_a_proposal(cx: &mut gpui::TestApp
         assert!(answer.join().unwrap());
         assert!(bench.phase(
             cx,
-            |phase| matches!(phase, GenerationPhase::Error(m) if m.contains("controlli di GPUI"))
+            |phase| matches!(phase, GenerationPhase::Error(m) if m == "La risposta dell’host non ha superato i controlli dell’app.")
         ));
     }
     bench.assert_no_clinical_write();
