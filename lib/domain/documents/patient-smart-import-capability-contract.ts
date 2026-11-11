@@ -71,8 +71,9 @@ export function buildPatientSmartImportCapabilityPlan(projection: SmartImportPro
 
 /*
  * Tetto della risposta (ADR 0012, misura dell'11 novembre 2026). Evidenze e prestazioni crescono con
- * le fonti, quindi il tetto segue il prompt: un quarto di token per carattere, piu' del doppio del
- * massimo misurato (0,11). Il minimo e' quasi il doppio della risposta completa piu' lunga (1093 token);
+ * le fonti, quindi il tetto segue il prompt: un quarto di token per carattere, una volta e mezza il
+ * massimo misurato con la fonte su ogni item (0,17; risposta piu' lunga 1695 token). Il minimo e' quasi
+ * il doppio della risposta completa piu' lunga misurata col tetto fisso (1093 token);
  * il massimo e' quello della sintesi documenti (ADR 0102), circa 70 s di generazione a 120 token/s.
  */
 export const SMART_IMPORT_RESPONSE_TOKENS_FLOOR = 2048;

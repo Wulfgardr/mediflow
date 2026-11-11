@@ -936,7 +936,9 @@ pub fn smart_import_message(code: &str) -> &'static str {
         "fabric_denied" => "L’host non ha autorizzato l’esecuzione sul modello locale.",
         "provider_failed" => "Il modello locale non ha risposto.",
         "proposal_invalid" => "La risposta del modello non ha superato i controlli dell’host.",
-        "response_truncated" => "La risposta del modello si è interrotta prima della fine. Riprova.",
+        "response_truncated" => {
+            "La risposta del modello si è interrotta prima della fine. Riprova."
+        }
         "projection_unavailable"
         | "projection_stale"
         | "lease_expired"
