@@ -86,3 +86,12 @@ test('un aggiornamento prescribed -> delivered con data di collaudo non viola l\
     } else assert.equal(result.status, 409);
     assert.equal(countClinicalStatusIncoherence(sql).prostheticCollaudoOnUntestedStatus, 0);
 });
+
+test('un aggiornamento che porta solo la data di collaudo su una protesica consegnata non viola l\'invariante collaudo/stato', async () => {
+    const id = seed('delivered');
+    const result = await update(id, { collaudoAt: '2026-10-01' });
+    assert.equal(result.status, 200);
+    assert.equal(row(id).status, 'delivered');
+    assert.equal(row(id).collaudoAt, null, 'una protesica consegnata ma non collaudata non ha data di collaudo');
+    assert.equal(countClinicalStatusIncoherence(sql).prostheticCollaudoOnUntestedStatus, 0);
+});
