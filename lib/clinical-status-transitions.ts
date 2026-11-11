@@ -171,15 +171,15 @@ export function planProstheticStatusChange(
     }
     if (to === undefined || to === saved.status) {
         const removesDate = saved.status === 'tested' && requested.collaudoAt === null && saved.collaudoAt !== null;
-        return removesDate
-            ? { ok: false, denial: { status: 409, value: { error: 'A tested prosthetic prescription needs a collaudo date', code: 'prosthetic_collaudo_date_required' } } }
-            : { ok: true };
+        if (removesDate) return { ok: false, denial: { status: 409, value: { error: 'A tested prosthetic prescription needs a collaudo date', code: 'prosthetic_collaudo_date_required' } } };
+        // Solo una voce collaudata ha la data del collaudo: su un altro stato la data richiesta non si salva.
+        return saved.status !== 'tested' && requested.collaudoAt instanceof Date ? { ok: true, collaudo: { collaudoAt: null } } : { ok: true };
     }
     if (to === 'tested') {
         const savedDate = saved.collaudoAt && saved.collaudoAt.getTime() <= now.getTime() ? saved.collaudoAt : null;
         return { ok: true, collaudo: { collaudoAt: requested.collaudoAt ?? savedDate ?? now } };
     }
-    if (saved.status === 'tested') return { ok: true, collaudo: { collaudoAt: null } };
+    if (saved.status === 'tested' || requested.collaudoAt instanceof Date) return { ok: true, collaudo: { collaudoAt: null } };
     return { ok: true };
 }
 
