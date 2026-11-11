@@ -1,6 +1,10 @@
 import { PATIENT_INSIGHT_CLAIM_MAX_LENGTH } from './ai-providers/extraction-json-schemas';
 import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPlan } from './ai-preparation/emission-plan';
 export const AI_TASK_EXTRACTION_SCHEMA_VERSION = 'mediflow.ai.extract.v1';
+/** ADR 0189: dice al modello cio' che il controllo di fedelta' del server scarta. */
+export const PATIENT_INSIGHT_DECISION_FIDELITY_RULE = 'mantieni lo stato delle decisioni come scritto nelle fonti '
+    + '(cio che e da decidere o proposto resta aperto, non scriverlo come deciso o avviato) '
+    + 'e non aggiungere urgenze o priorita che le fonti non scrivono';
 
 type PromptTaskKind = 'patient_insight' | 'smart_import' | 'document_synthesis';
 
@@ -89,6 +93,7 @@ export function buildPatientInsightExtractionPlan(contextPlan: EmissionPlan): Em
             'non usare placeholder come [Sx], [S?] o riferimenti generici: ogni citation deve corrispondere a un id reale presente nel contesto',
             'non usare markdown nelle stringhe oltre ai marker [Sx] o [DATI-INCOMPLETI]',
             'non inventare diagnosi, esami, terapie o fonti',
+            PATIENT_INSIGHT_DECISION_FIDELITY_RULE,
             'non scrivere frasi rassicuranti o boilerplate come nessuna criticita se il contesto contiene episodio acuto recente, valore anomalo, stop terapeutico, limitazione funzionale o ausilio clinicamente rilevante',
             'evita etichette inferite o enfatiche come fragilita alta, elevato rischio, complesso o pericoloso se non esplicite nelle fonti',
             'non trasformare da soli codici storici, fattori sociali o stili di vita in counselling o piani generici se non esiste follow-up attivo documentato',
