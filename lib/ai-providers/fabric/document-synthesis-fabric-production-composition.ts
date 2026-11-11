@@ -11,7 +11,7 @@ import { isServerSessionProjectionOwner } from '../../security/server-session-pr
 type Publication = ReturnType<typeof finalizeDocumentSynthesisFabricPreparedExecution>;
 type Binding = () => Promise<DocumentSynthesisProviderBindingResult>;
 type Configuration = Readonly<{ owner: object; session: object; capsule: object }>;
-export type DocumentSynthesisFabricProductionComposition = Readonly<{ execute(stillCurrent?: () => boolean): Promise<Publication | DocumentSynthesisModelResponseRejected> }>;
+export type DocumentSynthesisFabricProductionComposition = Readonly<{ execute(stillCurrent?: () => boolean): Promise<Publication | DocumentSynthesisModelResponseRejected | DocumentSynthesisCitationNotLiteral> }>;
 
 const OBJECT = Object.prototype; const ObjectAssign = Object.assign; const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectHasOwn = Object.hasOwn; const ObjectIsFrozen = Object.isFrozen; const ReflectOwnKeys = Reflect.ownKeys; const IsProxy = types.isProxy;
 const ProcessExecArgv = process.execArgv; const ProcessExecArgvLength = ProcessExecArgv.length; const StringStartsWith = String.prototype.startsWith;
@@ -26,6 +26,14 @@ export type DocumentSynthesisModelResponseRejected = Readonly<{ [modelResponseRe
 export const DOCUMENT_SYNTHESIS_MODEL_RESPONSE_REJECTED = ObjectFreeze(ObjectCreate(null)) as DocumentSynthesisModelResponseRejected;
 export function isDocumentSynthesisModelResponseRejected(value: unknown): value is DocumentSynthesisModelResponseRejected { return value === DOCUMENT_SYNTHESIS_MODEL_RESPONSE_REJECTED; }
 
+/** Esito senza pubblicazione per una citazione del modello che non si ritrova nella fonte, neppure
+ * ignorando la forma degli spazi, anche al secondo tentativo. Lo decide il controllo locale del
+ * tentativo, non il diniego del lease: selezione cambiata e sessione chiusa restano `null`. */
+declare const citationNotLiteral: unique symbol;
+export type DocumentSynthesisCitationNotLiteral = Readonly<{ [citationNotLiteral]: true }>;
+export const DOCUMENT_SYNTHESIS_CITATION_NOT_LITERAL = ObjectFreeze(ObjectCreate(null)) as DocumentSynthesisCitationNotLiteral;
+export function isDocumentSynthesisCitationNotLiteral(value: unknown): value is DocumentSynthesisCitationNotLiteral { return value === DOCUMENT_SYNTHESIS_CITATION_NOT_LITERAL; }
+
 function frozen<T extends Record<string, unknown>>(value: T): Readonly<T> { return ObjectFreeze(ObjectAssign(ObjectCreate(null) as T, value)); }
 function configuration(value: unknown): Configuration | null {
     try { if (typeof value !== 'object' || value === null || IsProxy(value) || !ObjectIsFrozen(value) || ObjectGetPrototypeOf(value) !== OBJECT || ReflectOwnKeys(value).length !== 3) return null; const copied = ObjectCreate(null) as Record<string, unknown>; for (const key of ['owner', 'session', 'capsule']) { const descriptor = ObjectGetOwnPropertyDescriptor(value, key); if (!descriptor || !descriptor.enumerable || !ObjectHasOwn(descriptor, 'value')) return null; copied[key] = descriptor.value; } const owner = copied.owner; const session = copied.session; const capsule = copied.capsule; return typeof owner === 'object' && owner !== null && typeof session === 'object' && session !== null && typeof capsule === 'object' && capsule !== null && isServerSessionProjectionOwner(owner) && resolveDocumentSynthesisSourceSetExecutionInputAccessor(capsule, owner, session) ? frozen({ owner, session, capsule }) : null; } catch { return null; }
@@ -34,7 +42,7 @@ function testBinding(value: unknown): Binding | null { try { if (typeof value !=
 function create(configurationValue: unknown, bind: Binding): DocumentSynthesisFabricProductionComposition | null {
     const input = configuration(configurationValue); if (!input) return null;
     let state: 'ready' | 'running' | 'terminal' = 'ready';
-    return frozen({ async execute(stillCurrent?: () => boolean): Promise<Publication | DocumentSynthesisModelResponseRejected> {
+    return frozen({ async execute(stillCurrent?: () => boolean): Promise<Publication | DocumentSynthesisModelResponseRejected | DocumentSynthesisCitationNotLiteral> {
         if (state !== 'ready') return null; state = 'running';
         let binding: DocumentSynthesisProviderBindingResult; try { binding = await bind(); } catch { state = 'terminal'; return null; }
         if (binding.status !== 'available') { state = 'terminal'; return null; }
@@ -43,7 +51,7 @@ function create(configurationValue: unknown, bind: Binding): DocumentSynthesisFa
         const handoff = beginDocumentSynthesisFabricExecution(admitted.token);
         if (!handoff) { disposeDocumentSynthesisFabricAdmission(admitted.token); state = 'terminal'; return null; }
         const prepared = await prepareDocumentSynthesisFabricExecution(handoff, stillCurrent);
-        if (prepared.status !== 'available') { disposeDocumentSynthesisFabricAdmission(admitted.token); state = 'terminal'; return prepared.code === 'response_invalid' ? DOCUMENT_SYNTHESIS_MODEL_RESPONSE_REJECTED : null; }
+        if (prepared.status !== 'available') { disposeDocumentSynthesisFabricAdmission(admitted.token); state = 'terminal'; return prepared.code === 'response_invalid' ? DOCUMENT_SYNTHESIS_MODEL_RESPONSE_REJECTED : prepared.code === 'citation_not_literal' ? DOCUMENT_SYNTHESIS_CITATION_NOT_LITERAL : null; }
         state = 'terminal';
         return finalizeDocumentSynthesisFabricPreparedExecution(prepared.preparedToken);
     } }) as DocumentSynthesisFabricProductionComposition;

@@ -310,6 +310,9 @@ pub fn document_synthesis_message(code: &str) -> &'static str {
             "L'host non ha prodotto una sintesi: modello locale non pronto, risposta del modello scartata dai controlli o guasto."
         }
         "model_response_invalid" => "La risposta del modello non era valida. Riprova.",
+        "citation_not_literal" => {
+            "Il modello non ha citato il documento parola per parola. Riprova."
+        }
         "response_invalid" => "La risposta dell'host non ha superato i controlli dell'app.",
         _ => "L'host ha rifiutato la richiesta.",
     }
@@ -763,6 +766,10 @@ mod tests {
             (
                 "response-proposal-truncated",
                 GenerationOutcome::Failed("model_response_invalid".into()),
+            ),
+            (
+                "response-proposal-citation-not-literal",
+                GenerationOutcome::Failed("citation_not_literal".into()),
             ),
             (
                 "response-preview-stale",

@@ -578,3 +578,35 @@ e Web e GPUI dicono «La risposta del modello non era valida. Riprova.». Le
 citazioni non riscontrate restano nel codice generico, perché lo stesso
 diniego nasce anche da selezione cambiata o sessione chiusa durante la
 generazione.
+
+### Lingua del riassunto e citazioni non letterali (misura dell'11 novembre 2026)
+
+Con `qwen3.5:35b-a3b` su main, 20 richieste per referto: sugli esami ematici 8
+riassunti su 20 erano in inglese (6 accettati), e 6 richieste su 40 finivano
+scartate per una citazione non letterale, mostrata col messaggio generico.
+
+- Il prompt chiede il riassunto in italiano, e nomina solo `summary`. Una prima
+  versione nominava anche `qualityReason`: nella misura il modello aggiungeva la
+  `claim` di quel campo senza scrivere il campo, e il lease scartava 9 tentativi
+  su 22 sugli esami.
+- Ogni tentativo locale, già letto, passa due controlli prima della validazione
+  del lease, che resta quella di sempre e non si ritenta. Il riassunto è
+  rifiutato se ha almeno tre parole grammaticali inglesi e più inglesi che
+  italiane: articoli, preposizioni e ausiliari, mai termini medici, così
+  «follow-up», «LDL» o «eGFR» in un testo italiano non pesano. La citazione è
+  rifiutata se non si ritrova nella sua fonte. In entrambi i casi la richiesta
+  parte una seconda volta, mai una terza.
+- Una citazione non letterale anche al secondo tentativo ha un codice proprio:
+  `citation_not_literal` 502, e Web e GPUI dicono «Il modello non ha citato il
+  documento parola per parola. Riprova.». Lo decide il controllo del tentativo,
+  non il diniego del lease, quindi selezione cambiata e sessione chiusa restano
+  nel codice generico.
+- Il confronto delle citazioni ignora solo la forma degli spazi bianchi: ogni
+  sequenza di spazi, tabulazioni e a capo vale un solo spazio, e quelli ai
+  bordi della citazione non contano. Prima si cerca la citazione identica. I
+  caratteri diversi dagli spazi devono coincidere uno per uno: una parola
+  mancante, aggiunta, cambiata o fusa con la vicina resta rifiutata. La
+  citazione accettata, mostrata e firmata dalla ricevuta è il tratto esatto
+  della fonte, mai il testo del modello. Nella misura 4 scarti su 6 erano titoli
+  con i due a capo fusi in uno spazio; gli altri 2 omettevano «(65 mmol/mol)» e
+  restano rifiutati.
