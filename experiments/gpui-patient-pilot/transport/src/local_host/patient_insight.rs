@@ -412,12 +412,10 @@ pub fn patient_insight_message(code: &str) -> &'static str {
             "I dati della scheda sono cambiati durante la generazione. Rileggi la scheda e riprova."
         }
         "provider_failed" => "Il modello locale non ha completato la risposta.",
-        "proposal_invalid" => {
-            "La risposta del modello non ha superato i controlli dell'host. Nessuna proposta creata."
-        }
+        "proposal_invalid" => "La risposta del modello non ha superato i controlli dell'host.",
         // ADR 0189: stesso testo del Web (`PATIENT_INSIGHT_UNFAITHFUL_MESSAGE`).
         "proposal_unfaithful" => {
-            "Il modello ha dato per presa una decisione ancora aperta nella scheda, o per urgente qualcosa che la scheda non segnala come urgente. Nessuna proposta creata."
+            "Il modello ha dato per presa una decisione ancora aperta nella scheda, o per urgente qualcosa che la scheda non segnala come urgente."
         }
         "binding_stale" | "catalog_stale" | "session_stale" => {
             "La configurazione dei modelli è cambiata durante la richiesta. Riprova."
@@ -425,9 +423,7 @@ pub fn patient_insight_message(code: &str) -> &'static str {
         "session_unavailable" => {
             "La sessione dell'host locale non è più valida. Riapri l'accesso locale."
         }
-        "response_invalid" => {
-            "La risposta dell'host non ha superato i controlli di GPUI. Nessuna proposta mostrata."
-        }
+        "response_invalid" => "La risposta dell'host non ha superato i controlli dell'app.",
         _ => "L'host ha rifiutato la richiesta.",
     }
 }
@@ -975,5 +971,45 @@ mod tests {
             patient_insight_message("codice-sconosciuto"),
             "L'host ha rifiutato la richiesta."
         );
+        assert_eq!(
+            patient_insight_message("proposal_invalid"),
+            "La risposta del modello non ha superato i controlli dell'host."
+        );
+        assert_eq!(
+            patient_insight_message("proposal_unfaithful"),
+            "Il modello ha dato per presa una decisione ancora aperta nella scheda, o per urgente qualcosa che la scheda non segnala come urgente."
+        );
+        assert_eq!(
+            patient_insight_message("response_invalid"),
+            "La risposta dell'host non ha superato i controlli dell'app."
+        );
+        // Nessun messaggio d'esito ripete la proposta mancante o nomina GPUI.
+        for code in [
+            "kill_switch_disabled",
+            "function_disabled",
+            "kill_switch_unavailable",
+            "lifecycle_missing",
+            "lifecycle_corrupt",
+            "lifecycle_unavailable",
+            "provider_binding_denied",
+            "provider_unready",
+            "model_unavailable",
+            "provider_unavailable",
+            "fabric_denied",
+            "source_stale",
+            "provider_failed",
+            "proposal_invalid",
+            "proposal_unfaithful",
+            "binding_stale",
+            "catalog_stale",
+            "session_stale",
+            "session_unavailable",
+            "response_invalid",
+            "codice-sconosciuto",
+        ] {
+            let message = patient_insight_message(code);
+            assert!(!message.contains("Nessuna proposta"), "{code}: {message}");
+            assert!(!message.contains("GPUI"), "{code}: {message}");
+        }
     }
 }

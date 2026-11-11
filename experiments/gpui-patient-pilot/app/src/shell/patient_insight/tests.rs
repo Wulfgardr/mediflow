@@ -339,7 +339,9 @@ fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppCon
                 assert!(message.contains(text), "{name}: {message}")
             }
             InsightPhase::Error(message) if !unavailable => {
-                assert!(message.contains(text), "{name}: {message}")
+                assert!(message.contains(text), "{name}: {message}");
+                assert!(!message.contains("Nessuna proposta"), "{name}: {message}");
+                assert!(!message.contains("GPUI"), "{name}: {message}");
             }
             InsightPhase::Unavailable(m) | InsightPhase::Error(m) | InsightPhase::Ended(m) => {
                 panic!("{name}: stato inatteso: {m}")
@@ -364,7 +366,7 @@ fn altered_response_is_an_error_not_a_proposal(cx: &mut gpui::TestAppContext) {
     cx.run_until_parked();
     assert!(bench.phase(cx, |phase| matches!(
         phase,
-        InsightPhase::Error(m) if m.contains("controlli di GPUI")
+        InsightPhase::Error(m) if m == "La risposta dell'host non ha superato i controlli dell'app."
     )));
 }
 

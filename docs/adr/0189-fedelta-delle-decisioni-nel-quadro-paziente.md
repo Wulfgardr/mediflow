@@ -100,8 +100,7 @@ tagliata), il codice resta `proposal_invalid`.
 Messaggio a schermo, uguale sul Web e in GPUI:
 
 > Il modello ha dato per presa una decisione ancora aperta nella scheda, o per
-> urgente qualcosa che la scheda non segnala come urgente. Nessuna proposta
-> creata.
+> urgente qualcosa che la scheda non segnala come urgente.
 
 ### Il prompt dice al modello che cosa le regole scartano
 
