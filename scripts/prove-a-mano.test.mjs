@@ -19,6 +19,8 @@ test('tre stati osservabili e skip non dichiarato verde', async () => {
   assert.equal((await run('playwright-skip', 'console.log("4 skipped")')).status, 'non provato');
   assert.equal((await run('zero-skips', 'console.log("ℹ skipped 0")')).status, 'provato');
   assert.equal((await run('skip', 'console.log("# skipped 1")')).status, 'non provato');
+  assert.equal((await run('tap-zero-skips', 'console.log("# pass 3\\n# skipped 0")')).status, 'provato');
+  assert.equal((await run('tap-skip-directive', 'console.log("ok 1 - caso # SKIP manca Xcode")')).status, 'non provato');
  } finally { rmSync(output, { recursive: true }); }
 });
 test('rifiuta archivio reale, qualsiasi archivio esterno e porte riservate', () => {
