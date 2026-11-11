@@ -66,7 +66,7 @@ test('round-trips only a strict review proposal with Fabric receipt, provenance,
         egressProfile: { id: 'local_only', version: 'mediflow.ai.egress-profile.v1', egress: 'none' }, provider: 'ollama', model: 'synthetic:latest',
         providerReceipt: { schemaVersion: 'mediflow.ai.provider-selection.v1', authorityPlane: 'clinical_application', task: 'clinical', provider: 'ollama', model: 'synthetic:latest', execution: 'local', endpointClass: 'loopback', egress: 'none', runtimeReadiness: 'required', fallbackCount: 0 }, fallbackCount: 0,
     };
-    const provenance = { schemaVersion: 'mediflow.ai.fabric-provenance.v1', capability: 'patient_insight', venue: 'local_process', provider: 'ollama', model: 'synthetic:latest', preprocessing: ['context_minimization', 'envelope_validation'], receipt };
+    const provenance = { schemaVersion: 'mediflow.ai.fabric-provenance.v1', capability: 'patient_insight', venue: 'local_process', provider: 'ollama', model: 'synthetic:latest', preprocessing: ['context_minimization', 'envelope_validation'], attempts: 2, receipt };
     const proposal = {
         schemaVersion: 'mediflow.patient-insight.review-proposal.v2', reviewOnly: true, summary: 'Synthetic summary [S1]',
         currentState: ['Synthetic state [S1]'], alerts: [], nextSteps: ['Synthetic review [S1]'], gaps: [], generatedAt: capturedAt,
@@ -80,8 +80,23 @@ test('round-trips only a strict review proposal with Fabric receipt, provenance,
     if (parsed?.preview.status === 'available') {
         assert.equal(parsed.preview.receipt.egress, 'none');
         assert.deepEqual(parsed.preview.provenance.preprocessing, ['context_minimization', 'envelope_validation']);
+        assert.equal(parsed.preview.provenance.provider === 'ollama' && parsed.preview.provenance.attempts, 2);
         assert.equal(parsed.preview.proposal.currentness.patientRevision, 4);
     }
     assert.equal(parsePatientInsightPreviewWireRoot({ preview: { ...(root?.preview as object), writesPerformed: 1 } }), null);
     assert.equal(parsePatientInsightPreviewWireRoot({ preview: { ...(root?.preview as object), apply: 'allowed' } }), null);
+
+    // WUL-826: l'host pubblica la provenienza locale solo con il numero dei tentativi, 1 o 2.
+    const hostRoot = (value: Record<string, unknown>) => serializePatientInsightPreviewWireRoot({ preview: { writesPerformed: 0, apply: 'denied', status: 'available', code: null, proposal, receipt, provenance: value, reviewRef: `review_${'b'.repeat(32)}` } });
+    const withoutAttempts = Object.fromEntries(Object.entries(provenance).filter(([key]) => key !== 'attempts'));
+    assert.equal(hostRoot(withoutAttempts), null, 'host: provenienza senza tentativi');
+    for (const attempts of [0, 3, '1', null]) assert.equal(hostRoot({ ...provenance, attempts }), null, `host: attempts ${String(attempts)}`);
+    const once = hostRoot({ ...provenance, attempts: 1 });
+    assert.ok(once);
+    assert.equal((once.preview.provenance as Readonly<{ attempts?: unknown }>).attempts, 1);
+    // In lettura una ricevuta senza il campo (host precedente) resta valida e non riceve un numero inventato.
+    const legacy = JSON.parse(JSON.stringify(root)); delete legacy.preview.provenance.attempts;
+    const legacyParsed = parsePatientInsightPreviewWireRoot(legacy);
+    assert.ok(legacyParsed);
+    assert.equal(Object.hasOwn(legacyParsed.preview.provenance as object, 'attempts'), false);
 });
