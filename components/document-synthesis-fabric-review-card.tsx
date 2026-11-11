@@ -10,9 +10,8 @@ import { ChoiceField } from '@/components/choice-field';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import PrivacyBlur from '@/components/privacy-blur';
 import disclosure from '@/components/patient-disclosure.module.css';
-import {
-    DocumentSynthesisBrowserOrchestratorError,
-} from '@/lib/ai-providers/fabric/document-synthesis-browser-orchestrator';
+import { DocumentSynthesisBrowserOrchestratorError } from '@/lib/ai-providers/fabric/document-synthesis-browser-orchestrator';
+import { documentSynthesisFailureHeadline } from '@/lib/ai-providers/fabric/document-synthesis-failure-headline';
 import { useSecurity } from '@/components/security-provider';
 import { db } from '@/lib/db';
 import { createDocumentSynthesisReviewBrowserController, DocumentSynthesisReviewBrowserControllerError, type DocumentSynthesisContextProposal, type DocumentSynthesisAmbulatoryChoice } from '@/lib/ai-providers/fabric/document-synthesis-review-browser-controller';
@@ -31,6 +30,14 @@ function failureMessage(error: unknown): string {
             : `unavailable · ${error.code} — la proposta non è utilizzabile.`;
     }
     return 'unavailable · la proposta non è utilizzabile.';
+}
+
+type Failure = Readonly<{ headline: string; detail: string }>;
+function failure(error: unknown): Failure {
+    const code = error instanceof DocumentSynthesisBrowserOrchestratorError
+        || error instanceof DocumentSynthesisReviewBrowserControllerError
+        || error instanceof SmartImportSelectionBrowserAdapterError ? error.code : null;
+    return { headline: documentSynthesisFailureHeadline(code), detail: failureMessage(error) };
 }
 
 function DocumentSynthesisFabricReviewCardSession({
@@ -54,7 +61,7 @@ function DocumentSynthesisFabricReviewCardSession({
     const running = useRef(false);
     const [phase, setPhase] = useState<Phase>('idle');
     const [preview, setPreview] = useState<DocumentSynthesisPreviewWire | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<Failure | null>(null);
 
     const reset = () => {
         generation.current += 1;
@@ -88,7 +95,7 @@ function DocumentSynthesisFabricReviewCardSession({
             setProposal(value); setPhase('confirm');
         } catch (loadError) {
             if (token !== generation.current) return;
-            setError(failureMessage(loadError)); setPhase('terminal');
+            setError(failure(loadError)); setPhase('terminal');
         } finally { if (token === generation.current) running.current = false; }
     };
 
@@ -106,7 +113,7 @@ function DocumentSynthesisFabricReviewCardSession({
             setPreview(result);
         } catch (runError) {
             if (token !== generation.current) return;
-            setError(failureMessage(runError));
+            setError(failure(runError));
         } finally {
             if (token === generation.current) {
                 running.current = false;
@@ -207,12 +214,10 @@ function DocumentSynthesisFabricReviewCardSession({
             {phase === 'terminal' && error && (
                 <div className="mt-3">
                     <p role="status" className="text-[color:var(--lume-ink)]">
-                        {error.startsWith('review_required · unsupported_local_extraction')
-                            ? 'Testo locale non disponibile. È necessaria la revisione manuale del documento.'
-                            : 'Sintesi non disponibile. La cartella rimane invariata.'}
+                        {error.headline}
                     </p>
                     <Disclosure className={disclosure.disclosure} title="Dettagli dell’esito">
-                        <p>{error}</p>
+                        <p>{error.detail}</p>
                     </Disclosure>
                 </div>
             )}

@@ -309,6 +309,7 @@ pub fn document_synthesis_message(code: &str) -> &'static str {
         "operation_unavailable" => {
             "L'host non ha prodotto una sintesi: modello locale non pronto, risposta del modello scartata dai controlli o guasto. Nessuna proposta creata."
         }
+        "model_response_invalid" => "La risposta del modello non era valida. Riprova.",
         "response_invalid" => {
             "La risposta dell'host non ha superato i controlli di GPUI. Nessuna proposta mostrata."
         }
@@ -759,7 +760,11 @@ mod tests {
             ),
             (
                 "response-proposal-invalid",
-                GenerationOutcome::Failed("operation_unavailable".into()),
+                GenerationOutcome::Failed("model_response_invalid".into()),
+            ),
+            (
+                "response-proposal-truncated",
+                GenerationOutcome::Failed("model_response_invalid".into()),
             ),
             (
                 "response-preview-stale",

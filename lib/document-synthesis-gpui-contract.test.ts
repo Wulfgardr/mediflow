@@ -73,7 +73,7 @@ function modelReply(quote: string) {
         claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] });
 }
 
-type Mode = 'valid' | 'malformed' | 'provider_failed' | 'function_disabled' | 'lane_disabled' | 'unsupported';
+type Mode = 'valid' | 'malformed' | 'truncated' | 'provider_failed' | 'function_disabled' | 'lane_disabled' | 'unsupported';
 
 function host(t: TestContext, mode: Mode) {
     const previousFetch = globalThis.fetch;
@@ -89,6 +89,9 @@ function host(t: TestContext, mode: Mode) {
         const payload = JSON.parse(String(init?.body));
         prompts.push(payload.messages.map((message: { content: string }) => message.content).join('\n'));
         if (mode === 'provider_failed') throw new Error('Synthetic provider failure');
+        // Come Ollama al tetto di token (collaudo dell'11/11/2026): JSON interrotto e `done_reason: length`.
+        if (mode === 'truncated') return Response.json({ model: MODEL, message: { content: modelReply(DOCUMENT.quote).slice(0, 120) },
+            prompt_eval_count: 3, eval_count: payload.options.num_predict, done_reason: 'length' });
         return Response.json({ model: MODEL, message: { content: mode === 'malformed' ? '{"schemaVersion":' : modelReply(DOCUMENT.quote) },
             prompt_eval_count: 3, eval_count: 4 });
     };
@@ -203,14 +206,21 @@ test('i corpi di GPUI passano per selezione, cattura, AnyDoc e Fabric reali fino
 
 test('dinieghi e fallimenti reali arrivano a GPUI come codici senza proposta', async (t) => {
     for (const [mode, name, status] of [
-        ['malformed', 'response-proposal-invalid', 503],
+        ['truncated', 'response-proposal-truncated', 502],
+        ['malformed', 'response-proposal-invalid', 502],
         ['provider_failed', 'response-provider-failed', 503],
         ['function_disabled', 'response-function-disabled', 403],
     ] as const) {
         const fixture = host(t, mode);
         const response = await untilPreview(fixture, false);
         assert.equal(response.status, status, mode);
-        await record(name, response);
+        const value = await record(name, response);
+        // Risposta tagliata o illeggibile: secondo tentativo, poi un codice proprio e non
+        // `operation_unavailable`, cosi' lo schermo dice la causa invece di tre ipotesi.
+        if (mode === 'malformed' || mode === 'truncated') {
+            assert.equal(value.body.code, 'model_response_invalid', mode);
+            assert.equal(fixture.prompts.length, 2, mode);
+        }
     }
     const lane = await host(t, 'lane_disabled').capture(read('request-capture'));
     assert.equal(lane.status, 409);
