@@ -24,6 +24,9 @@ interface TimelineProps {
     emptyMessage?: string;
     section?: Omit<ComponentProps<typeof CollapsibleSection>, 'children' | 'headerAction'>;
     heading?: string;
+    /* The last read of the entries failed; what is already shown stays. */
+    readFailed?: boolean;
+    onRetry?: () => void;
 }
 
 export default function Timeline({
@@ -34,6 +37,8 @@ export default function Timeline({
     emptyMessage = 'Nessuna voce visibile nel diario clinico.',
     section,
     heading,
+    readFailed = false,
+    onRetry,
 }: TimelineProps) {
     const { proposal } = useRuntimeTwinDesign();
     const [showDeleted, setShowDeleted] = useState(false);
@@ -136,10 +141,15 @@ export default function Timeline({
         </>;
     };
 
-    if (entries === undefined) return withHeader(<ViewState state="loading" title="Diario in caricamento." />);
-    if (!visibleEntries.length) return withHeader(<ViewState state="empty" title={emptyMessage} />);
+    const retry = onRetry ? { label: 'Riprova', onClick: onRetry } : undefined;
+    if (entries === undefined) return withHeader(readFailed
+        ? <ViewState state="error" title="Impossibile leggere il diario." action={retry} />
+        : <ViewState state="loading" title="Diario in caricamento." />);
+    const refreshFailed = readFailed ? <ViewState state="error" title="Impossibile aggiornare il diario." action={retry} /> : null;
+    if (!visibleEntries.length) return withHeader(<>{refreshFailed}<ViewState state="empty" title={emptyMessage} /></>);
 
-    return withHeader(
+    return withHeader(<>
+        {refreshFailed}
         <div className={patientDiary && proposal ? twin.patientDiary : "space-y-6"}>
             <div
                 className={proposal ? twin.diary : 'relative ml-3 space-y-3 pb-8'}
@@ -178,5 +188,5 @@ export default function Timeline({
                 />
             )}
         </div>
-    );
+    </>);
 }
