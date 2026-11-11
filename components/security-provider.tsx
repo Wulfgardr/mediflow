@@ -307,6 +307,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 setRequiresSetup(false);
                 // if server session is missing, lock and clear local session
                 if (data.hasSession === false) {
+                    /* no key here and the lock already confirmed (or a Recovery Kit being saved on the
+                       lock screen): nothing to close, and locking again would discard the kit. */
+                    if (masterKeyRef.current === null && authRecoveryStateRef.current === 'ready'
+                        && (lockReceiptGenerationRef.current > 0 || preparedAccessRef.current !== null)) return;
                     lock();
                     return;
                 }
