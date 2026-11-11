@@ -16,6 +16,7 @@ import {
     isAiPatientInsightEnabledValue,
 } from '@/lib/ai-patient-insight-kill-switch';
 import {
+    PATIENT_INSIGHT_REVIEW_NOTICE,
     buildPatientInsightPreviewRequest,
     parsePatientInsightPreviewWireRoot,
     patientInsightFailureMessage,
@@ -210,6 +211,8 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
                         <p className="mt-1 text-[color:var(--lume-ink-muted)]">La cartella resta invariata.</p>
                         <p className="mt-2"><span className="text-[color:var(--lume-ink-muted)]">Modello usato: </span>{preview.receipt.model} · {preview.receipt.provider}</p>
                     </div>
+                    {/* the model can misstate what is done or still to do: the doctor reads each sentence against its source. */}
+                    <p className="font-semibold" data-testid="patient-insight-review-notice">{PATIENT_INSIGHT_REVIEW_NOTICE}</p>
                     {preview.proposal.summary && <div><h4 className="font-semibold">Sintesi proposta</h4><p className="mt-2"><PrivacyBlur intensity="sm">{preview.proposal.summary}</PrivacyBlur></p></div>}
                     {preview.proposal.currentState.length > 0 && <div><h4 className="font-semibold">Quadro attuale</h4><InsightList items={preview.proposal.currentState} /></div>}
                     {preview.proposal.alerts.length > 0 && <div className="border-l-2 border-[color:var(--lume-signal-warning)] pl-4"><h4 className="font-semibold">Attenzioni proposte</h4><InsightList items={preview.proposal.alerts} warning /></div>}

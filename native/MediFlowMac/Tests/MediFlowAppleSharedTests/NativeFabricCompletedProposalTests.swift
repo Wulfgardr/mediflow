@@ -95,3 +95,28 @@ final class NativeFabricCompletedProposalTests: XCTestCase {
         XCTAssertEqual(cancels, 1, "l'attempt viene chiuso sull'host")
     }
 }
+
+/// WUL-826: sopra le frasi del Quadro paziente una sola riga chiede di controllarle
+/// sulla fonte. La vista disegna queste righe nell'ordine dato.
+final class NativePatientInsightReviewNoticeTests: XCTestCase {
+    private let notice = "Controlla ogni frase sulla fonte che cita: il modello può scambiare ciò che è fatto con ciò che è da fare."
+    func testNoticeIsTheFirstRowAboveThePatientInsightSentences() throws {
+        let proposal = NativeOrdinaryJSON.object([
+            "summary": .string("Sintesi sintetica da rivedere. [S1]"),
+            "currentState": .array([.string("Visita sintetica eseguita. [S2]")]),
+            "alerts": .array([]), "nextSteps": .array([.string("Controllo sintetico da prenotare. [S2]")]), "gaps": .array([]),
+        ])
+        let rows = NativeOrdinaryProposalView.patientInsightRows(proposal)
+        XCTAssertEqual(NativeOrdinaryProposalView.patientInsightReviewNotice, notice)
+        XCTAssertEqual(rows, [
+            .notice(notice),
+            .paragraph("Sintesi sintetica da rivedere. [S1]"),
+            .heading("Quadro attuale"), .item("Visita sintetica eseguita. [S2]"),
+            .heading("Passi da valutare"), .item("Controllo sintetico da prenotare. [S2]"),
+        ])
+        // Anche una proposta senza sintesi ha la riga in testa, una sola volta.
+        let onlyGaps = NativeOrdinaryProposalView.patientInsightRows(.object(["summary": .string(""), "gaps": .array([.string("Dato mancante. [DATI-INCOMPLETI]")])]))
+        XCTAssertEqual(onlyGaps.first, .notice(notice))
+        XCTAssertEqual(onlyGaps.filter { $0 == .notice(notice) }.count, 1)
+    }
+}
