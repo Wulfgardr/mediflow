@@ -108,7 +108,9 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
                                 </Disclosure>
                             </>
                         )}
-                        {preview && preview.status !== 'available' && <p>Anteprima non disponibile come proposta utilizzabile.</p>}
+                        {preview && preview.status !== 'available' && <p>{preview.status === 'failed' && preview.code === 'response_truncated'
+                            ? 'La risposta del modello si è interrotta prima della fine. Riprova.'
+                            : 'Anteprima non disponibile come proposta utilizzabile.'}</p>}
                         {error && <p>{error}</p>}
                     </div>
                     <button className="ui-btn-secondary mt-2" type="button" onClick={() => { picker.client.reset(picker.active); reset(); }}>Ricomincia</button>

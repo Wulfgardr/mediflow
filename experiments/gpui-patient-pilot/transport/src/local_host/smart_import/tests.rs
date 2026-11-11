@@ -218,6 +218,10 @@ fn real_handler_responses_become_outcomes() {
             GenerationOutcome::Failed("proposal_invalid".into()),
         ),
         (
+            "response-proposal-truncated",
+            GenerationOutcome::Failed("response_truncated".into()),
+        ),
+        (
             "response-preview-replayed",
             GenerationOutcome::Failed("projection_unavailable".into()),
         ),
@@ -378,6 +382,10 @@ fn refusal_messages_state_only_the_reason() {
             "La risposta del modello non ha superato i controlli dell’host.",
         ),
         (
+            "response_truncated",
+            "La risposta del modello si è interrotta prima della fine. Riprova.",
+        ),
+        (
             "selection_changed",
             "La selezione sull’host è cambiata durante la richiesta. Riprova.",
         ),
@@ -396,6 +404,7 @@ fn refusal_messages_state_only_the_reason() {
         "fabric_denied",
         "provider_failed",
         "proposal_invalid",
+        "response_truncated",
         "lease_expired",
         "session_unavailable",
         "response_invalid",

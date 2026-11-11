@@ -161,7 +161,8 @@ export function buildSmartImportExtractionPlan(contextPlan: EmissionPlan): Emiss
             "codeSystem": "sistema di codifica se esplicito",
             "serviceCode": "codice se esplicito",
             "confidence": "high|medium|low",
-            "evidence": "evidenza atomica del singolo atto"
+            "evidence": "evidenza atomica del singolo atto",
+            "sourceId": "id della fonte usata"
           }
         ]
       }
@@ -175,7 +176,7 @@ export function buildSmartImportExtractionPlan(contextPlan: EmissionPlan): Emiss
             'non trasformare da soli fattori di rischio, stili di vita, counselling o sospetti generici in diagnosi strutturate se non sono trattati come problema clinico attivo nelle fonti',
             'label deve restare in italiano clinico sintetico',
             'icdQuery deve essere una query breve e specifica in inglese, adatta alla ricerca WHO ICD-11 ufficiale',
-            'sourceId deve coincidere esattamente con un id presente nelle fonti fornite',
+            'ogni diagnosi, terapia, prestazione e item ha il suo sourceId, che deve coincidere esattamente con un id presente nelle fonti fornite',
             'massimo 5 diagnosi e 10 terapie',
             'ogni terapia deve rappresentare un singolo farmaco distinto',
             'non inserire in therapies prestazioni sanitarie, visite specialistiche, esami, controlli, consulenze, impegnative o referral: non sono farmaci',

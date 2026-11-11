@@ -11,7 +11,7 @@ import {
 } from './smart-import-fabric-wire';
 
 type DenialCode = 'input_invalid' | 'kill_switch_disabled' | 'kill_switch_unavailable' | 'projection_unavailable' | 'lifecycle_missing' | 'lifecycle_corrupt' | 'lifecycle_unavailable' | 'provider_binding_denied' | 'provider_unready' | 'model_unavailable' | 'fabric_denied' | 'source_invalid';
-type FailureCode = 'provider_failed' | 'proposal_invalid';
+type FailureCode = 'provider_failed' | 'proposal_invalid' | 'response_truncated';
 type Common = Readonly<{ writesPerformed: 0; apply: 'denied' }>;
 export type SmartImportPreviewWire =
     | (Common & Readonly<{ status: 'available'; code: null; proposal: SmartImportProposalWireV1; receipt: SmartImportFabricResolutionReceiptWire; provenance: SmartImportFabricProvenanceWire; reviewRef: string }>)
@@ -20,7 +20,7 @@ export type SmartImportPreviewWire =
 export type SmartImportPreviewWireRoot = Readonly<{ preview: SmartImportPreviewWire }>;
 
 const DENIAL_CODES: readonly DenialCode[] = ['input_invalid', 'kill_switch_disabled', 'kill_switch_unavailable', 'projection_unavailable', 'lifecycle_missing', 'lifecycle_corrupt', 'lifecycle_unavailable', 'provider_binding_denied', 'provider_unready', 'model_unavailable', 'fabric_denied', 'source_invalid'];
-const FAILURE_CODES: readonly FailureCode[] = ['provider_failed', 'proposal_invalid'];
+const FAILURE_CODES: readonly FailureCode[] = ['provider_failed', 'proposal_invalid', 'response_truncated'];
 const KEYS = ['writesPerformed', 'apply', 'status', 'code', 'proposal', 'receipt', 'provenance', 'reviewRef'];
 
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> | null {

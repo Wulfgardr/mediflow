@@ -882,7 +882,7 @@ const DENIAL_CODES: [&str; 12] = [
     "fabric_denied",
     "source_invalid",
 ];
-const FAILURE_CODES: [&str; 2] = ["provider_failed", "proposal_invalid"];
+const FAILURE_CODES: [&str; 3] = ["provider_failed", "proposal_invalid", "response_truncated"];
 /// Codici che dicono «funzione non disponibile» e non «errore».
 const UNAVAILABLE_CODES: [&str; 9] = [
     "kill_switch_disabled",
@@ -936,6 +936,9 @@ pub fn smart_import_message(code: &str) -> &'static str {
         "fabric_denied" => "L’host non ha autorizzato l’esecuzione sul modello locale.",
         "provider_failed" => "Il modello locale non ha risposto.",
         "proposal_invalid" => "La risposta del modello non ha superato i controlli dell’host.",
+        "response_truncated" => {
+            "La risposta del modello si è interrotta prima della fine. Riprova."
+        }
         "projection_unavailable"
         | "projection_stale"
         | "lease_expired"
