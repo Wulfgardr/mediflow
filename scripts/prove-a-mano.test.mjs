@@ -16,6 +16,7 @@ test('tre stati osservabili e skip non dichiarato verde', async () => {
   assert.ok(results.every(r => r.durationMs >= 0 && r.reason));
   assert.equal((await run('fail', 'process.exit(7)')).status, 'fallito');
   assert.equal((await runProof({ id: 'missing', command: ['/missing/proof'] }, {}, output)).status, 'non provato');
+  assert.equal((await run('playwright-skip', 'console.log("4 skipped")')).status, 'non provato');
   assert.equal((await run('zero-skips', 'console.log("ℹ skipped 0")')).status, 'provato');
   assert.equal((await run('skip', 'console.log("# skipped 1")')).status, 'non provato');
  } finally { rmSync(output, { recursive: true }); }

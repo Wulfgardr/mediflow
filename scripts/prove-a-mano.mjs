@@ -32,7 +32,7 @@ export async function runProof(proof, env, output) {
       writeFileSync(path.join(output, `${proof.id}.log`), result.text);
       if (result.error) reason = result.error.message;
       else if (result.code !== 0) { status = 'fallito'; reason = `uscita ${result.code}; vedere ${proof.id}.log`; }
-      else if (/# SKIP|(?:# |ℹ )?skipped [1-9]|[1-9] tests? skipped|XCTSkip/iu.test(result.text)) reason = `suite con prove saltate; vedere ${proof.id}.log`;
+      else if (/# SKIP|(?:# |ℹ )?skipped [1-9]|\b[1-9]\d* (?:tests? )?skipped\b|XCTSkip/iu.test(result.text)) reason = `suite con prove saltate; vedere ${proof.id}.log`;
       else { status = 'provato'; reason = 'comando concluso senza errori né skip'; }
     }
   } catch (error) { reason = error.message; }
