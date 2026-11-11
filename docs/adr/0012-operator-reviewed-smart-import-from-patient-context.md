@@ -152,14 +152,23 @@ rifiuta l'item.
 
 Il tetto della risposta segue lo schema della sintesi documenti (ADR 0102):
 dipende dal prompt, un quarto di token per carattere, mai meno di 2048 e mai
-più di 8192. Un quarto è più del doppio del rapporto massimo misurato (0,11),
-e lascia spazio alla riga in più che ogni item ora porta. Il minimo è quasi il
+più di 8192. Un quarto è più del doppio del rapporto massimo misurato col
+tetto fisso (0,11), e lascia spazio alla riga in più che ogni item ora porta. Il minimo è quasi il
 doppio della risposta completa più lunga (1093 token), per un contesto con
 poche fonti e molte prestazioni. Il massimo è quello della sintesi: alla
 velocità misurata (120 token al secondo) sono circa 70 secondi per tentativo,
 due tentativi restano dentro il timeout di 300 secondi della chiamata. Per
-Persona000001 il tetto passa da 1100 a circa 2640 token, per Persona000002 a
-circa 2420.
+Persona000001 il tetto passa da 1100 a 2664 token, per Persona000002 a 2438.
+
+Misura dopo la correzione, con lo stesso metodo (20 richieste per paziente):
+proposta in 20 su 20 per Persona000001 e in 16 su 20 per Persona000002,
+nessuna risposta troncata su 50 tentativi, nessuna scrittura. Con la fonte su
+ogni item le risposte sono più lunghe: 10 superano i 1100 token, la più lunga
+ne usa 1695, e il rapporto massimo sale a 0,17 token per carattere. Il tetto
+resta sopra la risposta più lunga di almeno il 50%. I 4 scarti rimasti hanno
+un'altra causa: il modello cita come fonte di una diagnosi già codificata il
+nome della sezione (`currentDiagnoses`) o un id inventato, che il controllo
+dell'host rifiuta.
 
 Una risposta che anche all'ultimo tentativo finisce troncata non diventa più
 `proposal_invalid`: l'anteprima risponde `response_truncated`, e Web e GPUI lo

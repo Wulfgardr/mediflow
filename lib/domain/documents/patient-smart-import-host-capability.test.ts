@@ -298,3 +298,34 @@ test('prompt, schema and host check ask for the same sourceId on every element, 
         rejectsSource(JSON.stringify(withoutSource));
     }
 });
+
+/*
+ * P2 (ADR 0012): la risposta completa piu' lunga misurata col modello reale dopo la correzione, su
+ * Persona000002. Il modello finto la taglia se il tetto e' sotto i token che ha davvero usato, come
+ * fa Ollama con done_reason length. Con il tetto fisso di 1100 sarebbe stata troncata due volte.
+ */
+test('the response ceiling covers the longest complete answer measured with the real model', async () => {
+    const longest = MEASURED.longestAccepted;
+    const ceilings: number[] = [];
+    const binding = resolution(async (messages, _signal, maxTokens) => {
+        ceilings.push(maxTokens ?? 0);
+        const truncated = (maxTokens ?? 0) < longest.evalCount;
+        return { content: truncated ? longest.content.slice(0, Math.floor(longest.content.length * (maxTokens ?? 0) / longest.evalCount)) : longest.content,
+            stats: { latency: 1, tokensIn: String(messages[0]!.content).length, tokensOut: truncated ? maxTokens ?? 0 : longest.evalCount, ...(truncated ? { truncated: true } : {}) } };
+    });
+    const capability = createPatientSmartImportHostCapability({
+        killSwitch: { read: async () => ({ status: 'enabled' }) },
+        broker: { consume: () => measuredProjection },
+        lifecycle: { read: () => ({ status: 'available', record: lifecycleRecord }) },
+        binding: { readClinical: async () => ({ status: 'available', resolution: binding }) },
+        readiness: { observeClinical: async () => ({ status: 'available', code: null, observation: { venue: 'local_process', state: 'available', reason: null } }) },
+        route: routeHostResolvedCandidateCapability,
+        sources: { clock: () => MEASURED_AT, entropy: () => new Uint8Array(16).fill(7) },
+    });
+    const result = await capability.preview({ handle: HANDLE, requestId: REQUEST_ID });
+    assert.equal(result.status, 'available', `tetto ${ceilings.join(', ')} per una risposta da ${longest.evalCount} token`);
+    assert.equal(ceilings.length, 1);
+    assert.equal(ceilings[0], smartImportResponseTokenLimit(buildPatientSmartImportCapabilityPrompt(measuredProjection)));
+    assert.ok(ceilings[0]! >= longest.evalCount);
+    if (result.status === 'available') assert.ok(result.proposal.servicePrescriptions.some((service) => (service.items?.length ?? 0) > 0));
+});
