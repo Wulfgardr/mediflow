@@ -37,7 +37,7 @@ function canonicalResult() {
     receipt: canonical(value.receipt) });
 }
 
-function createSyntheticOpenLoopsRead(scopes: unknown[]) {
+function createSyntheticOpenLoopsRead(scopes: unknown[], delayMs = 0) {
   return (sourcesValue: unknown) => {
     const sources = sourcesValue as {
       current: () => unknown; beginPermit: (permit: unknown, current: unknown, claim: unknown) => object;
@@ -52,6 +52,7 @@ function createSyntheticOpenLoopsRead(scopes: unknown[]) {
           operation: 'mediflow.patient.open_loops.read.v1',
           capabilityId: 'mediflow.patient.open_loops.read.v1',
         }));
+        if (delayMs) await new Promise(resolve => setTimeout(resolve, delayMs));
         const current = sources.current();
         const execution = sources.beginPermit(permit, current, claim);
         try {
@@ -82,7 +83,7 @@ function terminalAuditSink(audits: unknown[]) {
   };
 }
 
-async function runRealMini(command: 'open-loops' | 'follow-up-proposal') {
+async function runRealMini(command: 'open-loops' | 'follow-up-proposal', delayMs = 0, expectedOk = true) {
   let sequence = 0;
   let stdout = '', stderr = '';
   let resolveExit!: (code: number | null) => void;
@@ -132,13 +133,13 @@ async function runRealMini(command: 'open-loops' | 'follow-up-proposal') {
         terminate: () => { if (process.exitCode === null && process.signalCode === null) process.kill(); },
       };
     },
-    createOpenLoopsRead: createSyntheticOpenLoopsRead(scopes),
+    createOpenLoopsRead: createSyntheticOpenLoopsRead(scopes, delayMs),
     previewCheckupStatus: async () => { throw new Error('not exercised'); },
   });
 
   const session = await launcher.launch();
   assert.equal(session.status, 'authenticated');
-  assert.equal(await exited, 0, `${stdout}\n${stderr}\naudits=${JSON.stringify(audits)} scopes=${JSON.stringify(scopes)}`);
+  assert.equal(await exited, expectedOk ? 0 : 70, `${stdout}\n${stderr}\naudits=${JSON.stringify(audits)} scopes=${JSON.stringify(scopes)}`);
   assert.equal(stderr, '');
   return { response: JSON.parse(stdout) as { ok: boolean; result: unknown }, audits, terminalAudits, scopes, session };
 }
@@ -429,4 +430,16 @@ test('propagates restart to RPC, scope, broker and the authenticated child', asy
   assert.equal(terminated, true);
   await assert.rejects(launcher.launch(), (error: unknown) =>
     (error as { code?: string }).code === 'already_started');
+});
+
+test('Mini accepts a follow-up read delayed by 300 ms', async () => {
+  const { response, session } = await runRealMini('follow-up-proposal', 300);
+  assert.equal(response.ok, true);
+  assert.equal(session.close(), false);
+});
+
+test('Mini closes when the follow-up exceeds 500 ms', async () => {
+  const { response, session } = await runRealMini('follow-up-proposal', 600, false);
+  assert.equal(response.ok, false);
+  assert.equal(session.close(), false);
 });
