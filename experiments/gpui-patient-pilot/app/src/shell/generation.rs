@@ -11,7 +11,7 @@ use super::*;
 use crate::chat_access::owner::{Pending, Stage};
 use std::sync::Arc;
 
-const CHAT_WITHDRAWN: &str = "La chat ha ritirato la richiesta. Nessuna proposta.";
+const CHAT_WITHDRAWN: &str = "La chat ha ritirato la richiesta.";
 
 #[cfg(unix)]
 #[derive(Default)]
