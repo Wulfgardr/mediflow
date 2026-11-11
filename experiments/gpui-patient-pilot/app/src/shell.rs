@@ -67,8 +67,8 @@ use zeroize::Zeroizing;
 use crate::appointments::for_write as appointment_for_write;
 use crate::clinical_text;
 use crate::components::{
-    WritingInk, WritingSurface, brand_icon, button, confirmation_heading, display_date, heading,
-    notice, plain_text, section, tab, writing_status,
+    WritingInk, WritingSurface, brand_icon, button, confirmation_heading, display_date,
+    display_instant_date, heading, notice, plain_text, section, tab, writing_status,
 };
 use crate::documents::{self, Upload};
 use crate::editing;
@@ -4247,7 +4247,7 @@ impl ClinicalApp {
                                             .type_role(theme, crate::theme::TextRole::Meta)
                                             .text_color(theme.secondary)
                                             .child({
-                                                let text = text!(display_date(Some(&row.date)));
+                                                let text = text!(display_instant_date(&row.date));
                                                 #[cfg(test)]
                                                 let text =
                                                     crate::shell::rendered_command::observe_text(
@@ -4333,7 +4333,7 @@ impl ClinicalApp {
                                         div()
                                             .type_role(theme, crate::theme::TextRole::Meta)
                                             .text_color(theme.secondary)
-                                            .child(text!(display_date(Some(&row.observed_at)))),
+                                            .child(text!(display_instant_date(&row.observed_at))),
                                     )
                             }),
                     ),
@@ -4449,12 +4449,12 @@ impl ClinicalApp {
                 let unavailable = entry.locked_fields.iter().any(|field| field == "title" || field == "content");
                 let title = if entry.locked_fields.iter().any(|field| field == "title") { "Titolo non leggibile".into() } else { entry.title.clone() };
                 let prose = if entry.locked_fields.iter().any(|field| field == "content") { "Il testo cifrato non è leggibile con questo accesso.".into() } else { plain_text(&entry.content) };
-                let clipboard = format!("{} · {}\n{}\n{}", display_date(Some(&entry.date)), entry_type_label(&entry.entry_type), title, prose);
+                let clipboard = format!("{} · {}\n{}\n{}", display_instant_date(&entry.date), entry_type_label(&entry.entry_type), title, prose);
                 div().id(SharedString::from(format!("clinical-workspace-entry-{id}"))).debug_selector(|| format!("clinical-workspace-entry-{id}")).role(Role::Article)
-                    .aria_label(SharedString::from(format!("{}, {}", title, display_date(Some(&entry.date)))))
+                    .aria_label(SharedString::from(format!("{}, {}", title, display_instant_date(&entry.date))))
                     .border_b_1().border_color(theme.rule).pb(px(24.)).flex().gap(px(12.))
                     .child(div().w(px(84.)).flex_shrink_0().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
-                        .child(text!(display_date(Some(&entry.date))))
+                        .child(text!(display_instant_date(&entry.date)))
                         .child(text!(entry_time(&entry.date))))
                     .child(div().flex_1().min_w_0().flex().flex_col().gap(px(8.))
                     .child(div().flex().flex_wrap().gap(px(8.))
@@ -4753,7 +4753,7 @@ impl ClinicalApp {
                         div()
                             .type_role(theme, crate::theme::TextRole::Meta)
                             .text_color(theme.secondary)
-                            .child(text!(display_date(Some(&row.observed_at)))),
+                            .child(text!(display_instant_date(&row.observed_at))),
                     )
                     .child(
                         div()
@@ -5134,7 +5134,7 @@ impl ClinicalApp {
                                 "Apri scheda di {}, {}, {}",
                                 crate::title::TitleText::name(name.clone()).text(),
                                 row.title,
-                                display_date(Some(&row.date))
+                                display_instant_date(&row.date)
                             )))
                             .track_focus(&target.focus)
                             .anchor_scroll(Some(target.anchor.clone()))
@@ -9075,11 +9075,63 @@ fn diary_entry_day_and_time_follow_the_workstation_zone() {
     ] {
         assert_eq!(entry_time_in_zone(instant, &rome), time, "{instant}");
         assert_eq!(
-            crate::components::display_date_in_zone(Some(instant), &rome),
+            crate::components::display_instant_date_in_zone(instant, &rome),
             day,
             "{instant}"
         );
     }
+}
+
+#[test]
+fn diary_and_measurement_list_reads_utc_midnight_as_an_instant() {
+    // Entries, measurements and checkups are always instants: the field
+    // decides, so an exact midnight UTC is shown in the local day and time.
+    for (zone, instant, day, time) in [
+        // Bot case: 14/07 at 20:00 in New York, i.e. midnight UTC.
+        (
+            chrono_tz::America::New_York,
+            "2026-07-15T00:00:00.000Z",
+            "14/07/2026",
+            "20:00",
+        ),
+        // Rome: a summer entry at 02:00 and its winter move at 02:00.
+        (
+            chrono_tz::Europe::Rome,
+            "2026-07-15T00:00:00.000Z",
+            "15/07/2026",
+            "02:00",
+        ),
+        (
+            chrono_tz::Europe::Rome,
+            "2026-11-05T01:00:00.000Z",
+            "05/11/2026",
+            "02:00",
+        ),
+        // Dossier import and GPUI creation write midnight UTC: in Rome it is
+        // the same calendar day, as on the Web.
+        (
+            chrono_tz::Europe::Rome,
+            "2026-11-05T00:00:00.000Z",
+            "05/11/2026",
+            "01:00",
+        ),
+    ] {
+        assert_eq!(
+            crate::components::display_instant_date_in_zone(instant, &zone),
+            day,
+            "{zone} {instant}"
+        );
+        assert_eq!(entry_time_in_zone(instant, &zone), time, "{zone} {instant}");
+    }
+    let rome = chrono_tz::Europe::Rome;
+    assert_eq!(
+        crate::components::display_instant_date_in_zone("1950-03-01", &rome),
+        "01/03/1950"
+    );
+    assert_eq!(
+        crate::components::display_instant_date_in_zone("non una data", &rome),
+        "non una data"
+    );
 }
 
 #[test]
