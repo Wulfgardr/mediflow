@@ -7,17 +7,18 @@ pub(crate) mod model;
 #[cfg(target_os = "macos")]
 pub(crate) mod whisper;
 
+/// Il modello c'è ma i file non coincidono con quelli attesi.
 #[cfg(target_os = "macos")]
-const MODEL_INVALID: &str = "Il modello vocale locale è incompleto o diverso da quello atteso. Reinstallalo da Impostazioni, Voce locale.";
-#[cfg(target_os = "macos")]
-const ENGINE_FAILED: &str = "La dettatura locale si è interrotta e il testo non è stato conservato. Apri una nuova dettatura.";
-#[cfg(target_os = "macos")]
-const WHISPER_PREPARING: &str = "Verifica del permesso microfono e del modello vocale locale…";
-#[cfg(target_os = "macos")]
-const APPLE_UNAVAILABLE_WITH_MODEL_HINT: &str = "Trascrizione Apple locale non disponibile. Servono macOS 26 o successivo e le risorse italiane già installate, oppure il modello vocale locale, da installare in Impostazioni, Voce locale. Non viene usato alcun servizio remoto.";
+const MODEL_INVALID: &str = "Il modello vocale locale è incompleto o diverso da quello atteso.";
+const UNSUPPORTED: &str = "La dettatura locale non è disponibile su questo computer.";
 
+/// Fuori da macOS la sessione resta sempre non disponibile: gli altri stati
+/// nascono solo dal motore whisper.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum State {
+    /// Modello vocale non installato: nessuna dettatura finché non si installa.
+    ModelMissing,
     Disclosure,
     Preparing,
     Recording,
@@ -28,31 +29,20 @@ pub(crate) enum State {
     Review,
 }
 impl State {
-    fn decode(code: i32) -> Self {
-        match code {
-            0 => Self::Disclosure,
-            1 => Self::Preparing,
-            2 => Self::Recording,
-            3 => Self::Finalizing,
-            4 => Self::PermissionDenied,
-            6 => Self::Cancelled,
-            7 => Self::Review,
-            _ => Self::Unavailable,
-        }
-    }
     pub(crate) fn message(self) -> &'static str {
         match self {
+            Self::ModelMissing => "Modello vocale non installato.",
             Self::Disclosure => {
                 "L'audio viene trascritto sul Mac. Il testo resta qui da rivedere, anche se pronunci nomi o altri identificativi. Nessun invio alla chat o al modello."
             }
-            Self::Preparing => "Verifica del permesso microfono e delle risorse Apple locali…",
+            Self::Preparing => "Verifica del permesso microfono e del modello vocale locale…",
             Self::Recording => "Registrazione in corso sul Mac.",
             Self::Finalizing => "Completamento della trascrizione locale…",
             Self::PermissionDenied => {
                 "Permesso microfono negato. Puoi abilitarlo nelle Impostazioni di Sistema, Privacy e sicurezza, Microfono, e aprire una nuova richiesta."
             }
             Self::Unavailable => {
-                "Trascrizione Apple locale non disponibile. Servono macOS 26 o successivo e le risorse italiane già installate. Non viene usato alcun servizio remoto."
+                "La dettatura locale si è interrotta e il testo non è stato conservato. Apri una nuova dettatura."
             }
             Self::Cancelled => "Registrazione scartata.",
             Self::Review => {
@@ -83,129 +73,124 @@ impl LiveText {
     }
 }
 
+/// L'unico motore è whisper, e solo con il modello installato.
+enum Backend {
+    #[cfg(target_os = "macos")]
+    Whisper(whisper::WhisperSession),
+    /// Nessun file del modello nella cartella.
+    #[cfg(target_os = "macos")]
+    ModelMissing,
+    /// Sistema senza cattura del microfono per whisper.
+    Unsupported,
+}
+
 pub(crate) struct Session {
     #[cfg(test)]
     synthetic: Option<(State, Zeroizing<String>)>,
     /// Per le prove: testo dal vivo (confermato, provvisorio) deciso dal test.
     #[cfg(test)]
     synthetic_live: Option<std::sync::Arc<std::sync::Mutex<(String, String)>>>,
-    #[cfg(local_voice_apple)]
-    pointer: *mut std::ffi::c_void,
-    /// Motore whisper: si usa solo se il modello è installato.
-    #[cfg(target_os = "macos")]
-    whisper: Option<whisper::WhisperSession>,
-}
-#[cfg(local_voice_apple)]
-unsafe extern "C" {
-    fn MFVoiceCreate() -> *mut std::ffi::c_void;
-    fn MFVoiceCommand(pointer: *mut std::ffi::c_void, command: i32);
-    fn MFVoicePoll(pointer: *mut std::ffi::c_void) -> i32;
-    fn MFVoiceCopyText(pointer: *mut std::ffi::c_void, output: *mut u8, capacity: usize) -> usize;
-    fn MFVoiceRelease(pointer: *mut std::ffi::c_void);
+    backend: Backend,
 }
 impl Session {
-    /// `prompt`: nomi dei farmaci del paziente aperto, solo per il motore whisper.
-    pub(crate) fn new(prompt: Zeroizing<String>) -> Self {
-        #[cfg(local_voice_apple)]
-        if let Some(whisper) = Self::whisper(prompt) {
-            return Self {
-                #[cfg(test)]
-                synthetic: None,
-                #[cfg(test)]
-                synthetic_live: None,
-                pointer: std::ptr::null_mut(),
-                whisper: Some(whisper),
-            };
-        }
-        #[cfg(not(local_voice_apple))]
-        drop(prompt);
+    fn with_backend(backend: Backend) -> Self {
         Self {
             #[cfg(test)]
             synthetic: None,
             #[cfg(test)]
             synthetic_live: None,
-            #[cfg(local_voice_apple)]
-            pointer: unsafe { MFVoiceCreate() },
-            #[cfg(target_os = "macos")]
-            whisper: None,
+            backend,
         }
     }
-    /// Se nella cartella dei modelli c'è un file del modello whisper si usa
-    /// whisper (e un file alterato rende la voce non disponibile); se la
-    /// cartella è vuota resta il motore Apple.
-    #[cfg(local_voice_apple)]
-    fn whisper(prompt: Zeroizing<String>) -> Option<whisper::WhisperSession> {
-        let directory = model::directory()?;
-        if !model::whisper_selected(&directory) {
-            return None;
+    /// `prompt`: nomi dei farmaci del paziente aperto.
+    pub(crate) fn new(prompt: Zeroizing<String>) -> Self {
+        #[cfg(local_voice_capture)]
+        if let Some(directory) = model::directory() {
+            return Self::open(
+                whisper::Engine {
+                    directory,
+                    files: model::FILES,
+                    prompt,
+                    load: whisper::load_whisper,
+                },
+                || {
+                    whisper::swift::SwiftCapture::new()
+                        .map(|capture| Box::new(capture) as Box<dyn whisper::AudioSource>)
+                },
+            );
         }
-        let capture = whisper::swift::SwiftCapture::new()?;
-        Some(whisper::WhisperSession::new(
-            whisper::Engine {
-                directory,
-                files: model::FILES,
-                prompt,
-            },
-            Box::new(capture),
-        ))
+        #[cfg(not(local_voice_capture))]
+        drop(prompt);
+        Self::with_backend(Backend::Unsupported)
+    }
+    /// Senza file del modello la dettatura manca e si porta all'installazione;
+    /// un file presente ma alterato si scopre alla verifica completa, all'avvio.
+    #[cfg(target_os = "macos")]
+    #[cfg_attr(not(any(test, local_voice_capture)), allow(dead_code))]
+    pub(crate) fn open(
+        engine: whisper::Engine,
+        capture: impl FnOnce() -> Option<Box<dyn whisper::AudioSource>>,
+    ) -> Self {
+        if model::quick_status(&engine.directory, &engine.files) == model::ModelStatus::Missing {
+            return Self::with_backend(Backend::ModelMissing);
+        }
+        Self::with_backend(match capture() {
+            Some(source) => Backend::Whisper(whisper::WhisperSession::new(engine, source)),
+            None => Backend::Unsupported,
+        })
     }
     #[cfg(all(test, target_os = "macos"))]
     pub(crate) fn synthetic(state: State, text: &str) -> Self {
         Self {
             synthetic: Some((state, Zeroizing::new(text.to_owned()))),
-            synthetic_live: None,
-            #[cfg(local_voice_apple)]
-            pointer: std::ptr::null_mut(),
-            whisper: None,
+            ..Self::with_backend(Backend::Unsupported)
         }
     }
     #[cfg(all(test, target_os = "macos"))]
     pub(crate) fn with_whisper(session: whisper::WhisperSession) -> Self {
-        Self {
-            synthetic: None,
-            synthetic_live: None,
-            #[cfg(local_voice_apple)]
-            pointer: std::ptr::null_mut(),
-            whisper: Some(session),
-        }
+        Self::with_backend(Backend::Whisper(session))
     }
     pub(crate) fn start(&self) {
         #[cfg(target_os = "macos")]
-        if let Some(whisper) = &self.whisper {
+        if let Backend::Whisper(whisper) = &self.backend {
             whisper.start();
-            return;
-        }
-        #[cfg(local_voice_apple)]
-        unsafe {
-            MFVoiceCommand(self.pointer, 1)
         }
     }
     pub(crate) fn stop(&self) {
         #[cfg(target_os = "macos")]
-        if let Some(whisper) = &self.whisper {
+        if let Backend::Whisper(whisper) = &self.backend {
             whisper.stop();
-            return;
-        }
-        #[cfg(local_voice_apple)]
-        unsafe {
-            MFVoiceCommand(self.pointer, 2)
         }
     }
-    /// Messaggio dello stato per il motore in uso.
+    #[cfg(target_os = "macos")]
+    fn model_invalid(&self) -> bool {
+        matches!(&self.backend, Backend::Whisper(whisper)
+            if whisper.problem() == Some(whisper::Problem::ModelInvalid))
+    }
+    /// Messaggio dello stato.
     pub(crate) fn message(&self, state: State) -> &'static str {
-        #[cfg(target_os = "macos")]
-        match (&self.whisper, state) {
-            (Some(_), State::Preparing) => return WHISPER_PREPARING,
-            (Some(whisper), State::Unavailable) => {
-                return match whisper.problem() {
-                    Some(whisper::Problem::ModelInvalid) => MODEL_INVALID,
-                    _ => ENGINE_FAILED,
-                };
-            }
-            (None, State::Unavailable) => return APPLE_UNAVAILABLE_WITH_MODEL_HINT,
-            _ => {}
+        if state != State::Unavailable {
+            return state.message();
         }
-        state.message()
+        #[cfg(target_os = "macos")]
+        if self.model_invalid() {
+            return MODEL_INVALID;
+        }
+        match self.backend {
+            Backend::Unsupported => UNSUPPORTED,
+            #[cfg(target_os = "macos")]
+            _ => state.message(),
+        }
+    }
+    /// Dove la dettatura manca per il modello, assente o alterato, il gesto
+    /// che porta a Impostazioni, Voce locale.
+    pub(crate) fn model_action(&self, state: State) -> Option<&'static str> {
+        match state {
+            State::ModelMissing => Some("Installa il modello"),
+            #[cfg(target_os = "macos")]
+            State::Unavailable if self.model_invalid() => Some("Reinstalla il modello"),
+            _ => None,
+        }
     }
     /// Testo mentre si parla (solo whisper): da mostrare, mai modificabile né
     /// trasferibile.
@@ -217,9 +202,7 @@ impl Session {
         Self {
             synthetic: Some((state, Zeroizing::default())),
             synthetic_live: Some(live),
-            #[cfg(local_voice_apple)]
-            pointer: std::ptr::null_mut(),
-            whisper: None,
+            ..Self::with_backend(Backend::Unsupported)
         }
     }
     pub(crate) fn live_text(&self) -> Option<LiveText> {
@@ -232,7 +215,7 @@ impl Session {
             });
         }
         #[cfg(target_os = "macos")]
-        if let Some(whisper) = &self.whisper {
+        if let Backend::Whisper(whisper) = &self.backend {
             return matches!(self.state(), State::Recording | State::Finalizing)
                 .then(|| LiveText {
                     confirmed: whisper.stable_text(),
@@ -247,17 +230,12 @@ impl Session {
         if let Some((state, _)) = &self.synthetic {
             return *state;
         }
-        #[cfg(target_os = "macos")]
-        if let Some(whisper) = &self.whisper {
-            return whisper.state();
-        }
-        #[cfg(local_voice_apple)]
-        {
-            State::decode(unsafe { MFVoicePoll(self.pointer) })
-        }
-        #[cfg(not(local_voice_apple))]
-        {
-            State::decode(5)
+        match &self.backend {
+            #[cfg(target_os = "macos")]
+            Backend::Whisper(whisper) => whisper.state(),
+            #[cfg(target_os = "macos")]
+            Backend::ModelMissing => State::ModelMissing,
+            Backend::Unsupported => State::Unavailable,
         }
     }
     pub(crate) fn transcript(&self) -> Option<Zeroizing<String>> {
@@ -266,37 +244,12 @@ impl Session {
             return reviewed_text(*state, text);
         }
         #[cfg(target_os = "macos")]
-        if let Some(whisper) = &self.whisper {
+        if let Backend::Whisper(whisper) = &self.backend {
             return whisper
                 .transcript()
                 .and_then(|text| reviewed_text(whisper.state(), &text));
         }
-        #[cfg(local_voice_apple)]
-        {
-            if self.state() != State::Review {
-                return None;
-            }
-            let mut bytes = Zeroizing::new(vec![0; 256 * 1024]);
-            let count = unsafe { MFVoiceCopyText(self.pointer, bytes.as_mut_ptr(), bytes.len()) };
-            if count == 0 || count > bytes.len() {
-                return None;
-            }
-            Some(Zeroizing::new(
-                std::str::from_utf8(&bytes[..count]).ok()?.to_owned(),
-            ))
-        }
-        #[cfg(not(local_voice_apple))]
-        {
-            None
-        }
-    }
-}
-impl Drop for Session {
-    fn drop(&mut self) {
-        #[cfg(local_voice_apple)]
-        if !self.pointer.is_null() {
-            unsafe { MFVoiceRelease(self.pointer) }
-        }
+        None
     }
 }
 
@@ -315,6 +268,7 @@ mod tests {
     fn only_explicit_review_can_prepare_a_draft_and_identifiers_stay_native() {
         let text = "Nome inventato Ada Esempio, codice fiscale sintetico, controllo stabile.";
         for state in [
+            State::ModelMissing,
             State::Disclosure,
             State::Preparing,
             State::Recording,

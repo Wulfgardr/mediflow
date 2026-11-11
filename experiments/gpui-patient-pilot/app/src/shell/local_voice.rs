@@ -202,6 +202,21 @@ impl ClinicalApp {
         }
         cx.notify();
     }
+    /// Dalla dettatura che manca alla pagina dove si installa il modello. La
+    /// richiesta della chat si chiude come con «Scarta».
+    fn open_voice_model_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.chat_access.voice.retire(cx);
+        #[cfg(target_os = "macos")]
+        {
+            self.navigate(Area::Settings, cx);
+            if self.area == Area::Settings {
+                self.select_settings_page(SettingsPage::VoiceLocal, window, cx);
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        let _ = window;
+        cx.notify();
+    }
     pub(super) fn chat_voice_view(&self, cx: &Context<Self>) -> Option<Stateful<Div>> {
         let work = self.chat_access.voice.work.as_ref()?;
         let patient = self.patient.detail.ready()?;
@@ -234,6 +249,15 @@ impl ClinicalApp {
                     self.theme,
                     matches!(work.state, State::PermissionDenied | State::Unavailable),
                 ))
+                .when_some(work.session.model_action(work.state), |el, label| {
+                    el.child(
+                        button("chat-voice-model", label, self.theme, true, true).on_click(
+                            cx.listener(|this, _, window, cx| {
+                                this.open_voice_model_settings(window, cx)
+                            }),
+                        ),
+                    )
+                })
                 .when_some(work.session.live_text(), |el, live| {
                     let (text, provisional) = live.joined();
                     el.child(
@@ -538,6 +562,263 @@ mod tests {
             app.chat_access.voice.work = Some(Work { binding, pending, session, state, live: Default::default() });
         });
         (view, cx, remote)
+    }
+
+    /// Comandi e testi della vista come li legge VoiceOver.
+    fn voice_page(cx: &mut gpui::VisualTestContext, prefix: &str) -> (Vec<String>, Vec<String>) {
+        let draw = |cx: &mut gpui::VisualTestContext| {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            })
+        };
+        let ids = rendered_command::button_ids(|| draw(cx));
+        let mut nodes = Vec::new();
+        rendered_command::capture_all_texts(|| {
+            rendered_command::take_text_nodes();
+            draw(cx);
+            nodes = rendered_command::take_text_nodes();
+        });
+        let labels = nodes
+            .into_iter()
+            .filter_map(|(_, node)| node.value().map(str::to_owned))
+            .collect();
+        (
+            ids.into_iter()
+                .filter(|id| id.starts_with(prefix))
+                .collect(),
+            labels,
+        )
+    }
+    fn shows(labels: &[String], text: &str) -> bool {
+        labels.iter().any(|label| label.contains(text))
+    }
+    fn model_folder(name: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "mediflow-dettatura-{name}-{}-{:?}",
+            std::process::id(),
+            std::time::SystemTime::now()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        root
+    }
+    /// File di prova al posto dei pesi, con l'impronta fissata sui loro byte.
+    fn fixture_model(
+        directory: &std::path::Path,
+    ) -> [&'static crate::local_voice::model::ModelFile; 2] {
+        use crate::local_voice::model::{ModelFile, sha256_file};
+        std::fs::create_dir_all(directory).unwrap();
+        let mut files = Vec::new();
+        for (name, bytes) in [
+            ("pesi-di-prova.bin", &b"pesi inventati"[..]),
+            ("vad-di-prova.bin", b"vad inventato"),
+        ] {
+            let path = directory.join(name);
+            std::fs::write(&path, bytes).unwrap();
+            let file: &'static ModelFile = Box::leak(Box::new(ModelFile {
+                name,
+                url: "https://127.0.0.1/mai-scaricato",
+                sha256: Box::leak(sha256_file(&path).unwrap().into_boxed_str()),
+                size: bytes.len() as u64,
+            }));
+            files.push(file);
+        }
+        [files[0], files[1]]
+    }
+    /// Motore finto sugli stessi file verificati: una parola ogni 0,5 s.
+    fn fake_engine(
+        _: &std::path::Path,
+        _: &[&'static crate::local_voice::model::ModelFile; 2],
+        _: zeroize::Zeroizing<String>,
+    ) -> Result<crate::local_voice::whisper::Listener, crate::local_voice::listening::EngineFailure>
+    {
+        use crate::local_voice::listening::{
+            Dictation,
+            tests::{CountingDecoder, LoudnessDetector},
+        };
+        let dictation = Dictation::new(LoudnessDetector, CountingDecoder::default());
+        Ok(Box::new(move |source, commands, shared| {
+            crate::local_voice::whisper::listen(dictation, source, commands, shared)
+        }))
+    }
+
+    #[gpui::test]
+    fn without_the_model_dictation_is_missing_and_leads_to_the_install_button(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use crate::local_voice::{model, whisper};
+        let host = Host::new();
+        let root = model_folder("senza-modello");
+        let microphone = std::rc::Rc::new(std::cell::Cell::new(false));
+        let opened = microphone.clone();
+        let session = Session::open(
+            whisper::Engine {
+                directory: root.join("modelli-voce"),
+                files: model::FILES,
+                prompt: zeroize::Zeroizing::default(),
+                load: whisper::load_whisper,
+            },
+            move || {
+                opened.set(true);
+                None
+            },
+        );
+        assert!(!microphone.get(), "no microphone without the model");
+        assert_eq!(session.state(), State::ModelMissing);
+        assert!(session.transcript().is_none() && session.live_text().is_none());
+        let (view, cx, _remote) = recording_app(cx, &host, session);
+        cx.update_window_entity(&view, |app, _, cx| app.poll_chat_voice(cx));
+        let (ids, labels) = voice_page(cx, "chat-voice");
+        assert_eq!(
+            ids,
+            ["chat-voice-model", "chat-voice-discard"],
+            "{labels:?}"
+        );
+        assert!(
+            shows(&labels, "Modello vocale non installato."),
+            "{labels:?}"
+        );
+        assert!(shows(&labels, "Installa il modello"), "{labels:?}");
+        assert!(!shows(&labels, "Consenti e avvia"), "{labels:?}");
+        assert!(!shows(&labels, "Apple"), "{labels:?}");
+        // Il gesto porta alla pagina con il pulsante che installa il modello.
+        let catalog = model::Catalog::pinned(root.join("modelli-voce"));
+        let requests = host.request_count();
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.voice_model =
+                super::super::voice_model::VoiceModelArea::with_catalog(Some(catalog));
+            app.open_voice_model_settings(window, cx);
+            assert!(app.chat_access.voice.work.is_none());
+            assert_eq!(app.area, Area::Settings);
+            assert_eq!(app.settings_page, SettingsPage::VoiceLocal);
+        });
+        assert_eq!(host.request_count(), requests, "no write and no model call");
+        let (ids, labels) = voice_page(cx, "voice-model-");
+        assert_eq!(ids, ["voice-model-install"], "{labels:?}");
+        assert!(
+            shows(
+                &labels,
+                "Modello non installato: la dettatura non è disponibile."
+            ),
+            "{labels:?}"
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[gpui::test]
+    fn with_the_model_installed_dictation_reaches_review_and_the_writer(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use crate::local_voice::listening::tests::tone;
+        use crate::local_voice::whisper::{self, tests::InjectedSource};
+        let host = Host::new();
+        let root = model_folder("con-modello");
+        let directory = root.join("modelli-voce");
+        let files = fixture_model(&directory);
+        let session = Session::open(
+            whisper::Engine {
+                directory,
+                files,
+                prompt: zeroize::Zeroizing::default(),
+                load: fake_engine,
+            },
+            || Some(Box::new(InjectedSource::new(tone(3.0))) as Box<dyn whisper::AudioSource>),
+        );
+        assert_eq!(session.state(), State::Disclosure);
+        let (view, cx, _remote) = recording_app(cx, &host, session);
+        cx.update_window_entity(&view, |app, _, cx| app.poll_chat_voice(cx));
+        let (ids, labels) = voice_page(cx, "chat-voice");
+        assert_eq!(
+            ids,
+            ["chat-voice-start", "chat-voice-discard"],
+            "{labels:?}"
+        );
+        assert!(
+            !shows(&labels, "Modello vocale non installato."),
+            "{labels:?}"
+        );
+        cx.update_window_entity(&view, |app, _, _| {
+            app.chat_access.voice.work.as_ref().unwrap().session.start();
+        });
+        let mut reviewed = String::new();
+        for _ in 0..4_000 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            cx.update_window_entity(&view, |app, _, cx| {
+                app.poll_chat_voice(cx);
+                if app.chat_access.voice.work.as_ref().unwrap().state == State::Review {
+                    reviewed = app.chat_access.voice.editor.read(cx).value().to_owned();
+                }
+            });
+            if !reviewed.is_empty() {
+                break;
+            }
+        }
+        assert!(
+            reviewed.starts_with("parola1 parola2"),
+            "review text: {reviewed}"
+        );
+        let (ids, _) = voice_page(cx, "chat-voice");
+        assert_eq!(ids, ["chat-voice-transfer", "chat-voice-discard"]);
+        let requests = host.request_count();
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.transfer_chat_voice(window, cx);
+            let form = app.form.as_ref().unwrap();
+            assert!(form.kind == FormKind::Entry && form.state == FormState::Draft);
+            assert_eq!(form.fields[2].editor.read(cx).value(), reviewed);
+        });
+        assert_eq!(host.request_count(), requests, "the draft is not saved");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[gpui::test]
+    fn a_tampered_model_stops_dictation_and_leads_to_reinstall(cx: &mut gpui::TestAppContext) {
+        use crate::local_voice::listening::tests::tone;
+        use crate::local_voice::whisper::{self, tests::InjectedSource};
+        let host = Host::new();
+        let root = model_folder("alterato");
+        let directory = root.join("modelli-voce");
+        let files = fixture_model(&directory);
+        std::fs::write(directory.join(files[0].name), b"pesi alterati").unwrap();
+        let session = Session::open(
+            whisper::Engine {
+                directory,
+                files,
+                prompt: zeroize::Zeroizing::default(),
+                load: fake_engine,
+            },
+            || Some(Box::new(InjectedSource::new(tone(3.0))) as Box<dyn whisper::AudioSource>),
+        );
+        let (view, cx, _remote) = recording_app(cx, &host, session);
+        cx.update_window_entity(&view, |app, _, _| {
+            app.chat_access.voice.work.as_ref().unwrap().session.start();
+        });
+        let mut state = State::Disclosure;
+        for _ in 0..4_000 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            state = cx.update_window_entity(&view, |app, _, cx| {
+                app.poll_chat_voice(cx);
+                app.chat_access.voice.work.as_ref().unwrap().state
+            });
+            if state == State::Unavailable {
+                break;
+            }
+        }
+        assert_eq!(state, State::Unavailable);
+        let (ids, labels) = voice_page(cx, "chat-voice");
+        assert_eq!(
+            ids,
+            ["chat-voice-model", "chat-voice-discard"],
+            "{labels:?}"
+        );
+        assert!(
+            shows(
+                &labels,
+                "Il modello vocale locale è incompleto o diverso da quello atteso."
+            ),
+            "{labels:?}"
+        );
+        assert!(shows(&labels, "Reinstalla il modello"), "{labels:?}");
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[gpui::test]
