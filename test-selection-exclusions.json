@@ -263,5 +263,10 @@
     "path": "scripts/ui-identita/apple/CaptureTests.swift",
     "reason": "XCUITest di cattura UI sintetica locale, copiato in un progetto sullo scratch da scripts/ui-identita/apple/capture.sh; fuori dalle suite native.",
     "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/check-apple-lume-colors.mjs",
+    "reason": "Guard e self-test eseguiti direttamente dal job native-build-test in .github/workflows/apple-native.yml.",
+    "owner": "WUL-834"
   }
 ]

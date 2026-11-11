@@ -575,7 +575,7 @@ struct PairedPatientDocumentsSection: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Image(systemName: result.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(result.ok ? .green : .orange)
+                    .foregroundStyle(result.ok ? PlatformColors.signal(.positive) : PlatformColors.signal(.attention))
                 Text(model.fseDocumentValidationTargetLabel ?? result.profile)
                     .chartRowTitle()
             }
