@@ -370,7 +370,12 @@ const DENIAL_CODES: [&str; 13] = [
     "fabric_denied",
     "source_invalid",
 ];
-const FAILURE_CODES: [&str; 3] = ["provider_failed", "proposal_invalid", "source_stale"];
+const FAILURE_CODES: [&str; 4] = [
+    "provider_failed",
+    "proposal_invalid",
+    "proposal_unfaithful",
+    "source_stale",
+];
 /// Codici di diniego che dicono «funzione non disponibile» e non «errore».
 const UNAVAILABLE_CODES: [&str; 11] = [
     "kill_switch_disabled",
@@ -411,6 +416,10 @@ pub fn patient_insight_message(code: &str) -> &'static str {
         }
         "proposal_invalid" => {
             "La risposta del modello non ha superato i controlli dell'host. Nessuna proposta creata."
+        }
+        // ADR 0189: stesso testo del Web (`PATIENT_INSIGHT_UNFAITHFUL_MESSAGE`).
+        "proposal_unfaithful" => {
+            "Il modello ha dato per presa una decisione ancora aperta nella scheda, o per urgente qualcosa che la scheda non segnala come urgente. Nessuna proposta creata."
         }
         "binding_stale" | "catalog_stale" | "session_stale" => {
             "La configurazione dei modelli è cambiata durante la richiesta. Riprova."
@@ -894,6 +903,16 @@ mod tests {
             outcome("response-proposal-invalid"),
             Ok(PatientInsightOutcome::Failed("proposal_invalid".into()))
         );
+        // ADR 0189: lo scarto per infedeltà ha un codice e un testo propri.
+        assert_eq!(
+            outcome("response-proposal-unfaithful"),
+            Ok(PatientInsightOutcome::Failed("proposal_unfaithful".into()))
+        );
+        let unfaithful = patient_insight_message("proposal_unfaithful");
+        assert!(unfaithful.contains("decisione ancora aperta"));
+        assert!(unfaithful.contains("urgente"));
+        assert!(!unfaithful.contains('\u{2014}'));
+        assert_ne!(unfaithful, patient_insight_message("proposal_invalid"));
         assert_eq!(
             outcome("response-provider-failed"),
             Ok(PatientInsightOutcome::Failed("provider_failed".into()))
