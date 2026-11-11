@@ -156,6 +156,7 @@ jobs:
             if [ "$EVENT" != push ]; then
               case "$f" in
                 scripts/check-apple-*.sh)            apple=true ;;
+                scripts/check-apple-*.mjs)           apple=true ;;
                 # WUL-547: `scripts/assert-apple-terminology-tests.sh` non era coperto
                 # da NESSUN filtro, né push né pull_request — il glob era
                 # `scripts/check-apple-*.sh` e quel file inizia per `assert-`. È il
