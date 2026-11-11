@@ -82,7 +82,9 @@ function present(text: string, markers: readonly Marker[]): readonly Readonly<{ 
     for (const item of markers) {
         item.pattern.lastIndex = 0;
         for (const match of text.matchAll(item.pattern)) {
-            if (!negated(text, match.index ?? 0)) { found.push({ key: item.key, match: match[0] }); break; }
+            // Un marcatore di più parole («aumento ... in corso») è negato anche da una negazione al suo interno.
+            const inner = match[0].split(/[\s']+/u).some((word) => NEGATIONS.includes(word));
+            if (!inner && !negated(text, match.index ?? 0)) { found.push({ key: item.key, match: match[0] }); break; }
         }
     }
     return found;
@@ -122,6 +124,33 @@ export function claimFidelityFinding(claim: string, citedSources: readonly strin
     return null;
 }
 
+const CITATION_GROUP = /\[(?:S\d+|DATI-INCOMPLETI)(?:,\s*(?:S\d+|DATI-INCOMPLETI))*\]/gu;
+
+/**
+ * Divide una riga nelle proposizioni citate separatamente: ogni tratto di testo va con il
+ * gruppo [S<n>] che lo chiude, così la fonte di una frase non autorizza quella accanto.
+ * Gruppi adiacenti si sommano; il testo dopo l'ultimo gruppo va con l'ultimo gruppo.
+ */
+export function citedSegments(claim: string): readonly Readonly<{ text: string; indexes: readonly number[] }>[] {
+    const segments: { text: string; indexes: number[] }[] = [];
+    let last = 0;
+    for (const group of claim.matchAll(CITATION_GROUP)) {
+        const start = group.index ?? 0;
+        const text = claim.slice(last, start);
+        const indexes = [...citedSourceIndexes(group[0])];
+        const previous = segments.at(-1);
+        if (previous && !/[\p{L}\p{N}]/u.test(text)) previous.indexes.push(...indexes);
+        else segments.push({ text, indexes });
+        last = start + group[0].length;
+    }
+    const tail = claim.slice(last);
+    const previous = segments.at(-1);
+    if (/[\p{L}\p{N}]/u.test(tail)) {
+        if (previous) previous.text += tail; else segments.push({ text: tail, indexes: [] });
+    }
+    return Object.freeze(segments.map((segment) => Object.freeze({ text: segment.text, indexes: Object.freeze([...new Set(segment.indexes)]) })));
+}
+
 /**
  * Applica le regole a ogni frase di una proposta. `sources` sono i testi delle
  * fonti nell'ordine [S1], [S2], ... con cui il modello li ha ricevuti.
@@ -130,9 +159,11 @@ export function proposalFidelityFindings(claims: readonly string[], sources: rea
     const findings: Readonly<{ claim: string; finding: PatientInsightFidelityFinding }>[] = [];
     for (const claim of claims) {
         if (!claim) continue;
-        const cited = citedSourceIndexes(claim).map((index) => sources[index - 1]).filter((value): value is string => typeof value === 'string');
-        const finding = claimFidelityFinding(claim, cited);
-        if (finding) findings.push(Object.freeze({ claim, finding }));
+        for (const segment of citedSegments(claim)) {
+            const cited = segment.indexes.map((index) => sources[index - 1]).filter((value): value is string => typeof value === 'string');
+            const finding = claimFidelityFinding(segment.text, cited);
+            if (finding) { findings.push(Object.freeze({ claim, finding })); break; }
+        }
     }
     return Object.freeze(findings);
 }

@@ -8,7 +8,7 @@ import { localProviderRegistry, type LocalProviderResolution } from '../registry
 import { routeHostResolvedCandidateCapability } from './candidate-router';
 import type { ProviderLifecycleRead } from './provider-lifecycle-service';
 import { createPatientInsightHostCapability } from './patient-insight-host-capability.ts';
-import { claimFidelityFinding, proposalFidelityFindings } from './patient-insight-fidelity.ts';
+import { citedSegments, claimFidelityFinding, proposalFidelityFindings } from './patient-insight-fidelity.ts';
 
 const requestId = 'request.patient-insight.fidelity.0001';
 const generatedAt = '2026-11-11T10:00:01.000Z';
@@ -140,4 +140,20 @@ test('le frasi senza fonte con marcatore aperto e le fonti non citate non contan
 test('accenti, maiuscole e apostrofi tipografici non cambiano l’esito', () => {
     assert.equal(claimFidelityFinding('È STATO DECISO l’aumento [S1].', ['DA DECIDERE: aumento.'])?.rule, 'decision_state');
     assert.equal(claimFidelityFinding('Non è urgente [S1].', ['Fondo oculare da prenotare.']), null);
+});
+
+test('rilievo bot #928: ogni proposizione citata si confronta solo con le sue fonti', () => {
+    const sources = ['Visita cardiologica urgente.', 'Fondo oculare da prenotare.'];
+    const findings = proposalFidelityFindings(['Visita cardiologica urgente [S1]. Fondo oculare urgente [S2].'], sources);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0]?.finding.rule, 'urgency');
+    // Gruppi adiacenti valgono per la stessa proposizione; il testo dopo l'ultimo gruppo va con quello.
+    assert.deepEqual(citedSegments('Visita urgente [S1][S2], da ricontrollare.').map((segment) => segment.indexes), [[1, 2]]);
+    assert.deepEqual(proposalFidelityFindings(['Visita urgente [S2] [S1].'], sources), []);
+});
+
+test('rilievo bot #928: una negazione dentro «... in corso» annulla il marcatore', () => {
+    assert.equal(claimFidelityFinding('Aumento ramipril non ancora in corso [S1].', ['Da decidere: aumento ramipril.']), null);
+    // Una fonte che nega «in corso» non autorizza la frase che lo afferma.
+    assert.equal(claimFidelityFinding('Aumento ramipril in corso [S1].', ['Aumento ramipril non ancora in corso. Da decidere.'])?.rule, 'decision_state');
 });
