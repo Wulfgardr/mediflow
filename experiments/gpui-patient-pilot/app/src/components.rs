@@ -511,7 +511,9 @@ where
 
 /// Istante con ora portato nel fuso indicato; `None` per le date pure (vedi
 /// [`display_date_in_zone`]) e per i testi che non sono un istante RFC 3339.
-fn clinical_instant_in_zone<T: chrono::TimeZone>(
+/// L'editor delle date (`editing.rs`) usa la stessa regola, così il giorno
+/// proposto è quello dell'elenco.
+pub(crate) fn clinical_instant_in_zone<T: chrono::TimeZone>(
     value: &str,
     zone: &T,
 ) -> Option<chrono::DateTime<T>> {
