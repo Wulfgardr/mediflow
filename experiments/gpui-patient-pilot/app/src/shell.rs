@@ -9048,9 +9048,87 @@ fn allergy_label(known: Option<&str>, theme: crate::theme::Theme) -> Div {
 }
 
 fn entry_time(date: &str) -> String {
+    entry_time_in_zone(date, &chrono::Local)
+}
+
+/// Ora della voce nel fuso della postazione, lo stesso di «Registrata… alle».
+fn entry_time_in_zone<T: chrono::TimeZone>(date: &str, zone: &T) -> String
+where
+    T::Offset: std::fmt::Display,
+{
     chrono::DateTime::parse_from_rfc3339(date)
-        .map(|date| date.format("%H:%M").to_string())
+        .map(|date| date.with_timezone(zone).format("%H:%M").to_string())
         .unwrap_or_default()
+}
+
+#[test]
+fn diary_entry_day_and_time_follow_the_workstation_zone() {
+    let rome = chrono_tz::Europe::Rome;
+    for (instant, day, time) in [
+        // Ora legale (CEST, +2).
+        ("2026-09-12T09:00:00.000Z", "12/09/2026", "11:00"),
+        // Ora solare (CET, +1).
+        ("2026-11-05T09:30:00.000Z", "05/11/2026", "10:30"),
+        // A cavallo della mezzanotte di Roma: il giorno è quello locale.
+        ("2026-11-04T23:30:00.000Z", "05/11/2026", "00:30"),
+        ("2026-09-11T22:15:00.000Z", "12/09/2026", "00:15"),
+    ] {
+        assert_eq!(entry_time_in_zone(instant, &rome), time, "{instant}");
+        assert_eq!(
+            crate::components::display_date_in_zone(Some(instant), &rome),
+            day,
+            "{instant}"
+        );
+    }
+}
+
+#[test]
+fn calendar_dates_keep_their_day_in_every_zone() {
+    for zone in [
+        chrono_tz::Europe::Rome,
+        chrono_tz::America::New_York,
+        chrono_tz::Pacific::Kiritimati,
+        chrono_tz::Pacific::Pago_Pago,
+    ] {
+        for (value, day) in [
+            ("1950-03-01", "01/03/1950"),
+            ("1950-03-01T00:00:00.000Z", "01/03/1950"),
+            ("1950-03-01T00:00:00Z", "01/03/1950"),
+            ("2026-10-18T00:00:00+00:00", "18/10/2026"),
+        ] {
+            assert_eq!(
+                crate::components::display_date_in_zone(Some(value), &zone),
+                day,
+                "{value} in {zone}"
+            );
+        }
+        assert_eq!(
+            crate::components::display_date_in_zone(None, &zone),
+            "Non indicata"
+        );
+        assert_eq!(
+            crate::components::display_date_in_zone(Some("non una data"), &zone),
+            "non una data"
+        );
+    }
+}
+
+#[test]
+fn technical_receipts_show_the_workstation_time() {
+    let rome = chrono_tz::Europe::Rome;
+    assert_eq!(
+        crate::components::display_instant_in_zone("2026-11-04T23:30:00.000Z", &rome),
+        "05/11/2026 00:30"
+    );
+    // Per una ricevuta la mezzanotte UTC è un istante, non una data pura.
+    assert_eq!(
+        crate::components::display_instant_in_zone("2026-09-12T00:00:00.000Z", &rome),
+        "12/09/2026 02:00"
+    );
+    assert_eq!(
+        crate::components::display_instant_in_zone("in attesa", &rome),
+        "in attesa"
+    );
 }
 
 fn diary_registration<T: chrono::TimeZone>(

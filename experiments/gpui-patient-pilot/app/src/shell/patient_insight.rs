@@ -462,7 +462,9 @@ impl ClinicalApp {
                     )))
                     .child(muted(format!(
                         "Revisione della scheda {} · dati raccolti {} · verificati {}",
-                        proposal.patient_revision, proposal.captured_at, proposal.verified_at
+                        proposal.patient_revision,
+                        crate::components::display_instant(&proposal.captured_at),
+                        crate::components::display_instant(&proposal.verified_at)
                     )))
                     .child(
                         button("patient-insight-discard", "Scarta la proposta", theme, false, true)
