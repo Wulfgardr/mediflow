@@ -70,7 +70,7 @@
     "test:native-launcher": "node --test scripts/launch-mediflow-mac.test.mjs",
     "test:installability-v0": "node --test scripts/installability-v0-macos.test.mjs",
     "test:unit": "node scripts/run-unit-suite.mjs",
-    "test:test-selection": "node --test scripts/check-test-selection.test.mjs scripts/unit-test-selection.test.mjs scripts/explicit-npm-test-selection.test.mjs scripts/report-xcuitest-retries.test.mjs",
+    "test:test-selection": "node --test scripts/check-test-selection.test.mjs scripts/unit-test-selection.test.mjs scripts/explicit-npm-test-selection.test.mjs scripts/report-xcuitest-retries.test.mjs scripts/prove-a-mano.test.mjs",
     "check:test-selection": "node scripts/check-test-selection.mjs",
     "test:api-v1-contract-negative": "bash scripts/api-v1-contract-negative-test.sh",
     "test:api-v1-put-negative-routes": "bash scripts/api-v1-put-negative-routes-test.sh",
@@ -200,7 +200,8 @@
     "qualify:visual-091": "node scripts/qualify-visual-091.mjs",
     "collect:development-usage": "node scripts/collect-development-usage.mjs",
     "check:release-usage": "node scripts/check-release-usage.mjs",
-    "test:release-usage": "node --test scripts/check-release-usage.test.mjs"
+    "test:release-usage": "node --test scripts/check-release-usage.test.mjs",
+    "prove:a-mano": "node scripts/prove-a-mano.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",
