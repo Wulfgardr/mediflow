@@ -1,3 +1,5 @@
+> Calibrazione v1, non usata per decidere la PR. Protocollo decisivo: [v2](metodo-v2.md).
+
 # WUL-832: protocollo congelato prima della misura
 
 La PR #938 passa se diminuisce il numero di attribuzioni sbagliate e conserva almeno due terzi delle diagnosi nuove proposte da main. Una fonte sbagliata pesa piu di una diagnosi nuova mancata. Il merge resta al coordinatore.
