@@ -271,7 +271,15 @@ impl ViewState {
             ),
             ViewStateKind::Errore => (self.object.failed().into(), None),
         };
-        (format!("{}{first}", self.tone().sign()), second)
+        let sign = match self.kind {
+            ViewStateKind::Errore
+            | ViewStateKind::CampoIlleggibile
+            | ViewStateKind::AccessoNegato
+            | ViewStateKind::ArchivioSostituito
+            | ViewStateKind::Conflitto => "✕ ",
+            _ => self.tone().sign(),
+        };
+        (format!("{sign}{first}"), second)
     }
 
     pub(super) fn render(
@@ -738,35 +746,35 @@ mod tests {
             ),
             (
                 ViewStateKind::ArchivioSostituito,
-                "◆ L'archivio è stato ripristinato da una copia.",
+                "✕ L'archivio è stato ripristinato da una copia.",
                 Some("Riapri l'archivio prima di continuare."),
                 ViewTone::Critico,
                 None,
             ),
             (
                 ViewStateKind::Conflitto,
-                "◆ La scheda è stata modificata da un'altra postazione.",
+                "✕ La scheda è stata modificata da un'altra postazione.",
                 Some("La bozza è intatta: rileggi la scheda e riprova."),
                 ViewTone::Critico,
                 Some("Rileggi la scheda"),
             ),
             (
                 ViewStateKind::AccessoNegato,
-                "◆ Questa postazione non può vedere le terapie.",
+                "✕ Questa postazione non può vedere le terapie.",
                 None,
                 ViewTone::Critico,
                 None,
             ),
             (
                 ViewStateKind::CampoIlleggibile,
-                "◆ Questo dato non si può leggere con la chiave attuale. Non è vuoto.",
+                "✕ Questo dato non si può leggere con la chiave attuale. Non è vuoto.",
                 None,
                 ViewTone::Critico,
                 None,
             ),
             (
                 ViewStateKind::Errore,
-                "◆ Le terapie non si sono potute leggere.",
+                "✕ Le terapie non si sono potute leggere.",
                 None,
                 ViewTone::Critico,
                 Some("Riprova la lettura"),
@@ -829,6 +837,21 @@ mod tests {
             }
         }
         panic!("read-state rendering did not settle");
+    }
+
+    #[test]
+    fn system_errors_use_error_sign() {
+        for kind in [
+            ViewStateKind::Errore,
+            ViewStateKind::CampoIlleggibile,
+            ViewStateKind::AccessoNegato,
+            ViewStateKind::ArchivioSostituito,
+            ViewStateKind::Conflitto,
+        ] {
+            let state = ViewState::new(ReadObject::Terapie, kind);
+            assert!(state.lines().0.starts_with("✕ "), "{}", state.lines().0);
+        }
+        assert_eq!(ViewTone::Critico.sign(), "◆ ");
     }
 
     #[gpui::test]
@@ -1033,7 +1056,7 @@ mod tests {
             let state = app.patient.therapies.state(ReadObject::Terapie).unwrap();
             assert_eq!(
                 state.lines().0,
-                "◆ Questa postazione non può vedere le terapie."
+                "✕ Questa postazione non può vedere le terapie."
             );
             assert_eq!(
                 state.command(),
