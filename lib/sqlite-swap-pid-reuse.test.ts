@@ -79,3 +79,30 @@ test('crash dello swap e riavvio con lo stesso PID: il recupero ripristina l\'or
         assert.equal(recovered.rows[0].value, 'synthetic-original-A');
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+// Confine: il giornale scritto da questo stesso processo (swap fallito dopo
+// l'installazione, artefatti conservati) resta del proprietario vivo: HOLD.
+const ownFailedSwapScript = `
+    import Database from 'better-sqlite3';
+    import path from 'node:path';
+    import { replaceSqliteDatabase, recoverSqliteSwapArtifacts } from './lib/sqlite-repair.ts';
+    const dir = process.env.MEDIFLOW_DATA_DIR;
+    const destPath = path.join(dir, 'medical.db');
+    const live = new Database(destPath);
+    let opened = 0;
+    await replaceSqliteDatabase({ sourcePath: path.join(dir, 'replacement.db'), destPath, connection: live,
+        reopenConnection: () => { if (++opened === 1) throw new Error('synthetic reopen failure'); return new Database(destPath); },
+    }).catch(() => undefined);
+    console.log(JSON.stringify(recoverSqliteSwapArtifacts(destPath)));
+`;
+
+test('swap fallito nello stesso processo: il giornale è suo e il recupero resta in HOLD', () => {
+    const dir = fs.mkdtempSync(path.join(process.env.MEDIFLOW_DATA_DIR!, 'swap-own-journal-'));
+    try {
+        fixture(path.join(dir, 'medical.db'), 'synthetic-original-A');
+        fixture(path.join(dir, 'replacement.db'), 'synthetic-replacement-B');
+        const result = worker(dir, ownFailedSwapScript);
+        assert.equal(result.status, 0, result.stderr);
+        assert.deepEqual(JSON.parse(result.stdout.trim().split('\n').pop()!), { status: 'HOLD' });
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

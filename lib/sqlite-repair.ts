@@ -19,6 +19,9 @@ export class SqliteSwapInProgressError extends Error {
 // file interleave at the await points below and can delete each other's only
 // surviving copy, so a second request fails fast instead of queueing.
 const inFlightSwaps = new Set<string>();
+// Journals written by this process. A journal with this process's PID that is
+// not among them was left by an earlier process whose PID was reused.
+const ownSwapJournals = new Set<string>();
 
 const RECOVERY_SUFFIX = '.swap-recovery';
 const RECOVERY_FILES = ['prepared.json', 'committed.json', 'original.db', 'replacement.db',
@@ -230,9 +233,12 @@ export function recoverSqliteSwapArtifacts(file: string): SqliteSwapRecovery {
         if (names.length !== 1 || names[0] !== path.basename(target) + RECOVERY_SUFFIX) return { status: 'HOLD' };
         assertDurableDirectory(path.dirname(path.resolve(file)));
         const context = readContext(target);
-        // A live/unknown owner might still be swapping. PID reuse is HOLD.
-        try { process.kill(context.journal.pid, 0); return { status: 'HOLD' }; }
-        catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') return { status: 'HOLD' }; }
+        // A live/unknown owner might still be swapping. PID reuse by another process is HOLD;
+        // this process can only be the owner of a journal it wrote itself.
+        if (context.journal.pid !== process.pid || ownSwapJournals.has(context.journal.id)) {
+            try { process.kill(context.journal.pid, 0); return { status: 'HOLD' }; }
+            catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') return { status: 'HOLD' }; }
+        }
         if (commitExists(context)) {
             validateCommit(context);
             assertIntegrity(target);
@@ -421,6 +427,7 @@ export async function replaceSqliteDatabase(options: ReplaceSqliteDatabaseOption
             const journal: SwapJournal = { version: 1, id: randomUUID(), target, pid: process.pid,
                 originalSha256: digest(original), replacementSha256: digest(staging) };
             context = { target, dir, journal, journalText: JSON.stringify(journal) };
+            ownSwapJournals.add(journal.id);
             writeDurable(path.join(dir, 'prepared.json'), context.journalText);
             prepared = true;
             options.onPhaseForTest?.('prepared');
