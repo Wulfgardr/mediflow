@@ -44,14 +44,26 @@ def classify(case, data):
             reasons.append('id_inesistente')
         elif not found and evidence and any(evidence in norm(c) for k, c in sources.items() if k != sid):
             reasons.append('excerpt_di_altra_fonte')
+        if sid in sources and not found and evidence:
+            tokens = evidence.split()
+            cited = norm(content)
+            other_sources = {k: norm(v) for k, v in sources.items() if k != sid}
+            for i in range(len(tokens) - 2):
+                fragment = ' '.join(tokens[i:i+3])
+                if any(t.isdigit() and t not in cited.split() for t in tokens[i:i+3]) and fragment not in cited and any(fragment in v for v in other_sources.values()):
+                    reasons.append('fatto_numerico_di_altra_fonte')
+                    break
+            for diagnosis in case['projection']['currentDiagnoses']:
+                description = norm(diagnosis.get('description'))
+                code = norm(diagnosis.get('code'))
+                if description and description in evidence and description not in cited or code and (' ' + code + ' ') in (' ' + evidence + ' ') and (' ' + code + ' ') not in (' ' + cited + ' '):
+                    reasons.append('excerpt_della_scheda')
+                    break
         if location.startswith('diagnoses.'):
             label = str(item.get('label', '')) + ' ' + str(item.get('icdQuery', ''))
             for expected in case['expected']:
                 if match(expected['pattern'], label) and sid not in expected['sourceIds']:
                     reasons.append('diagnosi_nuova_fonte_errata')
-            for pattern in case['recordPatterns']:
-                if match(pattern, label) and not match(pattern, content):
-                    reasons.append('diagnosi_della_scheda_senza_riscontro')
         state = 'sbagliata' if reasons else 'letterale' if found else 'non_risolta'
         out.append({'location': location, 'state': state, 'reasons': reasons, 'item': item})
     return out
@@ -60,6 +72,17 @@ def classify(case, data):
 def novel(case, data):
     labels = [' '.join(str(d.get(k, '')) for k in ('label', 'icdQuery')) for d in data.get('diagnoses', []) or []]
     return [e['id'] for e in case['expected'] if any(match(e['pattern'], label) for label in labels)]
+
+
+def other_diagnoses(case, data):
+    patterns = [e['pattern'] for e in case['expected']] + case['recordPatterns']
+    labels = {}
+    for item in data.get('diagnoses', []) or []:
+        label = str(item.get('label', ''))
+        text = label + ' ' + str(item.get('icdQuery', ''))
+        if not any(match(pattern, text) for pattern in patterns):
+            labels.setdefault(norm(label), label)
+    return list(labels.values())
 
 
 def selfcheck():
@@ -73,6 +96,12 @@ def selfcheck():
     assert classify(case, {'therapies': [{'sourceId': 'source.synthetic.p5.02', 'evidence': 'Prosegue losartan 50 mg al mattino'}]})[0]['state'] == 'letterale'
     assert classify(case, {'therapies': [{'sourceId': 'source.synthetic.p5.01', 'evidence': 'Prosegue losartan 50 mg al mattino'}]})[0]['state'] == 'sbagliata'
     assert classify(case, {'therapies': [{'sourceId': 'source.synthetic.p5.02', 'evidence': 'Assume abitualmente losartan'}]})[0]['state'] == 'non_risolta'
+    p1 = CASES['P1']
+    ldl = {'label': 'Ipercolesterolemia pura', 'icdQuery': 'Pure hypercholesterolaemia', 'sourceId': 'source.local.00000000001.04', 'evidence': 'colesterolo LDL 162 mg/dL.'}
+    assert classify(p1, {'diagnoses': [ldl]})[0]['state'] == 'letterale'
+    mixed = {'label': 'Ipertensione essenziale', 'sourceId': 'source.local.00000000001.02', 'evidence': 'PA 150/94 mmHg, media domiciliare 150/95 mmHg.'}
+    assert classify(p1, {'diagnoses': [mixed]})[0]['state'] == 'sbagliata'
+    assert classify(p1, {'diagnoses': [dict(mixed, evidence='PA 150/94 mmHg.')]})[0]['state'] == 'letterale'
     assert novel(case, {}) == []
     assert norm('Hb 10,2 g/dL') == norm('HB 10,2 g/dl.')
 
@@ -113,12 +142,14 @@ def analyze(directory):
             proposal = result['proposal'] if success else {}
             new = novel(case, proposal)
             count['new'] += len(new)
+            others = other_diagnoses(case, proposal)
+            count['other_diagnoses_outside_reference'] += len(others)
             classified = classify(case, proposal)
             for c in classified:
                 count['visible_' + c['state']] += 1
                 if c['state'] != 'letterale':
                     details.append({'stage': 'visible', 'patient': pid, 'round': row['round'], **c})
-            rounds.append({'round': row['round'], 'new': new, 'success': bool(success)})
+            rounds.append({'round': row['round'], 'new': new, 'otherLabels': others, 'success': bool(success)})
         for row in raw:
             try:
                 response = json.loads(row['response'])

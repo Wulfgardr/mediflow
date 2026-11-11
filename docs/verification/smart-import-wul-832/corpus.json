@@ -1,8 +1,8 @@
 {
-  "schema": "wul832.synthetic-corpus.v1",
-  "frozenAt": "2026-11-11T22:14:19.025124+00:00",
+  "schema": "wul832.synthetic-corpus.v2",
+  "frozenAt": "2026-11-11T23:06:54.313125+00:00",
   "trialsPerPatient": 20,
-  "seedBase": 832000,
+  "seedBase": 1672000,
   "cases": [
     {
       "id": "P1",
