@@ -26,7 +26,7 @@ export const PATIENT_OPEN_LOOPS_FOLLOW_UP_PROPOSAL_MAX_ITEMS_V1
 const INPUT_SCHEMA = 'mediflow.patient.open_loops.follow_up.propose.input.v1' as const;
 const OUTPUT_SCHEMA = 'mediflow.patient.open_loops.follow_up.proposal.v1' as const;
 const RECEIPT_SCHEMA = 'mediflow.patient.open_loops.follow_up.proposal.receipt.v1' as const;
-const TIMEOUT_MS = 250 as const;
+const TIMEOUT_MS = 500 as const;
 const INPUT_KEYS = ['schemaVersion', 'operationId'] as const;
 const SOURCE_KEYS = ['now', 'nextRef', 'hashRef', 'current', 'beginPermit', 'finalizePermit', 'denyPermit',
     'readOpenLoops', 'writeAudit', 'timeoutMs'] as const;
@@ -61,7 +61,7 @@ type Sources = Readonly<{
     denyPermit: (execution: unknown) => unknown;
     readOpenLoops: (signal: AbortSignal) => unknown;
     writeAudit: (audit: unknown) => unknown;
-    timeoutMs: 250;
+    timeoutMs: 500;
 }>;
 
 const actionFor = (kind: PatientOpenLoopItemV1['kind']): FollowUpAction => {
