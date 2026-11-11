@@ -103,6 +103,26 @@ Messaggio a schermo, uguale sul Web e in GPUI:
 > urgente qualcosa che la scheda non segnala come urgente. Nessuna proposta
 > creata.
 
+### Il prompt dice al modello che cosa le regole scartano
+
+Le regole sono la rete, non la prevenzione: con il solo controllo, sul
+paziente 1 del collaudo il medico avrebbe visto spesso il rifiuto. Il prompt
+del Quadro (`buildPatientInsightExtractionPlan` in
+`lib/ai-task-contract-prompts.ts`, costante
+`PATIENT_INSIGHT_DECISION_FIDELITY_RULE`) ha quindi una riga in più, subito
+dopo «non inventare diagnosi, esami, terapie o fonti»:
+
+> mantieni lo stato delle decisioni come scritto nelle fonti (cio che e da
+> decidere o proposto resta aperto, non scriverlo come deciso o avviato) e non
+> aggiungere urgenze o priorita che le fonti non scrivono
+
+È l'unica modifica al prompt. Vale anche per il percorso in rete, che usa lo
+stesso prompt (la golden della preparazione cambia nella sola voce
+`patient_insight`). GPUI non costruisce il prompt: manda all'host la richiesta
+minimizzata, quindi non c'è un gemello Rust da allineare. La riga entra solo
+se la misura col modello locale reale riduce gli scarti per infedeltà senza
+aumentare `proposal_invalid` (rapporto `quadro-fedelta-misura.md` della 0.9.1).
+
 ## Limiti
 
 - Le regole leggono parole, non significati. Restano fuori le forme implicite
