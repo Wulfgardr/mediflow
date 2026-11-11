@@ -5,6 +5,7 @@ import { types } from 'node:util';
 
 import { bindDocumentSynthesisClaimsToCitations, type DocumentSynthesisClaimCitationsResult } from './document-synthesis-claim-citations';
 import { resolveDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope';
+import { locateDocumentSynthesisQuote } from './document-synthesis-quote-locator';
 import { composeDocumentSynthesisProviderProjection } from './document-synthesis-source-set-contract';
 
 const OBJECT = Object.prototype;
@@ -146,12 +147,21 @@ function canonicalCitations(sourceSet: object, value: unknown): readonly Citatio
         const source = projection.sources[index];
         const label = `S${index + 1}`;
         if (!descriptor || !descriptor.enumerable || !ObjectHasOwn(descriptor, 'value') || !source || source.label !== label) return null;
-        const quote = declaredQuote(descriptor.value, label, source.sourceText.length);
-        if (quote === null) return null;
-        const quoteBytes = ReflectApply(TextEncoderEncode, encoder, [quote]) as Uint8Array;
+        const declared = declaredQuote(descriptor.value, label, source.sourceText.length);
+        if (declared === null) return null;
         const sourceBytes = ReflectApply(TextEncoderEncode, encoder, [source.sourceText]) as Uint8Array;
-        const startByte = uniqueOffset(quoteBytes, sourceBytes);
-        if (startByte === null) return null;
+        let quote = declared;
+        let quoteBytes = ReflectApply(TextEncoderEncode, encoder, [quote]) as Uint8Array;
+        let startByte = uniqueOffset(quoteBytes, sourceBytes);
+        if (startByte === null) {
+            // Solo la forma degli spazi puo' differire; la citazione diventa il tratto esatto della fonte.
+            const located = locateDocumentSynthesisQuote(declared, source.sourceText);
+            if (!located) return null;
+            quote = located.quote;
+            quoteBytes = ReflectApply(TextEncoderEncode, encoder, [quote]) as Uint8Array;
+            startByte = uniqueOffset(quoteBytes, sourceBytes);
+            if (startByte === null) return null;
+        }
         const quoteSha256 = quoteDigest(sourceBytes, startByte, quoteBytes.length);
         if (quoteSha256 === null) return null;
         citations[index] = ObjectFreeze({ label, quote, startByte, endByte: startByte + quoteBytes.length, quoteSha256 });
