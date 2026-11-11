@@ -18,6 +18,7 @@ import {
 import {
     buildPatientInsightPreviewRequest,
     parsePatientInsightPreviewWireRoot,
+    patientInsightFailureMessage,
     type PatientInsightPreviewWire,
 } from '@/lib/ai-providers/fabric/patient-insight-preview-contract';
 import { db, type Patient } from '@/lib/db';
@@ -43,24 +44,6 @@ function readInsightSources(patientId: string) {
 
 /* scoped control geometry overrides the legacy shared button chrome. */
 const actionStyle = { borderRadius: 'var(--lume-control-radius, 10px)', fontSize: '0.875rem', minHeight: 'var(--lume-control-height, 44px)' };
-
-function safeError(preview: Exclude<PatientInsightPreviewWire, { status: 'available' }>): string {
-    if (preview.code === 'kill_switch_disabled') {
-        return 'Patient Insight è disabilitata. Si riattiva in Impostazioni AI.';
-    }
-    if (preview.code === 'source_stale') {
-        return 'I dati clinici sono cambiati durante la generazione. Riprova.';
-    }
-    if (preview.code === 'model_unavailable' || preview.code === 'provider_unready' || preview.code === 'provider_binding_denied') {
-        return 'Il modello clinico locale non è disponibile. Verifica le Impostazioni AI.';
-    }
-    if (preview.status === 'failed' && preview.code === 'provider_failed') {
-        return 'Il modello non ha completato la risposta. Riprova più tardi o verifica le Impostazioni AI.';
-    }
-    return preview.status === 'failed'
-        ? 'La risposta del modello locale non ha superato i controlli clinici.'
-        : 'Patient Insight non è disponibile in questo momento.';
-}
 
 function InsightList({ items, warning = false }: Readonly<{ items: readonly string[]; warning?: boolean }>) {
     if (items.length === 0) return null;
@@ -147,7 +130,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
             if (controller.signal.aborted || !picker.client.isCurrent(modelToken)) return;
             if (!root) { setError('La risposta non ha superato i controlli locali.'); return; }
             const result = root.preview;
-            if (result.status !== 'available') { setError(safeError(result)); return; }
+            if (result.status !== 'available') { setError(patientInsightFailureMessage(result)); return; }
             if (result.writesPerformed !== 0 || result.apply !== 'denied' || result.proposal.reviewOnly !== true) {
                 setError('La risposta non ha superato i controlli locali.'); return;
             }

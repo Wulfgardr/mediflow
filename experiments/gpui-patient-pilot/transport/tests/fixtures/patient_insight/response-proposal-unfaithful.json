@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "body": {
+    "preview": {
+      "writesPerformed": 0,
+      "apply": "denied",
+      "status": "failed",
+      "code": "proposal_unfaithful",
+      "proposal": null,
+      "receipt": {
+        "schemaVersion": "mediflow.ai.fabric-resolution.v1",
+        "capability": "patient_insight",
+        "venue": "local_process",
+        "provider": "ollama",
+        "model": "synthetic-patient-insight:1",
+        "egress": "none"
+      },
+      "provenance": {
+        "schemaVersion": "mediflow.ai.fabric-provenance.v1",
+        "capability": "patient_insight",
+        "venue": "local_process",
+        "provider": "ollama",
+        "model": "synthetic-patient-insight:1",
+        "preprocessing": [
+          "context_minimization",
+          "envelope_validation"
+        ]
+      },
+      "reviewRef": null
+    }
+  }
+}
