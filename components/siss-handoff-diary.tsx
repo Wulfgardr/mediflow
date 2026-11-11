@@ -3,7 +3,8 @@
 import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, LoaderCircle, MoreHorizontal, Plus } from 'lucide-react';
 import { db, captureSissHandoffWritePrecondition, resolveSissHandoffDraftPrecondition, type SissHandoffWritePrecondition, type SissHandoffEvent, type SissHandoffOutcome } from '@/lib/db';
-import { useLiveQuery } from '@/lib/live-query';
+import { useLiveQueryState } from '@/lib/live-query';
+import { ViewState } from '@/components/ui/view-state';
 import { Button } from '@/components/ui/button';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
@@ -84,7 +85,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
 
-    const handoffs = useLiveQuery(
+    const { data: handoffs, error: handoffsError, refresh: refreshHandoffs } = useLiveQueryState(
         async () => {
             const items = await db.sissHandoffs
                 .filter((item: SissHandoffEvent) => item.patientId === patientId)
@@ -225,7 +226,10 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
 
             {error && !isFormOpen ? <p className="mb-3 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p> : null}
 
-            {!handoffs ? <p className={styles.empty} role="status">Caricamento del diario locale…</p> : handoffs.length === 0 ? (
+            {handoffs !== undefined && handoffsError ? <ViewState state="error" title="Impossibile aggiornare i passaggi SISS." action={{ label: 'Riprova', onClick: refreshHandoffs }} /> : null}
+            {!handoffs ? (handoffsError
+                ? <ViewState state="error" title="Impossibile leggere i passaggi SISS." action={{ label: 'Riprova', onClick: refreshHandoffs }} />
+                : <p className={styles.empty} role="status">Caricamento del diario locale…</p>) : handoffs.length === 0 ? (
                 <p className={styles.empty}>Nessun passaggio SISS registrato per questo paziente.</p>
             ) : (
                 <table className={`${styles.table} ${styles.therapyTable}`}>
