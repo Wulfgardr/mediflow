@@ -192,6 +192,12 @@ test('una proposta infedele alle fonti arriva al Web e a GPUI con la sua causa, 
     assert.match(message, /decisione ancora aperta/u);
     assert.match(message, /urgente/u);
     assert.doesNotMatch(message, /\u2014/u);
+    assert.equal(message, 'Il modello ha dato per presa una decisione ancora aperta nella scheda, '
+        + 'o per urgente qualcosa che la scheda non segnala come urgente.');
+    assert.doesNotMatch(message, /Nessuna proposta|GPUI/u);
+    // GPUI mostra la stessa frase (`patient_insight_message`).
+    const transport = fs.readFileSync(path.join(ROOT_DIR, 'experiments/gpui-patient-pilot/transport/src/local_host/patient_insight.rs'), 'utf8');
+    assert.ok(transport.includes(`"${message}"`), 'stesso testo nel trasporto GPUI');
     // Lo scarto per citazioni resta distinto.
     const invalid = parsePatientInsightPreviewWireRoot(read('response-proposal-invalid').body);
     assert.ok(invalid && invalid.preview.status === 'failed');
