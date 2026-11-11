@@ -585,7 +585,10 @@ Con `qwen3.5:35b-a3b` su main, 20 richieste per referto: sugli esami ematici 8
 riassunti su 20 erano in inglese (6 accettati), e 6 richieste su 40 finivano
 scartate per una citazione non letterale, mostrata col messaggio generico.
 
-- Il prompt chiede riassunto e `qualityReason` in italiano.
+- Il prompt chiede il riassunto in italiano, e nomina solo `summary`. Una prima
+  versione nominava anche `qualityReason`: nella misura il modello aggiungeva la
+  `claim` di quel campo senza scrivere il campo, e il lease scartava 9 tentativi
+  su 22 sugli esami.
 - Ogni tentativo locale, già letto, passa due controlli prima della validazione
   del lease, che resta quella di sempre e non si ritenta. Il riassunto è
   rifiutato se ha almeno tre parole grammaticali inglesi e più inglesi che

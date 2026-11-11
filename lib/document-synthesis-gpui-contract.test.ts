@@ -292,7 +292,7 @@ test('riassunto in inglese: secondo tentativo, poi la risposta non valida e ness
     assert.equal(response.status, 502);
     assert.deepEqual(await response.json(), read('response-proposal-invalid').body);
     assert.equal(fixture.prompts.length, 2);
-    assert.match(fixture.prompts[0], /Write summary and qualityReason in Italian/u, 'il prompt chiede il riassunto in italiano');
+    assert.match(fixture.prompts[0], /Write summary in Italian/u, 'il prompt chiede il riassunto in italiano');
 });
 
 test('citazione che differisce solo negli spazi: proposta accettata con il testo esatto del documento', async (t) => {
