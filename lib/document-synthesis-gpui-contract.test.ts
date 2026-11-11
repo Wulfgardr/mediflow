@@ -73,7 +73,19 @@ function modelReply(quote: string) {
         claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] });
 }
 
-type Mode = 'valid' | 'malformed' | 'truncated' | 'provider_failed' | 'function_disabled' | 'lane_disabled' | 'unsupported';
+/* La risposta reale del modello locale con campi strutturati inventati (P1), con la
+ * citazione portata sul documento sintetico: l'host la accetta e deve toglierli. */
+const INVENTED = read('model-output-invented-fields').cases[0] as { output: { summary: string; data: Record<string, unknown> }; invented: string[] };
+function inventedReply(quote: string) {
+    const claims = [{ claimPath: 'summary', labels: ['S1'] }];
+    for (const [key, value] of Object.entries(INVENTED.output.data)) {
+        if (Array.isArray(value)) value.forEach((_, index) => claims.push({ claimPath: `data.${key}[${index}]`, labels: ['S1'] }));
+        else claims.push({ claimPath: `data.${key}`, labels: ['S1'] });
+    }
+    return JSON.stringify({ schemaVersion: 'mediflow.document-synthesis.provider-envelope.v2', output: INVENTED.output, citations: [{ label: 'S1', quote }], claims });
+}
+
+type Mode = 'valid' | 'invented' | 'malformed' | 'truncated' | 'provider_failed' | 'function_disabled' | 'lane_disabled' | 'unsupported';
 
 function host(t: TestContext, mode: Mode) {
     const previousFetch = globalThis.fetch;
@@ -92,7 +104,7 @@ function host(t: TestContext, mode: Mode) {
         // Come Ollama al tetto di token (collaudo dell'11/11/2026): JSON interrotto e `done_reason: length`.
         if (mode === 'truncated') return Response.json({ model: MODEL, message: { content: modelReply(DOCUMENT.quote).slice(0, 120) },
             prompt_eval_count: 3, eval_count: payload.options.num_predict, done_reason: 'length' });
-        return Response.json({ model: MODEL, message: { content: mode === 'malformed' ? '{"schemaVersion":' : modelReply(DOCUMENT.quote) },
+        return Response.json({ model: MODEL, message: { content: mode === 'malformed' ? '{"schemaVersion":' : mode === 'invented' ? inventedReply(DOCUMENT.quote) : modelReply(DOCUMENT.quote) },
             prompt_eval_count: 3, eval_count: 4 });
     };
     t.after(() => { globalThis.fetch = previousFetch; });
@@ -202,6 +214,21 @@ test('i corpi di GPUI passano per selezione, cattura, AnyDoc e Fabric reali fino
     // Il modello ha ricevuto il testo estratto dall'host dai byte di GPUI, non altro.
     assert.equal(fixture.prompts.length, 1);
     assert.match(fixture.prompts[0], new RegExp(DOCUMENT.quote.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+});
+
+test('campi strutturati inventati dal modello: gli handler reali li tolgono prima di rispondere a Web e GPUI', async (t) => {
+    const fixture = host(t, 'invented');
+    const response = await untilPreview(fixture, false);
+    assert.equal(response.status, 200, 'l\'host accetta la proposta con campi strutturati pieni');
+    const value = await record('response-available-invented-fields', response);
+    assert.equal(fixture.prompts.length, 1);
+    const text = JSON.stringify(value.body);
+    for (const needle of INVENTED.invented) assert.ok(!text.includes(needle), `${needle} arriva al client`);
+    assert.deepEqual(Object.keys(value.body.publication.output), ['schemaVersion', 'task', 'summary', 'qualityLevel']);
+    assert.equal(value.body.publication.output.summary, INVENTED.output.summary);
+    assert.ok(parseDocumentSynthesisPreviewWire(value.body), 'il Web legge la risposta senza campi strutturati');
+    const withData = structuredClone(value.body); withData.publication.output.data = INVENTED.output.data;
+    assert.equal(parseDocumentSynthesisPreviewWire(withData), null, 'il Web rifiuta la stessa risposta con i campi strutturati');
 });
 
 test('dinieghi e fallimenti reali arrivano a GPUI come codici senza proposta', async (t) => {
