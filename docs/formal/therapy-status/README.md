@@ -1007,3 +1007,24 @@ statechart, invarianti, limiti, testimoni e mutanti restano invariati; i test
 `therapy-status-transitions`, `therapy-required-audit`,
 `therapy-status-confirmation` e `therapy-status-command` passano e il comando
 completo `npm run verify:therapy-status` è rieseguito sul manifest aggiornato.
+
+## Raccordo dell'11 novembre 2026: ammissione mai inviata nel controller durevole
+
+`lib/therapy-status-command-confirmation.ts` cambia soltanto in `confirm()`, fra
+il claim del marker e l'invio. Prima, se la sessione si bloccava mentre il claim
+attendeva il lock, il marker restava scritto e la fase diventava `uncertain`
+senza che alcuna richiesta fosse partita; se il claim era negato a sessione
+bloccata, la fase restava `writing`. Ora un claim riuscito ma non più corrente
+rimuove il proprio marker e pubblica `unavailable('admission')`; un claim negato
+pubblica `unavailable('admission')` finché il controller possiede il turno,
+anche col segnale abortito. Dopo l'invio non cambia nulla: un esito ignoto resta
+`uncertain` col marker. È la stessa regola dell'invariante legacy
+`AdmissionIsNotUncertain`, applicata al controller durevole che TLC non modella.
+
+Confronto con `origin/main` 08e02162c: nessuna modifica a TLC, transizioni del
+modello legacy, CAS, ledger server, audit o ricevute. È aggiornato il solo
+digest di `lib/therapy-status-command-confirmation.ts`; `syncCommit` resta
+invariato. Il comportamento è provato in
+`lib/therapy-status-command-admission.test.ts` (due test rossi sul codice di
+main, verdi dopo la correzione) e il comando completo
+`npm run verify:therapy-status` è rieseguito sul manifest aggiornato.
