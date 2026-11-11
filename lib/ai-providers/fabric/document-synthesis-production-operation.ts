@@ -183,43 +183,45 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
             if (typeof handle !== 'string' || !CAPTURE_HANDLE.test(handle) || !(request instanceof Request)) return ingestDenied('input_invalid');
             const capture = broker.captures.get(handle); if (!capture) return ingestDenied('capture_consumed');
             broker.captures.delete(handle);
-            if (dependencies.readLaneEnabled() !== true) return ingestDenied('lane_disabled');
-            let preflight: DenialCode | null;
             try {
-                preflight = context.owner.withLeaseCriticalSection(context.session, (selection) => {
-                    if (!selectionAgrees(context, capture, selection)) return 'selection_changed';
-                    return sameCurrentness(capture.currentness, read(capture)) ? null : 'currentness_mismatch';
-                });
-            } catch { return ingestDenied('operation_unavailable'); }
-            if (preflight) return ingestDenied(preflight);
-            let extraction: LocalExtractionResult;
-            try { extraction = await dependencies.extract(context.session, capture.attachmentId, request); }
-            catch { return ingestDenied('operation_unavailable'); }
-            if (broker.discarded.has(handle) || request.signal.aborted) return ingestDenied('capture_consumed');
-            if (extraction.status === 'review_required' && extraction.reason === 'unsupported_local_extraction') return ingestDenied('unsupported_local_extraction');
-            const projection = resolveDocumentSynthesisAnyDocProjection(extraction, capture.attachmentId);
-            if (!projection) return ingestDenied('operation_unavailable');
-            try {
-                return context.owner.withLeaseCriticalSection(context.session, (selection) => {
-                    if (!selectionAgrees(context, capture, selection)) return ingestDenied('selection_changed');
-                    if (!sameCurrentness(capture.currentness, read(capture))) return ingestDenied('currentness_mismatch');
-                    if (broker.discarded.has(handle) || request.signal.aborted) return ingestDenied('capture_consumed');
-                    if (broker.nextEpoch >= MAX_U64 || broker.handles.size >= MAX_SESSION_HANDLES) return ingestDenied('operation_unavailable');
-                    const previewHandle = mint('dsp_', dependencies.entropy());
-                    if (!previewHandle || broker.handles.has(previewHandle)) return ingestDenied('operation_unavailable');
-                    broker.nextEpoch += BigInt(1);
-                    broker.handles.add(previewHandle);
-                    broker.previews.set(previewHandle, Object.freeze({ ...capture, sourceText: projection.sourceText, sourceSetEpoch: broker.nextEpoch }));
-                    return Object.freeze({ status: 'available' as const, code: null, previewHandle });
-                });
-            } catch { return ingestDenied('operation_unavailable'); }
+                if (dependencies.readLaneEnabled() !== true) return ingestDenied('lane_disabled');
+                let preflight: DenialCode | null;
+                try {
+                    preflight = context.owner.withLeaseCriticalSection(context.session, (selection) => {
+                        if (!selectionAgrees(context, capture, selection)) return 'selection_changed';
+                        return sameCurrentness(capture.currentness, read(capture)) ? null : 'currentness_mismatch';
+                    });
+                } catch { return ingestDenied('operation_unavailable'); }
+                if (preflight) return ingestDenied(preflight);
+                let extraction: LocalExtractionResult;
+                try { extraction = await dependencies.extract(context.session, capture.attachmentId, request); }
+                catch { return ingestDenied('operation_unavailable'); }
+                if (broker.discarded.has(handle) || request.signal.aborted) return ingestDenied('capture_consumed');
+                if (extraction.status === 'review_required' && extraction.reason === 'unsupported_local_extraction') return ingestDenied('unsupported_local_extraction');
+                const projection = resolveDocumentSynthesisAnyDocProjection(extraction, capture.attachmentId);
+                if (!projection) return ingestDenied('operation_unavailable');
+                try {
+                    return context.owner.withLeaseCriticalSection(context.session, (selection) => {
+                        if (!selectionAgrees(context, capture, selection)) return ingestDenied('selection_changed');
+                        if (!sameCurrentness(capture.currentness, read(capture))) return ingestDenied('currentness_mismatch');
+                        if (broker.discarded.has(handle) || request.signal.aborted) return ingestDenied('capture_consumed');
+                        if (broker.nextEpoch >= MAX_U64 || broker.handles.size >= MAX_SESSION_HANDLES) return ingestDenied('operation_unavailable');
+                        const previewHandle = mint('dsp_', dependencies.entropy());
+                        if (!previewHandle || broker.handles.has(previewHandle)) return ingestDenied('operation_unavailable');
+                        broker.nextEpoch += BigInt(1);
+                        broker.handles.add(previewHandle);
+                        broker.previews.set(previewHandle, Object.freeze({ ...capture, sourceText: projection.sourceText, sourceSetEpoch: broker.nextEpoch }));
+                        return Object.freeze({ status: 'available' as const, code: null, previewHandle });
+                    });
+                } catch { return ingestDenied('operation_unavailable'); }
+            } finally { releaseHandle(broker, handle); }
         },
         async preview(input: unknown): Promise<PreviewResult> {
             const parsed = exact(input, ['previewHandle']); const handle = parsed?.previewHandle;
             if (typeof handle !== 'string' || !PREVIEW_HANDLE.test(handle)) return previewDenied('input_invalid');
             const preview = broker.previews.get(handle); if (!preview) return previewDenied('preview_consumed');
             broker.previews.delete(handle);
-            if (dependencies.readLaneEnabled() !== true) return previewDenied('lane_disabled');
+            if (dependencies.readLaneEnabled() !== true) { releaseHandle(broker, handle); return previewDenied('lane_disabled'); }
             let capsule: ReturnType<typeof createDocumentSynthesisSourceSetCurrentnessOwner> | null = null;
             try {
                 const sourceSet = context.owner.withLeaseCriticalSection(context.session, (selection) => {
@@ -246,7 +248,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                 if (!current) return previewDenied('currentness_mismatch');
                 return Object.freeze({ status: 'available' as const, code: null, publication });
             } catch { return previewDenied('operation_unavailable'); }
-            finally { try { capsule?.dispose(); } catch { /* terminal cleanup is best effort */ } }
+            finally { releaseHandle(broker, handle); try { capsule?.dispose(); } catch { /* terminal cleanup is best effort */ } }
         },
     });
     operationBrokers.set(operation, broker);
@@ -259,7 +261,14 @@ export function discardDocumentSynthesisPreparation(operation: DocumentSynthesis
     const parsed = exact(input, ['captureHandle']) ?? exact(input, ['previewHandle']);
     const handle = parsed?.captureHandle ?? parsed?.previewHandle;
     if (typeof handle !== 'string' || !broker.handles.has(handle)) return;
-    broker.discarded.add(handle); broker.captures.delete(handle); broker.previews.delete(handle);
+    // Mai consumato: si ritira subito. In uso da ingest o preview: lo libera chi lo sta consumando.
+    const pending = broker.captures.delete(handle) || broker.previews.delete(handle);
+    if (pending) releaseHandle(broker, handle); else broker.discarded.add(handle);
+}
+
+/* A consumed or discarded handle leaves the session budget: only live handles count toward MAX_SESSION_HANDLES. */
+function releaseHandle(broker: Broker, handle: string): void {
+    broker.handles.delete(handle); broker.discarded.delete(handle);
 }
 
 function factory(dependencies: Dependencies) {

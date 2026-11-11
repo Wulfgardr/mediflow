@@ -109,6 +109,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Document Synthesis production-operation tests use an explicit synthetic clinician identity with mocked local authority.',
         },
         {
+            path: 'lib/ai-providers/fabric/document-synthesis-session-capacity.test.ts',
+            pattern: "username:\\s*'clinician\\.synthetic'",
+            reason: 'Document Synthesis session-capacity test reuses the synthetic clinician identity of the production-operation tests with mocked local authority.',
+        },
+        {
             path: 'lib/ai-providers/fabric/patient-insight-authenticated-preview.test.ts',
             pattern: "username:\\s*'synthetic'",
             reason: 'Patient Insight preview tests use a synthetic authenticated session fixture and no live credential.',
