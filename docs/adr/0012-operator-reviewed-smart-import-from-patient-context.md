@@ -174,3 +174,49 @@ Una risposta che anche all'ultimo tentativo finisce troncata non diventa più
 `proposal_invalid`: l'anteprima risponde `response_truncated`, e Web e GPUI lo
 dicono con un testo proprio. Decide l'ultimo tentativo, come per
 `proposal_unfaithful` del Quadro paziente (ADR 0189).
+
+## Fonti reali nello schema e diagnosi già in scheda (11 novembre 2026)
+
+### Problema
+
+Dopo la correzione della fonte sulle sotto-prestazioni restano 4 scarti su 20
+per Persona000002. I 14 tentativi scartati hanno tutti la stessa causa: un
+`sourceId` che non è fra le fonti. Il modello cita `currentDiagnoses`,
+`currentDiagnoses.system.E11.9`, `source.local.00000000000.00` e simili, quasi
+sempre per una diagnosi (o una terapia) che il contesto riporta come già in
+scheda. Il prompt mette nel contesto `currentDiagnoses` e
+`currentActiveTherapies` senza dire che cosa sono, e lo schema JSON accetta
+qualunque stringa come `sourceId`.
+
+### Che cosa vuol dire proporre una diagnosi che c'è già
+
+Nulla. L'applicazione della proposta fa il dedupe esplicito (prima thin slice,
+punto 3): una diagnosi già codificata non cambia la scheda. Le sezioni
+`currentDiagnoses` e `currentActiveTherapies` servono al modello per non
+riproporre ciò che c'è, non sono testo da cui il medico possa verificare una
+proposta. Dare loro un id di fonte vorrebbe dire accettare proposte la cui
+«fonte» è la scheda stessa: il controllo dell'host dovrebbe ammettere id che
+oggi rifiuta, cioè allargarsi, per proposte che non applicano nulla. Non lo
+facciamo.
+
+### Decisione
+
+- Il prompt dice che `currentDiagnoses` e `currentActiveTherapies` sono già in
+  scheda, non sono fonti e non vanno riproposti né citati come `sourceId`.
+- Con Ollama lo schema della risposta si costruisce per richiesta: `sourceId`
+  di diagnosi, terapie, prestazioni e sotto-prestazioni è un `enum` degli id
+  delle fonti inviate in quel prompt. Lo schema vincola la generazione, quindi
+  il modello non può più scrivere un id che non esiste. Lo schema statico resta
+  quello della validazione e del profilo ordinario remoto.
+- Il controllo dell'host non cambia: ogni `sourceId` deve essere fra le fonti
+  della proiezione, sulla risposta grezza e dopo il parser.
+
+### Rischio accettato
+
+L'`enum` impedisce un id inventato, non un id sbagliato. Se il modello vuole
+comunque riproporre una diagnosi già in scheda, ora deve scegliere una fonte
+reale, e l'evidenza può non stare in quel testo. Il caso esiste già oggi senza
+`enum` (nella misura dell'11 novembre una diagnosi riporta come evidenza la
+descrizione della diagnosi in scheda sotto una fonte reale) e il presidio resta
+lo stesso: il medico vede la fonte accanto alla proposta prima di applicarla.
+La misura dopo la correzione conta questi casi a parte.
