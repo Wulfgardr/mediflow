@@ -6,6 +6,7 @@ import {
     type ProviderAdapter,
 } from './provider';
 import { GENERATIVE_JSON_SCHEMAS } from './generative-json-schemas';
+import { smartImportJsonSchemaForSources } from './extraction-json-schemas';
 import { normalizeOllamaBaseUrl } from './base-url';
 import {
     assertLocalOllamaResponse,
@@ -67,7 +68,10 @@ export function buildOllamaChatPayload(
 ) {
     const responseFormat = options?.responseFormat;
     const format = responseFormat === undefined || responseFormat === 'json'
-        ? responseFormat : GENERATIVE_JSON_SCHEMAS[responseFormat];
+        ? responseFormat
+        : responseFormat === 'smart_import' && Array.isArray(options?.sourceIds)
+            ? smartImportJsonSchemaForSources(options.sourceIds)
+            : GENERATIVE_JSON_SCHEMAS[responseFormat];
     return {
         model,
         messages: toOllamaMessages(messages),
