@@ -50,6 +50,14 @@ export function createAmbulatoryDestructiveService(options: { now?: () => number
         const user = tx.select().from(users).where(eq(users.id, flow.native.userId)).get();
         return user?.role === 'admin' && user.username === flow.native.username && flow.native.role === 'admin' ? null : denied();
     }
+    /* A full table first drops flows that can no longer authorize anything; a flow whose web session is still active stays, so retire can close it. */
+    function pruneExpired(): void {
+        for (const [reference, flow] of flows) {
+            if (!flow.expired && now() >= flow.createdAt && now() < flow.expiresAt) continue;
+            if (flow.webId !== null && resolve(flow.webId, flow.controlId).status === 'active') continue;
+            flows.delete(reference);
+        }
+    }
     function locate(request: Request): Flow | null {
         const reference = request.headers.get(AMBULATORY_COMMAND_REFERENCE_HEADER);
         if (!reference || !/^[a-f0-9]{64}$/u.test(reference)) return null;
@@ -124,6 +132,7 @@ export function createAmbulatoryDestructiveService(options: { now?: () => number
                 if (!marker) return { ...denied(400), control: null };
                 identity = Object.fromEntries(markerKeys.filter(key => key !== 'planDigest').map(key => [key, marker![key]])) as Identity;
             }
+            if (flows.size >= 128) pruneExpired();
             if (flows.size >= 128) return { ...denied(503, 'AMBULATORY_COMMAND_CAPACITY'), control: null };
             const denial = dbServer.transaction(tx => {
                 const denial = peer(tx, { native, device, request, generation }); if (denial) return denial;
