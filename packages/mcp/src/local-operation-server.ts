@@ -24,9 +24,7 @@ export function createLocalOperationProtocol(port: { request(input: LocalOperati
             const parsed = frameSchema.safeParse(value);
             if (!parsed.success) return error(null);
             const frame = parsed.data;
-            if (frame.id === undefined) {
-                return frame.method === 'notifications/initialized' && initialized && empty.safeParse(frame.params ?? {}).success ? null : error(null);
-            }
+            if (frame.id === undefined) return null;
             const id = frame.id;
             const reply = (result: unknown) => JSON.stringify({ jsonrpc: '2.0', id, result });
             if (frame.method === 'initialize') {
