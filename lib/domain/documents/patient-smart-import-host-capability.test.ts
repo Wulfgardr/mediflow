@@ -5,6 +5,15 @@ import { localProviderRegistry, type LocalProviderResolution } from '../../ai-pr
 import { routeHostResolvedCandidateCapability } from '../../ai-providers/fabric/candidate-router';
 import type { ProviderLifecycleRead } from '../../ai-providers/fabric/provider-lifecycle-service';
 import { createPatientSmartImportHostCapability } from './patient-smart-import-host-capability';
+import {
+    buildPatientSmartImportCapabilityPrompt,
+    parsePatientSmartImportCapabilityProposal,
+    PatientSmartImportCapabilityError,
+    SMART_IMPORT_RESPONSE_TOKENS_FLOOR,
+    smartImportResponseTokenLimit,
+} from './patient-smart-import-capability-contract';
+import { validateGenerativeJson } from '../../ai-providers/generative-json-validation';
+import MEASURED from './fixtures/smart-import-measured-persona000002.json' with { type: 'json' };
 const HANDLE = `prj_${'1'.repeat(32)}`;
 const REQUEST_ID = 'request.synthetic.0001';
 const projection: SmartImportProjection = Object.freeze({
@@ -70,7 +79,8 @@ test('returns one frozen review-only proposal after the fixed host pipeline', as
     const calls = { kill: 0, broker: 0, lifecycle: 0, binding: 0, readiness: 0, router: 0, chat: 0, clock: 0, entropy: 0 };
     const binding = resolution(async (_messages, _signal, maxTokens, options) => {
         calls.chat += 1;
-        assert.equal(maxTokens, 1_100);
+        // Prompt corto: vale il minimo (ADR 0012).
+        assert.equal(maxTokens, SMART_IMPORT_RESPONSE_TOKENS_FLOOR);
         assert.deepEqual(options, { responseFormat: 'smart_import' });
         return { content: RESPONSE, stats: { latency: 1, tokensIn: 2, tokensOut: 3 } };
     });
@@ -204,7 +214,7 @@ test('local: an answer cut at the token ceiling is not published even when it pa
 });
 
 test('local: two invalid answers keep proposal_invalid after two calls, never three', async () => {
-    const fixture = retrying([MALFORMED, CUT, RESPONSE]);
+    const fixture = retrying([CUT, MALFORMED, RESPONSE]);
     const result = await fixture.capability.preview({ handle: HANDLE, requestId: REQUEST_ID });
     assert.equal(result.status, 'failed'); assert.equal(result.code, 'proposal_invalid'); assert.equal(result.proposal, null);
     assert.notEqual(result.receipt, null); assert.notEqual(result.provenance, null);
@@ -230,4 +240,61 @@ test('network venue: an invalid answer is not retried (no second egress)', async
     const result = await fixture.capability.preview({ handle: HANDLE, requestId: REQUEST_ID });
     assert.equal(result.status, 'failed'); assert.equal(result.code, 'proposal_invalid');
     assert.equal(result.receipt?.venue, 'home_base'); assert.equal(fixture.prompts.length, 1);
+});
+
+test('local: an answer still cut at the token ceiling on the last attempt fails with response_truncated, not proposal_invalid', async () => {
+    for (const answers of [[CUT, CUT, RESPONSE], [MALFORMED, CUT, RESPONSE]]) {
+        const fixture = retrying(answers);
+        const result = await fixture.capability.preview({ handle: HANDLE, requestId: REQUEST_ID });
+        assert.equal(result.status, 'failed'); assert.equal(result.code, 'response_truncated'); assert.equal(result.proposal, null);
+        assert.notEqual(result.receipt, null); assert.equal(fixture.prompts.length, 2);
+    }
+});
+
+// ADR 0012, misura dell'11/11/2026: proiezione e risposte reali di Persona000002 (archivio sintetico).
+const measuredProjection = MEASURED.projection as unknown as SmartImportProjection;
+const MEASURED_AT = '2026-11-11T03:00:00.000Z';
+function rejectsSource(response: string) {
+    assert.throws(() => parsePatientSmartImportCapabilityProposal(response, measuredProjection, MEASURED_AT),
+        (error) => error instanceof PatientSmartImportCapabilityError && error.code === 'source_binding_invalid');
+}
+
+test('a real answer whose items carry no sourceId is still refused by the host check', () => {
+    const answer = MEASURED.itemsWithoutSource.content;
+    const items = JSON.parse(answer).data.servicePrescriptions.flatMap((service: { items?: object[] }) => service.items ?? []);
+    assert.ok(items.length > 0 && items.every((item: object) => !('sourceId' in item)));
+    rejectsSource(answer);
+    // Lo schema trasmesso al modello ora la pretende anche lui.
+    assert.throws(() => validateGenerativeJson('smart_import', answer));
+});
+
+/* L'esempio di risposta che il prompt mostra al modello, con i segnaposto resi valori ammessi. */
+function promptExample(prompt: string, sourceId: string) {
+    const envelope = prompt.split('Usa esattamente questo envelope:\n')[1]!.split('\n\nRegole comuni:')[0]!;
+    return JSON.parse(envelope, (key, value) => key === 'sourceId' ? sourceId
+        : typeof value === 'string' && value.includes('|') ? value.split('|')[0] : value);
+}
+
+test('prompt, schema and host check ask for the same sourceId on every element, items included', () => {
+    const prompt = buildPatientSmartImportCapabilityPrompt(measuredProjection);
+    const sourceId = measuredProjection.sources[1]!.id;
+    const example = promptExample(prompt, sourceId);
+    const service = example.data.servicePrescriptions[0];
+    assert.equal(service.items[0].sourceId, sourceId, 'il prompt mostra sourceId sugli items');
+    // Chi segue l'esempio del prompt supera schema e controllo dell'host.
+    validateGenerativeJson('smart_import', JSON.stringify(example));
+    const proposal = parsePatientSmartImportCapabilityProposal(JSON.stringify(example), measuredProjection, MEASURED_AT);
+    assert.equal(proposal.servicePrescriptions[0]!.items?.[0]?.sourceId, sourceId);
+    // Senza sourceId su un qualunque elemento lo schema rifiuta, come il controllo dell'host.
+    const elements: Array<[string, (value: typeof example) => Record<string, unknown>]> = [
+        ['diagnoses', (value) => value.data.diagnoses[0]], ['therapies', (value) => value.data.therapies[0]],
+        ['servicePrescriptions', (value) => value.data.servicePrescriptions[0]],
+        ['servicePrescriptions.items', (value) => value.data.servicePrescriptions[0].items[0]],
+    ];
+    for (const [name, element] of elements) {
+        const withoutSource = structuredClone(example);
+        delete element(withoutSource).sourceId;
+        assert.throws(() => validateGenerativeJson('smart_import', JSON.stringify(withoutSource)), `schema: ${name}`);
+        rejectsSource(JSON.stringify(withoutSource));
+    }
 });
