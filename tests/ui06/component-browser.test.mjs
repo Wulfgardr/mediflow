@@ -425,6 +425,8 @@ const panels = [
         readError: 'Impossibile leggere le prescrizioni protesiche.', refreshError: 'Impossibile aggiornare le prescrizioni protesiche.' },
     { route: '/panel/siss', loading: 'Caricamento del diario locale…', row: 'Passaggio sintetico UI06',
         readError: 'Impossibile leggere i passaggi SISS.', refreshError: 'Impossibile aggiornare i passaggi SISS.' },
+    { route: '/panel/therapy', loading: 'Caricamento terapie…', row: 'Farmaco sintetico UI06',
+        readError: 'Impossibile leggere le terapie.', refreshError: 'Impossibile aggiornare le terapie.' },
 ];
 async function panelPage(t, route, reads) {
     const page = await pageFor(t, `${route}?reads=${reads}`, { width: 1280, height: 900 }, panelReadFailure);
