@@ -136,8 +136,8 @@ function normalizeCreate(
             clinicalReason: optionalPrescriptionText(body.clinicalReason),
             regionalPrescriptionId: optionalPrescriptionText(body.regionalPrescriptionId),
             supplier: optionalPrescriptionText(body.supplier),
-            // WUL-800: una voce registrata già collaudata ha sempre la data del collaudo.
-            collaudoAt: parsePrescriptionDate(body.collaudoAt) ?? (status === 'tested' ? new Date() : null),
+            // WUL-800: solo una voce collaudata ha la data del collaudo, e la ha sempre.
+            collaudoAt: status === 'tested' ? parsePrescriptionDate(body.collaudoAt) ?? new Date() : null,
             collaudoOutcome: optionalPrescriptionText(body.collaudoOutcome),
             source,
             documentRefs: optionalPrescriptionText(body.documentRefs),
