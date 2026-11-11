@@ -22,3 +22,14 @@ for (const surface of ['web', 'v1', 'network'] as const) {
         assert.equal(prepared.values.deletionReason, null, 'una voce attiva non conserva il motivo della vecchia eliminazione');
     });
 }
+
+for (const surface of ['web', 'v1', 'network'] as const) {
+    test(`PUT ${surface}: eliminare con un motivo resta permesso, senza motivo è un 400`, () => {
+        const refused = prepareEntryUpdate({ version: 1, deletedAt: '2026-11-01T10:00:00.000Z', deletionReason: '  ' }, surface);
+        assert.deepEqual(refused, { ok: false, error: 'Invalid deletionReason', status: 400 });
+        const prepared = prepareEntryUpdate({ version: 1, deletedAt: '2026-11-01T10:00:00.000Z', deletionReason: 'ENC:synthetic:reason' }, surface);
+        assert.ok(prepared.ok, JSON.stringify(prepared));
+        assert.equal(prepared.values.deletionReason, 'ENC:synthetic:reason');
+        assert.deepEqual(prepared.changedFields.filter((name) => name !== 'updatedAt'), ['deletedAt', 'deletionReason']);
+    });
+}
