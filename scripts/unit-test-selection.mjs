@@ -62,6 +62,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/unit-test-selection.test.mjs',
   'scripts/check-test-selection.test.mjs',
   'scripts/report-xcuitest-retries.test.mjs',
+  'scripts/prove-a-mano.test.mjs',
   'scripts/explicit-npm-test-selection.test.mjs',
   // Portable Node suites use the same local/CI strip-types runner.
   'scripts/anydoc-desktop-renderer-trace.test.mjs',
