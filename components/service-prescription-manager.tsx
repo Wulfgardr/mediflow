@@ -26,7 +26,7 @@ import {
     type ServicePrescriptionPriority,
     type ServicePrescriptionStatus,
 } from '@/lib/db';
-import { notifyDbChange, useLiveQuery } from '@/lib/live-query';
+import { notifyDbChange, useLiveQuery, useLiveQueryState } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
 import { Badge } from '@/components/ui/badge';
@@ -213,7 +213,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     /* the conditional form's open state is the pending-form signal. */
     useRuntimeTwinPendingForm(isFormOpen);
 
-    const prescriptions = useLiveQuery(
+    const { data: prescriptions, error: prescriptionsError, refresh: refreshPrescriptions } = useLiveQueryState(
         async () => {
             const items = await db.servicePrescriptions
                 .filter((item: ServicePrescription) => item.patientId === patientId)
@@ -638,7 +638,10 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             )}
             </div>
 
-            {!prescriptions ? <ViewState state="loading" title="Caricamento prescrizioni…" /> : prescriptions.length === 0 ? (
+            {prescriptions !== undefined && prescriptionsError ? <ViewState state="error" title="Impossibile aggiornare le prestazioni prescritte." action={{ label: 'Riprova', onClick: refreshPrescriptions }} /> : null}
+            {!prescriptions ? (prescriptionsError
+                ? <ViewState state="error" title="Impossibile leggere le prestazioni prescritte." action={{ label: 'Riprova', onClick: refreshPrescriptions }} />
+                : <ViewState state="loading" title="Caricamento prescrizioni…" />) : prescriptions.length === 0 ? (
                 <ViewState state="empty" title="Nessuna prestazione prescritta registrata." />
             ) : (
                 <div className="min-w-0">

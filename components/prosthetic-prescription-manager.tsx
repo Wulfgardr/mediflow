@@ -11,7 +11,7 @@ import styles from './clinical-register.module.css';
 import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { LoaderCircle, MoreHorizontal, Plus } from 'lucide-react';
 import { db, type ProstheticPrescription, type ProstheticPrescriptionCategory, type ProstheticPrescriptionStatus } from '@/lib/db';
-import { useLiveQuery } from '@/lib/live-query';
+import { useLiveQueryState } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
 import { ProstheticsOriginalLinks } from './prosthetics-source-documents';
@@ -144,7 +144,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     /* the conditional form's open state is the pending-form signal. */
     useRuntimeTwinPendingForm(isFormOpen);
 
-    const prescriptions = useLiveQuery(
+    const { data: prescriptions, error: prescriptionsError, refresh: refreshPrescriptions } = useLiveQueryState(
         async () => {
             const items = await db.prostheticPrescriptions
                 .filter((item: ProstheticPrescription) => item.patientId === patientId)
@@ -326,7 +326,10 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             )}
             </div>
 
-            {!prescriptions ? <ViewState state="loading" title="Caricamento prescrizioni…" /> : prescriptions.length === 0 ? (
+            {prescriptions !== undefined && prescriptionsError ? <ViewState state="error" title="Impossibile aggiornare le prescrizioni protesiche." action={{ label: 'Riprova', onClick: refreshPrescriptions }} /> : null}
+            {!prescriptions ? (prescriptionsError
+                ? <ViewState state="error" title="Impossibile leggere le prescrizioni protesiche." action={{ label: 'Riprova', onClick: refreshPrescriptions }} />
+                : <ViewState state="loading" title="Caricamento prescrizioni…" />) : prescriptions.length === 0 ? (
                 <ViewState state="empty" title="Nessuna prescrizione protesica registrata per questo paziente." />
             ) : (
                 <div className="min-w-0">
