@@ -3,6 +3,7 @@ import path from 'node:path';
 
 export const UNIT_TEST_GROUPS = Object.freeze(['lib', 'components']);
 export const UNIT_SCRIPT_TESTS = Object.freeze([
+  'scripts/measure-cb-redaction.test.ts',
   'scripts/gpui-comparison-audit.test.mjs',
   'scripts/chat-card-native-owner.test.mjs',
   'scripts/check-command-roles.test.mjs',
