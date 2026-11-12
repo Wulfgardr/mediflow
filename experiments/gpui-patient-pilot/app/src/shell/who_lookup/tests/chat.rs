@@ -523,11 +523,15 @@ fn matrix_request(
             .unwrap();
     }
     if function == Function::OpenLoops && code == 200 {
-        bench
-            .host
-            .plan(OPEN_LOOPS)
-            .send((200, loops_response()))
-            .unwrap();
+        let empty = bench.view.read_with(cx, |app, _| {
+            app.patient.attachments.ready().is_some_and(Vec::is_empty)
+        });
+        let mut rows = loops_response();
+        if empty {
+            rows["groups"] = json!([]);
+            rows["receipt"]["itemCount"] = json!(0);
+        }
+        bench.host.plan(OPEN_LOOPS).send((200, rows)).unwrap();
     }
     let (pending, remote) = function_request(function);
     bench
@@ -557,21 +561,43 @@ fn matrix_request(
     (pending, remote)
 }
 
-fn matrix_rendered(cx: &mut gpui::VisualTestContext) -> Vec<Function> {
+struct MatrixFrame {
+    functions: Vec<Function>,
+    texts: Vec<String>,
+    buttons: Vec<String>,
+}
+
+fn matrix_frame(cx: &mut gpui::VisualTestContext) -> MatrixFrame {
+    let _probe = rendered_command::begin_inks();
     let ids = rendered_command::button_ids(|| crate::shell::notes_recovery_tests::draw(cx));
-    [
+    let texts: Vec<String> = rendered_command::take_inks()
+        .into_iter()
+        .map(|ink| ink.label)
+        .collect();
+    let mut functions: Vec<Function> = [
         (Function::Insight, "patient-insight-confirm"),
-        (
-            Function::Synthesis,
-            "clinical-workspace-document-details-matrix-document",
-        ),
-        (Function::Import, "smart-import-prepare"),
+        (Function::Synthesis, "clinical-workspace-new-document"),
         (Function::Icd, "clinical-workspace-reference-run-search"),
         (Function::OpenLoops, "clinical-open-loops-close"),
     ]
     .into_iter()
     .filter_map(|(function, id)| ids.iter().any(|found| found == id).then_some(function))
-    .collect()
+    .collect();
+    if texts
+        .iter()
+        .any(|text| text == "IMPORT ASSISTITO · PROPOSTA")
+    {
+        functions.push(Function::Import);
+    }
+    MatrixFrame {
+        functions,
+        texts,
+        buttons: ids,
+    }
+}
+
+fn matrix_rendered(cx: &mut gpui::VisualTestContext) -> Vec<Function> {
+    matrix_frame(cx).functions
 }
 
 #[gpui::test]
@@ -587,88 +613,185 @@ fn chat_followups_view_matrix_covers_both_directions(cx: &mut gpui::TestAppConte
 fn run_view_matrix(cx: &mut gpui::TestAppContext, only_followups: bool) {
     let mut failures = vec![];
     let mut checked = 0;
-    for before in Function::ALL {
-        for completed in [false, true] {
-            if completed && before != Function::Icd {
-                continue;
-            }
-            for requested in Function::ALL {
-                if only_followups
-                    && before != Function::OpenLoops
-                    && requested != Function::OpenLoops
-                {
+    for empty in [false, true] {
+        for before in Function::ALL {
+            for completed in [false, true] {
+                if completed && before != Function::Icd {
                     continue;
                 }
-                let (bench, cx) = bench(cx);
-                matrix_ready(&bench, cx);
-                let (first, _first_remote) = matrix_open(&bench, before, cx);
-                assert_eq!(
-                    wire(&first),
-                    json!({"status":State::Generative(before, if before == Function::OpenLoops {Stage::Closed} else {Stage::Opened}).wire()}),
-                    "{before:?}"
-                );
-                assert!(
-                    matrix_rendered(cx).contains(&before),
-                    "la prima funzione deve essere visibile: {before:?}"
-                );
-                if completed {
-                    bench.host.plan(SEARCH).send((200, response())).unwrap();
-                    bench.view.update(cx, |app, cx| {
-                        query(app, cx);
-                        app.request_who(true, cx);
-                    });
-                    cx.run_until_parked();
-                    assert_eq!(wire(&first), json!({"status":"icd-closed"}));
-                }
-                let (next, _next_remote) = matrix_open(&bench, requested, cx);
-                let stage = if before == requested {
-                    Stage::Busy
-                } else if requested == Function::OpenLoops {
-                    Stage::Closed
-                } else {
-                    Stage::Opened
-                };
-                assert_eq!(
-                    wire(&next),
-                    json!({"status":State::Generative(requested,stage).wire()}),
-                    "{before:?} → {requested:?}, conclusa={completed}"
-                );
-                let actual = matrix_rendered(cx);
-                checked += 1;
-                eprintln!("{before:?} → {requested:?}, conclusa={completed}: render {actual:?}");
-                if before != requested {
-                    let expected = if before == Function::OpenLoops {
-                        "loops-closed"
-                    } else if completed {
-                        "icd-closed"
-                    } else {
-                        "withdrawn"
-                    };
-                    if wire(&first) != json!({"status":expected}) {
-                        failures.push(format!(
-                            "{before:?} → {requested:?}: funzione precedente ancora {}",
-                            wire(&first)
-                        ));
+                for requested in Function::ALL {
+                    if only_followups
+                        && before != Function::OpenLoops
+                        && requested != Function::OpenLoops
+                    {
+                        continue;
                     }
+                    let (bench, cx) = bench(cx);
+                    matrix_ready(&bench, cx);
+                    if empty {
+                        bench.view.update(cx, |app, _| {
+                            let mut patient = app.patient.detail.ready().unwrap().clone();
+                            patient.diagnoses = None;
+                            patient.notes = None;
+                            app.patient.detail = ReadLoad::Ready(patient);
+                            app.patient.attachments = ReadLoad::Ready(vec![]);
+                        });
+                    }
+                    cx.simulate_resize(gpui::size(px(1440.), px(1800.)));
+                    let (first, _first_remote) = matrix_open(&bench, before, cx);
+                    assert_eq!(
+                        wire(&first),
+                        json!({"status":State::Generative(before, if before == Function::OpenLoops {Stage::Closed} else {Stage::Opened}).wire()}),
+                        "{before:?}, vuota={empty}"
+                    );
+                    assert!(
+                        matrix_rendered(cx).contains(&before),
+                        "la prima funzione deve essere visibile: {before:?}, vuota={empty}"
+                    );
+                    if completed {
+                        let mut rows = response();
+                        if empty {
+                            rows["entries"] = json!([]);
+                            rows["partial"] = json!(false);
+                            rows["receipt"]["resultCount"] = json!(0);
+                        }
+                        bench.host.plan(SEARCH).send((200, rows)).unwrap();
+                        bench.view.update(cx, |app, cx| {
+                            query(app, cx);
+                            app.request_who(true, cx);
+                        });
+                        cx.run_until_parked();
+                        assert_eq!(wire(&first), json!({"status":"icd-closed"}));
+                    }
+                    let (next, _next_remote) = matrix_open(&bench, requested, cx);
+                    let stage = if before == requested {
+                        Stage::Busy
+                    } else if requested == Function::OpenLoops {
+                        Stage::Closed
+                    } else {
+                        Stage::Opened
+                    };
+                    assert_eq!(
+                        wire(&next),
+                        json!({"status":State::Generative(requested,stage).wire()}),
+                        "{before:?} → {requested:?}, conclusa={completed}, vuota={empty}"
+                    );
+                    let frame = matrix_frame(cx);
+                    checked += 1;
+                    let case =
+                        format!("{before:?} → {requested:?}, conclusa={completed}, vuota={empty}");
+                    eprintln!("{case}: render {:?}", frame.functions);
+                    if before != requested {
+                        let expected = if before == Function::OpenLoops {
+                            "loops-closed"
+                        } else if completed {
+                            "icd-closed"
+                        } else {
+                            "withdrawn"
+                        };
+                        if wire(&first) != json!({"status":expected}) {
+                            failures.push(format!(
+                                "{case}: funzione precedente ancora {}",
+                                wire(&first)
+                            ));
+                        }
+                    }
+                    if frame.functions != [requested] {
+                        failures.push(format!("{case}: render {:?}", frame.functions));
+                    }
+                    let expected: Vec<&str> = match requested {
+                        Function::Insight => vec![if empty {
+                            "Verranno inviati al modello locale dell’host: 0 condizioni, 0 terapie attive, 0 voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
+                        } else {
+                            "Verranno inviati al modello locale dell’host: 1 condizioni, 0 terapie attive, 0 voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
+                        }],
+                        Function::OpenLoops => vec![if empty {
+                            "Nessun follow-up aperto."
+                        } else {
+                            "Referto sintetico"
+                        }],
+                        Function::Synthesis if empty => vec![
+                            "Nessun documento da sintetizzare. Aggiungi un documento oppure revoca la richiesta dalla chat.",
+                            "Nessun documento presente nella scheda.",
+                        ],
+                        Function::Synthesis => vec!["Scegli un documento e apri Sintesi e fonte."],
+                        Function::Import => vec![if empty {
+                            "Nessuna nota, voce di diario o sintesi di documento da cui proporre. Aggiungine una oppure revoca la richiesta dalla chat."
+                        } else {
+                            "Prepara la richiesta nell’import assistito."
+                        }],
+                        Function::Icd => {
+                            let mut messages = vec![
+                                "Stato del servizio non ancora letto.",
+                                "Cerca un termine clinico in inglese o un codice. I titoli originali non vengono tradotti.",
+                            ];
+                            if empty && completed && before == requested {
+                                messages.push("Nessun risultato per questa ricerca. Prova altri termini in inglese.");
+                            }
+                            messages
+                        }
+                    };
+                    for message in expected {
+                        if frame.texts.iter().filter(|text| *text == message).count() != 1 {
+                            failures.push(format!("{case}: avviso assente o ripetuto: {message}"));
+                        }
+                    }
+                    if empty && requested == Function::Import {
+                        assert!(!frame.buttons.iter().any(|id| id == "smart-import-prepare"));
+                    }
+                    bench.view.read_with(cx, |app, _| {
+                        assert_eq!(app.selected_id.as_deref(), Some("patient-a"))
+                    });
+                    assert_read_only(&bench.host);
                 }
-                if actual != [requested] {
-                    failures.push(format!(
-                        "{before:?} → {requested:?}, conclusa={completed}: render {actual:?}"
-                    ));
-                }
-                bench.view.read_with(cx, |app, _| {
-                    assert_eq!(app.selected_id.as_deref(), Some("patient-a"))
-                });
-                assert_read_only(&bench.host);
             }
         }
     }
-    assert_eq!(checked, if only_followups { 10 } else { 30 });
+    assert_eq!(checked, if only_followups { 20 } else { 60 });
     assert!(
         failures.is_empty(),
-        "Viste errate nella matrice:\n{}",
+        "Viste o avvisi errati nella matrice:\n{}",
         failures.join("\n")
     );
+}
+
+#[gpui::test]
+fn chat_function_import_notice_is_not_duplicated_in_documents(cx: &mut gpui::TestAppContext) {
+    for empty in [false, true] {
+        let (bench, cx) = bench(cx);
+        matrix_ready(&bench, cx);
+        if empty {
+            bench.view.update(cx, |app, _| {
+                let mut patient = app.patient.detail.ready().unwrap().clone();
+                patient.notes = None;
+                app.patient.detail = ReadLoad::Ready(patient);
+                app.patient.attachments = ReadLoad::Ready(vec![]);
+            });
+        }
+        let (pending, _remote) = matrix_open(&bench, Function::Import, cx);
+        assert_eq!(wire(&pending), json!({"status":"import-opened"}));
+        bench.view.update(cx, |app, cx| {
+            app.section_selected(PatientSection::Documents, cx)
+        });
+        cx.simulate_resize(gpui::size(px(1440.), px(1800.)));
+        let frame = matrix_frame(cx);
+        let expected = if empty {
+            "Nessuna nota, voce di diario o sintesi di documento da cui proporre. Aggiungine una oppure revoca la richiesta dalla chat."
+        } else {
+            "Prepara la richiesta nell’import assistito."
+        };
+        assert_eq!(
+            frame.texts.iter().filter(|text| *text == expected).count(),
+            1,
+            "un solo avviso anche nei Documenti completi, vuota={empty}: {:?}",
+            frame.texts
+        );
+        assert_eq!(
+            frame.buttons.iter().any(|id| id == "smart-import-prepare"),
+            !empty
+        );
+        assert_read_only(&bench.host);
+    }
 }
 
 #[gpui::test]
