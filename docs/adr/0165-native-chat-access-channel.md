@@ -189,6 +189,12 @@ La dettatura usa solo whisper; senza il modello installato la vista dice che man
 porta a Impostazioni, Voce locale. Il ponte Swift resta solo per la cattura del
 microfono.
 
+Aggiornamento del 12 novembre 2026 (WUL-828, punto 3): la stessa richiesta apre
+la dettatura o l'ascolto della visita a due voci, con stati visibili, pausa e
+durata massima. Il limite di 12.000 caratteri della revisione è sostituito dai
+tetti descritti nell'[ADR 0113](./0113-recording-visita-trascrizione-locale-085.md),
+sezione «Ascolto della visita con whisper».
+
 Riferimenti Apple: [SpeechTranscriber](https://developer.apple.com/documentation/speech/speechtranscriber)
 e [SpeechAnalyzer, WWDC25](https://developer.apple.com/videos/play/wwdc2025/277/).
 

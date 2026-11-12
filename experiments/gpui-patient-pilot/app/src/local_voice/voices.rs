@@ -34,14 +34,12 @@ pub(crate) struct VoicePrint {
     pub(crate) frames: usize,
 }
 
-// Etichette e scambio servono alla revisione della bozza (WUL-828, parte D).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Speaker {
     Doctor,
     Patient,
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 impl Speaker {
     pub(crate) fn label(self) -> &'static str {
         match self {
@@ -55,6 +53,50 @@ impl Speaker {
             Self::Patient => Self::Doctor,
         }
     }
+}
+
+/// Bozza della visita: una riga per turno, «Medico: …» o «Paziente: …»; le
+/// frasi consecutive della stessa persona stanno sulla stessa riga.
+pub(crate) fn draft(lines: &[(Speaker, &str)]) -> String {
+    let mut out = String::new();
+    let mut previous = None;
+    for (speaker, text) in lines {
+        let text = text.trim();
+        if text.is_empty() {
+            continue;
+        }
+        if previous == Some(*speaker) {
+            out.push(' ');
+        } else {
+            if previous.is_some() {
+                out.push('\n');
+            }
+            out.push_str(speaker.label());
+            out.push_str(": ");
+        }
+        out.push_str(text);
+        previous = Some(*speaker);
+    }
+    out
+}
+
+/// Scambia medico e paziente all'inizio di ogni riga, lasciando com'è il
+/// resto del testo, correzioni del medico comprese.
+pub(crate) fn swap_speakers(text: &str) -> String {
+    text.split('\n')
+        .map(|line| {
+            for speaker in [Speaker::Doctor, Speaker::Patient] {
+                if let Some(rest) = line
+                    .strip_prefix(speaker.label())
+                    .and_then(|rest| rest.strip_prefix(':'))
+                {
+                    return format!("{}:{rest}", speaker.other().label());
+                }
+            }
+            line.to_owned()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Trasformata di Fourier in place, radice 2 (lunghezza potenza di due).
@@ -480,6 +522,38 @@ pub(crate) mod tests {
         let one = voice_print(&synthetic_voice(1.0, 120.0, 600.0, 1_100.0, 0));
         assert_eq!(attribute(&[None, one, None]), [Speaker::Doctor; 3]);
         assert!(attribute(&[]).is_empty());
+    }
+
+    #[test]
+    fn the_draft_has_one_line_per_turn_and_the_swap_keeps_edits() {
+        use Speaker::*;
+        let lines = [
+            (Doctor, "Buongiorno."),
+            (Doctor, "Come va?"),
+            (Patient, "Bene, ma ho le caviglie gonfie."),
+            (Doctor, " "),
+            (Doctor, "Prende il Ramipril?"),
+            (Patient, "Sì."),
+        ];
+        let text = draft(&lines);
+        assert_eq!(
+            text,
+            "Medico: Buongiorno. Come va?\nPaziente: Bene, ma ho le caviglie gonfie.\nMedico: Prende il Ramipril?\nPaziente: Sì."
+        );
+        // Il medico ha corretto una parola e aggiunto una riga sua.
+        let edited = text.replace("gonfie", "gonfie la sera") + "\nNota: controllo tra un mese.";
+        let swapped = swap_speakers(&edited);
+        assert_eq!(
+            swapped,
+            "Paziente: Buongiorno. Come va?\nMedico: Bene, ma ho le caviglie gonfie la sera.\nPaziente: Prende il Ramipril?\nMedico: Sì.\nNota: controllo tra un mese."
+        );
+        assert_eq!(swap_speakers(&swapped), edited);
+        // Solo l'etichetta a inizio riga: le stesse parole nel testo restano.
+        assert_eq!(
+            swap_speakers("Medico: il paziente: stabile"),
+            "Paziente: il paziente: stabile"
+        );
+        assert!(draft(&[]).is_empty());
     }
 
     #[test]
