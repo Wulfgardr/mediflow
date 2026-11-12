@@ -73,5 +73,9 @@ test('ascolto della visita: WAV, linea del tempo e quota attribuita', () => {
  assert.equal(attributionScore([[0.8, 2.1, 'a', 'Medico'], [2.7, 3.4, 'b', 'Paziente']], timeline), 1);
  assert.equal(attributionScore([[0.8, 2.1, 'a', 'Paziente'], [2.7, 3.4, 'b', 'Paziente']], timeline), 0.5 / 1.5);
  assert.equal(attributionScore([[0.8, 2.1, 'a']], timeline), 0);
+ // Parlato perso dal riconoscitore: conta nel denominatore, quindi mezza battuta su 1,5 s non passa.
+ assert.equal(attributionScore([[1, 1.5, 'a', 'Medico']], timeline), 0.5 / 1.5);
+ // Frasi duplicate sulla stessa battuta non gonfiano il punteggio.
+ assert.equal(attributionScore([[1, 2, 'a', 'Medico'], [1, 2, 'a', 'Medico']], timeline), 1 / 1.5);
  assert.ok(TURNS.length >= 6 && TURNS.every(([role]) => role in VOICES));
 });
