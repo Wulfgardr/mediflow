@@ -93,7 +93,7 @@ raccordo nei due host.
 | `aifa_drug_search` | `RuntimeSession.chat_drug_search`, servizio AIFA comune | Ricerca locale in sola lettura, conferma nativa, risultato app-only | Qualifica nei due host; aggiornamento del catalogo non verificato |
 | `service_prescription_matching` | `lib/service-prescription-write.ts` | Non collegata | Residuo WUL-829: il writer conserva `matchStatus`; manca una vista GPUI di abbinamento, distinta dal repertorio e dalle prescrizioni |
 | `evidence_absorption` | `lib/domain/documents/evidence-queue-contract.ts` | Non collegata | Residuo WUL-829: la coda alimenta `lib/ai-context.ts`; manca un lettore con vista GPUI della coda, distinta da Documenti e import dossier |
-| `patient_open_loops` | `lib/patient-open-loops.ts` | Non collegata | Residuo WUL-829: il Web proietta prescrizioni, elementi e osservazioni; GPUI non ha il lettore e la vista corrispondenti. L’agenda non equivale ai follow-up aperti |
+| `patient_open_loops` | `deriveOpenLoopProjection`, lettore paired `RuntimeSession.read_open_loops` | `open-loops`: consulta referti attesi e serie interrotte nella scheda corrente; alla chat solo stati | Test Web della carta, host HTTP sintetico GPUI, ricevuta, cambio paziente e revoca; due host reali da qualificare |
 | `fhir_export` | `lib/fhir/bundle-generator.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
 | `document_classification` | `lib/domain/documents/document-class-router.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
 | `document_identity_resolution` | `lib/domain/documents/document-identity-resolution.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
@@ -406,9 +406,39 @@ riuscita il legame termina e i risultati restano consultabili in MediFlow;
 chiudere la ricerca o cambiare contesto li cancella. Non è aggiunto un comando
 di applicazione del codice alla scheda.
 
-Le altre tre funzioni richieste restano residui espliciti nella matrice:
+Coda delle evidenze ed abbinamento delle prestazioni restano residui espliciti nella matrice:
 non si presenta l’agenda come follow-up aperti, la lista dei documenti come
 coda delle evidenze o il repertorio prestazioni come abbinamento. Per ciascuna
 manca una verticale GPUI riutilizzabile: servono un lettore nominato e una vista
 con le rispettive fonti, ricevute e prove di diniego prima del raccordo chat.
 I test dei soli servizi esistenti non provano questi percorsi.
+
+
+## Raccordo del 12 novembre 2026: follow-up aperti
+
+Il comando `open-loops`, senza argomenti, apre i follow-up del paziente
+selezionato nella finestra MediFlow. Il Web della chat usa la stessa carta
+e riceve solo `loops-opened`, `loops-busy`, `loops-unavailable`,
+`loops-closed` o gli stati comuni di attesa e ritiro. Nessun identificativo,
+risultato o contenuto della ricevuta passa alla chat.
+
+Il lettore paired `GET /api/v1/network/patients/[id]/open-loops` usa
+`deriveOpenLoopProjection`, come il Web ordinario. Richiede entrambi i
+permessi di lettura di prescrizioni ed osservazioni e verifica l’appartenenza
+all’ambulatorio anche quando non ci sono attese. La lettura acquisisce le
+fonti in una transazione. Oltre 1024 righe per fonte non pubblica una
+proiezione parziale come se fosse completa. Le etichette cifrate vengono
+aperte dal client, con la chiave già custodita dalla sessione. Il servizio
+AIP resta il lettore separato con riferimenti opachi e grant propri.
+
+La vista GPUI mostra prescrizioni raggruppate, referti attesi, serie
+interrotte e ricevuta di lettura (data, conteggio ed impronta dello snapshot
+nel contratto). Questa ricevuta non attesta un salvataggio clinico. Un
+errore non produce `loops-closed`. Cambio paziente, blocco, cambio sezione
+e revoca ritirano le letture pendenti. Dopo una lettura riuscita, i dati
+restano nella scheda fino alla chiusura o al cambio di contesto.
+
+Le prove di componente sono in `lib/chat-card/icd-lookup.test.ts`,
+`lib/patient-open-loops.test.ts`, `lib/network-cross-patient-read.test.ts`
+e nei test GPUI `chat_followups_*`. Il banco usa il trasporto HTTP paired
+contro un host sintetico. Non qualifica i desktop autenticati o l’uso clinico.

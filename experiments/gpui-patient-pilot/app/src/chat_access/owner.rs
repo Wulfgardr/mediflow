@@ -55,6 +55,10 @@ impl State {
             Self::Generative(Function::Icd, Stage::Unavailable) => "icd-unavailable",
             Self::Generative(Function::Icd, Stage::Busy) => "icd-busy",
             Self::Generative(Function::Icd, Stage::Closed) => "icd-closed",
+            Self::Generative(Function::OpenLoops, Stage::Opened) => "loops-opened",
+            Self::Generative(Function::OpenLoops, Stage::Unavailable) => "loops-unavailable",
+            Self::Generative(Function::OpenLoops, Stage::Busy) => "loops-busy",
+            Self::Generative(Function::OpenLoops, Stage::Closed) => "loops-closed",
             Self::Preparing => "preparing",
             Self::Selecting => "selecting",
             Self::Challenge => "challenge",
@@ -74,13 +78,15 @@ pub(crate) enum Function {
     Synthesis,
     Import,
     Icd,
+    OpenLoops,
 }
 impl Function {
-    pub(crate) const ALL: [Function; 4] = [
+    pub(crate) const ALL: [Function; 5] = [
         Function::Insight,
         Function::Synthesis,
         Function::Import,
         Function::Icd,
+        Function::OpenLoops,
     ];
 }
 
@@ -1673,7 +1679,7 @@ pub(crate) mod tests {
     }
 
     /// Solo questi stati possono tornare alla chat dal comando del Quadro paziente.
-    const INSIGHT_WIRE: [&str; 18] = [
+    const INSIGHT_WIRE: [&str; 22] = [
         "requested",
         "preparing",
         "insight-opened",
@@ -1692,6 +1698,10 @@ pub(crate) mod tests {
         "icd-unavailable",
         "icd-busy",
         "icd-closed",
+        "loops-opened",
+        "loops-unavailable",
+        "loops-busy",
+        "loops-closed",
     ];
     fn insight_reply(pending: &Pending) -> Value {
         let status = pending.lock().unwrap().status();
@@ -1743,7 +1753,11 @@ pub(crate) mod tests {
                 "icd-opened",
                 "icd-unavailable",
                 "icd-busy",
-                "icd-closed"
+                "icd-closed",
+                "loops-opened",
+                "loops-unavailable",
+                "loops-busy",
+                "loops-closed"
             ]
         );
         assert!(super::super::is_synthesis_command(
