@@ -213,7 +213,7 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await expect(page.getByTestId('patient-proposals-summary')).toContainText('1 proposta da rivedere');
   await expect(proposal).not.toBeVisible();
   await expect(page.locator('#quadro [data-testid="patient-insight-review-proposal"]')).toHaveCount(0);
-  await page.getByTestId('patient-proposals-summary').getByRole('link', { name: 'Patient Insight', exact: true }).click();
+  await page.getByTestId('patient-proposals-summary').getByRole('link', { name: 'Quadro paziente', exact: true }).click();
   await expect(proposal).toBeVisible();
   expect(previewCalls).toBe(1);
   await insightDisclosure.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
