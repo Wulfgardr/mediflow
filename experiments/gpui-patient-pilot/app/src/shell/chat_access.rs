@@ -223,6 +223,15 @@ impl ClinicalApp {
                 Some(self.evidence_queue_view(cx))
             }
             Function::EvidenceQueue => None,
+            Function::ServiceMatching
+                if self
+                    .selected_id
+                    .as_deref()
+                    .is_some_and(|id| self.service_matching.patient_is(id)) =>
+            {
+                Some(self.service_matching_view(cx))
+            }
+            Function::ServiceMatching => None,
             Function::Icd
                 if self
                     .selected_id
@@ -246,9 +255,11 @@ impl ClinicalApp {
         self.show_other = false;
         self.focus_after_render = true;
         let section = match function {
-            Function::Insight | Function::Icd | Function::OpenLoops | Function::EvidenceQueue => {
-                PatientSection::Overview
-            }
+            Function::Insight
+            | Function::Icd
+            | Function::OpenLoops
+            | Function::EvidenceQueue
+            | Function::ServiceMatching => PatientSection::Overview,
             Function::Synthesis | Function::Import => PatientSection::Documents,
         };
         if self.patient_section != section {
@@ -269,6 +280,7 @@ impl ClinicalApp {
             Function::Icd => &mut self.who,
             Function::OpenLoops => &mut self.open_loops,
             Function::EvidenceQueue => &mut self.evidence_queue,
+            Function::ServiceMatching => &mut self.service_matching,
         }
     }
 
@@ -325,7 +337,10 @@ impl ClinicalApp {
         } else if access.is_none()
             && !matches!(
                 function,
-                Function::Icd | Function::OpenLoops | Function::EvidenceQueue
+                Function::Icd
+                    | Function::OpenLoops
+                    | Function::EvidenceQueue
+                    | Function::ServiceMatching
             )
         {
             Some(Stage::Unavailable)
@@ -354,7 +369,8 @@ impl ClinicalApp {
                     Function::Insight
                     | Function::Icd
                     | Function::OpenLoops
-                    | Function::EvidenceQueue => true,
+                    | Function::EvidenceQueue
+                    | Function::ServiceMatching => true,
                     Function::Synthesis => access
                         .unwrap()
                         .document_synthesis_enabled()
@@ -395,6 +411,12 @@ impl ClinicalApp {
                 }
                 this.show_chat_function(function, cx);
                 match function {
+                    Function::ServiceMatching => {
+                        if let Ok(mut pending) = target.lock() {
+                            pending.finish_function_open(Stage::Opened);
+                        }
+                        this.open_service_matching(cx);
+                    }
                     Function::EvidenceQueue => {
                         if let Ok(mut pending) = target.lock() {
                             pending.finish_function_open(Stage::Opened);

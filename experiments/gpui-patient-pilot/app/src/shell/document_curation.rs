@@ -170,6 +170,10 @@ fn compose_review_text(row: &Value, output: &mut impl std::fmt::Write) -> std::f
 
 impl ClinicalApp {
     pub(super) fn local_work_pending(&self) -> bool {
+        #[cfg(unix)]
+        if self.service_matching.saving {
+            return true;
+        }
         self.local_host.has_work() || self.patient.document_curation.has_work()
     }
     fn read_document_archive(&mut self, cx: &mut Context<Self>) {

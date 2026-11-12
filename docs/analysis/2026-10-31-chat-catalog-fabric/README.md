@@ -91,7 +91,7 @@ raccordo nei due host.
 | `treatment_reasoning` | `app/api/ai/treatment-reasoning/preview/route.ts` | Esclusa dalla 0.9.1, diniego comune | Verificare diniego nei due host; nessuna generazione |
 | `icd_lookup` | `RuntimeSession.search_who`, vista `who_lookup`; Web ordinario `lib/icd-service.ts` | `icd-lookup`: ricerca nella scheda selezionata, soli stati alla chat | Prove di componente e frame; due host reali da qualificare |
 | `aifa_drug_search` | `RuntimeSession.chat_drug_search`, servizio AIFA comune | Ricerca locale in sola lettura, conferma nativa, risultato app-only | Qualifica nei due host; aggiornamento del catalogo non verificato |
-| `service_prescription_matching` | `lib/service-prescription-write.ts` | Non collegata | Residuo WUL-829: il writer conserva `matchStatus`; manca una vista GPUI di abbinamento, distinta dal repertorio e dalle prescrizioni |
+| `service_prescription_matching` | `lib/service-prescription-write.ts` | Comando `service-matching`: apre la scelta nella finestra; scrive solo dopo conferma del medico | Letture paired di voci e repertorio, `manual`, versione e ricevuta con rilettura. Negativi sintetici, due host reali da qualificare |
 | `evidence_absorption` | `lib/domain/documents/evidence-queue-contract.ts` | Comando `evidence-queue`, in sola lettura: apre le evidenze dai documenti nella scheda corrente | Worker locale con lo stesso contratto Web, dati decifrati paired, ricevuta e negativi sintetici. Due host reali da qualificare |
 | `patient_open_loops` | `deriveOpenLoopProjection`, lettore paired `RuntimeSession.read_open_loops` | `open-loops`: consulta referti attesi e serie interrotte nella scheda corrente; alla chat solo stati | Test Web della carta, host HTTP sintetico GPUI, ricevuta, cambio paziente e revoca; due host reali da qualificare |
 | `fhir_export` | `lib/fhir/bundle-generator.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
@@ -406,7 +406,7 @@ riuscita il legame termina e i risultati restano consultabili in MediFlow;
 chiudere la ricerca o cambiare contesto li cancella. Non è aggiunto un comando
 di applicazione del codice alla scheda.
 
-La coda delle evidenze è collegata dal raccordo successivo. L’abbinamento delle prestazioni resta residuo esplicito nella matrice:
+I raccordi successivi collegano la coda delle evidenze e l’abbinamento delle prestazioni alla finestra:
 non si presenta l’agenda come follow-up aperti, la lista dei documenti come
 coda delle evidenze o il repertorio prestazioni come abbinamento. Per ciascuna
 manca una verticale GPUI riutilizzabile: servono un lettore nominato e una vista
@@ -476,3 +476,23 @@ La matrice copre anche le schede senza fonti e controlla i testi degli stati
 vuoti. L’import isolato conserva l’avviso che invita ad aggiungere una nota,
 una voce di diario o una sintesi, oppure a revocare la richiesta dalla chat.
 Lo stesso avviso compare una sola volta nella vista completa dei Documenti.
+
+
+## Raccordo del 12 novembre 2026: abbinamento delle prestazioni
+
+Il comando `service-matching` apre la vista sul paziente selezionato. L’apertura
+legge gli elementi e cerca nel repertorio paired. Il medico sceglie la voce da
+abbinare, sceglie il codice del repertorio e preme «Conferma abbinamento».
+Solo questo gesto chiama il writer paired esistente con la versione letta e
+`matchStatus: manual`. La chat non invia codici, identificativi o istruzioni
+di scrittura. Alla chat tornano soltanto gli stati `matching-opened`,
+`matching-busy`, `matching-unavailable`, `matching-closed` e gli stati comuni.
+
+La ricevuta locale identifica prestazione, codice, nuova versione e data della
+rilettura. Viene mostrata soltanto dopo `success: true` e la rilettura della
+stessa versione con i campi confermati. Non è una ricevuta durevole del server.
+Un conflitto, un diniego o un esito non verificato richiedono una nuova lettura.
+La risposta tardiva dopo revoca non mostra la ricevuta. Una revoca successiva
+all’invio non annulla una scrittura già confermata dal medico ed eseguita dal
+server. Le prove usano dati sintetici, il client paired reale ed il writer SQLite
+esistente. I desktop autenticati e l’applicazione installata restano da qualificare.
