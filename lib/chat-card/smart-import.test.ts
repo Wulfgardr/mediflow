@@ -49,7 +49,7 @@ async function frame(host: { meta: unknown }) {
 
 test('the adapter admits the smart import command and its four states', () => {
     for (const state of ['import-opened', 'import-unavailable', 'import-busy', 'import-closed']) assert.ok(adapter.includes(`"${state}"`), state);
-    assert.match(adapter, /"booking-receipt","smart-import"\]/u);
+    assert.match(adapter, /"booking-receipt","smart-import","open-loops"\]/u);
 });
 
 test('smart import sends only its command and accepts finite status replies', async () => {

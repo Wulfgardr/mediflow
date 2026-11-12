@@ -773,6 +773,9 @@ mod chat {
         cx: &mut gpui::TestAppContext,
     ) {
         let (bench, cx) = bench(cx);
+        bench.view.read_with(cx, |app, _| {
+            assert!(app.directory, "selezione in anteprima nell’elenco")
+        });
         bench.view.update(cx, |app, _| {
             app.patient_section = PatientSection::Therapies;
         });
@@ -785,6 +788,10 @@ mod chat {
                 panic!("il Quadro attende il consenso nella finestra");
             };
             assert_eq!(request.patient_id, FIRST);
+            assert!(
+                !app.directory,
+                "la chat deve aprire la scheda dall’anteprima dell’elenco"
+            );
             assert_eq!(app.patient_section, PatientSection::Overview);
         });
         assert!(

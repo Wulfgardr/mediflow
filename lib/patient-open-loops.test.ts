@@ -217,3 +217,70 @@ test('resolves a known LOINC display and groups pending results by prescription'
     assert.deepEqual(projection.groups[0].loops.map((loop) => loop.label), ['Creatinina', 'Glicemia']);
     assert.deepEqual(projection.standaloneLoops, []);
 });
+
+test('the native open-loop transport preserves Web groups, sources and a read-only receipt', async () => {
+    const { readPatientOpenLoopProjection } = await import('./patient-open-loops-read');
+    const input = { patientId: 'patient-1', ambulatoryId: 'scope-a', now,
+        prescriptions: [{ id: 'prescription-1', prescribedAt: '2026-06-01T00:00:00.000Z' }],
+        items: [item()], observations: [observation(), observation({ observedAt: '2026-01-11T00:00:00.000Z' }),
+            observation({ observedAt: '2026-01-21T00:00:00.000Z' })] };
+    const read = readPatientOpenLoopProjection(input);
+    const web = deriveOpenLoopProjection(input);
+    assert.equal(read.groups[0].loops[0].label, web.groups[0].loops[0].label);
+    assert.equal(read.standaloneLoops[0].label, web.standaloneLoops[0].label);
+    assert.deepEqual(read.groups[0].loops[0].source, { type: 'service_prescription_item', id: 'item-1', prescriptionId: 'prescription-1' });
+    assert.deepEqual(read.standaloneLoops[0].source, { type: 'observation_series', codeSystem: 'LOINC', code: '2339-0' });
+    assert.equal(read.receipt.itemCount, 2);
+    assert.equal(read.receipt.outcome, 'read');
+    assert.equal(read.receipt.readAt, now.toISOString());
+    assert.match(read.receipt.snapshotHash, /^[a-f0-9]{64}$/u);
+    assert.deepEqual(input.items[0], item(), 'reading leaves clinical source rows untouched');
+    assert.throws(() => readPatientOpenLoopProjection({ ...input, patientId: 'patient-2' }), /scope mismatch/u);
+});
+
+test('the paired open-loop route denies either missing read grant before accessing the projection', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { runInNewContext } = await import('node:vm');
+    const ts = await import('typescript');
+    const source = readFileSync(new URL('../app/api/v1/network/patients/[id]/open-loops/route.ts', import.meta.url), 'utf8');
+    let allowed = true;
+    let observationsAllowed = true;
+    let reads = 0;
+    let found = true;
+    const dependencies: Record<string, unknown> = {
+        'next/server': { NextResponse: { json: Response.json } },
+        '@/lib/network-write-context': { requireNetworkCapabilityContext: async (_request: Request, capability: string) => {
+            assert.equal(capability, 'read-prescriptions');
+            return allowed ? { ok: true, context: { scopeAmbulatoryId: 'scope-a', pairedClient: {
+                grantedCapabilities: observationsAllowed ? ['read-observations'] : [] } } }
+                : { ok: false, response: Response.json({}, { status: 403 }) };
+        } },
+
+        '@/lib/network-observation-read': { NETWORK_OBSERVATION_READ_CAPABILITY: 'read-observations' },
+        '@/lib/service-prescription-write': { NETWORK_SERVICE_PRESCRIPTION_READ_CAPABILITY: 'read-prescriptions', readNetworkPatientOpenLoops: (patient: string, scope: string) => {
+            reads++; assert.equal(patient, 'patient-a'); assert.equal(scope, 'scope-a');
+            return found ? { patientId: patient, receipt: { outcome: 'read' } } : null;
+        } },
+    };
+    const exports: { GET?: (request: Request, context: { params: Promise<{ id: string }> }) => Promise<Response> } = {};
+    const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    runInNewContext(compiled, { exports, Request, Response, URL, require: (name: string) => {
+        assert.ok(name in dependencies, name); return dependencies[name];
+    } });
+    const request = () => exports.GET!(new Request('http://127.0.0.1/synthetic'), { params: Promise.resolve({ id: 'patient-a' }) });
+    allowed = false;
+    assert.equal((await request()).status, 403);
+    allowed = true; observationsAllowed = false;
+    assert.equal((await request()).status, 403);
+    assert.equal(reads, 0);
+    observationsAllowed = true;
+    const success = await request();
+    assert.equal(success.status, 200);
+    assert.equal(success.headers.get('Cache-Control'), 'no-store');
+    found = false;
+    assert.equal((await request()).status, 404);
+    const cancelled = new AbortController(); cancelled.abort();
+    const before = reads;
+    assert.equal((await exports.GET!(new Request('http://127.0.0.1/synthetic', { signal: cancelled.signal }), { params: Promise.resolve({ id: 'patient-a' }) })).status, 409);
+    assert.equal(reads, before);
+});
