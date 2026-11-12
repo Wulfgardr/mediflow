@@ -10,12 +10,14 @@ export type ProfileQuery =
     | Readonly<{ kind: 'read'; contractVersion: 1; projection: ProfileProjection; handle: string; expectedRevision: number }>;
 
 export const PROFILE_FIELD_NAMES = Object.freeze([
-    'firstName', 'lastName', 'taxCode', 'birthDate', 'address', 'phone', 'caregiver',
+    'firstName', 'lastName', 'taxCode', 'identifierType', 'birthDate', 'birthDatePrecision', 'birthYear', 'address', 'phone', 'caregiver',
     'diagnoses', 'exemptions', 'notes', 'isAdi', 'isArchived', 'statusReason', 'archiveReason', 'archiveNote',
 ] as const);
 
 export type ProfileFields = Readonly<{
     firstName: string; lastName: string; taxCode: string; birthDate: string | null;
+    identifierType: 'cf' | 'stp' | 'eni' | 'passport' | 'other' | 'none';
+    birthDatePrecision: 'exact' | 'estimated' | 'unknown'; birthYear: number | null;
     address: string | null; phone: string | null; caregiver: string | null;
     diagnoses: string | null; exemptions: string | null; notes: string | null;
     isAdi: boolean | null; isArchived: boolean | null;
@@ -101,6 +103,9 @@ export function isProfileResult(value: unknown): value is ProfileResult {
     if (!profile) return false;
     return fields.every(key => {
         const field = profile[key];
+        if (key === 'identifierType') return ['cf', 'stp', 'eni', 'passport', 'other', 'none'].some(value => value === field);
+        if (key === 'birthDatePrecision') return ['exact', 'estimated', 'unknown'].some(value => value === field);
+        if (key === 'birthYear') return field === null || integer(field, 0);
         if (key === 'isAdi' || key === 'isArchived') return field === null || typeof field === 'boolean';
         if (key === 'firstName' || key === 'lastName' || key === 'taxCode') return typeof field === 'string';
         return field === null || typeof field === 'string';

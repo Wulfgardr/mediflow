@@ -302,6 +302,8 @@ export const patientProfileQueryOutputSchema = z.discriminatedUnion('projection'
   z.object({ ...profileResultBase, projection: z.literal('notes'), profile: z.object({ notes: nullableText }).strict() }).strict(),
   z.object({ ...profileResultBase, projection: z.literal('profile'), profile: z.object({
     firstName: z.string(), lastName: z.string(), taxCode: z.string(), birthDate: nullableText,
+    identifierType: z.enum(['cf', 'stp', 'eni', 'passport', 'other', 'none']),
+    birthDatePrecision: z.enum(['exact', 'estimated', 'unknown']), birthYear: safeInteger.nullable(),
     address: nullableText, phone: nullableText, caregiver: nullableText, diagnoses: nullableText,
     exemptions: nullableText, notes: nullableText, isAdi: z.boolean().nullable(), isArchived: z.boolean().nullable(),
     statusReason: nullableText, archiveReason: nullableText, archiveNote: nullableText,
