@@ -185,7 +185,7 @@ function ProfileEditor({ controller }: { controller: WorkProfileController }) {
                             {draft.source === 'guided' && draft.step === 3 && (
                                 <>
                                     <p>{recommendation.reason}</p>
-                                    <p>Raccomandazione calcolata con regole locali dalle tue risposte, senza un modello AI.</p>
+                                    <p>Raccomandazione calcolata con regole locali dalle tue risposte, senza un modello IA.</p>
                                 </>
                             )}
                             <p>{preview.agentNote}</p>
@@ -207,7 +207,7 @@ export function WorkProfileOnboarding({ controller }: { controller: WorkProfileC
         <section className={`${styles.experience} ${styles.profile}`} aria-labelledby="work-profile-title" data-testid="work-profile-onboarding" aria-busy={busy}>
             <header className={styles.heading}>
                 <h1 id="work-profile-title" className="type-page-title">Il tuo modo di lavorare<span aria-hidden="true">.</span></h1>
-                <p>Scegli da dove iniziare. Puoi usare la cartella senza AI.</p>
+                <p>Scegli da dove iniziare. Puoi usare la cartella senza IA.</p>
                 <nav className={styles.links} aria-label="Percorsi sempre disponibili">
                     <Link className={styles.textAction} href="/?area=incarico">Apri la cartella manualmente</Link>
                 </nav>
@@ -219,7 +219,7 @@ export function WorkProfileOnboarding({ controller }: { controller: WorkProfileC
             {busy && <p className={styles.hint} role="status">Lettura o salvataggio del profilo…</p>}
             {state && <ProfileEditor key={`${state.revision}:${controller.snapshotVersion}`} controller={controller} />}
             <nav className={styles.links} aria-label="Configurazione facoltativa">
-                <Link className={styles.textAction} href="/settings/ai/fabric">Configurazione AI facoltativa</Link>
+                <Link className={styles.textAction} href="/settings/ai/fabric">Configurazione IA facoltativa</Link>
                 <Link className={styles.textAction} href="/settings/diagnostica">Diagnostica della postazione</Link>
             </nav>
         </section>
@@ -237,7 +237,7 @@ export function WorkProfileSettings({ showHeading = true }: { showHeading?: bool
         {state && <ProfileEditor key={`${state.revision}:${controller.snapshotVersion}`} controller={controller} />}
         <nav className={styles.links} aria-label="Percorsi sempre disponibili">
             <Link className={styles.textAction} href="/?area=incarico">Apri la cartella manualmente</Link>
-            <Link className={styles.textAction} href="/settings/ai/fabric">Configurazione AI facoltativa</Link>
+            <Link className={styles.textAction} href="/settings/ai/fabric">Configurazione IA facoltativa</Link>
             <Link className={styles.textAction} href="/settings/diagnostica">Diagnostica della postazione</Link>
         </nav>
     </section>;

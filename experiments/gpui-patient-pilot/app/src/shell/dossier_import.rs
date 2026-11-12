@@ -214,7 +214,7 @@ impl ClinicalApp {
             .pb(px(24.))
             .child(section("dossier-import-heading", "Importa dossier", theme));
         if !open {
-            return pane.child(notice("dossier-host-closed","Host locale chiuso. Per rivedere e applicare il dossier apri Gestione locale in Impostazioni e conferma l’accesso su questo Mac.",theme,false));
+            return pane.child(notice("dossier-host-closed","Accesso locale chiuso. Per rivedere e applicare il dossier apri Gestione locale in Impostazioni e conferma l’accesso su questo Mac.",theme,false));
         }
         pane = pane
             .child(

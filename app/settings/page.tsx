@@ -135,7 +135,7 @@ export default function SettingsPage() {
         : isHomeBase
             ? networkOverview
                 ? 'Il canale dati resta disponibile solo ai dispositivi associati con sessione operatore valida.'
-                : 'Pairing e sessione non sono verificabili finché i dettagli del nodo non tornano disponibili.'
+                : 'Abbinamento e sessione non sono verificabili finché i dettagli del nodo non tornano disponibili.'
             : 'Questa postazione non espone il canale dati ai dispositivi associati.';
 
     return (

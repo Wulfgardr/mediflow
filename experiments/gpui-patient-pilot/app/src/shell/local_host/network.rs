@@ -152,7 +152,7 @@ impl ClinicalApp {
     pub(in crate::shell) fn network_mode_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let mut pane = div().min_w_0().flex().flex_col().gap(px(16.))
-            .child(heading("network-mode-heading", "Modo host", theme))
+            .child(heading("network-mode-heading", "Modo home-base", theme))
             .child(text!("Solo locale limita i servizi di rete. Nodo della rete fidata abilita le capacità previste per i dispositivi abbinati. La scelta non modifica da sola firewall, porte o abbinamenti."))
             .child(self.local_host_panel(cx));
         if self.local_host.access().is_none() {
@@ -161,7 +161,7 @@ impl ClinicalApp {
         pane = pane.child(
             button(
                 "network-mode-read",
-                "Rileggi modo host",
+                "Rileggi modo home-base",
                 theme,
                 false,
                 !self.local_host.has_work(),
@@ -176,7 +176,7 @@ impl ClinicalApp {
             .and_then(|s| s.mode().ok())
         {
             pane = pane
-                .child(text!(format!("Modo host: {}", mode.title())))
+                .child(text!(format!("Modo home-base: {}", mode.title())))
                 .child(
                     button(
                         "network-mode-prepare",
@@ -190,7 +190,7 @@ impl ClinicalApp {
                     ),
                 );
         } else {
-            pane = pane.child(text!("Modo host non ancora letto."));
+            pane = pane.child(text!("Modo home-base non ancora letto."));
         }
         pane.child(self.territorial_view(cx))
     }
@@ -321,7 +321,7 @@ mod tests {
             assert!(matches!(app.local_host.operation, Operation::Idle));
             assert_eq!(
                 app.verified.as_deref(),
-                Some("Assetto territoriale aggiornato e riletto dall’host.")
+                Some("Assetto territoriale aggiornato e riletto dall’home-base.")
             );
             assert_eq!(
                 app.local_host.network.territorial,

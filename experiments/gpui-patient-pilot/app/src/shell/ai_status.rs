@@ -54,7 +54,7 @@ impl ClinicalApp {
             .gap(px(12.))
             .child(section(
                 "clinical-workspace-ai-status-heading",
-                "STATO FUNZIONI AI",
+                "STATO FUNZIONI IA",
                 theme,
             ))
             .child(notice(
@@ -68,7 +68,7 @@ impl ClinicalApp {
                     .attach_enabled(
                         button(
                             "clinical-workspace-ai-status-refresh",
-                            "Rileggi stato AI",
+                            "Rileggi stato IA",
                             theme,
                             false,
                             enabled,
@@ -83,9 +83,9 @@ impl ClinicalApp {
             return pane.child(notice(
                 "clinical-workspace-ai-status-state",
                 match &self.ai_status {
-                    Load::Idle => "Stato AI non ancora letto.".to_owned(),
-                    Load::Loading => "Lettura dello stato AI dall'archivio…".to_owned(),
-                    Load::Failed(message) => format!("{message} Lo stato AI non è disponibile. Puoi riprovare con Rileggi stato AI."),
+                    Load::Idle => "Stato IA non ancora letto.".to_owned(),
+                    Load::Loading => "Lettura dello stato IA dall'archivio…".to_owned(),
+                    Load::Failed(message) => format!("{message} Lo stato IA non è disponibile. Puoi riprovare con Rileggi stato IA."),
                     Load::Ready(_) => unreachable!(),
                 },
                 theme,

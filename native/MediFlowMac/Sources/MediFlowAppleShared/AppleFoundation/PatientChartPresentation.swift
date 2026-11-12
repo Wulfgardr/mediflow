@@ -45,7 +45,7 @@ enum PatientChartSummaryCategory: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .therapies: "Terapie attive"
-        case .measures: "Misure"
+        case .measures: "Parametri"
         case .diary: "Diario"
         case .scales: "Scale"
         }

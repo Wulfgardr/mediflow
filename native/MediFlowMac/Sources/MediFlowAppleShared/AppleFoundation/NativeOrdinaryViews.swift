@@ -127,7 +127,7 @@ private struct NativeFabricExperience: View {
                 }.labelsHidden().accessibilityIdentifier("clinical-workspace-document-synthesis-document")
             }
             Picker("Esegui la funzione", selection: venue) {
-                Text("Locale sull’host").tag(false)
+                Text("Locale sull’home-base").tag(false)
                 Text("ChatGPT").tag(true)
             }.disabled(!owner.canChangeVenue)
                 .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-venue")
@@ -137,7 +137,7 @@ private struct NativeFabricExperience: View {
                 NativeFabricLocalExperience(workspaceModel: workspaceModel, function: function, model: owner.local)
             }
             if function == .documentSynthesis {
-                Text("Il documento deve essere estraibile localmente dall’host. File non supportati o cifrati senza una lettura autorizzata non vengono inviati.")
+                Text("Il documento deve essere estraibile localmente dall’home-base. File non supportati o cifrati senza una lettura autorizzata non vengono inviati.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -166,12 +166,12 @@ private struct NativeOrdinaryExperience: View {
     private func sendDetails<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
         #if os(iOS)
         if let expansion = sendDetailsExpansion {
-            DisclosureGroup("Dettagli dell’invio", isExpanded: expansion, content: content)
+            DisclosureGroup("Dettagli", isExpanded: expansion, content: content)
         } else {
-            DisclosureGroup("Dettagli dell’invio", content: content)
+            DisclosureGroup("Dettagli", content: content)
         }
         #else
-        DisclosureGroup("Dettagli dell’invio", content: content)
+        DisclosureGroup("Dettagli", content: content)
         #endif
     }
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
@@ -193,13 +193,12 @@ private struct NativeOrdinaryExperience: View {
             } else {
                 Text("\(function.title) con OpenAI").font(.headline)
             }
+            if model.phase != .completed { Text("La cartella non cambia.").font(.callout) }
             Text(model.message).font(.callout).fixedSize(horizontal: false, vertical: true).accessibilityFocused($statusFocused)
                 .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-status")
             if model.isWorking { ProgressView(model.phase == .generating ? "Elaborazione e chiusura…" : "Verifica in corso…") }
             if model.phase == .needsConsent, let disclosure = model.disclosure {
-                Text("Autorizzi l’invio a OpenAI dei contenuti preparati e oscurati per questa sola proposta. Si applicano le condizioni del servizio ChatGPT; la proposta non modifica la cartella.")
-                Text("Funzione: \(function.title). L’autorizzazione scade con questa operazione; un nuovo contenuto richiede un nuovo consenso.")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("Autorizzi l’invio a OpenAI dei contenuti preparati e oscurati per questa sola proposta. Si applicano le condizioni del servizio ChatGPT.")
                 if function == .treatmentReasoning {
                     Text("Destinazioni: auth.openai.com e chatgpt.com").chartMetadata()
                 }
@@ -257,8 +256,6 @@ private struct NativeOrdinaryExperience: View {
                     }
                 }
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-proposal")
-                Text("Da verificare sulle fonti. Nessuna applicazione automatica né salvataggio clinico da questa vista.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading).buttonStyle(.bordered)
@@ -289,7 +286,7 @@ private struct NativeOrdinaryExperience: View {
         switch model.phase {
         case .idle, .completed:
             primaryAction {
-                Button(model.phase == .completed ? "Prepara una nuova proposta" : "Prepara proposta") { model.prepare() }.disabled(!model.canPrepare)
+                Button(model.phase == .completed ? "Nuova proposta" : "Genera proposta") { model.prepare() }.disabled(!model.canPrepare)
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-prepare")
             }
         case .consented:
@@ -321,7 +318,7 @@ struct NativeOrdinaryProposalView: View {
     static func patientInsightRows(_ proposal: NativeOrdinaryJSON) -> [PatientInsightRow] {
         var rows: [PatientInsightRow] = [.notice(patientInsightReviewNotice)]
         if let summary = proposal["summary"].string, !summary.isEmpty { rows.append(.paragraph(summary)) }
-        for (title, key) in [("Quadro attuale", "currentState"), ("Elementi di attenzione", "alerts"),
+        for (title, key) in [("Stato attuale", "currentState"), ("Elementi di attenzione", "alerts"),
                              ("Passi da valutare", "nextSteps"), ("Informazioni mancanti", "gaps")] {
             let items = proposal[key].array.compactMap(\.string)
             if !items.isEmpty { rows.append(.heading(title)); rows += items.map(PatientInsightRow.item) }

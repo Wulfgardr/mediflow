@@ -297,7 +297,7 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
 
         let readonlyMessage = await store.unavailableMessage(for: "network.replica.readonly-documents")
         let writeMessage = await store.unavailableMessage(for: "network.replica.write-documents")
-        let repairStep = "Aggiorna MediFlow sull'host, poi ripeti il pairing."
+        let repairStep = "Aggiorna MediFlow sull'home-base, poi ripeti l’abbinamento."
         XCTAssertTrue(readonlyMessage?.contains("archivio documenti") == true)
         XCTAssertTrue(readonlyMessage?.hasSuffix(repairStep) == true)
         XCTAssertTrue(writeMessage?.contains("caricamento documenti") == true)
