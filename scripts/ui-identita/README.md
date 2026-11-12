@@ -1,6 +1,13 @@
 # Banco UI sintetico
 
-Eseguire dal worktree con Node v24.22.0. Tutti i dati sono inventati.
+Per la sola prova di regressione basta `node scripts/ui-identita/prova.mjs`
+(lo lancia anche `npm run prove:a-mano`): crea il banco in una cartella
+temporanea del disco interno, che è già APFS, sceglie porte libere, resta sul
+loopback, esegue `web-regression.spec.ts` e arresta il banco. Le istruzioni
+che seguono servono alle catture e al pairing sul banco di Vision.
+`MF_BANCO_SCRATCH` sceglie lo scratch; senza, resta quello di Vision.
+
+Eseguire dal worktree con Node 24. Tutti i dati sono inventati.
 
 ```sh
 npm ci --cache /Volumes/Vision/mf-ui-identita-20261107-scratch/npm-cache

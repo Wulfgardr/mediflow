@@ -30,7 +30,7 @@ ricontrollati nei sorgenti al momento dell'implementazione.
 | Contenitore Mac | execution-mac-probe: confini del processo sintetico |
 | Archivio Mac | backup-destination-policy e native-patient-document |
 | Aspetto 0.9.1 | qualify-visual-091 con browser sandbox e rete loopback |
-| Identità UI | non provato: web-regression è vincolato al vecchio banco /Volumes/Vision e reference.json |
+| Identità UI | scripts/ui-identita/prova.mjs: banco sintetico temporaneo sul disco interno, porte libere, solo loopback; web-regression nei quattro progetti, senza skip |
 
 Gli skip di iPad D2, paired host, WHO, plugin installati, esecuzione di sorgenti
 Mac esterni, runtime redaction installer e prove Rust sperimentali restano nel
