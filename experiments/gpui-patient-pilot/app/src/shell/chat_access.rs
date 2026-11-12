@@ -200,6 +200,54 @@ fn catalog_copy(prosthetics: bool) -> (&'static str, &'static str) {
 }
 
 impl ClinicalApp {
+    pub(super) fn chat_function_view(&self, cx: &Context<Self>) -> Option<Div> {
+        match self.patient.chat_function? {
+            Function::Insight => Some(self.patient_insight_view(cx)),
+            Function::Synthesis => Some(self.documents_view(cx)),
+            Function::Import => Some(self.smart_import_view(cx)),
+            Function::OpenLoops
+                if self
+                    .selected_id
+                    .as_deref()
+                    .is_some_and(|id| self.open_loops.patient_is(id)) =>
+            {
+                Some(self.open_loops_view(cx))
+            }
+            Function::OpenLoops => None,
+            Function::Icd
+                if self
+                    .selected_id
+                    .as_deref()
+                    .is_some_and(|id| self.who.patient_is(id)) =>
+            {
+                Some(self.who_view(cx))
+            }
+            Function::Icd => None,
+        }
+    }
+
+    fn show_chat_function(&mut self, function: Function, cx: &mut Context<Self>) {
+        for other in Function::ALL {
+            if other != function {
+                self.chat_area(other).close_view();
+            }
+        }
+        self.area = Area::Patients;
+        self.directory = false;
+        self.show_other = false;
+        self.focus_after_render = true;
+        let section = match function {
+            Function::Insight | Function::Icd | Function::OpenLoops => PatientSection::Overview,
+            Function::Synthesis | Function::Import => PatientSection::Documents,
+        };
+        if self.patient_section != section {
+            self.section_selected(section, cx);
+        }
+        if function == Function::Synthesis {
+            self.patient.document_details_id = self.patient.synthesis.document.clone();
+        }
+        self.patient.chat_function = Some(function);
+    }
     /// L'area della funzione che la chat chiede: ogni funzione ha la sua,
     /// con il suo legame.
     fn chat_area(&mut self, function: Function) -> &mut dyn ChatArea {
@@ -268,6 +316,9 @@ impl ClinicalApp {
             None
         };
         if let Some(stage) = early {
+            if stage == Stage::Busy && self.chat_area(function).can_show() {
+                self.show_chat_function(function, cx);
+            }
             if let Ok(mut pending) = pending.lock() {
                 pending.finish_function_open(stage);
             }
@@ -318,11 +369,11 @@ impl ClinicalApp {
                     cx.notify();
                     return;
                 }
-                this.area = Area::Patients;
-                this.directory = false;
-                this.show_other = false;
-                this.focus_after_render = true;
                 this.chat_area(function).admitted();
+                if function == Function::Synthesis {
+                    this.patient.synthesis.document = None;
+                }
+                this.show_chat_function(function, cx);
                 match function {
                     Function::OpenLoops => {
                         if let Ok(mut pending) = target.lock() {
@@ -331,10 +382,6 @@ impl ClinicalApp {
                         this.open_patient_loops(cx);
                     }
                     Function::Icd => {
-                        this.open_loops.reset();
-                        if this.patient_section != PatientSection::Overview {
-                            this.section_selected(PatientSection::Overview, cx);
-                        }
                         this.who
                             .open_for_patient(patient_id.clone(), &this.profile_scroll, cx);
                         this.reference_search
@@ -344,19 +391,9 @@ impl ClinicalApp {
                         }
                     }
                     Function::Insight => {
-                        this.open_loops.reset();
-                        if this.patient_section != PatientSection::Overview {
-                            this.section_selected(PatientSection::Overview, cx);
-                        }
                         this.insight_prepare(cx);
                     }
                     Function::Synthesis | Function::Import => {
-                        if function == Function::Synthesis {
-                            this.patient.synthesis.document = None;
-                        }
-                        if this.patient_section != PatientSection::Documents {
-                            this.section_selected(PatientSection::Documents, cx);
-                        }
                         if let Ok(mut pending) = target.lock() {
                             pending.finish_function_open(Stage::Opened);
                         }

@@ -45,6 +45,12 @@ impl OpenLoops {
 }
 #[cfg(unix)]
 impl ChatArea for OpenLoops {
+    fn can_show(&self) -> bool {
+        self.patient.is_some() && self.chat_ready()
+    }
+    fn close_view(&mut self) {
+        self.reset();
+    }
     fn occupied(&self) -> bool {
         self.patient.is_some() || self.chat.0.is_some()
     }
