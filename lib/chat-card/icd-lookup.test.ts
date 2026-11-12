@@ -206,3 +206,42 @@ test('Web document evidence discard a late successful status after revocation', 
     assert.equal(view.polling(), false);
     assert.equal(view.elements.get('card').hidden, true);
 });
+
+test('service matching open from the Web chat using only the current native patient and return a status receipt', async () => {
+    for (const [status, terminal] of [['requested', false], ['preparing', false], ['matching-opened', false],
+        ['matching-closed', true], ['matching-unavailable', true], ['matching-busy', true]] as const) {
+        const view = await frame({ meta: { status } }, 'service-matching');
+        assert.deepEqual(view.commands(), [{ command: 'attach' }, { command: 'service-matching' }]);
+        assert.equal(view.elements.get('card').hidden, true);
+        assert.equal(view.elements.get('consume').disabled, true);
+        assert.equal(view.polling(), !terminal);
+        assert.ok(adapter.includes(`"${status}"`), status);
+        if (status === 'matching-closed') assert.match(view.elements.get('status').textContent, /Operazione conclusa/u);
+    }
+});
+
+test('Web service matching reject foreign patient, denied permission and clinical or receipt payloads', async () => {
+    for (const meta of [{ status: 'withdrawn' }, { status: 'icd-closed' },
+        { status: 'matching-opened', patientId: 'patient-b' },
+        { status: 'matching-closed', receipt: { outcome: 'read' } },
+        { status: 'matching-opened', payload: 'Referto sintetico' },
+        { status: 'matching-opened', groups: [] }]) {
+        const view = await frame({ meta }, 'service-matching');
+        assert.equal(view.polling(), false);
+        assert.equal(view.elements.get('card').hidden, true);
+        assert.match(view.elements.get('status').textContent, /Apertura non confermata/u);
+    }
+});
+
+test('Web service matching discard a late successful status after revocation', async () => {
+    const host = { meta: { status: 'matching-opened' } };
+    const view = await frame(host, 'service-matching');
+    assert.equal(view.elements.get('revoke').disabled, false);
+    view.elements.get('revoke').onclick();
+    await view.settle();
+    host.meta = { status: 'matching-closed' };
+    await view.tick();
+    assert.match(view.elements.get('status').textContent, /Richiesta ritirata/u);
+    assert.equal(view.polling(), false);
+    assert.equal(view.elements.get('card').hidden, true);
+});
