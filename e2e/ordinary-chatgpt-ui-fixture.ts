@@ -112,24 +112,28 @@ export async function selectOrdinaryChatGpt(scope: Locator, policyAlreadyEnabled
   await scope.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption('chatgpt_subscription');
   await scope.getByRole('button', { name: 'Cambia', exact: true }).click();
   const controls = scope.getByRole('group', { name: 'OpenAI per questa proposta' });
-  await expect(controls.getByRole('checkbox', { name: /Consenti OpenAI/u })).toBeVisible();
+  await expect(controls.getByRole('checkbox', { name: /Abilita OpenAI/u })).toBeVisible();
   if (!policyAlreadyEnabled) {
-    await expect(controls.getByRole('checkbox', { name: /Consenti OpenAI/u })).not.toBeChecked();
-    await controls.getByRole('checkbox', { name: /Consenti OpenAI/u }).click();
+    await expect(controls.getByRole('checkbox', { name: /Abilita OpenAI/u })).not.toBeChecked();
+    await controls.getByRole('checkbox', { name: /Abilita OpenAI/u }).click();
   }
-  await expect(controls.getByRole('checkbox', { name: /Consenti OpenAI/u })).toBeChecked();
+  await expect(controls.getByRole('checkbox', { name: /Abilita OpenAI/u })).toBeChecked();
   await expect(controls).toContainText('Usa l’azione di proposta della funzione');
   return controls;
 }
 
 export async function finishOrdinaryChatGpt(controls: Locator, option = OPTION) {
-  await expect(controls).toContainText('Contesto preparato e redatto: 100 byte.');
-  await controls.getByRole('button', { name: 'Consenti per questo contesto' }).click();
+  await expect(controls).toContainText('Contesto preparato ed oscurato: 100 byte.');
+  const details = controls.getByRole('button', { name: 'Dettagli', exact: true });
+  await expect(details).toHaveAttribute('aria-expanded', 'false');
+  await details.click();
+  await expect(controls.getByText('Contesto preparato ed oscurato: 100 byte.', { exact: true })).toBeVisible();
+  await controls.getByRole('button', { name: 'Consenti invio a OpenAI per questo contesto' }).click();
   await controls.getByRole('button', { name: 'Avvia accesso dedicato ChatGPT' }).click();
   await expect(controls).toContainText('SYNTHETIC-ONLY');
   // The official URL is fixture data only: never open the link or authenticate.
   await controls.getByRole('button', { name: 'Ho completato: verifica accesso' }).click();
   await controls.getByRole('button', { name: 'Leggi i modelli disponibili' }).click();
   await controls.getByRole('combobox', { name: 'Modello e ragionamento correnti' }).selectOption(option);
-  await controls.getByRole('button', { name: 'Genera questa proposta' }).click();
+  await controls.getByRole('button', { name: 'Genera proposta' }).click();
 }
