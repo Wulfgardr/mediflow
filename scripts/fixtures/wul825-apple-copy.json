@@ -238,6 +238,15 @@
     ]
   },
   {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PatientClinicalOverview.swift",
+    "removed": [
+      "Misure recenti"
+    ],
+    "added": [
+      "Parametri recenti"
+    ]
+  },
+  {
     "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/RepertoriWorkspaceView.swift",
     "removed": [
       "La configurazione non prova che WHO risponda. Esegui una ricerca specifica o un controllo codice; se fallisce, verifica il servizio sull’host.",
