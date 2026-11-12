@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { types } from 'node:util';
 import { evaluateEgress } from './ai-egress-gate';
 import type { RedactionEntityType } from './redaction-contracts';
+import { localIdentifierSpans } from './redaction-identifier-spans';
 
 export type RedactionSessionEntity = Readonly<{
     type: RedactionEntityType;
@@ -203,9 +204,7 @@ export function createRedactionSession(): Readonly<{
                     spans.push({ start: match.index, end: match.index + match[1].length, type: layerOneType(token) });
                 }
             }
-            for (const match of input.text.matchAll(/[^\s"'<>()[\]{};,:]+?\.(?:pdf|docx?|xlsx?|csv|jpe?g|png|tiff?|dcm|xml|json)\b/giu)) {
-                spans.push({ start: match.index, end: match.index + match[0].length, type: 'identifier' });
-            }
+            spans.push(...localIdentifierSpans(input.text));
             for (const match of input.text.matchAll(/\b(?:luogo|indirizzo|residenza|domicilio)\s*:\s*([^\r\n;]+?)(?=\.(?:\s|$)|;|\r?\n|$)/giu)) {
                 const start = match.index + match[0].lastIndexOf(match[1]);
                 spans.push({ start, end: start + match[1].length, type: 'address' });

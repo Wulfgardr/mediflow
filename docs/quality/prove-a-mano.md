@@ -68,7 +68,7 @@ il suo schema li deve rifiutare. Un errore del runtime è **non provato**, senza
 contarlo come identificativo fermato. Tre controlli privi di identificativi
 rivelano un eventuale rifiuto indiscriminato o una perdita del testo clinico.
 
-Il [risultato del 13 novembre 2026](./cb-redaction-20261113.json) è rosso:
+Il [risultato del primo giro, 13 novembre 2026](./cb-redaction-20261113.json) è rosso:
 
 | Famiglia | Attesi | Redattore: fermati | Sfuggiti | Scheda: fermati | Sfuggiti |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -105,6 +105,53 @@ Il criterio zero falsi negativi non è raggiunto. Il dato riguarda questo corpus
 e questi pesi: non qualifica consenso, governance del broker, invio, desktop,
 canali osservati, equivalenza clinica o dati reali. Non viene scritta alcuna
 ammissione all'uscita. Il processo che riceve una chat non viene avviato.
+
+## C-B: correzioni e riserva, secondo giro
+
+Il [secondo risultato del 13 novembre](./cb-redaction-20261113-giro2.json)
+conserva il confronto prima/dopo sullo stesso runner e sugli stessi pesi.
+La [riserva](../../scripts/fixtures/cb-redaction-reserve.json) è stata scritta,
+annotata e misurata sulla base prima delle correzioni: 25 casi, 23 identificativi,
+almeno tre varianti per ognuna delle sette classi. Il digest congelato è
+`f6bf3b96f4996527acd8e4677665e1d9adf871628514bbe08329040d539c05c6`.
+
+| Serie | Identificativi | Sfuggiti prima | Sfuggiti dopo | Nella scheda prima | Dopo |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Originale | 43 | 8 | 0 | 2 | 0 |
+| Riserva | 23 | 14 | 0 | 0 | 0 |
+
+I conteggi per famiglia sono nel JSON. Le misure finali durano 58,614 s e
+32,446 s. Per la riserva aggiungere al comando già documentato
+`--corpus scripts/fixtures/cb-redaction-reserve.json`. Il negativo usa la stessa
+opzione: restano 19 sfuggiti nell'originale e uno nella riserva.
+
+Le regole in `lib/redaction-identifier-spans.ts` sono comuni alla redazione e al
+rifiuto della scheda: grammatica del CF attraverso separatori e ritorni a capo,
+email e telefoni dettati, formati di file Office/OpenDocument, contesti
+geografici nelle frasi e nelle coppie chiave/valore importate. Le chiavi cliniche
+non vengono cancellate indiscriminatamente. Il contesto funziona anche nei
+lotti concatenati della preparazione. Non ci sono dizionari di persone o luoghi,
+né valori delle fixture nel codice di produzione. I luoghi privi di indizio
+geografico dipendono ancora dal modello: il caso di riserva è rilevato dal runner
+reale e sfugge al negativo vuoto.
+
+Gli undici test nuovi hanno 9 fallimenti e 2 pass sulla base, tutti verdi dopo
+la modifica. I 148 test pertinenti, incluse le prove preesistenti, passano senza
+cambiarne le attese.
+
+**Il flag aggregato del comando resta `passed: false`, con uscita 1.** Richiede
+che tutti i controlli clinici siano conservati integralmente, condizione già
+falsa prima della modifica. Non è stato allentato. Il requisito di questo giro
+è misurato separatamente: zero identificativi sfuggiti e nessuna perdita
+clinica aggiuntiva. Con le stesse entità neurali, confrontate nelle sessioni
+prima e dopo, nessun carattere prima visibile è stato rimosso. Nell'originale
+restano 0/3 controlli integri e 0/8 parole visibili; nella riserva 1/3 controlli
+integri e 13/16 parole visibili, prima e dopo. Le parole sono contate per
+occorrenza con lettere e cifre, senza contare punteggiatura e numeri isolati.
+La conservazione integrale dei controlli rimane un limite della redazione.
+
+Questa misura qualifica le due serie sintetiche fissate. Consenso, ammissione
+del broker, canali e uso dei desktop restano fuori dalla prova.
 
 ## Ascolto della visita (WUL-828)
 

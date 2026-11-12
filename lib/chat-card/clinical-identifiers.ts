@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { RedactionSessionEntity } from '../ai-redaction-session';
+import { localIdentifierSpans } from '../redaction-identifier-spans';
 
 export const knownClinicalIdentifiersSchema = z.strictObject({
     names: z.array(z.string().min(1).max(256)).max(64),
@@ -51,7 +52,7 @@ function withinEdits(a: string, b: string, limit: number) {
 }
 
 export function clinicalIdentifierSpans(text: string, known: KnownClinicalIdentifiers): RedactionSessionEntity[] {
-    const spans: RedactionSessionEntity[] = [];
+    const spans: RedactionSessionEntity[] = [...localIdentifierSpans(text)];
     const add = (start: number, end: number) => spans.push({ start, end, text: text.slice(start, end), type: 'identifier', confidence: 1 });
     const view = normalized(text);
     if (!view.compact) throw new Error('clinical_card_denied');
