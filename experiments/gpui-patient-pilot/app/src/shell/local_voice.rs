@@ -27,19 +27,21 @@ impl LocalVoice {
         self.work.is_some()
     }
     pub(super) fn new(theme: Theme, cx: &mut Context<ClinicalApp>) -> Self {
-        Self {
-            work: None,
-            editor: cx.new(|cx| {
-                TextInput::new(
-                    "chat-voice-review",
-                    "Trascrizione da rivedere",
-                    "",
-                    true,
-                    theme,
-                    cx,
-                )
-            }),
-        }
+        let editor = cx.new(|cx| {
+            TextInput::new(
+                "chat-voice-review",
+                "Trascrizione da rivedere",
+                "",
+                true,
+                theme,
+                cx,
+            )
+        });
+        cx.subscribe(&editor, |_, _, _: &crate::text_input::InputChanged, cx| {
+            cx.notify()
+        })
+        .detach();
+        Self { work: None, editor }
     }
     pub(super) fn retire(&mut self, cx: &mut App) {
         if let Some(work) = self.work.take()
@@ -51,6 +53,58 @@ impl LocalVoice {
     }
 }
 impl ClinicalApp {
+    fn voice_drug_suggestions(&self, cx: &App) -> Vec<crate::local_voice::drug_review::Suggestion> {
+        let Some(work) = &self.chat_access.voice.work else {
+            return Vec::new();
+        };
+        if work.state != State::Review
+            || self.voice_binding().as_ref() != Some(&work.binding)
+            || !work
+                .pending
+                .lock()
+                .is_ok_and(|mut p| p.status() == RequestState::VoiceOpened)
+        {
+            return Vec::new();
+        }
+        let Some(therapies) = self.patient.therapies.ready() else {
+            return Vec::new();
+        };
+        crate::local_voice::drug_review::suggestions(
+            self.chat_access.voice.editor.read(cx).value(),
+            therapies
+                .iter()
+                .filter(|t| t.patient_id == work.binding.patient && t.deleted_at.is_none())
+                .flat_map(|t| {
+                    std::iter::once(t.drug_name.as_str()).chain(t.active_principle.as_deref())
+                }),
+        )
+    }
+
+    fn apply_voice_drug_suggestion(
+        &mut self,
+        binding: &Binding,
+        suggestion: &crate::local_voice::drug_review::Suggestion,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.voice_binding().as_ref() != Some(binding) {
+            self.chat_access.voice.retire(cx);
+            return;
+        }
+        if self.voice_drug_suggestions(cx).contains(suggestion) {
+            self.chat_access.voice.editor.update(cx, |input, cx| {
+                input.correct_word(
+                    suggestion.range.clone(),
+                    &suggestion.original,
+                    &suggestion.replacement,
+                    window,
+                    cx,
+                );
+            });
+            self.poll_chat_voice(cx);
+        }
+    }
+
     fn voice_binding(&self) -> Option<Binding> {
         let session = self.session.as_ref().filter(|s| !s.is_locked())?;
         let patient = self.patient.detail.ready()?;
@@ -162,6 +216,15 @@ impl ClinicalApp {
         self.chat_access.voice.editor.update(cx, |input, cx| {
             input.configure(self.theme, work.state != State::Review, cx)
         });
+        let ranges = self
+            .voice_drug_suggestions(cx)
+            .into_iter()
+            .map(|s| s.range)
+            .collect();
+        self.chat_access
+            .voice
+            .editor
+            .update(cx, |input, cx| input.set_suggestion_ranges(ranges, cx));
     }
     fn transfer_chat_voice(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(work) = &self.chat_access.voice.work else {
@@ -307,18 +370,46 @@ impl ClinicalApp {
                     )
                 })
                 .when(work.state == State::Review, |el| {
-                    el.child(self.chat_access.voice.editor.clone()).child(
-                        button(
-                            "chat-voice-transfer",
-                            "Ho rivisto il testo: prepara la bozza",
-                            self.theme,
-                            true,
-                            true,
+                    el.child(self.chat_access.voice.editor.clone())
+                        .children(
+                            self.voice_drug_suggestions(cx)
+                                .into_iter()
+                                .map(|suggestion| {
+                                    let binding = work.binding.clone();
+                                    button(
+                                        format!("chat-voice-drug-{}", suggestion.range.start),
+                                        format!(
+                                            "{} → {}",
+                                            suggestion.original, suggestion.replacement
+                                        ),
+                                        self.theme,
+                                        false,
+                                        true,
+                                    )
+                                    .on_click(cx.listener(
+                                        move |this, _, window, cx| {
+                                            this.apply_voice_drug_suggestion(
+                                                &binding,
+                                                &suggestion,
+                                                window,
+                                                cx,
+                                            );
+                                        },
+                                    ))
+                                }),
                         )
-                        .on_click(
-                            cx.listener(|this, _, window, cx| this.transfer_chat_voice(window, cx)),
-                        ),
-                    )
+                        .child(
+                            button(
+                                "chat-voice-transfer",
+                                "Ho rivisto il testo: prepara la bozza",
+                                self.theme,
+                                true,
+                                true,
+                            )
+                            .on_click(cx.listener(
+                                |this, _, window, cx| this.transfer_chat_voice(window, cx),
+                            )),
+                        )
                 })
                 .child(
                     button("chat-voice-discard", "Scarta", self.theme, false, true).on_click(
@@ -592,6 +683,180 @@ mod tests {
     }
     fn shows(labels: &[String], text: &str) -> bool {
         labels.iter().any(|label| label.contains(text))
+    }
+
+    #[gpui::test]
+    fn patient_drug_typos_are_offered_without_changing_the_dictation(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(crate::text_input::bind_keys);
+        let host = Host::new();
+        let text = "È stabile: Ramipli 5 mg, Metformna 500 mg e Tachipirna. Ramipli la sera.";
+        let (view, cx, _remote) = recording_app(cx, &host, Session::synthetic(State::Review, text));
+        cx.update_window_entity(&view, |app, _, cx| {
+            let therapies = [
+                ("Ramipril", "Ramipril"),
+                ("Glucophage", "Metformina"),
+                ("Tachipirina", "Paracetamolo"),
+            ];
+            app.patient.therapies = ReadLoad::Ready(
+                therapies
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, (drug, principle))| {
+                        serde_json::from_value(serde_json::json!({
+                            "id":format!("therapy-{i}"),"patientId":"patient-a","drugName":drug,
+                            "activePrinciple":principle,"dosage":"1 compressa","status":"active",
+                            "startDate":"2026-01-01","version":1
+                        }))
+                        .unwrap()
+                    })
+                    .collect(),
+            );
+            app.chat_access.voice.work.as_mut().unwrap().state = State::Finalizing;
+            app.poll_chat_voice(cx);
+            assert_eq!(
+                app.chat_access.voice.editor.read(cx).value().as_bytes(),
+                text.as_bytes()
+            );
+        });
+        let (ids, labels) = voice_page(cx, "chat-voice-drug-");
+        assert_eq!(ids.len(), 4, "missing corrections: {labels:?}");
+        for label in [
+            "Ramipli → Ramipril",
+            "Metformna → Metformina",
+            "Tachipirna → Tachipirina",
+        ] {
+            assert!(shows(&labels, label), "missing {label}: {labels:?}");
+        }
+        cx.update_window_entity(&view, |app, _, cx| {
+            app.poll_chat_voice(cx);
+            assert_eq!(
+                app.chat_access.voice.editor.read(cx).value().as_bytes(),
+                text.as_bytes()
+            );
+        });
+        cx.update_window_entity(&view, |app, _, cx| {
+            let requests = host.request_count();
+            app.poll_chat_voice(cx);
+            assert_eq!(host.request_count(), requests);
+            let ranges = app.chat_access.voice.editor.read(cx).suggestion_ranges();
+            assert_eq!(
+                ranges.iter().map(|r| &text[r.clone()]).collect::<Vec<_>>(),
+                ["Ramipli", "Metformna", "Tachipirna", "Ramipli"]
+            );
+        });
+        let target = cx
+            .debug_bounds("control-label:Metformna → Metformina")
+            .unwrap();
+        cx.simulate_click(target.center(), gpui::Modifiers::default());
+        cx.update_window_entity(&view, |app, _, cx| {
+            assert_eq!(
+                app.chat_access.voice.editor.read(cx).value(),
+                text.replacen("Metformna", "Metformina", 1)
+            );
+            assert_eq!(app.voice_drug_suggestions(cx).len(), 3);
+            assert!(app.form.is_none());
+        });
+        cx.simulate_keystrokes("cmd-z");
+        cx.update_window_entity(&view, |app, _, cx| {
+            assert_eq!(
+                app.chat_access.voice.editor.read(cx).value().as_bytes(),
+                text.as_bytes()
+            );
+            app.poll_chat_voice(cx);
+            assert_eq!(app.voice_drug_suggestions(cx).len(), 4);
+        });
+        let stale = cx.update_window_entity(&view, |app, _, cx| {
+            let suggestion = app.voice_drug_suggestions(cx).remove(0);
+            (app.voice_binding().unwrap(), suggestion)
+        });
+        cx.update_window_entity(&view, |app, window, cx| {
+            let requests = host.request_count();
+            app.apply_voice_drug_suggestion(&stale.0, &stale.1, window, cx);
+            assert_eq!(
+                app.chat_access.voice.editor.read(cx).value(),
+                text.replacen("Ramipli", "Ramipril", 1)
+            );
+            assert_eq!(host.request_count(), requests);
+        });
+        cx.simulate_keystrokes("cmd-z");
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.selected_id = Some("patient-b".into());
+            assert!(app.voice_drug_suggestions(cx).is_empty());
+            app.poll_chat_voice(cx);
+            assert!(app.chat_access.voice.work.is_none());
+            assert!(
+                app.chat_access
+                    .voice
+                    .editor
+                    .read(cx)
+                    .suggestion_ranges()
+                    .is_empty()
+            );
+            app.apply_voice_drug_suggestion(&stale.0, &stale.1, window, cx);
+            assert!(app.chat_access.voice.work.is_none());
+            assert!(app.chat_access.voice.editor.read(cx).value().is_empty());
+            assert!(
+                app.chat_access
+                    .voice
+                    .editor
+                    .read(cx)
+                    .suggestion_ranges()
+                    .is_empty()
+            );
+        });
+        let (ids, _) = voice_page(cx, "chat-voice-drug-");
+        assert!(ids.is_empty());
+    }
+
+    #[gpui::test]
+    fn drug_suggestions_require_current_patient_therapies_and_revalidate_each_click(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = Host::new();
+        let text = "Ramipli, Ramipril, controllo, lirica, Lasix e Atorvastatna.";
+        let (view, cx, _remote) = recording_app(cx, &host, Session::synthetic(State::Review, text));
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.chat_access.voice.work.as_mut().unwrap().state = State::Finalizing;
+            app.poll_chat_voice(cx);
+            assert!(app.voice_drug_suggestions(cx).is_empty());
+            let therapy = serde_json::from_value(serde_json::json!({
+                "id":"therapy-a","patientId":"patient-b","drugName":"Ramipril",
+                "dosage":"5 mg","status":"active","startDate":"2026-01-01","version":1
+            }))
+            .unwrap();
+            app.patient.therapies = ReadLoad::Ready(vec![therapy]);
+            assert!(
+                app.voice_drug_suggestions(cx).is_empty(),
+                "other patient's therapy used"
+            );
+            if let ReadLoad::Ready(therapies) = &mut app.patient.therapies {
+                therapies[0].patient_id = "patient-a".into();
+            }
+            let binding = app.voice_binding().unwrap();
+            let suggestions = app.voice_drug_suggestions(cx);
+            assert_eq!(suggestions.len(), 1);
+            assert_eq!(suggestions[0].original, "Ramipli");
+            app.chat_access.voice.editor.update(cx, |input, cx| {
+                input.set_content("Testo rivisto a mano.", cx)
+            });
+            app.apply_voice_drug_suggestion(&binding, &suggestions[0], window, cx);
+            assert_eq!(
+                app.chat_access.voice.editor.read(cx).value(),
+                "Testo rivisto a mano."
+            );
+            app.chat_access
+                .voice
+                .editor
+                .update(cx, |input, cx| input.set_content(text, cx));
+            if let ReadLoad::Ready(therapies) = &mut app.patient.therapies {
+                therapies[0].deleted_at = Some("2026-11-12".into());
+            }
+            app.apply_voice_drug_suggestion(&binding, &suggestions[0], window, cx);
+            assert_eq!(app.chat_access.voice.editor.read(cx).value(), text);
+            assert!(app.voice_drug_suggestions(cx).is_empty());
+        });
     }
     fn model_folder(name: &str) -> std::path::PathBuf {
         let root = std::env::temp_dir().join(format!(

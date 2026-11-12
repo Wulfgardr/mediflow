@@ -17,6 +17,7 @@ gpui.workspace = true
 gpui_platform.workspace = true
 serde_json.workspace = true
 unicode-segmentation = "1.12"
+unicode-normalization = "0.1.26"
 chrono = "0.4"
 iana-time-zone = "0.1.65"
 zeroize = "1.8"

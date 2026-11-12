@@ -78,6 +78,7 @@ pub struct TextInput {
     writing_ink: Option<WritingInk>,
     undo: Vec<Snapshot>,
     redo: Vec<Snapshot>,
+    suggestion_ranges: Vec<Range<usize>>,
 }
 
 impl EventEmitter<InputChanged> for TextInput {}
@@ -119,6 +120,7 @@ impl TextInput {
             writing_ink: None,
             undo: Vec::new(),
             redo: Vec::new(),
+            suggestion_ranges: Vec::new(),
         }
     }
 
@@ -174,6 +176,39 @@ impl TextInput {
         &self.content
     }
 
+    #[cfg(all(test, target_os = "macos"))]
+    pub(crate) fn suggestion_ranges(&self) -> &[Range<usize>] {
+        &self.suggestion_ranges
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn set_suggestion_ranges(
+        &mut self,
+        ranges: Vec<Range<usize>>,
+        cx: &mut Context<Self>,
+    ) {
+        if self.suggestion_ranges != ranges {
+            self.suggestion_ranges = ranges;
+            cx.notify();
+        }
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn correct_word(
+        &mut self,
+        range: Range<usize>,
+        original: &str,
+        replacement: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.marked.is_some() || self.content.get(range.clone()) != Some(original) {
+            return;
+        }
+        self.replace_text_in_range(Some(self.to_utf16(range)), replacement, window, cx);
+        self.focus(window, cx);
+    }
+
     fn display_index(&self, byte: usize) -> usize {
         if self.secret {
             masked_index(&self.content, byte)
@@ -202,6 +237,7 @@ impl TextInput {
         self.scroll.set_offset(point(px(0.), px(0.)));
         self.undo.clear();
         self.redo.clear();
+        self.suggestion_ranges.clear();
         cx.notify();
     }
 
@@ -228,6 +264,7 @@ impl TextInput {
     }
 
     fn changed(&mut self, window: &Window, cx: &mut Context<Self>) {
+        self.suggestion_ranges.clear();
         self.autoscroll = true;
         window.notify_text_input_changed(&self.focus);
         // Secret controls are read explicitly at submission, never broadcast.
@@ -817,13 +854,18 @@ impl Render for TextInput {
         } else {
             self.content.clone()
         };
-        let highlights = input_highlights(
+        let highlights = input_highlights_with_suggestions(
             &display,
             self.display_index(self.range.start)..self.display_index(self.range.end),
             self.marked
                 .clone()
                 .map(|r| self.display_index(r.start)..self.display_index(r.end)),
             theme,
+            if self.secret {
+                &[]
+            } else {
+                &self.suggestion_ranges
+            },
         );
         let minimum_height = px(if self.multiline {
             (theme.role(TypeRole::Prose).line_height * 3. + 28.).max(160.)
@@ -1051,11 +1093,22 @@ fn committed_replacement_range(
 
 // StyledText requires ordered, disjoint byte ranges. IME selection may intersect
 // the preedit, so split at their boundaries and combine styles in the intersection.
+#[cfg(test)]
 fn input_highlights(
     text: &str,
     selection: Range<usize>,
     marked: Option<Range<usize>>,
     theme: Theme,
+) -> Vec<(Range<usize>, HighlightStyle)> {
+    input_highlights_with_suggestions(text, selection, marked, theme, &[])
+}
+
+fn input_highlights_with_suggestions(
+    text: &str,
+    selection: Range<usize>,
+    marked: Option<Range<usize>>,
+    theme: Theme,
+    suggestions: &[Range<usize>],
 ) -> Vec<(Range<usize>, HighlightStyle)> {
     let clamp = |range: Range<usize>| {
         let start = floor_boundary(text, range.start);
@@ -1068,6 +1121,10 @@ fn input_highlights(
     if let Some(range) = &marked {
         boundaries.extend([range.start, range.end]);
     }
+    for range in suggestions {
+        let range = clamp(range.clone());
+        boundaries.extend([range.start, range.end]);
+    }
     boundaries.sort_unstable();
     boundaries.dedup();
     boundaries
@@ -1078,17 +1135,20 @@ fn input_highlights(
             let composing = marked
                 .as_ref()
                 .is_some_and(|marked| marked.start < range.end && marked.end > range.start);
-            if !selected && !composing {
+            let suggested = suggestions
+                .iter()
+                .any(|s| s.start < range.end && s.end > range.start);
+            if !selected && !composing && !suggested {
                 return None;
             }
             Some((
                 range,
                 HighlightStyle {
                     background_color: selected.then_some(theme.selected),
-                    underline: composing.then_some(UnderlineStyle {
+                    underline: (composing || suggested).then_some(UnderlineStyle {
                         thickness: px(1.),
-                        color: Some(theme.fresh),
-                        wavy: false,
+                        color: Some(if composing { theme.fresh } else { theme.pencil }),
+                        wavy: suggested && !composing,
                     }),
                     ..Default::default()
                 },
@@ -1310,6 +1370,32 @@ mod tests {
             runs.iter().map(|(range, _)| range.len()).sum::<usize>(),
             text.len()
         );
+    }
+
+    #[test]
+    fn suggested_words_are_underlined_and_keep_selection_and_ime_styles() {
+        let text = "È: Ramipli.";
+        for dark in [false, true] {
+            let theme = Theme::for_dark(dark);
+            let runs = input_highlights_with_suggestions(
+                text,
+                6..8,
+                Some(8..10),
+                theme,
+                std::slice::from_ref(&(4..11)),
+            );
+            assert_eq!(
+                runs.iter().map(|(r, _)| r.clone()).collect::<Vec<_>>(),
+                [4..6, 6..8, 8..10, 10..11]
+            );
+            assert!(runs[0].1.underline.as_ref().unwrap().wavy);
+            assert_eq!(runs[1].1.background_color, Some(theme.selected));
+            assert!(!runs[2].1.underline.as_ref().unwrap().wavy);
+            assert_eq!(
+                runs[2].1.underline.as_ref().unwrap().color,
+                Some(theme.fresh)
+            );
+        }
     }
 }
 
