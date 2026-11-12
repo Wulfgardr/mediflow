@@ -64,7 +64,7 @@ final class NativeAIConfigurationTests: XCTestCase {
         XCTAssertEqual(previews, 1); XCTAssertNil(applied); XCTAssertEqual(model.preview?.command.commandId, command.commandId)
         model.confirm(); await settle(model)
         XCTAssertEqual(applied, command); XCTAssertEqual(reads, 2); XCTAssertEqual(model.snapshot, updated); XCTAssertNil(model.preview)
-        XCTAssertEqual(model.message, "Preferenze salvate e rilette dall’host.")
+        XCTAssertEqual(model.message, "Preferenze salvate e rilette dall’home-base.")
     }
     func testLockDiscardsLateReadEvenWhenTransportIgnoresCancellation() async throws {
         let value = try snapshot()

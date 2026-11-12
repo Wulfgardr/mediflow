@@ -111,7 +111,7 @@ final class PatientSummaryPresentationTests: XCTestCase {
 
     func testChartSummaryContainsEachExternalCategoryOnce() {
         let categories = PatientChartSummaryCategory.allCases
-        XCTAssertEqual(categories.map(\.title), ["Terapie attive", "Misure", "Diario", "Scale"])
+        XCTAssertEqual(categories.map(\.title), ["Terapie attive", "Parametri", "Diario", "Scale"])
         XCTAssertEqual(Set(categories.map(\.id)).count, 4)
         XCTAssertFalse(categories.contains { $0.destination == .overview })
     }
@@ -123,7 +123,7 @@ final class PatientSummaryPresentationTests: XCTestCase {
 
     func testChartSummaryAccessibleNamesPreserveCountBounds() {
         XCTAssertEqual(PatientChartSummaryCategory.therapies.accessibilityLabel(count: .exact(1)), "Apri Terapie attive, 1")
-        XCTAssertEqual(PatientChartSummaryCategory.measures.accessibilityLabel(count: .init(count: 200, atCap: true)), "Apri Misure, 200+")
+        XCTAssertEqual(PatientChartSummaryCategory.measures.accessibilityLabel(count: .init(count: 200, atCap: true)), "Apri Parametri, 200+")
         XCTAssertEqual(PatientChartSummaryCategory.scales.accessibilityLabel(count: .exact(0)), "Apri Scale, 0")
     }
 

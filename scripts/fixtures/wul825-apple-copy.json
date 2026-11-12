@@ -1,0 +1,374 @@
+[
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/ClinicalWorkspaceViews.swift",
+    "removed": [
+      "Dati sintetici di esempio · Nessuna lettura dall’host",
+      "Impossibile verificare che cosa offre l'host: \\(error.localizedDescription)",
+      "L'host non offre ancora il diario di tutti i pazienti. Aggiorna MediFlow sull'host.",
+      "L'host non offre ancora l'agenda. Aggiorna MediFlow sull'host.",
+      "L'host non offre ancora l'archivio documenti. Aggiorna MediFlow sull'host, poi ripeti il pairing.",
+      "L'host non offre ancora la bozza visita. Aggiorna MediFlow sull'host, poi ripeti il pairing.",
+      "L'host non offre ancora questa sezione. Aggiorna MediFlow sull'host.",
+      "L'host non offre il caricamento documenti. Aggiorna MediFlow sull'host, poi ripeti il pairing.",
+      "L'host non offre la gestione ambulatori. Aggiorna MediFlow sull'host, poi ripeti il pairing.",
+      "Verifica dell'host in corso."
+    ],
+    "added": [
+      "Dati sintetici di esempio · Nessuna lettura dall’home-base",
+      "Impossibile verificare che cosa offre l'home-base: \\(error.localizedDescription)",
+      "L'home-base non offre ancora il diario di tutti i pazienti. Aggiorna MediFlow sull'home-base.",
+      "L'home-base non offre ancora l'agenda. Aggiorna MediFlow sull'home-base.",
+      "L'home-base non offre ancora l'archivio documenti. Aggiorna MediFlow sull'home-base, poi ripeti l’abbinamento.",
+      "L'home-base non offre ancora la bozza visita. Aggiorna MediFlow sull'home-base, poi ripeti l’abbinamento.",
+      "L'home-base non offre ancora questa sezione. Aggiorna MediFlow sull'home-base.",
+      "L'home-base non offre il caricamento documenti. Aggiorna MediFlow sull'home-base, poi ripeti l’abbinamento.",
+      "L'home-base non offre la gestione ambulatori. Aggiorna MediFlow sull'home-base, poi ripeti l’abbinamento.",
+      "Verifica dell'home-base in corso."
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/HostAdminWorkspaceView.swift",
+    "removed": [
+      "Backup e ripristino, riparazione database, correzione orfani, migrazione many-to-many, import repertori AIFA ed esenzioni, conversazioni AI e Smart Import esistono sull'host e si usano da localhost. Sono operazioni che modificano o esportano l'archivio clinico: qui arrivano con conferma esplicita e prova di esito, non prima.",
+      "Collega l'home-base per leggere lo stato dell'host.",
+      "L'host limita questa lettura a 200 eventi: i conteggi qui sopra descrivono gli ultimi 200, non l'intero periodo.",
+      "Non supportata su questo host",
+      "Runtime AI",
+      "Supportata su questo host",
+      "modelli AI"
+    ],
+    "added": [
+      "Backup e ripristino, riparazione database, correzione orfani, migrazione many-to-many, import repertori AIFA ed esenzioni, conversazioni IA e Smart Import esistono sull'home-base e si usano da localhome-base. Sono operazioni che modificano o esportano l'archivio clinico: qui arrivano con conferma esplicita e prova di esito, non prima.",
+      "Collega l'home-base per leggere lo stato dell'home-base.",
+      "L'home-base limita questa lettura a 200 eventi: i conteggi qui sopra descrivono gli ultimi 200, non l'intero periodo.",
+      "Non supportata su questo home-base",
+      "Runtime IA",
+      "Supportata su questo home-base",
+      "modelli IA"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/NativeAIConfigurationView.swift",
+    "removed": [
+      "Associazione da verificare sull’host.",
+      "Collega l’host e accedi con il PIN operatore.",
+      "Conferma configurazione dell’host",
+      "Conferma e salva sull’host",
+      "Configurazione letta dall’host.",
+      "L’amministratore deve autorizzare questo operatore e questo Mac sul computer host.",
+      "L’host è cambiato dopo il salvataggio. Mostro la configurazione riletta.",
+      "Preferenze per tutti gli operatori dell’host. La disponibilità di un modello non prova che l’inferenza sia pronta.",
+      "Preferenze salvate e rilette dall’host.",
+      "Questo host non espone ancora la configurazione AI nativa.",
+      "Rileggi preferenze dall’host",
+      "Sessione o pairing non più validi. Accedi nuovamente.",
+      "Valore configurato sull’host",
+      "Valore host",
+      "Verifica sull’host…"
+    ],
+    "added": [
+      "Associazione da verificare sull’home-base.",
+      "Collega l’home-base e accedi con il PIN operatore.",
+      "Conferma configurazione dell’home-base",
+      "Conferma e salva sull’home-base",
+      "Configurazione letta dall’home-base.",
+      "L’amministratore deve autorizzare questo operatore e questo Mac sull’home-base.",
+      "L’home-base è cambiato dopo il salvataggio. Mostro la configurazione riletta.",
+      "Preferenze per tutti gli operatori dell’home-base. La disponibilità di un modello non prova che l’inferenza sia pronta.",
+      "Preferenze salvate e rilette dall’home-base.",
+      "Questo home-base non espone ancora la configurazione IA nativa.",
+      "Rileggi preferenze dall’home-base",
+      "Sessione o abbinamento non più validi. Accedi nuovamente.",
+      "Valore configurato sull’home-base",
+      "Valore home-base",
+      "Verifica sull’home-base…"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/NativeFabricModel.swift",
+    "removed": [
+      "Chiusura non confermata. Verifica la chiusura prima di avviare un’altra proposta. Nessuna modifica alla cartella.",
+      "Elaborazione locale sull’host…",
+      "Fonti pronte. Genera sul Mac con il modello configurato dall’host.",
+      "Host non raggiungibile.",
+      "Nessuna alternativa avviata; nessuna modifica alla cartella.",
+      "Operazione chiusa. Nessuna modifica alla cartella.",
+      "Proposta locale da verificare sulle fonti. Nessuna modifica alla cartella.",
+      "Usa la funzione locale già configurata sull’host.",
+      "Verifica delle fonti e della funzione locale sull’host…"
+    ],
+    "added": [
+      "Chiusura non confermata. Verifica la chiusura prima di avviare un’altra proposta.",
+      "Elaborazione locale sull’home-base…",
+      "Fonti pronte. Genera sul Mac con il modello configurato dall’home-base.",
+      "Home-base non raggiungibile.",
+      "Nessuna alternativa avviata.",
+      "Proposta locale da verificare sulle fonti.",
+      "Usa la funzione locale già configurata sull’home-base.",
+      "Verifica delle fonti e della funzione locale sull’home-base…"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/NativeFabricViews.swift",
+    "removed": [
+      "Chiudi proposta",
+      "Configurazione dell’host",
+      "Da verificare sulle fonti. Nessuna applicazione automatica né salvataggio clinico da questa vista.",
+      "Genera sul Mac",
+      "Preferenza salvata sull’host",
+      "Prepara sul Mac",
+      "Verifica sull’host…",
+      "\\(selection.model) · \\(selection.provider) · locale sull’host"
+    ],
+    "added": [
+      "Configurazione dell’home-base",
+      "Genera proposta",
+      "La cartella non cambia.",
+      "Nuova proposta",
+      "Preferenza salvata sull’home-base",
+      "Verifica sull’home-base…",
+      "\\(selection.model) · \\(selection.provider) · locale sull’home-base"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/NativeOrdinaryModel.swift",
+    "removed": [
+      "Operazione chiusa. Nessuna modifica alla cartella.",
+      "Operazione non completata (HTTP \\(status)): \\(reason). Operazione chiusa; nessuna modifica alla cartella.",
+      "Operazione non completata (\\(failure.code.rawValue)): \\(reason). Operazione chiusa; nessuna modifica alla cartella.",
+      "Operazione non completata: \\(reason). Operazione chiusa; nessuna modifica alla cartella.",
+      "Prepara una proposta da rivedere: nessuna modifica alla cartella.",
+      "host non raggiungibile",
+      "sessione o pairing non più validi"
+    ],
+    "added": [
+      "Operazione chiusa.",
+      "Operazione non completata (HTTP \\(status)): \\(reason). Operazione chiusa.",
+      "Operazione non completata (\\(failure.code.rawValue)): \\(reason). Operazione chiusa.",
+      "Operazione non completata: \\(reason). Operazione chiusa.",
+      "Prepara una proposta da rivedere.",
+      "home-base non raggiungibile",
+      "sessione o abbinamento non più validi"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/NativeOrdinaryViews.swift",
+    "removed": [
+      "Autorizzi l’invio a OpenAI dei contenuti preparati e oscurati per questa sola proposta. Si applicano le condizioni del servizio ChatGPT; la proposta non modifica la cartella.",
+      "Da verificare sulle fonti. Nessuna applicazione automatica né salvataggio clinico da questa vista.",
+      "Dettagli dell’invio",
+      "Funzione: \\(function.title). L’autorizzazione scade con questa operazione; un nuovo contenuto richiede un nuovo consenso.",
+      "Il documento deve essere estraibile localmente dall’host. File non supportati o cifrati senza una lettura autorizzata non vengono inviati.",
+      "Locale sull’host",
+      "Prepara proposta",
+      "Prepara una nuova proposta",
+      "Quadro attuale"
+    ],
+    "added": [
+      "Autorizzi l’invio a OpenAI dei contenuti preparati e oscurati per questa sola proposta. Si applicano le condizioni del servizio ChatGPT.",
+      "Il documento deve essere estraibile localmente dall’home-base. File non supportati o cifrati senza una lettura autorizzata non vengono inviati.",
+      "La cartella non cambia.",
+      "Locale sull’home-base",
+      "Nuova proposta",
+      "Stato attuale"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientClinicalSections.swift",
+    "removed": [
+      "LOINC + UCUM manuali. Nessun AI plane remoto, OCR o coda offline.",
+      "Misure",
+      "Solo campi manuali non-AI. Nessuna coda offline o import documentale."
+    ],
+    "added": [
+      "LOINC + UCUM manuali. Nessun IA plane remoto, OCR o coda offline.",
+      "Parametri",
+      "Solo campi manuali non-IA. Nessuna coda offline o import documentale."
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientDetailSection.swift",
+    "removed": [
+      "Conosco solo l’anno (stima)",
+      "Persona di riferimento",
+      "Sintesi AI",
+      "Sintesi con IA"
+    ],
+    "added": [
+      "Conosco solo l’anno",
+      "Quadro paziente"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientTherapiesSection.swift",
+    "removed": [
+      "Solo campi non-AI. Nessuna prescrizione SISS nativa o coda offline."
+    ],
+    "added": [
+      "Solo campi non-IA. Nessuna prescrizione SISS nativa o coda offline."
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorklistView.swift",
+    "removed": [
+      "Conosco solo l’anno (stima)"
+    ],
+    "added": [
+      "Conosco solo l’anno"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceModel.swift",
+    "removed": [
+      "Fixture sintetica senza sessione host. Apri Visita senza rete per gli appunti già conservati.",
+      "Solo dati sintetici: host e autenticazione dispositivo simulati. Nessuna prova del Keychain fisico."
+    ],
+    "added": [
+      "Fixture sintetica senza sessione home-base. Apri Visita senza rete per gli appunti già conservati.",
+      "Solo dati sintetici: home-base e autenticazione dispositivo simulati. Nessuna prova del Keychain fisico."
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PatientChartPresentation.swift",
+    "removed": [
+      "Misure"
+    ],
+    "added": [
+      "Parametri"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/RepertoriWorkspaceView.swift",
+    "removed": [
+      "La configurazione non prova che WHO risponda. Esegui una ricerca specifica o un controllo codice; se fallisce, verifica il servizio sull’host.",
+      "Nessuna voce corrisponde alla ricerca. Se il repertorio non è mai stato importato sull’host, l’elenco è vuoto per qualunque termine.",
+      "WHO disabilitato sull’host"
+    ],
+    "added": [
+      "La configurazione non prova che WHO risponda. Esegui una ricerca specifica o un controllo codice; se fallisce, verifica il servizio sull’home-base.",
+      "Nessuna voce corrisponde alla ricerca. Se il repertorio non è mai stato importato sull’home-base, l’elenco è vuoto per qualunque termine.",
+      "WHO disabilitato sull’home-base"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/SettingsWorkspaceView.swift",
+    "removed": [
+      "Collega l'home-base e accedi con il PIN operatore per consultare le funzioni AI.",
+      "Funzioni AI",
+      "I dati sono cambiati sull'host. La lista è stata aggiornata.",
+      "Patient Insight",
+      "Piano AI",
+      "Preferenze AI",
+      "Stato dei servizi AI in sola lettura."
+    ],
+    "added": [
+      "Collega l'home-base e accedi con il PIN operatore per consultare le funzioni IA.",
+      "Funzioni IA",
+      "I dati sono cambiati sull'home-base. La lista è stata aggiornata.",
+      "Piano IA",
+      "Preferenze IA",
+      "Quadro paziente",
+      "Stato dei servizi IA in sola lettura."
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/AppleRolloutModel.swift",
+    "removed": [
+      "Estensione di `/api/v1/network/*` con primi write path non-AI e stessa semantica di audit/conflitto del core.",
+      "Il backend locale e `/api/v1/network/*` read-only esistono gia. Pairing, HTTPS LAN e discovery Bonjour hanno smoke ripetibile; il bundle packaged supervisiona WebRuntime e proxy TLS.",
+      "La app macOS espone il readiness del bootstrap locale e il bundle packaged supervisiona backend e proxy TLS; Ollama resta diagnostico, mentre Docker è fuori scope e non app-managed. L'AI mobile resta separata dal data plane clinico.",
+      "La prima wave mobile resta non-AI e paired-first.",
+      "Nessun comando AI remoto in questa wave",
+      "Pairing harden su LAN fidata",
+      "Parita Apple-wide non-AI",
+      "Read/write non-AI dipendono da boundary paired",
+      "Runtime locale e AI plane",
+      "macOS packaged runtime host"
+    ],
+    "added": [
+      "Abbinamento harden su LAN fidata",
+      "Estensione di `/api/v1/network/*` con primi write path non-IA e stessa semantica di audit/conflitto del core.",
+      "Il backend locale e `/api/v1/network/*` read-only esistono gia. Abbinamento, HTTPS LAN e discovery Bonjour hanno smoke ripetibile; il bundle packaged supervisiona WebRuntime e proxy TLS.",
+      "La app macOS espone il readiness del bootstrap locale e il bundle packaged supervisiona backend e proxy TLS; Ollama resta diagnostico, mentre Docker è fuori scope e non app-managed. L'IA mobile resta separata dal data plane clinico.",
+      "La prima wave mobile resta non-IA e paired-first.",
+      "Nessun comando IA remoto in questa wave",
+      "Parita Apple-wide non-IA",
+      "Read/write non-IA dipendono da boundary paired",
+      "Runtime locale e IA plane",
+      "macOS packaged runtime home-base"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/HomeBaseHostAdminClient.swift",
+    "removed": [
+      "L'host riserva questa lettura alla console web. Un client nativo abbinato non vi accede, nemmeno con un account amministratore: si consulta da localhost.",
+      "La sessione operatore è scaduta. Accedi di nuovo per gestire l'host."
+    ],
+    "added": [
+      "L'home-base riserva questa lettura alla console web. Un client nativo abbinato non vi accede, nemmeno con un account amministratore: si consulta da localhome-base.",
+      "La sessione operatore è scaduta. Accedi di nuovo per gestire l'home-base."
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/HomeBaseOptionalServicesProbe.swift",
+    "removed": [
+      "Ollama (AI locale)"
+    ],
+    "added": [
+      "Ollama (IA locale)"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/HomeBaseRuntimeStatus.swift",
+    "removed": [
+      "Bootstrap locale registrato. Il bundle packaged può gestire WebRuntime e proxy TLS; i provider AI opzionali restano diagnostici."
+    ],
+    "added": [
+      "Bootstrap locale registrato. Il bundle packaged può gestire WebRuntime e proxy TLS; i provider IA opzionali restano diagnostici."
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/HomeBaseWHOModels.swift",
+    "removed": [
+      "Consultazione non autorizzata per questo dispositivo o ambulatorio. Verifica accesso e ambulatorio con il responsabile dell’host.",
+      "La modalità home-base non è attiva sull’host. È necessario l’intervento del responsabile dell’host.",
+      "La sessione o il pairing non sono più validi. Ricollega l’home-base e accedi nuovamente prima di riprovare.",
+      "WHO non è disponibile tramite questo datasource. Usa una connessione paired all’home-base configurata dal responsabile dell’host. Nessun repertorio alternativo viene usato."
+    ],
+    "added": [
+      "Consultazione non autorizzata per questo dispositivo o ambulatorio. Verifica accesso e ambulatorio con il responsabile dell’home-base.",
+      "La modalità home-base non è attiva sull’home-base. È necessario l’intervento del responsabile dell’home-base.",
+      "La sessione o il abbinamento non sono più validi. Ricollega l’home-base e accedi nuovamente prima di riprovare.",
+      "WHO non è disponibile tramite questo datasource. Usa una connessione paired all’home-base configurata dal responsabile dell’home-base. Nessun repertorio alternativo viene usato."
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/MobileVisitOnlineAdapter.swift",
+    "removed": [
+      "Funzioni intelligenti: richiedono l’host online"
+    ],
+    "added": [
+      "Funzioni intelligenti: richiedono l’home-base online"
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/NativeFabricDTO.swift",
+    "removed": [
+      "Esecuzione locale non disponibile sull’host.",
+      "Funzione disabilitata sull’host."
+    ],
+    "added": [
+      "Esecuzione locale non disponibile sull’home-base.",
+      "Funzione disabilitata sull’home-base."
+    ]
+  },
+  {
+    "file": "native/MediFlowMac/Sources/MediFlowAppleShared/NativeOrdinaryDTO.swift",
+    "removed": [
+      "sessione o pairing non più validi"
+    ],
+    "added": [
+      "sessione o abbinamento non più validi"
+    ]
+  }
+]

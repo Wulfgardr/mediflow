@@ -50,7 +50,7 @@ public enum HomeBaseOptionalServicesProbe {
         HomeBaseOptionalServicesSnapshot(services: [
             HomeBaseOptionalServiceStatus(
                 id: "optional-ollama",
-                title: "Ollama (AI locale)",
+                title: "Ollama (IA locale)",
                 detail: detail(
                     reachable: ollamaReachable,
                     ready: "Endpoint 127.0.0.1:11434 raggiungibile",
