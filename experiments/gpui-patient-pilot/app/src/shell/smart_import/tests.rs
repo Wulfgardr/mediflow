@@ -427,10 +427,18 @@ fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppCon
     let (bench, cx) = bench(cx);
     for (name, unavailable, message) in [
         ("response-function-disabled", true, "spento sull’home-base"),
-        ("response-kill-switch-disabled", true, "spento sull’home-base"),
+        (
+            "response-kill-switch-disabled",
+            true,
+            "spento sull’home-base",
+        ),
         ("response-provider-unready", true, "Modelli locali"),
         ("response-provider-failed", false, "non ha risposto"),
-        ("response-proposal-invalid", false, "controlli dell’home-base"),
+        (
+            "response-proposal-invalid",
+            false,
+            "controlli dell’home-base",
+        ),
         (
             "response-preview-replayed",
             false,

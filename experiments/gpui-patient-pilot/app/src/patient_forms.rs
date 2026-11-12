@@ -73,11 +73,7 @@ pub fn fields(original: Option<&PatientDetail>) -> Vec<FieldSpec> {
         ),
         ("clinical-workspace-patient-address", "Indirizzo", true),
         ("clinical-workspace-patient-phone", "Telefono", false),
-        (
-            "clinical-workspace-patient-caregiver",
-            "Caregiver",
-            true,
-        ),
+        ("clinical-workspace-patient-caregiver", "Caregiver", true),
         (
             "clinical-workspace-patient-adi",
             "Assistenza domiciliare integrata",

@@ -397,7 +397,8 @@ impl ClinicalApp {
                 area.busy = false;
                 match result {
                     Ok(RetentionOutcome::Done(_)) => {
-                        area.message = Some(("Registrato. Stato riletto dall’home-base.".into(), false));
+                        area.message =
+                            Some(("Registrato. Stato riletto dall’home-base.".into(), false));
                         area.hold_document
                             .update(cx, |input, cx| input.set_content("", cx));
                     }

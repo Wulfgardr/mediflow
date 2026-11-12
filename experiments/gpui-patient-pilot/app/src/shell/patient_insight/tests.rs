@@ -278,7 +278,10 @@ fn review_notice_is_painted_above_the_proposal_lines(cx: &mut gpui::TestAppConte
         .into_iter()
         .map(|ink| ink.label)
         .collect();
-    println!("WUL825_COPY_SNAPSHOT_BEGIN\n{}\nWUL825_COPY_SNAPSHOT_END", labels.join("\n"));
+    println!(
+        "WUL825_COPY_SNAPSHOT_BEGIN\n{}\nWUL825_COPY_SNAPSHOT_END",
+        labels.join("\n")
+    );
     let position = |text: &str| labels.iter().position(|label| label == text);
     let notice = position(mediflow_runtime_client::PATIENT_INSIGHT_REVIEW_NOTICE)
         .unwrap_or_else(|| panic!("riga di controllo non dipinta: {labels:#?}"));
@@ -291,7 +294,13 @@ fn review_notice_is_painted_above_the_proposal_lines(cx: &mut gpui::TestAppConte
     );
     let heading = position("Proposta da rivedere.").unwrap();
     assert!(position("Stato attuale").is_some(), "{labels:#?}");
-    assert!(labels.iter().all(|label| !label.contains("scheda resta invariata") && !label.contains("cartella non cambia")), "{labels:#?}");
+    assert!(
+        labels
+            .iter()
+            .all(|label| !label.contains("scheda resta invariata")
+                && !label.contains("cartella non cambia")),
+        "{labels:#?}"
+    );
     let sentence = position(&first).unwrap_or_else(|| panic!("prima riga: {labels:#?}"));
     assert!(heading < notice && notice < sentence, "{labels:#?}");
     assert!(
