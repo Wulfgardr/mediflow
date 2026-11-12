@@ -75,7 +75,7 @@ pub fn fields(original: Option<&PatientDetail>) -> Vec<FieldSpec> {
         ("clinical-workspace-patient-phone", "Telefono", false),
         (
             "clinical-workspace-patient-caregiver",
-            "Persona di riferimento",
+            "Caregiver",
             true,
         ),
         (
@@ -124,7 +124,7 @@ pub fn fields(original: Option<&PatientDetail>) -> Vec<FieldSpec> {
                     9 => &[
                         ("unknown", "Non conosciuta"),
                         ("exact", "Data completa"),
-                        ("estimated", "Conosco solo l’anno (stima)"),
+                        ("estimated", "Conosco solo l’anno"),
                     ],
                     _ => &[],
                 },

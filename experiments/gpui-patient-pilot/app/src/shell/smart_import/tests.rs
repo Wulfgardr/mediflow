@@ -377,7 +377,7 @@ fn kill_switch_off_is_unavailable_without_generation(cx: &mut gpui::TestAppConte
     cx.run_until_parked();
     assert!(bench.phase(
         cx,
-        |phase| matches!(phase, GenerationPhase::Unavailable(m) if m.contains("spento sull’host"))
+        |phase| matches!(phase, GenerationPhase::Unavailable(m) if m.contains("spento sull’home-base"))
     ));
     assert!(bench.generation_routes().is_empty());
     bench.assert_no_clinical_write();
@@ -393,7 +393,7 @@ fn host_closed_is_unavailable_without_any_call(cx: &mut gpui::TestAppContext) {
     cx.run_until_parked();
     assert!(bench.phase(
         cx,
-        |phase| matches!(phase, GenerationPhase::Unavailable(m) if m.contains("Host locale chiuso"))
+        |phase| matches!(phase, GenerationPhase::Unavailable(m) if m.contains("Accesso locale chiuso"))
     ));
     assert!(bench.host.bodies(SETTING).is_empty());
     assert!(bench.generation_routes().is_empty());
@@ -421,20 +421,20 @@ fn chart_without_sources_is_unavailable_without_generation(cx: &mut gpui::TestAp
     assert!(bench.generation_routes().is_empty());
 }
 
-/// Dinieghi e fallimenti reali dell'host: messaggio leggibile, nessuna proposta.
+/// Dinieghi e fallimenti reali dell'home-base: messaggio leggibile, nessuna proposta.
 #[gpui::test]
 fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppContext) {
     let (bench, cx) = bench(cx);
     for (name, unavailable, message) in [
-        ("response-function-disabled", true, "spento sull’host"),
-        ("response-kill-switch-disabled", true, "spento sull’host"),
+        ("response-function-disabled", true, "spento sull’home-base"),
+        ("response-kill-switch-disabled", true, "spento sull’home-base"),
         ("response-provider-unready", true, "Modelli locali"),
         ("response-provider-failed", false, "non ha risposto"),
-        ("response-proposal-invalid", false, "controlli dell’host"),
+        ("response-proposal-invalid", false, "controlli dell’home-base"),
         (
             "response-preview-replayed",
             false,
-            "selezione sull’host è cambiata",
+            "selezione sull’home-base è cambiata",
         ),
     ] {
         prepare(&bench, cx);
@@ -462,7 +462,7 @@ fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppCon
     cx.run_until_parked();
     assert!(bench.phase(
         cx,
-        |phase| matches!(phase, GenerationPhase::Error(m) if m == "La selezione sull’host è cambiata durante la richiesta. Riprova.")
+        |phase| matches!(phase, GenerationPhase::Error(m) if m == "La selezione sull’home-base è cambiata durante la richiesta. Riprova.")
     ));
     assert_eq!(bench.host.bodies(PREVIEW).len(), previews);
     bench.assert_no_clinical_write();
@@ -487,7 +487,7 @@ fn altered_or_foreign_response_is_an_error_not_a_proposal(cx: &mut gpui::TestApp
         assert!(answer.join().unwrap());
         assert!(bench.phase(
             cx,
-            |phase| matches!(phase, GenerationPhase::Error(m) if m == "La risposta dell’host non ha superato i controlli dell’app.")
+            |phase| matches!(phase, GenerationPhase::Error(m) if m == "La risposta dell’home-base non ha superato i controlli dell’app.")
         ));
     }
     bench.assert_no_clinical_write();
