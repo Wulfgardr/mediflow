@@ -317,6 +317,10 @@ impl ClinicalApp {
                     cx.notify();
                     return;
                 }
+                this.area = Area::Patients;
+                this.directory = false;
+                this.show_other = false;
+                this.focus_after_render = true;
                 this.chat_area(function).admitted();
                 match function {
                     Function::Icd => {
