@@ -1377,7 +1377,13 @@ mod tests {
         let text = "È: Ramipli.";
         for dark in [false, true] {
             let theme = Theme::for_dark(dark);
-            let runs = input_highlights_with_suggestions(text, 6..8, Some(8..10), theme, &[4..11]);
+            let runs = input_highlights_with_suggestions(
+                text,
+                6..8,
+                Some(8..10),
+                theme,
+                std::slice::from_ref(&(4..11)),
+            );
             assert_eq!(
                 runs.iter().map(|(r, _)| r.clone()).collect::<Vec<_>>(),
                 [4..6, 6..8, 8..10, 10..11]
