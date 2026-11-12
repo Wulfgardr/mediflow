@@ -101,6 +101,30 @@ impl RuntimeSession {
             JSON_LIMIT,
             Some(intent),
         )?;
+        if value["patientId"] != patient
+            || value["ambulatoryId"] != scope
+            || value["contractVersion"] != 1
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        let groups = value["groups"]
+            .as_array()
+            .ok_or(RuntimeError::InvalidResponse)?;
+        let standalone = value["standaloneLoops"]
+            .as_array()
+            .ok_or(RuntimeError::InvalidResponse)?;
+        let mut count = standalone.len();
+        for group in groups {
+            count = count.saturating_add(
+                group["loops"]
+                    .as_array()
+                    .ok_or(RuntimeError::InvalidResponse)?
+                    .len(),
+            );
+        }
+        if groups.len() > 1024 || count > 2048 {
+            return Err(RuntimeError::TooLarge);
+        }
         let decrypt_row = |value: &mut Value| -> Result<()> {
             if !self
                 .decrypt_fields(value, &[("label", true, false)])?
