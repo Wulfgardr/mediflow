@@ -241,6 +241,9 @@ impl ClinicalApp {
         let Some(access) = self.local_host.access() else {
             return;
         };
+        if matches!(self.patients, Load::Idle) {
+            self.load_patients(cx);
+        }
         let area = &mut self.local_host.retention;
         area.busy = true;
         area.command = None;
@@ -758,6 +761,66 @@ mod tests {
     }
     fn archived_patient() -> Value {
         json!([{"id":"patient-a","firstName":"Amina","lastName":"Sintetica","birthDate":"1940-01-01","taxCode":"SYNTHETIC","version":4,"isArchived":true,"deletedAt":null}])
+    }
+
+    #[gpui::test]
+    fn wul839_retention_search_loads_people_without_visiting_the_directory(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let mut empty = overview(0, json!({}));
+        empty["review"] = json!([]);
+        host.plan(&format!("GET {ROUTE}"))
+            .send((200, empty))
+            .unwrap();
+        host.plan("GET /api/v1/network/patients")
+            .send((
+                200,
+                json!([
+                    {"id":"patient-a","firstName":"Amina","lastName":"Sintetica","birthDate":null,
+                     "taxCode":"SYNTHETIC","version":1}
+                ]),
+            ))
+            .unwrap();
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.area = Area::Settings;
+            app.settings_page = SettingsPage::Retention;
+            app.local_host.authority = Authority::Open(access);
+            app.read_retention(cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            app.local_host
+                .retention
+                .hold_patient
+                .update(cx, |input, cx| input.set_content("Sintetica", cx));
+            cx.notify();
+        });
+        let commands = rendered_command::button_ids(|| {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            })
+        });
+        assert!(
+            commands.iter().any(|id| id == "retention-hold-place-0"),
+            "retention must not depend on a prior visit to Patients: {commands:?}"
+        );
+        assert!(host.routes().iter().all(|route| route.starts_with("GET ")
+            || route.starts_with("POST /api/auth/")
+            || route == "POST /api/v1/network/pairing/confirm"));
     }
 
     #[gpui::test]
