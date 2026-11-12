@@ -5,10 +5,18 @@ const confidence = Object.freeze({ type: 'string', enum: Object.freeze(['high', 
 const category = Object.freeze({ type: 'string', enum: Object.freeze(['lab', 'imaging', 'visit', 'rehab', 'screening', 'procedure', 'other']) });
 // Il controllo dell'host (patient-smart-import-capability-contract.ts) pretende la fonte su ogni
 // elemento, items compresi: lo schema la chiede negli stessi punti (ADR 0012).
-const diagnosis = record({ label: text(240), icdQuery: text(240), confidence, evidence: text(240), sourceId: text(80), explicitCode: text(80) }, ['label', 'icdQuery', 'confidence', 'evidence', 'sourceId']);
-const therapy = record({ drugMention: text(240), drugQuery: text(240), activePrinciple: text(240), dosage: text(240), motivation: text(240), therapyState: Object.freeze({ type: 'string', enum: Object.freeze(['active', 'transition', 'uncertain', 'inactive']) }), reviewNote: text(240), confidence, evidence: text(240), sourceId: text(80) }, ['drugMention', 'drugQuery', 'confidence', 'evidence', 'sourceId']);
-const serviceItem = record({ serviceName: text(240), category, codeSystem: text(80), serviceCode: text(80), confidence, evidence: text(240), sourceId: text(80) }, ['serviceName', 'confidence', 'evidence', 'sourceId']);
-const service = record({ serviceName: text(240), category, priority: text(80), codeSystem: text(80), serviceCode: text(80), clinicalQuestion: text(240), provider: text(240), prescribedAt: text(32), requestReference: text(80), confidence, evidence: text(240), sourceId: text(80), items: list(serviceItem, 32) }, ['serviceName', 'confidence', 'evidence', 'sourceId']);
+const sourceIdText = text(80);
+function smartImportElements(sourceId: Readonly<Record<string, unknown>>) {
+    const diagnosis = record({ label: text(240), icdQuery: text(240), confidence, evidence: text(240), sourceId, explicitCode: text(80) }, ['label', 'icdQuery', 'confidence', 'evidence', 'sourceId']);
+    const therapy = record({ drugMention: text(240), drugQuery: text(240), activePrinciple: text(240), dosage: text(240), motivation: text(240), therapyState: Object.freeze({ type: 'string', enum: Object.freeze(['active', 'transition', 'uncertain', 'inactive']) }), reviewNote: text(240), confidence, evidence: text(240), sourceId }, ['drugMention', 'drugQuery', 'confidence', 'evidence', 'sourceId']);
+    const serviceItem = record({ serviceName: text(240), category, codeSystem: text(80), serviceCode: text(80), confidence, evidence: text(240), sourceId }, ['serviceName', 'confidence', 'evidence', 'sourceId']);
+    const service = record({ serviceName: text(240), category, priority: text(80), codeSystem: text(80), serviceCode: text(80), clinicalQuestion: text(240), provider: text(240), prescribedAt: text(32), requestReference: text(80), confidence, evidence: text(240), sourceId, items: list(serviceItem, 32) }, ['serviceName', 'confidence', 'evidence', 'sourceId']);
+    return { diagnosis, therapy, service };
+}
+function smartImportSchema(sourceId: Readonly<Record<string, unknown>>) {
+    const { diagnosis, therapy, service } = smartImportElements(sourceId);
+    return record({ schemaVersion: Object.freeze({ type: 'string', const: 'mediflow.ai.extract.v1' }), task: Object.freeze({ type: 'string', const: 'smart_import' }), summary: text(220), data: record({ diagnoses: list(diagnosis, 32), therapies: list(therapy, 32), servicePrescriptions: list(service, 32) }) });
+}
 
 // Patient Insight accepts a claim only with a source marker (host check in
 // patient-insight-host-capability.ts): the schema asks the model for the same rule, summary included.
@@ -18,4 +26,17 @@ const cited = (maxLength: number) => Object.freeze({ ...text(maxLength), pattern
 export const PATIENT_INSIGHT_CLAIM_MAX_LENGTH = 220;
 const claim = cited(PATIENT_INSIGHT_CLAIM_MAX_LENGTH);
 export const PATIENT_INSIGHT_JSON_SCHEMA = record({ schemaVersion: Object.freeze({ type: 'string', const: 'mediflow.ai.extract.v1' }), task: Object.freeze({ type: 'string', const: 'patient_insight' }), summary: claim, data: record({ currentState: list(claim, 2), alerts: list(claim, 2), nextSteps: list(claim, 3), gaps: list(claim, 1) }) });
-export const SMART_IMPORT_JSON_SCHEMA = record({ schemaVersion: Object.freeze({ type: 'string', const: 'mediflow.ai.extract.v1' }), task: Object.freeze({ type: 'string', const: 'smart_import' }), summary: text(220), data: record({ diagnoses: list(diagnosis, 32), therapies: list(therapy, 32), servicePrescriptions: list(service, 32) }) });
+export const SMART_IMPORT_JSON_SCHEMA = smartImportSchema(sourceIdText);
+export const SMART_IMPORT_MAX_SOURCES = 32;
+/*
+ * Schema per richiesta (ADR 0012, «Fonti reali nello schema»): con Ollama lo schema vincola la
+ * generazione, quindi sourceId puo' valere solo uno degli id delle fonti inviate in quel prompt.
+ * Solo i valori dell'enum vengono da fuori; la forma dello schema resta questa. Con id non validi si
+ * torna allo schema statico: il controllo dell'host sulle fonti vale comunque.
+ */
+export function smartImportJsonSchemaForSources(sourceIds: ReadonlyArray<string>) {
+    const ids = [...new Set(sourceIds)];
+    if (ids.length === 0 || ids.length > SMART_IMPORT_MAX_SOURCES
+        || ids.some(id => typeof id !== 'string' || id.length === 0 || id.length > 80)) return SMART_IMPORT_JSON_SCHEMA;
+    return smartImportSchema(Object.freeze({ type: 'string', enum: Object.freeze(ids) }));
+}
