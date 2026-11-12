@@ -59,6 +59,10 @@ impl State {
             Self::Generative(Function::OpenLoops, Stage::Unavailable) => "loops-unavailable",
             Self::Generative(Function::OpenLoops, Stage::Busy) => "loops-busy",
             Self::Generative(Function::OpenLoops, Stage::Closed) => "loops-closed",
+            Self::Generative(Function::EvidenceQueue, Stage::Opened) => "evidence-opened",
+            Self::Generative(Function::EvidenceQueue, Stage::Unavailable) => "evidence-unavailable",
+            Self::Generative(Function::EvidenceQueue, Stage::Busy) => "evidence-busy",
+            Self::Generative(Function::EvidenceQueue, Stage::Closed) => "evidence-closed",
             Self::Preparing => "preparing",
             Self::Selecting => "selecting",
             Self::Challenge => "challenge",
@@ -79,14 +83,16 @@ pub(crate) enum Function {
     Import,
     Icd,
     OpenLoops,
+    EvidenceQueue,
 }
 impl Function {
-    pub(crate) const ALL: [Function; 5] = [
+    pub(crate) const ALL: [Function; 6] = [
         Function::Insight,
         Function::Synthesis,
         Function::Import,
         Function::Icd,
         Function::OpenLoops,
+        Function::EvidenceQueue,
     ];
 }
 
@@ -1679,7 +1685,7 @@ pub(crate) mod tests {
     }
 
     /// Solo questi stati possono tornare alla chat dal comando del Quadro paziente.
-    const INSIGHT_WIRE: [&str; 22] = [
+    const INSIGHT_WIRE: [&str; 26] = [
         "requested",
         "preparing",
         "insight-opened",
@@ -1702,6 +1708,10 @@ pub(crate) mod tests {
         "loops-unavailable",
         "loops-busy",
         "loops-closed",
+        "evidence-opened",
+        "evidence-unavailable",
+        "evidence-busy",
+        "evidence-closed",
     ];
     fn insight_reply(pending: &Pending) -> Value {
         let status = pending.lock().unwrap().status();
@@ -1757,7 +1767,11 @@ pub(crate) mod tests {
                 "loops-opened",
                 "loops-unavailable",
                 "loops-busy",
-                "loops-closed"
+                "loops-closed",
+                "evidence-opened",
+                "evidence-unavailable",
+                "evidence-busy",
+                "evidence-closed"
             ]
         );
         assert!(super::super::is_synthesis_command(

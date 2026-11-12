@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import {
     MEDIFLOW_EVIDENCE_QUEUE_SCHEMA_VERSION,
     buildEvidenceQueue,
@@ -9,6 +11,29 @@ import {
     buildDocumentParseEvidenceArtifact,
     serializeDocumentParseEvidenceArtifact,
 } from './document-parse-evidence-artifact';
+
+test('GPUI evidence worker uses the current Web queue contract without dossier write ports', async () => {
+    const { bundleEvidenceQueueWorker } = await import('../../../scripts/build-evidence-queue-worker.mjs');
+    const worker = readFileSync('experiments/gpui-patient-pilot/worker/evidence-queue.bundle.mjs', 'utf8');
+    assert.equal(await bundleEvidenceQueueWorker(), worker);
+    const artifact = buildDocumentParseEvidenceArtifact({ documentInsightId: 'synthetic-insight', attachmentId: 'synthetic-a',
+        fileName: 'sintetico.txt', documentDate: '2026-11-12T00:00:00Z', summary: 'Controllo programmato.', rawMarkdown: 'Indicazioni alla dimissione\nControllo ortopedico tra 7 giorni.\nStato funzionale\nDeambulazione con ausilio.',
+        diagnoses: [], medications: [] });
+    const input = { patientId: 'patient-a', generatedAt: '2026-11-12T01:00:00Z', attachments: [
+        { id: 'synthetic-a', patientId: 'patient-a', fileName: 'sintetico.txt', createdAt: '2026-11-12T00:00:00Z',
+            parseEvidenceArtifactSnapshot: serializeDocumentParseEvidenceArtifact(artifact) },
+        { id: 'synthetic-b', patientId: 'patient-a', fileName: 'sintesi.txt', createdAt: '2026-11-12T00:00:00Z', summarySnapshot: 'Sintesi lunga da rivedere prima di utilizzarla.' },
+        { id: 'synthetic-c', patientId: 'patient-a', fileName: 'vecchio.txt', createdAt: '2026-11-12T00:00:00Z', replacedById: 'synthetic-a' },
+    ] };
+    const actual = spawnSync(process.execPath, ['--permission', '--input-type=module', '--eval', worker],
+        { input: JSON.stringify(input), encoding: 'utf8', env: { NODE_ENV: 'test' }, maxBuffer: 16 * 1024 * 1024 });
+    assert.equal(actual.status, 0, actual.stderr);
+    assert.deepEqual(JSON.parse(actual.stdout), JSON.parse(JSON.stringify(buildEvidenceQueue(input))));
+    assert.equal(JSON.parse(actual.stdout).totals.included, 1);
+    assert.equal(JSON.parse(actual.stdout).totals.needsReview, 1);
+    assert.equal(JSON.parse(actual.stdout).totals.invalidated, 1);
+    assert.doesNotMatch(worker, /createAttachment|updateArtifact|createRecord|patientCodes/u);
+});
 
 test('buildEvidenceQueue accepts WUL-152 parse/evidence artifacts as included attachment evidence', () => {
     const artifact = buildDocumentParseEvidenceArtifact({

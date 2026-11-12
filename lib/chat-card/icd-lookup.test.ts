@@ -167,3 +167,42 @@ test('Web follow-ups discard a late successful status after revocation', async (
     assert.equal(view.polling(), false);
     assert.equal(view.elements.get('card').hidden, true);
 });
+
+test('document evidence open from the Web chat using only the current native patient and return a status receipt', async () => {
+    for (const [status, terminal] of [['requested', false], ['preparing', false], ['evidence-opened', false],
+        ['evidence-closed', true], ['evidence-unavailable', true], ['evidence-busy', true]] as const) {
+        const view = await frame({ meta: { status } }, 'evidence-queue');
+        assert.deepEqual(view.commands(), [{ command: 'attach' }, { command: 'evidence-queue' }]);
+        assert.equal(view.elements.get('card').hidden, true);
+        assert.equal(view.elements.get('consume').disabled, true);
+        assert.equal(view.polling(), !terminal);
+        assert.ok(adapter.includes(`"${status}"`), status);
+        if (status === 'evidence-closed') assert.match(view.elements.get('status').textContent, /Evidenze consultate/u);
+    }
+});
+
+test('Web document evidence reject foreign patient, denied permission and clinical or receipt payloads', async () => {
+    for (const meta of [{ status: 'withdrawn' }, { status: 'icd-closed' },
+        { status: 'evidence-opened', patientId: 'patient-b' },
+        { status: 'evidence-closed', receipt: { outcome: 'read' } },
+        { status: 'evidence-opened', payload: 'Referto sintetico' },
+        { status: 'evidence-opened', groups: [] }]) {
+        const view = await frame({ meta }, 'evidence-queue');
+        assert.equal(view.polling(), false);
+        assert.equal(view.elements.get('card').hidden, true);
+        assert.match(view.elements.get('status').textContent, /Apertura non confermata/u);
+    }
+});
+
+test('Web document evidence discard a late successful status after revocation', async () => {
+    const host = { meta: { status: 'evidence-opened' } };
+    const view = await frame(host, 'evidence-queue');
+    assert.equal(view.elements.get('revoke').disabled, false);
+    view.elements.get('revoke').onclick();
+    await view.settle();
+    host.meta = { status: 'evidence-closed' };
+    await view.tick();
+    assert.match(view.elements.get('status').textContent, /Richiesta ritirata/u);
+    assert.equal(view.polling(), false);
+    assert.equal(view.elements.get('card').hidden, true);
+});
