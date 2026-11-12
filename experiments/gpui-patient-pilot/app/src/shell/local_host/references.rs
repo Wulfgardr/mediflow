@@ -905,7 +905,7 @@ impl ClinicalApp {
             }
             ReferenceCatalog::Who => {
                 pane = pane.child(self.who_administration_view(cx));
-                pane=pane.child(text!("ICD-11 MMS 2026-01, inglese. World Health Organization, CC BY-ND 3.0 IGO. Solo categorie e titoli inglesi, senza sinonimi o postcoordinazione. Il servizio locale opzionale resta gestito dall’host tramite Setup_WHO.command. Nessun import da file o svuotamento WHO disponibile. Il ripristino richiede una conferma separata e la revisione corrente del catalogo."));
+                pane=pane.child(text!("ICD-11 MMS 2026-01, inglese. World Health Organization, CC BY-ND 3.0 IGO. Solo categorie e titoli inglesi, senza sinonimi o postcoordinazione. Il servizio locale opzionale resta gestito dall’home-base tramite Setup_WHO.command. Nessun import da file o svuotamento WHO disponibile. Il ripristino richiede una conferma separata e la revisione corrente del catalogo."));
                 let can_acquire = area
                     .snapshot
                     .as_ref()

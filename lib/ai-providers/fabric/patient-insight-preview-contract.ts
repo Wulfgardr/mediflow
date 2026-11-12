@@ -41,6 +41,9 @@ type LocalPatientInsightReceiptWire = Readonly<{
     egress: 'none';
 }>;
 
+/** Chiamate al modello locale per questa proposta: 2 quando il primo tentativo e' stato scartato. */
+export type PatientInsightGenerationAttempts = 1 | 2;
+
 type LocalPatientInsightProvenanceWire = Readonly<{
     schemaVersion: 'mediflow.ai.fabric-provenance.v1';
     capability: 'patient_insight';
@@ -48,6 +51,8 @@ type LocalPatientInsightProvenanceWire = Readonly<{
     provider: 'ollama';
     model: string;
     preprocessing: readonly ['context_minimization', 'envelope_validation'];
+    // L'host lo scrive sempre; manca solo nelle ricevute di un host precedente.
+    attempts?: PatientInsightGenerationAttempts;
 }>;
 
 export type PatientInsightReceiptWire = LocalPatientInsightReceiptWire | OrdinaryRemoteReceipt;
@@ -65,26 +70,29 @@ export type PatientInsightPreviewWire =
     | (Common & Readonly<{ status: 'failed'; code: PatientInsightFailureCode; proposal: null; receipt: PatientInsightReceiptWire; provenance: PatientInsightProvenanceWire; reviewRef: null }>);
 export type PatientInsightPreviewWireRoot = Readonly<{ preview: PatientInsightPreviewWire }>;
 
+/** Riga sopra ogni proposta del Quadro; stesso testo in GPUI (`PATIENT_INSIGHT_REVIEW_NOTICE`) e nell'app Apple. */
+export const PATIENT_INSIGHT_REVIEW_NOTICE = 'Controlla ogni frase sulla fonte che cita: il modello può scambiare ciò che è fatto con ciò che è da fare.';
+
 /** Testo a schermo di un esito senza proposta; GPUI usa le stesse frasi (`patient_insight_message`). */
 export const PATIENT_INSIGHT_UNFAITHFUL_MESSAGE = 'Il modello ha dato per presa una decisione ancora aperta nella scheda, '
     + 'o per urgente qualcosa che la scheda non segnala come urgente.';
 export function patientInsightFailureMessage(preview: Exclude<PatientInsightPreviewWire, { status: 'available' }>): string {
     if (preview.code === 'kill_switch_disabled') {
-        return 'Patient Insight è disabilitata. Si riattiva in Impostazioni AI.';
+        return 'Quadro paziente è disabilitato. Si riattiva in Impostazioni IA.';
     }
     if (preview.code === 'source_stale') {
         return 'I dati clinici sono cambiati durante la generazione. Riprova.';
     }
     if (preview.code === 'model_unavailable' || preview.code === 'provider_unready' || preview.code === 'provider_binding_denied') {
-        return 'Il modello clinico locale non è disponibile. Verifica le Impostazioni AI.';
+        return 'Il modello clinico locale non è disponibile. Verifica le Impostazioni IA.';
     }
     if (preview.status === 'failed' && preview.code === 'provider_failed') {
-        return 'Il modello non ha completato la risposta. Riprova più tardi o verifica le Impostazioni AI.';
+        return 'Il modello non ha completato la risposta. Riprova più tardi o verifica le Impostazioni IA.';
     }
     if (preview.status === 'failed' && preview.code === 'proposal_unfaithful') return PATIENT_INSIGHT_UNFAITHFUL_MESSAGE;
     return preview.status === 'failed'
         ? 'La risposta del modello locale non ha superato i controlli clinici.'
-        : 'Patient Insight non è disponibile in questo momento.';
+        : 'Quadro paziente non è disponibile in questo momento.';
 }
 
 type CaptureInput = Readonly<{
@@ -282,27 +290,43 @@ function receiptWire(value: unknown): PatientInsightReceiptWire | null {
             venue: 'local_process', provider: 'ollama', model: input.model, egress: 'none' });
 }
 
+function generationAttempts(value: unknown): PatientInsightGenerationAttempts | null {
+    return value === 1 || value === 2 ? value : null;
+}
+
+function localProvenance(model: string, attempts: PatientInsightGenerationAttempts | null): PatientInsightProvenanceWire {
+    return Object.freeze({ schemaVersion: 'mediflow.ai.fabric-provenance.v1', capability: 'patient_insight', venue: 'local_process',
+        provider: 'ollama', model, preprocessing: Object.freeze(['context_minimization', 'envelope_validation'] as const),
+        ...(attempts === null ? {} : { attempts }) });
+}
+
+/* Lato host la provenienza locale porta sempre il numero dei tentativi. */
 function provenance(value: unknown, expected: PatientInsightReceiptWire): PatientInsightProvenanceWire | null {
     if (expected.provider === 'chatgpt_subscription') return parseOrdinaryRemoteProvenance(value, expected);
-    const input = exact(value, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing', 'receipt']);
+    const input = exact(value, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing', 'attempts', 'receipt']);
     const labels = input && stringArray(input.preprocessing, 2);
     const nested = input && receipt(input.receipt);
+    const attempts = input && generationAttempts(input.attempts);
     return !input || !labels || labels.length !== 2 || labels[0] !== 'context_minimization' || labels[1] !== 'envelope_validation'
         || !nested || nested.model !== expected.model || input.schemaVersion !== 'mediflow.ai.fabric-provenance.v1'
         || input.capability !== 'patient_insight' || input.venue !== 'local_process' || input.provider !== 'ollama' || input.model !== expected.model
-        ? null : Object.freeze({ schemaVersion: 'mediflow.ai.fabric-provenance.v1', capability: 'patient_insight', venue: 'local_process',
-            provider: 'ollama', model: expected.model, preprocessing: Object.freeze(['context_minimization', 'envelope_validation'] as const) });
+        || !attempts
+        ? null : localProvenance(expected.model, attempts);
 }
 
+/* In lettura si accetta anche la ricevuta di un host precedente, senza `attempts`. */
 function provenanceWire(value: unknown, expected: PatientInsightReceiptWire): PatientInsightProvenanceWire | null {
     if (expected.provider === 'chatgpt_subscription') return parseOrdinaryRemoteProvenance(value, expected);
-    const input = exact(value, ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing']);
+    const keys = ['schemaVersion', 'capability', 'venue', 'provider', 'model', 'preprocessing'];
+    const recorded = exact(value, [...keys, 'attempts']);
+    const input = recorded ?? exact(value, keys);
     const labels = input && stringArray(input.preprocessing, 2);
+    const attempts = recorded ? generationAttempts(recorded.attempts) : null;
     return !input || !labels || labels[0] !== 'context_minimization' || labels[1] !== 'envelope_validation'
         || input.schemaVersion !== 'mediflow.ai.fabric-provenance.v1' || input.capability !== 'patient_insight'
         || input.venue !== 'local_process' || input.provider !== 'ollama' || input.model !== expected.model
-        ? null : Object.freeze({ schemaVersion: 'mediflow.ai.fabric-provenance.v1', capability: 'patient_insight', venue: 'local_process',
-            provider: 'ollama', model: expected.model, preprocessing: Object.freeze(['context_minimization', 'envelope_validation'] as const) });
+        || (recorded !== null && attempts === null)
+        ? null : localProvenance(expected.model, attempts);
 }
 
 function statusCode<T extends string>(value: unknown, allowed: readonly T[]): T | null {

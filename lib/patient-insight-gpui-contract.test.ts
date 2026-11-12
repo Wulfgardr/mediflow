@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 
-import { buildPatientInsightPreviewRequest, parsePatientInsightPreviewRequest, parsePatientInsightPreviewWireRoot, patientInsightFailureMessage } from './ai-providers/fabric/patient-insight-preview-contract.ts';
+import { PATIENT_INSIGHT_REVIEW_NOTICE, buildPatientInsightPreviewRequest, parsePatientInsightPreviewRequest, parsePatientInsightPreviewWireRoot, patientInsightFailureMessage } from './ai-providers/fabric/patient-insight-preview-contract.ts';
 import { createAuthenticatedPatientInsightPreviewService, createPatientInsightPreviewHttpHandler } from './ai-providers/fabric/patient-insight-authenticated-preview.ts';
 import { createPatientInsightHostCapability } from './ai-providers/fabric/patient-insight-host-capability.ts';
 import { routeHostResolvedCandidateCapability } from './ai-providers/fabric/candidate-router.ts';
@@ -40,7 +40,7 @@ const MODEL_REPLY = JSON.stringify({
 /* ADR 0189: stessa forma valida, ma una frase aggiunge un'urgenza che la fonte S9 non contiene. */
 const UNFAITHFUL_REPLY = MODEL_REPLY.replace('Ricontrollare gli esami ematici al prossimo accesso. [S9]', 'Ricontrollare con urgenza gli esami ematici. [S9]');
 
-type Mode = 'valid' | 'malformed' | 'unfaithful' | 'provider_failed' | 'kill_switch' | 'stale' | 'function_disabled';
+type Mode = 'valid' | 'second_attempt' | 'malformed' | 'unfaithful' | 'provider_failed' | 'kill_switch' | 'stale' | 'function_disabled';
 const lifecycle: Extract<ProviderLifecycleRead, { status: 'available' }> = { status: 'available', record: {
     schemaVersion: 'mediflow.ai.provider-lifecycle-record.v1', lifecycle: { schemaVersion: 'mediflow.ai.provider-lifecycle.v1', provider: 'ollama', credentialClass: 'local_model', status: 'available_unqualified' },
     actorClass: 'host_service', actorRef: `actor_${'a'.repeat(32)}`, version: 1, hostTimestamp: VERIFIED_AT, receiptRef: `receipt_${'b'.repeat(32)}` } };
@@ -58,7 +58,10 @@ function route(t: TestContext, mode: Mode, revision = 3) {
         assert.equal(url.pathname, '/api/chat');
         const payload = JSON.parse(String(init?.body)); prompts.push(String(payload.messages?.[0]?.content ?? ''));
         if (mode === 'provider_failed') throw new Error('Synthetic provider failure');
-        return Response.json({ model: MODEL, message: { content: mode === 'malformed' ? '{"schemaVersion":"mediflow.ai.extract.v1"' : mode === 'unfaithful' ? UNFAITHFUL_REPLY : MODEL_REPLY }, prompt_eval_count: 3, eval_count: 4 });
+        // second_attempt: la prima risposta e' infedele e viene scartata, la seconda e' valida.
+        const reply = mode === 'malformed' ? '{"schemaVersion":"mediflow.ai.extract.v1"'
+            : mode === 'unfaithful' || (mode === 'second_attempt' && prompts.length === 1) ? UNFAITHFUL_REPLY : MODEL_REPLY;
+        return Response.json({ model: MODEL, message: { content: reply }, prompt_eval_count: 3, eval_count: 4 });
     };
     t.after(() => { globalThis.fetch = previousFetch; });
 
@@ -131,6 +134,9 @@ test('il corpo di GPUI passa per handler, servizio e capacità reali e torna una
     assert.equal(value.body.preview.status, 'available');
     assert.equal(value.body.preview.writesPerformed, 0);
     assert.ok(parsePatientInsightPreviewWireRoot(value.body), 'il Web legge la stessa risposta');
+    // Caso normale: una sola chiamata al modello, registrata nella provenienza.
+    assert.equal(fixture.prompts.length, 1);
+    assert.equal(value.body.preview.provenance.attempts, 1);
     // Le righe [Sx] del prompt sono quelle che GPUI numera: S1 motivo, poi condizioni, terapie, eventi.
     const prompt = fixture.prompts[0];
     assert.match(prompt, /\[S1\] Valutazione manuale del follow-up clinico attuale/u);
@@ -159,6 +165,50 @@ test('dinieghi e fallimenti reali arrivano a GPUI come codici senza proposta', a
             assert.equal(value.body.preview.writesPerformed, 0, mode);
         }
     }
+});
+
+test('una prima risposta scartata e una seconda valida: la provenienza salvata registra 2 tentativi', async (t) => {
+    const fixture = route(t, 'second_attempt');
+    const response = await fixture.send(read('request'));
+    assert.equal(response.status, 200);
+    const value = await record('response-available-second-attempt', response);
+    assert.equal(fixture.prompts.length, 2, 'stesso prompt, seconda chiamata dopo lo scarto');
+    assert.equal(fixture.prompts[0], fixture.prompts[1]);
+    assert.equal(value.body.preview.status, 'available');
+    assert.equal(value.body.preview.provenance.attempts, 2);
+    const root = parsePatientInsightPreviewWireRoot(value.body);
+    assert.ok(root && root.preview.status === 'available' && root.preview.provenance.provider === 'ollama');
+    if (root?.preview.status === 'available' && root.preview.provenance.provider === 'ollama') assert.equal(root.preview.provenance.attempts, 2);
+    // Anche gli scarti registrano le chiamate fatte: due per l'infedele e per l'illeggibile, una per l'errore del provider.
+    assert.equal(read('response-proposal-unfaithful').body.preview.provenance.attempts, 2);
+    assert.equal(read('response-proposal-invalid').body.preview.provenance.attempts, 2);
+    assert.equal(read('response-provider-failed').body.preview.provenance.attempts, 1);
+});
+
+test('una ricevuta di un host precedente, senza il numero dei tentativi, si legge ancora', () => {
+    // Il file e' la risposta registrata dall'handler prima di questa modifica: GPUI la legge nel test Rust.
+    const before = read('response-available-before-attempts');
+    assert.equal('attempts' in before.body.preview.provenance, false);
+    const root = parsePatientInsightPreviewWireRoot(before.body);
+    assert.ok(root, 'il Web legge la ricevuta vecchia');
+    assert.equal(root.preview.status, 'available');
+    if (root.preview.status !== 'available' || root.preview.provenance.provider !== 'ollama') return;
+    assert.equal(root.preview.provenance.attempts, undefined, 'nessun numero inventato');
+    assert.deepEqual(root.preview.proposal, parsePatientInsightPreviewWireRoot(read('response-available').body)?.preview.proposal);
+    // Un numero fuori contratto invece non si legge.
+    for (const attempts of [0, 3, '2', null, 1.5]) {
+        const altered = structuredClone(before.body); altered.preview.provenance.attempts = attempts;
+        assert.equal(parsePatientInsightPreviewWireRoot(altered), null, `attempts ${String(attempts)}`);
+    }
+});
+
+test('la riga sopra la proposta ha lo stesso testo sul Web, in GPUI e nell\'app Apple', () => {
+    assert.match(PATIENT_INSIGHT_REVIEW_NOTICE, /^Controlla ogni frase sulla fonte/u);
+    assert.doesNotMatch(PATIENT_INSIGHT_REVIEW_NOTICE, /\u2014|\bAI\b/u);
+    const transport = fs.readFileSync(path.join(ROOT_DIR, 'experiments/gpui-patient-pilot/transport/src/local_host/patient_insight.rs'), 'utf8');
+    assert.ok(transport.includes(`pub const PATIENT_INSIGHT_REVIEW_NOTICE: &str = "${PATIENT_INSIGHT_REVIEW_NOTICE}";`), 'stesso testo nel trasporto GPUI');
+    const apple = fs.readFileSync(path.join(ROOT_DIR, 'native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/NativeOrdinaryViews.swift'), 'utf8');
+    assert.ok(apple.includes(`static let patientInsightReviewNotice = "${PATIENT_INSIGHT_REVIEW_NOTICE}"`), 'stesso testo nell\'app Apple');
 });
 
 test('controprova: un corpo alterato è rifiutato dalla route', async (t) => {

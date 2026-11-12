@@ -221,7 +221,7 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
                 state = .idle
                 return
             }
-            state = .failed("Impossibile verificare che cosa offre l'host: \(error.localizedDescription)")
+            state = .failed("Impossibile verificare che cosa offre l'home-base: \(error.localizedDescription)")
         }
     }
 
@@ -267,19 +267,19 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
         guard state == .loaded, !availableKeys.contains(key) else { return nil }
         switch key {
         case "network.replica.readonly-agenda":
-            return "L'host non offre ancora l'agenda. Aggiorna MediFlow sull'host."
+            return "L'home-base non offre ancora l'agenda. Aggiorna MediFlow sull'home-base."
         case "network.replica.readonly-clinical-diary-global":
-            return "L'host non offre ancora il diario di tutti i pazienti. Aggiorna MediFlow sull'host."
+            return "L'home-base non offre ancora il diario di tutti i pazienti. Aggiorna MediFlow sull'home-base."
         case "network.ambulatories.write":
-            return "L'host non offre la gestione ambulatori. Aggiorna MediFlow sull'host, poi ripeti il pairing."
+            return "L'home-base non offre la gestione ambulatori. Aggiorna MediFlow sull'home-base, poi ripeti l’abbinamento."
         case "network.replica.readonly-documents":
-            return "L'host non offre ancora l'archivio documenti. Aggiorna MediFlow sull'host, poi ripeti il pairing."
+            return "L'home-base non offre ancora l'archivio documenti. Aggiorna MediFlow sull'home-base, poi ripeti l’abbinamento."
         case "network.replica.write-documents":
-            return "L'host non offre il caricamento documenti. Aggiorna MediFlow sull'host, poi ripeti il pairing."
+            return "L'home-base non offre il caricamento documenti. Aggiorna MediFlow sull'home-base, poi ripeti l’abbinamento."
         case "network.compute.visit-draft":
-            return "L'host non offre ancora la bozza visita. Aggiorna MediFlow sull'host, poi ripeti il pairing."
+            return "L'home-base non offre ancora la bozza visita. Aggiorna MediFlow sull'home-base, poi ripeti l’abbinamento."
         default:
-            return "L'host non offre ancora questa sezione. Aggiorna MediFlow sull'host."
+            return "L'home-base non offre ancora questa sezione. Aggiorna MediFlow sull'home-base."
         }
     }
 }
@@ -709,9 +709,9 @@ struct ClinicalCapabilityGateView: View {
         if let message = store.unavailableMessage(for: capability) { return message }
         switch store.state {
         case .failed(let message), .unavailable(let message): return message
-        case .loading: return "Verifica dell'host in corso."
+        case .loading: return "Verifica dell'home-base in corso."
         case .idle: return "Collega l'home-base."
-        case .loaded: return "L'host non offre ancora questa sezione. Aggiorna MediFlow sull'host."
+        case .loaded: return "L'home-base non offre ancora questa sezione. Aggiorna MediFlow sull'home-base."
         }
     }
 }
@@ -811,7 +811,7 @@ struct AgendaWorkspaceView: View {
         #if DEBUG
         .safeAreaInset(edge: .bottom) {
             if AppleFoundationDemoMode.isDemoDataset {
-                Text("Dati sintetici di esempio · Nessuna lettura dall’host")
+                Text("Dati sintetici di esempio · Nessuna lettura dall’home-base")
                     .chartMetadata().padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     .background(PlatformColors.chartCardSurface)
             }
@@ -1065,7 +1065,7 @@ struct PopulationAnalyticsWorkspaceView: View {
         #if DEBUG
         .safeAreaInset(edge: .bottom) {
             if AppleFoundationDemoMode.isDemoDataset {
-                Text("Dati sintetici di esempio · Nessuna lettura dall’host")
+                Text("Dati sintetici di esempio · Nessuna lettura dall’home-base")
                     .chartMetadata().padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     .background(PlatformColors.chartCardSurface)
             }

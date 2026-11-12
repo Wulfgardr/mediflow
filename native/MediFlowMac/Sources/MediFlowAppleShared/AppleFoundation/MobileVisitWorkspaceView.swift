@@ -93,10 +93,10 @@ struct MobileVisitWorkspaceView: View {
                     }
                 }
                 if model.isBusy || coordinator.isWorking { ProgressView("Verifica in corso") }
-                if let error = model.errorMessage { Text(error).foregroundStyle(.red).accessibilityIdentifier("mobile-visit-error") }
+                if let error = model.errorMessage { Text(error).foregroundStyle(PlatformColors.signal(.critical)).accessibilityIdentifier("mobile-visit-error") }
                 if let status = model.statusMessage { Text(status).font(.callout).accessibilityIdentifier("mobile-visit-status") }
                 if let message = coordinator.message { Text(message).font(.callout) }
-                if let error = workspace.errorMessage, coordinator.needsAuthentication { Text(error).foregroundStyle(.red) }
+                if let error = workspace.errorMessage, coordinator.needsAuthentication { Text(error).foregroundStyle(PlatformColors.signal(.critical)) }
             }
             .padding()
         }

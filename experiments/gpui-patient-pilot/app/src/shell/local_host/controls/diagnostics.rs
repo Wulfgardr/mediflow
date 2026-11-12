@@ -3,9 +3,9 @@ use super::*;
 use std::time::Instant;
 const NAMES: [&str; 4] = [
     "Autenticazione",
-    "Catalogo del provider AI locale",
+    "Catalogo del provider IA locale",
     "Disponibilità WHO",
-    "Impostazioni del provider AI",
+    "Impostazioni del provider IA",
 ];
 pub(super) enum DiagnosticOutcome {
     Observed(String),

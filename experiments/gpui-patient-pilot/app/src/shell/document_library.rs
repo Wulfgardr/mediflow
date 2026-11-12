@@ -1,6 +1,11 @@
 use super::*;
 use std::path::PathBuf;
 
+#[cfg(test)]
+macro_rules! text {
+    ($($args:tt)*) => { crate::shell::rendered_command::observe_ink(gpui::text!($($args)*)) };
+}
+
 const MAX_IMPORT_FILES: usize = 20;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -105,6 +110,11 @@ impl DocumentOperation {
 impl ClinicalApp {
     pub(super) fn documents_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
+        #[cfg(unix)]
+        let show_import =
+            self.patient.chat_function != Some(crate::chat_access::owner::Function::Synthesis);
+        #[cfg(not(unix))]
+        let show_import = true;
         let writable =
             self.document_import_available() && self.patient.attachments.ready().is_some();
         div().min_w_0().max_w_full().flex().flex_col().gap(px(16.))
@@ -113,9 +123,8 @@ impl ClinicalApp {
                 .child(button("clinical-workspace-new-document", "Aggiungi documenti…", theme, true, writable && !self.document_imports.pending())
                     .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))))
             .when_some(self.synthesis_chat_notice(), |el, message| el.child(notice("document-synthesis-chat-selection", message, theme, false)))
-            .when_some(self.import_chat_notice(), |el, message| el.child(notice("smart-import-chat-step", message, theme, false)))
             .child(self.dossier_import_view(cx))
-            .child(self.smart_import_view(cx))
+            .when(show_import, |el| el.child(self.smart_import_view(cx)))
             .child(self.document_imports_view(cx))
             .child(self.document_curation_view(cx))
             .child(div().text_color(theme.secondary).child(text!("Prima del salvataggio puoi annullare la copia cambiando scheda o bloccando la sessione. Una copia già avviata può completarsi anche dopo il blocco.")))
@@ -154,7 +163,7 @@ impl ClinicalApp {
                     .when(details_open, |el| el.child(self.document_details_view(row, cx)).child(self.document_synthesis_view(row, cx)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
-            .child(notice("clinical-workspace-documents-native-limits", "Anteprima delle immagini diverse da PNG e JPEG, nuova estrazione dagli allegati, revisione agentica e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI.", theme, false))
+            .child(notice("clinical-workspace-documents-native-limits", "Anteprima delle immagini diverse da PNG e JPEG, nuova estrazione dagli allegati, revisione agentica e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni IA.", theme, false))
     }
 
     pub(super) fn document_imports_view(&self, cx: &Context<Self>) -> Div {

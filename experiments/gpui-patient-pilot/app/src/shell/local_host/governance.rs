@@ -410,7 +410,7 @@ impl ClinicalApp {
         }
         pane = pane.child(section(
             "governance-parliament",
-            "Confronto modelli AI",
+            "Confronto modelli IA",
             theme,
         ));
         if let Some(state) =

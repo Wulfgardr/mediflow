@@ -98,7 +98,7 @@ struct PairedPatientClinicalSections: View {
                     onCancel: nil,
                     onSubmit: { Task { await model.createCheckupForSelectedPatient() } }
                 )
-                Text("Solo campi manuali non-AI. Nessuna coda offline o import documentale.")
+                Text("Solo campi manuali non-IA. Nessuna coda offline o import documentale.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -108,7 +108,7 @@ struct PairedPatientClinicalSections: View {
     private var observationsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             PairedPatientSectionHeader(model: model,
-                title: "Misure",
+                title: "Parametri",
                 subtitle: "Ultime \(PairedPatientsWorkspaceSupport.clinicalPreviewCap) osservazioni",
                 systemImage: "waveform.path.ecg",
                 refreshIdentifier: "homebase-refresh-observations-button",
@@ -182,7 +182,7 @@ struct PairedPatientClinicalSections: View {
                     onCancel: nil,
                     onSubmit: { Task { await model.createObservationForSelectedPatient() } }
                 )
-                Text("LOINC + UCUM manuali. Nessun AI plane remoto, OCR o coda offline.")
+                Text("LOINC + UCUM manuali. Nessun IA plane remoto, OCR o coda offline.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

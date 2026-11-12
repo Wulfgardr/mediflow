@@ -11,13 +11,13 @@ extension AppleDeliveryPhase {
     var tintColor: Color {
         switch self {
         case .shipping:
-            return .green
+            return PlatformColors.signal(.positive)
         case .foundation:
-            return .teal
+            return PlatformColors.secondaryInk
         case .next:
-            return .orange
+            return PlatformColors.signal(.attention)
         case .blocked:
-            return .red
+            return PlatformColors.signal(.critical)
         }
     }
 }

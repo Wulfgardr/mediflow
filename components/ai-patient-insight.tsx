@@ -16,6 +16,7 @@ import {
     isAiPatientInsightEnabledValue,
 } from '@/lib/ai-patient-insight-kill-switch';
 import {
+    PATIENT_INSIGHT_REVIEW_NOTICE,
     buildPatientInsightPreviewRequest,
     parsePatientInsightPreviewWireRoot,
     patientInsightFailureMessage,
@@ -44,6 +45,13 @@ function readInsightSources(patientId: string) {
 
 /* scoped control geometry overrides the legacy shared button chrome. */
 const actionStyle = { borderRadius: 'var(--lume-control-radius, 10px)', fontSize: '0.875rem', minHeight: 'var(--lume-control-height, 44px)' };
+const VENUE_LABELS = { local_process: 'Processo locale', cloud: 'Servizio esterno' } as const;
+const EGRESS_LABELS = { none: 'Nessuna uscita dati', redacted_explicit_consent: 'Contenuti oscurati inviati con consenso' } as const;
+const PREPROCESSING_LABELS = {
+    context_minimization: 'Riduzione del contesto', layer1_redaction: 'Primo passaggio di oscuramento',
+    layer2_redaction: 'Secondo passaggio di oscuramento', envelope_validation: 'Verifica del formato',
+} as const;
+
 
 function InsightList({ items, warning = false }: Readonly<{ items: readonly string[]; warning?: boolean }>) {
     if (items.length === 0) return null;
@@ -101,7 +109,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
 
     const generateInsight = async () => {
         if (!enabled) {
-            setError('Patient Insight è disabilitata. Si riattiva in Impostazioni AI.');
+            setError('Quadro paziente è disabilitato. Si riattiva in Impostazioni IA.');
             return;
         }
         const controller = new AbortController(); abortControllerRef.current = controller;
@@ -122,7 +130,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
             });
             if (controller.signal.aborted) return;
             if (!response.ok) {
-                setError(response.status === 401 ? 'La sessione non è più disponibile. Accedi di nuovo.' : 'Patient Insight non è disponibile in questo momento.');
+                setError(response.status === 401 ? 'La sessione non è più disponibile. Accedi di nuovo.' : 'Quadro paziente non è disponibile in questo momento.');
                 return;
             }
             setProgress('Controllo della proposta clinica…');
@@ -136,7 +144,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
             }
             setPreview({ patientId: patient.id, patientKey, sourceSignature: patientInsightSourceSignature(request), value: result });
         } catch {
-            if (!controller.signal.aborted) setError('Patient Insight non è disponibile in questo momento.');
+            if (!controller.signal.aborted) setError('Quadro paziente non è disponibile in questo momento.');
         } finally {
             if (abortControllerRef.current === controller) {
                 abortControllerRef.current = null; setGeneration({ patientKey, active: false }); setProgress('');
@@ -154,8 +162,8 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
         return (
             /* a disabled function is a compact state with an explicit recovery action. */
             <section className="min-w-0 space-y-4 py-3 text-sm leading-relaxed text-[color:var(--lume-ink)]" data-testid="patient-insight-disabled-card">
-                <h3 className="text-base font-semibold">Patient Insight disabilitata</h3>
-                <Link href="/settings/ai/funzioni" className="ui-btn-secondary" style={actionStyle}>Apri Impostazioni AI</Link>
+                <h3 className="text-base font-semibold">Quadro paziente disabilitato</h3>
+                <Link href="/settings/ai/funzioni" className="ui-btn-secondary" style={actionStyle}>Apri Impostazioni IA</Link>
             </section>
         );
     }
@@ -165,10 +173,9 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
             <section className="min-w-0 space-y-4 py-3 text-sm leading-relaxed text-[color:var(--lume-ink)]">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 basis-64">
-                        <h3 className="text-base font-semibold">Genera una proposta da revisionare</h3>
-                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">Un riepilogo temporaneo da confrontare con i dati in cartella. Nessun aggiornamento automatico.</p>
+                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">La cartella non cambia.</p>
                     </div>
-                    <button type="button" onClick={generateInsight} disabled={!picker.canGenerate} className="ui-btn-primary" style={actionStyle}><Sparkles className="h-4 w-4" aria-hidden="true" />Avvia supporto</button>
+                    <button type="button" onClick={generateInsight} disabled={!picker.canGenerate} className="ui-btn-primary" style={actionStyle}><Sparkles className="h-4 w-4" aria-hidden="true" />Genera proposta</button>
                 </div>
                 {error && <p role="alert" className="text-[color:var(--lume-signal-critical)]">{error}</p>}
                 <FunctionModelPicker picker={picker} />
@@ -181,11 +188,11 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
         <section className="min-w-0 space-y-5 py-3 text-sm leading-relaxed text-[color:var(--lume-ink)] [overflow-wrap:anywhere]">
             <header className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1 basis-64">
-                    <h3 className="text-base font-semibold">Supporto al ragionamento clinico</h3>
                     <p className="mt-1 text-[color:var(--lume-ink-muted)]">{picker.view.remote ? 'Generazione manuale · OpenAI con redazione locale' : 'Generazione manuale · proposta locale'}</p>
                 </div>
-                <button type="button" onClick={generateInsight} disabled={isGenerating || !enabled || !picker.canGenerate} className="ui-btn-secondary" style={actionStyle}><RefreshCw className="h-4 w-4" aria-hidden="true" />{isGenerating ? 'Analisi…' : 'Nuova bozza'}</button>
+                <button type="button" onClick={generateInsight} disabled={isGenerating || !enabled || !picker.canGenerate} className="ui-btn-secondary" style={actionStyle}><RefreshCw className="h-4 w-4" aria-hidden="true" />{isGenerating ? 'Analisi…' : 'Nuova proposta'}</button>
             </header>
+            {!preview && <p className="text-[color:var(--lume-ink-muted)]">La cartella non cambia.</p>}
             <FunctionModelPicker picker={picker} />
             {error && <p role="alert" className="flex items-start gap-2 text-[color:var(--lume-signal-critical)]"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{error}</p>}
             {!enabled && <p data-testid="patient-insight-disabled-banner" className="text-[color:var(--lume-ink-muted)]">La funzione è disabilitata per le nuove generazioni.</p>}
@@ -207,11 +214,12 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
                 <section className={`${styles.proposal} min-w-0 space-y-5`} data-testid="patient-insight-review-proposal">
                     <div>
                         <h4 className="text-base font-semibold"><InkState state="pencil">Proposta · da rivedere</InkState></h4>
-                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">La cartella resta invariata.</p>
                         <p className="mt-2"><span className="text-[color:var(--lume-ink-muted)]">Modello usato: </span>{preview.receipt.model} · {preview.receipt.provider}</p>
                     </div>
+                    {/* the model can misstate what is done or still to do: the doctor reads each sentence against its source. */}
+                    <p className="font-semibold" data-testid="patient-insight-review-notice">{PATIENT_INSIGHT_REVIEW_NOTICE}</p>
                     {preview.proposal.summary && <div><h4 className="font-semibold">Sintesi proposta</h4><p className="mt-2"><PrivacyBlur intensity="sm">{preview.proposal.summary}</PrivacyBlur></p></div>}
-                    {preview.proposal.currentState.length > 0 && <div><h4 className="font-semibold">Quadro attuale</h4><InsightList items={preview.proposal.currentState} /></div>}
+                    {preview.proposal.currentState.length > 0 && <div><h4 className="font-semibold">Stato attuale</h4><InsightList items={preview.proposal.currentState} /></div>}
                     {preview.proposal.alerts.length > 0 && <div className="border-l-2 border-[color:var(--lume-signal-warning)] pl-4"><h4 className="font-semibold">Attenzioni proposte</h4><InsightList items={preview.proposal.alerts} warning /></div>}
                     {preview.proposal.nextSteps.length > 0 && <div><h4 className="font-semibold">Follow-up proposto</h4><InsightList items={preview.proposal.nextSteps} /></div>}
                     {preview.proposal.gaps.length > 0 && <div><h4 className="font-semibold">Dati mancanti</h4><InsightList items={preview.proposal.gaps} /></div>}
@@ -226,12 +234,12 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
                     </div>
                     <Disclosure className={disclosure.disclosure} title="Dettagli di verifica">
                         <div className="space-y-3 pb-4 text-sm text-[color:var(--lume-ink-muted)]">
-                            <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="h-4 w-4" aria-hidden="true" />Receipt, provenance e currentness</p>
+                            <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="h-4 w-4" aria-hidden="true" />Ricevuta, provenienza e validità</p>
                             <p>0 scritture · Applicazione non consentita</p>
                             <dl className="grid min-w-0 gap-3 sm:grid-cols-2">
-                                <div><dt>Esecuzione</dt><dd className="text-[color:var(--lume-ink)]">{preview.receipt.provider} · {preview.receipt.model} · {preview.receipt.venue} · egress {preview.receipt.egress}</dd></div>
-                                <div><dt>Provenance</dt><dd className="text-[color:var(--lume-ink)]">{preview.provenance.preprocessing.join(' → ')}</dd></div>
-                                <div><dt>Currentness</dt><dd className="text-[color:var(--lume-ink)]">epoch {preview.proposal.currentness.selectionEpoch} · revisione {preview.proposal.currentness.patientRevision}</dd></div>
+                                <div><dt>Esecuzione</dt><dd className="text-[color:var(--lume-ink)]">{preview.receipt.provider} · {preview.receipt.model} · {VENUE_LABELS[preview.receipt.venue]} · {EGRESS_LABELS[preview.receipt.egress]}</dd></div>
+                                <div><dt>Provenienza</dt><dd className="text-[color:var(--lume-ink)]">{preview.provenance.preprocessing.map(step => PREPROCESSING_LABELS[step]).join(' → ')}</dd></div>
+                                <div><dt>Validità</dt><dd className="text-[color:var(--lume-ink)]">Selezione {preview.proposal.currentness.selectionEpoch} · revisione {preview.proposal.currentness.patientRevision}</dd></div>
                                 <div><dt>Cattura / verifica</dt><dd className="text-[color:var(--lume-ink)]">{new Date(preview.proposal.currentness.capturedAt).toLocaleString('it-IT')} · {new Date(preview.proposal.currentness.verifiedAt).toLocaleString('it-IT')}</dd></div>
                             </dl>
                         </div>
@@ -243,7 +251,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
                 <section className="space-y-3" data-testid="patient-insight-historical-summary">
                     <h4 className="font-semibold">Riepilogo storico salvato</h4>
                     {stale && <p className="text-[color:var(--lume-ink-muted)]">Dati modificati dopo la generazione</p>}
-                    <div className="prose prose-sm max-w-none text-[color:var(--lume-ink)] prose-headings:text-[color:var(--lume-ink)] prose-strong:text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm"><ReactMarkdown>{patient.aiSummary}</ReactMarkdown></PrivacyBlur></div>
+                    <div className="prose prose-sm max-w-none text-[color:var(--lume-ink)] prose-headings:text-[color:var(--lume-ink)] prose-strong:text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm"><ReactMarkdown>{patient.aiSummary.replace(/Quadro attuale/g, 'Stato attuale')}</ReactMarkdown></PrivacyBlur></div>
                     <p className="text-[color:var(--lume-ink-muted)]">Le nuove generazioni non sostituiscono né aggiornano automaticamente questo contenuto.</p>
                 </section>
             )}

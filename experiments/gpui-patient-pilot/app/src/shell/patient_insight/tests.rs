@@ -248,6 +248,68 @@ fn proposal_is_shown_with_its_sources_and_receipt(cx: &mut gpui::TestAppContext)
     bench.assert_no_clinical_write();
 }
 
+/// WUL-826: sopra le righe della proposta, una sola riga chiede di controllare ogni
+/// frase sulla sua fonte. I tentativi (qui 2) restano nella provenienza, non a schermo.
+#[gpui::test]
+fn review_notice_is_painted_above_the_proposal_lines(cx: &mut gpui::TestAppContext) {
+    let (bench, cx) = bench(cx);
+    prepare(&bench, cx);
+    let answer = bench.answer("response-available-second-attempt");
+    bench.view.update(cx, |app, cx| app.insight_confirm(cx));
+    cx.run_until_parked();
+    assert!(answer.join().unwrap());
+    let first = bench.view.read_with(cx, |app, _| {
+        let InsightPhase::Proposal { request, proposal } = &app.patient.insight.phase else {
+            panic!("la risposta disponibile è una proposta");
+        };
+        assert!(app.insight_is_current(request, proposal));
+        assert_eq!(proposal.attempts, Some(2));
+        insight_lines(request, proposal)[0].text.clone()
+    });
+    // Con una sessione e la scheda aperta («Apri scheda») si vede la panoramica con il Quadro.
+    bench.view.update(cx, |app, _| {
+        app.session = Some(bench.host.session.clone());
+        app.directory = false;
+    });
+    cx.simulate_resize(gpui::size(px(1440.), px(4000.)));
+    let _probe = crate::shell::rendered_command::begin_inks();
+    crate::shell::notes_recovery_tests::draw(cx);
+    let labels: Vec<String> = crate::shell::rendered_command::take_inks()
+        .into_iter()
+        .map(|ink| ink.label)
+        .collect();
+    println!(
+        "WUL825_COPY_SNAPSHOT_BEGIN\n{}\nWUL825_COPY_SNAPSHOT_END",
+        labels.join("\n")
+    );
+    let position = |text: &str| labels.iter().position(|label| label == text);
+    let notice = position(mediflow_runtime_client::PATIENT_INSIGHT_REVIEW_NOTICE)
+        .unwrap_or_else(|| panic!("riga di controllo non dipinta: {labels:#?}"));
+    assert_eq!(
+        labels
+            .iter()
+            .filter(|label| *label == mediflow_runtime_client::PATIENT_INSIGHT_REVIEW_NOTICE)
+            .count(),
+        1
+    );
+    let heading = position("Proposta da rivedere.").unwrap();
+    assert!(position("Stato attuale").is_some(), "{labels:#?}");
+    assert!(
+        labels
+            .iter()
+            .all(|label| !label.contains("scheda resta invariata")
+                && !label.contains("cartella non cambia")),
+        "{labels:#?}"
+    );
+    let sentence = position(&first).unwrap_or_else(|| panic!("prima riga: {labels:#?}"));
+    assert!(heading < notice && notice < sentence, "{labels:#?}");
+    assert!(
+        labels.iter().all(|label| !label.contains("tentativ")),
+        "i tentativi non vanno a schermo"
+    );
+    bench.assert_no_clinical_write();
+}
+
 #[gpui::test]
 fn declined_consent_sends_nothing(cx: &mut gpui::TestAppContext) {
     let (bench, cx) = bench(cx);
@@ -274,7 +336,7 @@ fn kill_switch_off_is_unavailable_without_generation(cx: &mut gpui::TestAppConte
     cx.run_until_parked();
     assert!(bench.phase(cx, |phase| matches!(
         phase,
-        InsightPhase::Unavailable(m) if m.contains("spento sull'host")
+        InsightPhase::Unavailable(m) if m.contains("spento sull'home-base")
     )));
     assert!(bench.host.bodies(PREVIEW).is_empty());
     let buttons = rendered_buttons(&bench, cx);
@@ -294,7 +356,7 @@ fn host_closed_is_unavailable_without_any_call(cx: &mut gpui::TestAppContext) {
     cx.run_until_parked();
     assert!(bench.phase(
         cx,
-        |phase| matches!(phase, InsightPhase::Unavailable(m) if m.contains("Host locale chiuso"))
+        |phase| matches!(phase, InsightPhase::Unavailable(m) if m.contains("Accesso locale chiuso"))
     ));
     assert!(bench.host.bodies(SETTING).is_empty());
     assert!(bench.host.bodies(PREVIEW).is_empty());
@@ -306,12 +368,12 @@ fn host_closed_is_unavailable_without_any_call(cx: &mut gpui::TestAppContext) {
 fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppContext) {
     let (bench, cx) = bench(cx);
     for (name, unavailable, text) in [
-        ("response-function-disabled", true, "spento sull'host"),
-        ("response-kill-switch", true, "spento sull'host"),
+        ("response-function-disabled", true, "spento sull'home-base"),
+        ("response-kill-switch", true, "spento sull'home-base"),
         (
             "response-proposal-invalid",
             false,
-            "non ha superato i controlli dell'host",
+            "non ha superato i controlli dell'home-base",
         ),
         (
             "response-proposal-unfaithful",
@@ -366,7 +428,7 @@ fn altered_response_is_an_error_not_a_proposal(cx: &mut gpui::TestAppContext) {
     cx.run_until_parked();
     assert!(bench.phase(cx, |phase| matches!(
         phase,
-        InsightPhase::Error(m) if m == "La risposta dell'host non ha superato i controlli dell'app."
+        InsightPhase::Error(m) if m == "La risposta dell'home-base non ha superato i controlli dell'app."
     )));
 }
 
@@ -711,6 +773,9 @@ mod chat {
         cx: &mut gpui::TestAppContext,
     ) {
         let (bench, cx) = bench(cx);
+        bench.view.read_with(cx, |app, _| {
+            assert!(app.directory, "selezione in anteprima nell’elenco")
+        });
         bench.view.update(cx, |app, _| {
             app.patient_section = PatientSection::Therapies;
         });
@@ -723,6 +788,10 @@ mod chat {
                 panic!("il Quadro attende il consenso nella finestra");
             };
             assert_eq!(request.patient_id, FIRST);
+            assert!(
+                !app.directory,
+                "la chat deve aprire la scheda dall’anteprima dell’elenco"
+            );
             assert_eq!(app.patient_section, PatientSection::Overview);
         });
         assert!(

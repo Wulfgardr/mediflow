@@ -98,7 +98,7 @@ struct PairedHomeBaseCredentialsView: View {
                 Button("Dissocia") {
                     confirmsClearingPairing = true
                 }
-                .tint(.red)
+                .tint(PlatformColors.signal(.critical))
                 .accessibilityIdentifier("homebase-clear-pairing-button")
                 .disabled(model.isWorking)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1182,7 +1182,7 @@ struct PairedPatientCreateView: View {
                     }
                 }
                 Section {
-                    Toggle("Conosco solo l’anno (stima)", isOn: $model.newPatientHasEstimatedBirthYear)
+                    Toggle("Conosco solo l’anno", isOn: $model.newPatientHasEstimatedBirthYear)
                         .accessibilityIdentifier("new-patient-estimated-birth")
                         .onChange(of: model.newPatientHasEstimatedBirthYear) { estimated in
                             if estimated { model.newPatientHasBirthDate = false }

@@ -369,7 +369,7 @@ pub(crate) fn reply(status: State, pending: Option<&Pending>, payload: Option<St
     }
 }
 
-/// I comandi delle funzioni generative non portano argomenti: la chat non sceglie
+/// I comandi che aprono una funzione nella finestra non portano argomenti: la chat non sceglie
 /// paziente, ambulatorio, documento, fonti o modello. Ogni altro campo chiude la
 /// connessione.
 fn generative_function(value: &Value) -> Option<owner::Function> {
@@ -378,6 +378,9 @@ fn generative_function(value: &Value) -> Option<owner::Function> {
         (Function::Insight, "patient-insight"),
         (Function::Synthesis, "document-synthesis"),
         (Function::Import, "smart-import"),
+        (Function::Icd, "icd-lookup"),
+        (Function::OpenLoops, "open-loops"),
+        (Function::EvidenceQueue, "evidence-queue"),
     ]
     .into_iter()
     .find(|(_, command)| *value == json!({ "command": command }))

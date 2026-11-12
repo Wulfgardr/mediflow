@@ -173,7 +173,7 @@ export function RuntimeTwinPatientNavigation({ items, active }: { items: readonl
   const primary = patientPrimaryDestinations.flatMap(href => items.filter(item => item.href === href));
   const secondary = items.filter(item => !patientPrimaryDestinations.includes(item.href));
   return <nav className={styles.patientNavigation} aria-label="Sezioni della vista">
-    {primary.map(item => <a key={item.href} href={item.href} aria-current={active === item.href.slice(1) ? 'location' : undefined}>{item.href === '#quadro' ? 'Riepilogo' : item.href === '#parametri' ? 'Misure' : item.label}{item.meta && Number(item.meta) > 0 ? <span>{item.meta}</span> : null}</a>)}
+    {primary.map(item => <a key={item.href} href={item.href} aria-current={active === item.href.slice(1) ? 'location' : undefined}>{item.href === '#quadro' ? 'Riepilogo' : item.href === '#parametri' ? 'Parametri' : item.label}{item.meta && Number(item.meta) > 0 ? <span>{item.meta}</span> : null}</a>)}
     <PatientSheetMenu label="Altre sezioni della cartella" className={styles.moreSections}
       trigger={props => <button {...props} aria-current={secondary.some(item => item.href === `#${active}`) ? 'location' : undefined}>Altro <ChevronDown size={14} aria-hidden /></button>}>
       {secondary.map(item => <a key={item.href} href={item.href} role="menuitem" tabIndex={-1} className="mf-popover-row"

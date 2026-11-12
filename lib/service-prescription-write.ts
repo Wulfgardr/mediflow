@@ -12,6 +12,8 @@ import {
     type ServicePrescriptionUpdatePayload,
 } from './api-schemas/prescriptions';
 import { dbServer } from './db-server';
+import { readPatientOpenLoopProjection } from './patient-open-loops-read';
+import { observations } from './schema';
 import { activePatients } from './patient-lifecycle';
 import type { NetworkWriteContext } from './network-write-context';
 import { buildPrescriptionVersionConflictPayload, parsePrescriptionExpectedVersion } from './prescription-concurrency';
@@ -737,4 +739,24 @@ export async function readServiceCatalog(searchParams: URLSearchParams) {
             .limit(limit);
     }
     return dbServer.select().from(serviceCatalogEntries).orderBy(asc(serviceCatalogEntries.displayName)).limit(limit);
+}
+
+export function readNetworkPatientOpenLoops(patientId: string, ambulatoryId: string) {
+    return dbServer.transaction(tx => {
+        const member = tx.select({ id: patientsToAmbulatories.patientId }).from(patientsToAmbulatories)
+            .where(and(eq(patientsToAmbulatories.patientId, patientId),
+                eq(patientsToAmbulatories.ambulatoryId, ambulatoryId))).get();
+        if (!member) return null;
+        const prescriptions = tx.select().from(servicePrescriptions).where(eq(servicePrescriptions.patientId, patientId)).limit(1025).all();
+        const items = tx.select().from(servicePrescriptionItems).where(eq(servicePrescriptionItems.patientId, patientId)).limit(1025).all();
+        const sourceObservations = tx.select().from(observations).where(eq(observations.patientId, patientId)).limit(1025).all();
+        if (Math.max(prescriptions.length, items.length, sourceObservations.length) > 1024) {
+            throw new Error('Open-loop source limit exceeded');
+        }
+        return readPatientOpenLoopProjection({ patientId, ambulatoryId, now: new Date(),
+            prescriptions,
+            items: items.map(item => ({ ...item, codeSystem: item.codeSystem ?? undefined, serviceCode: item.serviceCode ?? undefined })),
+            observations: sourceObservations,
+        });
+    });
 }

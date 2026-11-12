@@ -58,7 +58,7 @@ pub(super) enum SynthesisCurrency {
     Superseded,
 }
 
-const HOST_CLOSED: &str = "Host locale chiuso. La sintesi si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.";
+const HOST_CLOSED: &str = "Accesso locale chiuso. La sintesi si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.";
 
 impl ClinicalApp {
     fn synthesis_row(&self, document: &str) -> Option<&Attachment> {
@@ -160,7 +160,7 @@ impl ClinicalApp {
                             .into(),
                     ),
                     Err(RuntimeError::TooLarge) => GenerationPhase::Unavailable(
-                        "Il documento supera i 25 MiB che l’host accetta: la richiesta non parte."
+                        "Il documento supera i 25 MiB che l’home-base accetta: la richiesta non parte."
                             .into(),
                     ),
                     Err(RuntimeError::ReadRequired) => GenerationPhase::Error(
@@ -199,7 +199,7 @@ impl ClinicalApp {
                 .synthesis
                 .area
                 .end(GenerationPhase::Unavailable(
-                    "Host locale chiuso. Nessun dato è stato inviato.".into(),
+                    "Accesso locale chiuso. Nessun dato è stato inviato.".into(),
                 ));
             cx.notify();
             return;
@@ -280,7 +280,7 @@ impl ClinicalApp {
                 GenerationPhase::Error(document_synthesis_message("response_invalid").into())
             }
             Err(RuntimeError::Conflict) => GenerationPhase::Error(
-                "La selezione sull’host è cambiata durante la richiesta. Riprova.".into(),
+                "La selezione sull’home-base è cambiata durante la richiesta. Riprova.".into(),
             ),
             Err(error) => GenerationPhase::Error(ui_error(error)),
         };
@@ -431,12 +431,12 @@ impl ClinicalApp {
             GenerationPhase::Consent(request) => {
                 pane = pane
                     .child(line(format!(
-                        "Verrà inviato all’host il documento «{}» ({}, {}). L’host ne estrae il testo e lo passa al modello locale.",
+                        "Verrà inviato all’home-base il documento «{}» ({}, {}). L’home-base ne estrae il testo e lo passa al modello locale.",
                         request.name,
                         request.mime_type,
                         format_size(request.byte_length() as u64)
                     )))
-                    .child(muted("Il testo non lascia il computer dell’host. La risposta resta una proposta: la sintesi salvata del documento non cambia.".into()))
+                    .child(muted("Il testo non lascia il home-base. La risposta resta una proposta: la sintesi salvata del documento non cambia.".into()))
                     .child(
                         button("document-synthesis-confirm", "Invia e genera", theme, true, true)
                             .on_click(cx.listener(|this, _, _, cx| this.synthesis_confirm(cx))),
@@ -450,7 +450,7 @@ impl ClinicalApp {
                 pane = pane
                     .child(notice(
                         "document-synthesis-running",
-                        "Estrazione e generazione in corso sull’host.",
+                        "Estrazione e generazione in corso sull’home-base.",
                         theme,
                         false,
                     ))
