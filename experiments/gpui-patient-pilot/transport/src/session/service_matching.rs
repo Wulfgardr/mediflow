@@ -261,7 +261,8 @@ impl RuntimeSession {
             service_code: prepared.entry.service_code.clone(),
             display_name: prepared.entry.display_name.clone(),
             version: item.version,
-            read_at: chrono::Utc::now().to_rfc3339(),
+            read_at: chrono::DateTime::<chrono::Utc>::from(std::time::SystemTime::now())
+                .to_rfc3339(),
             intent: prepared.intent.clone(),
             scope: prepared.scope.clone(),
             patient: prepared.patient.clone(),
