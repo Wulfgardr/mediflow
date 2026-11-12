@@ -461,14 +461,14 @@ fatti nella cartella clinica. Le prove sintetiche coprono il frame Web ed il
 client GPUI, compresa l’apertura dopo un’altra funzione. Desktop autenticati,
 applicazione installata ed uso clinico restano da qualificare.
 
-Le cinque aperture alla finestra (Quadro, sintesi, import, ICD e follow-up) selezionano
+Le sette aperture alla finestra (Quadro, sintesi, import, ICD, follow-up, evidenze ed abbinamento) selezionano
 una sola funzione visibile. Una nuova apertura ammessa sostituisce il pannello
 precedente e ritira la richiesta ancora aperta; una proposta già conclusa
 resta nello stato nativo. Una funzione già occupata rimostra la propria area
 senza sostituirne il lavoro; se attende ancora l’ammissione, conserva la vista
 precedente. Il render della finestra è coperto dalla matrice
-`chat_function_view_matrix_renders_only_the_requested_function`, con 60 casi: tutte le coppie su archivi vuoti e popolati, ICD anche dopo una ricerca conclusa e follow-up
-con ricevuta di lettura già disponibile. Altri venti casi verificano le direzioni
+`chat_function_view_matrix_renders_only_the_requested_function`, con 112 casi: tutte le coppie su archivi vuoti e popolati, ICD anche dopo una ricerca conclusa e follow-up
+con ricevuta di lettura già disponibile. La ricevuta conclusa dell’abbinamento è verificata separatamente contro tutte le sette funzioni. Altri ventotto casi verificano le direzioni
 da e verso i follow-up. La richiesta negata durante
 l’ammissione lascia visibile la funzione precedente.
 
