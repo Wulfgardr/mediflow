@@ -236,16 +236,20 @@ export function collectGpuiComparisonSelection(root) {
   const source = read(root, `${gpuiDirectory}/comparison/run.mjs`);
   // These exact children are executed/imported by the versioned orchestrator.
   // An additional test file still fails the repository's discovery inventory.
-  const files = ['prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs', 'governance.mjs'].map(file => `${gpuiDirectory}/comparison/${file}`);
+  const files = ['prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs', 'governance.mjs', 'audit.mjs'].map(file => `${gpuiDirectory}/comparison/${file}`);
   for (const file of files) read(root, file);
   for (const required of [
     "import { compareReports, compareResourceWritesReports, comparePatientProfileWritesReports } from './compare.mjs';",
+    "import { clinicalEvents, expectedAudit, verifyClinicalAudit } from './audit.mjs';",
     "[path.join(directory, 'verify-vectors.mjs')]",
     "[path.join(directory, 'prepare-runtime.mjs'), 'candidate', privatePath, workspace]",
     "[path.join(directory, 'js-client.mjs'), '--config', configPath]",
     'compareReports(mutationReports.javascript, mutationReports.rust)',
     'compareResourceWritesReports(resourceReports.javascript, resourceReports.rust)',
     'comparePatientProfileWritesReports(profileReports.javascript, profileReports.rust)',
+    'checkAudit(cursor, expectedAudit.writes)',
+    'checkAudit(cursor, expectedAudit.resources)',
+    'checkAudit(cursor, expectedAudit.profiles)',
   ]) {
     if (source.split(required).length !== 2) throw new Error('Runtime comparison child binding changed');
   }

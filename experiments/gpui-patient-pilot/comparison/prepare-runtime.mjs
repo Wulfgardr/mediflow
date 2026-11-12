@@ -153,7 +153,7 @@ const requestedCapabilities = [
 ];
 const intent = await request('POST', '/api/v1/network/pairing-intents', {
     body: {
-        deviceName: `Confronto sintetico ${mode}`, clientPlatform: mode === 'candidate' ? 'linux' : 'macos',
+        deviceName: `Confronto sintetico ${mode}`, clientPlatform: process.platform === 'darwin' ? 'macos' : 'linux',
         appVersion: '0.9.0-transition', requestedCapabilities,
     }, statuses: [201],
 });
