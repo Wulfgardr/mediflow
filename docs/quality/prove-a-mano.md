@@ -38,6 +38,74 @@ censimento Q-8 e non diventano qualificati da questo comando. Non sono le prove
 D1/D3 scelte per questa lane. check-standalone-runtime-bundle controlla anche i vincoli Mac del runtime distribuito
 ed è incluso nel comando.
 
+## C-B: qualità del redattore con i pesi reali
+
+La voce `redazione-protocollo` non esegue questa misura. Sul Mac, con un Python
+e un modello già installati, eseguire separatamente:
+
+```bash
+nice -n 19 node scripts/run-strip-types.mjs scripts/measure-cb-redaction.ts --python /percorso/venv/bin/python --model /percorso/model --out /percorso/nuovo-esito.json
+```
+
+Il comando non scarica pesi, non legge archivi clinici e non invia dati.
+Usa il worker della repository in sandbox senza rete, con quattro thread di
+inferenza. Il worker verifica pesi e dipendenze prima di dichiarare l'identità
+osservata. Il JSON lega questa identità ai digest del corpus e dei sorgenti,
+riporta input, rilevamenti, residui esatti e tempi; la tabella stampa attesi,
+fermati e sfuggiti per famiglia. Il file di uscita deve essere nuovo.
+
+Il [corpus sintetico annotato](../../scripts/fixtures/cb-redaction-acceptance.json)
+contiene 36 casi e 43 identificativi. Si contano le occorrenze con offset UTF-16;
+nei nomi file si annota il basename identificante, senza estensione. Un residuo
+leggibile anche parziale conta come sfuggito. Soli spazi o caratteri Unicode di
+formato rimasti visibili non identificano; `fullyCovered` conserva anche questa
+distinzione. Le annotazioni non sono fornite al runner.
+
+La misura applica il runner reale più la sessione di redazione condivisa e,
+separatamente, la preparazione clinica usata dalla scheda chat con il controllo
+sul payload serializzato. I campi ignoti sono inseriti anche nel profilo clinico:
+il suo schema li deve rifiutare. Un errore del runtime è **non provato**, senza
+contarlo come identificativo fermato. Tre controlli privi di identificativi
+rivelano un eventuale rifiuto indiscriminato o una perdita del testo clinico.
+
+Il [risultato del 13 novembre 2026](./cb-redaction-20261113.json) è rosso:
+
+| Famiglia | Attesi | Redattore: fermati | Sfuggiti | Scheda: fermati | Sfuggiti |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| CF OCR | 6 | 4 | 2 | 6 | 0 |
+| Terze persone | 7 | 7 | 0 | 7 | 0 |
+| Luoghi | 5 | 3 | 2 | 3 | 2 |
+| Nascita | 8 | 8 | 0 | 8 | 0 |
+| Nomi file | 5 | 5 | 0 | 5 | 0 |
+| Campi ignoti | 5 | 3 | 2 | 5 | 0 |
+| Identità nota | 3 | 3 | 0 | 3 | 0 |
+| Contatti | 4 | 2 | 2 | 4 | 0 |
+| **Totale** | **43** | **35** | **8** | **41** | **2** |
+
+Tempo: 75,279 s, uscita 1. Il caso `luogo-04`, «Trasferita da Valleverde
+Inventato a Rocca Sintetica», conserva entrambi i luoghi nella preparazione
+clinica e nel suo payload serializzato. Gli altri difetti aperti riguardano
+`cf-04`, `cf-06`, `ignoto-02`, `ignoto-04`, `contatto-02` e `contatto-03`;
+il JSON conserva ogni identificativo e frammento residuo. Nessuno è corretto
+in questa tranche. I tre controlli clinici sono preparati integri dalla scheda;
+il redattore condiviso li oscura invece come persone.
+
+Controllo negativo, con gli stessi casi e le stesse regole locali, togliendo
+la sola componente neurale:
+
+```bash
+nice -n 19 node scripts/run-strip-types.mjs scripts/measure-cb-redaction.ts --negative-control --out /percorso/nuovo-negativo.json
+```
+
+Risultato: 33 sfuggiti su 43, uscita 1. I cinque test della misura verificano
+conteggi, offset, copertura parziale, residui invisibili e controllo negativo;
+sono registrati nella suite unit. Questi test non qualificano i pesi.
+
+Il criterio zero falsi negativi non è raggiunto. Il dato riguarda questo corpus
+e questi pesi: non qualifica consenso, governance del broker, invio, desktop,
+canali osservati, equivalenza clinica o dati reali. Non viene scritta alcuna
+ammissione all'uscita. Il processo che riceve una chat non viene avviato.
+
 ## Ascolto della visita (WUL-828)
 
 `ascolto-visita-modello` lancia `scripts/prove-ascolto-visita.mjs` con i due file
