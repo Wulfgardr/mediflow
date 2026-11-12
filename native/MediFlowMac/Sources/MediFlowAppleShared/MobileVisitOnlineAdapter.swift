@@ -78,7 +78,7 @@ struct MobileVisitOnlineAdapter: MobileVisitOnlineReading {
         return MobileVisitDossier(id: UUID(), context: after.context,
             patientName: "\(patient.lastName) \(patient.firstName)", acquiredAt: started,
             expiresAt: started.addingTimeInterval(86_400), sections: sections,
-            omissions: ["Documenti e allegati", "Checkup e osservazioni", "Prescrizioni", "Funzioni intelligenti: richiedono l’host online"])
+            omissions: ["Documenti e allegati", "Checkup e osservazioni", "Prescrizioni", "Funzioni intelligenti: richiedono l’home-base online"])
     }
 
     private func checkCurrent() throws {

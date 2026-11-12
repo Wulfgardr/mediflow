@@ -141,9 +141,9 @@ test('deriveNetworkOperatingModeViewModel maps local-only into the real local st
     assert.equal(viewModel.activationReasonLabel, 'Default locale');
     assert.equal(viewModel.nodeStatusLabel, 'Locale');
     assert.equal(viewModel.pairingLabel, 'Disabilitato');
-    assert.equal(viewModel.aiRuntimeLabel, 'AI locale');
+    assert.equal(viewModel.aiRuntimeLabel, 'IA locale');
     assert.equal(viewModel.aiLocalRuntimeLabel, 'Ollama locale pronto, profilo medium');
-    assert.equal(viewModel.aiFallbackLabel, 'Fallback automatico negato: se l AI non e disponibile, la richiesta fallisce');
+    assert.equal(viewModel.aiFallbackLabel, 'Fallback automatico negato: se l IA non e disponibile, la richiesta fallisce');
     assert.equal(viewModel.currentReplicaState.code, 'local-only');
     assert.equal(viewModel.replicaPendingActionLabel, 'Nessuna');
     assert.equal(viewModel.backupBoundaryLabel, 'Il backup v1 resta separato dal mirror di rete');
@@ -279,9 +279,9 @@ test('deriveNetworkOperatingModeViewModel maps network-unpaired into the availab
     assert.equal(viewModel.activationReasonLabel, 'Manuale');
     assert.equal(viewModel.nodeStatusLabel, 'Disponibile');
     assert.equal(viewModel.pairingLabel, 'Richiesto');
-    assert.equal(viewModel.replicaPendingActionLabel, 'Serve pairing');
-    assert.equal(viewModel.aiRuntimeLabel, 'Stato AI host disponibile');
-    assert.match(viewModel.aiRuntimeDescription, /non autorizza esecuzione AI/);
+    assert.equal(viewModel.replicaPendingActionLabel, 'Serve abbinamento');
+    assert.equal(viewModel.aiRuntimeLabel, 'Stato IA home-base disponibile');
+    assert.match(viewModel.aiRuntimeDescription, /non autorizza esecuzione IA/);
     assert.equal(viewModel.aiCapabilityStatus, 'available');
     assert.equal(viewModel.identityCredentialLabel, 'Sessione operatore attiva');
     assert.equal(viewModel.identityScopeSourceLabel, 'Contesto sessione');
@@ -366,10 +366,10 @@ test('deriveNetworkOperatingModeViewModel marks centralized AI unavailable when 
         },
     }));
 
-    assert.equal(viewModel.aiRuntimeLabel, 'Stato AI host non disponibile');
+    assert.equal(viewModel.aiRuntimeLabel, 'Stato IA home-base non disponibile');
     assert.equal(viewModel.aiCapabilityStatus, 'unavailable');
     assert.equal(viewModel.aiLocalRuntimeLabel, 'Ollama locale non valido, profilo custom');
-    assert.equal(viewModel.aiRolloutGateLabel, 'Benchmark per area AI e governance prima dell attivazione reale');
+    assert.equal(viewModel.aiRolloutGateLabel, 'Benchmark per area IA e governance prima dell attivazione reale');
 });
 
 test('deriveNetworkOperatingModeViewModel treats paired-online as a real active state', () => {

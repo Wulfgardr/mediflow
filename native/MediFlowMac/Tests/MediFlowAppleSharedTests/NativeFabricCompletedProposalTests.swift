@@ -1,5 +1,9 @@
 import Foundation
 import XCTest
+import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 @testable import MediFlowAppleShared
 
 /// Rischio #4 (censimento macchine a stati, 11/11): a proposta locale completata
@@ -93,5 +97,66 @@ final class NativeFabricCompletedProposalTests: XCTestCase {
         XCTAssertEqual(model.phase, .idle)
         XCTAssertNil(model.proposal)
         XCTAssertEqual(cancels, 1, "l'attempt viene chiuso sull'host")
+    }
+}
+
+/// WUL-826: sopra le frasi del Quadro paziente una sola riga chiede di controllarle
+/// sulla fonte. La vista disegna queste righe nell'ordine dato.
+final class NativePatientInsightReviewNoticeTests: XCTestCase {
+    #if os(macOS)
+    func testWebAdministrationKeepsTheTechnicalLocalhostAddress() throws {
+        XCTAssertEqual(HostAdminError.forbidden.errorDescription,
+            "L'home-base riserva questa lettura alla console web. Un client nativo abbinato non vi accede, nemmeno con un account amministratore: si consulta da localhost.")
+        let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let view = try String(contentsOf: package.appendingPathComponent("Sources/MediFlowAppleShared/AppleFoundation/HostAdminWorkspaceView.swift"), encoding: .utf8)
+        XCTAssertTrue(view.contains("si usano da localhost."))
+        XCTAssertFalse(view.contains("localhome-base"))
+    }
+    #endif
+
+    @MainActor
+    func testProposalCopySnapshot() throws {
+        let proposal = NativeOrdinaryJSON.object(["preview": .object(["proposal": .object([
+            "summary": .string("Proposta sintetica da rivedere. [S1]"),
+            "currentState": .array([.string("Visita sintetica eseguita. [S2]")]),
+            "alerts": .array([]), "nextSteps": .array([.string("Controllo sintetico da prenotare. [S2]")]), "gaps": .array([]),
+        ])])])
+        #if os(macOS)
+        if let output = ProcessInfo.processInfo.environment["WUL825_APPLE_SNAPSHOTS"] {
+            try FileManager.default.createDirectory(atPath: output, withIntermediateDirectories: true)
+            for width in [390.0, 820.0, 1024.0] {
+                let view = NativeOrdinaryProposalView(function: .patientInsight, result: proposal)
+                    .padding(20).frame(width: width, alignment: .leading).background(Color.white)
+                let renderer = ImageRenderer(content: view)
+                renderer.scale = 2
+                let image = try XCTUnwrap(renderer.cgImage)
+                let data = try XCTUnwrap(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
+                try data.write(to: URL(fileURLWithPath: output).appendingPathComponent("proposal-\(Int(width)).png"))
+            }
+        }
+        #endif
+        XCTAssertEqual(NativeOrdinaryFunction.patientInsight.title, "Quadro paziente")
+    }
+
+    private let notice = "Controlla ogni frase sulla fonte che cita: il modello può scambiare ciò che è fatto con ciò che è da fare."
+    func testNoticeIsTheFirstRowAboveThePatientInsightSentences() throws {
+        let proposal = NativeOrdinaryJSON.object([
+            "summary": .string("Sintesi sintetica da rivedere. [S1]"),
+            "currentState": .array([.string("Visita sintetica eseguita. [S2]")]),
+            "alerts": .array([]), "nextSteps": .array([.string("Controllo sintetico da prenotare. [S2]")]), "gaps": .array([]),
+        ])
+        let rows = NativeOrdinaryProposalView.patientInsightRows(proposal)
+        XCTAssertEqual(NativeOrdinaryProposalView.patientInsightReviewNotice, notice)
+        XCTAssertEqual(rows, [
+            .notice(notice),
+            .paragraph("Sintesi sintetica da rivedere. [S1]"),
+            .heading("Stato attuale"), .item("Visita sintetica eseguita. [S2]"),
+            .heading("Passi da valutare"), .item("Controllo sintetico da prenotare. [S2]"),
+        ])
+        // Anche una proposta senza sintesi ha la riga in testa, una sola volta.
+        let onlyGaps = NativeOrdinaryProposalView.patientInsightRows(.object(["summary": .string(""), "gaps": .array([.string("Dato mancante. [DATI-INCOMPLETI]")])]))
+        XCTAssertEqual(onlyGaps.first, .notice(notice))
+        XCTAssertEqual(onlyGaps.filter { $0 == .notice(notice) }.count, 1)
     }
 }

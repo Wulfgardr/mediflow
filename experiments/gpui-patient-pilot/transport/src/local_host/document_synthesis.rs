@@ -284,37 +284,37 @@ fn denied(status: u16, body: &[u8]) -> DocumentSynthesisOutcome {
 pub fn document_synthesis_message(code: &str) -> &'static str {
     match code {
         "lane_disabled" | "function_disabled" => {
-            "La sintesi dei documenti è spenta sull'host. Si riattiva in Impostazioni, Funzioni AI."
+            "La sintesi dei documenti è spenta sull'home-base. Si riattiva in Impostazioni, Funzioni IA."
         }
         "provider_unavailable" | "unsupported" => {
-            "Il modello locale dell'host non è disponibile. Verifica Impostazioni, Modelli locali."
+            "Il modello locale dell'home-base non è disponibile. Verifica Impostazioni, Modelli locali."
         }
         "unsupported_local_extraction" => {
-            "L'host non riesce a estrarre il testo di questo documento. Serve la lettura diretta dell'originale."
+            "L'home-base non riesce a estrarre il testo di questo documento. Serve la lettura diretta dell'originale."
         }
-        "fabric_denied" => "L'host non ha autorizzato l'esecuzione sul modello locale.",
+        "fabric_denied" => "L'home-base non ha autorizzato l'esecuzione sul modello locale.",
         "currentness_mismatch" | "selection_changed" => {
             "Il documento o la selezione sono cambiati durante la richiesta. Riprova."
         }
         "capture_consumed" | "preview_consumed" | "capture_expired" | "preview_expired" => {
-            "La richiesta è scaduta sull'host. Riprova."
+            "La richiesta è scaduta sull'home-base. Riprova."
         }
         "binding_stale" | "catalog_stale" | "session_stale" | "revision_conflict"
         | "command_conflict" => {
             "La configurazione dei modelli è cambiata durante la richiesta. Riprova."
         }
         "session_unavailable" => {
-            "La sessione dell'host locale non è più valida. Riapri l'accesso locale."
+            "La sessione dell'home-base non è più valida. Riapri l'accesso locale."
         }
         "operation_unavailable" => {
-            "L'host non ha prodotto una sintesi: modello locale non pronto, risposta del modello scartata dai controlli o guasto."
+            "L'home-base non ha prodotto una sintesi: modello locale non pronto, risposta del modello scartata dai controlli o guasto."
         }
         "model_response_invalid" => "La risposta del modello non era valida. Riprova.",
         "citation_not_literal" => {
             "Il modello non ha citato il documento parola per parola. Riprova."
         }
-        "response_invalid" => "La risposta dell'host non ha superato i controlli dell'app.",
-        _ => "L'host ha rifiutato la richiesta.",
+        "response_invalid" => "La risposta dell'home-base non ha superato i controlli dell'app.",
+        _ => "L'home-base ha rifiutato la richiesta.",
     }
 }
 
@@ -951,17 +951,20 @@ mod tests {
             ),
             (
                 "preview_expired",
-                "La richiesta è scaduta sull'host. Riprova.",
+                "La richiesta è scaduta sull'home-base. Riprova.",
             ),
             (
                 "operation_unavailable",
-                "L'host non ha prodotto una sintesi: modello locale non pronto, risposta del modello scartata dai controlli o guasto.",
+                "L'home-base non ha prodotto una sintesi: modello locale non pronto, risposta del modello scartata dai controlli o guasto.",
             ),
             (
                 "response_invalid",
-                "La risposta dell'host non ha superato i controlli dell'app.",
+                "La risposta dell'home-base non ha superato i controlli dell'app.",
             ),
-            ("codice-sconosciuto", "L'host ha rifiutato la richiesta."),
+            (
+                "codice-sconosciuto",
+                "L'home-base ha rifiutato la richiesta.",
+            ),
         ] {
             assert_eq!(document_synthesis_message(code), expected, "{code}");
         }

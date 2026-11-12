@@ -7,7 +7,7 @@ import MediFlowCore
 final class NativeOrdinaryModel: ObservableObject {
     enum Phase: Equatable { case idle, preparing, needsConsent, consented, awaitingLogin, connected, ready, generating, completed, closing, blocked }
     @Published private(set) var phase: Phase = .idle
-    @Published private(set) var message = "Prepara una proposta da rivedere: nessuna modifica alla cartella."
+    @Published private(set) var message = "Prepara una proposta da rivedere."
     @Published private(set) var disclosure: NativeOrdinaryDisclosure?
     @Published private(set) var challenge: NativeOrdinaryChallenge?
     @Published private(set) var catalog: NativeOrdinaryCatalog?
@@ -233,7 +233,7 @@ final class NativeOrdinaryModel: ObservableObject {
                 try value.validate(function: function, attempt: id)
                 guard value.phase == "closed", value.cleanupConfirmed == true else { throw NativeOrdinaryContractError.cleanupUnconfirmed }
                 attemptId = nil; pendingProjection = nil; original = nil; expiry = .infinity; isWorking = false; phase = .idle
-                message = closedMessage ?? "Operazione chiusa. Nessuna modifica alla cartella."
+                message = closedMessage ?? "Operazione chiusa."
             } catch {
                 guard generation == epoch else { return }
                 isWorking = false; phase = .blocked
@@ -252,16 +252,16 @@ final class NativeOrdinaryModel: ObservableObject {
         switch error {
         case let failure as NativeOrdinaryServerFailure:
             let reason = failure.code == .upstreamError && phase == .preparing ? "preparazione locale non disponibile" : failure.code.safeReason
-            return "Operazione non completata (\(failure.code.rawValue)): \(reason). Operazione chiusa; nessuna modifica alla cartella."
+            return "Operazione non completata (\(failure.code.rawValue)): \(reason). Operazione chiusa."
         case HomeBaseClientError.httpStatus(let status, _):
             switch status {
-            case 401: reason = "sessione o pairing non più validi"
+            case 401: reason = "sessione o abbinamento non più validi"
             case 403: reason = "operazione non autorizzata"
             case 409: reason = "contesto o operazione non più correnti"
             case 429: reason = "servizio temporaneamente non disponibile"
             default: reason = "servizio non disponibile o risposta non verificata"
             }
-            return "Operazione non completata (HTTP \(status)): \(reason). Operazione chiusa; nessuna modifica alla cartella."
+            return "Operazione non completata (HTTP \(status)): \(reason). Operazione chiusa."
         case NativeOrdinaryContractError.invalid:
             reason = "risposta non verificata"
         case NativeOrdinaryContractError.stale:
@@ -275,14 +275,14 @@ final class NativeOrdinaryModel: ObservableObject {
         case HomeBaseClientError.transport(let issue):
             switch issue {
             case .tlsHandshakeFailed: reason = "verifica TLS non riuscita"
-            case .unreachable: reason = "host non raggiungibile"
+            case .unreachable: reason = "home-base non raggiungibile"
             case .timeout: reason = "tempo di risposta scaduto"
             case .other: reason = "trasporto non disponibile"
             }
         default:
             reason = "errore locale o risposta non verificata"
         }
-        return "Operazione non completata: \(reason). Operazione chiusa; nessuna modifica alla cartella."
+        return "Operazione non completata: \(reason). Operazione chiusa."
     }
     private func retireLate(_ value: NativeOrdinaryResponse, source: NativeOrdinarySnapshot, token: UUID) async {
         guard authorityToken == token else { return }

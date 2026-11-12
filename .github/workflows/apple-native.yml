@@ -156,6 +156,7 @@ jobs:
             if [ "$EVENT" != push ]; then
               case "$f" in
                 scripts/check-apple-*.sh)            apple=true ;;
+                scripts/check-apple-*.mjs)           apple=true ;;
                 # WUL-547: `scripts/assert-apple-terminology-tests.sh` non era coperto
                 # da NESSUN filtro, né push né pull_request — il glob era
                 # `scripts/check-apple-*.sh` e quel file inizia per `assert-`. È il
@@ -201,6 +202,10 @@ jobs:
         run: npm ci && npm run prepare:dependencies
       - name: Verify native source boundary test prerequisites
         run: node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) process.exit(1); console.log("Node", process.versions.node, "TypeScript", require("typescript").version)'
+      - name: Apple Lume color guard
+        run: |
+          node scripts/check-apple-lume-colors.mjs
+          node scripts/check-apple-lume-colors.mjs --self-test
       - name: Select latest stable Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
       - name: Toolchain diagnostics

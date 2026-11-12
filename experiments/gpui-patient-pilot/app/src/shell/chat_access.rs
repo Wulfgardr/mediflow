@@ -200,13 +200,75 @@ fn catalog_copy(prosthetics: bool) -> (&'static str, &'static str) {
 }
 
 impl ClinicalApp {
-    /// L'area della funzione generativa che la chat chiede: ogni funzione ha la sua,
+    pub(super) fn chat_function_view(&self, cx: &Context<Self>) -> Option<Div> {
+        match self.patient.chat_function? {
+            Function::Insight => Some(self.patient_insight_view(cx)),
+            Function::Synthesis => Some(self.documents_view(cx)),
+            Function::Import => Some(self.smart_import_view(cx)),
+            Function::OpenLoops
+                if self
+                    .selected_id
+                    .as_deref()
+                    .is_some_and(|id| self.open_loops.patient_is(id)) =>
+            {
+                Some(self.open_loops_view(cx))
+            }
+            Function::OpenLoops => None,
+            Function::EvidenceQueue
+                if self
+                    .selected_id
+                    .as_deref()
+                    .is_some_and(|id| self.evidence_queue.patient_is(id)) =>
+            {
+                Some(self.evidence_queue_view(cx))
+            }
+            Function::EvidenceQueue => None,
+            Function::Icd
+                if self
+                    .selected_id
+                    .as_deref()
+                    .is_some_and(|id| self.who.patient_is(id)) =>
+            {
+                Some(self.who_view(cx))
+            }
+            Function::Icd => None,
+        }
+    }
+
+    fn show_chat_function(&mut self, function: Function, cx: &mut Context<Self>) {
+        for other in Function::ALL {
+            if other != function {
+                self.chat_area(other).close_view();
+            }
+        }
+        self.area = Area::Patients;
+        self.directory = false;
+        self.show_other = false;
+        self.focus_after_render = true;
+        let section = match function {
+            Function::Insight | Function::Icd | Function::OpenLoops | Function::EvidenceQueue => {
+                PatientSection::Overview
+            }
+            Function::Synthesis | Function::Import => PatientSection::Documents,
+        };
+        if self.patient_section != section {
+            self.section_selected(section, cx);
+        }
+        if function == Function::Synthesis {
+            self.patient.document_details_id = self.patient.synthesis.document.clone();
+        }
+        self.patient.chat_function = Some(function);
+    }
+    /// L'area della funzione che la chat chiede: ogni funzione ha la sua,
     /// con il suo legame.
     fn chat_area(&mut self, function: Function) -> &mut dyn ChatArea {
         match function {
             Function::Insight => &mut self.patient.insight,
             Function::Synthesis => &mut self.patient.synthesis.area,
             Function::Import => &mut self.patient.smart_import,
+            Function::Icd => &mut self.who,
+            Function::OpenLoops => &mut self.open_loops,
+            Function::EvidenceQueue => &mut self.evidence_queue,
         }
     }
 
@@ -260,12 +322,20 @@ impl ClinicalApp {
         let access = self.local_host.access();
         let early = if occupied {
             Some(Stage::Busy)
-        } else if access.is_none() {
+        } else if access.is_none()
+            && !matches!(
+                function,
+                Function::Icd | Function::OpenLoops | Function::EvidenceQueue
+            )
+        {
             Some(Stage::Unavailable)
         } else {
             None
         };
         if let Some(stage) = early {
+            if stage == Stage::Busy && self.chat_area(function).can_show() {
+                self.show_chat_function(function, cx);
+            }
             if let Ok(mut pending) = pending.lock() {
                 pending.finish_function_open(stage);
             }
@@ -280,11 +350,16 @@ impl ClinicalApp {
                 if !chat_access::owner::admit_function(&admitting) {
                     return Ok(None);
                 }
-                let access = access.unwrap();
                 let enabled = match function {
-                    Function::Insight => true,
-                    Function::Synthesis => access.document_synthesis_enabled().unwrap_or(false),
-                    Function::Import => access.smart_import_enabled().unwrap_or(false),
+                    Function::Insight
+                    | Function::Icd
+                    | Function::OpenLoops
+                    | Function::EvidenceQueue => true,
+                    Function::Synthesis => access
+                        .unwrap()
+                        .document_synthesis_enabled()
+                        .unwrap_or(false),
+                    Function::Import => access.unwrap().smart_import_enabled().unwrap_or(false),
                 };
                 Ok(Some(enabled))
             },
@@ -315,20 +390,36 @@ impl ClinicalApp {
                     return;
                 }
                 this.chat_area(function).admitted();
+                if function == Function::Synthesis {
+                    this.patient.synthesis.document = None;
+                }
+                this.show_chat_function(function, cx);
                 match function {
-                    Function::Insight => {
-                        if this.patient_section != PatientSection::Overview {
-                            this.section_selected(PatientSection::Overview, cx);
+                    Function::EvidenceQueue => {
+                        if let Ok(mut pending) = target.lock() {
+                            pending.finish_function_open(Stage::Opened);
                         }
+                        this.open_patient_evidence_queue(cx);
+                    }
+                    Function::OpenLoops => {
+                        if let Ok(mut pending) = target.lock() {
+                            pending.finish_function_open(Stage::Opened);
+                        }
+                        this.open_patient_loops(cx);
+                    }
+                    Function::Icd => {
+                        this.who
+                            .open_for_patient(patient_id.clone(), &this.profile_scroll, cx);
+                        this.reference_search
+                            .update(cx, |input, cx| input.set_content("", cx));
+                        if let Ok(mut pending) = target.lock() {
+                            pending.finish_function_open(Stage::Opened);
+                        }
+                    }
+                    Function::Insight => {
                         this.insight_prepare(cx);
                     }
                     Function::Synthesis | Function::Import => {
-                        if function == Function::Synthesis {
-                            this.patient.synthesis.document = None;
-                        }
-                        if this.patient_section != PatientSection::Documents {
-                            this.section_selected(PatientSection::Documents, cx);
-                        }
                         if let Ok(mut pending) = target.lock() {
                             pending.finish_function_open(Stage::Opened);
                         }
@@ -531,7 +622,7 @@ impl ClinicalApp {
                 else { Err("Esito non confermato. Rileggi la ricevuta; non ripetere la scrittura.".to_owned()) }
             } else if with_pin {
                 session.confirm_chat_access_pin(&context, &pin).map_err(|error| if error.status_code() == Some(423) {
-                    "PIN bloccato dopo troppi tentativi. Attendi lo sblocco previsto dall’host.".to_owned()
+                    "PIN bloccato dopo troppi tentativi. Attendi lo sblocco previsto dall’home-base.".to_owned()
                 } else { "PIN non confermato o sessione non più disponibile.".to_owned() })
             } else {
                 attempt.biometric().map_err(str::to_owned).and_then(|()|
@@ -873,7 +964,7 @@ impl ClinicalApp {
             .child(button("native-chat-access-deny", "Nega e ritira", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| { this.chat_access.retire(cx); cx.notify(); })))
             .when(state != State::Challenge, |el| el.child(notice("native-chat-access-state",
-                if matches!(state, State::Write(ChatWriteResolution::Confirmed(_)) | State::Write(ChatWriteResolution::Uncertain)) { "" } else if state == State::Consumed && therapy_mode { "Operazione terminata. Controlla ricevuta e rilettura; nessuna ripetizione automatica." } else if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
+                if matches!(state, State::Write(ChatWriteResolution::Confirmed(_)) | State::Write(ChatWriteResolution::Uncertain)) { "" } else if state == State::Consumed && therapy_mode { "Operazione terminata. Controlla ricevuta e rilettura; nessuna ripetizione automatica." } else if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’home-base non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
     }
 }
 

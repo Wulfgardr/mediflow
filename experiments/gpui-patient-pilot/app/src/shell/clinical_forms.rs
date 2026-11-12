@@ -28,7 +28,7 @@ impl ClinicalApp {
                 .child(div().text_color(theme.secondary).child(text!(match form.kind {
                     FormKind::Notes => "La conferma sostituisce soltanto le note della scheda del paziente indicato.",
                     FormKind::Entry => "Questa voce è una nota di diario. Per una visita strutturata, un contatto remoto o allegati usa l'editor corrente.",
-                    FormKind::Scale => "La valutazione utilizza il questionario letto dall'host.",
+                    FormKind::Scale => "La valutazione utilizza il questionario letto dall'home-base.",
                     FormKind::Therapy => "Scegli il farmaco dal repertorio oppure riporta una terapia a testo libero. Verifica dose, motivo e date: la scelta della confezione non li modifica.",
                     FormKind::Observation => "Riporta il valore e le codifiche presenti nel referto. Non vengono dedotte unità, intervalli o interpretazioni cliniche.",
                     FormKind::Document => "Il documento scelto verrà aggiunto alla scheda del paziente indicato. Verifica nome, formato e dimensione prima di registrarlo.",
@@ -167,7 +167,7 @@ impl ClinicalApp {
                     format!("{first} {}",second.unwrap_or_default())
                 }
                 _ if form.kind == FormKind::Scale => "La rilettura non invia la valutazione. Le risposte restano in questa finestra fino alla verifica o alla chiusura esplicita.".into(),
-                _ => "La bozza è conservata. Copia il testo se vuoi conservarlo, poi rileggi la scheda prima di una nuova modifica.".into(),
+                _ => "La bozza è intatta.".into(),
             }
             }
         } else {

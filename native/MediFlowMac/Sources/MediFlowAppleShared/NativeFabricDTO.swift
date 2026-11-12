@@ -8,8 +8,8 @@ public struct NativeFabricFailure: Error, Sendable {
         var message: String {
             switch self {
             case .treatmentReasoningUnavailableInRelease: return NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.safeReason
-            case .functionDisabled: return "Funzione disabilitata sull’host."
-            case .providerUnavailable, .unavailable: return "Esecuzione locale non disponibile sull’host."
+            case .functionDisabled: return "Funzione disabilitata sull’home-base."
+            case .providerUnavailable, .unavailable: return "Esecuzione locale non disponibile sull’home-base."
             case .bindingStale, .catalogStale: return "Le impostazioni del modello sono cambiate. Prepara una nuova proposta."
             case .sessionExpired, .revoked: return "Sessione, fonti o contesto non più correnti."
             }

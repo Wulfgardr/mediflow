@@ -22,7 +22,7 @@ impl ScheduleArea {
         let fields = [
             "Ora (0-23)",
             "Minuto (0-59)",
-            "Cartella dei backup sul computer host",
+            "Cartella dei backup sull’home-base",
         ]
         .map(|label| cx.new(|cx| TextInput::new(label, label, label, false, theme, cx)));
         let subscriptions = fields
@@ -93,7 +93,7 @@ impl ClinicalApp {
         let available = self.archive_available();
         let mut pane = div().flex().flex_col().gap(px(12.))
             .child(section("backup-schedule-heading", "Backup programmato", theme))
-            .child(text!("Esportazione portabile sul computer host, nell’ora locale del sistema. Non comprende account e chiavi e non sostituisce il backup completo cifrato. Nessuna eliminazione automatica delle copie precedenti."))
+            .child(text!("Esportazione portabile sull’home-base, nell’ora locale del sistema. Non comprende account e chiavi e non sostituisce il backup completo cifrato. Nessuna eliminazione automatica delle copie precedenti."))
             .child(button("backup-schedule-read", "Rileggi programmazione", theme, false, available)
                 .on_click(cx.listener(|this, _, _, cx| this.read_backup_schedule(cx))));
         if let Some(status) = &area.snapshot {

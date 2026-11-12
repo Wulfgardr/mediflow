@@ -8,36 +8,35 @@ struct NativeFabricLocalExperience: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(function.title).chartGroupHeading()
+            if model.phase != .completed { Text("La cartella non cambia.").font(.callout) }
             Text(model.message).font(.callout).fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-fabric-status")
             if let selection = model.selection {
-                Text("\(selection.model) · \(selection.provider) · locale sull’host").font(.caption)
+                Text("\(selection.model) · \(selection.provider) · locale sull’home-base").font(.caption)
                 DisclosureGroup("Provenienza") {
-                    Text(selection.source == "saved_preference" ? "Preferenza salvata sull’host" : "Configurazione dell’host")
+                    Text(selection.source == "saved_preference" ? "Preferenza salvata sull’home-base" : "Configurazione dell’home-base")
                     Text("Opzione: \(selection.modelOptionId)")
                     Text("Catalogo: \(selection.catalogRevision)")
                     Text("Nessuna uscita cloud; nessuna alternativa automatica.")
                 }.font(.caption).textSelection(.enabled)
             }
-            if model.isWorking { ProgressView("Verifica sull’host…") }
+            if model.isWorking { ProgressView("Verifica sull’home-base…") }
             if model.phase == .idle {
-                Button("Prepara sul Mac") { model.prepare() }.disabled(!model.canPrepare)
+                Button("Genera proposta") { model.prepare() }.disabled(!model.canPrepare)
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-fabric-prepare")
             }
             if model.phase == .ready {
-                Button("Genera sul Mac") { model.generate() }.disabled(model.isWorking)
+                Button("Genera proposta") { model.generate() }.disabled(model.isWorking)
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-fabric-generate")
             }
             if [.preparing, .ready, .generating, .completed].contains(model.phase) {
-                Button(model.phase == .completed ? "Chiudi proposta" : "Annulla e chiudi") { model.invalidate() }
+                Button(model.phase == .completed ? "Nuova proposta" : "Annulla e chiudi") { model.invalidate() }
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-fabric-cancel")
             }
             if model.phase == .blocked { Button("Verifica la chiusura") { model.verifyClosure() }.disabled(model.isWorking) }
             if let proposal = model.proposal {
                 NativeOrdinaryProposalView(function: function, result: proposal)
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-fabric-proposal")
-                Text("Da verificare sulle fonti. Nessuna applicazione automatica né salvataggio clinico da questa vista.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
         }.buttonStyle(.bordered).frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-fabric")

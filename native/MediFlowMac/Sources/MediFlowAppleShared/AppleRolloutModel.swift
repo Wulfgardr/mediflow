@@ -217,7 +217,7 @@ public extension AppleFoundationSnapshot {
             AppleCapabilityLane(
                 id: "home-base",
                 title: "Home-base e trasporto",
-                summary: "Il backend locale e `/api/v1/network/*` read-only esistono gia. Pairing, HTTPS LAN e discovery Bonjour hanno smoke ripetibile; il bundle packaged supervisiona WebRuntime e proxy TLS.",
+                summary: "Il backend locale e `/api/v1/network/*` read-only esistono gia. Abbinamento, HTTPS LAN e discovery Bonjour hanno smoke ripetibile; il bundle packaged supervisiona WebRuntime e proxy TLS.",
                 sourceOfTruth: "ADR 0034, ADR 0038, ADR 0047",
                 macOS: ApplePlatformStatus(phase: .foundation, detail: "HTTPS LAN e node summary PHI-safe verificati dal Mac home-base"),
                 iPhone: ApplePlatformStatus(phase: .foundation, detail: "Shell mobile paired con smoke iPhone e selection harden"),
@@ -240,17 +240,17 @@ public extension AppleFoundationSnapshot {
                 summary: "Pazienti, diario, terapie, controlli, osservazioni, farmaci ed esenzioni devono migrare modulo-per-modulo senza fork logici.",
                 sourceOfTruth: "PLANS sezione 5, docs/parity-matrix.md",
                 macOS: ApplePlatformStatus(phase: .next, detail: "Rebuild del shell clinico nel nuovo assetto"),
-                iPhone: ApplePlatformStatus(phase: .blocked, detail: "Read/write non-AI dipendono da boundary paired"),
+                iPhone: ApplePlatformStatus(phase: .blocked, detail: "Read/write non-IA dipendono da boundary paired"),
                 iPad: ApplePlatformStatus(phase: .blocked, detail: "Parita ampia dopo write boundary e cache"),
                 nextIssue: "WUL-193"
             ),
             AppleCapabilityLane(
                 id: "runtime",
-                title: "Runtime locale e AI plane",
-                summary: "La app macOS espone il readiness del bootstrap locale e il bundle packaged supervisiona backend e proxy TLS; Ollama resta diagnostico, mentre Docker è fuori scope e non app-managed. L'AI mobile resta separata dal data plane clinico.",
+                title: "Runtime locale e IA plane",
+                summary: "La app macOS espone il readiness del bootstrap locale e il bundle packaged supervisiona backend e proxy TLS; Ollama resta diagnostico, mentre Docker è fuori scope e non app-managed. L'IA mobile resta separata dal data plane clinico.",
                 sourceOfTruth: "ADR 0048",
                 macOS: ApplePlatformStatus(phase: .foundation, detail: "Shell home-base primaria con supervisione WebRuntime/TLS e diagnostica provider"),
-                iPhone: ApplePlatformStatus(phase: .blocked, detail: "Nessun comando AI remoto in questa wave"),
+                iPhone: ApplePlatformStatus(phase: .blocked, detail: "Nessun comando IA remoto in questa wave"),
                 iPad: ApplePlatformStatus(phase: .blocked, detail: "Consultazione output solo dopo boundary esplicito"),
                 nextIssue: "Post-0.8 provider lifecycle"
             )
@@ -265,7 +265,7 @@ public extension AppleFoundationSnapshot {
             ),
             AppleMilestone(
                 id: "transport",
-                title: "Pairing harden su LAN fidata",
+                title: "Abbinamento harden su LAN fidata",
                 summary: "Discovery Bonjour, trasporto HTTPS e credenziali paired senza riuso del `local-api-token`.",
                 issue: "WUL-189",
                 phase: .foundation
@@ -273,20 +273,20 @@ public extension AppleFoundationSnapshot {
             AppleMilestone(
                 id: "writes",
                 title: "Write boundary reviewable",
-                summary: "Estensione di `/api/v1/network/*` con primi write path non-AI e stessa semantica di audit/conflitto del core.",
+                summary: "Estensione di `/api/v1/network/*` con primi write path non-IA e stessa semantica di audit/conflitto del core.",
                 issue: "WUL-190",
                 phase: .next
             ),
             AppleMilestone(
                 id: "runtime",
-                title: "macOS packaged runtime host",
+                title: "macOS packaged runtime home-base",
                 summary: "Shell home-base primaria, readiness runtime e supervisione di backend e proxy TLS nel bundle packaged. Ollama resta diagnostico; Docker è fuori scope e non app-managed.",
                 issue: "WUL-192",
                 phase: .foundation
             ),
             AppleMilestone(
                 id: "parity",
-                title: "Parita Apple-wide non-AI",
+                title: "Parita Apple-wide non-IA",
                 summary: "Cache cifrata, stati paired online/offline e matrice parity su macOS, iPhone e iPad.",
                 issue: "WUL-193 / WUL-194",
                 phase: .next
@@ -295,7 +295,7 @@ public extension AppleFoundationSnapshot {
         safetyNotes: [
             "SQLite resta autorevole solo sul Mac home-base.",
             "iPhone e iPad non usano `local-api-token` e non leggono il DB locale direttamente.",
-            "La prima wave mobile resta non-AI e paired-first.",
+            "La prima wave mobile resta non-IA e paired-first.",
             "La parita resta comportamentale e contrattuale, non una UI unica cross-platform."
         ]
     )

@@ -60,7 +60,7 @@ export function WhoSetupPanel({ expanded, onExpandedChange }: { expanded?: boole
         <Disclosure title="Opzionale: servizio locale WHO">
         <WhoLocalSetupGuide status={state.kind === 'ready' ? 'catalogState' in state.readiness ? undefined : state.readiness.status : state.kind} onRefresh={() => { setState({ kind: 'loading' }); setRefresh(value => value + 1); }} />
         <Disclosure title="Per chi gestisce il server">
-            <p className="mt-3 leading-6">Il setup host conserva manifesto, consenso, snapshot e prove nella cartella privata MediFlow/WHO. Non espone Docker al Web. Per controllare o riprendere le verifiche del solo servizio creato dalla procedura:</p>
+            <p className="mt-3 leading-6">Il setup home-base conserva manifesto, consenso, snapshot e prove nella cartella privata MediFlow/WHO. Non espone Docker al Web. Per controllare o riprendere le verifiche del solo servizio creato dalla procedura:</p>
             <pre className="mt-3 whitespace-pre-wrap break-all text-xs leading-5"><code>{'node scripts/who-local-onboarding.mjs status\nnode scripts/who-local-onboarding.mjs qualify'}</code></pre>
             <p className="mt-3 leading-6">La procedura completa è in docs/icd-who-setup.md. La CLI tecnica precedente resta disponibile per deployment gestiti separatamente; le prove di un altro deployment non si ereditano.</p>
             <dl className="mt-4 space-y-2 break-words text-xs">

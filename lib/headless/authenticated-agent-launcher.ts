@@ -401,7 +401,7 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
             readOpenLoops: (readSignal: AbortSignal) => executeOpenLoops(openLoopsState, record({
               schemaVersion: 'mediflow.patient.open_loops.read.input.v1' as const,
               operationId: PATIENT_OPEN_LOOPS_READ_OPERATION_V1,
-            }), readSignal), writeAudit, timeoutMs: 250 as const }));
+            }), readSignal), writeAudit, timeoutMs: 500 as const }));
           return withAbort(signal, service.cancel, async () => {
             try { return await service.propose(permit, input); } finally { service.dispose(); }
           });

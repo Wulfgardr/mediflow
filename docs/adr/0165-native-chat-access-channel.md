@@ -425,7 +425,64 @@ scheda. La chat riceve soltanto `status`: `requested`, `preparing`,
 
 Il raccordo riusa i controlli comuni di `GenerationArea` (`start`,
 `take_running`, `follow_chat`) e l'apertura comune del canale, con un legame
-proprio: Quadro, sintesi e import non si sostituiscono il lavoro a vicenda.
+proprio. Una nuova apertura ammessa seleziona una sola funzione visibile e ritira la richiesta precedente ancora aperta; le proposte concluse restano nello stato nativo.
 Dopo `import-closed` la proposta appartiene alla finestra e la sua validità
 segue solo le fonti della scheda. Le stringhe `insight-*` e `synthesis-*`
 non cambiano. L'applicazione dei candidati resta legata al contratto G-6j.
+
+## Ricerca ICD dalla chat, 12 novembre 2026
+
+Il comando app-only `icd-lookup` non accetta argomenti. La sessione, l’account,
+l’archivio e la selezione del paziente sono ammessi con il percorso comune
+prima di aprire la ricerca ICD-11 WHO dentro la Panoramica della scheda.
+Il lettore paired `RuntimeSession.search_who` conserva i propri controlli.
+Non serve l’accesso amministrativo all’host locale, che la normale consultazione
+WHO non richiede. L’apertura non invia query, non genera testo e non applica
+codici alla scheda. Il medico scrive la query nella finestra.
+
+La carta Web riceve soltanto `status`: `requested`, `preparing`, `icd-opened`,
+`icd-unavailable`, `icd-busy`, `icd-closed` oppure `withdrawn`. Query, risultati
+e ricevuta WHO restano nella finestra. `icd-closed` segue una lettura riuscita,
+compreso un elenco vuoto, e rilascia il legame con la chat. Non rappresenta
+una scrittura clinica né una ricevuta durevole da recuperare dopo un riavvio.
+Una lettura negata o fallita non produce lo stato di consultazione conclusa.
+
+Cambio di paziente, blocco, revoca, chiusura e perdita del contesto ritirano
+la richiesta. La risposta viene ricontrollata prima di mostrarla. Lasciare
+la Panoramica chiude la ricerca. Dopo la lettura riuscita i risultati restano
+nella scheda fino alla chiusura o al cambio di contesto. Non viene concessa
+alcuna autorità di scrittura alla chat.
+
+Abbinamento delle prestazioni, coda delle evidenze e follow-up aperti restano
+non collegati: i residui del [catalogo C-7](../analysis/2026-10-31-chat-catalog-fabric/README.md#wul-829-ricerca-icd-aperta-dalla-chat)
+indicano quali lettori e viste GPUI mancano. I banchi sintetici non qualificano
+i desktop Claude e Codex reali.
+
+## Una funzione visibile alla volta dalla chat, 12 novembre 2026
+
+Le aperture di ICD, Quadro paziente, sintesi e import scelgono esplicitamente
+l’area da mostrare nella scheda. La selezione della funzione governa il render:
+un pannello ICD, anche dopo una ricerca conclusa, non può coprire il consenso
+del Quadro. L’apertura della sintesi mostra la scelta del documento e la sua
+sintesi; l’import mostra la propria preparazione. La navigazione ordinaria
+ai Documenti conserva la vista completa.
+
+Una nuova apertura ammessa chiude il pannello precedente e ritira la sua
+richiesta ancora aperta. Le richieste generative in preparazione, al consenso
+o in corso vengono interrotte e i loro testi temporanei cancellati. La ricerca
+ICD perde i risultati e invalida le risposte tardive. Una proposta già
+conclusa resta nello stato nativo e segue i suoi controlli di validità.
+Se la funzione richiesta è già occupata, `busy` rimostra il suo lavoro
+esistente senza sostituirlo, leggere nuovi dati o avviare una generazione.
+Se l’ammissione è ancora in corso, la richiesta duplicata lascia la vista
+precedente visibile.
+La richiesta negata durante l’ammissione conserva la vista precedente.
+
+Il collegamento non cambia la selezione del paziente, l’epoca, i permessi o
+l’autorità di scrittura. La matrice dei test attraversa il render della
+finestra per tutte le coppie funzione precedente e funzione richiesta,
+compreso ICD dopo la lettura conclusa, con schede provviste o prive di fonti.
+Gli avvisi dell’import appartengono alla sua vista: senza note, diario o sintesi
+la vista isolata spiega come aggiungere una fonte o revocare la richiesta.
+Il contenitore Documenti riusa lo stesso avviso senza ripeterlo. I test
+controllano i testi dipinti degli stati vuoti e del consenso, oltre ai comandi.

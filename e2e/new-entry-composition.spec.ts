@@ -146,7 +146,7 @@ test('Quadro in scrittura distingue lettura, errore e paziente non disponibile',
     try {
         await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto(`/patients/${patientId}/entries/new`);
         const quadro = page.getByRole('region', { name: 'Riepilogo clinico', exact: true });
-        for (const name of ['Terapie attive', 'Misure recenti', 'Controlli aperti']) {
+        for (const name of ['Terapie attive', 'Parametri recenti', 'Controlli aperti']) {
             const section = quadro.getByRole('region', { name, exact: true });
             await expect(section.getByRole('status')).toContainText('in corso'); await expect(section).not.toContainText(/Nessun[ao]? /u);
         }
@@ -154,7 +154,7 @@ test('Quadro in scrittura distingue lettura, errore e paziente non disponibile',
         await expect(previous.getByRole('status')).toContainText('Lettura'); await expect(previous).not.toContainText('Nessuna voce recente');
         release();
         await expect(previous.getByRole('alert')).toHaveText('✕ Voci precedenti non disponibili.'); await expect(previous).not.toContainText('Nessuna voce recente');
-        for (const name of ['Terapie attive', 'Misure recenti', 'Controlli aperti']) {
+        for (const name of ['Terapie attive', 'Parametri recenti', 'Controlli aperti']) {
             const section = quadro.getByRole('region', { name, exact: true });
             await expect(section.getByRole('alert')).toContainText('Impossibile leggere'); await expect(section).not.toContainText(/Nessun[ao]? /u);
             await expect(section.locator('table')).toHaveCount(0);

@@ -11,6 +11,8 @@ import {
 import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 const MODEL = 'synthetic-patient-insight:latest';
+// WUL-826: same literal as PATIENT_INSIGHT_REVIEW_NOTICE, written out so the check does not depend on the constant.
+const REVIEW_NOTICE = 'Controlla ogni frase sulla fonte che cita: il modello può scambiare ciò che è fatto con ciò che è da fare.';
 const REVIEW_REF = `review_${'b'.repeat(32)}`;
 const MODEL_OPTION_ID = `model_option_${'a'.repeat(32)}`;
 const PATIENT_INSIGHT_CATALOG = {
@@ -62,7 +64,7 @@ function availablePreview(request: PatientInsightPreviewRequest) {
       proposal: {
         schemaVersion: 'mediflow.patient-insight.review-proposal.v2',
         reviewOnly: true,
-        summary: 'Sintesi Patient Insight sintetica da revisionare. [S1]',
+        summary: 'Proposta sintetica da revisionare. [S1]',
         currentState: ['Quadro sintetico stabile da verificare. [S1]'],
         alerts: ['Attenzione sintetica da confermare. [S1]'],
         nextSteps: ['Rivedere la fonte sintetica durante il follow-up. [S1]'],
@@ -91,6 +93,8 @@ function availablePreview(request: PatientInsightPreviewRequest) {
         provider: 'ollama',
         model: MODEL,
         preprocessing: ['context_minimization', 'envelope_validation'],
+        // the first local attempt was discarded: recorded in the provenance, never on screen.
+        attempts: 2,
       },
       reviewRef: REVIEW_REF,
     },
@@ -99,7 +103,7 @@ function availablePreview(request: PatientInsightPreviewRequest) {
 
 test.describe.configure({ retries: 0 });
 
-test('Patient Insight UI invia un payload strict e mostra una proposta review-only', async ({ page }) => {
+test('Quadro paziente invia un payload strict e mostra una proposta review-only', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   let previewCalls = 0;
   let capturedRequest: PatientInsightPreviewRequest | null = null;
@@ -119,7 +123,7 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await page.route('**/api/ai/patient-insight/preview', async (route) => {
     previewCalls += 1;
     capturedRequest = parsePatientInsightPreviewRequest(route.request().postDataJSON());
-    if (!capturedRequest) throw new Error('La UI Patient Insight ha inviato un payload preview non conforme.');
+    if (!capturedRequest) throw new Error('La UI Quadro paziente ha inviato un payload preview non conforme.');
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -157,7 +161,7 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await modelPicker.selectOption(MODEL_OPTION_ID);
   await expect(modelPicker).toHaveValue(MODEL_OPTION_ID);
   generationStarted = true;
-  await page.getByRole('button', { name: 'Avvia supporto' }).click();
+  await page.getByRole('button', { name: 'Genera proposta' }).click();
 
   const proposal = page.getByTestId('patient-insight-review-proposal');
   await expect(proposal).toBeVisible();
@@ -166,11 +170,17 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await expect(proposal).toContainText('Fonti della proposta');
   await expect(proposal).toContainText('0 scritture');
   await expect(proposal).toContainText('Applicazione non consentita');
-  await expect(proposal).toContainText('Sintesi Patient Insight sintetica da revisionare. [S1]');
-  await expect(proposal).toContainText('Receipt, provenance e currentness');
-  await expect(proposal).toContainText(`ollama · ${MODEL} · local_process · egress none`);
-  await expect(proposal).toContainText('context_minimization → envelope_validation');
-  await expect(proposal).toContainText('epoch 7 · revisione 1');
+  await expect(proposal).toContainText('Proposta sintetica da revisionare. [S1]');
+  await expect(proposal).toContainText('Ricevuta, provenienza e validità');
+  await expect(proposal).toContainText(`ollama · ${MODEL} · Processo locale · Nessuna uscita dati`);
+  await expect(proposal).toContainText('Riduzione del contesto → Verifica del formato');
+  await expect(proposal).toContainText('Selezione 7 · revisione 1');
+  // WUL-826: one line above the sentences asks to check each of them against its source.
+  await expect(proposal.getByTestId('patient-insight-review-notice')).toHaveText(REVIEW_NOTICE);
+  const proposalText = await proposal.innerText();
+  expect(proposalText.split(REVIEW_NOTICE)).toHaveLength(2);
+  expect(proposalText.indexOf(REVIEW_NOTICE)).toBeLessThan(proposalText.indexOf('Proposta sintetica da revisionare.'));
+  expect(proposalText).not.toMatch(/tentativ/iu);
 
   expect(previewCalls).toBe(1);
   expect(capturedRequest).not.toBeNull();
@@ -203,7 +213,7 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await expect(page.getByTestId('patient-proposals-summary')).toContainText('1 proposta da rivedere');
   await expect(proposal).not.toBeVisible();
   await expect(page.locator('#quadro [data-testid="patient-insight-review-proposal"]')).toHaveCount(0);
-  await page.getByTestId('patient-proposals-summary').getByRole('link', { name: 'Patient Insight', exact: true }).click();
+  await page.getByTestId('patient-proposals-summary').getByRole('link', { name: 'Quadro paziente', exact: true }).click();
   await expect(proposal).toBeVisible();
   expect(previewCalls).toBe(1);
   await insightDisclosure.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
@@ -214,7 +224,7 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
 });
 
 for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
-  test(`Patient Insight composizione ${theme} ${size}`, async ({ page, baseURL }) => {
+  test(`Quadro paziente composizione ${theme} ${size}`, async ({ page, baseURL }) => {
     test.setTimeout(120_000);
     const baseline = process.env.PATIENT_INSIGHT_BASELINE === '1';
     const zoom = size.startsWith('zoom-') ? await openBrowserZoomFixture(baseURL!) : undefined;
@@ -250,11 +260,11 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
       if (directory) await mkdir(directory, { recursive: true });
       const capture = async (state: string) => {
         await panel.scrollIntoViewIfNeeded();
-        if (!baseline) await assertNoHorizontalOverflow(page, [{ label: 'Patient Insight', selector: '#patient-insight' }, { label: 'pagina', selector: 'document' }]);
+        if (!baseline) await assertNoHorizontalOverflow(page, [{ label: 'Quadro paziente', selector: '#patient-insight' }, { label: 'pagina', selector: 'document' }]);
         if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-${state}.png`, animations: 'disabled' });
       };
       await capture('pronta');
-      await panel.getByRole('button', { name: 'Avvia supporto', exact: true }).click();
+      await panel.getByRole('button', { name: 'Genera proposta', exact: true }).click();
       await entered.promise;
       await capture('in-corso');
       release.resolve();
@@ -266,8 +276,9 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
       if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-fonti.png`, animations: 'disabled' });
       fail = true;
       await panel.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
-      await panel.getByRole('button', { name: 'Avvia supporto', exact: true }).click();
-      await expect(panel.getByRole('alert')).toContainText('Patient Insight non è disponibile');
+      await expect(panel.getByTestId('patient-insight-review-proposal')).toHaveCount(0);
+      await panel.getByRole('button', { name: 'Genera proposta', exact: true }).click();
+      await expect(panel.getByRole('alert')).toContainText('Quadro paziente non è disponibile');
       await capture('errore');
       await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'disabled');
       await page.reload(); await openPatientSection(page, baseline ? 'quadro' : 'attenzione');
@@ -281,3 +292,102 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
     } finally { release.resolve(); await zoom?.close(); }
   });
 }
+
+for (const width of [1440, 390]) test(`copy del Quadro paziente ${width}`, async ({ page }) => {
+  test.setTimeout(180_000);
+  const baseline = process.env.WUL825_BASELINE === '1';
+  await page.setViewportSize({ width, height: 1000 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
+  const patientId = await createSyntheticPatient(page);
+  await page.route('**/api/settings/ai/functions', route => route.fulfill({ status: 200, json: PATIENT_INSIGHT_CATALOG }));
+  await page.route('**/api/ai/patient-insight/preview', route => {
+    const request = parsePatientInsightPreviewRequest(route.request().postDataJSON());
+    if (!request) throw new Error('Invalid synthetic preview request');
+    const preview = availablePreview(request);
+    preview.preview.proposal.summary = 'Proposta sintetica da revisionare. [S1]';
+    return route.fulfill({ status: 200, json: preview });
+  });
+  await page.goto(`/patients/${patientId}/modules`);
+  await openPatientSection(page, 'attenzione');
+  const panel = page.locator('#patient-insight');
+  await panel.locator(':scope > div > [data-disclosure-control]').click();
+  await panel.getByRole('button', { name: 'Cambia', exact: true }).click();
+  const picker = panel.getByRole('combobox', { name: 'Modello per questa proposta', exact: true });
+  await picker.focus(); await picker.selectOption(MODEL_OPTION_ID);
+  const directory = process.env.PATIENT_INSIGHT_CAPTURES;
+  if (directory) await mkdir(directory, { recursive: true });
+  const capture = async (state: string) => {
+    await panel.scrollIntoViewIfNeeded();
+    if (directory) await page.screenshot({ path: `${directory}/${width}-${state}.png`, fullPage: true, animations: 'disabled' });
+  };
+  await capture('prima-di-generare');
+  await panel.getByRole('button', { name: baseline ? 'Avvia supporto' : 'Genera proposta', exact: true }).click();
+  const proposal = panel.getByTestId('patient-insight-review-proposal');
+  await expect(proposal).toBeVisible();
+  await expect(proposal.getByTestId('patient-insight-review-notice')).toHaveText(REVIEW_NOTICE);
+  if (!baseline) {
+    await expect(proposal.getByRole('heading', { name: 'Stato attuale', exact: true })).toBeVisible();
+    await expect(panel.getByText('La cartella non cambia.', { exact: true })).toHaveCount(0);
+    await expect(proposal).not.toContainText('La cartella resta invariata.');
+    await expect(panel.getByRole('button', { name: 'Nuova proposta', exact: true })).toBeVisible();
+  }
+  await capture('proposta');
+  await proposal.getByText('Dettagli di verifica', { exact: true }).click();
+  await capture('dettagli');
+});
+
+for (const width of [1440, 390]) test(`copy anagrafica e note ${width}`, async ({ page }) => {
+  test.setTimeout(180_000);
+  const baseline = process.env.WUL825_BASELINE === '1';
+  await page.setViewportSize({ width, height: 1000 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const directory = process.env.PATIENT_INSIGHT_CAPTURES;
+  if (directory) await mkdir(directory, { recursive: true });
+  await page.goto('/patients/new');
+  const year = page.getByRole('checkbox', { name: baseline ? 'Conosco solo l’anno (stima)' : 'Conosco solo l’anno', exact: true });
+  await expect(year).toBeVisible();
+  await year.check();
+  await year.scrollIntoViewIfNeeded();
+  if (directory) await page.screenshot({ path: `${directory}/${width}-anno.png`, animations: 'disabled' });
+  const patientId = await createSyntheticPatient(page);
+  await page.goto(`/patients/${patientId}/notes-review`);
+  const notes = page.getByRole('textbox', { name: 'Note da proporre' });
+  await notes.fill('Bozza sintetica da conservare.');
+  await page.route(`**/api/patients/${patientId}/notes-commit`, route => {
+    const input = route.request().postDataJSON();
+    if (input.kind === 'prepare') return route.fulfill({ status: 200, json: {
+      kind: 'prepared', policy: 'patient-profile.notes.commit.v1', reference: `ppr_${'a'.repeat(64)}`,
+      digest: 'b'.repeat(64), notes: input.notes, expectedRevision: input.expectedRevision,
+      selectionEpoch: input.expectedSelectionEpoch, expiresAt: Date.now() + 30_000,
+      recipient: { id: patientId, firstName: 'Fabric', lastName: 'Review' }, action: 'replace-notes',
+    } });
+    return input.kind === 'confirm' ? route.fulfill({ status: 403, json: { code: 'review_denied', error: 'synthetic-denial' } })
+      : route.fulfill({ status: 200, json: { kind: 'cancelled' } });
+  });
+  await page.getByRole('button', { name: 'Prepara la revisione', exact: true }).click();
+  await page.getByLabel('PIN di conferma').fill('0000');
+  await page.getByRole('button', { name: 'Conferma e salva le note', exact: true }).click();
+  await expect(page.locator('p[role=alert]')).toHaveText(baseline
+    ? 'Revisione non ammessa. Nessuna modifica salvata. La bozza è conservata: verifica la sessione e il PIN, poi prepara una nuova revisione.'
+    : 'La bozza è intatta.');
+  await expect(notes).toHaveValue('Bozza sintetica da conservare.');
+  if (directory) await page.screenshot({ path: `${directory}/${width}-errore-note.png`, animations: 'disabled' });
+});
+
+for (const width of [1440, 390]) test(`copy titolo parametri recenti ${width}`, async ({ page }) => {
+  test.setTimeout(180_000);
+  const baseline = process.env.WUL825_BASELINE === '1';
+  await page.setViewportSize({ width, height: 1000 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const patientId = await createSyntheticPatient(page);
+  await page.goto(`/patients/${patientId}/modules`);
+  const section = page.locator('#quadro').getByRole('region', { name: baseline ? 'Misure recenti' : 'Parametri recenti', exact: true });
+  await expect(section).toBeVisible();
+  await section.scrollIntoViewIfNeeded();
+  const directory = process.env.PATIENT_INSIGHT_CAPTURES;
+  if (directory) {
+    await mkdir(directory, { recursive: true });
+    await page.screenshot({ path: `${directory}/${width}-parametri-recenti.png`, fullPage: true, animations: 'disabled' });
+  }
+});

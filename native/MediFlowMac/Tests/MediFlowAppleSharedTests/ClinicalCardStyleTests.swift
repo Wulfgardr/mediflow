@@ -159,7 +159,7 @@ final class ClinicalCardStyleTests: XCTestCase {
 
     func testOverviewPresentsFourTablesAndAdaptiveColumns() throws {
         let overview = try appleSource("AppleFoundation/PatientClinicalOverview.swift")
-        for title in ["Problemi", "Terapie attive", "Misure recenti", "Controlli aperti"] {
+        for title in ["Problemi", "Terapie attive", "Parametri recenti", "Controlli aperti"] {
             XCTAssertTrue(overview.contains("table(\"" + title + "\""))
         }
         XCTAssertTrue(overview.contains("ClinicalSignalCount.fromLoadedList"))

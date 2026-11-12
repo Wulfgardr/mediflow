@@ -1,5 +1,5 @@
 import * as availability from '../../lib/ai-function-availability.ts';
-/* @Codex — synthetic component projection, not a live/browser or admission claim. */
+/* @Codex, synthetic component projection, not a live/browser or admission claim. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -79,11 +79,11 @@ test('digest disclosure is identity + bytes + proposal-only, never raw prepared 
     const view = { loading: false, error: null, state: { phase: 'needs_consent' }, disclosure };
     const tree = component({ client: { remote: {} }, view });
     const content = text(tree);
-    assert.match(content, /Identità del contesto preparato/u);
+    assert.match(content, /Impronta del contesto/u);
     assert.doesNotMatch(content, /Verifica contenuto preparato|PRIVATE_PROVIDER_SENTINEL/u);
-    assert.match(content, /100 byte/u); assert.match(content, /Questa proposta non modifica la cartella/u);
+    assert.match(content, /100 byte/u); assert.doesNotMatch(content, /Questa proposta non modifica la cartella/u);
     assert.ok(content.includes('c'.repeat(64))); assert.equal(rawReads, 0);
-    assert.equal(text(nodes(tree).find(n => n.type === 'button' && n.props['data-disclosure-control'])!.props.children), 'Identità del contesto preparato');
+    assert.equal(text(nodes(tree).find(n => n.type === 'button' && n.props['data-disclosure-control'])!.props.children), 'Dettagli');
 });
 
 test('a terminal remote result exposes explicit fresh preparation, without automatic execution', () => {
