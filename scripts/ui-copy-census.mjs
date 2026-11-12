@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = process.env.MEDIFLOW_COPY_ROOT ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const selected = process.argv.find(a => a.startsWith('--surface='))?.split('=')[1];
-const oldNames = /localhome-base|Patient Insight|Sintesi del quadro paziente|Supporto al ragionamento clinico|Sintesi con IA|Sintesi AI|Quadro attuale|Conosco solo l[’']anno \(stima\)|\bAI\b|\b[Hh]ost\b|\b[Pp]airing\b|\b[Cc]apability\b/;
+const oldNames = /localhome-base|Misure recenti|Patient Insight|Sintesi del quadro paziente|Supporto al ragionamento clinico|Sintesi con IA|Sintesi AI|Quadro attuale|Conosco solo l[’']anno \(stima\)|\bAI\b|\b[Hh]ost\b|\b[Pp]airing\b|\b[Cc]apability\b/;
 const variants = ['Misure', 'Controlli', 'Parametri', 'Scale', 'Valutazione', 'Caregiver', 'Persona di riferimento'];
 const presentationLibraries = [
     'lib/fabric-settings-view.ts', 'lib/function-models/browser.ts', 'lib/function-models/ordinary-browser.ts', 'lib/function-models/preview-client.ts', 'lib/ai-rollout-model-guard.ts', 'lib/ai-rollout-readiness-storage.ts', 'lib/network-operating-mode.ts',

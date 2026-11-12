@@ -31,7 +31,7 @@ fn overview_has_four_counted_tables_including_observations() {
     let s = source("shell.rs");
     let s = &s[s.find("fnoverview(").unwrap()..s.find("fndiary_view(").unwrap()];
     assert_eq!(s.matches("overview_heading(").count(), 4);
-    assert!(s.contains("Misurerecenti"));
+    assert!(s.contains("Parametrirecenti"));
     assert!(s.contains("Controlliaperti"));
     assert!(s.contains("self.patient.observations.ready()"));
     assert!(s.contains("ReadObject::Parametri"));

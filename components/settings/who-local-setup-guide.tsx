@@ -71,7 +71,7 @@ export function WhoLocalSetupGuide({ status, onRefresh }: { status?: string; onR
                     </select>
                 </label>
                 <p>macOS/Linux richiedono un socket Unix locale; Windows un named pipe locale ammesso, Docker in modalità Linux e una cartella NTFS privata. L’operatore sceglie e avvia Docker e gestisce i suoi prerequisiti e termini: questa procedura non installa runtime, non modifica VM e non eleva privilegi.</p>
-                <p>Per il primo download serve una connessione. Controlla sul home-base lo spazio libero per immagine, catalogo e copie di recupero: questa pagina non lo misura e non dichiara i prerequisiti soddisfatti.</p>
+                <p>Per il primo download serve una connessione. Controlla sull’home-base lo spazio libero per immagine, catalogo e copie di recupero: questa pagina non lo misura e non dichiara i prerequisiti soddisfatti.</p>
                 <p>ARM64 e AMD64 hanno manifest figlio e readback verificati nel pacchetto: sono solo metadati immagine, non download eseguiti, licenze accettate o installazioni qualificate. Il terminale verifica i byte per il motore rilevato e blocca il percorso se le evidenze mancano o sono alterate. Nessun target diventa disponibile da un checkbox. Se la porta 8382 è occupata o esiste un servizio diverso, non cancellarlo: consulta il gestore.</p>
             </>}
             {step === 1 && <>
@@ -88,9 +88,9 @@ export function WhoLocalSetupGuide({ status, onRefresh }: { status?: string; onR
                 <p>Una risposta diversa da ACCETTO annulla la nuova installazione. L’accettazione di un utente precedente non preseleziona questa casella.</p>
             </>}
             {step === 2 && <>
-                <h3 className="font-medium">Installa e avvia dal home-base</h3>
+                <h3 className="font-medium">Installa e avvia dall’home-base</h3>
                 {accepted ? <>
-                    <p>Nella cartella MediFlow del home-base, usa il comando selezionato in Prepara. Windows usa PowerShell senza bypass della policy; Linux e macOS usano il terminale locale:</p>
+                    <p>Nella cartella MediFlow dell’home-base, usa il comando selezionato in Prepara. Windows usa PowerShell senza bypass della policy; Linux e macOS usano il terminale locale:</p>
                     {commandBlock(command)}
                     <p>La procedura usa il pin distribuito, richiede il consenso locale, avvia il solo servizio creato da essa e verifica catalogo, riavvio offline e ripristino. Se un controllo fallisce, non considerare WHO pronto.</p>
                     <p>Al termine scegli esplicitamente l’avvio di MediFlow proposto. Se MediFlow è già aperto, non viene interrotto: usa il launcher WHO al prossimo avvio. Per avviare un’installazione già qualificata:</p>
@@ -108,7 +108,7 @@ export function WhoLocalSetupGuide({ status, onRefresh }: { status?: string; onR
             </>}
             {step === 4 && <>
                 <h3 className="font-medium">Recupera senza eliminare i dati</h3>
-                <p>Controlla per prima cosa il servizio sul home-base. Questo comando legge lo stato; non scarica e non avvia WHO:</p>
+                <p>Controlla per prima cosa il servizio sull’home-base. Questo comando legge lo stato; non scarica e non avvia WHO:</p>
                 {commandBlock(`${command} status`)}
                 <p>Se mancano prerequisiti, installa o avvia personalmente il runtime scelto e ripeti lo stesso comando. Download in corso, qualifica in corso e configurazione salvata non equivalgono a una risposta WHO. Un download interrotto conserva il consenso registrato: per riprendere serve una nuova conferma nel terminale. Non si adotta un container senza identità certa.</p>
                 <p>Una qualifica incompleta conserva snapshot e receipt e disabilita il file per il prossimo avvio. Non cambia l’ambiente di MediFlow già in esecuzione. Nel terminale Ctrl+C richiede l’annullamento ai confini delle operazioni; può proseguire il solo recupero del servizio posseduto. Un arresto forzato può richiedere la verifica del lock da parte del gestore.</p>
@@ -117,7 +117,7 @@ export function WhoLocalSetupGuide({ status, onRefresh }: { status?: string; onR
                     {commandBlock(`${command} qualify`)}
                 </> : <p>Per i comandi che riprendono installazione e verifiche, torna prima al passaggio Licenza.</p>}
                 <p>Porta occupata, registrazione incoerente, servizio non riconosciuto o recupero fallito richiedono il gestore. Non rimuovere container, copie o lock e non copiare prove da un altro computer.</p>
-                <p>Chiudere questa guida non interrompe un’installazione già avviata sul home-base. Non è disponibile un arresto dal browser.</p>
+                <p>Chiudere questa guida non interrompe un’installazione già avviata sull’home-base. Non è disponibile un arresto dal browser.</p>
             </>}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
