@@ -276,7 +276,7 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
       if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-fonti.png`, animations: 'disabled' });
       fail = true;
       await panel.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
-      await panel.getByRole('button', { name: 'Genera proposta', exact: true }).click();
+      await panel.getByRole('button', { name: 'Nuova proposta', exact: true }).click();
       await expect(panel.getByRole('alert')).toContainText('Quadro paziente non è disponibile');
       await capture('errore');
       await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'disabled');

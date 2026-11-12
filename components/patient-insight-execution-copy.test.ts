@@ -53,3 +53,12 @@ for (const remote of [false, true]) test(`verification copy follows the ${remote
         assert.match(visible, /primo passaggio di oscuramento.*secondo passaggio di oscuramento/i);
     }
 });
+
+test('therapies render no empty proposal panel or generation controls', () => {
+    const file = process.env.MEDIFLOW_COPY_ROOT
+        ? `${process.env.MEDIFLOW_COPY_ROOT}/components/treatment-reasoning-panel.tsx` : 'components/treatment-reasoning-panel.tsx';
+    assert.equal(mountContract(file, 'default', { imports: { '@/lib/ai-function-availability': {
+        TREATMENT_REASONING_UNAVAILABLE_LABEL: 'Non disponibile in questa versione',
+        TREATMENT_REASONING_UNAVAILABLE_REASON: 'Le nuove proposte terapeutiche sono rinviate a una versione successiva.',
+    } } }).render(), null);
+});
