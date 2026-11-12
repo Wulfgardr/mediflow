@@ -25,7 +25,7 @@ ricontrollati nei sorgenti al momento dell'implementazione.
 | OCR desktop | anydoc-desktop-ocr-real forza MEDIFLOW_TEST_TESSERACT_REAL |
 | Motore dati personali | gliner-redaction-runner: protocollo, sandbox e rifiuto pesi alterati. Non misura la qualità del modello |
 | Voce locale | local-voice: contratto e guardia contro il motore Apple |
-| Ascolto della visita | prove-ascolto-visita: modello whisper installato, visita inventata a due voci generata con `say`. Attribuzione su almeno l'80% del parlato e calcolo sotto il tempo reale |
+| Ascolto della visita | prove-ascolto-visita: modello whisper installato, visita inventata di oltre dieci minuti a due voci generata con `say`. Attribuzione su almeno l'80% del parlato, calcolo sotto il tempo reale, errore di parola nel rapporto (si ferma sopra il 20%) |
 | Microfono vero | non provato: richiede la voce di Leonardo, elenco qui sotto |
 | Contenitore Mac | execution-mac-probe: confini del processo sintetico |
 | Archivio Mac | backup-destination-policy e native-patient-document |
@@ -42,9 +42,12 @@ ed è incluso nel comando.
 
 `ascolto-visita-modello` lancia `scripts/prove-ascolto-visita.mjs` con i due file
 del modello installato da Impostazioni, Voce locale (nella HOME vera: il runner
-isola HOME). Genera con `say` una visita inventata a due voci, la passa al test
+isola HOME). Genera con `say` la visita inventata di
+`scripts/fixtures/visita-due-voci.json` (122 battute, 11 minuti), la passa al test
 Rust ignorato `real_model_long_session_in_segments` a blocchi come il microfono e
-controlla attribuzione e tempo di calcolo. Non scarica nulla e non apre il
+controlla durata, attribuzione e tempo di calcolo. Scrive `rapporto.json` con
+errore di parola (regola del banco voce), tempi, memoria e quota del parlato
+attribuita alla persona giusta, nella cartella temporanea della prova. Non scarica nulla e non apre il
 microfono. Senza macOS, cargo o modello la voce è dichiarata non provata prima
 dell'avvio.
 

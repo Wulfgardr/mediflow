@@ -314,11 +314,58 @@ fn distance(a: &[f32; PRINT], b: &[f32; PRINT]) -> f32 {
     (0..PRINT).map(|d| weight(d) * (a[d] - b[d]).powi(2)).sum()
 }
 
+/// Oltre tre deviazioni una dimensione non pesa di più: una frase
+/// brevissima e anomala non deve decidere da sola i gruppi.
+const CLIP: f32 = 3.0;
+/// Coppie di partenza provate al massimo, scelte a passo regolare.
+const STARTS: usize = 32;
+
+/// K-medie a due gruppi pesate dalla durata, a partire da due punti.
+/// Restituisce i gruppi e la dispersione pesata dentro i gruppi.
+fn two_means(points: &[[f32; PRINT]], weights: &[f32], a: usize, b: usize) -> (Vec<usize>, f32) {
+    let mut centroids = [points[a], points[b]];
+    let mut groups = vec![0usize; points.len()];
+    for _ in 0..50 {
+        let next: Vec<usize> = points
+            .iter()
+            .map(|p| usize::from(distance(p, &centroids[1]) < distance(p, &centroids[0])))
+            .collect();
+        let settled = next == groups;
+        groups = next;
+        for (group, centroid) in centroids.iter_mut().enumerate() {
+            let members: Vec<usize> = (0..points.len()).filter(|&i| groups[i] == group).collect();
+            let sum: f32 = members.iter().map(|&i| weights[i]).sum();
+            if sum > 0.0 {
+                *centroid = std::array::from_fn(|d| {
+                    members
+                        .iter()
+                        .map(|&i| points[i][d] * weights[i])
+                        .sum::<f32>()
+                        / sum
+                });
+            }
+        }
+        if settled {
+            break;
+        }
+    }
+    let spread = points
+        .iter()
+        .zip(&groups)
+        .zip(weights)
+        .map(|((p, &g), w)| w * distance(p, &centroids[g]))
+        .sum();
+    (groups, spread)
+}
+
 /// Attribuisce ogni frase a medico o paziente. Due gruppi di impronte
-/// standardizzate (k-medie pesate dalla durata, partenza dalla coppia più
-/// lontana); è medico il gruppo della prima frase con un'impronta, perché la
-/// visita la apre il medico. Le frasi senza impronta prendono la voce della
-/// frase precedente. Con meno di due impronte tutto resta al medico.
+/// standardizzate e limitate a tre deviazioni (k-medie pesate dalla durata).
+/// Si parte da più coppie, ognuna fatta da un'impronta e dalla più lontana
+/// da lei, e si tiene la divisione più compatta: una sola partenza dalla
+/// coppia più lontana in assoluto finiva su due frasi anomale. È medico il
+/// gruppo della prima frase con un'impronta, perché la visita la apre il
+/// medico. Le frasi senza impronta prendono la voce della frase precedente.
+/// Con meno di due impronte tutto resta al medico.
 pub(crate) fn attribute(prints: &[Option<VoicePrint>]) -> Vec<Speaker> {
     let valid: Vec<(usize, VoicePrint)> = prints
         .iter()
@@ -347,45 +394,27 @@ pub(crate) fn attribute(prints: &[Option<VoicePrint>]) -> Vec<Speaker> {
     }
     let points: Vec<[f32; PRINT]> = valid
         .iter()
-        .map(|(_, p)| std::array::from_fn(|d| (p.values[d] - mean[d]) / spread[d]))
+        .map(|(_, p)| {
+            std::array::from_fn(|d| ((p.values[d] - mean[d]) / spread[d]).clamp(-CLIP, CLIP))
+        })
         .collect();
     let weights: Vec<f32> = valid.iter().map(|(_, p)| p.frames as f32).collect();
-    let (mut a, mut b) = (0, 1);
-    let mut farthest = -1.0;
-    for i in 0..points.len() {
-        for j in i + 1..points.len() {
-            let d = distance(&points[i], &points[j]);
-            if d > farthest {
-                (farthest, a, b) = (d, i, j);
-            }
-        }
-    }
-    let mut centroids = [points[a], points[b]];
-    let mut groups = vec![0usize; points.len()];
-    for _ in 0..50 {
-        let next: Vec<usize> = points
-            .iter()
-            .map(|p| usize::from(distance(p, &centroids[1]) < distance(p, &centroids[0])))
-            .collect();
-        let settled = next == groups;
-        groups = next;
-        for (group, centroid) in centroids.iter_mut().enumerate() {
-            let members: Vec<usize> = (0..points.len()).filter(|&i| groups[i] == group).collect();
-            let sum: f32 = members.iter().map(|&i| weights[i]).sum();
-            if sum > 0.0 {
-                *centroid = std::array::from_fn(|d| {
-                    members
-                        .iter()
-                        .map(|&i| points[i][d] * weights[i])
-                        .sum::<f32>()
-                        / sum
-                });
-            }
-        }
-        if settled {
-            break;
-        }
-    }
+    let farthest_from = |a: usize| {
+        (0..points.len())
+            .max_by(|&i, &j| {
+                distance(&points[a], &points[i]).total_cmp(&distance(&points[a], &points[j]))
+            })
+            .unwrap_or(a)
+    };
+    let step = points.len().div_ceil(STARTS).max(1);
+    let (groups, _) = (0..points.len())
+        .step_by(step)
+        .filter_map(|a| {
+            let b = farthest_from(a);
+            (b != a).then(|| two_means(&points, &weights, a, b))
+        })
+        .min_by(|x, y| x.1.total_cmp(&y.1))
+        .unwrap_or_else(|| (vec![0; points.len()], 0.0));
     let doctor = groups[0];
     let mut speakers = Vec::with_capacity(prints.len());
     let mut by_segment = valid.iter().map(|(i, _)| *i).zip(&groups).peekable();
@@ -515,6 +544,44 @@ pub(crate) mod tests {
         prints.insert(3, None);
         truth.insert(3, truth[2]);
         assert_eq!(attribute(&prints), truth);
+    }
+
+    /// Visita lunga (WUL-828, misura del 12/11): le impronte vere delle 122
+    /// frasi della visita inventata di `scripts/fixtures/visita-due-voci.json`
+    /// (voci `say`, medico sulle frasi pari), tagliate ai confini che la
+    /// sessione ha chiuso. Due frasi brevissime con un'altezza più bassa
+    /// («D'accordo.», «Così?», 89 e 93) facevano partire i gruppi dalla coppia
+    /// sbagliata: restavano loro due al paziente e tutto il resto al medico.
+    #[test]
+    fn a_long_visit_with_two_short_odd_phrases_is_attributed_turn_by_turn() {
+        let rows: Vec<Vec<f32>> =
+            serde_json::from_str(include_str!("fixtures/impronte-visita-lunga.json")).unwrap();
+        let prints: Vec<Option<VoicePrint>> = rows
+            .iter()
+            .map(|row| {
+                Some(VoicePrint {
+                    frames: row[0] as usize,
+                    values: std::array::from_fn(|d| row[d + 1]),
+                })
+            })
+            .collect();
+        assert_eq!(prints.len(), 122);
+        let speakers = attribute(&prints);
+        let wrong: Vec<usize> = (0..prints.len())
+            .filter(|&i| {
+                speakers[i]
+                    != if i % 2 == 0 {
+                        Speaker::Doctor
+                    } else {
+                        Speaker::Patient
+                    }
+            })
+            .collect();
+        assert!(
+            wrong.is_empty(),
+            "{} frasi attribuite male: {wrong:?}",
+            wrong.len()
+        );
     }
 
     #[test]
