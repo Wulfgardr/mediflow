@@ -10,6 +10,8 @@ import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { canonicalJson, sha256 } from './crypto.mjs';
 import { compareReports, compareResourceWritesReports, comparePatientProfileWritesReports } from './compare.mjs';
+import Database from 'better-sqlite3';
+import { clinicalEvents, expectedAudit, verifyClinicalAudit } from './audit.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(directory, '../../..');
@@ -22,7 +24,7 @@ for (let index = 0; index < args.length; index += 2) {
     options.set(args[index], args[index + 1]);
 }
 if (!options.has('--rust-probe')) throw new Error('--rust-probe is required; the runner never builds or downloads a binary implicitly');
-if (process.platform !== 'linux') throw new Error('This owned HTTP runtime qualification currently follows the Linux smoke recipe; native compile/test jobs cover other OSes separately');
+if (!['linux', 'darwin'].includes(process.platform)) throw new Error('This owned HTTP runtime qualification requires POSIX process groups (Linux or macOS); native compile/test jobs cover other OSes separately');
 const probe = path.resolve(options.get('--rust-probe'));
 fs.accessSync(probe, fs.constants.X_OK);
 const samples = Number(options.get('--samples') ?? 5);
@@ -30,7 +32,8 @@ if (!Number.isInteger(samples) || samples < 5 || samples > 30) throw new Error('
 const outputDirectory = options.has('--output-dir') ? path.resolve(options.get('--output-dir')) : fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-comparison-report-'));
 fs.mkdirSync(outputDirectory, { recursive: true });
 if (fs.readdirSync(outputDirectory).length > 0) throw new Error('The report directory must be empty to prevent mixing runs');
-const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-transition-'));
+// The synthetic preparer admits only this explicit POSIX scratch root.
+const owned = fs.mkdtempSync(path.join('/tmp', 'mediflow-transition-'));
 fs.chmodSync(owned, 0o700);
 const workspace = path.join(owned, 'candidate-current');
 const dataDirectory = path.join(owned, 'data-candidate');
@@ -39,6 +42,7 @@ const privatePath = path.join(owned, 'candidate-private.json');
 const clientPath = path.join(owned, 'candidate-client-private.json');
 const sourceEntries = ['app', 'components', 'instrumentation.ts', 'lib', 'public', 'drizzle', 'packages', 'package.json', 'package-lock.json', 'tsconfig.json', 'postcss.config.mjs'];
 let server;
+let audit;
 let phase = 'prepare';
 let result;
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -198,6 +202,14 @@ try {
     phase = 'seed';
     await execute(process.execPath, [path.join(directory, 'prepare-runtime.mjs'), 'candidate', privatePath, workspace], environment);
     const client = JSON.parse(fs.readFileSync(clientPath, 'utf8'));
+    audit = new Database(path.join(dataDirectory, 'medical.db'), { readonly: true });
+    const operator = audit.prepare('SELECT id FROM users WHERE username = ?').get(runtime.E2E_USERNAME)?.id;
+    if (!operator) throw new Error('Synthetic audit operator missing');
+    const auditCursor = () => audit.prepare('SELECT COALESCE(MAX(rowid), 0) AS cursor FROM audit_events').get().cursor;
+    const checkAudit = (cursor, expected) => verifyClinicalAudit(audit.prepare(
+        `SELECT * FROM audit_events WHERE rowid > ? AND event_type IN (${clinicalEvents.map(() => '?').join(',')}) ORDER BY rowid`
+    ).all(cursor, ...clinicalEvents), expected, operator);
+    const auditReports = { writes: {}, resources: {}, profiles: {} };
     save('seed-receipt.json', JSON.parse(fs.readFileSync(path.join(owned, 'candidate-seed-receipt.json'), 'utf8')));
     const runClient = async (name, configPath, label) => {
         phase = `${label}-${name}`;
@@ -223,7 +235,9 @@ try {
     for (const name of ['javascript', 'rust']) {
         const configName = `${name}-writes-private.json`;
         savePrivate(configName, { ...client, exerciseWrites: true, writePatientId: client.writePatientIds[name] });
+        const cursor = auditCursor();
         mutationReports[name] = await runClient(name, path.join(owned, configName), 'writes');
+        auditReports.writes[name] = checkAudit(cursor, expectedAudit.writes);
     }
     const comparison = compareReports(mutationReports.javascript, mutationReports.rust);
     save('writes-comparison.json', comparison);
@@ -233,7 +247,9 @@ try {
         const configName = `${name}-resources-private.json`;
         savePrivate(configName, { ...client, exerciseWrites: false, exerciseResourceWrites: true,
             resourceWritesSha256: sha256(canonicalJson(resourceFixture)), writePatientId: client.writePatientIds[name] });
+        const cursor = auditCursor();
         resourceReports[name] = await runClient(name, path.join(owned, configName), 'resources');
+        auditReports.resources[name] = checkAudit(cursor, expectedAudit.resources);
     }
     const resourceComparison = compareResourceWritesReports(resourceReports.javascript, resourceReports.rust);
     save('resources-comparison.json', resourceComparison);
@@ -243,10 +259,14 @@ try {
         const configName = `${name}-patient-profiles-private.json`;
         savePrivate(configName, { ...client, exerciseWrites: false, exerciseResourceWrites: false,
             exercisePatientProfileWrites: true, patientProfileWritesSha256: sha256(canonicalJson(profileFixture)) });
+        const cursor = auditCursor();
         profileReports[name] = await runClient(name, path.join(owned, configName), 'patient-profiles');
+        auditReports.profiles[name] = checkAudit(cursor, expectedAudit.profiles);
     }
     const profileComparison = comparePatientProfileWritesReports(profileReports.javascript, profileReports.rust);
     save('patient-profiles-comparison.json', profileComparison);
+    save('audit-comparison.json', auditReports);
+    audit.close();
     result = { schemaVersion: 1, result: 'pass', synthetic: true, protocolId: comparison.protocolId,
         provenance, corpusSha256: client.corpusSha256, snapshotCanonicalSha256: comparison.snapshotCanonicalSha256,
         sampleOrder: 'Alternating JS/Rust after one discarded warm-up per client; each sample authenticates a fresh session.',
@@ -257,13 +277,14 @@ try {
         checkedWrites: comparison.checkedWrites, resourceWriteProtocolId: resourceComparison.protocolId,
         resourceWritesSha256: resourceComparison.fixtureSha256, checkedResourceWrites: true,
         patientProfileWriteProtocolId: profileComparison.protocolId,
-        patientProfileWritesSha256: profileComparison.fixtureSha256, checkedPatientProfileWrites: true,
+        patientProfileWritesSha256: profileComparison.fixtureSha256, checkedPatientProfileWrites: true, checkedAudit: true,
         completedAt: new Date().toISOString() };
 } catch (error) {
     result = { schemaVersion: 1, result: 'fail', phase, reason: error instanceof Error ? error.message : 'Comparison failed',
         qualification: 'No equivalence or performance result is issued for an incomplete run.' };
     process.exitCode = 1;
 } finally {
+    if (audit?.open) audit.close();
     if (server?.pid) {
         const closed = new Promise((resolve) => server.once('close', resolve));
         try { process.kill(-server.pid, 'SIGTERM'); } catch (error) { if (error.code !== 'ESRCH') throw error; }

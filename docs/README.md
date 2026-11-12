@@ -49,11 +49,11 @@ e pilota chiuso non attestano il completamento della release.
 La [prima analisi I-3b](./analysis/2026-10-26-athena-method.md) ricostruisce
 metodo, fonti e runner ATHENA con REA e prove locali; resta come base per la
 ripresa dopo la 0.9.1 secondo l'ADR 0166 Proposed.
-Il [censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) confronta la
-base `0a1980f32` con le 66 righe di parità, tutte le route Web e Punto
-d'inchiostro. Assegna i residui alle unità G-1–9, distingue il pilota
-installato dal sorgente e propone una scomposizione finita delle PR;
-non attesta parità o qualifica del bundle.
+Il [censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) è riallineato al
+candidato `e964e4382` del 12 novembre 2026: 66 righe di parità, route Web,
+consumer nativi, scritture e specifica Punto d’inchiostro. Distingue test di
+trasporto e servizi dall’uso del bundle installato; le nuove proposte di
+esclusione aspettano Leonardo e mantengono aperti i relativi obblighi.
 Il [rapporto G-2 su accesso e modelli](./analysis/2026-10-30-gpui-g2-settings/README.md)
 parte dal censimento delle lacune e registra i consumer Web aggiunti, le prove
 sintetiche e le funzioni ancora aperte. Non attesta la chiusura complessiva G-2.
