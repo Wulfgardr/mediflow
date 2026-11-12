@@ -2,7 +2,7 @@
 //! Il ponte Swift cattura il microfono e consegna blocchi a 16 kHz; il thread
 //! li legge, li passa al ciclo di ascolto e pubblica solo il testo stabile.
 
-use super::listening::{Decoder, Dictation, EngineFailure, SpeechDetector};
+use super::listening::{Decoder, Dictation, EngineFailure, Segment, SpeechDetector};
 use super::model::{self, ModelFile, ModelStatus};
 use super::recording::Machine;
 use super::{Event, State};
@@ -166,8 +166,15 @@ pub(crate) struct Shared {
     open_confirmed: usize,
     finals: usize,
     pub(crate) transcript: Option<Zeroizing<String>>,
+    /// Frasi definitive con i loro tempi: pubblicate con il testo da rivedere.
+    pub(crate) segments: Vec<Segment>,
+    /// La registrazione si è fermata da sola alla durata massima.
+    pub(crate) limit_reached: bool,
     #[cfg(test)]
     windows: Vec<(usize, usize, usize)>,
+    /// Per le prove: massimo di campioni audio trattenuti dal ciclo.
+    #[cfg(test)]
+    pub(crate) max_retained: usize,
     /// Per le prove: campioni rimasti nel ciclo dopo l'annullamento.
     #[cfg(test)]
     pub(crate) retained_after_cancel: Option<usize>,
@@ -269,6 +276,21 @@ impl WhisperSession {
         self.read(|s| Zeroizing::new(s.provisional.as_str().to_owned()))
             .unwrap_or_default()
     }
+    /// Frasi con i loro tempi, solo con il testo da rivedere.
+    #[cfg(test)]
+    pub(crate) fn segments(&self) -> Vec<Segment> {
+        self.read(|s| {
+            if s.machine.state().reviewable() && s.transcript.is_some() {
+                s.segments.clone()
+            } else {
+                Vec::new()
+            }
+        })
+        .unwrap_or_default()
+    }
+    pub(crate) fn limit_reached(&self) -> bool {
+        self.read(|s| s.limit_reached).unwrap_or(false)
+    }
     pub(crate) fn transcript(&self) -> Option<Zeroizing<String>> {
         self.read(|s| {
             s.machine
@@ -286,6 +308,18 @@ impl WhisperSession {
         V: SpeechDetector + Send + 'static,
         D: Decoder + Send + 'static,
     {
+        Self::with_dictation(Dictation::new(detector, decoder), source)
+    }
+    /// Sessione di prova con una dettatura già configurata dal test.
+    #[cfg(test)]
+    pub(crate) fn with_dictation<V, D>(
+        dictation: Dictation<V, D>,
+        source: Box<dyn AudioSource>,
+    ) -> Self
+    where
+        V: SpeechDetector + Send + 'static,
+        D: Decoder + Send + 'static,
+    {
         let shared = Arc::new(Mutex::new(Shared::default()));
         let (commands, receiver) = mpsc::channel();
         let worker_shared = shared.clone();
@@ -294,12 +328,7 @@ impl WhisperSession {
             if !wait_for_start(&receiver, &worker_shared) {
                 return;
             }
-            listen(
-                Dictation::new(detector, decoder),
-                source.as_mut(),
-                &receiver,
-                &worker_shared,
-            );
+            listen(dictation, source.as_mut(), &receiver, &worker_shared);
         });
         Self {
             shared,
@@ -348,6 +377,10 @@ impl Drop for WhisperSession {
             s.stable.zeroize();
             s.provisional.zeroize();
             s.transcript = None;
+            for segment in &mut s.segments {
+                segment.text.zeroize();
+            }
+            s.segments.clear();
         }
         let _ = self.commands.send(Event::Cancel);
         drop(self.worker.take());
@@ -394,6 +427,7 @@ fn fail(shared: &Mutex<Shared>, event: Event) {
         s.stable.zeroize();
         s.provisional.zeroize();
         s.transcript = None;
+        s.segments.clear();
     });
 }
 
@@ -436,6 +470,15 @@ fn run(
         return;
     }
     listener(source.as_mut(), &commands, &shared);
+}
+
+/// Oltre la durata massima l'audio non entra: si azzera e si scarta.
+fn keep_room<V: SpeechDetector, D: Decoder>(blocks: &mut Vec<f32>, dictation: &Dictation<V, D>) {
+    let room = dictation.room();
+    if blocks.len() > room {
+        blocks[room..].zeroize();
+        blocks.truncate(room);
+    }
 }
 
 /// Testo dal vivo della dettatura, pubblicato per la vista.
@@ -495,6 +538,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
                 // trascrive e la frase aperta diventa definitiva.
                 source.pause();
                 source.read(&mut blocks);
+                keep_room(&mut blocks, &dictation);
                 let flushed = dictation.feed(&blocks).and_then(|()| dictation.finish());
                 blocks.zeroize();
                 if flushed.is_err() {
@@ -538,11 +582,21 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
             continue;
         }
         last_audio = Instant::now();
+        keep_room(&mut blocks, &dictation);
         if dictation.feed(&blocks).is_err() {
             break Event::EngineFailed;
         }
         blocks.zeroize();
+        #[cfg(test)]
+        {
+            let retained = dictation.retained_samples();
+            publish(shared, |s| s.max_retained = s.max_retained.max(retained));
+        }
         publish_live(shared, &dictation);
+        if dictation.room() == 0 {
+            publish(shared, |s| s.limit_reached = true);
+            break Event::Stop;
+        }
     };
     // Una sorgente che finisce prima di consegnare audio non ha nulla da
     // trascrivere: si chiude come uno scarto.
@@ -560,15 +614,18 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
                 transition(shared, Event::CaptureFailed);
             }
             source.read(&mut blocks);
+            keep_room(&mut blocks, &dictation);
             let finished = dictation.feed(&blocks).and_then(|()| dictation.finish());
             blocks.zeroize();
             let transcript = Zeroizing::new(dictation.transcript().to_owned());
+            let segments = dictation.segments().to_vec();
             dictation.wipe();
             publish(shared, |s| {
                 s.stable.zeroize();
                 s.provisional.zeroize();
-                s.transcript =
-                    (finished.is_ok() && !transcript.trim().is_empty()).then_some(transcript);
+                let kept = finished.is_ok() && !transcript.trim().is_empty();
+                s.segments = if kept { segments } else { Vec::new() };
+                s.transcript = kept.then_some(transcript);
             });
             return;
         }
@@ -589,6 +646,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
     transition(shared, Event::Stop);
     source.stop();
     source.read(&mut blocks);
+    keep_room(&mut blocks, &dictation);
     let finished = dictation.feed(&blocks).and_then(|()| dictation.finish());
     blocks.zeroize();
     if finished.is_err() {
@@ -597,12 +655,14 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
         return;
     }
     let transcript = Zeroizing::new(dictation.transcript().to_owned());
+    let segments = dictation.segments().to_vec();
     let finals = dictation.finals_count();
     #[cfg(test)]
     let windows = dictation.windows.clone();
     dictation.wipe();
     publish(shared, |s| {
         s.finals = finals;
+        s.segments = segments;
         #[cfg(test)]
         {
             s.windows = windows;
@@ -872,6 +932,138 @@ pub(crate) mod tests {
             self.close();
             self.phase = SourcePhase::Stopped;
         }
+    }
+
+    /// Visita sintetica generata mentre la si legge, senza tenerla in
+    /// memoria: ogni minuto dieci frasi da 2 s con 1 s di pausa, un monologo
+    /// da 25 s (più lungo di una frase) e 5 s di silenzio.
+    pub(crate) struct SyntheticVisit {
+        pub(crate) total: usize,
+        position: usize,
+        phase: SourcePhase,
+        pub(crate) log: Arc<Mutex<Vec<&'static str>>>,
+    }
+    impl SyntheticVisit {
+        pub(crate) fn minutes(minutes: usize) -> Self {
+            Self {
+                total: minutes * 60 * 16_000,
+                position: 0,
+                phase: SourcePhase::Starting,
+                log: Arc::default(),
+            }
+        }
+        fn sample(index: usize) -> f32 {
+            const SECOND: usize = 16_000;
+            let cycle = index % (60 * SECOND);
+            let voiced = if cycle < 30 * SECOND {
+                cycle % (3 * SECOND) < 2 * SECOND
+            } else {
+                cycle < 55 * SECOND
+            };
+            if voiced {
+                0.3 * (index as f32 * 0.07).sin().signum()
+            } else {
+                0.0
+            }
+        }
+    }
+    impl AudioSource for SyntheticVisit {
+        fn start(&mut self) {
+            self.log.lock().unwrap().push("start");
+            self.phase = SourcePhase::Running;
+        }
+        fn phase(&mut self) -> SourcePhase {
+            if self.phase == SourcePhase::Running && self.position >= self.total {
+                return SourcePhase::Stopped;
+            }
+            self.phase
+        }
+        fn read(&mut self, out: &mut Vec<f32>) {
+            if self.phase != SourcePhase::Running {
+                return;
+            }
+            let end = (self.position + 4 * BLOCK).min(self.total);
+            out.extend((self.position..end).map(Self::sample));
+            self.position = end;
+        }
+        fn pause(&mut self) {
+            self.phase = SourcePhase::Stopped;
+        }
+        fn resume(&mut self) {
+            self.phase = SourcePhase::Running;
+        }
+        fn stop(&mut self) {
+            self.log.lock().unwrap().push("stop");
+            self.phase = SourcePhase::Stopped;
+        }
+    }
+
+    /// Campioni che il ciclo può trattenere in qualunque momento: la frase
+    /// aperta, il contesto del rilevatore e il resto di una finestra.
+    const RETAINED_BOUND: usize = super::super::listening::MAX_UTTERANCE + 33 * 512 + 512;
+
+    #[test]
+    fn a_long_recording_keeps_audio_bounded_and_reaches_review_in_segments() {
+        use super::super::listening::SAMPLE_RATE;
+        let source = SyntheticVisit::minutes(12);
+        let log = source.log.clone();
+        let session = WhisperSession::with_parts(
+            LoudnessDetector,
+            CountingDecoder::default(),
+            Box::new(source),
+        );
+        session.start();
+        assert_eq!(session.wait_for(&[State::Review]), State::Review);
+        assert_eq!(*log.lock().unwrap(), ["start", "stop"]);
+        let shared = session.shared_for_test();
+        let s = shared.lock().unwrap();
+        assert!(
+            s.max_retained <= RETAINED_BOUND,
+            "audio retained grew to {} samples",
+            s.max_retained
+        );
+        assert!(!s.limit_reached);
+        // Dodici frasi al minuto: dieci brevi e il monologo diviso in due.
+        let segments = &s.segments;
+        assert_eq!(segments.len(), 12 * 12);
+        // In ordine; due frasi si toccano solo nel margine di 0,2 s, quando un
+        // monologo oltre i 20 s si divide.
+        let mut previous_end = 0;
+        for segment in segments {
+            assert!(segment.start < segment.end);
+            assert!(segment.start + SAMPLE_RATE / 5 >= previous_end);
+            previous_end = segment.end;
+        }
+        assert!(previous_end <= 12 * 60 * SAMPLE_RATE);
+        let joined: Vec<&str> = segments.iter().map(|s| s.text.as_str()).collect();
+        assert_eq!(s.transcript.as_deref().unwrap().as_str(), joined.join(" "));
+        // Il monologo del settimo minuto parte a 6:30, con 0,2 s di margine.
+        let monologue = &segments[6 * 12 + 10];
+        let at = monologue.start as f64 / SAMPLE_RATE as f64;
+        assert!((389.7..390.0).contains(&at), "monologue at {at} s");
+    }
+
+    #[test]
+    fn the_recording_stops_by_itself_at_sixty_minutes() {
+        use super::super::listening::{MAX_RECORDING, SAMPLE_RATE};
+        let source = SyntheticVisit::minutes(61);
+        let log = source.log.clone();
+        let session = WhisperSession::with_parts(
+            LoudnessDetector,
+            CountingDecoder::default(),
+            Box::new(source),
+        );
+        session.start();
+        assert_eq!(session.wait_for(&[State::Review]), State::Review);
+        assert_eq!(*log.lock().unwrap(), ["start", "stop"]);
+        assert!(session.limit_reached());
+        let segments = session.segments();
+        let last = segments.last().unwrap();
+        assert!(last.end <= MAX_RECORDING, "{} s", last.end / SAMPLE_RATE);
+        // L'ultima frase prima del limite è nel testo, niente dopo i 60 minuti.
+        assert!(last.start >= 59 * 60 * SAMPLE_RATE);
+        assert_eq!(MAX_RECORDING, 60 * 60 * SAMPLE_RATE);
+        assert!(super::super::LIMIT_REACHED.contains("60 minuti"));
     }
 
     fn session_with(source: InjectedSource) -> (Arc<Mutex<Shared>>, Sender<Event>, JoinHandle<()>) {
@@ -1249,6 +1441,98 @@ pub(crate) mod tests {
         }
         drop(session);
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Registrazione lunga col modello vero (WUL-828 punto 3): i file WAV
+    /// indicati, uno dopo l'altro, entrano nel ciclo `listen` a blocchi da
+    /// 0,5 s senza attese. Misura tempo di calcolo, memoria del processo nel
+    /// tempo (RSS da `ps` ogni 2 s), frasi con i tempi e testo. Solo a mano.
+    #[test]
+    #[ignore = "richiede MEDIFLOW_VOCE_WHISPER, MEDIFLOW_VOCE_VAD, MEDIFLOW_VOCE_FILES, MEDIFLOW_VOCE_OUT"]
+    fn real_model_long_session_in_segments() {
+        let var = |name: &str| std::env::var(name).unwrap_or_else(|_| panic!("{name}"));
+        let whisper_path = PathBuf::from(var("MEDIFLOW_VOCE_WHISPER"));
+        let vad_path = PathBuf::from(var("MEDIFLOW_VOCE_VAD"));
+        for (path, file) in [(&whisper_path, &model::WHISPER), (&vad_path, &model::VAD)] {
+            assert_eq!(
+                model::sha256_file(path).unwrap(),
+                file.sha256,
+                "pinned hash"
+            );
+        }
+        let rss = || -> u64 {
+            let out = std::process::Command::new("ps")
+                .args(["-o", "rss=", "-p", &std::process::id().to_string()])
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&out.stdout)
+                .trim()
+                .parse::<u64>()
+                .unwrap_or(0)
+                / 1024
+        };
+        let mut audio = Vec::new();
+        for file in var("MEDIFLOW_VOCE_FILES").split(',') {
+            audio.extend(read_wav(file));
+        }
+        let seconds = audio.len() as f64 / 16_000.0;
+        let prompt = std::env::var("MEDIFLOW_VOCE_PROMPT").unwrap_or_default();
+        let rss_before_model = rss();
+        let session = WhisperSession::with_parts(
+            SileroDetector::load(&vad_path).unwrap(),
+            WhisperDecoder::load(&whisper_path, Zeroizing::new(prompt)).unwrap(),
+            Box::new(InjectedSource::new(audio)),
+        );
+        let rss_loaded = rss();
+        let started = Instant::now();
+        session.start();
+        let mut samples: Vec<(f64, u64)> = Vec::new();
+        let mut last = Instant::now() - Duration::from_secs(10);
+        while !matches!(
+            session.state(),
+            State::Review | State::Error(_) | State::Cancelled
+        ) {
+            if last.elapsed() >= Duration::from_secs(2) {
+                samples.push((started.elapsed().as_secs_f64(), rss()));
+                last = Instant::now();
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let wall = started.elapsed().as_secs_f64();
+        assert_eq!(session.state(), State::Review);
+        let text = session.transcript().unwrap();
+        let segments: Vec<_> = session
+            .segments()
+            .iter()
+            .map(|s| {
+                (
+                    s.start as f64 / 16_000.0,
+                    s.end as f64 / 16_000.0,
+                    s.text.to_string(),
+                )
+            })
+            .collect();
+        let max_rss = samples.iter().map(|s| s.1).max().unwrap_or(0);
+        let shared = session.shared_for_test();
+        let max_retained = shared.lock().unwrap().max_retained;
+        let report = serde_json::json!({
+            "file": var("MEDIFLOW_VOCE_FILES"), "durata_audio_s": seconds, "calcolo_s": wall,
+            "rtf": wall / seconds, "rss_mb_prima_del_modello": rss_before_model,
+            "rss_mb_modello_caricato": rss_loaded, "rss_mb_massimo": max_rss,
+            "rss_mb_nel_tempo": samples, "campioni_audio_trattenuti_max": max_retained,
+            "caratteri": text.chars().count(), "caratteri_al_minuto": text.chars().count() as f64 / (seconds / 60.0),
+            "frasi": segments, "testo": text.as_str(),
+        });
+        std::fs::write(
+            var("MEDIFLOW_VOCE_OUT"),
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+        .unwrap();
+        println!(
+            "audio {seconds:.0} s, calcolo {wall:.0} s, RSS massimo {max_rss} MB, {} caratteri",
+            text.chars().count()
+        );
+        assert!(max_retained <= RETAINED_BOUND);
     }
 
     /// P2: modello vero, file del banco iniettati a blocchi da 0,5 s al posto
