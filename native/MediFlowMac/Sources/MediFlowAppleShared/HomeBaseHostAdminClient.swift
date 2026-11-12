@@ -178,7 +178,7 @@ public enum HostAdminError: Error, LocalizedError, Equatable {
         case .transport:
             "Non è stato possibile raggiungere il runtime locale."
         case .sessionExpired:
-            "La sessione operatore è scaduta. Accedi di nuovo per gestire l'host."
+            "La sessione operatore è scaduta. Accedi di nuovo per gestire l'home-base."
         case .forbidden:
             // Measured, not guessed. The host guards these reads with
             // isWebAdminSession: role == admin AND authChannel == web. This app
@@ -190,7 +190,7 @@ public enum HostAdminError: Error, LocalizedError, Equatable {
             //
             // Saying "you need an admin account" would send an operator who
             // already is an admin looking for permissions they hold.
-            "L'host riserva questa lettura alla console web. Un client nativo abbinato non vi accede, nemmeno con un account amministratore: si consulta da localhost."
+            "L'home-base riserva questa lettura alla console web. Un client nativo abbinato non vi accede, nemmeno con un account amministratore: si consulta da localhome-base."
         case let .status(code):
             "Il runtime locale ha risposto \(code)."
         case let .decoding(detail):

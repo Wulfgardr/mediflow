@@ -24,7 +24,7 @@ final class HostAdminStore: ObservableObject {
 
     func refresh(connection: ClinicalWorkspaceConnection?, serverURL: String, tlsPin: String) async {
         guard let connection else {
-            failures = ["connessione": "Collega l'home-base per leggere lo stato dell'host."]
+            failures = ["connessione": "Collega l'home-base per leggere lo stato dell'home-base."]
             return
         }
         guard HostAdminAvailability.isLocalHost(serverURLString: serverURL) else {
@@ -46,7 +46,7 @@ final class HostAdminStore: ObservableObject {
         // state assignments straightforward.
         updateAwareness = await attempt("versione") { try await client.updateAwareness(sessionCookie: cookie) }
         networkOverview = await attempt("rete") { try await client.networkOverview(sessionCookie: cookie) }
-        aiModels = await attempt("modelli AI") { try await client.aiModels(sessionCookie: cookie) }
+        aiModels = await attempt("modelli IA") { try await client.aiModels(sessionCookie: cookie) }
         auditSummary = await attempt("audit") { try await client.auditSummary(sessionCookie: cookie) }
         backupScheduler = await attempt("backup") { try await client.backupScheduler(sessionCookie: cookie) }
 
@@ -217,7 +217,7 @@ struct HostAdminWorkspaceView: View {
                     InfoRow(entry.eventType ?? "Evento", String(entry.count ?? 0))
                 }
                 if audit.reachedRecordCap {
-                    Text("L'host limita questa lettura a 200 eventi: i conteggi qui sopra descrivono gli ultimi 200, non l'intero periodo.")
+                    Text("L'home-base limita questa lettura a 200 eventi: i conteggi qui sopra descrivono gli ultimi 200, non l'intero periodo.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -230,7 +230,7 @@ struct HostAdminWorkspaceView: View {
     private var backupSection: some View {
         if let backup = store.backupScheduler {
             section("Backup", systemImage: "externaldrive.badge.timemachine") {
-                InfoRow("Pianificazione", (backup.supported ?? false) ? "Supportata su questo host" : "Non supportata su questo host")
+                InfoRow("Pianificazione", (backup.supported ?? false) ? "Supportata su questo home-base" : "Non supportata su questo home-base")
                 InfoRow("Installata", (backup.installed ?? false) ? "Sì" : "No")
                 if let kind = backup.scheduleKind { InfoRow("Tipo", kind) }
                 if let path = backup.schedulePath { InfoRow("Percorso", path) }
@@ -303,7 +303,7 @@ struct HostAdminWorkspaceView: View {
     @ViewBuilder
     private var runtimeSection: some View {
         if let runtime = store.networkOverview?.aiRuntime {
-            section("Runtime AI", systemImage: "cpu") {
+            section("Runtime IA", systemImage: "cpu") {
                 if let value = runtime.mode { InfoRow("Modalità", value) }
                 if let local = runtime.localRuntime {
                     if let value = local.provider { InfoRow("Provider", value) }
@@ -340,7 +340,7 @@ struct HostAdminWorkspaceView: View {
     /// backup and database repair reads as if this host had neither.
     private var pendingSection: some View {
         section("Non ancora in questa app", systemImage: "ellipsis.circle") {
-            Text("Backup e ripristino, riparazione database, correzione orfani, migrazione many-to-many, import repertori AIFA ed esenzioni, conversazioni AI e Smart Import esistono sull'host e si usano da localhost. Sono operazioni che modificano o esportano l'archivio clinico: qui arrivano con conferma esplicita e prova di esito, non prima.")
+            Text("Backup e ripristino, riparazione database, correzione orfani, migrazione many-to-many, import repertori AIFA ed esenzioni, conversazioni IA e Smart Import esistono sull'home-base e si usano da localhome-base. Sono operazioni che modificano o esportano l'archivio clinico: qui arrivano con conferma esplicita e prova di esito, non prima.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
