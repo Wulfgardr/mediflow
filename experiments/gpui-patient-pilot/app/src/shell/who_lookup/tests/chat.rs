@@ -513,7 +513,7 @@ fn matrix_request(
         Function::Insight => Some("aiPatientInsightKillSwitch"),
         Function::Synthesis => Some("aiDocumentSynthesisKillSwitch"),
         Function::Import => Some("aiSmartImportKillSwitch"),
-        Function::Icd | Function::OpenLoops => None,
+        Function::Icd | Function::OpenLoops | Function::EvidenceQueue => None,
     };
     if let Some(key) = key {
         bench
@@ -532,6 +532,18 @@ fn matrix_request(
             rows["receipt"]["itemCount"] = json!(0);
         }
         bench.host.plan(OPEN_LOOPS).send((200, rows)).unwrap();
+    }
+    if function == Function::EvidenceQueue && code == 200 {
+        let empty = bench.view.read_with(cx, |app, _| {
+            app.patient.attachments.ready().is_some_and(Vec::is_empty)
+        });
+        for _ in 0..2 {
+            bench
+                .host
+                .plan(EVIDENCE_ATTACHMENTS)
+                .send((200, if empty { json!([]) } else { evidence_rows() }))
+                .unwrap();
+        }
     }
     let (pending, remote) = function_request(function);
     bench
@@ -554,6 +566,9 @@ fn matrix_request(
             }
             Function::OpenLoops => {
                 app.open_loops.follow_chat();
+            }
+            Function::EvidenceQueue => {
+                app.evidence_queue.follow_chat();
             }
         }
         cx.notify();
@@ -579,6 +594,7 @@ fn matrix_frame(cx: &mut gpui::VisualTestContext) -> MatrixFrame {
         (Function::Synthesis, "clinical-workspace-new-document"),
         (Function::Icd, "clinical-workspace-reference-run-search"),
         (Function::OpenLoops, "clinical-open-loops-close"),
+        (Function::EvidenceQueue, "evidence-queue-close"),
     ]
     .into_iter()
     .filter_map(|(function, id)| ids.iter().any(|found| found == id).then_some(function))
@@ -641,7 +657,7 @@ fn run_view_matrix(cx: &mut gpui::TestAppContext, only_followups: bool) {
                     let (first, _first_remote) = matrix_open(&bench, before, cx);
                     assert_eq!(
                         wire(&first),
-                        json!({"status":State::Generative(before, if before == Function::OpenLoops {Stage::Closed} else {Stage::Opened}).wire()}),
+                        json!({"status":State::Generative(before, if matches!(before,Function::OpenLoops | Function::EvidenceQueue) {Stage::Closed} else {Stage::Opened}).wire()}),
                         "{before:?}, vuota={empty}"
                     );
                     assert!(
@@ -666,7 +682,7 @@ fn run_view_matrix(cx: &mut gpui::TestAppContext, only_followups: bool) {
                     let (next, _next_remote) = matrix_open(&bench, requested, cx);
                     let stage = if before == requested {
                         Stage::Busy
-                    } else if requested == Function::OpenLoops {
+                    } else if matches!(requested, Function::OpenLoops | Function::EvidenceQueue) {
                         Stage::Closed
                     } else {
                         Stage::Opened
@@ -684,6 +700,8 @@ fn run_view_matrix(cx: &mut gpui::TestAppContext, only_followups: bool) {
                     if before != requested {
                         let expected = if before == Function::OpenLoops {
                             "loops-closed"
+                        } else if before == Function::EvidenceQueue {
+                            "evidence-closed"
                         } else if completed {
                             "icd-closed"
                         } else {
@@ -704,6 +722,11 @@ fn run_view_matrix(cx: &mut gpui::TestAppContext, only_followups: bool) {
                             "Verranno inviati al modello locale dell’host: 0 condizioni, 0 terapie attive, 0 voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
                         } else {
                             "Verranno inviati al modello locale dell’host: 1 condizioni, 0 terapie attive, 0 voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
+                        }],
+                        Function::EvidenceQueue => vec![if empty {
+                            "Nessuna evidenza dai documenti."
+                        } else {
+                            "Referto sintetico · Da rivedere"
                         }],
                         Function::OpenLoops => vec![if empty {
                             "Nessun follow-up aperto."
@@ -747,7 +770,7 @@ fn run_view_matrix(cx: &mut gpui::TestAppContext, only_followups: bool) {
             }
         }
     }
-    assert_eq!(checked, if only_followups { 20 } else { 60 });
+    assert_eq!(checked, if only_followups { 24 } else { 84 });
     assert!(
         failures.is_empty(),
         "Viste o avvisi errati nella matrice:\n{}",
@@ -894,5 +917,302 @@ fn chat_followups_busy_reveals_the_existing_read_without_another_request(
     assert_eq!(wire(&first), json!({"status":"loops-closed"}));
     assert_eq!(matrix_rendered(cx), [Function::OpenLoops]);
     assert_eq!(bench.host.routes().len(), calls);
+    assert_read_only(&bench.host);
+}
+
+const EVIDENCE_ATTACHMENTS: &str = "GET /api/v1/network/patients/patient-a/attachments";
+fn evidence_rows() -> Value {
+    json!([{"id":"document-a","patientId":"patient-a","name":"Referto sintetico",
+        "type":"text/plain","size":12,"path":"uploads/synthetic.txt","createdAt":"2026-11-12T00:00:00Z",
+        "summarySnapshot":"Sintesi del documento da rivedere prima dell’uso clinico.","parseEvidenceArtifactSnapshot":null,
+        "currentness":{"sourceRef":"a".repeat(64),"revision":1,"freshnessEpoch":1}}])
+}
+fn open_evidence(bench: &Bench, cx: &mut gpui::VisualTestContext) -> (Pending, UnixStream) {
+    let function = Function::ALL
+        .into_iter()
+        .find(|function| State::Generative(*function, Stage::Opened).wire() == "evidence-opened")
+        .expect("la chat offre le evidenze dai documenti");
+    let (pending, remote) = function_request(function);
+    bench
+        .view
+        .update(cx, |app, cx| app.open_chat_function(&pending, function, cx));
+    (pending, remote)
+}
+#[gpui::test]
+fn chat_evidence_opens_selected_patient_receives_and_renders_read_receipt(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    admission(&bench.host, 200);
+    for _ in 0..2 {
+        bench
+            .host
+            .plan(EVIDENCE_ATTACHMENTS)
+            .send((200, evidence_rows()))
+            .unwrap();
+    }
+    let (pending, _remote) = open_evidence(&bench, cx);
+    cx.run_until_parked();
+    assert_eq!(wire(&pending), json!({"status":"evidence-closed"}));
+    bench.view.read_with(cx, |app, _| {
+        assert_eq!(app.selected_id.as_deref(), Some("patient-a"));
+        assert_eq!(app.patient.detail.ready().unwrap().id, "patient-a");
+        assert_eq!(app.patient_section, PatientSection::Overview);
+        assert!(!app.directory);
+    });
+    crate::shell::notes_recovery_tests::draw(cx);
+    assert!(
+        cx.debug_bounds("evidence-queue-heading").is_some(),
+        "vista visibile"
+    );
+    assert!(
+        cx.debug_bounds("evidence-queue-receipt").is_some(),
+        "ricevuta visibile"
+    );
+    assert!(
+        cx.debug_bounds("evidence-queue-source-0").is_some(),
+        "fonte visibile"
+    );
+    assert_read_only(&bench.host);
+}
+#[gpui::test]
+fn chat_evidence_denied_admission_or_reader_never_produces_receipt(cx: &mut gpui::TestAppContext) {
+    for denied in [true, false] {
+        let (bench, cx) = bench(cx);
+        admission(&bench.host, if denied { 403 } else { 200 });
+        if !denied {
+            bench
+                .host
+                .plan(EVIDENCE_ATTACHMENTS)
+                .send((403, json!({"error":"denied"})))
+                .unwrap();
+        }
+        let (pending, _remote) = open_evidence(&bench, cx);
+        cx.run_until_parked();
+        assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+        assert_eq!(
+            bench
+                .host
+                .routes()
+                .iter()
+                .any(|r| r == EVIDENCE_ATTACHMENTS),
+            !denied
+        );
+        assert_read_only(&bench.host);
+    }
+}
+#[gpui::test]
+fn chat_evidence_late_response_after_patient_change_or_revocation_is_discarded(
+    cx: &mut gpui::TestAppContext,
+) {
+    for revoke in [false, true] {
+        let (bench, cx) = bench(cx);
+        admission(&bench.host, 200);
+        let response = bench.host.plan(EVIDENCE_ATTACHMENTS);
+        let (pending, _remote) = open_evidence(&bench, cx);
+        let session = bench.host.session.clone();
+        let withdrawn = pending.clone();
+        let worker = after_request(&bench.host, EVIDENCE_ATTACHMENTS, move || {
+            if revoke {
+                withdrawn.lock().unwrap().revoke();
+            } else {
+                session
+                    .select_profile_patient("scope-a", "patient-b")
+                    .unwrap();
+            }
+            response.send((200, evidence_rows())).unwrap();
+        });
+        cx.run_until_parked();
+        worker.join().unwrap();
+        assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+        crate::shell::notes_recovery_tests::draw(cx);
+        assert!(cx.debug_bounds("evidence-queue-receipt").is_none());
+        assert_read_only(&bench.host);
+    }
+}
+#[gpui::test]
+fn chat_evidence_foreign_locked_or_changed_sources_never_produce_receipt(
+    cx: &mut gpui::TestAppContext,
+) {
+    for mutation in ["patient", "locked", "changed", "missing-currentness"] {
+        let (bench, cx) = bench(cx);
+        admission(&bench.host, 200);
+        let mut rows = evidence_rows();
+        match mutation {
+            "patient" => rows[0]["patientId"] = json!("patient-b"),
+            "locked" => rows[0]["summarySnapshot"] = json!("ENC:unreadable"),
+            "missing-currentness" => rows[0]["currentness"] = Value::Null,
+            _ => {}
+        }
+        bench
+            .host
+            .plan(EVIDENCE_ATTACHMENTS)
+            .send((200, rows.clone()))
+            .unwrap();
+        if mutation == "changed" {
+            rows[0]["currentness"]["revision"] = json!(2);
+            bench
+                .host
+                .plan(EVIDENCE_ATTACHMENTS)
+                .send((200, rows))
+                .unwrap();
+        }
+        let (pending, _remote) = open_evidence(&bench, cx);
+        cx.run_until_parked();
+        assert_eq!(wire(&pending), json!({"status":"withdrawn"}), "{mutation}");
+        assert_read_only(&bench.host);
+    }
+}
+#[gpui::test]
+fn chat_evidence_changed_patient_during_admission_does_not_read(cx: &mut gpui::TestAppContext) {
+    let (bench, cx) = bench(cx);
+    admission(&bench.host, 200);
+    let (pending, _remote) = open_evidence(&bench, cx);
+    bench.view.update(cx, |app, _| {
+        bench
+            .host
+            .session
+            .select_profile_patient("scope-a", "patient-b")
+            .unwrap();
+        app.selected_id = Some("patient-b".into());
+    });
+    cx.run_until_parked();
+    assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+    assert!(
+        !bench
+            .host
+            .routes()
+            .iter()
+            .any(|r| r == EVIDENCE_ATTACHMENTS)
+    );
+}
+
+#[gpui::test]
+fn chat_evidence_function_visibility_matrix(cx: &mut gpui::TestAppContext) {
+    let functions = [
+        ("icd-opened", "control-label:Chiudi ricerca ICD"),
+        ("loops-opened", "control-label:Chiudi follow-up"),
+        ("evidence-opened", "control-label:Chiudi evidenze"),
+    ];
+    for (previous, _) in functions {
+        for (next, close) in functions {
+            if previous == next {
+                continue;
+            }
+            let (bench, cx) = bench(cx);
+            cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+            let mut remotes = Vec::new();
+            for status in [previous, next] {
+                let function = Function::ALL
+                    .into_iter()
+                    .find(|f| State::Generative(*f, Stage::Opened).wire() == status)
+                    .expect("la chat offre la funzione della matrice");
+                admission(&bench.host, 200);
+                if status == "loops-opened" {
+                    bench
+                        .host
+                        .plan(OPEN_LOOPS)
+                        .send((200, loops_response()))
+                        .unwrap();
+                }
+                if status == "evidence-opened" {
+                    for _ in 0..2 {
+                        bench
+                            .host
+                            .plan(EVIDENCE_ATTACHMENTS)
+                            .send((200, evidence_rows()))
+                            .unwrap();
+                    }
+                }
+                let (pending, remote) = function_request(function);
+                bench
+                    .view
+                    .update(cx, |app, cx| app.open_chat_function(&pending, function, cx));
+                cx.run_until_parked();
+                assert_ne!(
+                    wire(&pending),
+                    json!({"status":"withdrawn"}),
+                    "{previous} -> {next}"
+                );
+                remotes.push(remote);
+            }
+            crate::shell::notes_recovery_tests::draw(cx);
+            assert!(cx.debug_bounds(close).is_some(), "{previous} -> {next}");
+            assert_read_only(&bench.host);
+        }
+    }
+}
+
+#[gpui::test]
+fn chat_evidence_currentness_is_checked_again_by_the_visible_view(cx: &mut gpui::TestAppContext) {
+    let (bench, cx) = bench(cx);
+    admission(&bench.host, 200);
+    for _ in 0..2 {
+        bench
+            .host
+            .plan(EVIDENCE_ATTACHMENTS)
+            .send((200, evidence_rows()))
+            .unwrap();
+    }
+    let (pending, _remote) = open_evidence(&bench, cx);
+    cx.run_until_parked();
+    assert_eq!(wire(&pending), json!({"status":"evidence-closed"}));
+    crate::shell::notes_recovery_tests::draw(cx);
+    assert!(cx.debug_bounds("evidence-queue-receipt").is_some());
+    bench
+        .host
+        .session
+        .select_profile_patient("scope-a", "patient-b")
+        .unwrap();
+    crate::shell::notes_recovery_tests::draw(cx);
+    assert!(cx.debug_bounds("evidence-queue-receipt").is_none());
+    assert_read_only(&bench.host);
+}
+
+#[gpui::test]
+fn chat_evidence_refreshed_source_currentness_hides_the_previous_queue(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    admission(&bench.host, 200);
+    for _ in 0..2 {
+        bench
+            .host
+            .plan(EVIDENCE_ATTACHMENTS)
+            .send((200, evidence_rows()))
+            .unwrap();
+    }
+    let (pending, _remote) = open_evidence(&bench, cx);
+    cx.run_until_parked();
+    assert_eq!(wire(&pending), json!({"status":"evidence-closed"}));
+    crate::shell::notes_recovery_tests::draw(cx);
+    assert!(cx.debug_bounds("evidence-queue-receipt").is_some());
+    let mut rows = evidence_rows();
+    rows[0]["currentness"]["revision"] = json!(2);
+    bench.view.update(cx, |app, cx| {
+        app.patient.attachments = ReadLoad::Ready(serde_json::from_value(rows).unwrap());
+        cx.notify();
+    });
+    crate::shell::notes_recovery_tests::draw(cx);
+    assert!(
+        cx.debug_bounds("evidence-queue-receipt").is_none(),
+        "una fonte riletta e cambiata ritira la coda precedente"
+    );
+    for _ in 0..2 {
+        let mut rows = evidence_rows();
+        rows[0]["currentness"]["revision"] = json!(2);
+        bench
+            .host
+            .plan(EVIDENCE_ATTACHMENTS)
+            .send((200, rows))
+            .unwrap();
+    }
+    let refresh = cx
+        .debug_bounds("control-label:Rileggi evidenze")
+        .expect("rilettura disponibile");
+    cx.simulate_click(refresh.center(), gpui::Modifiers::default());
+    cx.run_until_parked();
+    crate::shell::notes_recovery_tests::draw(cx);
+    assert!(cx.debug_bounds("evidence-queue-receipt").is_some());
     assert_read_only(&bench.host);
 }

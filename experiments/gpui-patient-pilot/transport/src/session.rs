@@ -1,3 +1,4 @@
+pub mod evidence_queue;
 pub mod open_loops;
 pub mod patient_document;
 use crate::{ChatWriteKind, ChatWriteOutcome, ChatWriteResolution};
