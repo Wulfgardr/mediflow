@@ -302,13 +302,17 @@ impl ClinicalApp {
         if !(work.state.reviewable() && work.filled && work.session.two_voices()) {
             return;
         }
-        let swapped = crate::local_voice::voices::swap_speakers(
-            self.chat_access.voice.editor.read(cx).value(),
-        );
-        self.chat_access
-            .voice
-            .editor
-            .update(cx, |input, cx| input.set_content(&swapped, cx));
+        // L'ascolto a due voci esiste solo sul Mac.
+        #[cfg(target_os = "macos")]
+        {
+            let swapped = crate::local_voice::voices::swap_speakers(
+                self.chat_access.voice.editor.read(cx).value(),
+            );
+            self.chat_access
+                .voice
+                .editor
+                .update(cx, |input, cx| input.set_content(&swapped, cx));
+        }
         self.poll_chat_voice(cx);
         cx.notify();
     }
