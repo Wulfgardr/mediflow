@@ -74,12 +74,6 @@ pub(crate) fn quick_status(directory: &Path, files: &[&ModelFile]) -> ModelStatu
     }
 }
 
-/// La dettatura usa whisper se nella cartella c'è almeno un file del modello;
-/// a cartella vuota resta il motore di sistema.
-pub(crate) fn whisper_selected(directory: &Path) -> bool {
-    quick_status(directory, &FILES) != ModelStatus::Missing
-}
-
 /// Verifica completa: dimensione e SHA-256 di ogni file.
 pub(crate) fn verify(directory: &Path, files: &[&ModelFile]) -> ModelStatus {
     match quick_status(directory, files) {
@@ -183,14 +177,14 @@ impl Catalog {
     pub(crate) fn total_size(&self) -> u64 {
         total_size(&self.files)
     }
-    /// Toglie i file del modello e gli eventuali parziali. La dettatura torna al
-    /// motore di sistema.
     /// Avvio: i parziali lasciati da un'uscita brusca non servono a nulla.
     pub(crate) fn remove_partials(&self) {
         for file in &self.files {
             let _ = fs::remove_file(partial_path(&self.directory, file));
         }
     }
+    /// Toglie i file del modello e gli eventuali parziali: la dettatura non è
+    /// più disponibile finché il modello non si reinstalla.
     pub(crate) fn remove(&self) -> io::Result<()> {
         for file in &self.files {
             for path in [
@@ -912,7 +906,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn remove_takes_the_model_away_and_dictation_falls_back_to_the_system_engine() {
+    fn remove_takes_the_model_away_and_leaves_no_file_behind() {
         let root = temp("remove");
         let catalog = Catalog::pinned(root.join("modelli-voce"));
         fs::create_dir_all(&catalog.directory).unwrap();
@@ -920,9 +914,8 @@ pub(crate) mod tests {
             fs::write(catalog.directory.join(file.name), b"pesi inventati").unwrap();
         }
         fs::write(partial_path(&catalog.directory, &WHISPER), b"mezzo").unwrap();
-        assert!(whisper_selected(&catalog.directory));
+        assert_eq!(catalog.quick_status(), ModelStatus::Invalid);
         catalog.remove().unwrap();
-        assert!(!whisper_selected(&catalog.directory));
         assert_eq!(catalog.quick_status(), ModelStatus::Missing);
         assert!(!catalog.directory.exists());
         catalog.remove().unwrap();

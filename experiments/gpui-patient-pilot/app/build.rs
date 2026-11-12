@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, process::Command};
 
 fn main() {
-    println!("cargo:rustc-check-cfg=cfg(local_voice_apple)");
+    println!("cargo:rustc-check-cfg=cfg(local_voice_capture)");
     println!("cargo:rerun-if-changed=src/chat_access/native.m");
     println!("cargo:rerun-if-changed=src/documents/pdf_native.m");
     println!("cargo:rerun-if-changed=src/documents/adobe_glyph_names.h");
@@ -71,62 +71,18 @@ fn main() {
     }
 }
 
+/// Ponte Swift della dettatura: solo la cattura del microfono per whisper.
+/// Senza compilatore Swift la dettatura non è disponibile.
 fn build_voice(out: &std::path::Path, minimum: &str) {
-    let sources = [
-        "../../../native/MediFlowMac/Sources/MediFlowCore/VisitRecordingStateContract.swift",
-        "../../../native/MediFlowMac/Sources/MediFlowAppleShared/VisitRecordingPreflight.swift",
-        "../../../native/MediFlowMac/Sources/MediFlowAppleShared/VisitRecordingCapture.swift",
-        "../../../native/MediFlowMac/Sources/MediFlowAppleShared/AppleVisitRecordingRuntime.swift",
-        "src/local_voice/bridge.swift",
-    ];
-    for source in sources {
-        println!("cargo:rerun-if-changed={source}");
-    }
-    let version = Command::new("xcrun")
-        .args(["swiftc", "--version"])
-        .output()
-        .expect("Swift compiler required for local Apple voice");
-    let version = String::from_utf8_lossy(&version.stdout);
-    let modern = version.split("Swift version ").nth(1).is_some_and(|v| {
-        let mut parts = v.split('.');
-        let major = parts
-            .next()
-            .and_then(|p| p.split_whitespace().next()?.parse::<u32>().ok())
-            .unwrap_or(0);
-        let minor = parts
-            .next()
-            .and_then(|p| p.split_whitespace().next()?.parse::<u32>().ok())
-            .unwrap_or(0);
-        major > 6 || major == 6 && minor >= 2
-    });
-    if !modern {
-        println!(
-            "cargo:warning=Local Apple voice unavailable: Swift 6.2 and macOS 26 SDK required"
-        );
+    let source = "src/local_voice/bridge.swift";
+    println!("cargo:rerun-if-changed={source}");
+    let swift = Command::new("xcrun").args(["swiftc", "--version"]).output();
+    if !swift.is_ok_and(|output| output.status.success()) {
+        println!("cargo:warning=Local voice capture unavailable: Swift compiler required");
         return;
     }
     let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let arch = if arch == "aarch64" { "arm64" } else { &arch };
-    // A selected SDK may predate the Speech types even under a recent compiler.
-    let probe = out.join("local_voice_sdk_probe.swift");
-    std::fs::write(
-        &probe,
-        "import Speech\n@available(macOS 26.0, *) func probe() { _ = (SpeechTranscriber.self, SpeechAnalyzer.self, AssetInventory.self) }\n",
-    )
-    .unwrap();
-    let sdk_ready = Command::new("xcrun")
-        .args(["swiftc", "-typecheck", "-parse-as-library", "-target"])
-        .arg(format!("{arch}-apple-macos{minimum}"))
-        .arg(&probe)
-        .stderr(std::process::Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success());
-    if !sdk_ready {
-        println!(
-            "cargo:warning=Local Apple voice unavailable: Swift 6.2 and macOS 26 SDK required"
-        );
-        return;
-    }
     assert!(
         Command::new("xcrun")
             .args([
@@ -139,13 +95,13 @@ fn build_voice(out: &std::path::Path, minimum: &str) {
                 "-target"
             ])
             .arg(format!("{arch}-apple-macos{minimum}"))
-            .args(sources)
+            .arg(source)
             .arg("-o")
             .arg(out.join("libmediflow_voice.a"))
             .status()
             .unwrap()
             .success(),
-        "Local Apple voice compilation failed"
+        "Local voice capture compilation failed"
     );
     let sdk = Command::new("xcrun")
         .args(["--sdk", "macosx", "--show-sdk-path"])
@@ -170,5 +126,5 @@ fn build_voice(out: &std::path::Path, minimum: &str) {
     println!("cargo:rustc-link-search=native={}", libraries.display());
     println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
     println!("cargo:rustc-link-lib=static=mediflow_voice");
-    println!("cargo:rustc-cfg=local_voice_apple");
+    println!("cargo:rustc-cfg=local_voice_capture");
 }
