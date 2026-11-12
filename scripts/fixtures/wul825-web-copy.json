@@ -209,6 +209,15 @@
     ]
   },
   {
+    "file": "components/patient-synoptic-sheet.tsx",
+    "removed": [
+      "Misure recenti"
+    ],
+    "added": [
+      "Parametri recenti"
+    ]
+  },
+  {
     "file": "components/runtime-twin-workspace.tsx",
     "removed": [
       "Misure"
@@ -253,12 +262,12 @@
       "Questa conferma non viene salvata né inviata al server e non sostituisce il consenso nel terminale host. Per una nuova installazione, la procedura locale richiede di scrivere"
     ],
     "added": [
-      "Chiudere questa guida non interrompe un’installazione già avviata sul home-base. Non è disponibile un arresto dal browser.",
+      "Chiudere questa guida non interrompe un’installazione già avviata sull’home-base. Non è disponibile un arresto dal browser.",
       "Configura WHO su questo home-base",
-      "Controlla per prima cosa il servizio sul home-base. Questo comando legge lo stato; non scarica e non avvia WHO:",
-      "Installa e avvia dal home-base",
-      "Nella cartella MediFlow del home-base, usa il comando selezionato in Prepara. Windows usa PowerShell senza bypass della policy; Linux e macOS usano il terminale locale:",
-      "Per il primo download serve una connessione. Controlla sul home-base lo spazio libero per immagine, catalogo e copie di recupero: questa pagina non lo misura e non dichiara i prerequisiti soddisfatti.",
+      "Controlla per prima cosa il servizio sull’home-base. Questo comando legge lo stato; non scarica e non avvia WHO:",
+      "Installa e avvia dall’home-base",
+      "Nella cartella MediFlow dell’home-base, usa il comando selezionato in Prepara. Windows usa PowerShell senza bypass della policy; Linux e macOS usano il terminale locale:",
+      "Per il primo download serve una connessione. Controlla sull’home-base lo spazio libero per immagine, catalogo e copie di recupero: questa pagina non lo misura e non dichiara i prerequisiti soddisfatti.",
       "Questa conferma non viene salvata né inviata al server e non sostituisce il consenso nel terminale home-base. Per una nuova installazione, la procedura locale richiede di scrivere"
     ]
   },
