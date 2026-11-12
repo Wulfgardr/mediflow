@@ -177,6 +177,7 @@ export function buildSmartImportExtractionPlan(contextPlan: EmissionPlan): Emiss
             'label deve restare in italiano clinico sintetico',
             'icdQuery deve essere una query breve e specifica in inglese, adatta alla ricerca WHO ICD-11 ufficiale',
             'ogni diagnosi, terapia, prestazione e item ha il suo sourceId, che deve coincidere esattamente con un id presente nelle fonti fornite',
+            'currentDiagnoses e currentActiveTherapies sono gia nella scheda: non sono fonti, non citarli come sourceId e non riproporli',
             'massimo 5 diagnosi e 10 terapie',
             'ogni terapia deve rappresentare un singolo farmaco distinto',
             'non inserire in therapies prestazioni sanitarie, visite specialistiche, esami, controlli, consulenze, impegnative o referral: non sono farmaci',

@@ -103,8 +103,15 @@ fn empty_chart(app: &mut ClinicalApp) {
 #[gpui::test]
 fn chat_import_waits_for_native_preparation_and_consent(cx: &mut gpui::TestAppContext) {
     let (bench, cx) = bench(cx);
+    bench.view.read_with(cx, |app, _| {
+        assert!(app.directory, "selezione in anteprima nell’elenco")
+    });
     let (pending, _remote) = opened(&bench, cx);
     bench.view.read_with(cx, |app, _| {
+        assert!(
+            !app.directory,
+            "la chat deve aprire la scheda dall’anteprima dell’elenco"
+        );
         assert_eq!(app.patient_section, PatientSection::Documents);
         assert!(matches!(
             app.patient.smart_import.phase,
@@ -467,10 +474,12 @@ fn an_active_import_or_proposal_is_never_replaced(cx: &mut gpui::TestAppContext)
     assert!(bench.phase(cx, |phase| matches!(phase, GenerationPhase::Consent(_))));
 }
 
-/// Quadro, sintesi e import hanno legami distinti: aprirne uno non tocca il lavoro
-/// degli altri e la revoca di uno non ritira gli altri.
+/// Un'apertura ammessa sostituisce le altre richieste ancora aperte. La revoca
+/// dell'import non ripristina quelle sostituite e non avvia generazioni.
 #[gpui::test]
-fn import_synthesis_and_insight_have_independent_chat_ownership(cx: &mut gpui::TestAppContext) {
+fn switching_import_closes_other_function_requests_without_generation(
+    cx: &mut gpui::TestAppContext,
+) {
     let (bench, cx) = bench(cx);
     paired(&bench);
     admission(&bench, true);
@@ -519,14 +528,11 @@ fn import_synthesis_and_insight_have_independent_chat_ownership(cx: &mut gpui::T
     let (import, _c) = open(&bench, cx);
     assert_eq!(reply(&import), json!({"status":"import-opened"}));
     bench.view.read_with(cx, |app, _| {
-        assert!(app.patient.insight.holds(&insight_ticket));
-        assert!(matches!(
-            app.patient.insight.phase,
-            GenerationPhase::Consent(_)
-        ));
+        assert!(!app.patient.insight.holds(&insight_ticket));
+        assert!(matches!(app.patient.insight.phase, GenerationPhase::Idle));
     });
-    assert_eq!(reply(&insight), json!({"status":"insight-opened"}));
-    assert_eq!(reply(&synthesis), json!({"status":"synthesis-opened"}));
+    assert_eq!(reply(&insight), json!({"status":"withdrawn"}));
+    assert_eq!(reply(&synthesis), json!({"status":"withdrawn"}));
 
     import.lock().unwrap().revoke();
     bench.view.update(cx, |app, _| {
@@ -535,8 +541,8 @@ fn import_synthesis_and_insight_have_independent_chat_ownership(cx: &mut gpui::T
         app.patient.smart_import.follow_chat();
     });
     assert_eq!(reply(&import), json!({"status":"withdrawn"}));
-    assert_eq!(reply(&insight), json!({"status":"insight-opened"}));
-    assert_eq!(reply(&synthesis), json!({"status":"synthesis-opened"}));
+    assert_eq!(reply(&insight), json!({"status":"withdrawn"}));
+    assert_eq!(reply(&synthesis), json!({"status":"withdrawn"}));
     synthesis.lock().unwrap().revoke();
     insight.lock().unwrap().revoke();
     follow(&bench, cx);
