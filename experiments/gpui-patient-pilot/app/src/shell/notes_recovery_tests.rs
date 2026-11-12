@@ -1535,18 +1535,28 @@ fn wul839_orphan_retirement_confirmation_scrolls_into_view_with_large_text(
         app.local_host.retirement = notice.clone();
         cx.notify();
     });
-    draw(cx);
-    cx.update_window_entity(&view, |app, window, cx| {
-        window.focus(&app.retirement_dismiss_target.focus, cx);
-        app.reveal_focused(window, cx);
-    });
-    draw(cx);
-    let viewport = cx.debug_bounds("clinical-workspace-notices").unwrap();
-    let action = cx.debug_bounds("local-session-retirement-dismiss").unwrap();
-    assert!(
-        action.top() >= viewport.top() && action.bottom() <= viewport.bottom(),
-        "retirement confirmation is clipped: {action:?} / {viewport:?}"
-    );
+    for body in [14., 16.] {
+        view.update(cx, |app, cx| {
+            app.test_body_size = Some(body);
+            cx.notify();
+        });
+        draw(cx);
+        cx.update_window_entity(&view, |app, window, cx| {
+            window.focus(&app.retirement_dismiss_target.focus, cx);
+            app.reveal_focused(window, cx);
+        });
+        draw(cx);
+        let viewport = cx.debug_bounds("clinical-workspace-notices").unwrap();
+        let action = cx.debug_bounds("local-session-retirement-dismiss").unwrap();
+        assert!(
+            viewport.size.height >= px(body * 4. * 3. + 32.),
+            "two-line confirmation has no room: {body}: {viewport:?}"
+        );
+        assert!(
+            action.top() >= viewport.top() && action.bottom() <= viewport.bottom(),
+            "retirement confirmation is clipped: {body}: {action:?} / {viewport:?}"
+        );
+    }
     cx.simulate_keystrokes("enter");
     cx.simulate_event(gpui::KeyUpEvent {
         keystroke: gpui::Keystroke::parse("enter").unwrap(),
