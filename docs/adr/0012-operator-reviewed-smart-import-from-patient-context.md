@@ -174,3 +174,92 @@ Una risposta che anche all'ultimo tentativo finisce troncata non diventa più
 `proposal_invalid`: l'anteprima risponde `response_truncated`, e Web e GPUI lo
 dicono con un testo proprio. Decide l'ultimo tentativo, come per
 `proposal_unfaithful` del Quadro paziente (ADR 0189).
+
+## Fonti reali nello schema e diagnosi già in scheda (11 novembre 2026)
+
+### Problema
+
+Dopo la correzione della fonte sulle sotto-prestazioni restano 4 scarti su 20
+per Persona000002. I 14 tentativi scartati hanno tutti la stessa causa: un
+`sourceId` che non è fra le fonti. Il modello cita `currentDiagnoses`,
+`currentDiagnoses.system.E11.9`, `source.local.00000000000.00` e simili, quasi
+sempre per una diagnosi (o una terapia) che il contesto riporta come già in
+scheda. Il prompt mette nel contesto `currentDiagnoses` e
+`currentActiveTherapies` senza dire che cosa sono, e lo schema JSON accetta
+qualunque stringa come `sourceId`.
+
+### Che cosa vuol dire proporre una diagnosi che c'è già
+
+Nulla. L'applicazione della proposta fa il dedupe esplicito (prima thin slice,
+punto 3): una diagnosi già codificata non cambia la scheda. Le sezioni
+`currentDiagnoses` e `currentActiveTherapies` servono al modello per non
+riproporre ciò che c'è, non sono testo da cui il medico possa verificare una
+proposta. Dare loro un id di fonte vorrebbe dire accettare proposte la cui
+«fonte» è la scheda stessa: il controllo dell'host dovrebbe ammettere id che
+oggi rifiuta, cioè allargarsi, per proposte che non applicano nulla. Non lo
+facciamo.
+
+### Decisione
+
+- Il prompt dice che `currentDiagnoses` e `currentActiveTherapies` sono già in
+  scheda, non sono fonti e non vanno riproposti né citati come `sourceId`.
+- Con Ollama lo schema della risposta si costruisce per richiesta: `sourceId`
+  di diagnosi, terapie, prestazioni e sotto-prestazioni è un `enum` degli id
+  delle fonti inviate in quel prompt. Lo schema vincola la generazione, quindi
+  il modello non può più scrivere un id che non esiste. Lo schema statico resta
+  quello della validazione e del profilo ordinario remoto.
+- Il controllo dell'host non cambia: ogni `sourceId` deve essere fra le fonti
+  della proiezione, sulla risposta grezza e dopo il parser.
+
+### Rischio accettato
+
+L'`enum` impedisce un id inventato, non un id sbagliato. Se il modello vuole
+comunque riproporre una diagnosi già in scheda, ora deve scegliere una fonte
+reale, e l'evidenza può non stare in quel testo. Il caso esiste già oggi senza
+`enum` (nella misura dell'11 novembre una diagnosi riporta come evidenza la
+descrizione della diagnosi in scheda sotto una fonte reale) e il presidio resta
+lo stesso: il medico vede la fonte accanto alla proposta prima di applicarla.
+La misura dopo la correzione conta questi casi a parte.
+
+### Misura (11 novembre 2026)
+
+Stesso metodo della misura precedente (`qwen3.5:35b-a3b`, archivio sintetico,
+20 richieste per paziente, percorso dell'host chiamato dal trasporto GPUI),
+due corse con questa decisione:
+
+| | Persona000001 | Persona000002 |
+| --- | --- | --- |
+| Proposte | 40 su 40 | 40 su 40 |
+| Tentativi scartati | 0 | 0 |
+| `sourceId` fuori dalle fonti | 0 | 0 |
+| Diagnosi con evidenza copiata dalla scheda | 0 | 0 |
+
+Il prezzo è nel richiamo di Persona000002. «Microalbuminuria», l'unica
+diagnosi che le fonti aggiungono alla scheda, compare in 11 proposte su 40;
+nella misura precedente compariva in 13 delle 16 proposte arrivate al medico
+su 20 richieste. Le prove con un'altra formulazione non lo recuperano senza
+riaprire l'attribuzione sbagliata:
+
+| Variante | Proposte P1 / P2 | Microalbuminuria | Evidenza copiata dalla scheda sotto una fonte reale |
+| --- | --- | --- | --- |
+| Prima (misura dopo #936, schema statico) | 20/20 e 16/20 | 13 su 16 proposte | 4 diagnosi in 31 tentativi |
+| Solo `enum`, prompt invariato | 20/20 e 20/20 | 10 su 20 | 13 diagnosi in 20 tentativi |
+| `enum` e «non citarli come sourceId», senza «non riproporli» | 39/40 e 40/40 | 16 su 40 | 0 |
+| `enum` e regola completa (questa decisione) | 40/40 e 40/40 | 11 su 40 | 0 |
+| `enum`, regola e «proponi comunque le diagnosi nuove» | 20/20 e 20/20 | 1 su 20 | 0 |
+
+Con il solo `enum` il modello scrive ancora le diagnosi in scheda, ma sotto
+una fonte reale con l'evidenza presa dalla scheda: l'errore non sparisce, si
+nasconde. Per questo il prompt resta parte della decisione. Fra la regola
+completa e quella senza «non riproporli» la differenza sta nel rumore di 40
+richieste (Persona000001 perde l'ipertrofia ventricolare sinistra in 12
+proposte su 39 con la seconda, in 5 su 40 con la prima). La regola completa
+propone meno doppioni della scheda. Il richiamo delle diagnosi nuove resta
+una questione aperta, da misurare con un riferimento delle voci attese.
+
+
+### Esito WUL-832, 12 novembre 2026
+
+Il [confronto su cinque pazienti sintetici](../verification/smart-import-wul-832/README.md), con 20 richieste per paziente e braccio e qwen3.5:35b-a3b locale, supera la regola aggregata fissata prima della misura decisiva. Le attribuzioni errate rilevate passano da 50 a 18 nei tentativi grezzi e da 26 a 18 nelle proposte accettate. Le diagnosi nuove attese proposte passano da 84 a 82 su 100 occasioni (perdita del 2,4%, sotto il limite di un terzo), le proposte accettate da 96 a 100.
+
+Restano 18 attribuzioni errate su P1, con valori presi da fonti diverse sotto un solo ID. Su P2 la microalbuminuria scende da 12 a 3 proposte su 20. Gli excerpt finali non risolti salgono da 16 a 33 e non sono dichiarati verificati. Il protocollo v2 e i semi sono congelati prima delle nuove inferenze. La calibrazione v1, che segnava come errate anche citazioni letterali corrette, è esclusa dalla decisione e conservata. La tabella, le definizioni, le revisioni ed i limiti sono nel rapporto collegato. Nessuna applicazione clinica o prova UI è inclusa in questa misura.

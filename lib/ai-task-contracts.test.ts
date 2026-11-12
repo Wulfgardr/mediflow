@@ -649,8 +649,8 @@ test('smart import prompt stays byte-identical through the compatible barrel', (
     const prompt = buildSmartImportExtractionPrompt(payload);
 
     assert.equal(prompt, buildSmartImportPromptDirect(payload));
-    assert.equal(Buffer.byteLength(prompt, 'utf8'), 5488);
-    assert.equal(createHash('sha256').update(prompt).digest('hex'), 'e2e7d57dba85312bee8a675532c674b047c0e69e38d7997ddedb0b9e74286e94');
+    assert.equal(Buffer.byteLength(prompt, 'utf8'), 5614);
+    assert.equal(createHash('sha256').update(prompt).digest('hex'), 'b2d041180c61326f0093743f1f6b3ea07ff0ba91c7aea8f84babb221430f7dc4');
 });
 
 test('document synthesis prompt stays byte-identical through the compatible barrel', () => {
