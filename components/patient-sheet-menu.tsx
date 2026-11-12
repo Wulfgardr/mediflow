@@ -88,6 +88,12 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
                 if (event.key === 'ArrowUp') next = (index - 1 + candidates.length) % candidates.length;
                 if (event.key === 'Home') next = 0;
                 if (event.key === 'End') next = candidates.length - 1;
+                if (event.key.length === 1 && event.key.trim() && !event.altKey && !event.ctrlKey && !event.metaKey) {
+                    const letter = event.key.toLocaleLowerCase('it-IT');
+                    const match = [...candidates.slice(index + 1), ...candidates.slice(0, index + 1)]
+                        .find(item => item.textContent?.trim().toLocaleLowerCase('it-IT').startsWith(letter));
+                    if (match) next = candidates.indexOf(match);
+                }
                 if (next !== undefined) { event.preventDefault(); candidates[next]?.focus(); }
             }}>
             {children}
