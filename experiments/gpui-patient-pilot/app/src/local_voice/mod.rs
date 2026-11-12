@@ -48,7 +48,12 @@ impl State {
 
 /// Avviso quando la registrazione si è fermata da sola.
 pub(crate) const LIMIT_REACHED: &str =
-    "La registrazione si è fermata da sola a 60 minuti, la durata massima.";
+    "La registrazione si è fermata da sola: 60 minuti o 80.000 caratteri sono il massimo.";
+
+/// Testo massimo della revisione: la trascrizione più le etichette di medico e
+/// paziente e le correzioni. Resta sotto i 262.144 caratteri UTF-16 di una
+/// voce di diario.
+pub(crate) const MAX_REVIEW_CHARS: usize = 120_000;
 
 impl Fault {
     pub(crate) fn message(self) -> &'static str {
@@ -112,6 +117,9 @@ pub(crate) struct Session {
     /// Per le prove: testo dal vivo (confermato, provvisorio) deciso dal test.
     #[cfg(test)]
     synthetic_live: Option<std::sync::Arc<std::sync::Mutex<(String, String)>>>,
+    /// Per le prove: frasi della visita già attribuite.
+    #[cfg(all(test, target_os = "macos"))]
+    synthetic_visit: Option<Vec<(voices::Speaker, String)>>,
     backend: Backend,
 }
 impl Session {
@@ -121,6 +129,8 @@ impl Session {
             synthetic: None,
             #[cfg(test)]
             synthetic_live: None,
+            #[cfg(all(test, target_os = "macos"))]
+            synthetic_visit: None,
             backend,
         }
     }
@@ -173,6 +183,19 @@ impl Session {
             ..Self::with_backend(Backend::Unsupported)
         }
     }
+    /// Visita di prova ferma in revisione, con frasi già attribuite.
+    #[cfg(all(test, target_os = "macos"))]
+    pub(crate) fn synthetic_visit(lines: &[(voices::Speaker, &str)]) -> Self {
+        let text: Vec<&str> = lines.iter().map(|(_, t)| *t).collect();
+        Self {
+            synthetic_visit: Some(lines.iter().map(|(s, t)| (*s, (*t).to_owned())).collect()),
+            ..Self::synthetic_at(
+                State::Review,
+                std::time::Duration::from_secs(90),
+                &text.join(" "),
+            )
+        }
+    }
     #[cfg(all(test, target_os = "macos"))]
     pub(crate) fn synthetic(state: State, text: &str) -> Self {
         Self::synthetic_at(state, std::time::Duration::ZERO, text)
@@ -193,8 +216,6 @@ impl Session {
         self.send(Event::Start);
     }
     /// Ascolto della visita: come l'avvio, ma ogni frase va a medico o paziente.
-    // Il pulsante arriva con la revisione della bozza (WUL-828, parte D).
-    #[allow(dead_code)]
     pub(crate) fn start_visit(&self) {
         #[cfg(target_os = "macos")]
         if let Backend::Whisper(whisper) = &self.backend {
@@ -280,6 +301,40 @@ impl Session {
         }
         false
     }
+    /// Ascolto della visita a due voci, scelto all'avvio.
+    pub(crate) fn two_voices(&self) -> bool {
+        #[cfg(all(test, target_os = "macos"))]
+        if self.synthetic_visit.is_some() {
+            return true;
+        }
+        #[cfg(target_os = "macos")]
+        if let Backend::Whisper(whisper) = &self.backend {
+            return whisper.two_voices();
+        }
+        false
+    }
+    /// Testo da rivedere: nell'ascolto della visita, a righe per medico e
+    /// paziente; nella dettatura, la trascrizione così com'è.
+    pub(crate) fn review_text(&self) -> Option<Zeroizing<String>> {
+        #[cfg(target_os = "macos")]
+        let state = self.state();
+        #[cfg(all(test, target_os = "macos"))]
+        if let Some(visit) = &self.synthetic_visit {
+            let lines: Vec<(voices::Speaker, &str)> =
+                visit.iter().map(|(s, t)| (*s, t.as_str())).collect();
+            return reviewed_text(state, &voices::draft(&lines));
+        }
+        #[cfg(target_os = "macos")]
+        if let Backend::Whisper(whisper) = &self.backend {
+            let attributed = whisper.attributed();
+            if !attributed.is_empty() {
+                let lines: Vec<(voices::Speaker, &str)> =
+                    attributed.iter().map(|(s, t)| (*s, t.as_str())).collect();
+                return reviewed_text(state, &voices::draft(&lines));
+            }
+        }
+        self.transcript()
+    }
     pub(crate) fn transcript(&self) -> Option<Zeroizing<String>> {
         #[cfg(test)]
         if let Some((machine, text)) = &self.synthetic {
@@ -298,7 +353,7 @@ impl Session {
 pub(crate) fn reviewed_text(state: State, text: &str) -> Option<Zeroizing<String>> {
     (state.reviewable()
         && !text.trim().is_empty()
-        && text.chars().count() <= 12_000
+        && text.chars().count() <= MAX_REVIEW_CHARS
         && text.len() <= 256 * 1024)
         .then(|| Zeroizing::new(text.to_owned()))
 }
@@ -335,7 +390,15 @@ mod tests {
             );
         }
         assert!(reviewed_text(State::Review, "  ").is_none());
-        assert!(reviewed_text(State::Review, &"è".repeat(12_001)).is_none());
+        // Una visita lunga supera i 12.000 caratteri della dettatura breve.
+        let long = "Paziente in buon compenso. ".repeat(3_000);
+        assert!(long.chars().count() > 80_000);
+        assert!(reviewed_text(State::Review, &long).is_some());
+        assert!(reviewed_text(State::Review, &"è".repeat(MAX_REVIEW_CHARS + 1)).is_none());
+        assert!(
+            reviewed_text(State::Review, &"€".repeat(MAX_REVIEW_CHARS)).is_none(),
+            "256 KiB"
+        );
     }
 
     /// Ogni stato ha un messaggio, salvo la registrazione in corso, dove parla

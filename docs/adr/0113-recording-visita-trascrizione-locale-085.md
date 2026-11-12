@@ -9,6 +9,10 @@ Apple per Mac non ha più l'ascolto della visita con SpeechAnalyzer; runtime,
 preflight degli asset e test relativi sono stati tolti. Il resto di questo ADR resta
 come nota storica. L'ascolto dell'intera visita tornerà con whisper (WUL-828, punto 3).
 
+Aggiornamento del 12 novembre 2026 (WUL-828, punto 3): l'ascolto dell'intera visita
+torna nel client GPUI per Mac, con whisper. Le scelte valide da qui in avanti sono
+nella sezione «Ascolto della visita con whisper» in fondo.
+
 Issue: [GitHub #280](https://github.com/Wulfgardr/mediflow/issues/280)
 
 Program line: candidata `0.8.5`
@@ -271,3 +275,70 @@ nessuna capability runtime consegnata o release-ready**.
 - [Apple SpeechTranscriber](https://developer.apple.com/documentation/speech/speechtranscriber)
 - [Apple AVAudioApplication](https://developer.apple.com/documentation/avfaudio/avaudioapplication)
 - [Apple AVAudioEngine](https://developer.apple.com/documentation/avfaudio/avaudioengine)
+
+## Ascolto della visita con whisper (12 novembre 2026)
+
+Per decisione di Leonardo dell'11 novembre, confermata il 12, l'ascolto
+dell'intera visita entra nella 0.9.1: registrazione lunga, due voci, bozza da
+rivedere prima di salvare. Lo stesso pannello del client GPUI offre la
+dettatura (una voce) e l'ascolto della visita (medico e paziente).
+
+### Stati, indicatore
+
+La registrazione segue una tabella esplicita di passaggi
+(`local_voice/recording.rs`): pronta, in registrazione, in pausa, ferma,
+errore. Ogni stato ha una forma (cerchio vuoto, cerchio pieno, due barre,
+quadrato, punto esclamativo), una parola e, dal primo audio, il tempo
+trascorso, che si ferma in pausa. Pausa e ripresa chiudono e riaprono il
+microfono. Microfono assente, permesso negato, microfono staccato o muto per
+più di due secondi fermano subito la registrazione in errore, con il motivo e
+il rimedio. Dopo l'avvio il testo trascritto fin lì resta da rivedere.
+
+### Memoria e durata
+
+L'audio resta solo in memoria e solo per la frase aperta (al massimo 20 s,
+più il contesto del rilevatore): nessun file temporaneo, come nel resto di
+questo ADR. Ogni frase definitiva porta i suoi tempi. La registrazione si
+ferma da sola a 60 minuti di audio o a 80.000 caratteri di testo e lo dice
+nella finestra.
+
+### Due voci
+
+L'attribuzione è locale e senza modelli: per ogni frase un'impronta di 25
+numeri (medie e dispersioni dei coefficienti cepstrali mel, altezza della
+voce), poi due gruppi. È medico il gruppo della prima frase. Non esiste nel
+progetto un modello locale aperto di diarizzazione già verificato in italiano:
+l'attribuzione è quindi un aiuto che il medico corregge nella revisione
+(testo modificabile e pulsante «Scambia medico e paziente»). Una frase in cui
+parlano entrambi senza pausa va a una sola persona.
+
+### Limite dei 12.000 caratteri
+
+La dettatura breve rifiutava in revisione un testo oltre 12.000 caratteri: una
+visita lunga sarebbe finita in «testo non conservato». Misure del 12 novembre
+con il modello vero (large-v3-turbo q5_0 e Silero, hash fissati) su sedute
+sintetiche a due voci generate con `say`:
+
+| Seduta | Durata | Caratteri al minuto | WER | Attribuzione corretta |
+|---|---|---|---|---|
+| s1, pause lunghe | 9,5 min | 256 | 6,5% | 100% del parlato |
+| s2, pause lunghe | 9,1 min | 240 | 5,6% | 100% |
+| a1, dettati alternati | 9,5 min | 613 | 12,5% | 100% |
+| a2, due voci maschili | 4,6 min | 679 | 8,5% | 100% |
+
+Con 613-679 caratteri al minuto i 12.000 caratteri si esauriscono fra i 18 e
+i 20 minuti. Un parlato fitto e continuo a 180 parole al minuto arriva verso i
+1.150. Decisione: il tetto del testo segue la durata massima. La registrazione
+si ferma a 80.000 caratteri (oltre i 69.000 di un'ora di parlato continuo), la
+revisione accetta fino a 120.000 caratteri per etichette e correzioni e resta
+sotto i 256 KiB e sotto i 262.144 caratteri UTF-16 di una voce di diario. Il
+limite di 12.000 caratteri del servizio web `visit-draft` non cambia: non
+riguarda questo percorso.
+
+Sulle stesse sedute il calcolo è rimasto sotto il tempo reale (RTF fra 0,15 e
+0,45, misurato senza attese) e la memoria del processo fra 830 e 960 MB senza
+crescere con la durata (19 minuti di seguito). Le voci sono sintetiche:
+l'attribuzione al 100% non vale per voci reali, stanze rumorose o turni
+sovrapposti. Microfono vero e voce di Leonardo restano da provare a mano
+(`npm run prove:a-mano`, voce `ascolto-visita-microfono`).
+

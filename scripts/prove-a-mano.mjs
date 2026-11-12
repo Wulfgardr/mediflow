@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, realpathSync, existsSync, readFileSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { tmpdir, homedir, userInfo } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,6 +41,16 @@ export async function runProof(proof, env, output) {
 const node = process.execPath;
 const mac = () => process.platform !== 'darwin' ? 'richiede macOS' : !existsSync('/Applications/Xcode-beta.app') ? 'manca Xcode-beta' : undefined;
 const ts = (id, files, unavailable = mac) => ({ id, command: [node, 'scripts/run-strip-types.mjs', '--test', ...files], unavailable: () => !existsSync('node_modules/typescript') ? 'mancano dipendenze npm' : unavailable() });
+// Modello vocale installato da Impostazioni, Voce locale, nella HOME vera: il runner isola HOME.
+const voiceModel = (home = userInfo().homedir) => ['ggml-large-v3-turbo-q5_0.bin', 'ggml-silero-v6.2.0.bin']
+  .map(name => path.join(home, 'Library/Application Support/MediFlow GPUI/modelli-voce', name));
+export function listeningUnavailable(home = userInfo().homedir, platform = process.platform) {
+  if (platform !== 'darwin') return 'richiede macOS';
+  if (!existsSync(path.join(home, '.cargo/bin/cargo'))) return 'manca cargo in ~/.cargo/bin';
+  const missing = voiceModel(home).filter(file => !existsSync(file));
+  if (missing.length) return `modello vocale non installato: ${missing.map(file => path.basename(file)).join(', ')}`;
+  return undefined;
+}
 export function catalog(output) {
   return [
     ts('apple-vision', ['lib/domain/documents/anydoc-apple-vision-ocr.test.ts', 'lib/domain/documents/anydoc-ocr-acceptance.test.ts', 'lib/domain/documents/anydoc-current-source-composition.test.ts']),
@@ -54,11 +64,10 @@ export function catalog(output) {
     ts('voce-contratto', ['lib/chat-card/local-voice.test.ts']),
     ts('contenitore-mac', ['lib/chatgpt-execution/execution-mac-probe.test.ts']),
     ts('archivio-mac', ['lib/backup-destination-policy.test.ts', 'lib/native-patient-document.test.ts']),
-    { id: 'registrazione-cattura', command: ['swift', 'test', '--package-path', 'native/MediFlowMac', '--disable-automatic-resolution', '--filter', 'VisitRecordingCaptureTests'], unavailable: mac },
-    { id: 'registrazione-visita', command: [node, 'scripts/run-visit-recording-synthetic-benchmark.mjs'], unavailable: mac },
     { id: 'visuale-091', command: [node, 'scripts/qualify-visual-091.mjs'], unavailable: () => !existsSync('node_modules/next/dist/bin/next') ? 'mancano dipendenze Next' : undefined },
     { id: 'identita-ui', unavailable: () => 'spec vincolato al banco /Volumes/Vision e reference.json; migrazione del banco necessaria' },
-    { id: 'voce-whisper-wul-828', unavailable: () => 'WUL-828: prova reale non ancora integrata; aggancio catalog(output) documentato' },
+    { id: 'ascolto-visita-modello', command: [node, 'scripts/prove-ascolto-visita.mjs', ...voiceModel()], unavailable: listeningUnavailable },
+    { id: 'ascolto-visita-microfono', unavailable: () => 'WUL-828: microfono vero e voce di Leonardo, da provare a mano nella seconda seduta (elenco in docs/quality/prove-a-mano.md)' },
   ];
 }
 export function writeReport(output, results) {

@@ -212,7 +212,7 @@ impl ClinicalApp {
             cx.notify();
         }
         let transcript = (state.reviewable() && !work.filled)
-            .then(|| work.session.transcript())
+            .then(|| work.session.review_text())
             .flatten();
         // Una fine senza testo da rivedere è un errore, non una revisione vuota.
         let state = if state == State::Review && !work.filled && transcript.is_none() {
@@ -293,6 +293,29 @@ impl ClinicalApp {
         }
         cx.notify();
     }
+    /// Nell'ascolto della visita, scambia le etichette di medico e paziente
+    /// nel testo in revisione, correzioni comprese. Nessun salvataggio.
+    fn swap_voice_speakers(&mut self, cx: &mut Context<Self>) {
+        let Some(work) = &self.chat_access.voice.work else {
+            return;
+        };
+        if !(work.state.reviewable() && work.filled && work.session.two_voices()) {
+            return;
+        }
+        // L'ascolto a due voci esiste solo sul Mac.
+        #[cfg(target_os = "macos")]
+        {
+            let swapped = crate::local_voice::voices::swap_speakers(
+                self.chat_access.voice.editor.read(cx).value(),
+            );
+            self.chat_access
+                .voice
+                .editor
+                .update(cx, |input, cx| input.set_content(&swapped, cx));
+        }
+        self.poll_chat_voice(cx);
+        cx.notify();
+    }
     /// Dalla dettatura che manca alla pagina dove si installa il modello. La
     /// richiesta della chat si chiude come con «Scarta».
     fn open_voice_model_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -323,7 +346,11 @@ impl ClinicalApp {
                 .gap(px(12.))
                 .child(heading(
                     "chat-local-voice-title",
-                    "Dettatura locale",
+                    if work.session.two_voices() {
+                        "Ascolto della visita"
+                    } else {
+                        "Dettatura locale"
+                    },
                     self.theme,
                 ))
                 .child(crate::title::title(
@@ -399,6 +426,22 @@ impl ClinicalApp {
                             cx.notify();
                         })),
                     )
+                    .child(
+                        button(
+                            "chat-voice-start-visit",
+                            "Consenti e ascolta la visita",
+                            self.theme,
+                            false,
+                            true,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.poll_chat_voice(cx);
+                            if let Some(work) = &this.chat_access.voice.work {
+                                work.session.start_visit();
+                            }
+                            cx.notify();
+                        })),
+                    )
                 })
                 .when(work.state == State::Recording, |el| {
                     el.child(
@@ -470,6 +513,20 @@ impl ClinicalApp {
                                     ))
                                 }),
                         )
+                        .when(work.session.two_voices(), |el| {
+                            el.child(
+                                button(
+                                    "chat-voice-swap",
+                                    "Scambia medico e paziente",
+                                    self.theme,
+                                    false,
+                                    true,
+                                )
+                                .on_click(
+                                    cx.listener(|this, _, _, cx| this.swap_voice_speakers(cx)),
+                                ),
+                            )
+                        })
                         .child(
                             button(
                                 "chat-voice-transfer",
@@ -1143,7 +1200,11 @@ mod tests {
         let (ids, labels) = voice_page(cx, "chat-voice");
         assert_eq!(
             ids,
-            ["chat-voice-start", "chat-voice-discard"],
+            [
+                "chat-voice-start",
+                "chat-voice-start-visit",
+                "chat-voice-discard"
+            ],
             "{labels:?}"
         );
         assert!(
@@ -1361,7 +1422,11 @@ mod tests {
                 "chat-voice-shape-ready",
                 "Pronta",
                 None,
-                &["chat-voice-start", "chat-voice-discard"],
+                &[
+                    "chat-voice-start",
+                    "chat-voice-start-visit",
+                    "chat-voice-discard",
+                ],
             ),
             (
                 State::Recording,
@@ -1641,5 +1706,135 @@ mod tests {
             assert!(app.form.is_none());
         });
         assert_eq!(host.request_count(), requests);
+    }
+
+    /// Bozza della visita: una riga per medico e paziente, modificabile, con
+    /// l'aiuto sui farmaci del paziente e lo scambio delle due persone; si
+    /// prepara solo con il gesto del medico e non si salva da sola.
+    #[gpui::test]
+    fn a_visit_review_is_attributed_editable_swappable_and_never_saved_by_itself(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use crate::local_voice::voices::Speaker::{Doctor, Patient};
+        cx.update(crate::text_input::bind_keys);
+        let host = Host::new();
+        let session = Session::synthetic_visit(&[
+            (Doctor, "Buongiorno, come va?"),
+            (Patient, "Bene. Prendo il Ramipli la mattina."),
+            (Patient, "La sera niente."),
+            (Doctor, "Continui così."),
+        ]);
+        let (view, cx, _remote) = recording_app(cx, &host, session);
+        let requests = host.request_count();
+        let draft = "Medico: Buongiorno, come va?\nPaziente: Bene. Prendo il Ramipli la mattina. La sera niente.\nMedico: Continui così.";
+        cx.update_window_entity(&view, |app, _, cx| {
+            app.patient.therapies = ReadLoad::Ready(vec![
+                serde_json::from_value(serde_json::json!({
+                    "id":"therapy-0","patientId":"patient-a","drugName":"Ramipril",
+                    "activePrinciple":"Ramipril","dosage":"1 compressa","status":"active",
+                    "startDate":"2026-01-01","version":1
+                }))
+                .unwrap(),
+            ]);
+            app.poll_chat_voice(cx);
+            assert_eq!(app.chat_access.voice.editor.read(cx).value(), draft);
+            assert!(app.form.is_none(), "a writer opened by itself");
+        });
+        let (ids, labels) = voice_page(cx, "chat-voice");
+        assert!(!shows(&labels, "Consenti"), "{labels:?}");
+        assert!(shows(&labels, "Ferma"), "{labels:?}");
+        assert!(shows(&labels, "Ramipli → Ramipril"), "{labels:?}");
+        assert_eq!(
+            ids.iter()
+                .filter(|id| !id.starts_with("chat-voice-drug-"))
+                .collect::<Vec<_>>(),
+            [
+                "chat-voice-swap",
+                "chat-voice-transfer",
+                "chat-voice-discard"
+            ],
+            "{labels:?}"
+        );
+        let target = cx.debug_bounds("control-label:Ramipli → Ramipril").unwrap();
+        cx.simulate_click(target.center(), gpui::Modifiers::default());
+        let corrected = draft.replacen("Ramipli", "Ramipril", 1);
+        cx.update_window_entity(&view, |app, _, cx| {
+            assert_eq!(app.chat_access.voice.editor.read(cx).value(), corrected);
+        });
+        let target = cx
+            .debug_bounds("control-label:Scambia medico e paziente")
+            .unwrap();
+        cx.simulate_click(target.center(), gpui::Modifiers::default());
+        let swapped = "Paziente: Buongiorno, come va?\nMedico: Bene. Prendo il Ramipril la mattina. La sera niente.\nPaziente: Continui così.";
+        cx.update_window_entity(&view, |app, _, cx| {
+            assert_eq!(app.chat_access.voice.editor.read(cx).value(), swapped);
+            assert!(app.form.is_none());
+        });
+        assert_eq!(host.request_count(), requests, "nothing saved");
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.transfer_chat_voice(window, cx);
+            let form = app.form.as_ref().unwrap();
+            assert!(form.kind == FormKind::Entry && form.state == FormState::Draft);
+            assert_eq!(form.fields[2].editor.read(cx).value(), swapped);
+        });
+        assert_eq!(host.request_count(), requests, "the draft is not saved");
+    }
+
+    /// Pronta: la stessa informativa porta alla dettatura o all'ascolto della
+    /// visita, e la scelta vale per tutta la registrazione.
+    #[gpui::test]
+    fn ready_offers_dictation_or_visit_listening(cx: &mut gpui::TestAppContext) {
+        use crate::local_voice::listening::tests::{CountingDecoder, LoudnessDetector, tone};
+        use crate::local_voice::whisper::{WhisperSession, tests::InjectedSource};
+        let host = Host::new();
+        let whisper = WhisperSession::with_parts(
+            LoudnessDetector,
+            CountingDecoder::default(),
+            Box::new(InjectedSource::paced(tone(60.0), 1.0)),
+        );
+        let (view, cx, _remote) = recording_app(cx, &host, Session::with_whisper(whisper));
+        let (ids, labels) = voice_page(cx, "chat-voice");
+        assert_eq!(
+            ids,
+            [
+                "chat-voice-start",
+                "chat-voice-start-visit",
+                "chat-voice-discard"
+            ]
+        );
+        assert!(shows(&labels, "Consenti e ascolta la visita"), "{labels:?}");
+        let target = cx
+            .debug_bounds("control-label:Consenti e ascolta la visita")
+            .unwrap();
+        cx.simulate_click(target.center(), gpui::Modifiers::default());
+        let mut recording = false;
+        for _ in 0..1_000 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            recording = cx.update_window_entity(&view, |app, _, cx| {
+                app.poll_chat_voice(cx);
+                app.chat_access.voice.work.as_ref().unwrap().state == State::Recording
+            });
+            if recording {
+                break;
+            }
+        }
+        assert!(recording);
+        let (ids, labels) = voice_page(cx, "chat-voice");
+        assert!(shows(&labels, "In registrazione"), "{labels:?}");
+        cx.update_window_entity(&view, |app, _, _| {
+            assert!(
+                app.chat_access
+                    .voice
+                    .work
+                    .as_ref()
+                    .unwrap()
+                    .session
+                    .two_voices()
+            );
+        });
+        assert_eq!(
+            ids,
+            ["chat-voice-pause", "chat-voice-stop", "chat-voice-discard"]
+        );
     }
 }

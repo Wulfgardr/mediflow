@@ -301,8 +301,10 @@ impl WhisperSession {
     pub(crate) fn limit_reached(&self) -> bool {
         self.read(|s| s.limit_reached).unwrap_or(false)
     }
+    pub(crate) fn two_voices(&self) -> bool {
+        self.read(|s| s.two_voices).unwrap_or(false)
+    }
     /// Ascolto della visita a due voci; vale solo prima dell'avvio.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn set_two_voices(&self, two_voices: bool) {
         publish(&self.shared, |s| {
             if s.machine.state() == State::Disclosure {
@@ -312,7 +314,6 @@ impl WhisperSession {
     }
     /// Frasi attribuite a medico o paziente, solo con il testo da rivedere
     /// dell'ascolto a due voci.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn attributed(&self) -> Vec<(Speaker, Zeroizing<String>)> {
         self.read(|s| {
             if !(s.two_voices && s.machine.state().reviewable() && s.transcript.is_some()) {
@@ -1192,6 +1193,54 @@ pub(crate) mod tests {
         assert_eq!(s.segments.len(), 2);
         assert!(s.segments.iter().all(|segment| segment.voice.is_none()));
         assert!(s.print_ms.is_empty());
+    }
+
+    /// Una visita di 15 minuti scrive più dei 12.000 caratteri della vecchia
+    /// dettatura: arriva intera alla revisione, senza perdere il testo.
+    #[test]
+    fn a_fifteen_minute_visit_reaches_review_with_all_its_text() {
+        let whisper = WhisperSession::with_parts(
+            LoudnessDetector,
+            CountingDecoder::default(),
+            Box::new(SyntheticVisit::minutes(15)),
+        );
+        let session = super::super::Session::with_whisper(whisper);
+        session.start();
+        let started = Instant::now();
+        while session.state() != State::Review {
+            assert!(started.elapsed() < Duration::from_secs(120));
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let text = session.review_text().expect("whole text to review");
+        assert!(text.chars().count() > 12_000, "{}", text.chars().count());
+        assert_eq!(
+            text.matches("parola").count(),
+            session.transcript().unwrap().matches("parola").count()
+        );
+        assert!(!session.limit_reached());
+    }
+
+    /// Oltre la lunghezza massima del testo la registrazione si ferma da sola,
+    /// come alla durata massima, e lo dice.
+    #[test]
+    fn the_recording_stops_by_itself_at_the_maximum_text() {
+        let dictation = Dictation::new(LoudnessDetector, CountingDecoder::default())
+            .with_max_transcript_chars(2_000);
+        let source = SyntheticVisit::minutes(10);
+        let log = source.log.clone();
+        let session = WhisperSession::with_dictation(dictation, Box::new(source));
+        session.start();
+        assert_eq!(session.wait_for(&[State::Review]), State::Review);
+        assert!(session.limit_reached());
+        assert_eq!(*log.lock().unwrap(), ["start", "stop"]);
+        let text = session.transcript().unwrap();
+        assert!(
+            (2_000..2_600).contains(&text.chars().count()),
+            "{}",
+            text.chars().count()
+        );
+        assert!(super::super::LIMIT_REACHED.contains("80.000 caratteri"));
+        assert_eq!(super::super::listening::MAX_TRANSCRIPT_CHARS, 80_000);
     }
 
     fn session_with(source: InjectedSource) -> (Arc<Mutex<Shared>>, Sender<Event>, JoinHandle<()>) {
