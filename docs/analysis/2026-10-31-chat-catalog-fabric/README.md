@@ -412,3 +412,13 @@ coda delle evidenze o il repertorio prestazioni come abbinamento. Per ciascuna
 manca una verticale GPUI riutilizzabile: servono un lettore nominato e una vista
 con le rispettive fonti, ricevute e prove di diniego prima del raccordo chat.
 I test dei soli servizi esistenti non provano questi percorsi.
+
+Le quattro aperture alla finestra (Quadro, sintesi, import e ICD) selezionano
+una sola funzione visibile. Una nuova apertura ammessa sostituisce il pannello
+precedente e ritira la richiesta ancora aperta; una proposta già conclusa
+resta nello stato nativo. Una funzione già occupata rimostra la propria area
+senza sostituirne il lavoro; se attende ancora l’ammissione, conserva la vista
+precedente. Il render della finestra è coperto dalla matrice
+`chat_function_view_matrix_renders_only_the_requested_function`, con tutte le
+coppie e con ICD anche dopo una ricerca conclusa. La richiesta negata durante
+l’ammissione lascia visibile la funzione precedente.

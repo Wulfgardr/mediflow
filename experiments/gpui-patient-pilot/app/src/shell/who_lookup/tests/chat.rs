@@ -270,3 +270,240 @@ fn chat_icd_search_permission_denied_has_no_success_receipt(cx: &mut gpui::TestA
         .read_with(cx, |app, _| assert!(app.who.rows.ready().is_none()));
     assert_read_only(&bench.host);
 }
+
+fn matrix_ready(bench: &Bench, cx: &mut gpui::VisualTestContext) {
+    let access = std::sync::Arc::new(
+        bench
+            .host
+            .session
+            .authenticate_local_host(
+                "Synthetic scales fixture passphrase",
+                mediflow_runtime_client::RetirementNotice::new(None),
+            )
+            .unwrap(),
+    );
+    bench.view.update(cx, |app, _| {
+        app.local_host.test_access(access);
+        let mut patient = app.patient.detail.ready().unwrap().clone();
+        patient.diagnoses = Some(
+            r#"[{"code":"I10","description":"Ipertensione sintetica","system":"ICD-10"}]"#.into(),
+        );
+        patient.notes = Some("Nota sintetica per la matrice delle viste.".into());
+        app.patient.detail = ReadLoad::Ready(patient);
+        app.patient.entries = ReadLoad::Ready(vec![]);
+        app.patient.therapies = ReadLoad::Ready(vec![]);
+        app.patient.observations = ReadLoad::Ready(vec![]);
+        app.patient.checkups = ReadLoad::Ready(vec![]);
+        app.patient.attachments =
+            ReadLoad::Ready(vec![serde_json::from_value(json!({
+            "id":"matrix-document", "patientId":"patient-a", "name":"Documento sintetico.pdf",
+            "type":"application/pdf", "size":12, "path":"matrix.pdf"
+        })).unwrap()]);
+    });
+    cx.simulate_resize(gpui::size(px(1440.), px(1100.)));
+}
+
+fn matrix_open(
+    bench: &Bench,
+    function: Function,
+    cx: &mut gpui::VisualTestContext,
+) -> (Pending, UnixStream) {
+    matrix_request(bench, function, 200, cx)
+}
+
+fn matrix_request(
+    bench: &Bench,
+    function: Function,
+    code: u16,
+    cx: &mut gpui::VisualTestContext,
+) -> (Pending, UnixStream) {
+    admission(&bench.host, code);
+    let key = match function {
+        Function::Insight => Some("aiPatientInsightKillSwitch"),
+        Function::Synthesis => Some("aiDocumentSynthesisKillSwitch"),
+        Function::Import => Some("aiSmartImportKillSwitch"),
+        Function::Icd => None,
+    };
+    if let Some(key) = key {
+        bench
+            .host
+            .plan(&format!("GET /api/settings/{key}"))
+            .send((200, json!({"key":key,"value":"enabled"})))
+            .unwrap();
+    }
+    let (pending, remote) = function_request(function);
+    bench
+        .view
+        .update(cx, |app, cx| app.open_chat_function(&pending, function, cx));
+    cx.run_until_parked();
+    bench.view.update(cx, |app, cx| {
+        match function {
+            Function::Insight => {
+                app.patient.insight.follow_chat();
+            }
+            Function::Synthesis => {
+                app.patient.synthesis.area.follow_chat();
+            }
+            Function::Import => {
+                app.patient.smart_import.follow_chat();
+            }
+            Function::Icd => {
+                app.who.follow_chat();
+            }
+        }
+        cx.notify();
+    });
+    (pending, remote)
+}
+
+fn matrix_rendered(cx: &mut gpui::VisualTestContext) -> Vec<Function> {
+    let ids = rendered_command::button_ids(|| crate::shell::notes_recovery_tests::draw(cx));
+    [
+        (Function::Insight, "patient-insight-confirm"),
+        (
+            Function::Synthesis,
+            "clinical-workspace-document-details-matrix-document",
+        ),
+        (Function::Import, "smart-import-prepare"),
+        (Function::Icd, "clinical-workspace-reference-run-search"),
+    ]
+    .into_iter()
+    .filter_map(|(function, id)| ids.iter().any(|found| found == id).then_some(function))
+    .collect()
+}
+
+#[gpui::test]
+fn chat_function_view_matrix_renders_only_the_requested_function(cx: &mut gpui::TestAppContext) {
+    let mut failures = vec![];
+    let mut checked = 0;
+    for before in Function::ALL {
+        for completed in [false, true] {
+            if completed && before != Function::Icd {
+                continue;
+            }
+            for requested in Function::ALL {
+                let (bench, cx) = bench(cx);
+                matrix_ready(&bench, cx);
+                let (first, _first_remote) = matrix_open(&bench, before, cx);
+                assert_eq!(
+                    wire(&first),
+                    json!({"status":State::Generative(before,Stage::Opened).wire()}),
+                    "{before:?}"
+                );
+                assert!(
+                    matrix_rendered(cx).contains(&before),
+                    "la prima funzione deve essere visibile: {before:?}"
+                );
+                if completed {
+                    bench.host.plan(SEARCH).send((200, response())).unwrap();
+                    bench.view.update(cx, |app, cx| {
+                        query(app, cx);
+                        app.request_who(true, cx);
+                    });
+                    cx.run_until_parked();
+                    assert_eq!(wire(&first), json!({"status":"icd-closed"}));
+                }
+                let (next, _next_remote) = matrix_open(&bench, requested, cx);
+                let stage = if before == requested {
+                    Stage::Busy
+                } else {
+                    Stage::Opened
+                };
+                assert_eq!(
+                    wire(&next),
+                    json!({"status":State::Generative(requested,stage).wire()}),
+                    "{before:?} → {requested:?}, conclusa={completed}"
+                );
+                let actual = matrix_rendered(cx);
+                checked += 1;
+                eprintln!("{before:?} → {requested:?}, conclusa={completed}: render {actual:?}");
+                if before != requested {
+                    let expected = if completed { "icd-closed" } else { "withdrawn" };
+                    assert_eq!(
+                        wire(&first),
+                        json!({"status":expected}),
+                        "la funzione sostituita non resta aperta"
+                    );
+                }
+                if actual != [requested] {
+                    failures.push(format!(
+                        "{before:?} → {requested:?}, conclusa={completed}: render {actual:?}"
+                    ));
+                }
+                bench.view.read_with(cx, |app, _| {
+                    assert_eq!(app.selected_id.as_deref(), Some("patient-a"))
+                });
+                assert_read_only(&bench.host);
+            }
+        }
+    }
+    assert_eq!(checked, 20);
+    assert!(
+        failures.is_empty(),
+        "Viste errate nella matrice:\n{}",
+        failures.join("\n")
+    );
+}
+
+#[gpui::test]
+fn denied_chat_function_keeps_the_previous_rendered_function(cx: &mut gpui::TestAppContext) {
+    for requested in Function::ALL {
+        let before = if requested == Function::Icd {
+            Function::Insight
+        } else {
+            Function::Icd
+        };
+        let (bench, cx) = bench(cx);
+        matrix_ready(&bench, cx);
+        let (first, _remote) = matrix_open(&bench, before, cx);
+        let (next, _other) = matrix_request(&bench, requested, 403, cx);
+        assert_eq!(wire(&next), json!({"status":"withdrawn"}));
+        assert_eq!(
+            wire(&first),
+            json!({"status":State::Generative(before,Stage::Opened).wire()})
+        );
+        assert_eq!(matrix_rendered(cx), [before], "{before:?} → {requested:?}");
+    }
+}
+
+#[gpui::test]
+fn busy_chat_function_reveals_its_existing_consent(cx: &mut gpui::TestAppContext) {
+    let (bench, cx) = bench(cx);
+    matrix_ready(&bench, cx);
+    let (first, _remote) = matrix_open(&bench, Function::Insight, cx);
+    bench.view.update(cx, |app, cx| {
+        app.section_selected(PatientSection::Documents, cx)
+    });
+    assert!(!matrix_rendered(cx).contains(&Function::Insight));
+    let calls = bench.host.routes().len();
+    let (next, _other) = matrix_open(&bench, Function::Insight, cx);
+    assert_eq!(wire(&next), json!({"status":"insight-busy"}));
+    assert_eq!(wire(&first), json!({"status":"insight-opened"}));
+    assert_eq!(matrix_rendered(cx), [Function::Insight]);
+    assert_eq!(
+        bench.host.routes().len(),
+        calls,
+        "rimostra il consenso senza nuove letture o generazioni"
+    );
+}
+
+#[gpui::test]
+fn duplicate_during_denied_admission_keeps_the_previous_rendered_function(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    matrix_ready(&bench, cx);
+    let (first, _remote) = matrix_open(&bench, Function::Icd, cx);
+    admission(&bench.host, 403);
+    let (denied, _denied_remote) = function_request(Function::Insight);
+    let (duplicate, _duplicate_remote) = function_request(Function::Insight);
+    bench.view.update(cx, |app, cx| {
+        app.open_chat_function(&denied, Function::Insight, cx);
+        app.open_chat_function(&duplicate, Function::Insight, cx);
+    });
+    cx.run_until_parked();
+    assert_eq!(wire(&denied), json!({"status":"withdrawn"}));
+    assert_eq!(wire(&duplicate), json!({"status":"insight-busy"}));
+    assert_eq!(wire(&first), json!({"status":"icd-opened"}));
+    assert_eq!(matrix_rendered(cx), [Function::Icd]);
+}
