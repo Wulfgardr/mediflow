@@ -422,3 +422,8 @@ precedente. Il render della finestra è coperto dalla matrice
 `chat_function_view_matrix_renders_only_the_requested_function`, con tutte le
 coppie e con ICD anche dopo una ricerca conclusa. La richiesta negata durante
 l’ammissione lascia visibile la funzione precedente.
+
+La matrice copre anche le schede senza fonti e controlla i testi degli stati
+vuoti. L’import isolato conserva l’avviso che invita ad aggiungere una nota,
+una voce di diario o una sintesi, oppure a revocare la richiesta dalla chat.
+Lo stesso avviso compare una sola volta nella vista completa dei Documenti.
