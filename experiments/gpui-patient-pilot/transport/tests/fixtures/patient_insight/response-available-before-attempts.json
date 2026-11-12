@@ -1,0 +1,56 @@
+{
+  "status": 200,
+  "body": {
+    "preview": {
+      "writesPerformed": 0,
+      "apply": "denied",
+      "status": "available",
+      "code": null,
+      "proposal": {
+        "schemaVersion": "mediflow.patient-insight.review-proposal.v2",
+        "reviewOnly": true,
+        "summary": "Paziente con ipertensione e diabete in follow-up domiciliare. [S2, S3]",
+        "currentState": [
+          "Pressione stabile all'ultima visita domiciliare. [S7]"
+        ],
+        "alerts": [
+          "Metformina in corso: verificare la funzione renale. [S6]"
+        ],
+        "nextSteps": [
+          "Ricontrollare gli esami ematici al prossimo accesso. [S9]"
+        ],
+        "gaps": [
+          "Valori glicemici recenti non presenti. [DATI-INCOMPLETI]"
+        ],
+        "generatedAt": "2026-11-09T10:00:01.000Z",
+        "currentness": {
+          "selectionEpoch": 7,
+          "patientRevision": 3,
+          "projectionDigest": "sha256_a49a5feffe8760a0681bea92506cc256c5ea4496b20036c7ae2ae1fd478dd369",
+          "capturedAt": "2026-11-09T10:00:00.000Z",
+          "verifiedAt": "2026-11-09T10:00:01.000Z"
+        }
+      },
+      "receipt": {
+        "schemaVersion": "mediflow.ai.fabric-resolution.v1",
+        "capability": "patient_insight",
+        "venue": "local_process",
+        "provider": "ollama",
+        "model": "synthetic-patient-insight:1",
+        "egress": "none"
+      },
+      "provenance": {
+        "schemaVersion": "mediflow.ai.fabric-provenance.v1",
+        "capability": "patient_insight",
+        "venue": "local_process",
+        "provider": "ollama",
+        "model": "synthetic-patient-insight:1",
+        "preprocessing": [
+          "context_minimization",
+          "envelope_validation"
+        ]
+      },
+      "reviewRef": "review_abababababababababababababababab"
+    }
+  }
+}
