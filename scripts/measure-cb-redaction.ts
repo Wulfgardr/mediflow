@@ -44,7 +44,7 @@ export function scoreAnnotations(text: string, expected: Annotation[], ranges: r
 
 export function validateCorpus(value: unknown): Corpus {
     const corpus = value as Corpus;
-    if (corpus.schema !== 'mediflow.cb-acceptance.v1' || corpus.syntheticOnly !== true
+    if (!['mediflow.cb-acceptance.v1', 'mediflow.cb-reserve.v1'].includes(corpus.schema) || corpus.syntheticOnly !== true
         || !Array.isArray(corpus.cases) || !corpus.cases.length) throw new Error('invalid_corpus');
     const actual: Corpus['families'] = {};
     const ids = new Set<string>();
@@ -58,7 +58,8 @@ export function validateCorpus(value: unknown): Corpus {
         const family = actual[entry.family] ??= { cases: 0, identifiers: 0 };
         family.cases++; family.identifiers += entry.expected.length;
     }
-    for (const required of ['cf_ocr', 'terze_persone', 'luoghi', 'nascita', 'nomi_file', 'campi_ignoti']) {
+    for (const required of corpus.schema === 'mediflow.cb-acceptance.v1'
+        ? ['cf_ocr', 'terze_persone', 'luoghi', 'nascita', 'nomi_file', 'campi_ignoti'] : ['cf_ocr', 'luoghi', 'campi_ignoti', 'contatti']) {
         if (!actual[required]?.identifiers) throw new Error('missing_family');
     }
     if (JSON.stringify(actual) !== JSON.stringify(corpus.families)) throw new Error('family_counts_mismatch');
@@ -89,9 +90,10 @@ async function measureClinical(entry: Entry, configuration: Parameters<typeof cr
     } finally { await job.close(); }
 }
 
-export async function measureCb(options: { pythonExecutable?: string; modelDirectory?: string; negativeControl?: boolean; onCase?: (id: string) => void }) {
+export async function measureCb(options: { pythonExecutable?: string; modelDirectory?: string; corpusPath?: string; negativeControl?: boolean; onCase?: (id: string) => void }) {
     const started = performance.now();
-    const corpusBytes = fs.readFileSync(CORPUS);
+    const corpusPath = options.corpusPath ?? CORPUS;
+    const corpusBytes = fs.readFileSync(corpusPath);
     const corpus = validateCorpus(JSON.parse(corpusBytes.toString('utf8')));
     const workerPath = path.join(ROOT, 'scripts/gliner-redaction-worker.py');
     if (hash(fs.readFileSync(workerPath)) !== REDACTION_WORKER_SHA256) throw new Error('worker_pin_mismatch');
@@ -102,7 +104,8 @@ export async function measureCb(options: { pythonExecutable?: string; modelDirec
     if (!options.negativeControl && (!options.pythonExecutable || !options.modelDirectory)) throw new Error('runtime_paths_required');
     const sourceFiles = ['scripts/measure-cb-redaction.ts', 'lib/gliner-redaction-runner.ts', 'scripts/gliner-redaction-worker.py',
         'lib/redaction-runtime-identity.ts', 'lib/ai-redaction-session.ts', 'lib/ai-egress-gate.ts',
-        'lib/chat-card/clinical-preparation.ts', 'lib/chat-card/clinical-identifiers.ts', 'lib/chat-card/clinical-profile.ts'];
+        'lib/chat-card/clinical-preparation.ts', 'lib/chat-card/clinical-identifiers.ts', 'lib/chat-card/clinical-profile.ts',
+        ...['lib/redaction-identifier-spans.ts'].filter(name => fs.existsSync(path.join(ROOT, name)))];
     const sources = Object.fromEntries(sourceFiles.map(name => [name, hash(fs.readFileSync(path.join(ROOT, name)))]));
     const runner = configuration ? createGlinerRedactionRunner(configuration) : null;
     const families: Record<string, { redactor: Counts; clinical: Counts; unproven: number }> = {};
@@ -136,11 +139,14 @@ export async function measureCb(options: { pythonExecutable?: string; modelDirec
                 results.push({ id: entry.id, family: entry.family, inputText: entry.inputText, annotations,
                     neural, redactedText: prepared.redactedText, clinical,
                     controlPreserved: entry.preserveText ? prepared.redactedText === entry.inputText && clinical.state === 'prepared' : null,
+                    clinicalControl: entry.preserveText ? { redactorPreserved: prepared.redactedText === entry.inputText,
+                        visibleCharacters: entry.inputText.split('').filter((_, index) => !prepared.spans.some(s => s.start <= index && index < s.end)).length,
+                        totalCharacters: entry.inputText.length, clinicalPrepared: clinical.state === 'prepared' } : null,
                     elapsedMs: Math.round(performance.now() - began) });
             } finally { session.close(); }
         }
     } finally { await runner?.close(); }
-    if (hash(fs.readFileSync(CORPUS)) !== hash(corpusBytes)) throw new Error('corpus_changed');
+    if (hash(fs.readFileSync(corpusPath)) !== hash(corpusBytes)) throw new Error('corpus_changed');
     for (const [name, digest] of Object.entries(sources)) {
         if (hash(fs.readFileSync(path.join(ROOT, name))) !== digest) throw new Error('source_changed');
     }
@@ -152,6 +158,7 @@ export async function measureCb(options: { pythonExecutable?: string; modelDirec
         mode: options.negativeControl ? 'negative_empty_runner' : 'real',
         passed: !!runtimeIdentity && misses.length === 0 && clinicalEscapes.length === 0 && unproven.length === 0 && controlsPassed,
         elapsedMs: Math.round(performance.now() - started), corpusSha256: hash(corpusBytes),
+        corpusSchema: corpus.schema,
         gitHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(),
         sources,
         configuration, pythonResolvedPath: configuration ? fs.realpathSync(configuration.pythonExecutable) : null,
@@ -164,7 +171,7 @@ async function main() {
     const value = (flag: string) => { const index = args.indexOf(flag); return index < 0 ? undefined : args[index + 1]; };
     const out = value('--out');
     if (!out) throw new Error('usage: --python ABS_PYTHON --model ABS_MODEL --out JSON | --negative-control --out JSON');
-    const report = await measureCb({ pythonExecutable: value('--python'), modelDirectory: value('--model'),
+    const report = await measureCb({ pythonExecutable: value('--python'), modelDirectory: value('--model'), corpusPath: value('--corpus'),
         negativeControl: args.includes('--negative-control'), onCase: id => console.error(`C-B ${id}`) });
     fs.writeFileSync(out, JSON.stringify(report, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     console.log('famiglia\tattesi\tfermati\tsfuggiti\tscheda_fermati\tscheda_sfuggiti\tnon_provati');
