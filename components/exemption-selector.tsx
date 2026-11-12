@@ -167,6 +167,7 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                 <input
                     type="text"
                     role="combobox"
+                    aria-label="Cerca codice o descrizione esenzione"
                     aria-expanded={isOpen && results.length > 0}
                     aria-controls={listboxId}
                     aria-autocomplete="list"
