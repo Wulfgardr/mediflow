@@ -425,6 +425,72 @@ for (const field of ['summary', 'candidates', 'sources', 'patientId', 'noteId', 
     });
 }
 
+for (const [status, text] of [
+    ['icd-opened', 'Cerca nella finestra MediFlow'],
+    ['icd-unavailable', 'Ricerca ICD non disponibile'],
+    ['icd-busy', 'già in uso nella finestra MediFlow'],
+    ['icd-closed', 'conclusa nella finestra MediFlow'],
+]) test(`ICD lookup ${status} returns only the state`, async ({ page }) => {
+    await page.evaluate(status => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = status; }, status);
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Apri la ricerca ICD in MediFlow' }).click();
+    await expect(frame.getByRole('status')).toContainText(text);
+    await expect(frame.locator('#card')).toBeHidden();
+    await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeDisabled();
+    await expect(frame.getByRole('button', { name: 'Apri la ricerca ICD in MediFlow' })).toBeDisabled();
+    if (status === 'icd-opened') await expect(frame.getByRole('button', { name: 'Revoca' })).toBeEnabled();
+    else await expect(frame.getByRole('button', { name: 'Revoca' })).toBeDisabled();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: unknown }[] } }).accessFixture.calls);
+    expect(calls.map(call => call.arguments).slice(0, 2)).toEqual([{ command: 'attach' }, { command: 'icd-lookup' }]);
+    expect(calls.slice(2).every(call => JSON.stringify(call.arguments) === '{"command":"status"}')).toBe(true);
+    expect(await frame.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await captureFrame(page, `icd-${status}-light.png`);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    expect(await frame.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await captureFrame(page, `icd-${status}-dark.png`);
+});
+
+test('ICD lookup keeps revocation available until the native operation closes', async ({ page }) => {
+    await page.clock.install();
+    await page.evaluate(() => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = 'icd-opened'; });
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Apri la ricerca ICD in MediFlow' }).click();
+    await expect(frame.getByRole('button', { name: 'Revoca' })).toBeEnabled();
+    await page.clock.runFor(1000);
+    await expect(frame.getByRole('button', { name: 'Revoca' })).toBeEnabled();
+    await page.evaluate(() => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = 'icd-closed'; });
+    await page.clock.runFor(1000);
+    await expect(frame.getByRole('status')).toContainText('conclusa nella finestra MediFlow');
+    await expect(frame.getByRole('button', { name: 'Revoca' })).toBeDisabled();
+});
+
+test('ICD lookup can be revoked without returning sources or candidates', async ({ page }) => {
+    await page.evaluate(() => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = 'icd-opened'; });
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Apri la ricerca ICD in MediFlow' }).click();
+    await frame.getByRole('button', { name: 'Revoca' }).click();
+    await expect(frame.getByRole('status')).toContainText('Richiesta ritirata');
+    await expect(frame.locator('#card')).toBeHidden();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: unknown }[] } }).accessFixture.calls);
+    expect(calls.at(-1)?.arguments).toEqual({ command: 'revoke' });
+});
+
+for (const field of ['summary', 'candidates', 'sources', 'patientId', 'noteId', 'token', 'receipt']) {
+    test(`ICD lookup refuses a reply containing ${field}`, async ({ page }) => {
+        await page.evaluate(field => {
+            const fixture = (window as unknown as { accessFixture: { status: string; extra: Record<string, unknown> } }).accessFixture;
+            fixture.status = 'icd-opened';
+            fixture.extra = { [field]: 'Ada Esempio · ipertensione arteriosa' };
+        }, field);
+        const frame = page.frameLocator('#access');
+        await frame.getByRole('button', { name: 'Apri la ricerca ICD in MediFlow' }).click();
+        await expect(frame.getByRole('status')).toContainText('Apertura non confermata');
+        await expect(frame.locator('body')).not.toContainText('Ada Esempio');
+        await expect(frame.locator('#card')).toBeHidden();
+        await expect(frame.getByRole('button', { name: 'Revoca' })).toBeDisabled();
+    });
+}
+
 const sourcedCard = () => ({
     profile: 'mediflow.synthetic-chat-card.v1', pseudonym: 'card_' + 'a'.repeat(32),
     history: [], therapies: [{ medicine: 'metformina', dose: '500 mg', frequency: 'due volte al giorno', sourceRef: 'src_' + 'b'.repeat(32) }], measures: [],

@@ -105,7 +105,8 @@ test('una terapia modificata dopo la generazione rende la proposta superata, e s
   await editTherapy(page, 'dosage', 'Dose cambiata sintetica');
   await expectSuperseded(page);
   await panel.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
-  await panel.getByRole('button', { name: 'Nuova proposta', exact: true }).click();
+  await expect(panel.getByTestId('patient-insight-superseded')).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Genera proposta', exact: true }).click();
   await expect(panel.getByTestId('patient-insight-review-proposal')).toBeVisible();
   await expect(panel.getByTestId('patient-insight-superseded')).toHaveCount(0);
   expect(requests).toHaveLength(2);

@@ -207,6 +207,8 @@ impl<R: Wipe, P: Wipe> GenerationArea<R, P> {
 /// tutte: verifica di occupazione, legame durante l'ammissione, controllo del legame.
 #[cfg(unix)]
 pub(super) trait ChatArea {
+    fn can_show(&self) -> bool;
+    fn close_view(&mut self);
     fn occupied(&self) -> bool;
     fn follow_chat(&mut self) -> bool;
     /// Lega la richiesta all'area in verifica e restituisce il biglietto dell'ammissione.
@@ -220,6 +222,21 @@ pub(super) trait ChatArea {
 }
 #[cfg(unix)]
 impl<R: Wipe, P: Wipe> ChatArea for GenerationArea<R, P> {
+    fn can_show(&self) -> bool {
+        self.chat_ready()
+    }
+    fn close_view(&mut self) {
+        self.follow_chat();
+        self.chat = ChatHold::default();
+        if matches!(
+            self.phase,
+            GenerationPhase::Checking
+                | GenerationPhase::Consent(_)
+                | GenerationPhase::Running { .. }
+        ) {
+            self.end(GenerationPhase::Idle);
+        }
+    }
     fn occupied(&self) -> bool {
         GenerationArea::occupied(self)
     }
@@ -373,5 +390,31 @@ mod tests {
                 assert_eq!(wiped.load(Ordering::Acquire), revoked);
             }
         }
+    }
+    #[test]
+    fn replacing_a_function_view_cancels_and_wipes_its_running_request() {
+        let wiped = Arc::new(AtomicBool::new(false));
+        let context = RequestContext::default();
+        let mut area: GenerationArea<Payload, Payload> = GenerationArea::default();
+        assert!(area.start(Payload(wiped.clone()), context.clone()));
+        area.close_view();
+        assert!(context.check().is_err());
+        assert!(wiped.load(Ordering::Acquire));
+        assert!(matches!(area.phase, GenerationPhase::Idle));
+    }
+
+    #[test]
+    fn replacing_a_function_view_preserves_its_completed_proposal() {
+        let request = Arc::new(AtomicBool::new(false));
+        let proposal = Arc::new(AtomicBool::new(false));
+        let mut area: GenerationArea<Payload, Payload> = GenerationArea::default();
+        area.end(GenerationPhase::Proposal {
+            request: Box::new(Payload(request.clone())),
+            proposal: Box::new(Payload(proposal.clone())),
+        });
+        area.close_view();
+        assert!(matches!(area.phase, GenerationPhase::Proposal { .. }));
+        assert!(!request.load(Ordering::Acquire));
+        assert!(!proposal.load(Ordering::Acquire));
     }
 }
