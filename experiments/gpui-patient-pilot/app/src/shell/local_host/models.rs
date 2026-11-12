@@ -254,7 +254,7 @@ impl ClinicalApp {
                     }
                     area.snapshot = Load::Ready(config);
                     area.current = true;
-                    area.message = Some(if preserve { "Configurazione riletta. La bozza è conservata: confrontala prima di confermare." } else { "Configurazione riletta dall’host." }.into());
+                    area.message = Some(if preserve { "Configurazione riletta. La bozza è conservata: confrontala prima di confermare." } else { "Configurazione riletta dall’home-base." }.into());
                 }
                 Err(error) => {
                     this.local_host.models.current = false;

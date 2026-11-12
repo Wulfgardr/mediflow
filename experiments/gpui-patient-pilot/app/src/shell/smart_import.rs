@@ -56,7 +56,7 @@ pub(super) enum ImportCurrency {
     Superseded,
 }
 
-const HOST_CLOSED: &str = "Host locale chiuso. L’import assistito si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.";
+const HOST_CLOSED: &str = "Accesso locale chiuso. L’import assistito si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.";
 
 impl ClinicalApp {
     /// La cattura che una richiesta fatta adesso invierebbe; `None` se una parte
@@ -159,13 +159,13 @@ impl ClinicalApp {
                         "La scheda non ha note, voci di diario o sintesi di documenti da cui proporre.".into(),
                     ),
                     Err(RuntimeError::TooLarge) => ImportPhase::Unavailable(
-                        "La scheda ha più di 32 testi utilizzabili, oltre il limite dell’host.".into(),
+                        "La scheda ha più di 32 testi utilizzabili, oltre il limite dell’home-base.".into(),
                     ),
                     Err(RuntimeError::LockedField) => ImportPhase::Unavailable(
                         "Le diagnosi della scheda non sono leggibili con la chiave attuale: la richiesta non parte.".into(),
                     ),
                     Err(RuntimeError::InvalidInput) => ImportPhase::Unavailable(
-                        "La scheda non indica un ambulatorio leggibile o ha testi che l’host non accetta: la richiesta non parte.".into(),
+                        "La scheda non indica un ambulatorio leggibile o ha testi che l’home-base non accetta: la richiesta non parte.".into(),
                     ),
                     Err(error) => ImportPhase::Error(ui_error(error)),
                 };
@@ -193,7 +193,7 @@ impl ClinicalApp {
         };
         let Some(access) = self.local_host.access() else {
             self.patient.smart_import.end(ImportPhase::Unavailable(
-                "Host locale chiuso: nulla è stato inviato.".into(),
+                "Accesso locale chiuso: nulla è stato inviato.".into(),
             ));
             cx.notify();
             return;
@@ -440,7 +440,7 @@ impl ClinicalApp {
                 pane = pane
                     .child(notice(
                         "smart-import-running",
-                        "Generazione in corso sull’host.",
+                        "Generazione in corso sull’home-base.",
                         theme,
                         false,
                     ))
@@ -578,7 +578,7 @@ fn consent_text(request: &SmartImportRequest) -> String {
     })
     .collect();
     format!(
-        "Verranno inviati all’host {} testi della scheda ({}), con {} diagnosi e {} terapie in corso. Il modello locale dell’host ne ricava una proposta da rivedere: nella scheda non viene scritto nulla.",
+        "Verranno inviati all’home-base {} testi della scheda ({}), con {} diagnosi e {} terapie in corso. Il modello locale dell’home-base ne ricava una proposta da rivedere: nella scheda non viene scritto nulla.",
         request.sources.len(),
         parts.join(", "),
         request.diagnosis_count,

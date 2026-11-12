@@ -1,0 +1,478 @@
+[
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/chat_access/chain.rs",
+    "removed": [
+      "Processo apritore: {opener}\\nCatena verso l'host: {links}",
+      "host firmato assente",
+      "host non raggiunto entro 24 antenati",
+      "processo intermedio senza firma Developer ID dello stesso team dell'host"
+    ],
+    "added": [
+      "Processo apritore: {opener}\\nCatena verso l'home-base: {links}",
+      "home-base firmato assente",
+      "home-base non raggiunto entro 24 antenati",
+      "processo intermedio senza firma Developer ID dello stesso team dell'home-base"
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/patient_forms.rs",
+    "removed": [
+      "Conosco solo l’anno (stima)",
+      "Persona di riferimento"
+    ],
+    "added": [
+      "Caregiver",
+      "Conosco solo l’anno"
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell.rs",
+    "removed": [
+      "Ho verificato le sessioni dell’host",
+      "Salvataggio delle preferenze AI non verificato. {}",
+      "Sessione bloccata. Un salvataggio AI era in corso: rileggi le preferenze dopo l’accesso."
+    ],
+    "added": [
+      "Ho verificato le sessioni dell’home-base",
+      "Salvataggio delle preferenze IA non verificato. {}",
+      "Sessione bloccata. Un salvataggio IA era in corso: rileggi le preferenze dopo l’accesso."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/ai_preferences.rs",
+    "removed": [
+      "Anteprima delle preferenze dell’host",
+      "Anteprima ricevuta dall’host. Nessuna modifica salvata. Controlla i valori proposti prima di confermare.",
+      "Bozza annullata. Nessun nuovo invio all’host.",
+      "Bozza locale. Prepara l’anteprima per verificare la modifica sull’host.",
+      "Completa o annulla la bozza delle preferenze AI prima di cambiare pagina.",
+      "Conferma e salva sull’host",
+      "Il modello della bozza non è più nel catalogo letto. Scegli un’opzione disponibile nel catalogo o il valore dell’host.",
+      "La bozza conserva un modello salvato che non compare nel catalogo letto. Non è stato sostituito; verifica la scelta con l’host.",
+      "Le preferenze o il catalogo sono cambiati sull’host. Rileggi e prepara una nuova anteprima.",
+      "Le preferenze valgono per tutti gli operatori dell’host.",
+      "Lettura delle preferenze sull’host…",
+      "L’host non accetta questa scelta. Verifica funzione e modello dopo una nuova lettura.",
+      "L’host è cambiato dopo la conferma. Mostro la configurazione riletta; verifica la bozza prima di una nuova anteprima.",
+      "Modello host non disponibile in questo catalogo",
+      "Non è stato possibile verificare la risposta dell’host. Rileggi prima di riprovare; nessun invio automatico.",
+      "Preferenze funzioni AI",
+      "Preferenze lette dall’host.",
+      "Preferenze rilette dall’host. Verifica la bozza conservata e prepara una nuova anteprima.",
+      "Preferenze salvate e rilette dall’host.",
+      "Preparazione dell’anteprima sull’host… Nessuna preferenza viene salvata.",
+      "Questo host non espone una configurazione AI compatibile. Verifica la versione sul computer host.",
+      "Rileggi preferenze dall’host",
+      "Ripristina i modelli configurati sull’host, mantenendo gli interruttori attuali.",
+      "Salvataggio e rilettura delle preferenze sull’host…",
+      "Serve un operatore amministratore. Chiedi all’amministratore di autorizzare questo operatore e questo dispositivo sul computer host.",
+      "Valore configurato sull’host",
+      "Valori host",
+      "Valori host ripristina i modelli mantenendo gli interruttori attuali. Tutte disattivate spegne le tre funzioni disponibili. Il Ragionamento terapeutico resta come è salvato.",
+      "· associazione da rileggere sull’host"
+    ],
+    "added": [
+      "Anteprima delle preferenze dell’home-base",
+      "Anteprima ricevuta dall’home-base. Nessuna modifica salvata. Controlla i valori proposti prima di confermare.",
+      "Bozza annullata. Nessun nuovo invio all’home-base.",
+      "Bozza locale. Prepara l’anteprima per verificare la modifica sull’home-base.",
+      "Completa o annulla la bozza delle preferenze IA prima di cambiare pagina.",
+      "Conferma e salva sull’home-base",
+      "Il modello della bozza non è più nel catalogo letto. Scegli un’opzione disponibile nel catalogo o il valore dell’home-base.",
+      "La bozza conserva un modello salvato che non compare nel catalogo letto. Non è stato sostituito; verifica la scelta con l’home-base.",
+      "Le preferenze o il catalogo sono cambiati sull’home-base. Rileggi e prepara una nuova anteprima.",
+      "Le preferenze valgono per tutti gli operatori dell’home-base.",
+      "Lettura delle preferenze sull’home-base…",
+      "L’home-base non accetta questa scelta. Verifica funzione e modello dopo una nuova lettura.",
+      "L’home-base è cambiato dopo la conferma. Mostro la configurazione riletta; verifica la bozza prima di una nuova anteprima.",
+      "Modello home-base non disponibile in questo catalogo",
+      "Non è stato possibile verificare la risposta dell’home-base. Rileggi prima di riprovare; nessun invio automatico.",
+      "Preferenze funzioni IA",
+      "Preferenze lette dall’home-base.",
+      "Preferenze rilette dall’home-base. Verifica la bozza conservata e prepara una nuova anteprima.",
+      "Preferenze salvate e rilette dall’home-base.",
+      "Preparazione dell’anteprima sull’home-base… Nessuna preferenza viene salvata.",
+      "Questo home-base non espone una configurazione IA compatibile. Verifica la versione sull’home-base.",
+      "Rileggi preferenze dall’home-base",
+      "Ripristina i modelli configurati sull’home-base, mantenendo gli interruttori attuali.",
+      "Salvataggio e rilettura delle preferenze sull’home-base…",
+      "Serve un operatore amministratore. Chiedi all’amministratore di autorizzare questo operatore e questo dispositivo sull’home-base.",
+      "Valore configurato sull’home-base",
+      "Valori home-base",
+      "Valori home-base ripristina i modelli mantenendo gli interruttori attuali. Tutte disattivate spegne le tre funzioni disponibili. Il Ragionamento terapeutico resta come è salvato.",
+      "· associazione da rileggere sull’home-base"
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/ai_status.rs",
+    "removed": [
+      "Lettura dello stato AI dall'archivio…",
+      "Rileggi stato AI",
+      "STATO FUNZIONI AI",
+      "Stato AI non ancora letto.",
+      "{message} Lo stato AI non è disponibile. Puoi riprovare con Rileggi stato AI."
+    ],
+    "added": [
+      "Lettura dello stato IA dall'archivio…",
+      "Rileggi stato IA",
+      "STATO FUNZIONI IA",
+      "Stato IA non ancora letto.",
+      "{message} Lo stato IA non è disponibile. Puoi riprovare con Rileggi stato IA."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/chat_access.rs",
+    "removed": [
+      "PIN bloccato dopo troppi tentativi. Attendi lo sblocco previsto dall’host.",
+      "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati."
+    ],
+    "added": [
+      "PIN bloccato dopo troppi tentativi. Attendi lo sblocco previsto dall’home-base.",
+      "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’home-base non vengono cancellati."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/clinical_forms.rs",
+    "removed": [
+      "La bozza è conservata. Copia il testo se vuoi conservarlo, poi rileggi la scheda prima di una nuova modifica.",
+      "La valutazione utilizza il questionario letto dall'host."
+    ],
+    "added": [
+      "La bozza è intatta.",
+      "La valutazione utilizza il questionario letto dall'home-base."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/document_curation.rs",
+    "removed": [
+      "Per leggere e gestire le sintesi apri prima Gestione locale in Impostazioni → Funzioni AI."
+    ],
+    "added": [
+      "Per leggere e gestire le sintesi apri prima Gestione locale in Impostazioni → Funzioni IA."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/document_library.rs",
+    "removed": [
+      "Anteprima delle immagini diverse da PNG e JPEG, nuova estrazione dagli allegati, revisione agentica e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI."
+    ],
+    "added": [
+      "Anteprima delle immagini diverse da PNG e JPEG, nuova estrazione dagli allegati, revisione agentica e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni IA."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/document_synthesis.rs",
+    "removed": [
+      "Estrazione e generazione in corso sull’host.",
+      "Host locale chiuso. La sintesi si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.",
+      "Host locale chiuso. Nessun dato è stato inviato.",
+      "Il documento supera i 25 MiB che l’host accetta: la richiesta non parte.",
+      "Il testo non lascia il computer dell’host. La risposta resta una proposta: la sintesi salvata del documento non cambia.",
+      "La selezione sull’host è cambiata durante la richiesta. Riprova.",
+      "Verrà inviato all’host il documento «{}» ({}, {}). L’host ne estrae il testo e lo passa al modello locale."
+    ],
+    "added": [
+      "Accesso locale chiuso. La sintesi si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.",
+      "Accesso locale chiuso. Nessun dato è stato inviato.",
+      "Estrazione e generazione in corso sull’home-base.",
+      "Il documento supera i 25 MiB che l’home-base accetta: la richiesta non parte.",
+      "Il testo non lascia il home-base. La risposta resta una proposta: la sintesi salvata del documento non cambia.",
+      "La selezione sull’home-base è cambiata durante la richiesta. Riprova.",
+      "Verrà inviato all’home-base il documento «{}» ({}, {}). L’home-base ne estrae il testo e lo passa al modello locale."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/dossier_import.rs",
+    "removed": [
+      "Host locale chiuso. Per rivedere e applicare il dossier apri Gestione locale in Impostazioni e conferma l’accesso su questo Mac."
+    ],
+    "added": [
+      "Accesso locale chiuso. Per rivedere e applicare il dossier apri Gestione locale in Impostazioni e conferma l’accesso su questo Mac."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/local_host.rs",
+    "removed": [
+      "Accesso locale chiuso in questa finestra. Ritiro remoto non confermato: verifica le sessioni dell’host.",
+      "Assetto territoriale aggiornato e riletto dall’host.",
+      "Funzione aggiornata e riletta dall’host.",
+      "La gestione dell’host è disponibile solo collegandosi al suo indirizzo loopback su questo computer.",
+      "Modo host aggiornato e riletto.",
+      "Parametri aggiornati e riletti dall’host.",
+      "Scelta conservata: {}. Rileggi il modo host prima di ripreparare."
+    ],
+    "added": [
+      "Accesso locale chiuso in questa finestra. Ritiro remoto non confermato: verifica le sessioni dell’home-base.",
+      "Assetto territoriale aggiornato e riletto dall’home-base.",
+      "Funzione aggiornata e riletta dall’home-base.",
+      "La gestione dell’home-base è disponibile solo collegandosi al suo indirizzo loopback su questo computer.",
+      "Modo home-base aggiornato e riletto.",
+      "Parametri aggiornati e riletti dall’home-base.",
+      "Scelta conservata: {}. Rileggi il modo home-base prima di ripreparare."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/local_host/archives/schedule.rs",
+    "removed": [
+      "Cartella dei backup sul computer host",
+      "Esportazione portabile sul computer host, nell’ora locale del sistema. Non comprende account e chiavi e non sostituisce il backup completo cifrato. Nessuna eliminazione automatica delle copie precedenti."
+    ],
+    "added": [
+      "Cartella dei backup sull’home-base",
+      "Esportazione portabile sull’home-base, nell’ora locale del sistema. Non comprende account e chiavi e non sostituisce il backup completo cifrato. Nessuna eliminazione automatica delle copie precedenti."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/local_host/controls.rs",
+    "removed": [
+      "Indirizzo dell’host",
+      "Runtime AI locale"
+    ],
+    "added": [
+      "Indirizzo dell’home-base",
+      "Runtime IA locale"
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/local_host/controls/diagnostics.rs",
+    "removed": [
+      "Catalogo del provider AI locale",
+      "Impostazioni del provider AI"
+    ],
+    "added": [
+      "Catalogo del provider IA locale",
+      "Impostazioni del provider IA"
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/local_host/drug_catalog.rs",
+    "removed": [
+      "Catalogo sostituito: {count} voci da {}. Stato riletto dall’host."
+    ],
+    "added": [
+      "Catalogo sostituito: {count} voci da {}. Stato riletto dall’home-base."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/local_host/governance.rs",
+    "removed": [
+      "Confronto modelli AI"
+    ],
+    "added": [
+      "Confronto modelli IA"
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/local_host/models.rs",
+    "removed": [
+      "Configurazione riletta dall’host."
+    ],
+    "added": [
+      "Configurazione riletta dall’home-base."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/local_host/network.rs",
+    "removed": [
+      "Modo host",
+      "Modo host non ancora letto.",
+      "Modo host: {}",
+      "Rileggi modo host"
+    ],
+    "added": [
+      "Modo home-base",
+      "Modo home-base non ancora letto.",
+      "Modo home-base: {}",
+      "Rileggi modo home-base"
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/local_host/references.rs",
+    "removed": [
+      "ICD-11 MMS 2026-01, inglese. World Health Organization, CC BY-ND 3.0 IGO. Solo categorie e titoli inglesi, senza sinonimi o postcoordinazione. Il servizio locale opzionale resta gestito dall’host tramite Setup_WHO.command. Nessun import da file o svuotamento WHO disponibile. Il ripristino richiede una conferma separata e la revisione corrente del catalogo."
+    ],
+    "added": [
+      "ICD-11 MMS 2026-01, inglese. World Health Organization, CC BY-ND 3.0 IGO. Solo categorie e titoli inglesi, senza sinonimi o postcoordinazione. Il servizio locale opzionale resta gestito dall’home-base tramite Setup_WHO.command. Nessun import da file o svuotamento WHO disponibile. Il ripristino richiede una conferma separata e la revisione corrente del catalogo."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/local_host/retention.rs",
+    "removed": [
+      "Registrato. Stato riletto dall’host."
+    ],
+    "added": [
+      "Registrato. Stato riletto dall’home-base."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/local_host/who_administration.rs",
+    "removed": [
+      "Disponibile secondo la risposta dell’host",
+      "Esegui il comando dalla cartella di MediFlow sul computer host. La procedura verifica immagine e dataset previsti dal pacchetto. Copiare il comando non lo esegue.",
+      "Leggi i termini WHO prima dell’installazione. L’eventuale accettazione viene richiesta e registrata dalla procedura sull’host; questa guida non registra un consenso.",
+      "Se l’avvio non riesce, usa le indicazioni di recupero della procedura sull’host. Conserva catalogo e copie precedenti; questa pagina non arresta né rimuove servizi.",
+      "Verrà riattivata la versione precedente conservata sull’host. I suoi dettagli saranno disponibili dopo il ripristino. Le voci cliniche salvate restano invariate."
+    ],
+    "added": [
+      "Disponibile secondo la risposta dell’home-base",
+      "Esegui il comando dalla cartella di MediFlow sull’home-base. La procedura verifica immagine e dataset previsti dal pacchetto. Copiare il comando non lo esegue.",
+      "Leggi i termini WHO prima dell’installazione. L’eventuale accettazione viene richiesta e registrata dalla procedura sull’home-base; questa guida non registra un consenso.",
+      "Se l’avvio non riesce, usa le indicazioni di recupero della procedura sull’home-base. Conserva catalogo e copie precedenti; questa pagina non arresta né rimuove servizi.",
+      "Verrà riattivata la versione precedente conservata sull’home-base. I suoi dettagli saranno disponibili dopo il ripristino. Le voci cliniche salvate restano invariate."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/patient_insight.rs",
+    "removed": [
+      "Generazione in corso sul modello locale dell’host.",
+      "Host locale chiuso. Il Quadro paziente si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.",
+      "Host locale chiuso. Nessun dato è stato inviato.",
+      "Il testo non lascia il computer dell’host. La risposta resta una proposta: la scheda non cambia.",
+      "Invia e genera",
+      "Prepara la richiesta",
+      "Prepara una nuova richiesta",
+      "Proposta da rivedere. La scheda resta invariata.",
+      "Un riepilogo temporaneo dal modello locale dell’host, da confrontare con la scheda. Nessun aggiornamento automatico.",
+      "Verifica della funzione sull’host…",
+      "Verranno inviati al modello locale dell’host: {} condizioni, {} terapie attive, {} voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
+    ],
+    "added": [
+      "Accesso locale chiuso. Il Quadro paziente si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.",
+      "Accesso locale chiuso. Nessun dato è stato inviato.",
+      "Genera proposta",
+      "Generazione in corso sul modello locale dell’home-base.",
+      "Il testo non lascia il home-base. La cartella non cambia.",
+      "Proposta da rivedere.",
+      "Un riepilogo temporaneo dal modello locale dell’home-base, da confrontare con la scheda. Nessun aggiornamento automatico.",
+      "Verifica della funzione sull’home-base…",
+      "Verranno inviati al modello locale dell’home-base: {} condizioni, {} terapie attive, {} voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/settings.rs",
+    "removed": [
+      "Funzioni AI",
+      "Modo host",
+      "Stato della configurazione sull’host"
+    ],
+    "added": [
+      "Funzioni IA",
+      "Modo home-base",
+      "Stato della configurazione sull’home-base"
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/smart_import.rs",
+    "removed": [
+      "Generazione in corso sull’host.",
+      "Host locale chiuso. L’import assistito si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.",
+      "Host locale chiuso: nulla è stato inviato.",
+      "La scheda ha più di 32 testi utilizzabili, oltre il limite dell’host.",
+      "La scheda non indica un ambulatorio leggibile o ha testi che l’host non accetta: la richiesta non parte.",
+      "Verranno inviati all’host {} testi della scheda ({}), con {} diagnosi e {} terapie in corso. Il modello locale dell’host ne ricava una proposta da rivedere: nella scheda non viene scritto nulla."
+    ],
+    "added": [
+      "Accesso locale chiuso. L’import assistito si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.",
+      "Accesso locale chiuso: nulla è stato inviato.",
+      "Generazione in corso sull’home-base.",
+      "La scheda ha più di 32 testi utilizzabili, oltre il limite dell’home-base.",
+      "La scheda non indica un ambulatorio leggibile o ha testi che l’home-base non accetta: la richiesta non parte.",
+      "Verranno inviati all’home-base {} testi della scheda ({}), con {} diagnosi e {} terapie in corso. Il modello locale dell’home-base ne ricava una proposta da rivedere: nella scheda non viene scritto nulla."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/transport/src/local_host/document_synthesis.rs",
+    "removed": [
+      "Il modello locale dell'host non è disponibile. Verifica Impostazioni, Modelli locali.",
+      "L'host ha rifiutato la richiesta.",
+      "L'host non ha autorizzato l'esecuzione sul modello locale.",
+      "L'host non ha prodotto una sintesi: modello locale non pronto, risposta del modello scartata dai controlli o guasto.",
+      "L'host non riesce a estrarre il testo di questo documento. Serve la lettura diretta dell'originale.",
+      "La richiesta è scaduta sull'host. Riprova.",
+      "La risposta dell'host non ha superato i controlli dell'app.",
+      "La sessione dell'host locale non è più valida. Riapri l'accesso locale.",
+      "La sintesi dei documenti è spenta sull'host. Si riattiva in Impostazioni, Funzioni AI."
+    ],
+    "added": [
+      "Il modello locale dell'home-base non è disponibile. Verifica Impostazioni, Modelli locali.",
+      "L'home-base ha rifiutato la richiesta.",
+      "L'home-base non ha autorizzato l'esecuzione sul modello locale.",
+      "L'home-base non ha prodotto una sintesi: modello locale non pronto, risposta del modello scartata dai controlli o guasto.",
+      "L'home-base non riesce a estrarre il testo di questo documento. Serve la lettura diretta dell'originale.",
+      "La richiesta è scaduta sull'home-base. Riprova.",
+      "La risposta dell'home-base non ha superato i controlli dell'app.",
+      "La sessione dell'home-base non è più valida. Riapri l'accesso locale.",
+      "La sintesi dei documenti è spenta sull'home-base. Si riattiva in Impostazioni, Funzioni IA."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/transport/src/local_host/patient_insight.rs",
+    "removed": [
+      "Il Quadro paziente è spento sull'host. Si riattiva in Impostazioni, Funzioni AI.",
+      "Il modello locale dell'host non è disponibile. Verifica Impostazioni, Modelli locali.",
+      "L'host ha rifiutato la richiesta.",
+      "L'host non ha autorizzato l'esecuzione sul modello locale.",
+      "La risposta del modello non ha superato i controlli dell'host.",
+      "La risposta dell'host non ha superato i controlli dell'app.",
+      "La sessione dell'host locale non è più valida. Riapri l'accesso locale.",
+      "Lo stato della funzione sull'host non è leggibile.",
+      "Quadro attuale"
+    ],
+    "added": [
+      "Il Quadro paziente è spento sull'home-base. Si riattiva in Impostazioni, Funzioni IA.",
+      "Il modello locale dell'home-base non è disponibile. Verifica Impostazioni, Modelli locali.",
+      "L'home-base ha rifiutato la richiesta.",
+      "L'home-base non ha autorizzato l'esecuzione sul modello locale.",
+      "La risposta del modello non ha superato i controlli dell'home-base.",
+      "La risposta dell'home-base non ha superato i controlli dell'app.",
+      "La sessione dell'home-base non è più valida. Riapri l'accesso locale.",
+      "Lo stato della funzione sull'home-base non è leggibile.",
+      "Stato attuale"
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/transport/src/local_host/smart_import.rs",
+    "removed": [
+      "Il modello locale dell’host non è disponibile. Verifica Impostazioni, Modelli locali.",
+      "La risposta del modello non ha superato i controlli dell’host.",
+      "La risposta dell’host non ha superato i controlli dell’app.",
+      "La selezione sull’host è cambiata durante la richiesta. Riprova.",
+      "La sessione dell’host locale non è più valida. Riapri l’accesso locale.",
+      "L’host ha rifiutato la richiesta.",
+      "L’host non ha autorizzato l’esecuzione sul modello locale.",
+      "L’host non riesce a leggere se l’import assistito è acceso. Verifica Impostazioni, Funzioni AI.",
+      "L’import assistito è spento sull’host. Si riattiva in Impostazioni, Funzioni AI."
+    ],
+    "added": [
+      "Il modello locale dell’home-base non è disponibile. Verifica Impostazioni, Modelli locali.",
+      "La risposta del modello non ha superato i controlli dell’home-base.",
+      "La risposta dell’home-base non ha superato i controlli dell’app.",
+      "La selezione sull’home-base è cambiata durante la richiesta. Riprova.",
+      "La sessione dell’home-base non è più valida. Riapri l’accesso locale.",
+      "L’home-base ha rifiutato la richiesta.",
+      "L’home-base non ha autorizzato l’esecuzione sul modello locale.",
+      "L’home-base non riesce a leggere se l’import assistito è acceso. Verifica Impostazioni, Funzioni IA.",
+      "L’import assistito è spento sull’home-base. Si riattiva in Impostazioni, Funzioni IA."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/transport/src/retirement_notice.rs",
+    "removed": [
+      "Il ritiro non confermato risale a un avvio dell’app ormai chiuso. Dopo aver verificato nell’host che la sessione non è più attiva, puoi chiudere l’avviso. I ritiri ancora in corso in un’altra finestra aperta restano segnalati.",
+      "Ritiro di una sessione locale non confermato. Verifica le sessioni dell’host prima di lasciare la postazione."
+    ],
+    "added": [
+      "Il ritiro non confermato risale a un avvio dell’app ormai chiuso. Dopo aver verificato nell’home-base che la sessione non è più attiva, puoi chiudere l’avviso. I ritiri ancora in corso in un’altra finestra aperta restano segnalati.",
+      "Ritiro di una sessione locale non confermato. Verifica le sessioni dell’home-base prima di lasciare la postazione."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/transport/src/scales.rs",
+    "removed": [
+      "Descrizione sintetica restituita dall'host."
+    ],
+    "added": [
+      "Descrizione sintetica restituita dall'home-base."
+    ]
+  }
+]

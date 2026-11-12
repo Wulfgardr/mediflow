@@ -531,7 +531,7 @@ impl ClinicalApp {
                 else { Err("Esito non confermato. Rileggi la ricevuta; non ripetere la scrittura.".to_owned()) }
             } else if with_pin {
                 session.confirm_chat_access_pin(&context, &pin).map_err(|error| if error.status_code() == Some(423) {
-                    "PIN bloccato dopo troppi tentativi. Attendi lo sblocco previsto dall’host.".to_owned()
+                    "PIN bloccato dopo troppi tentativi. Attendi lo sblocco previsto dall’home-base.".to_owned()
                 } else { "PIN non confermato o sessione non più disponibile.".to_owned() })
             } else {
                 attempt.biometric().map_err(str::to_owned).and_then(|()|
@@ -873,7 +873,7 @@ impl ClinicalApp {
             .child(button("native-chat-access-deny", "Nega e ritira", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| { this.chat_access.retire(cx); cx.notify(); })))
             .when(state != State::Challenge, |el| el.child(notice("native-chat-access-state",
-                if matches!(state, State::Write(ChatWriteResolution::Confirmed(_)) | State::Write(ChatWriteResolution::Uncertain)) { "" } else if state == State::Consumed && therapy_mode { "Operazione terminata. Controlla ricevuta e rilettura; nessuna ripetizione automatica." } else if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
+                if matches!(state, State::Write(ChatWriteResolution::Confirmed(_)) | State::Write(ChatWriteResolution::Uncertain)) { "" } else if state == State::Consumed && therapy_mode { "Operazione terminata. Controlla ricevuta e rilettura; nessuna ripetizione automatica." } else if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’home-base non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
     }
 }
 

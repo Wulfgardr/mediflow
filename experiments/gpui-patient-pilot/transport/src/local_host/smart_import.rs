@@ -920,10 +920,10 @@ fn denied(status: u16, body: &[u8]) -> SmartImportOutcome {
 pub fn smart_import_message(code: &str) -> &'static str {
     match code {
         "kill_switch_disabled" | "function_disabled" => {
-            "L’import assistito è spento sull’host. Si riattiva in Impostazioni, Funzioni AI."
+            "L’import assistito è spento sull’home-base. Si riattiva in Impostazioni, Funzioni IA."
         }
         "kill_switch_unavailable" => {
-            "L’host non riesce a leggere se l’import assistito è acceso. Verifica Impostazioni, Funzioni AI."
+            "L’home-base non riesce a leggere se l’import assistito è acceso. Verifica Impostazioni, Funzioni IA."
         }
         "lifecycle_missing"
         | "lifecycle_corrupt"
@@ -931,11 +931,11 @@ pub fn smart_import_message(code: &str) -> &'static str {
         | "provider_binding_denied"
         | "provider_unready"
         | "model_unavailable" => {
-            "Il modello locale dell’host non è disponibile. Verifica Impostazioni, Modelli locali."
+            "Il modello locale dell’home-base non è disponibile. Verifica Impostazioni, Modelli locali."
         }
-        "fabric_denied" => "L’host non ha autorizzato l’esecuzione sul modello locale.",
+        "fabric_denied" => "L’home-base non ha autorizzato l’esecuzione sul modello locale.",
         "provider_failed" => "Il modello locale non ha risposto.",
-        "proposal_invalid" => "La risposta del modello non ha superato i controlli dell’host.",
+        "proposal_invalid" => "La risposta del modello non ha superato i controlli dell’home-base.",
         "response_truncated" => {
             "La risposta del modello si è interrotta prima della fine. Riprova."
         }
@@ -948,12 +948,12 @@ pub fn smart_import_message(code: &str) -> &'static str {
         | "request_replayed"
         | "broker_revoked"
         | "selection_busy"
-        | "owner_unavailable" => "La selezione sull’host è cambiata durante la richiesta. Riprova.",
+        | "owner_unavailable" => "La selezione sull’home-base è cambiata durante la richiesta. Riprova.",
         "session_unavailable" | "session_ineligible" => {
-            "La sessione dell’host locale non è più valida. Riapri l’accesso locale."
+            "La sessione dell’home-base non è più valida. Riapri l’accesso locale."
         }
-        "response_invalid" => "La risposta dell’host non ha superato i controlli dell’app.",
-        _ => "L’host ha rifiutato la richiesta.",
+        "response_invalid" => "La risposta dell’home-base non ha superato i controlli dell’app.",
+        _ => "L’home-base ha rifiutato la richiesta.",
     }
 }
 

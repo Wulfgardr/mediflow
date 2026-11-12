@@ -92,25 +92,25 @@ impl AiPreferences {
         self.failed = true;
         let reason = match error {
             RuntimeError::Forbidden => {
-                "Serve un operatore amministratore. Chiedi all’amministratore di autorizzare questo operatore e questo dispositivo sul computer host."
+                "Serve un operatore amministratore. Chiedi all’amministratore di autorizzare questo operatore e questo dispositivo sull’home-base."
             }
             RuntimeError::Conflict => {
-                "Le preferenze o il catalogo sono cambiati sull’host. Rileggi e prepara una nuova anteprima."
+                "Le preferenze o il catalogo sono cambiati sull’home-base. Rileggi e prepara una nuova anteprima."
             }
             RuntimeError::Missing | RuntimeError::UnsupportedProtocol => {
-                "Questo host non espone una configurazione AI compatibile. Verifica la versione sul computer host."
+                "Questo home-base non espone una configurazione IA compatibile. Verifica la versione sull’home-base."
             }
             RuntimeError::Authentication | RuntimeError::Locked => {
                 "La sessione non è più valida. Accedi nuovamente."
             }
             RuntimeError::InvalidInput => {
-                "Il modello della bozza non è più nel catalogo letto. Scegli un’opzione disponibile nel catalogo o il valore dell’host."
+                "Il modello della bozza non è più nel catalogo letto. Scegli un’opzione disponibile nel catalogo o il valore dell’home-base."
             }
             RuntimeError::Rejected(400) => {
-                "L’host non accetta questa scelta. Verifica funzione e modello dopo una nuova lettura."
+                "L’home-base non accetta questa scelta. Verifica funzione e modello dopo una nuova lettura."
             }
             _ => {
-                "Non è stato possibile verificare la risposta dell’host. Rileggi prima di riprovare; nessun invio automatico."
+                "Non è stato possibile verificare la risposta dell’home-base. Rileggi prima di riprovare; nessun invio automatico."
             }
         };
         self.message = format!(
@@ -162,7 +162,7 @@ impl ClinicalApp {
         state.current = false;
         state.working = Some(Working::Read);
         state.failed = false;
-        state.message = "Lettura delle preferenze sull’host…".into();
+        state.message = "Lettura delle preferenze sull’home-base…".into();
         self.run(
             move || session.read_ai_preferences(&context),
             Self::receive_ai_preferences,
@@ -179,8 +179,8 @@ impl ClinicalApp {
             Ok(snapshot) => {
                 self.ai_preferences.observed(snapshot);
                 self.ai_preferences.message = if self.ai_preferences.draft.is_some() {
-                    "Preferenze rilette dall’host. Verifica la bozza conservata e prepara una nuova anteprima."
-                } else { "Preferenze lette dall’host." }.into();
+                    "Preferenze rilette dall’home-base. Verifica la bozza conservata e prepara una nuova anteprima."
+                } else { "Preferenze lette dall’home-base." }.into();
                 self.sync_ai_model_targets(cx);
             }
             Err(error) => self.ai_preferences.failure(error),
@@ -214,7 +214,7 @@ impl ClinicalApp {
         state.preview = None;
         state.failed = false;
         state.message =
-            "Bozza locale. Prepara l’anteprima per verificare la modifica sull’host.".into();
+            "Bozza locale. Prepara l’anteprima per verificare la modifica sull’home-base.".into();
         state.focus_target = Some(9);
         cx.notify();
     }
@@ -241,12 +241,12 @@ impl ClinicalApp {
         self.ai_preferences.working = Some(Working::Preview);
         self.ai_preferences.failed = false;
         self.ai_preferences.message =
-            "Preparazione dell’anteprima sull’host… Nessuna preferenza viene salvata.".into();
+            "Preparazione dell’anteprima sull’home-base… Nessuna preferenza viene salvata.".into();
         self.run(move || session.preview_ai_preferences(&context, &command), |this, result, _| {
             match result {
                 Ok(preview) => {
                     this.ai_preferences.preview = Some(preview); this.ai_preferences.working = None;
-                    this.ai_preferences.message = "Anteprima ricevuta dall’host. Nessuna modifica salvata. Controlla i valori proposti prima di confermare.".into();
+                    this.ai_preferences.message = "Anteprima ricevuta dall’home-base. Nessuna modifica salvata. Controlla i valori proposti prima di confermare.".into();
                     this.ai_preferences.focus_target = Some(13);
                 }
                 Err(error) => this.ai_preferences.failure(error),
@@ -267,7 +267,7 @@ impl ClinicalApp {
         };
         self.ai_preferences.working = Some(Working::Save);
         self.ai_preferences.failed = false;
-        self.ai_preferences.message = "Salvataggio e rilettura delle preferenze sull’host…".into();
+        self.ai_preferences.message = "Salvataggio e rilettura delle preferenze sull’home-base…".into();
         self.run(
             move || session.apply_ai_preferences(&context, &preview),
             Self::receive_ai_preferences_readback,
@@ -285,9 +285,9 @@ impl ClinicalApp {
                 self.ai_preferences.observed(result.observed);
                 if result.matches_confirmation {
                     self.ai_preferences.draft = None;
-                    self.ai_preferences.message = "Preferenze salvate e rilette dall’host.".into();
+                    self.ai_preferences.message = "Preferenze salvate e rilette dall’home-base.".into();
                 } else {
-                    self.ai_preferences.message = "L’host è cambiato dopo la conferma. Mostro la configurazione riletta; verifica la bozza prima di una nuova anteprima.".into();
+                    self.ai_preferences.message = "L’home-base è cambiato dopo la conferma. Mostro la configurazione riletta; verifica la bozza prima di una nuova anteprima.".into();
                     self.ai_preferences.failed = true;
                 }
                 self.ai_status = Load::Idle;
@@ -313,7 +313,7 @@ impl ClinicalApp {
         }
         self.ai_preferences.draft = None;
         self.ai_preferences.preview = None;
-        self.ai_preferences.message = "Bozza annullata. Nessun nuovo invio all’host.".into();
+        self.ai_preferences.message = "Bozza annullata. Nessun nuovo invio all’home-base.".into();
         self.ai_preferences.focus_target = Some(1);
         cx.notify();
     }
@@ -324,7 +324,7 @@ impl ClinicalApp {
         self.show_other = false;
         self.ai_preferences.message = if self.ai_preferences.working.is_some() {
             "Attendi l’esito della verifica prima di cambiare pagina. Puoi sempre bloccare la sessione."
-        } else { "Completa o annulla la bozza delle preferenze AI prima di cambiare pagina." }.into();
+        } else { "Completa o annulla la bozza delle preferenze IA prima di cambiare pagina." }.into();
         cx.notify();
         true
     }
@@ -345,14 +345,14 @@ impl ClinicalApp {
         let state = &self.ai_preferences;
         let idle = state.working.is_none();
         let mut view = div().w_full().min_w_0().max_w(px(760.)).flex().flex_col().gap(px(20.))
-            .child(heading("clinical-workspace-ai-preferences-heading", "Preferenze funzioni AI", theme))
+            .child(heading("clinical-workspace-ai-preferences-heading", "Preferenze funzioni IA", theme))
             .child(div().type_role(theme, crate::theme::TextRole::Strong)
-                .child(text!("Le preferenze valgono per tutti gli operatori dell’host.")))
+                .child(text!("Le preferenze valgono per tutti gli operatori dell’home-base.")))
             .child(notice("clinical-workspace-ai-preferences-scope", "Scegli i modelli per le funzioni disponibili. La disponibilità indicata nel catalogo non verifica che il modello possa eseguire un’analisi.", theme, false))
             .child(div().flex().flex_wrap().gap(px(8.))
                 .child(state.targets[0].attach_enabled(button("clinical-workspace-ai-preferences-back", "Torna alle impostazioni", theme, false, idle), idle)
                     .on_click(cx.listener(|this, _, window, cx| this.close_ai_preferences(window, cx))))
-                .child(state.targets[1].attach_enabled(button("clinical-workspace-ai-preferences-reload", "Rileggi preferenze dall’host", theme, false, idle), idle)
+                .child(state.targets[1].attach_enabled(button("clinical-workspace-ai-preferences-reload", "Rileggi preferenze dall’home-base", theme, false, idle), idle)
                     .on_click(cx.listener(|this, _, _, cx| this.load_ai_preferences(cx)))))
             .child(notice("clinical-workspace-ai-preferences-message", state.message.clone(), theme, state.failed));
         if let Some(received) = state.received_at {
@@ -411,9 +411,9 @@ impl ClinicalApp {
             let enabled = state.current && idle;
             view = view.child(div().flex().flex_col().gap(px(8.))
                 .child(section("clinical-workspace-ai-presets-heading", "IMPOSTAZIONI CONDIVISE", theme))
-                .child(text!("Valori host ripristina i modelli mantenendo gli interruttori attuali. Tutte disattivate spegne le tre funzioni disponibili. Il Ragionamento terapeutico resta come è salvato."))
+                .child(text!("Valori home-base ripristina i modelli mantenendo gli interruttori attuali. Tutte disattivate spegne le tre funzioni disponibili. Il Ragionamento terapeutico resta come è salvato."))
                 .child(div().flex().flex_wrap().gap(px(8.))
-                    .children([(6, AiPreferencePreset::HostDefaults, "Valori host"), (7, AiPreferencePreset::AllOff, "Tutte disattivate")].map(|(index, preset_id, label)|
+                    .children([(6, AiPreferencePreset::HostDefaults, "Valori home-base"), (7, AiPreferencePreset::AllOff, "Tutte disattivate")].map(|(index, preset_id, label)|
                         state.targets[index].attach_enabled(button(format!("clinical-workspace-ai-preset-{index}"), label, theme, false, enabled), enabled)
                             .on_click(cx.listener(move |this, _, _, cx| this.start_ai_draft(AiPreferenceChange::Preset { preset_id }, cx)))))));
         }
@@ -422,7 +422,7 @@ impl ClinicalApp {
                 .id("clinical-workspace-ai-preview")
                 .accessibility_id("clinical-workspace-ai-preview")
                 .role(Role::Group)
-                .aria_label("Anteprima delle preferenze dell’host")
+                .aria_label("Anteprima delle preferenze dell’home-base")
                 .track_focus(&state.targets[13].focus.clone().tab_stop(false))
                 .anchor_scroll(Some(state.targets[13].anchor.clone()))
                 .min_w_0()
@@ -471,7 +471,7 @@ impl ClinicalApp {
                                 .attach_enabled(
                                     button(
                                         "clinical-workspace-ai-confirm",
-                                        "Conferma e salva sull’host",
+                                        "Conferma e salva sull’home-base",
                                         theme,
                                         true,
                                         idle,
@@ -506,7 +506,7 @@ impl ClinicalApp {
         match draft {
             AiPreferenceChange::Preset { preset_id } => {
                 view = view.child(div().type_role(theme, crate::theme::TextRole::Strong).child(text!(match preset_id {
-                    AiPreferencePreset::HostDefaults => "Ripristina i modelli configurati sull’host, mantenendo gli interruttori attuali.",
+                    AiPreferencePreset::HostDefaults => "Ripristina i modelli configurati sull’home-base, mantenendo gli interruttori attuali.",
                     AiPreferencePreset::AllOff => "Disattiva le funzioni disponibili, mantenendo i modelli salvati.",
                 })));
             }
@@ -569,7 +569,7 @@ impl ClinicalApp {
                         );
                     let options = std::iter::once((
                         "host".to_owned(),
-                        "Valore configurato sull’host".to_owned(),
+                        "Valore configurato sull’home-base".to_owned(),
                         None,
                     ))
                     .chain(row.options.iter().map(|option| {
@@ -626,7 +626,7 @@ impl ClinicalApp {
                             .iter()
                             .any(|option| &option.model_option_id == id)
                     }) {
-                        view = view.child(notice("clinical-workspace-ai-draft-missing-model", "La bozza conserva un modello salvato che non compare nel catalogo letto. Non è stato sostituito; verifica la scelta con l’host.", theme, true));
+                        view = view.child(notice("clinical-workspace-ai-draft-missing-model", "La bozza conserva un modello salvato che non compare nel catalogo letto. Non è stato sostituito; verifica la scelta con l’home-base.", theme, true));
                     }
                 }
             }
@@ -695,7 +695,7 @@ fn model_label(row: &AiFunctionPreference) -> String {
             if row.default_source == AiDefaultSource::SavedPreference {
                 "Modello salvato non presente nel catalogo"
             } else {
-                "Modello host non disponibile in questo catalogo"
+                "Modello home-base non disponibile in questo catalogo"
             }
             .into()
         })
@@ -748,11 +748,11 @@ fn function_summary(row: &AiFunctionPreference, kind: &str, theme: Theme) -> Sta
                     "Preferenza salvata"
                 }
             } else {
-                "Valore configurato sull’host"
+                "Valore configurato sull’home-base"
             },
             match row.binding_state {
                 AiBindingState::Current => "",
-                AiBindingState::Stale => " · associazione da rileggere sull’host",
+                AiBindingState::Stale => " · associazione da rileggere sull’home-base",
                 AiBindingState::Unsupported => " · associazione non supportata da questo catalogo",
             }
         ))))
@@ -896,7 +896,7 @@ mod tests {
             assert!(app.ai_preferences.draft.is_none());
             assert_eq!(
                 app.ai_preferences.message,
-                "Preferenze salvate e rilette dall’host."
+                "Preferenze salvate e rilette dall’home-base."
             );
         });
     }
@@ -934,7 +934,7 @@ mod tests {
                 );
                 let (message, failed) = app.message.as_ref().unwrap();
                 assert!(*failed);
-                assert!(message.starts_with("Salvataggio delle preferenze AI non verificato."));
+                assert!(message.starts_with("Salvataggio delle preferenze IA non verificato."));
                 assert!(message.contains("Accedi di nuovo"));
             });
         }

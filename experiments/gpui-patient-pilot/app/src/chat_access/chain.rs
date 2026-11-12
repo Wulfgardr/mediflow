@@ -54,11 +54,11 @@ pub(super) enum Denial {
 impl Denial {
     pub(super) fn reason(&self) -> &'static str {
         match self {
-            Self::MissingHost => "host firmato assente",
-            Self::TooDeep => "host non raggiunto entro 24 antenati",
+            Self::MissingHost => "home-base firmato assente",
+            Self::TooDeep => "home-base non raggiunto entro 24 antenati",
             Self::Interpreter => "shell o interprete nella catena",
             Self::UntrustedLink => {
-                "processo intermedio senza firma Developer ID dello stesso team dell'host"
+                "processo intermedio senza firma Developer ID dello stesso team dell'home-base"
             }
             Self::Incomplete => "catena di processi incompleta o modificata",
         }
@@ -132,7 +132,7 @@ pub(super) fn summary(chain: &[Process]) -> String {
         .map(|p| format!("{} (PID {})", p.name(), p.pid))
         .collect::<Vec<_>>()
         .join(" → ");
-    format!("Processo apritore: {opener}\nCatena verso l'host: {links}")
+    format!("Processo apritore: {opener}\nCatena verso l'home-base: {links}")
 }
 
 #[cfg(any(target_os = "macos", test))]

@@ -325,7 +325,7 @@ fn kill_switch_off_is_unavailable_without_generation(cx: &mut gpui::TestAppConte
     cx.run_until_parked();
     assert!(bench.phase(
         cx,
-        |phase| matches!(phase, GenerationPhase::Unavailable(m) if m.contains("spenta sull'host"))
+        |phase| matches!(phase, GenerationPhase::Unavailable(m) if m.contains("spenta sull'home-base"))
     ));
     assert!(bench.generation_routes().is_empty());
     assert!(
@@ -346,19 +346,19 @@ fn host_closed_is_unavailable_without_any_call(cx: &mut gpui::TestAppContext) {
     cx.run_until_parked();
     assert!(bench.phase(
         cx,
-        |phase| matches!(phase, GenerationPhase::Unavailable(m) if m.contains("Host locale chiuso"))
+        |phase| matches!(phase, GenerationPhase::Unavailable(m) if m.contains("Accesso locale chiuso"))
     ));
     assert!(bench.host.bodies(SETTING).is_empty());
     assert!(!bench.host.routes().contains(&detail_route()));
     assert!(bench.generation_routes().is_empty());
 }
 
-/// Dinieghi e fallimenti reali dell'host: messaggio leggibile, nessuna proposta.
+/// Dinieghi e fallimenti reali dell'home-base: messaggio leggibile, nessuna proposta.
 #[gpui::test]
 fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppContext) {
     let (bench, cx) = bench(cx);
     let preview_cases = [
-        ("response-function-disabled", true, "spenta sull'host"),
+        ("response-function-disabled", true, "spenta sull'home-base"),
         (
             "response-provider-failed",
             false,
@@ -406,7 +406,7 @@ fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppCon
         (
             CAPTURE,
             "response-capture-lane-disabled",
-            "spenta sull'host",
+            "spenta sull'home-base",
         ),
         (INGEST, "response-ingest-unsupported", "estrarre il testo"),
     ] {
@@ -448,7 +448,7 @@ fn altered_response_is_an_error_not_a_proposal(cx: &mut gpui::TestAppContext) {
     cx.run_until_parked();
     assert!(bench.phase(
         cx,
-        |phase| matches!(phase, GenerationPhase::Error(m) if m == "La risposta dell'host non ha superato i controlli dell'app.")
+        |phase| matches!(phase, GenerationPhase::Error(m) if m == "La risposta dell'home-base non ha superato i controlli dell'app.")
     ));
     bench.assert_no_clinical_write();
 }
@@ -527,7 +527,7 @@ fn proposal_is_superseded_when_the_document_changes_or_disappears(cx: &mut gpui:
         .view
         .update(cx, |app, _| app.patient.attachments = ReadLoad::loading());
     check(cx, SynthesisCurrency::Reading);
-    // Stesso documento, nuova currentness sull'host (sostituito o modificato).
+    // Stesso documento, nuova currentness sull'home-base (sostituito o modificato).
     bench.view.update(cx, |app, _| {
         let mut changed = row();
         changed.patient_id = app.selected_id.clone().unwrap();
