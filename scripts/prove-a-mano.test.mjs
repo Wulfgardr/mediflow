@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import path from 'node:path';
 import { runProof, validateEnvironment, reservedPorts, writeReport, browserEnv, catalog, listeningUnavailable } from './prove-a-mano.mjs';
-import { assemble, attributionScore, readWav, writeWav, SAMPLE_RATE, TURNS, VOICES } from './prove-ascolto-visita.mjs';
+import { assemble, attributionScore, gates, measure, normalizeWords, numberWord, readWav, wordErrorRate, writeWav, MIN_SECONDS, SAMPLE_RATE, TURNS, VOICES } from './prove-ascolto-visita.mjs';
 test('la HOME isolata non nasconde il browser di Playwright installato', () => {
  assert.deepEqual(browserEnv({}, '/Users/medico', 'darwin'), { PLAYWRIGHT_BROWSERS_PATH: '/Users/medico/Library/Caches/ms-playwright' });
  assert.deepEqual(browserEnv({}, '/home/medico', 'linux'), { PLAYWRIGHT_BROWSERS_PATH: '/home/medico/.cache/ms-playwright' });
@@ -78,4 +78,34 @@ test('ascolto della visita: WAV, linea del tempo e quota attribuita', () => {
  // Frasi duplicate sulla stessa battuta non gonfiano il punteggio.
  assert.equal(attributionScore([[1, 2, 'a', 'Medico'], [1, 2, 'a', 'Medico']], timeline), 1 / 1.5);
  assert.ok(TURNS.length >= 6 && TURNS.every(([role]) => role in VOICES));
+});
+
+test('ascolto della visita: errore di parola con la regola del banco voce', () => {
+ assert.equal(numberWord('centoventicinque'), 125);
+ assert.equal(numberWord('duemilaventisei'), 2026);
+ assert.equal(numberWord('settimane'), undefined);
+ // Cifre e parole, unità per esteso e abbreviate valgono uguale.
+ assert.deepEqual(normalizeWords('Furosemide da venticinque milligrammi, 72 chili.'), ['furosemide', 'da', '25', 'mg', '72', 'kg']);
+ assert.deepEqual(normalizeWords('furosemide da 25 mg, settantadue kg'), ['furosemide', 'da', '25', 'mg', '72', 'kg']);
+ assert.deepEqual(normalizeWords('La creatinina è 1,1'), normalizeWords('la creatinina è uno virgola uno'));
+ assert.equal(wordErrorRate('La pressione è 135 su 80.', 'la pressione è centotrentacinque su ottanta'), 0);
+ assert.equal(wordErrorRate('prende la furosemide al mattino', 'prende la furosemide'), 2 / 5);
+ assert.equal(wordErrorRate('prende la furosemide', 'prende la fluorosemide al mattino'), 3 / 3);
+});
+
+test('ascolto della visita: la prova chiude solo una visita lunga, attribuita e utile', () => {
+ const timeline = [{ role: 'M', start: 1, end: 601 }];
+ const segments = [[1, 601, TURNS.map(([, text]) => text).join(' '), 'Medico']];
+ const report = measure({ durata_audio_s: 602, calcolo_s: 120, rtf: 0.2, rss_mb_massimo: 900, frasi: segments }, timeline);
+ assert.equal(report.errore_di_parola, 0);
+ assert.equal(report.attribuzione, 1);
+ assert.deepEqual(gates(report, segments), []);
+ assert.match(gates({ ...report, audio_s: MIN_SECONDS - 1 }, segments).join(), /almeno 600/u);
+ assert.match(gates({ ...report, errore_di_parola: 0.25 }, segments).join(), /errore di parola/u);
+ assert.match(gates({ ...report, rtf: 1 }, segments).join(), /tempo reale/u);
+ assert.match(gates({ ...report, attribuzione: 0.79 }, segments).join(), /attribuzione/u);
+ assert.match(gates(report, [[1, 2, 'a']]).join(), /senza medico o paziente/u);
+ // Il dialogo dura 672 s con `say` (12/11): circa 1500 parole, alternate fra le due voci. Sotto 1400 la visita scende sotto i dieci minuti.
+ assert.ok(normalizeWords(TURNS.map(([, text]) => text).join(' ')).length >= 1400);
+ assert.ok(TURNS.every(([role], i) => role === (i % 2 ? 'P' : 'M')));
 });
