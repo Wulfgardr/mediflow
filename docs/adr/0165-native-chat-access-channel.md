@@ -476,4 +476,8 @@ La richiesta negata durante l’ammissione conserva la vista precedente.
 Il collegamento non cambia la selezione del paziente, l’epoca, i permessi o
 l’autorità di scrittura. La matrice dei test attraversa il render della
 finestra per tutte le coppie funzione precedente e funzione richiesta,
-compreso ICD dopo la lettura conclusa.
+compreso ICD dopo la lettura conclusa, con schede provviste o prive di fonti.
+Gli avvisi dell’import appartengono alla sua vista: senza note, diario o sintesi
+la vista isolata spiega come aggiungere una fonte o revocare la richiesta.
+Il contenitore Documenti riusa lo stesso avviso senza ripeterlo. I test
+controllano i testi dipinti degli stati vuoti e del consenso, oltre ai comandi.

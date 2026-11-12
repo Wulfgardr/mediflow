@@ -1,6 +1,11 @@
 use super::*;
 use std::path::PathBuf;
 
+#[cfg(test)]
+macro_rules! text {
+    ($($args:tt)*) => { crate::shell::rendered_command::observe_ink(gpui::text!($($args)*)) };
+}
+
 const MAX_IMPORT_FILES: usize = 20;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -118,7 +123,6 @@ impl ClinicalApp {
                 .child(button("clinical-workspace-new-document", "Aggiungi documenti…", theme, true, writable && !self.document_imports.pending())
                     .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))))
             .when_some(self.synthesis_chat_notice(), |el, message| el.child(notice("document-synthesis-chat-selection", message, theme, false)))
-            .when_some(self.import_chat_notice(), |el, message| el.child(notice("smart-import-chat-step", message, theme, false)))
             .child(self.dossier_import_view(cx))
             .when(show_import, |el| el.child(self.smart_import_view(cx)))
             .child(self.document_imports_view(cx))
