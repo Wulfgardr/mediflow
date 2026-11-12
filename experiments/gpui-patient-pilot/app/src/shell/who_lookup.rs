@@ -1,7 +1,11 @@
 //! Explicit, read-only WHO consultation through the paired host. A result
 //! belongs to one query generation, area, scope and connection; it never writes.
 
+#[cfg(unix)]
+use super::generation::{ChatArea, ChatHold};
 use super::*;
+#[cfg(unix)]
+use crate::chat_access::owner::Pending;
 use crate::theme::TypeStyle;
 use mediflow_runtime_client::{
     WHO_ATTRIBUTION, WhoReadiness, WhoReadinessStatus, WhoSearchResponse, WhoSource,
@@ -13,9 +17,17 @@ pub(super) struct WhoLookup {
     query: Option<String>,
     readiness: Load<WhoReadiness>,
     rows: Load<WhoSearchResponse>,
+    scroll: ScrollHandle,
+    search: ScrollTarget,
+    run: ScrollTarget,
     read: ScrollTarget,
     cancel: ScrollTarget,
     results: Vec<ScrollTarget>,
+    patient: Option<String>,
+    #[cfg(unix)]
+    chat: ChatHold,
+    #[cfg(unix)]
+    ticket: std::sync::Arc<()>,
 }
 
 impl WhoLookup {
@@ -25,9 +37,17 @@ impl WhoLookup {
             query: None,
             readiness: Load::Idle,
             rows: Load::Idle,
+            scroll: scroll.clone(),
+            search: ScrollTarget::new(scroll, cx),
+            run: ScrollTarget::new(scroll, cx),
             read: ScrollTarget::new(scroll, cx),
             cancel: ScrollTarget::new(scroll, cx),
             results: vec![],
+            patient: None,
+            #[cfg(unix)]
+            chat: ChatHold::default(),
+            #[cfg(unix)]
+            ticket: std::sync::Arc::new(()),
         }
     }
 
@@ -45,8 +65,39 @@ impl WhoLookup {
     }
 
     pub(super) fn reset(&mut self) {
+        #[cfg(unix)]
+        {
+            self.chat = ChatHold::default();
+        }
+        self.patient = None;
         self.clear_results();
         self.readiness = Load::Idle;
+    }
+
+    pub(super) fn patient_is(&self, id: &str) -> bool {
+        self.patient.as_deref() == Some(id)
+    }
+
+    #[cfg(unix)]
+    pub(super) fn open_for_patient(&mut self, id: String, scroll: &ScrollHandle, cx: &App) {
+        self.patient = Some(id);
+        self.set_scroll(scroll, cx);
+    }
+
+    pub(super) fn set_scroll(&mut self, scroll: &ScrollHandle, cx: &App) {
+        self.scroll = scroll.clone();
+        self.search = ScrollTarget::new(scroll, cx);
+        self.run = ScrollTarget::new(scroll, cx);
+        self.read = ScrollTarget::new(scroll, cx);
+        self.cancel = ScrollTarget::new(scroll, cx);
+    }
+
+    fn chat_ready(&self) -> bool {
+        #[cfg(unix)]
+        if let Some(chat) = &self.chat.0 {
+            return chat.lock().is_ok_and(|mut chat| chat.function_open());
+        }
+        true
     }
 
     fn busy(&self) -> bool {
@@ -54,13 +105,53 @@ impl WhoLookup {
     }
 
     pub(super) fn reveal_if_focused(&self, window: &mut Window, cx: &mut App) -> bool {
-        self.read.reveal_if_focused(window, cx)
+        self.search.reveal_if_focused(window, cx)
+            || self.run.reveal_if_focused(window, cx)
+            || self.read.reveal_if_focused(window, cx)
             || self.cancel.reveal_if_focused(window, cx)
             || self
                 .results
                 .iter()
                 .any(|target| target.reveal_if_focused(window, cx))
     }
+}
+
+#[cfg(unix)]
+impl ChatArea for WhoLookup {
+    fn occupied(&self) -> bool {
+        self.chat.0.is_some() || self.patient.is_some() || self.busy() || self.query.is_some()
+    }
+    fn follow_chat(&mut self) -> bool {
+        if self
+            .chat
+            .0
+            .as_ref()
+            .is_some_and(|chat| !chat.lock().is_ok_and(|mut chat| chat.function_held()))
+        {
+            self.reset();
+            return true;
+        }
+        false
+    }
+    fn hold(&mut self, chat: Pending) -> std::sync::Arc<()> {
+        self.reset();
+        self.chat.0 = Some(chat);
+        self.ticket = std::sync::Arc::new(());
+        self.ticket.clone()
+    }
+    fn holds_chat(&self, ticket: &std::sync::Arc<()>, chat: &Pending) -> bool {
+        std::sync::Arc::ptr_eq(ticket, &self.ticket)
+            && self
+                .chat
+                .0
+                .as_ref()
+                .is_some_and(|held| std::sync::Arc::ptr_eq(held, chat))
+    }
+    fn release(&mut self) {
+        self.chat.0 = None;
+        self.reset();
+    }
+    fn admitted(&mut self) {}
 }
 
 #[derive(Clone)]
@@ -78,7 +169,7 @@ enum WhoResult {
 
 impl ClinicalApp {
     pub(super) fn who_query_changed(&mut self) {
-        if self.reference_kind == ReferenceKind::Who {
+        if self.reference_kind == ReferenceKind::Who || self.who.patient.is_some() {
             self.who.clear_results();
         }
     }
@@ -101,8 +192,8 @@ impl ClinicalApp {
 
     fn current_who(&self, token: &WhoToken, cx: &App) -> bool {
         self.account_profile.generation == token.authority
-            && self.area == Area::References
-            && self.reference_kind == ReferenceKind::Who
+            && self.who_location()
+            && self.who.chat_ready()
             && self.epoch == token.epoch
             && self.who.revision == token.revision
             && self.who.query == token.query
@@ -132,12 +223,25 @@ impl ClinicalApp {
                 self.who.readiness = who_load(result);
             }
             WhoResult::Search(result) => {
+                #[cfg(unix)]
+                if let Some(chat) = self.who.chat.0.take()
+                    && let Ok(mut chat) = chat.lock()
+                {
+                    if !chat.function_open() {
+                        return false;
+                    }
+                    if result.is_ok() {
+                        chat.close_function();
+                    } else {
+                        chat.withdraw();
+                    }
+                }
                 self.who.results = result.as_ref().map_or_else(
                     |_| vec![],
                     |rows| {
                         rows.entries
                             .iter()
-                            .map(|_| ScrollTarget::new(&self.area_scroll, cx))
+                            .map(|_| ScrollTarget::new(&self.who.scroll, cx))
                             .collect()
                     },
                 );
@@ -151,10 +255,7 @@ impl ClinicalApp {
         let (Some(session), Some(scope)) = (self.session.clone(), self.scope.clone()) else {
             return;
         };
-        if self.who.busy()
-            || self.area != Area::References
-            || self.reference_kind != ReferenceKind::Who
-        {
+        if self.who.busy() || !self.who_location() || !self.who.chat_ready() {
             return;
         }
         let query = if search {
@@ -182,6 +283,22 @@ impl ClinicalApp {
         })
         .detach();
         cx.notify();
+    }
+
+    fn who_location(&self) -> bool {
+        if let Some(patient) = self.who.patient.as_deref() {
+            self.area == Area::Patients
+                && !self.directory
+                && self.patient_section == PatientSection::Overview
+                && self.selected_id.as_deref() == Some(patient)
+                && self
+                    .patient
+                    .detail
+                    .ready()
+                    .is_some_and(|detail| detail.id == patient)
+        } else {
+            self.area == Area::References && self.reference_kind == ReferenceKind::Who
+        }
     }
 
     fn copy_who_reference(&mut self, token: WhoToken, index: usize, cx: &mut Context<Self>) {
@@ -217,7 +334,7 @@ impl ClinicalApp {
     pub(super) fn who_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let busy = self.who.busy();
-        let can_read = self.scope.is_some() && !busy;
+        let can_read = self.scope.is_some() && !busy && self.who.chat_ready();
         let query_valid = normalize_who_query(self.reference_search.read(cx).value()).is_ok();
         let can_search = can_read && query_valid;
         let token = WhoToken {
@@ -228,6 +345,9 @@ impl ClinicalApp {
         };
         let mut pane = div().min_w_0().max_w_full().flex().flex_col().gap(px(16.))
             .child(heading("clinical-workspace-who-heading", crate::title::TitleText::code("ICD-11 WHO"), theme))
+            .when(self.who.patient.is_some(), |el| el.child(
+                button("clinical-workspace-who-close", "Chiudi ricerca ICD", theme, false, true)
+                    .on_click(cx.listener(|this, _, _, cx| { this.who.reset(); cx.notify(); }))))
             .child(who_text("clinical-who-introduction", "Repertorio in inglese · release 2026-01. Questo percorso consulta il servizio WHO locale sul computer che ospita l’archivio.", theme))
             .child(self.who.read.attach_enabled(button("clinical-workspace-who-readiness", "Leggi stato del servizio", theme, false, can_read), can_read)
                 .when(can_read, |el| el.on_click(cx.listener(|this, _, _, cx| this.request_who(false, cx)))))
@@ -277,8 +397,8 @@ impl ClinicalApp {
             .child(who_text("clinical-who-search-help", "Cerca un termine clinico in inglese o un codice. I titoli originali non vengono tradotti.", theme))
             .child(div().min_w_0().flex().flex_wrap().gap(px(8.))
                 .when(self.text_scale >= 2.5, |el| el.flex_col().items_stretch())
-                .child(self.reference_search_target.attach_enabled(div().id("clinical-workspace-reference-search-anchor").flex_1().min_w(px(160.)).max_w_full().child(self.reference_search.clone()), false))
-                .child(self.reference_run_target.attach_enabled(button("clinical-workspace-reference-run-search", "Cerca in ICD-11 WHO", theme, true, can_search), can_search)
+                .child(self.who.search.attach_enabled(div().id("clinical-workspace-reference-search-anchor").flex_1().min_w(px(160.)).max_w_full().child(self.reference_search.clone()), false))
+                .child(self.who.run.attach_enabled(button("clinical-workspace-reference-run-search", "Cerca in ICD-11 WHO", theme, true, can_search), can_search)
                     .when(can_search, |el| el.on_click(cx.listener(|this, _, _, cx| this.request_who(true, cx))))))
             .when(!query_valid && !self.reference_search.read(cx).value().is_empty(), |el| el.child(notice("clinical-workspace-who-query-hint", "Usa una ricerca breve, senza simboli di marcatura o caratteri invisibili. Riduci il testo e riprova.", theme, false)))
             .when(busy || !matches!(self.who.rows, Load::Idle), |el| el.child(
@@ -710,3 +830,7 @@ mod tests {
         });
     }
 }
+
+#[cfg(all(test, target_os = "macos"))]
+#[path = "who_lookup/tests/chat.rs"]
+mod chat_tests;

@@ -424,3 +424,31 @@ proprio: Quadro, sintesi e import non si sostituiscono il lavoro a vicenda.
 Dopo `import-closed` la proposta appartiene alla finestra e la sua validità
 segue solo le fonti della scheda. Le stringhe `insight-*` e `synthesis-*`
 non cambiano. L'applicazione dei candidati resta legata al contratto G-6j.
+
+## Ricerca ICD dalla chat, 12 novembre 2026
+
+Il comando app-only `icd-lookup` non accetta argomenti. La sessione, l’account,
+l’archivio e la selezione del paziente sono ammessi con il percorso comune
+prima di aprire la ricerca ICD-11 WHO dentro la Panoramica della scheda.
+Il lettore paired `RuntimeSession.search_who` conserva i propri controlli.
+Non serve l’accesso amministrativo all’host locale, che la normale consultazione
+WHO non richiede. L’apertura non invia query, non genera testo e non applica
+codici alla scheda. Il medico scrive la query nella finestra.
+
+La carta Web riceve soltanto `status`: `requested`, `preparing`, `icd-opened`,
+`icd-unavailable`, `icd-busy`, `icd-closed` oppure `withdrawn`. Query, risultati
+e ricevuta WHO restano nella finestra. `icd-closed` segue una lettura riuscita,
+compreso un elenco vuoto, e rilascia il legame con la chat. Non rappresenta
+una scrittura clinica né una ricevuta durevole da recuperare dopo un riavvio.
+Una lettura negata o fallita non produce lo stato di consultazione conclusa.
+
+Cambio di paziente, blocco, revoca, chiusura e perdita del contesto ritirano
+la richiesta. La risposta viene ricontrollata prima di mostrarla. Lasciare
+la Panoramica chiude la ricerca. Dopo la lettura riuscita i risultati restano
+nella scheda fino alla chiusura o al cambio di contesto. Non viene concessa
+alcuna autorità di scrittura alla chat.
+
+Abbinamento delle prestazioni, coda delle evidenze e follow-up aperti restano
+non collegati: i residui del [catalogo C-7](../analysis/2026-10-31-chat-catalog-fabric/README.md#wul-829-ricerca-icd-aperta-dalla-chat)
+indicano quali lettori e viste GPUI mancano. I banchi sintetici non qualificano
+i desktop Claude e Codex reali.
