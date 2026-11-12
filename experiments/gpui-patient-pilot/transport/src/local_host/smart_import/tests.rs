@@ -379,7 +379,7 @@ fn refusal_messages_state_only_the_reason() {
         ("provider_failed", "Il modello locale non ha risposto."),
         (
             "proposal_invalid",
-            "La risposta del modello non ha superato i controlli dell’host.",
+            "La risposta del modello non ha superato i controlli dell’home-base.",
         ),
         (
             "response_truncated",
@@ -387,13 +387,13 @@ fn refusal_messages_state_only_the_reason() {
         ),
         (
             "selection_changed",
-            "La selezione sull’host è cambiata durante la richiesta. Riprova.",
+            "La selezione sull’home-base è cambiata durante la richiesta. Riprova.",
         ),
         (
             "response_invalid",
-            "La risposta dell’host non ha superato i controlli dell’app.",
+            "La risposta dell’home-base non ha superato i controlli dell’app.",
         ),
-        ("codice-sconosciuto", "L’host ha rifiutato la richiesta."),
+        ("codice-sconosciuto", "L’home-base ha rifiutato la richiesta."),
     ] {
         assert_eq!(smart_import_message(code), expected, "{code}");
     }
