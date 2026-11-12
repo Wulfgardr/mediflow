@@ -784,6 +784,16 @@ mod tests {
         cx.update_window_entity(&view, |app, window, cx| {
             app.selected_id = Some("patient-b".into());
             assert!(app.voice_drug_suggestions(cx).is_empty());
+            app.poll_chat_voice(cx);
+            assert!(app.chat_access.voice.work.is_none());
+            assert!(
+                app.chat_access
+                    .voice
+                    .editor
+                    .read(cx)
+                    .suggestion_ranges()
+                    .is_empty()
+            );
             app.apply_voice_drug_suggestion(&stale.0, &stale.1, window, cx);
             assert!(app.chat_access.voice.work.is_none());
             assert!(app.chat_access.voice.editor.read(cx).value().is_empty());

@@ -142,6 +142,8 @@ mod tests {
         }
         assert_eq!(text.as_bytes(), before);
         assert!(suggestions("Ramipli", ["Atorvastatina"]).is_empty());
+        assert_eq!(distance("controllo", "control", 2), Some(2));
+        assert!(suggestions("controllo", ["Control"]).is_empty());
     }
 
     #[test]
