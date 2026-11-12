@@ -42,6 +42,22 @@ test('profile result budget counts UTF-8 bytes and preserves notes without reser
         { code: 'output_too_large' });
 });
 
+test('full profile readback retains typed identity and birth metadata without widening authority', () => {
+    const result = { schemaVersion: 'mediflow.patient.profile-view.v1', operationId: 'patient-profile.read.v1',
+        contractVersion: 1, handle: `pph_${'4'.repeat(64)}`, projection: 'profile',
+        currentness: { revision: 1, selectionEpoch: 2, observedAt: 10_000, expiresAt: 40_000 },
+        profile: { firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTHETIC', identifierType: 'other',
+            birthDate: null, birthDatePrecision: 'estimated', birthYear: 1940, address: null, phone: null,
+            caregiver: null, diagnoses: null, exemptions: null, notes: null, isAdi: false, isArchived: false,
+            statusReason: null, archiveReason: null, archiveNote: null } };
+    assert.equal(isProfileResult(result), true);
+    for (const patch of [{ identifierType: 'invented' }, { identifierType: null }, { birthDatePrecision: 'year' },
+        { birthDatePrecision: null }, { birthYear: '1940' }, { birthYear: 1940.5 }, { birthYear: -1 },
+        { patientId: 'forbidden' }]) {
+        assert.equal(isProfileResult({ ...result, profile: { ...result.profile, ...patch } }), false);
+    }
+});
+
 test('review and notes commit preserve ENC and keep their policies distinct', () => {
     for (const notes of [enc, null]) {
         const input = { kind: 'prepare', expectedSelectionEpoch: 2, expectedRevision: 4, notes };

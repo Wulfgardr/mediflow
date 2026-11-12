@@ -212,6 +212,14 @@ test('keeps the profile operation separate from semantic reads and enforces exac
     contractVersion: 1, handle: `pph_${'a'.repeat(64)}`, projection: 'notes',
     currentness: { revision: 1, selectionEpoch: 2, observedAt: 1000, expiresAt: 2000 }, profile: { notes: 'Synthetic' } };
   assert.equal(patientProfileQueryOutputSchema.safeParse(result).success, true);
+  const full = { ...result, projection: 'profile', profile: {
+    firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTHETIC', identifierType: 'other',
+    birthDate: null, birthDatePrecision: 'estimated', birthYear: 1940,
+    address: null, phone: null, caregiver: null, diagnoses: null, exemptions: null, notes: null,
+    isAdi: false, isArchived: false, statusReason: null, archiveReason: null, archiveNote: null,
+  } };
+  assert.equal(patientProfileQueryOutputSchema.safeParse(full).success, true);
+  assert.equal(patientProfileQueryOutputSchema.safeParse({ ...full, profile: { ...full.profile, birthYear: '1940' } }).success, false);
   assert.equal(patientProfileQueryOutputSchema.safeParse({ ...result, profile: { notes: 'Synthetic', id: 'forbidden' } }).success, false);
   assert.equal(patientProfileQueryOutputSchema.safeParse({ ...result, profile: { notes: '😀'.repeat(9000) } }).success, false);
   assert.equal(semanticQueryArgumentsSchema.safeParse({ ...semanticArguments,

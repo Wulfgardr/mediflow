@@ -109,6 +109,27 @@ for (const lane of ['web', 'network'] as const) test(`${lane}: real scoped adapt
     assert.deepEqual(snapshot(), before);
 });
 
+for (const lane of ['web', 'network'] as const) {
+    for (const identity of [
+        { identifierType: 'other', birthDatePrecision: 'unknown', birthYear: null, birthDate: null },
+        { identifierType: 'cf', birthDatePrecision: 'estimated', birthYear: 1940, birthDate: null },
+        { identifierType: 'cf', birthDatePrecision: 'exact', birthYear: null, birthDate: new Date('1940-01-02T12:00:00Z') },
+    ] as const) test(`${lane}: scoped creation readback preserves ${identity.identifierType}/${identity.birthDatePrecision} identity metadata`, async () => {
+        reset(); select(lane);
+        dbServer.update(patients).set(identity).where(eq(patients.id, patientA)).run();
+        const before = snapshot();
+        const response = await query(lane, open(await epoch(lane)));
+        assert.equal(response.status, 200, await response.clone().text());
+        const result = await response.json() as { profile: Record<string, unknown> };
+        for (const key of ['identifierType', 'birthDatePrecision', 'birthYear'] as const) {
+            assert.equal(result.profile[key], identity[key], `creation confirmation needs ${key}`);
+        }
+        assert.equal(result.profile.birthDate, identity.birthDate?.toISOString() ?? null);
+        assert.equal(isProfileResult(result), true);
+        assert.deepEqual(snapshot(), before, 'readback must not write or emit clinical audit');
+    });
+}
+
 test('real adapters reject forged, wrong-patient, wrong-scope, wrong-revision, widened and superseded references', async () => {
     reset(); const first = await (await query('web', open(0, 'notes'))).json() as ProfileResult;
     assert.equal((await query('web', { ...reread(first), handle: 'pph_' + '0'.repeat(64) })).status, 409);
