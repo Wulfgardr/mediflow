@@ -6278,7 +6278,7 @@ mod tests {
     }
     fn profile_wire(session: &RuntimeSession) -> Value {
         let fields = session.seal_fields(json!({"firstName":"Amina","lastName":"Sintetica","taxCode":"SYNTHETIC",
-            "birthDate":null,"address":null,"phone":null,"caregiver":null,"diagnoses":null,"exemptions":null,
+            "birthDate":null,"identifierType":"other","birthDatePrecision":"unknown","birthYear":null,"address":null,"phone":null,"caregiver":null,"diagnoses":null,"exemptions":null,
             "notes":"synthetic notes","isAdi":false,"isArchived":false,"statusReason":null,"archiveReason":null,"archiveNote":null}), &["notes"]).unwrap();
         json!({"schemaVersion":"mediflow.patient.profile-view.v1","operationId":"patient-profile.read.v1","contractVersion":1,
             "handle":format!("pph_{}", "a".repeat(64)),"projection":"profile",

@@ -78,6 +78,7 @@ pub(super) mod tests {
             "handle":format!("pph_{}", "a".repeat(64)), "projection":"profile",
             "currentness":{"revision":7, "selectionEpoch":epoch, "observedAt":1000, "expiresAt":61000},
             "profile":{"firstName":"Amina", "lastName":"Sintetica", "taxCode":"SYNTHETIC", "birthDate":null,
+                "identifierType":"other", "birthDatePrecision":"unknown", "birthYear":null,
                 "address":null, "phone":null, "caregiver":null, "diagnoses":null, "exemptions":null, "notes":null,
                 "isAdi":false, "isArchived":false, "statusReason":null, "archiveReason":null, "archiveNote":null}})
     }
