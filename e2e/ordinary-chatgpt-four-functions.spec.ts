@@ -31,10 +31,10 @@ async function installSelectionFixture(page: Page) {
 
 test.describe.configure({ retries: 0 });
 
-test('Patient Insight ordinary ChatGPT: consent, catalog, review-only source proposal', async ({ page }) => {
+test('Quadro paziente ordinary ChatGPT: consent, catalog, review-only source proposal', async ({ page }) => {
   let request: { capturedAt: string; patientRevision: number } | null = null;
   const remote = await installOrdinaryChatGptTransport(page, 'patient_insight', () => {
-    if (!request) throw new Error('Missing original Patient Insight request');
+    if (!request) throw new Error('Missing original patient context request');
     const { receipt, provenance } = remoteMetadata('patient_insight');
     return { preview: { writesPerformed: 0, apply: 'denied', status: 'available', code: null,
       proposal: { schemaVersion: 'mediflow.patient-insight.review-proposal.v2', reviewOnly: true,
@@ -190,7 +190,9 @@ test('Treatment Reasoning ordinary ChatGPT: diniego senza preparazione, consenso
   const run = await openTreatmentReasoningDenial(page);
   try {
     remote.arm();
-    await run.proposals.click(); await run.proposals.click();
+    await expect(run.proposals).toHaveCount(0);
+    await openPatientSection(page, 'quadro');
+    await openPatientSection(page, 'terapie');
     await run.assertDenied();
     expect(remote.previews).toEqual([]);
     expect(remote.operations).toEqual([]);
