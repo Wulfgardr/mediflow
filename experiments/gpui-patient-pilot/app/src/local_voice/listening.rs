@@ -30,6 +30,11 @@ pub(crate) const MAX_UTTERANCE: usize = 20 * SAMPLE_RATE;
 /// a 60 minuti si ferma da sola. Il testo resta limitato quanto l'audio, che
 /// non si conserva oltre la frase aperta.
 pub(crate) const MAX_RECORDING: usize = 60 * 60 * SAMPLE_RATE;
+/// Testo massimo di una registrazione. Sulle visite sintetiche whisper
+/// scrive da 240 a 680 caratteri al minuto; un parlato fitto e continuo arriva
+/// verso i 1.150. Con 80.000 caratteri in 60 minuti il limite che conta resta
+/// la durata (ADR 0113, aggiornamento del 12 novembre 2026).
+pub(crate) const MAX_TRANSCRIPT_CHARS: usize = 80_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct EngineFailure;
@@ -310,10 +315,14 @@ pub(crate) struct Dictation<V, D> {
     listener: Listener<V>,
     decoder: D,
     finals: Zeroizing<String>,
+    /// Caratteri di `finals`, contati frase per frase.
+    finals_chars: usize,
     finals_count: usize,
     segments: Vec<Segment>,
     /// Audio registrato oltre il quale la registrazione si ferma.
     max_recording: usize,
+    /// Testo oltre il quale la registrazione si ferma.
+    max_transcript_chars: usize,
     /// Ascolto della visita: ogni frase definitiva riceve l'impronta della voce.
     two_voices: bool,
     /// Per le prove e le misure: millisecondi di calcolo di ogni impronta.
@@ -333,9 +342,11 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
             listener: Listener::new(detector),
             decoder,
             finals: Zeroizing::new(String::new()),
+            finals_chars: 0,
             finals_count: 0,
             segments: Vec::new(),
             max_recording: MAX_RECORDING,
+            max_transcript_chars: MAX_TRANSCRIPT_CHARS,
             two_voices: false,
             #[cfg(test)]
             print_ms: Vec::new(),
@@ -357,8 +368,10 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
         if !text.is_empty() {
             if !self.finals.is_empty() {
                 self.finals.push(' ');
+                self.finals_chars += 1;
             }
             self.finals.push_str(text);
+            self.finals_chars += text.chars().count();
             #[cfg(test)]
             let started = std::time::Instant::now();
             let voice = self
@@ -454,9 +467,20 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
         self.two_voices = two_voices;
     }
 
-    /// Campioni che si possono ancora registrare prima della durata massima.
+    /// Campioni che si possono ancora registrare prima della durata massima;
+    /// zero anche quando il testo ha raggiunto la lunghezza massima.
     pub(crate) fn room(&self) -> usize {
+        if self.finals_chars >= self.max_transcript_chars {
+            return 0;
+        }
         self.max_recording.saturating_sub(self.recorded_samples())
+    }
+
+    /// Per le prove: una lunghezza massima del testo più corta.
+    #[cfg(test)]
+    pub(crate) fn with_max_transcript_chars(mut self, chars: usize) -> Self {
+        self.max_transcript_chars = chars;
+        self
     }
 
     /// Audio registrato finora, in campioni.
@@ -468,6 +492,7 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
         self.listener.wipe();
         self.agreement.reset();
         self.finals.zeroize();
+        self.finals_chars = 0;
         for segment in &mut self.segments {
             segment.text.zeroize();
         }
