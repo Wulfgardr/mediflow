@@ -1001,7 +1001,7 @@ impl ClinicalApp {
         };
         let message = if self.ai_preferences.is_saving() {
             format!(
-                "Salvataggio delle preferenze AI non verificato. {}",
+                "Salvataggio delle preferenze IA non verificato. {}",
                 ui_error(error)
             )
         } else if self.form.as_ref().is_some_and(|form| {
@@ -1922,7 +1922,7 @@ impl ClinicalApp {
             } else if ambulatory_pending {
                 self.message = Some(("Sessione bloccata. Un salvataggio delle sedi era in corso: rileggi l’elenco dopo l’accesso.".into(),false));
             } else if ai_pending {
-                self.message = Some(("Sessione bloccata. Un salvataggio AI era in corso: rileggi le preferenze dopo l’accesso.".into(), false));
+                self.message = Some(("Sessione bloccata. Un salvataggio IA era in corso: rileggi le preferenze dopo l’accesso.".into(), false));
             }
             return;
         }
@@ -4338,7 +4338,7 @@ impl ClinicalApp {
                     .gap(px(8.))
                     .child(overview_heading(
                         "clinical-overview-observations",
-                        "Misure recenti",
+                        "Parametri recenti",
                         self.patient
                             .observations
                             .ready()
@@ -6045,7 +6045,7 @@ impl Render for ClinicalApp {
                                                 .child(
                                                     button(
                                                         "local-session-retirement-dismiss",
-                                                        "Ho verificato le sessioni dell’host",
+                                                        "Ho verificato le sessioni dell’home-base",
                                                         theme,
                                                         false,
                                                         true,

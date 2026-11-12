@@ -192,7 +192,7 @@ impl ClinicalApp {
                         window.focus(&this.focus, cx);
                     }))))
 ,
-            SettingsPage::Functions => view.child(heading("clinical-workspace-settings-heading","Funzioni AI",theme))
+            SettingsPage::Functions => view.child(heading("clinical-workspace-settings-heading","Funzioni IA",theme))
                 .child(self.local_host_panel(cx))
                 .child(self.ai_status_view(cx))
                 .child(self.parameters_view(cx))
@@ -212,7 +212,7 @@ impl ClinicalApp {
                         (SettingsPage::Access, "Accesso", "Passphrase, PIN e blocco della sessione"),
                         (SettingsPage::Appearance, "Aspetto", "Tema, dimensione del testo e privacy"),
                         (SettingsPage::Ambulatories, "Ambulatori", "Sedi e contesti clinici"),
-                        (SettingsPage::Host, "Modo host", "Accesso locale o nodo della rete fidata"),
+                        (SettingsPage::Host, "Modo home-base", "Accesso locale o nodo della rete fidata"),
                         (SettingsPage::Danger, "Zona pericolo", "Credenziali e recupero dell’accesso"),
                         (SettingsPage::Archives, "Archivi e backup", "Esportazione, verifica e ripristino"),
                         (SettingsPage::Controls, "Controlli", "Evidenze, aggiornamenti, audit e redazione"),
@@ -221,8 +221,8 @@ impl ClinicalApp {
                     ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)))
                     .child(section("clinical-workspace-settings-intelligenza", "Intelligenza", theme))
                     .children([
-                        (SettingsPage::Models, "Modelli", "Stato della configurazione sull’host"),
-                        (SettingsPage::Functions, "Funzioni AI", "Preferenze e scelta del modello per funzione"),
+                        (SettingsPage::Models, "Modelli", "Stato della configurazione sull’home-base"),
+                        (SettingsPage::Functions, "Funzioni IA", "Preferenze e scelta del modello per funzione"),
                         (SettingsPage::Governance, "Governo Fabric", "Registro, sedi e verifiche salvate"),
                     ].into_iter().chain(voice_settings_row()).map(|(page, label, description)| self.settings_item(page, label, description, cx)))
                     .child(section("clinical-workspace-connection-heading", "Archivio collegato", theme))

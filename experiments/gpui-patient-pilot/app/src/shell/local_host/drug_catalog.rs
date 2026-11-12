@@ -309,7 +309,7 @@ impl ClinicalApp {
                         area.preview = None;
                         area.reduction = None;
                         area.message = Some((
-                            format!("Catalogo sostituito: {count} voci da {}. Stato riletto dall’host.",
+                            format!("Catalogo sostituito: {count} voci da {}. Stato riletto dall’home-base.",
                                 receipt["imported"]["agency"].as_str().unwrap_or("fonte dichiarata")),
                             false,
                         ));

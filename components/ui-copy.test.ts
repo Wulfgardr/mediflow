@@ -8,7 +8,7 @@ type CopyChange = { file: string; removed: string[]; added: string[] };
 const root = path.resolve(import.meta.dirname, '..');
 const productRoot = process.env.MEDIFLOW_COPY_ROOT ?? root;
 const read = (file: string) => fs.readFileSync(path.join(productRoot, file), 'utf8');
-for (const surface of ['web']) {
+for (const surface of ['web', 'gpui']) {
     const rows = JSON.parse(execFileSync(process.execPath, ['scripts/ui-copy-census.mjs', `--surface=${surface}`, '--all'], { cwd: root, env: process.env, encoding: 'utf8' })) as { file: string; text: string }[];
     const changes = JSON.parse(fs.readFileSync(path.join(root, `scripts/fixtures/wul825-${surface}-copy.json`), 'utf8')) as CopyChange[];
     for (const change of changes) test(`${surface} visible copy: ${change.file}`, () => {
@@ -37,4 +37,13 @@ test('context bytes and fingerprint are inside Details at the context consent', 
 
 test('therapy proposals stay hidden while unavailable', () => {
     assert.match(read('components/treatment-reasoning-panel.tsx'), /return null;/);
+});
+
+
+test('GPUI proposal keeps source review with a single pre-generation chart notice', () => {
+    const source = read('experiments/gpui-patient-pilot/app/src/shell/patient_insight.rs');
+    assert.match(source, /PATIENT_INSIGHT_REVIEW_NOTICE.into\(\)/);
+    assert.match(source, /La cartella non cambia\./);
+    assert.doesNotMatch(source, /Proposta da rivedere\. La scheda resta invariata\./);
+    assert.match(source, /prepare\("Genera proposta"/);
 });
