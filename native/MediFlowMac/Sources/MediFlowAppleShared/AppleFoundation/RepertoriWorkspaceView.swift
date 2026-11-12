@@ -254,7 +254,7 @@ struct RepertoriWorkspaceView: View {
         } else if !store.canSearch {
             placeholder(systemImage: "magnifyingglass", title: "Cerca nel repertorio", detail: "Digita almeno due caratteri. \(store.catalogue.prompt).")
         } else if store.hasSearched, store.resultCount == 0 {
-            placeholder(systemImage: "tray", title: "Nessun risultato", detail: "Nessuna voce corrisponde alla ricerca. Se il repertorio non è mai stato importato sull’host, l’elenco è vuoto per qualunque termine.")
+            placeholder(systemImage: "tray", title: "Nessun risultato", detail: "Nessuna voce corrisponde alla ricerca. Se il repertorio non è mai stato importato sull’home-base, l’elenco è vuoto per qualunque termine.")
         } else { list }
     }
 
@@ -341,7 +341,7 @@ struct RepertoriWorkspaceView: View {
     }
     private func readinessTitle(_ status: HomeBaseWHOReadinessStatus) -> String {
         switch status {
-        case .disabled: "WHO disabilitato sull’host"
+        case .disabled: "WHO disabilitato sull’home-base"
         case .configurationRequired: "Configurazione WHO richiesta"
         case .configured: "WHO configurato, disponibilità non verificata"
         case .available: "WHO disponibile secondo l’ultima osservazione"
@@ -353,7 +353,7 @@ struct RepertoriWorkspaceView: View {
         case .disabled, .configurationRequired:
             "Chiedi al responsabile dell’home-base di verificare il setup WHO locale documentato. Questa app non installa o avvia servizi."
         case .configured:
-            "La configurazione non prova che WHO risponda. Esegui una ricerca specifica o un controllo codice; se fallisce, verifica il servizio sull’host."
+            "La configurazione non prova che WHO risponda. Esegui una ricerca specifica o un controllo codice; se fallisce, verifica il servizio sull’home-base."
         case .available:
             "Stato osservato dal backend, non un nuovo test live. Una risposta dalla cache è indicata separatamente."
         case .unavailable:

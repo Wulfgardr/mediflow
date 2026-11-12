@@ -344,13 +344,13 @@ test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza r
     const summary = page.getByTestId('patient-proposals-summary');
     await expect(summary).toHaveCount(1); await expect(summary).toContainText('Nessuna proposta da rivedere');
     await expect(summary.getByRole('link')).toHaveCount(2);
-    await summary.getByRole('link', { name: 'Patient Insight', exact: true }).click();
+    await summary.getByRole('link', { name: 'Quadro paziente', exact: true }).click();
     const insight = page.locator('#patient-insight');
     const insightToggle = insight.locator(':scope > div > [data-disclosure-control]');
     await expect(insightToggle).toHaveAttribute('aria-expanded', 'true');
     await insight.getByRole('button', { name: 'Cambia', exact: true }).click();
     await insight.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption(FIXTURE_MODEL.modelOptionId);
-    await insight.getByRole('button', { name: 'Avvia supporto', exact: true }).click();
+    await insight.getByRole('button', { name: 'Genera proposta', exact: true }).click();
     const insightProposal = insight.getByTestId('patient-insight-review-proposal');
     await expect(insightProposal).toBeVisible();
     await openPatientSection(page, 'quadro'); await expect(summary).toContainText('1 proposta da rivedere');
@@ -380,11 +380,11 @@ test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza r
       }, theme);
       await summary.scrollIntoViewIfNeeded();
       await assertNoHorizontalOverflow(page, [{ label: 'pagina', selector: 'document' }, { label: 'Riepilogo proposte', selector: '[data-testid="patient-proposals-summary"]' }]);
-      for (const name of ['Patient Insight', 'Smart Import']) await assertNotClippedInViewport(summary.getByRole('link', { name, exact: true }), name);
+      for (const name of ['Quadro paziente', 'Smart Import']) await assertNotClippedInViewport(summary.getByRole('link', { name, exact: true }), name);
       if (directory) { await mkdir(directory, { recursive: true }); await page.screenshot({ path: `${directory}/${theme}-${size}-riepilogo-combinato.png`, animations: 'disabled' }); }
     }
     await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
-    await summary.getByRole('link', { name: 'Patient Insight', exact: true }).click();
+    await summary.getByRole('link', { name: 'Quadro paziente', exact: true }).click();
     await expect(insightProposal).toBeVisible(); await insight.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
     await openPatientSection(page, 'quadro'); await expect(summary).toContainText('1 proposta da rivedere');
     await summary.getByRole('link', { name: 'Smart Import', exact: true }).click();

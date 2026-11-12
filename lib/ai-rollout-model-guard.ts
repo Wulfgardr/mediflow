@@ -44,7 +44,7 @@ export type AiRolloutLocalControlGuard = {
 };
 
 const LANE_LABELS: Record<AiRolloutGuardLane, string> = {
-    patient_insight: 'Patient Insight',
+    patient_insight: 'Quadro paziente',
     smart_import: 'Smart Import',
     redaction: 'Redaction',
     clinical_entities: 'Clinical Entities',

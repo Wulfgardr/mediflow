@@ -222,7 +222,7 @@ export function useAiSettingsController() {
             await saveAIInsightStoredSettings(aiInsightSettings);
             setAiTestStatus('idle');
             setSavedConfigurationRevision(previous => previous + 1);
-            showToast({ tone: 'success', title: 'Configurazione AI salvata' });
+            showToast({ tone: 'success', title: 'Configurazione IA salvata' });
         } catch (e) {
             console.error(e);
             showToast({ tone: 'error', title: 'Salvataggio non riuscito' });

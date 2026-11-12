@@ -35,9 +35,6 @@ struct PairedPatientTherapiesSection: View {
                 }
             }
 
-            Divider()
-            NativeTreatmentReasoningView(workspaceModel: model)
-
             if model.isEditingTherapy {
                 Divider()
                 therapyForm(
@@ -99,7 +96,7 @@ struct PairedPatientTherapiesSection: View {
                     onCancel: nil,
                     onSubmit: { Task { await model.createTherapyForSelectedPatient() } }
                 )
-                Text("Solo campi non-AI. Nessuna prescrizione SISS nativa o coda offline.")
+                Text("Solo campi non-IA. Nessuna prescrizione SISS nativa o coda offline.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

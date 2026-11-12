@@ -5,7 +5,7 @@ import MediFlowCore
 final class NativeAIConfigurationModel: ObservableObject {
     @Published private(set) var snapshot: NativeAIFunctionPreferences?
     @Published private(set) var preview: NativeAIFunctionPreview?
-    @Published private(set) var message = "Collega l’host e accedi con il PIN operatore."
+    @Published private(set) var message = "Collega l’home-base e accedi con il PIN operatore."
     @Published private(set) var isWorking = false
     private var task: Task<Void, Never>?
     private var generation: UInt = 0
@@ -42,7 +42,7 @@ final class NativeAIConfigurationModel: ObservableObject {
         run { connection in
             let value = try await self.services.read(connection)
             try value.validate()
-            return (value, nil, "Configurazione letta dall’host.")
+            return (value, nil, "Configurazione letta dall’home-base.")
         }
     }
     func prepare(_ command: NativeAIFunctionCommand) {
@@ -70,12 +70,12 @@ final class NativeAIConfigurationModel: ObservableObject {
             let observed = try await self.services.read(connection)
             try observed.validate()
             return (observed, nil, observed.revision == applied.revision && observed.catalogRevision == applied.catalogRevision
-                ? "Preferenze salvate e rilette dall’host." : "L’host è cambiato dopo il salvataggio. Mostro la configurazione riletta.")
+                ? "Preferenze salvate e rilette dall’home-base." : "L’home-base è cambiato dopo il salvataggio. Mostro la configurazione riletta.")
         }
     }
     private func run(_ operation: @escaping (ClinicalWorkspaceConnection) async throws -> (NativeAIFunctionPreferences, NativeAIFunctionPreview?, String)) {
         guard let connection = connectionProvider() else {
-            snapshot = nil; preview = nil; message = "Collega l’host e accedi con il PIN operatore."; return
+            snapshot = nil; preview = nil; message = "Collega l’home-base e accedi con il PIN operatore."; return
         }
         generation &+= 1; let expected = generation
         task?.cancel(); isWorking = true
@@ -92,10 +92,10 @@ final class NativeAIConfigurationModel: ObservableObject {
                 if let failure = error as? NativeOrdinaryServerFailure { self.message = failure.code.safeReason }
                 else if case HomeBaseClientError.httpStatus(let status, _) = error {
                     switch status {
-                    case 401: self.message = "Sessione o pairing non più validi. Accedi nuovamente."
-                    case 403: self.message = "L’amministratore deve autorizzare questo operatore e questo Mac sul computer host."
+                    case 401: self.message = "Sessione o abbinamento non più validi. Accedi nuovamente."
+                    case 403: self.message = "L’amministratore deve autorizzare questo operatore e questo Mac sull’home-base."
                     case 409: self.message = "La configurazione è cambiata. Rileggi e prepara una nuova anteprima."
-                    case 404: self.message = "Questo host non espone ancora la configurazione AI nativa."
+                    case 404: self.message = "Questo home-base non espone ancora la configurazione IA nativa."
                     default: self.message = "Esito non verificato. Rileggi prima di riprovare; nessun invio automatico."
                     }
                 } else { self.message = "Esito non verificato. Rileggi prima di riprovare; nessun invio automatico." }
@@ -114,10 +114,10 @@ struct NativeAIConfigurationView: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Preferenze per tutti gli operatori dell’host. La disponibilità di un modello non prova che l’inferenza sia pronta.")
+            Text("Preferenze per tutti gli operatori dell’home-base. La disponibilità di un modello non prova che l’inferenza sia pronta.")
                 .font(.caption).foregroundStyle(.secondary)
             Text(model.message).font(.callout).accessibilityIdentifier("native-ai-configuration-status")
-            if model.isWorking { ProgressView("Verifica sull’host…") }
+            if model.isWorking { ProgressView("Verifica sull’home-base…") }
             if let snapshot = model.snapshot {
                 ForEach(snapshot.functions) { function in
                     NativeAIFunctionEditor(function: function, snapshot: snapshot, isWorking: model.isWorking || model.preview != nil, prepare: model.prepare)
@@ -125,20 +125,20 @@ struct NativeAIConfigurationView: View {
                 }
             }
             if let preview = model.preview {
-                GroupBox("Conferma configurazione dell’host") {
+                GroupBox("Conferma configurazione dell’home-base") {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(preview.proposed.functions) { function in
                             Text(function.id == "treatment_reasoning" ? "\(function.title): Non disponibile in questa versione" : "\(function.title): \(function.enabled ? "attiva" : "disattivata") · \(function.options.first(where: { $0.id == function.defaultModelOptionId })?.label ?? "modello non disponibile")")
                         }
                         HStack {
-                            Button("Conferma e salva sull’host") { model.confirm() }
+                            Button("Conferma e salva sull’home-base") { model.confirm() }
                                 .accessibilityIdentifier("native-ai-configuration-confirm")
                             Button("Annulla anteprima") { model.cancelPreview() }
                         }.disabled(model.isWorking)
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            Button("Rileggi preferenze dall’host") { model.load() }.disabled(model.isWorking)
+            Button("Rileggi preferenze dall’home-base") { model.load() }.disabled(model.isWorking)
                 .accessibilityIdentifier("native-ai-configuration-reload")
             Divider()
             Text("Lo stato account ChatGPT non è ancora disponibile per questa sessione Mac.")
@@ -171,12 +171,12 @@ private struct NativeAIFunctionEditor: View {
                 if function.id == "treatment_reasoning" {
                     Text(NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.safeReason)
                     Text("Valore salvato: \(function.enabled ? "attiva" : "disattivata")").font(.caption)
-                    Text("Modello salvato: " + (function.options.first { $0.id == function.defaultModelOptionId }?.label ?? function.defaultModelOptionId ?? "Valore host")).font(.caption)
+                    Text("Modello salvato: " + (function.options.first { $0.id == function.defaultModelOptionId }?.label ?? function.defaultModelOptionId ?? "Valore home-base")).font(.caption)
                 } else {
                     Toggle("Funzione attiva", isOn: $enabled)
                         .accessibilityLabel(function.title + ": funzione attiva")
                     Picker("Modello preferito", selection: $option) {
-                        Text("Valore configurato sull’host").tag("")
+                        Text("Valore configurato sull’home-base").tag("")
                         ForEach(function.options) { value in
                             Text("\(value.label)\(value.state == "unavailable" ? " · non disponibile" : "")").tag(value.id)
                         }
@@ -184,7 +184,7 @@ private struct NativeAIFunctionEditor: View {
                     .pickerStyle(.menu)
                     .accessibilityLabel("Modello preferito per " + function.title)
                     if function.bindingState != "current" {
-                        Text("Associazione da verificare sull’host.").font(.caption).foregroundStyle(.secondary)
+                        Text("Associazione da verificare sull’home-base.").font(.caption).foregroundStyle(.secondary)
                     }
                     Button("Prepara modifica") {
                         prepare(NativeAIFunctionCommand(snapshot: snapshot, functionId: function.id, enabled: enabled, defaultModelOptionId: option.isEmpty ? nil : option))

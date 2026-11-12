@@ -42,7 +42,7 @@
         "path": "components/ai-patient-insight.tsx",
         "requestBindingLiteral": "fetch('/api/ai/patient-insight/preview'",
         "requiredLiterals": [
-          "Receipt, provenance e currentness",
+          "Ricevuta, provenienza e validità",
           "preview.receipt",
           "preview.provenance"
         ]

@@ -182,7 +182,7 @@ export default function SettingsAiFunctionsPage() {
                             </span>
                         </div>
                         <div className={styles.fact}>
-                            <span className="block text-xs uppercase tracking-wide" style={{ color: 'var(--lume-ink-muted)' }}>Budget AI</span>
+                            <span className="block text-xs uppercase tracking-wide" style={{ color: 'var(--lume-ink-muted)' }}>Budget IA</span>
                             <span className="font-semibold" style={{ color: 'var(--lume-ink)' }}>{insightRuntimePreview}</span>
                         </div>
                     </div>

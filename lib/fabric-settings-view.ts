@@ -136,7 +136,7 @@ export function describeProviderDisclosure(
 }
 
 export const FABRIC_CAPABILITY_LABELS: Readonly<Record<FabricCapabilityId, string>> = Object.freeze({
-    patient_insight: 'Sintesi del quadro paziente',
+    patient_insight: 'Quadro paziente',
     smart_import: 'Importazione assistita',
     document_synthesis: 'Sintesi dei documenti',
     ocr: 'Lettura di scansioni e immagini',
@@ -501,7 +501,7 @@ export function parseFabricSnapshotPair(
             || !('egress' in profile)
             || profile.egress !== expectedProfile.egress;
     })) {
-        throw new Error('Registro capability Fabric non conforme.');
+        throw new Error('Registro delle funzioni Fabric non conforme.');
     }
     const observedCapabilityIds = status.capabilities.map((capability) => capability.id as string);
     if (
@@ -509,7 +509,7 @@ export function parseFabricSnapshotPair(
         || new Set(observedCapabilityIds).size !== capabilityIds.size
         || observedCapabilityIds.some((id) => !capabilityIds.has(id))
     ) {
-        throw new Error('Registro capability Fabric incompleto o duplicato.');
+        throw new Error('Registro delle funzioni Fabric incompleto o duplicato.');
     }
 
     if (observability.observations.some((observation) => (

@@ -326,7 +326,7 @@ impl ClinicalApp {
             .child(text!("Sintesi salvate in precedenza. Il testo sorgente archiviato può differire dall’originale disponibile oggi. Il modello usato per ciascuna sintesi non è registrato nell’archivio."))
             .child(button("document-curation-read", "Leggi l’archivio delle sintesi", theme, false, can_read)
                 .when(can_read, |el| el.on_click(cx.listener(|this,_,_,cx|this.read_document_archive(cx)))))
-            .when(self.local_host.access().is_none(), |el|el.child(text!("Per leggere e gestire le sintesi apri prima Gestione locale in Impostazioni → Funzioni AI.")));
+            .when(self.local_host.access().is_none(), |el|el.child(text!("Per leggere e gestire le sintesi apri prima Gestione locale in Impostazioni → Funzioni IA.")));
         match &area.archive {
             ReadLoad::Loading { .. } => {
                 view = view.child(text!("Lettura delle sintesi archiviate…"))
