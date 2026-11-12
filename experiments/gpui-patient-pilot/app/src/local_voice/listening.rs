@@ -26,6 +26,10 @@ const MIN_SPEECH_FRAMES: usize = 8;
 const PAD: usize = SAMPLE_RATE / 5;
 /// Durata massima di una frase: oltre si chiude e se ne apre un'altra.
 pub(crate) const MAX_UTTERANCE: usize = 20 * SAMPLE_RATE;
+/// Durata massima di una registrazione, in audio registrato (pause escluse):
+/// a 60 minuti si ferma da sola. Il testo resta limitato quanto l'audio, che
+/// non si conserva oltre la frase aperta.
+pub(crate) const MAX_RECORDING: usize = 60 * 60 * SAMPLE_RATE;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct EngineFailure;
@@ -176,12 +180,17 @@ impl<V: SpeechDetector> Listener<V> {
         result
     }
 
-    /// Audio della frase in corso, se contiene abbastanza voce da decodificare.
     /// Campioni passati dal rilevatore dall'inizio della dettatura.
     pub(crate) fn consumed(&self) -> usize {
         self.consumed
     }
 
+    /// Campioni arrivati e non ancora passati al rilevatore (meno di una finestra).
+    pub(crate) fn pending_samples(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Audio della frase in corso, se contiene abbastanza voce da decodificare.
     pub(crate) fn open_audio(&self) -> Option<&[f32]> {
         self.utterance
             .as_ref()
@@ -285,12 +294,24 @@ impl Agreement {
     }
 }
 
+/// Frase definitiva con la sua posizione nella registrazione, in campioni
+/// di audio registrato (le pause non contano).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Segment {
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+    pub(crate) text: Zeroizing<String>,
+}
+
 /// Dettatura completa: frasi definitive accumulate e testo stabile da mostrare.
 pub(crate) struct Dictation<V, D> {
     listener: Listener<V>,
     decoder: D,
     finals: Zeroizing<String>,
     finals_count: usize,
+    segments: Vec<Segment>,
+    /// Audio registrato oltre il quale la registrazione si ferma.
+    max_recording: usize,
     agreement: Agreement,
     /// Ultimo istante della griglia da 0,5 s in cui si è decodificato un parziale.
     partial_tick: usize,
@@ -306,6 +327,8 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
             decoder,
             finals: Zeroizing::new(String::new()),
             finals_count: 0,
+            segments: Vec::new(),
+            max_recording: MAX_RECORDING,
             agreement: Agreement::default(),
             partial_tick: 0,
             #[cfg(test)]
@@ -321,13 +344,16 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
         #[cfg(test)]
         self.windows
             .push((closed.start, closed.end, text.split_whitespace().count()));
-        #[cfg(not(test))]
-        let _ = (closed.start, closed.end);
         if !text.is_empty() {
             if !self.finals.is_empty() {
                 self.finals.push(' ');
             }
             self.finals.push_str(text);
+            self.segments.push(Segment {
+                start: closed.start,
+                end: closed.end,
+                text: Zeroizing::new(text.to_owned()),
+            });
         }
         Ok(())
     }
@@ -390,10 +416,36 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
         &self.finals
     }
 
+    /// Frasi definitive con i loro tempi, nell'ordine in cui sono state dette.
+    pub(crate) fn segments(&self) -> &[Segment] {
+        &self.segments
+    }
+
+    /// Per le prove: una durata massima più corta.
+    #[cfg(test)]
+    pub(crate) fn with_max_recording(mut self, samples: usize) -> Self {
+        self.max_recording = samples;
+        self
+    }
+
+    /// Campioni che si possono ancora registrare prima della durata massima.
+    pub(crate) fn room(&self) -> usize {
+        self.max_recording.saturating_sub(self.recorded_samples())
+    }
+
+    /// Audio registrato finora, in campioni.
+    pub(crate) fn recorded_samples(&self) -> usize {
+        self.listener.consumed() + self.listener.pending_samples()
+    }
+
     pub(crate) fn wipe(&mut self) {
         self.listener.wipe();
         self.agreement.reset();
         self.finals.zeroize();
+        for segment in &mut self.segments {
+            segment.text.zeroize();
+        }
+        self.segments.clear();
     }
 
     #[cfg(test)]

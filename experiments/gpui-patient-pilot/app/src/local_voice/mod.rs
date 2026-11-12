@@ -44,6 +44,10 @@ impl State {
     }
 }
 
+/// Avviso quando la registrazione si è fermata da sola.
+pub(crate) const LIMIT_REACHED: &str =
+    "La registrazione si è fermata da sola a 60 minuti, la durata massima.";
+
 impl Fault {
     pub(crate) fn message(self) -> &'static str {
         match self {
@@ -255,6 +259,14 @@ impl Session {
     }
     pub(crate) fn state(&self) -> State {
         self.machine().state()
+    }
+    /// La registrazione si è fermata da sola alla durata massima.
+    pub(crate) fn limit_reached(&self) -> bool {
+        #[cfg(target_os = "macos")]
+        if let Backend::Whisper(whisper) = &self.backend {
+            return whisper.limit_reached();
+        }
+        false
     }
     pub(crate) fn transcript(&self) -> Option<Zeroizing<String>> {
         #[cfg(test)]
