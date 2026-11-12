@@ -214,6 +214,15 @@ impl ClinicalApp {
                 Some(self.open_loops_view(cx))
             }
             Function::OpenLoops => None,
+            Function::EvidenceQueue
+                if self
+                    .selected_id
+                    .as_deref()
+                    .is_some_and(|id| self.evidence_queue.patient_is(id)) =>
+            {
+                Some(self.evidence_queue_view(cx))
+            }
+            Function::EvidenceQueue => None,
             Function::Icd
                 if self
                     .selected_id
@@ -237,7 +246,9 @@ impl ClinicalApp {
         self.show_other = false;
         self.focus_after_render = true;
         let section = match function {
-            Function::Insight | Function::Icd | Function::OpenLoops => PatientSection::Overview,
+            Function::Insight | Function::Icd | Function::OpenLoops | Function::EvidenceQueue => {
+                PatientSection::Overview
+            }
             Function::Synthesis | Function::Import => PatientSection::Documents,
         };
         if self.patient_section != section {
@@ -257,6 +268,7 @@ impl ClinicalApp {
             Function::Import => &mut self.patient.smart_import,
             Function::Icd => &mut self.who,
             Function::OpenLoops => &mut self.open_loops,
+            Function::EvidenceQueue => &mut self.evidence_queue,
         }
     }
 
@@ -310,7 +322,12 @@ impl ClinicalApp {
         let access = self.local_host.access();
         let early = if occupied {
             Some(Stage::Busy)
-        } else if access.is_none() && !matches!(function, Function::Icd | Function::OpenLoops) {
+        } else if access.is_none()
+            && !matches!(
+                function,
+                Function::Icd | Function::OpenLoops | Function::EvidenceQueue
+            )
+        {
             Some(Stage::Unavailable)
         } else {
             None
@@ -334,7 +351,10 @@ impl ClinicalApp {
                     return Ok(None);
                 }
                 let enabled = match function {
-                    Function::Insight | Function::Icd | Function::OpenLoops => true,
+                    Function::Insight
+                    | Function::Icd
+                    | Function::OpenLoops
+                    | Function::EvidenceQueue => true,
                     Function::Synthesis => access
                         .unwrap()
                         .document_synthesis_enabled()
@@ -375,6 +395,12 @@ impl ClinicalApp {
                 }
                 this.show_chat_function(function, cx);
                 match function {
+                    Function::EvidenceQueue => {
+                        if let Ok(mut pending) = target.lock() {
+                            pending.finish_function_open(Stage::Opened);
+                        }
+                        this.open_patient_evidence_queue(cx);
+                    }
                     Function::OpenLoops => {
                         if let Ok(mut pending) = target.lock() {
                             pending.finish_function_open(Stage::Opened);

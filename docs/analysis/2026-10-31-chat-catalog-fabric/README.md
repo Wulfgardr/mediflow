@@ -92,7 +92,7 @@ raccordo nei due host.
 | `icd_lookup` | `RuntimeSession.search_who`, vista `who_lookup`; Web ordinario `lib/icd-service.ts` | `icd-lookup`: ricerca nella scheda selezionata, soli stati alla chat | Prove di componente e frame; due host reali da qualificare |
 | `aifa_drug_search` | `RuntimeSession.chat_drug_search`, servizio AIFA comune | Ricerca locale in sola lettura, conferma nativa, risultato app-only | Qualifica nei due host; aggiornamento del catalogo non verificato |
 | `service_prescription_matching` | `lib/service-prescription-write.ts` | Non collegata | Residuo WUL-829: il writer conserva `matchStatus`; manca una vista GPUI di abbinamento, distinta dal repertorio e dalle prescrizioni |
-| `evidence_absorption` | `lib/domain/documents/evidence-queue-contract.ts` | Non collegata | Residuo WUL-829: la coda alimenta `lib/ai-context.ts`; manca un lettore con vista GPUI della coda, distinta da Documenti e import dossier |
+| `evidence_absorption` | `lib/domain/documents/evidence-queue-contract.ts` | Comando `evidence-queue`, in sola lettura: apre le evidenze dai documenti nella scheda corrente | Worker locale con lo stesso contratto Web, dati decifrati paired, ricevuta e negativi sintetici. Due host reali da qualificare |
 | `patient_open_loops` | `deriveOpenLoopProjection`, lettore paired `RuntimeSession.read_open_loops` | `open-loops`: consulta referti attesi e serie interrotte nella scheda corrente; alla chat solo stati | Test Web della carta, host HTTP sintetico GPUI, ricevuta, cambio paziente e revoca; due host reali da qualificare |
 | `fhir_export` | `lib/fhir/bundle-generator.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
 | `document_classification` | `lib/domain/documents/document-class-router.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
@@ -406,7 +406,7 @@ riuscita il legame termina e i risultati restano consultabili in MediFlow;
 chiudere la ricerca o cambiare contesto li cancella. Non è aggiunto un comando
 di applicazione del codice alla scheda.
 
-Coda delle evidenze ed abbinamento delle prestazioni restano residui espliciti nella matrice:
+La coda delle evidenze è collegata dal raccordo successivo. L’abbinamento delle prestazioni resta residuo esplicito nella matrice:
 non si presenta l’agenda come follow-up aperti, la lista dei documenti come
 coda delle evidenze o il repertorio prestazioni come abbinamento. Per ciascuna
 manca una verticale GPUI riutilizzabile: servono un lettore nominato e una vista
@@ -442,6 +442,24 @@ Le prove di componente sono in `lib/chat-card/icd-lookup.test.ts`,
 `lib/patient-open-loops.test.ts`, `lib/network-cross-patient-read.test.ts`
 e nei test GPUI `chat_followups_*`. Il banco usa il trasporto HTTP paired
 contro un host sintetico. Non qualifica i desktop autenticati o l’uso clinico.
+
+
+## Raccordo del 12 novembre 2026: evidenze dai documenti
+
+Il comando `evidence-queue`, senza argomenti, apre una vista di sola lettura sul
+paziente selezionato. Il lettore paired decifra gli allegati. Un worker locale
+separato chiama `buildEvidenceQueue`, come il Web, con `summarySnapshot` e
+`parseEvidenceArtifactSnapshot`. Non espone porte dossier né scritture.
+La seconda lettura scarta fonti cambiate durante il calcolo. Selezione, sessione,
+epoca di lettura ed archivio sono ricontrollati fino al rendering.
+
+La ricevuta locale contiene operazione, esito `read`, data, numero delle fonti
+ed impronta della coda. Resta nella finestra insieme alle citazioni. Alla chat
+tornano solo `evidence-opened`, `evidence-busy`, `evidence-unavailable`,
+`evidence-closed` e gli stati comuni di attesa o ritiro. La lettura non promuove
+fatti nella cartella clinica. Le prove sintetiche coprono il frame Web ed il
+client GPUI, compresa l’apertura dopo un’altra funzione. Desktop autenticati,
+applicazione installata ed uso clinico restano da qualificare.
 
 Le cinque aperture alla finestra (Quadro, sintesi, import, ICD e follow-up) selezionano
 una sola funzione visibile. Una nuova apertura ammessa sostituisce il pannello

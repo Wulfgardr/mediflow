@@ -16,6 +16,8 @@ mod document_details;
 mod document_library;
 mod document_synthesis;
 mod dossier_import;
+#[cfg(unix)]
+mod evidence_queue;
 mod generation;
 mod local_host;
 pub(crate) mod local_preferences;
@@ -477,6 +479,8 @@ pub struct ClinicalApp {
     account_profile: AccountProfile,
     who: WhoLookup,
     open_loops: open_loops::OpenLoops,
+    #[cfg(unix)]
+    evidence_queue: evidence_queue::EvidenceQueue,
     scales: ScaleArea,
     analytics: AnalyticsArea,
     selected_id: Option<String>,
@@ -752,6 +756,8 @@ impl ClinicalApp {
             account_profile: AccountProfile::new(Theme::for_dark(false), cx),
             who: WhoLookup::new(&area_scroll, cx),
             open_loops: open_loops::OpenLoops::default(),
+            #[cfg(unix)]
+            evidence_queue: evidence_queue::EvidenceQueue::default(),
             scales: ScaleArea::new(&area_scroll, theme, cx),
             analytics: AnalyticsArea::new(theme, cx),
             area_scroll,
@@ -959,6 +965,8 @@ impl ClinicalApp {
         }
         self.who.reset();
         self.open_loops.reset();
+        #[cfg(unix)]
+        self.evidence_queue.reset();
         self.patient.document_curation = document_curation::DocumentCuration::default();
         self.patient.document_details_id = None;
         self.patient.document_original = None;
@@ -2709,6 +2717,8 @@ impl ClinicalApp {
             self.patient_section = section;
             if section != PatientSection::Overview {
                 self.open_loops.reset();
+                #[cfg(unix)]
+                self.evidence_queue.reset();
             }
             #[cfg(unix)]
             {
