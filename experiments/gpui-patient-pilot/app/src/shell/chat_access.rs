@@ -205,6 +205,15 @@ impl ClinicalApp {
             Function::Insight => Some(self.patient_insight_view(cx)),
             Function::Synthesis => Some(self.documents_view(cx)),
             Function::Import => Some(self.smart_import_view(cx)),
+            Function::OpenLoops
+                if self
+                    .selected_id
+                    .as_deref()
+                    .is_some_and(|id| self.open_loops.patient_is(id)) =>
+            {
+                Some(self.open_loops_view(cx))
+            }
+            Function::OpenLoops => None,
             Function::Icd
                 if self
                     .selected_id
@@ -228,7 +237,7 @@ impl ClinicalApp {
         self.show_other = false;
         self.focus_after_render = true;
         let section = match function {
-            Function::Insight | Function::Icd => PatientSection::Overview,
+            Function::Insight | Function::Icd | Function::OpenLoops => PatientSection::Overview,
             Function::Synthesis | Function::Import => PatientSection::Documents,
         };
         if self.patient_section != section {
@@ -247,6 +256,7 @@ impl ClinicalApp {
             Function::Synthesis => &mut self.patient.synthesis.area,
             Function::Import => &mut self.patient.smart_import,
             Function::Icd => &mut self.who,
+            Function::OpenLoops => &mut self.open_loops,
         }
     }
 
@@ -300,7 +310,7 @@ impl ClinicalApp {
         let access = self.local_host.access();
         let early = if occupied {
             Some(Stage::Busy)
-        } else if access.is_none() && function != Function::Icd {
+        } else if access.is_none() && !matches!(function, Function::Icd | Function::OpenLoops) {
             Some(Stage::Unavailable)
         } else {
             None
@@ -324,7 +334,7 @@ impl ClinicalApp {
                     return Ok(None);
                 }
                 let enabled = match function {
-                    Function::Insight | Function::Icd => true,
+                    Function::Insight | Function::Icd | Function::OpenLoops => true,
                     Function::Synthesis => access
                         .unwrap()
                         .document_synthesis_enabled()
@@ -365,6 +375,12 @@ impl ClinicalApp {
                 }
                 this.show_chat_function(function, cx);
                 match function {
+                    Function::OpenLoops => {
+                        if let Ok(mut pending) = target.lock() {
+                            pending.finish_function_open(Stage::Opened);
+                        }
+                        this.open_patient_loops(cx);
+                    }
                     Function::Icd => {
                         this.who
                             .open_for_patient(patient_id.clone(), &this.profile_scroll, cx);

@@ -24,6 +24,7 @@ mod local_settings;
 mod local_voice;
 #[cfg(test)]
 mod notes_recovery_tests;
+mod open_loops;
 #[cfg(unix)]
 mod patient_document;
 mod patient_insight;
@@ -475,6 +476,7 @@ pub struct ClinicalApp {
     local_host: local_host::LocalAdministration,
     account_profile: AccountProfile,
     who: WhoLookup,
+    open_loops: open_loops::OpenLoops,
     scales: ScaleArea,
     analytics: AnalyticsArea,
     selected_id: Option<String>,
@@ -749,6 +751,7 @@ impl ClinicalApp {
             ),
             account_profile: AccountProfile::new(Theme::for_dark(false), cx),
             who: WhoLookup::new(&area_scroll, cx),
+            open_loops: open_loops::OpenLoops::default(),
             scales: ScaleArea::new(&area_scroll, theme, cx),
             analytics: AnalyticsArea::new(theme, cx),
             area_scroll,
@@ -955,6 +958,7 @@ impl ClinicalApp {
             self.settings_page = SettingsPage::Overview;
         }
         self.who.reset();
+        self.open_loops.reset();
         self.patient.document_curation = document_curation::DocumentCuration::default();
         self.patient.document_details_id = None;
         self.patient.document_original = None;
@@ -2703,6 +2707,9 @@ impl ClinicalApp {
             self.message = None;
             self.verified = None;
             self.patient_section = section;
+            if section != PatientSection::Overview {
+                self.open_loops.reset();
+            }
             #[cfg(unix)]
             {
                 self.patient.chat_function = None;
@@ -4038,6 +4045,9 @@ impl ClinicalApp {
                 content.child(view)
             } else {
                 match self.patient_section {
+                    PatientSection::Overview if self.open_loops.patient_is(&patient.id) => {
+                        content.child(self.open_loops_view(cx))
+                    }
                     PatientSection::Overview => content.child(
                         div()
                             .flex()
@@ -4070,6 +4080,16 @@ impl ClinicalApp {
             diagnosis_labels(patient.diagnoses.as_deref())
         };
         let mut overview = div()
+            .child(
+                button(
+                    "clinical-overview-open-loops",
+                    "Follow-up aperti",
+                    theme,
+                    false,
+                    true,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.open_patient_loops(cx))),
+            )
             .flex()
             .flex_col()
             .gap(px(28.))
