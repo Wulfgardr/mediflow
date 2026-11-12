@@ -7,7 +7,7 @@ const html = readFileSync(new URL('./native-access.html', import.meta.url), 'utf
 const script = html.match(/<script>([\s\S]*?)<\/script>/u)![1];
 const adapter = readFileSync(new URL('../../experiments/gpui-patient-pilot/app/src/chat_access/adapter.rs', import.meta.url), 'utf8');
 
-async function frame(host: { meta: unknown }) {
+async function frame(host: { meta: unknown }, command = 'icd-lookup') {
     const elements = new Map<string, any>();
     for (const id of html.matchAll(/id="([^"]+)"/gu)) {
         elements.set(id[1], { disabled: true, hidden: true, value: '', textContent: '', replaceChildren() {} });
@@ -34,8 +34,8 @@ async function frame(host: { meta: unknown }) {
     });
     const settle = () => new Promise(resolve => setImmediate(resolve));
     await settle();
-    const button = elements.get('icd-lookup');
-    assert.ok(button, 'la carta offre la ricerca ICD');
+    const button = elements.get(command);
+    assert.ok(button, `la carta offre ${command}`);
     assert.equal(button.disabled, false);
     button.onclick();
     await settle();
@@ -125,6 +125,45 @@ test('icd-closed ends chat ownership and stops status refreshes', async () => {
     assert.match(view.elements.get('status').textContent, /conclusa nella finestra MediFlow/u);
     assert.equal(view.elements.get('revoke').disabled, true);
     assert.equal(view.elements.get('icd-lookup').disabled, true);
+    assert.equal(view.polling(), false);
+    assert.equal(view.elements.get('card').hidden, true);
+});
+
+test('follow-ups open from the Web chat using only the current native patient and return a status receipt', async () => {
+    for (const [status, terminal] of [['requested', false], ['preparing', false], ['loops-opened', false],
+        ['loops-closed', true], ['loops-unavailable', true], ['loops-busy', true]] as const) {
+        const view = await frame({ meta: { status } }, 'open-loops');
+        assert.deepEqual(view.commands(), [{ command: 'attach' }, { command: 'open-loops' }]);
+        assert.equal(view.elements.get('card').hidden, true);
+        assert.equal(view.elements.get('consume').disabled, true);
+        assert.equal(view.polling(), !terminal);
+        assert.ok(adapter.includes(`"${status}"`), status);
+        if (status === 'loops-closed') assert.match(view.elements.get('status').textContent, /Follow-up consultati/u);
+    }
+});
+
+test('Web follow-ups reject foreign patient, denied permission and clinical or receipt payloads', async () => {
+    for (const meta of [{ status: 'withdrawn' }, { status: 'icd-closed' },
+        { status: 'loops-opened', patientId: 'patient-b' },
+        { status: 'loops-closed', receipt: { outcome: 'read' } },
+        { status: 'loops-opened', payload: 'Referto sintetico' },
+        { status: 'loops-opened', groups: [] }]) {
+        const view = await frame({ meta }, 'open-loops');
+        assert.equal(view.polling(), false);
+        assert.equal(view.elements.get('card').hidden, true);
+        assert.match(view.elements.get('status').textContent, /Apertura non confermata/u);
+    }
+});
+
+test('Web follow-ups discard a late successful status after revocation', async () => {
+    const host = { meta: { status: 'loops-opened' } };
+    const view = await frame(host, 'open-loops');
+    assert.equal(view.elements.get('revoke').disabled, false);
+    view.elements.get('revoke').onclick();
+    await view.settle();
+    host.meta = { status: 'loops-closed' };
+    await view.tick();
+    assert.match(view.elements.get('status').textContent, /Richiesta ritirata/u);
     assert.equal(view.polling(), false);
     assert.equal(view.elements.get('card').hidden, true);
 });
