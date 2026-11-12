@@ -172,8 +172,8 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await expect(proposal).toContainText('Applicazione non consentita');
   await expect(proposal).toContainText('Sintesi Patient Insight sintetica da revisionare. [S1]');
   await expect(proposal).toContainText('Ricevuta, provenienza e validità');
-  await expect(proposal).toContainText(`ollama · ${MODEL} · processo locale · nessuna uscita dati`);
-  await expect(proposal).toContainText('Riduzione del contesto → verifica del formato');
+  await expect(proposal).toContainText(`ollama · ${MODEL} · Processo locale · Nessuna uscita dati`);
+  await expect(proposal).toContainText('Riduzione del contesto → Verifica del formato');
   await expect(proposal).toContainText('Selezione 7 · revisione 1');
   // WUL-826: one line above the sentences asks to check each of them against its source.
   await expect(proposal.getByTestId('patient-insight-review-notice')).toHaveText(REVIEW_NOTICE);
