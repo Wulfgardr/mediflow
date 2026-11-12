@@ -7,13 +7,9 @@ test('Terapie conserva registro e gerarchia con Treatment Reasoning indisponibil
   const run = await openTreatmentReasoningDenial(page);
   try {
     const therapies = page.locator('#terapie');
-    await expect(therapies.getByRole('heading', { level: 3 })).toHaveText([/^Terapie farmacologiche\s*1 attiva$/, 'Guida alla prescrizione', 'Attive', 'Proposte']);
-    await expect(therapies.getByRole('heading')).toHaveCount(4);
+    await expect(therapies.getByRole('heading', { level: 3 })).toHaveText([/^Terapie farmacologiche\s*1 attiva$/, 'Guida alla prescrizione', 'Attive']);
+    await expect(therapies.getByRole('heading')).toHaveCount(3);
     await expect(therapies.locator('[data-clinical-register="therapies"]')).toContainText('Farmaco sintetico locale');
-    await run.proposals.click();
-    await expect(run.proposals).toHaveAttribute('aria-expanded', 'false');
-    await expect(run.panel).toBeHidden();
-    await run.proposals.click();
     await run.assertDenied();
   } finally { run.restore(); }
 });
@@ -31,22 +27,21 @@ for (const theme of ['light', 'dark']) for (const size of ['1440', '768', '390',
         document.documentElement.classList.toggle('light', theme === 'light');
       }, theme);
       if (zoom) await zoom.setZoom(size === 'zoom-200' ? 2 : 4);
-      const notice = run.panel.getByText('Non disponibile in questa versione', { exact: true });
-      await notice.scrollIntoViewIfNeeded();
-      await assertNotClippedInViewport(notice, 'Diniego Treatment Reasoning');
-      await assertNoHorizontalOverflow(page, [{ label: 'documento', selector: 'document' }, { label: 'proposte', selector: '[data-testid="treatment-reasoning-panel"]' }]);
+      const heading = page.locator('#terapie').getByRole('heading', { name: /^Terapie farmacologiche/ });
+      await heading.scrollIntoViewIfNeeded();
+      await assertNotClippedInViewport(heading, 'Terapie');
+      await assertNoHorizontalOverflow(page, [{ label: 'documento', selector: 'document' }, { label: 'terapie', selector: '#terapie' }]);
       await run.assertDenied();
     } finally { run?.restore(); await zoom?.close(); }
   });
 }
 
-test.describe('Proposte al tocco', () => {
+test.describe('Terapie al tocco', () => {
   test.use({ hasTouch: true });
-  test('disclosure raggiungibile e diniego senza generazione', async ({ page }) => {
+  test('registro raggiungibile e nessun pannello vuoto', async ({ page }) => {
     const run = await openTreatmentReasoningDenial(page);
     try {
-      expect(await run.proposals.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
-      await run.proposals.tap(); await run.proposals.tap();
+      await expect(page.locator('#terapie').getByRole('heading', { name: /^Terapie farmacologiche/ })).toBeVisible();
       await run.assertDenied();
     } finally { run.restore(); }
   });

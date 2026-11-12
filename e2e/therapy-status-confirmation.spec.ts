@@ -210,6 +210,9 @@ for (const applied of [true, false]) {
         await expect(confirm(page)).toHaveCount(0);
         await expect((await action(page, 'Sospendi'))).toBeDisabled();
         await expect((await action(page, 'Concludi', true))).toBeDisabled();
+        // Il menu delle azioni aperto per il controllo sopra copre la soglia: lo chiude come farebbe il medico.
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('menu')).toHaveCount(0);
         await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
         if (applied) await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
         else {

@@ -100,15 +100,17 @@ function OrdinaryFunctionControls({ client, view, needsReprepare = false, canRep
         {view.state?.quota && <p role="status">{view.state.quota.includedUsage === 'exhausted'
             ? 'Quota inclusa esaurita; crediti potenzialmente disponibili.' : 'Quota inclusa osservata disponibile.'} Il singolo tentativo richiede il tuo gesto e resta soggetto alla verifica di OpenAI; non garantisce accesso o disponibilità.</p>}
         {!view.state && !view.completed && !needsReprepare && <>
-            <p>Il contesto scelto viene minimizzato e redatto sul computer host. OpenAI riceve il testo redatto solo dopo il consenso. Restano applicabili le condizioni e la conservazione del servizio ChatGPT; non è garantita conservazione zero.</p>
-            {view.settings && <label><input type="checkbox" disabled={view.loading} checked={view.settings.enabled} onChange={e => void client.remote.policy(e.target.checked)} /> Consenti OpenAI su questo host (disattivato per default)</label>}
+            <p>Il contesto scelto viene minimizzato ed oscurato sull’home-base. OpenAI riceve il testo redatto solo dopo il consenso. Restano applicabili le condizioni e la conservazione del servizio ChatGPT; non è garantita conservazione zero.</p>
+            {view.settings && <label><input type="checkbox" disabled={view.loading} checked={view.settings.enabled} onChange={e => void client.remote.policy(e.target.checked)} /> Abilita OpenAI su questo home-base (disattivato per default)</label>}
             <button type="button" disabled={view.loading} onClick={() => void client.remote.read()}>Rileggi configurazione OpenAI</button>
             {view.settings?.enabled && <p>Usa l’azione di proposta della funzione per preparare questo contesto. Nessun accesso o invio automatico.</p>}
         </>}
         {phase === 'needs_consent' && view.disclosure && <>
-            <p>Contesto preparato e redatto: {view.disclosure.payloadBytes} byte. Questa proposta non modifica la cartella.</p>
-            <Disclosure title="Identità del contesto preparato"><code style={{ overflowWrap: 'anywhere' }}>{view.disclosure.payloadSha256}</code></Disclosure>
-            <button type="button" disabled={view.loading} onClick={() => void client.remote.action('consent')}>Consenti per questo contesto</button>
+            <Disclosure title="Dettagli">
+                <p>Contesto preparato ed oscurato: {view.disclosure.payloadBytes} byte.</p>
+                <p>Impronta del contesto</p><code style={{ overflowWrap: 'anywhere' }}>{view.disclosure.payloadSha256}</code>
+            </Disclosure>
+            <button type="button" disabled={view.loading} onClick={() => void client.remote.action('consent')}>Consenti invio a OpenAI per questo contesto</button>
         </>}
         {phase === 'consented' && <button type="button" disabled={view.loading} onClick={() => void client.remote.action('login/start')}>Avvia accesso dedicato ChatGPT</button>}
         {phase === 'awaiting_login' && view.challenge && <>
@@ -122,7 +124,7 @@ function OrdinaryFunctionControls({ client, view, needsReprepare = false, canRep
                 <option value="">Scegli modello e ragionamento</option>
                 {view.catalog.choices.map(choice => <option key={choice.optionId} value={choice.optionId}>{choice.model} · {choice.effort}</option>)}
             </ChoiceField>
-            <button type="button" disabled={view.loading || !view.choice} onClick={() => void client.remote.action('generate')}>Genera questa proposta</button>
+            <button type="button" disabled={view.loading || !view.choice} onClick={() => void client.remote.action('generate')}>Genera proposta</button>
             <button type="button" disabled={view.loading || !view.choice} onClick={() => void client.remote.action('preference')}>Salva modello e ragionamento preferiti</button>
             <p>La preferenza non conserva accesso, consenso o disponibilità del modello.</p>
         </>}

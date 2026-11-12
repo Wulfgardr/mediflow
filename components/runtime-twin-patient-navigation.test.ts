@@ -87,13 +87,13 @@ test('patient section menu closes when navigation selects a primary or secondary
             const f = await fixture(width);
             try {
                 const primary = f.navigation.locator(':scope > a');
-                await expect(primary).toHaveText(['Riepilogo', 'Terapie', 'Misure', 'Documenti']);
+                await expect(primary).toHaveText(['Riepilogo', 'Terapie', 'Parametri', 'Documenti']);
                 await f.summary.click();
                 await expect(f.menu).toBeVisible();
                 const current = f.menu.getByRole('menuitem').nth(3);
                 await current.focus();
                 await f.page.evaluate(() => window.dispatchEvent(new Event('synthetic-counts')));
-                await expect(primary).toHaveText(['Riepilogo', 'Terapie12', 'Misure', 'Documenti']);
+                await expect(primary).toHaveText(['Riepilogo', 'Terapie12', 'Parametri', 'Documenti']);
                 await expect(f.menu).toBeVisible();
                 await expect(current).toBeFocused();
                 await f.navigation.locator(':scope > a[href="#terapie"]').click();

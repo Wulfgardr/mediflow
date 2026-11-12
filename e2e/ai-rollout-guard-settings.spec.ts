@@ -75,7 +75,7 @@ test('settings warns when selected AI model is still on hold in rollout readines
 
   const guardNotice = page.getByTestId('ai-rollout-guard-notice');
   await expect(guardNotice).toBeVisible();
-  await expect(guardNotice).toContainText('Patient Insight');
+  await expect(guardNotice).toContainText('Quadro paziente');
   // A disabled local control stays explicit even if a model has readiness evidence.
   await expect(guardNotice).toContainText('Spenta nelle impostazioni');
 
@@ -93,7 +93,7 @@ test('settings warns when selected AI model is still on hold in rollout readines
   await expect(guardNotice).toContainText('In attesa di verifica');
   await expect(guardNotice).toContainText('Generative Challenger');
   await expect(guardNotice).toContainText('therapyStateRecall 0.7 < 0.95');
-  await expect(guardNotice).toContainText('Patient Insight');
+  await expect(guardNotice).toContainText('Quadro paziente');
   await expect(guardNotice).toContainText('Spenta nelle impostazioni');
   await expect(page.getByTestId('ai-rollout-local-guard-patient_insight')).toBeVisible();
 });
@@ -140,7 +140,7 @@ for (const route of ['modelli', 'funzioni'] as const) {
         await input.fill('gemma4:e4b');
         await expect(input).toHaveValue('gemma4:e4b');
         await save.click();
-        await expect(page.getByText('Configurazione AI salvata', { exact: true })).toBeVisible();
+        await expect(page.getByText('Configurazione IA salvata', { exact: true })).toBeVisible();
         await expect(input).toHaveValue('gemma4:e4b');
         const storedModel = await page.evaluate(async () => {
           const response = await fetch('/api/settings/aiModel_clinical');
