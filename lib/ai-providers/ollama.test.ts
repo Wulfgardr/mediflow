@@ -3,6 +3,7 @@ import test from 'node:test';
 import { DOCUMENT_SYNTHESIS_V2_JSON_SCHEMA } from './document-synthesis-json-schema.ts';
 import { normalizeOllamaBaseUrl, resolveOllamaBaseUrl } from './base-url.ts';
 import { buildOllamaChatPayload, OllamaProviderAdapter, toOllamaMessages } from './ollama.ts';
+import { SMART_IMPORT_JSON_SCHEMA } from './extraction-json-schemas.ts';
 
 test('normalizza URL Ollama e applica l euristica anti-8080', () => {
     assert.equal(normalizeOllamaBaseUrl('http://127.0.0.1:11434/v1/'), 'http://127.0.0.1:11434');
@@ -151,4 +152,20 @@ test('only the internal DS name selects a static schema independent of message c
     const invalid = buildOllamaChatPayload('qwen', [], 1400, { responseFormat: arbitrary as unknown as 'json' });
     assert.equal('format' in invalid, false);
     assert.equal(buildOllamaChatPayload('qwen', [], 1400, { responseFormat: 'json' }).format, 'json');
+});
+
+test('source ids only narrow the smart import schema to an enum of those ids', () => {
+    const ids = ['source.local.1', 'source.local.2'];
+    const narrowed = buildOllamaChatPayload('qwen', [], 2048, { responseFormat: 'smart_import', sourceIds: ids }).format as typeof SMART_IMPORT_JSON_SCHEMA;
+    const diagnosis = (narrowed.properties.data as typeof SMART_IMPORT_JSON_SCHEMA).properties.diagnoses as { items: { properties: Record<string, unknown> } };
+    assert.deepEqual(diagnosis.items.properties.sourceId, { type: 'string', enum: ids });
+    // La forma resta quella statica: cambia solo il vincolo su sourceId.
+    assert.equal(JSON.stringify(narrowed).replaceAll(JSON.stringify({ type: 'string', enum: ids }), JSON.stringify({ type: 'string', minLength: 1, maxLength: 80 })), JSON.stringify(SMART_IMPORT_JSON_SCHEMA));
+    // Senza id validi, o per un altro formato, nulla cambia.
+    for (const sourceIds of [[], ['x'.repeat(81)], Array.from({ length: 33 }, (_, index) => `s${index}`)]) {
+        assert.strictEqual(buildOllamaChatPayload('qwen', [], 2048, { responseFormat: 'smart_import', sourceIds }).format, SMART_IMPORT_JSON_SCHEMA);
+    }
+    assert.strictEqual(buildOllamaChatPayload('qwen', [], 2048, { responseFormat: 'smart_import' }).format, SMART_IMPORT_JSON_SCHEMA);
+    assert.strictEqual(buildOllamaChatPayload('qwen', [], 1400, { responseFormat: 'document_synthesis_v2', sourceIds: ids }).format, DOCUMENT_SYNTHESIS_V2_JSON_SCHEMA);
+    assert.equal(buildOllamaChatPayload('qwen', [], 1400, { responseFormat: 'json', sourceIds: ids }).format, 'json');
 });

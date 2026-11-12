@@ -189,3 +189,20 @@ test('patient diagnoses are opt-in ciphertext and do not change the default summ
     assert.equal(includedResult[0]?.diagnoses?.startsWith('ENC:'), true);
     assert.equal(includedResult.some((item) => item.id === 'patient-out'), false);
 });
+
+test('native open loops require patient membership even for empty projections and retain a read receipt', async () => {
+    resetDatabase();
+    seedScopedRows();
+    const { readNetworkPatientOpenLoops } = await import('./service-prescription-write');
+    assert.equal(readNetworkPatientOpenLoops('patient-out', IN_SCOPE_AMBULATORY), null);
+    assert.equal(readNetworkPatientOpenLoops('patient-in-1', OTHER_AMBULATORY), null);
+    assert.equal(readNetworkPatientOpenLoops('unknown', IN_SCOPE_AMBULATORY), null);
+    const result = readNetworkPatientOpenLoops('patient-in-1', IN_SCOPE_AMBULATORY)!;
+    assert.equal(result.patientId, 'patient-in-1');
+    assert.equal(result.ambulatoryId, IN_SCOPE_AMBULATORY);
+    assert.equal(result.receipt.operation, 'patient-open-loops.read.v1');
+    assert.equal(result.receipt.outcome, 'read');
+    assert.equal(result.receipt.itemCount, 0);
+    assert.deepEqual(result.groups, []);
+    assert.deepEqual(result.standaloneLoops, []);
+});

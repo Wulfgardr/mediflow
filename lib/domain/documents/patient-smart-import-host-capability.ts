@@ -171,8 +171,10 @@ export function createPatientSmartImportHostCapability(dependencies: Dependencie
                 attempt: async () => {
                     let response: string;
                     try {
+                        // sourceId nello schema e' un enum delle fonti di questo prompt (ADR 0012); il controllo resta sotto.
                         const providerResult = await routedBinding.adapter.chat(
-                            [{ role: 'user', content: prompt }], undefined, smartImportResponseTokenLimit(prompt), { responseFormat: 'smart_import' },
+                            [{ role: 'user', content: prompt }], undefined, smartImportResponseTokenLimit(prompt),
+                            { responseFormat: 'smart_import', sourceIds: projection.sources.map(({ id }) => id) },
                         );
                         if (typeof providerResult.content !== 'string') throw new Error('invalid');
                         // Una risposta tagliata dal tetto di token non si pubblica, anche se per caso fosse leggibile.

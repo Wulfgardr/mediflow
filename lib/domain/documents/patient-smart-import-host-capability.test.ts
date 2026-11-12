@@ -13,6 +13,9 @@ import {
     smartImportResponseTokenLimit,
 } from './patient-smart-import-capability-contract';
 import { validateGenerativeJson } from '../../ai-providers/generative-json-validation';
+import { buildOllamaChatPayload } from '../../ai-providers/ollama';
+import type { AIChatOptions } from '../../ai-providers/provider';
+import { fromJSONSchema } from 'zod';
 import MEASURED from './fixtures/smart-import-measured-persona000002.json' with { type: 'json' };
 const HANDLE = `prj_${'1'.repeat(32)}`;
 const REQUEST_ID = 'request.synthetic.0001';
@@ -81,7 +84,7 @@ test('returns one frozen review-only proposal after the fixed host pipeline', as
         calls.chat += 1;
         // Prompt corto: vale il minimo (ADR 0012).
         assert.equal(maxTokens, SMART_IMPORT_RESPONSE_TOKENS_FLOOR);
-        assert.deepEqual(options, { responseFormat: 'smart_import' });
+        assert.deepEqual(options, { responseFormat: 'smart_import', sourceIds: ['source.synthetic.0001'] });
         return { content: RESPONSE, stats: { latency: 1, tokensIn: 2, tokensOut: 3 } };
     });
     const capability = createPatientSmartImportHostCapability({
@@ -266,6 +269,66 @@ test('a real answer whose items carry no sourceId is still refused by the host c
     rejectsSource(answer);
     // Lo schema trasmesso al modello ora la pretende anche lui.
     assert.throws(() => validateGenerativeJson('smart_import', answer));
+});
+
+/*
+ * P1 (ADR 0012, «Fonti reali nello schema»): risposta reale scartata nella misura dopo #936. Le due
+ * diagnosi gia' in scheda (E11.9, I10) citano come fonte la sezione del contesto, che non e' una fonte.
+ */
+test('a real answer citing the record section as source for a coded diagnosis is still refused by the host check', () => {
+    const answer = MEASURED.inventedSource.content;
+    const ids = new Set(measuredProjection.sources.map(({ id }) => id));
+    const diagnoses: Array<{ sourceId: string }> = JSON.parse(answer).data.diagnoses;
+    assert.deepEqual(diagnoses.map(({ sourceId }) => sourceId), ['currentDiagnoses.system.E11.9', 'currentDiagnoses.system.I10']);
+    assert.ok(diagnoses.every(({ sourceId }) => !ids.has(sourceId)));
+    assert.deepEqual(measuredProjection.currentDiagnoses.map(({ code }) => code), ['E11.9', 'I10']);
+    rejectsSource(answer);
+});
+
+function sourceIdSchemas(node: unknown, found: unknown[] = []): unknown[] {
+    if (Array.isArray(node)) { for (const value of node) sourceIdSchemas(value, found); return found; }
+    if (!node || typeof node !== 'object') return found;
+    for (const [key, value] of Object.entries(node)) {
+        if (key === 'properties' && value && typeof value === 'object' && 'sourceId' in value) found.push((value as Record<string, unknown>).sourceId);
+        sourceIdSchemas(value, found);
+    }
+    return found;
+}
+
+/*
+ * P2 (ADR 0012): lo schema che l'host manda a Ollama per questa richiesta ammette come sourceId solo
+ * gli id delle fonti del prompt, su diagnosi, terapie, prestazioni e items. Con Ollama lo schema vincola
+ * la generazione: la risposta reale con la fonte inventata non e' piu' generabile, la risposta valida
+ * piu' lunga si'. Il prompt dice che le diagnosi e le terapie in scheda non sono fonti.
+ */
+test('the schema sent to the model for a request admits only the ids of the sources in that prompt', async () => {
+    const sent: Array<Readonly<{ maxTokens: number | undefined; options: AIChatOptions | undefined }>> = [];
+    const binding = resolution(async (_messages, _signal, maxTokens, options) => {
+        sent.push({ maxTokens, options });
+        return { content: MEASURED.longestAccepted.content, stats: { latency: 1, tokensIn: 2, tokensOut: MEASURED.longestAccepted.evalCount } };
+    });
+    const capability = createPatientSmartImportHostCapability({
+        killSwitch: { read: async () => ({ status: 'enabled' }) },
+        broker: { consume: () => measuredProjection },
+        lifecycle: { read: () => ({ status: 'available', record: lifecycleRecord }) },
+        binding: { readClinical: async () => ({ status: 'available', resolution: binding }) },
+        readiness: { observeClinical: async () => ({ status: 'available', code: null, observation: { venue: 'local_process', state: 'available', reason: null } }) },
+        route: routeHostResolvedCandidateCapability,
+        sources: { clock: () => MEASURED_AT, entropy: () => new Uint8Array(16).fill(7) },
+    });
+    const result = await capability.preview({ handle: HANDLE, requestId: REQUEST_ID });
+    assert.equal(result.status, 'available');
+    assert.equal(sent.length, 1);
+    const format = buildOllamaChatPayload('synthetic', [], sent[0]!.maxTokens, sent[0]!.options).format;
+    const ids = measuredProjection.sources.map(({ id }) => id);
+    const schemas = sourceIdSchemas(format);
+    assert.equal(schemas.length, 4, 'diagnosi, terapie, prestazioni, items');
+    for (const schema of schemas) assert.deepEqual(schema, { type: 'string', enum: ids }, 'sourceId e\' un enum delle fonti del prompt');
+    const validator = fromJSONSchema(format as Parameters<typeof fromJSONSchema>[0]);
+    assert.equal(validator.safeParse(JSON.parse(MEASURED.inventedSource.content)).success, false);
+    assert.equal(validator.safeParse(JSON.parse(MEASURED.longestAccepted.content)).success, true);
+    assert.match(buildPatientSmartImportCapabilityPrompt(measuredProjection),
+        /- currentDiagnoses e currentActiveTherapies sono gia nella scheda: non sono fonti, non citarli come sourceId e non riproporli\n/u);
 });
 
 /* L'esempio di risposta che il prompt mostra al modello, con i segnaposto resi valori ammessi. */
