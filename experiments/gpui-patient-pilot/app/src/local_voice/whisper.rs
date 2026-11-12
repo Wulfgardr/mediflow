@@ -2,14 +2,15 @@
 //! Il ponte Swift cattura il microfono e consegna blocchi a 16 kHz; il thread
 //! li legge, li passa al ciclo di ascolto e pubblica solo il testo stabile.
 
-use super::State;
 use super::listening::{Decoder, Dictation, EngineFailure, SpeechDetector};
 use super::model::{self, ModelFile, ModelStatus};
+use super::recording::Machine;
+use super::{Event, State};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use whisper_rs::{
     FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState,
     WhisperVadContext, WhisperVadContextParams,
@@ -143,21 +144,23 @@ pub(crate) trait AudioSource: Send {
     fn phase(&mut self) -> SourcePhase;
     /// Aggiunge a `out` i campioni a 16 kHz arrivati dall'ultima lettura.
     fn read(&mut self, out: &mut Vec<f32>);
+    /// Chiude il microfono per la pausa: nessun campione finché non riprende.
+    fn pause(&mut self);
+    /// Riapre il microfono dopo la pausa.
+    fn resume(&mut self);
     fn stop(&mut self);
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Problem {
-    ModelInvalid,
-    EngineFailed,
-}
+/// Microfono aperto che non consegna audio per questo tempo: è perso, e la
+/// registrazione si ferma invece di restare «in registrazione» a vuoto. Il
+/// microfono consegna un pezzo ogni 85 ms circa.
+pub(crate) const STALL: Duration = Duration::from_secs(2);
 
 #[derive(Default)]
 pub(crate) struct Shared {
     /// La sessione è stata ritirata: il thread finisce da solo e non pubblica più nulla.
     retired: bool,
-    state: Option<State>,
-    problem: Option<Problem>,
+    pub(crate) machine: Machine,
     pub(crate) stable: Zeroizing<String>,
     pub(crate) provisional: Zeroizing<String>,
     open_confirmed: usize,
@@ -168,12 +171,9 @@ pub(crate) struct Shared {
     /// Per le prove: campioni rimasti nel ciclo dopo l'annullamento.
     #[cfg(test)]
     pub(crate) retained_after_cancel: Option<usize>,
-}
-
-pub(crate) enum Command {
-    Start,
-    Stop,
-    Cancel,
+    /// Per le prove: pause la cui ultima frase è già trascritta.
+    #[cfg(test)]
+    pub(crate) pauses_flushed: usize,
 }
 
 pub(crate) struct Engine {
@@ -186,8 +186,7 @@ pub(crate) struct Engine {
 }
 
 /// Ciclo di ascolto con rilevatore e decodificatore già caricati.
-pub(crate) type Listener =
-    Box<dyn FnOnce(&mut dyn AudioSource, &Receiver<Command>, &Mutex<Shared>)>;
+pub(crate) type Listener = Box<dyn FnOnce(&mut dyn AudioSource, &Receiver<Event>, &Mutex<Shared>)>;
 /// Carica il motore dai file della cartella, dopo la verifica dello SHA-256.
 pub(crate) type Loader =
     fn(&Path, &[&'static ModelFile; 2], Zeroizing<String>) -> Result<Listener, EngineFailure>;
@@ -215,16 +214,13 @@ pub(crate) type Snapshot = (State, usize, usize, usize, Vec<(usize, usize, usize
 /// lettura dello stato pubblicato.
 pub(crate) struct WhisperSession {
     shared: Arc<Mutex<Shared>>,
-    commands: Sender<Command>,
+    commands: Sender<Event>,
     worker: Option<JoinHandle<()>>,
 }
 
 impl WhisperSession {
     pub(crate) fn new(engine: Engine, source: Box<dyn AudioSource>) -> Self {
-        let shared = Arc::new(Mutex::new(Shared {
-            state: Some(State::Disclosure),
-            ..Shared::default()
-        }));
+        let shared = Arc::new(Mutex::new(Shared::default()));
         let (commands, receiver) = mpsc::channel();
         let worker_shared = shared.clone();
         let worker = std::thread::Builder::new()
@@ -237,24 +233,31 @@ impl WhisperSession {
             worker,
         }
     }
-    pub(crate) fn start(&self) {
-        let _ = self.commands.send(Command::Start);
+    /// Comando del medico: il thread lo esegue solo se la macchina lo
+    /// ammette nello stato in cui lo trova.
+    pub(crate) fn send(&self, command: Event) {
+        let _ = self.commands.send(command);
     }
+    #[cfg(test)]
+    pub(crate) fn start(&self) {
+        self.send(Event::Start);
+    }
+    #[cfg(test)]
     pub(crate) fn stop(&self) {
-        let _ = self.commands.send(Command::Stop);
+        self.send(Event::Stop);
     }
     fn read<T>(&self, f: impl FnOnce(&Shared) -> T) -> Option<T> {
         self.shared.lock().ok().map(|s| f(&s))
     }
-    pub(crate) fn state(&self) -> State {
+    pub(crate) fn machine(&self) -> Machine {
+        let broken = Machine::failed(super::Fault::EngineFailed);
         if self.worker.is_none() {
-            return State::Unavailable;
+            return broken;
         }
-        self.read(|s| s.state.unwrap_or(State::Unavailable))
-            .unwrap_or(State::Unavailable)
+        self.read(|s| s.machine).unwrap_or(broken)
     }
-    pub(crate) fn problem(&self) -> Option<Problem> {
-        self.read(|s| s.problem).flatten()
+    pub(crate) fn state(&self) -> State {
+        self.machine().state()
     }
     /// Testo stabile mentre si parla: solo da mostrare, mai da trasferire.
     pub(crate) fn stable_text(&self) -> Zeroizing<String> {
@@ -268,7 +271,9 @@ impl WhisperSession {
     }
     pub(crate) fn transcript(&self) -> Option<Zeroizing<String>> {
         self.read(|s| {
-            (s.state == Some(State::Review))
+            s.machine
+                .state()
+                .reviewable()
                 .then(|| s.transcript.clone())
                 .flatten()
         })
@@ -281,19 +286,14 @@ impl WhisperSession {
         V: SpeechDetector + Send + 'static,
         D: Decoder + Send + 'static,
     {
-        let shared = Arc::new(Mutex::new(Shared {
-            state: Some(State::Disclosure),
-            ..Shared::default()
-        }));
+        let shared = Arc::new(Mutex::new(Shared::default()));
         let (commands, receiver) = mpsc::channel();
         let worker_shared = shared.clone();
         let worker = std::thread::spawn(move || {
             let mut source = source;
-            if !matches!(receiver.recv(), Ok(Command::Start)) {
-                fail(&worker_shared, State::Cancelled, None);
+            if !wait_for_start(&receiver, &worker_shared) {
                 return;
             }
-            publish(&worker_shared, |s| s.state = Some(State::Preparing));
             listen(
                 Dictation::new(detector, decoder),
                 source.as_mut(),
@@ -316,7 +316,7 @@ impl WhisperSession {
     pub(crate) fn snapshot(&self) -> Snapshot {
         let s = self.shared.lock().unwrap();
         (
-            s.state.unwrap_or(State::Unavailable),
+            s.machine.state(),
             s.provisional.len(),
             s.open_confirmed,
             s.finals,
@@ -349,7 +349,7 @@ impl Drop for WhisperSession {
             s.provisional.zeroize();
             s.transcript = None;
         }
-        let _ = self.commands.send(Command::Cancel);
+        let _ = self.commands.send(Event::Cancel);
         drop(self.worker.take());
     }
 }
@@ -366,39 +366,70 @@ fn publish(shared: &Mutex<Shared>, f: impl FnOnce(&mut Shared)) {
     }
 }
 
-fn fail(shared: &Mutex<Shared>, state: State, problem: Option<Problem>) {
+/// Applica un evento alla macchina pubblicata. Un evento illegale nello
+/// stato corrente non cambia nulla e restituisce `false`.
+fn transition(shared: &Mutex<Shared>, event: Event) -> bool {
+    let mut legal = false;
     publish(shared, |s| {
-        s.state = Some(state);
-        s.problem = problem;
+        legal = s.machine.apply(event, Instant::now()).is_ok()
+    });
+    legal
+}
+
+fn current(shared: &Mutex<Shared>) -> State {
+    shared
+        .lock()
+        .map_or(State::Cancelled, |s| s.machine.state())
+}
+
+/// Passa allo stato d'errore o di scarto e butta ogni testo. Il thread esce
+/// dopo: se l'evento non è ammesso, la sessione si chiude come scartata e non
+/// resta mai in uno stato di registrazione senza nessuno che ascolti.
+fn fail(shared: &Mutex<Shared>, event: Event) {
+    publish(shared, |s| {
+        let now = Instant::now();
+        if s.machine.apply(event, now).is_err() {
+            let _ = s.machine.apply(Event::Cancel, now);
+        }
         s.stable.zeroize();
         s.provisional.zeroize();
         s.transcript = None;
     });
 }
 
+/// Attende il gesto «Consenti e avvia». Pausa, ripresa e fine prima
+/// dell'avvio sono illegali e si ignorano; l'annullamento chiude.
+fn wait_for_start(commands: &Receiver<Event>, shared: &Mutex<Shared>) -> bool {
+    loop {
+        match commands.recv() {
+            Ok(Event::Start) if transition(shared, Event::Start) => return true,
+            Ok(Event::Cancel) | Err(_) => {
+                fail(shared, Event::Cancel);
+                return false;
+            }
+            Ok(_) => {}
+        }
+    }
+}
+
 fn run(
     engine: Engine,
     mut source: Box<dyn AudioSource>,
-    commands: Receiver<Command>,
+    commands: Receiver<Event>,
     shared: Arc<Mutex<Shared>>,
 ) {
-    match commands.recv() {
-        Ok(Command::Start) => {}
-        _ => {
-            fail(&shared, State::Cancelled, None);
-            return;
-        }
+    if !wait_for_start(&commands, &shared) {
+        return;
     }
-    publish(&shared, |s| s.state = Some(State::Preparing));
     if model::verify(&engine.directory, &engine.files) != ModelStatus::Verified {
-        fail(&shared, State::Unavailable, Some(Problem::ModelInvalid));
+        fail(&shared, Event::ModelInvalid);
         return;
     }
     if retired(&shared) {
         return;
     }
     let Ok(listener) = (engine.load)(&engine.directory, &engine.files, engine.prompt) else {
-        fail(&shared, State::Unavailable, Some(Problem::EngineFailed));
+        fail(&shared, Event::EngineFailed);
         return;
     };
     if retired(&shared) {
@@ -407,82 +438,162 @@ fn run(
     listener(source.as_mut(), &commands, &shared);
 }
 
+/// Testo dal vivo della dettatura, pubblicato per la vista.
+fn publish_live<V: SpeechDetector, D: Decoder>(
+    shared: &Mutex<Shared>,
+    dictation: &Dictation<V, D>,
+) {
+    let stable = dictation.confirmed_text();
+    let provisional = dictation.provisional_text();
+    let open_confirmed = dictation.open_confirmed_len();
+    let finals = dictation.finals_count();
+    publish(shared, |s| {
+        s.stable = stable;
+        s.provisional = provisional;
+        s.open_confirmed = open_confirmed;
+        s.finals = finals;
+    });
+}
+
 /// Ciclo del thread: lo stesso per il microfono e per le prove su file.
+///
+/// La vista mostra lo stato della macchina, e la macchina segue il
+/// microfono: in registrazione solo mentre arriva audio; in pausa e dopo la
+/// fine il microfono è chiuso; se il microfono manca, si chiude o tace oltre
+/// [`STALL`], la registrazione si ferma subito in errore.
 pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
     mut dictation: Dictation<V, D>,
     source: &mut dyn AudioSource,
-    commands: &Receiver<Command>,
+    commands: &Receiver<Event>,
     shared: &Mutex<Shared>,
 ) {
-    if matches!(commands.try_recv(), Ok(Command::Cancel)) {
-        fail(shared, State::Cancelled, None);
+    if matches!(commands.try_recv(), Ok(Event::Cancel)) {
+        fail(shared, Event::Cancel);
         return;
     }
     source.start();
     let mut blocks = Zeroizing::new(Vec::with_capacity(super::listening::MAX_UTTERANCE));
+    let mut last_audio = Instant::now();
     let outcome = loop {
-        match commands.try_recv() {
-            Ok(Command::Cancel) | Err(TryRecvError::Disconnected) => break Err(State::Cancelled),
-            Ok(Command::Stop) => break Ok(()),
-            Ok(Command::Start) | Err(TryRecvError::Empty) => {}
+        let paused = current(shared) == State::Paused;
+        let command = if paused {
+            match commands.recv_timeout(Duration::from_millis(50)) {
+                Ok(command) => Ok(command),
+                Err(RecvTimeoutError::Timeout) => Err(TryRecvError::Empty),
+                Err(RecvTimeoutError::Disconnected) => Err(TryRecvError::Disconnected),
+            }
+        } else {
+            commands.try_recv()
+        };
+        match command {
+            Ok(Event::Cancel) | Err(TryRecvError::Disconnected) => break Event::Cancel,
+            Ok(Event::Stop) if shared.lock().is_ok_and(|s| s.machine.allows(Event::Stop)) => {
+                break Event::Stop;
+            }
+            Ok(Event::Pause) if transition(shared, Event::Pause) => {
+                // Il microfono si chiude al gesto; l'audio arrivato fin qui si
+                // trascrive e la frase aperta diventa definitiva.
+                source.pause();
+                source.read(&mut blocks);
+                let flushed = dictation.feed(&blocks).and_then(|()| dictation.finish());
+                blocks.zeroize();
+                if flushed.is_err() {
+                    break Event::EngineFailed;
+                }
+                publish_live(shared, &dictation);
+                #[cfg(test)]
+                publish(shared, |s| s.pauses_flushed += 1);
+                continue;
+            }
+            Ok(Event::Resume) if transition(shared, Event::Resume) => {
+                source.resume();
+                last_audio = Instant::now();
+                continue;
+            }
+            Ok(_) | Err(TryRecvError::Empty) => {}
+        }
+        if paused {
+            continue;
         }
         match source.phase() {
             SourcePhase::Starting => {
                 std::thread::sleep(Duration::from_millis(20));
                 continue;
             }
-            SourcePhase::PermissionDenied => break Err(State::PermissionDenied),
-            SourcePhase::Failed => break Err(State::Unavailable),
-            SourcePhase::Stopped => break Ok(()),
+            SourcePhase::PermissionDenied => break Event::PermissionDenied,
+            SourcePhase::Failed => break Event::CaptureFailed,
+            SourcePhase::Stopped => break Event::Stop,
             SourcePhase::Running => {}
         }
-        publish(shared, |s| {
-            if s.state == Some(State::Preparing) {
-                s.state = Some(State::Recording);
-            }
-        });
+        if current(shared) == State::Preparing {
+            transition(shared, Event::CaptureRunning);
+            last_audio = Instant::now();
+        }
         source.read(&mut blocks);
         if blocks.is_empty() {
+            if last_audio.elapsed() >= STALL {
+                break Event::CaptureFailed;
+            }
             std::thread::sleep(Duration::from_millis(20));
             continue;
         }
+        last_audio = Instant::now();
         if dictation.feed(&blocks).is_err() {
-            break Err(State::Unavailable);
+            break Event::EngineFailed;
         }
         blocks.zeroize();
-        let stable = dictation.confirmed_text();
-        let provisional = dictation.provisional_text();
-        let open_confirmed = dictation.open_confirmed_len();
-        let finals = dictation.finals_count();
-        publish(shared, |s| {
-            s.stable = stable;
-            s.provisional = provisional;
-            s.open_confirmed = open_confirmed;
-            s.finals = finals;
-        });
+        publish_live(shared, &dictation);
     };
-    if let Err(state) = outcome {
-        source.stop();
-        dictation.wipe();
-        #[cfg(test)]
+    // Una sorgente che finisce prima di consegnare audio non ha nulla da
+    // trascrivere: si chiude come uno scarto.
+    let stoppable = shared.lock().is_ok_and(|s| s.machine.allows(Event::Stop));
+    match outcome {
+        Event::Stop if stoppable => {}
+        Event::PermissionDenied | Event::CaptureFailed
+            if shared.lock().is_ok_and(|s| s.machine.has_recorded()) =>
         {
-            let retained = dictation.retained_samples();
-            if let Ok(mut s) = shared.lock() {
-                s.retained_after_cancel = Some(retained);
+            // Il microfono si è fermato dopo l'avvio: lo stato lo dice subito,
+            // la registrazione non continua e il testo trascritto fin qui resta
+            // da rivedere. Nessun salvataggio senza il gesto del medico.
+            source.stop();
+            if !transition(shared, outcome) {
+                transition(shared, Event::CaptureFailed);
             }
+            source.read(&mut blocks);
+            let finished = dictation.feed(&blocks).and_then(|()| dictation.finish());
+            blocks.zeroize();
+            let transcript = Zeroizing::new(dictation.transcript().to_owned());
+            dictation.wipe();
+            publish(shared, |s| {
+                s.stable.zeroize();
+                s.provisional.zeroize();
+                s.transcript =
+                    (finished.is_ok() && !transcript.trim().is_empty()).then_some(transcript);
+            });
+            return;
         }
-        let problem = (state == State::Unavailable).then_some(Problem::EngineFailed);
-        fail(shared, state, problem);
-        return;
+        _ => {
+            source.stop();
+            dictation.wipe();
+            #[cfg(test)]
+            {
+                let retained = dictation.retained_samples();
+                if let Ok(mut s) = shared.lock() {
+                    s.retained_after_cancel = Some(retained);
+                }
+            }
+            fail(shared, outcome);
+            return;
+        }
     }
-    publish(shared, |s| s.state = Some(State::Finalizing));
+    transition(shared, Event::Stop);
     source.stop();
     source.read(&mut blocks);
     let finished = dictation.feed(&blocks).and_then(|()| dictation.finish());
     blocks.zeroize();
     if finished.is_err() {
         dictation.wipe();
-        fail(shared, State::Unavailable, Some(Problem::EngineFailed));
+        fail(shared, Event::EngineFailed);
         return;
     }
     let transcript = Zeroizing::new(dictation.transcript().to_owned());
@@ -499,7 +610,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
         s.stable.zeroize();
         s.provisional.zeroize();
         s.transcript = Some(transcript);
-        s.state = Some(State::Review);
+        let _ = s.machine.apply(Event::Finished, Instant::now());
     });
     // Resta in attesa solo per l'annullamento; nessun altro lavoro.
     let _ = commands.recv();
@@ -555,6 +666,22 @@ pub(crate) mod swift {
             let count = unsafe { MFVoiceCaptureRead(self.0, out[start..].as_mut_ptr(), room) };
             out[start + count.min(room)..].fill(0.0);
             out.truncate(start + count.min(room));
+        }
+        fn pause(&mut self) {
+            unsafe { MFVoiceCaptureStop(self.0) }
+        }
+        /// Il ponte apre il microfono una volta sola per cattura: alla ripresa
+        /// se ne apre una nuova e si rilascia la vecchia, già letta e ferma.
+        fn resume(&mut self) {
+            let next = unsafe { MFVoiceCaptureCreate() };
+            if next.is_null() {
+                return;
+            }
+            let previous = std::mem::replace(&mut self.0, next);
+            unsafe {
+                MFVoiceCaptureRelease(previous);
+                MFVoiceCaptureStart(self.0);
+            }
         }
         fn stop(&mut self) {
             unsafe { MFVoiceCaptureStop(self.0) }
@@ -638,6 +765,18 @@ pub(crate) mod tests {
         /// Campioni consegnati alla volta: 0,5 s, o circa 85 ms come il tap
         /// del microfono (4096 campioni a 48 kHz).
         pub(crate) chunk: usize,
+        /// Posizione da cui l'orologio conta l'arrivo (dopo una ripresa).
+        pub(crate) base: usize,
+        /// Microfono chiuso (pausa o fine): oltre questa posizione non arriva nulla.
+        pub(crate) closed_at: Option<usize>,
+        /// Il microfono si stacca a questa posizione.
+        pub(crate) fail_at: Option<usize>,
+        /// Il microfono resta aperto ma tace da questa posizione.
+        pub(crate) silent_from: Option<usize>,
+        /// Il microfono non si riapre dopo la pausa.
+        pub(crate) fail_on_resume: bool,
+        /// Gesti ricevuti dalla sorgente, in ordine: per le prove.
+        pub(crate) log: Arc<Mutex<Vec<&'static str>>>,
     }
     impl InjectedSource {
         pub(crate) fn new(audio: Vec<f32>) -> Self {
@@ -649,6 +788,12 @@ pub(crate) mod tests {
                 speed: 0.0,
                 started: None,
                 chunk: BLOCK,
+                base: 0,
+                closed_at: None,
+                fail_at: None,
+                silent_from: None,
+                fail_on_resume: false,
+                log: Arc::default(),
             }
         }
         pub(crate) fn paced(audio: Vec<f32>, speed: f64) -> Self {
@@ -657,13 +802,41 @@ pub(crate) mod tests {
                 ..Self::new(audio)
             }
         }
+        /// Campioni arrivati finora secondo l'orologio (o il prossimo pezzo).
+        fn arrived(&self) -> usize {
+            let end = match self.started.filter(|_| self.speed > 0.0) {
+                // Pezzi interi arrivati secondo l'orologio.
+                Some(started) => {
+                    let elapsed = started.elapsed().as_secs_f64() * self.speed;
+                    self.base + (elapsed * 16_000.0) as usize / self.chunk * self.chunk
+                }
+                None => self.position + self.chunk,
+            };
+            let end = [Some(end), self.closed_at, self.fail_at, self.silent_from]
+                .into_iter()
+                .flatten()
+                .min()
+                .unwrap_or(end);
+            end.min(self.audio.len()).max(self.position)
+        }
+        fn close(&mut self) {
+            if self.closed_at.is_none() && self.phase == SourcePhase::Running {
+                self.closed_at = Some(self.arrived());
+            }
+        }
     }
     impl AudioSource for InjectedSource {
         fn start(&mut self) {
+            self.log.lock().unwrap().push("start");
             self.phase = self.after_start;
             self.started = Some(std::time::Instant::now());
         }
         fn phase(&mut self) -> SourcePhase {
+            if self.phase == SourcePhase::Running
+                && self.fail_at.is_some_and(|at| self.position >= at)
+            {
+                self.phase = SourcePhase::Failed;
+            }
             if self.phase == SourcePhase::Running
                 && self.position >= self.audio.len()
                 && self.speed == 0.0
@@ -673,30 +846,37 @@ pub(crate) mod tests {
             self.phase
         }
         fn read(&mut self, out: &mut Vec<f32>) {
-            let end = match self.started.filter(|_| self.speed > 0.0) {
-                // Pezzi interi arrivati secondo l'orologio.
-                Some(started) => {
-                    let elapsed = started.elapsed().as_secs_f64() * self.speed;
-                    let arrived = (elapsed * 16_000.0) as usize / self.chunk * self.chunk;
-                    arrived.min(self.audio.len()).max(self.position)
-                }
-                None => (self.position + self.chunk).min(self.audio.len()),
-            };
+            let end = self.arrived();
             out.extend_from_slice(&self.audio[self.position..end]);
             self.position = end;
         }
+        fn pause(&mut self) {
+            self.log.lock().unwrap().push("pause");
+            self.close();
+            self.phase = SourcePhase::Stopped;
+        }
+        fn resume(&mut self) {
+            self.log.lock().unwrap().push("resume");
+            // L'audio rimasto fuori durante la pausa non arriva mai.
+            self.position = self.closed_at.take().unwrap_or(self.position);
+            self.base = self.position;
+            self.started = Some(std::time::Instant::now());
+            self.phase = if self.fail_on_resume {
+                SourcePhase::Failed
+            } else {
+                SourcePhase::Running
+            };
+        }
         fn stop(&mut self) {
+            self.log.lock().unwrap().push("stop");
+            self.close();
             self.phase = SourcePhase::Stopped;
         }
     }
 
-    fn session_with(
-        source: InjectedSource,
-    ) -> (Arc<Mutex<Shared>>, Sender<Command>, JoinHandle<()>) {
-        let shared = Arc::new(Mutex::new(Shared {
-            state: Some(State::Preparing),
-            ..Shared::default()
-        }));
+    fn session_with(source: InjectedSource) -> (Arc<Mutex<Shared>>, Sender<Event>, JoinHandle<()>) {
+        let shared = Arc::new(Mutex::new(Shared::default()));
+        assert!(transition(&shared, Event::Start));
         let (commands, receiver) = mpsc::channel();
         let worker_shared = shared.clone();
         let worker = std::thread::spawn(move || {
@@ -709,13 +889,13 @@ pub(crate) mod tests {
 
     fn wait(shared: &Mutex<Shared>, wanted: State) -> State {
         for _ in 0..4_000 {
-            let state = shared.lock().unwrap().state.unwrap();
+            let state = shared.lock().unwrap().machine.state();
             if state == wanted {
                 return state;
             }
             std::thread::sleep(Duration::from_millis(5));
         }
-        shared.lock().unwrap().state.unwrap()
+        shared.lock().unwrap().machine.state()
     }
 
     #[test]
@@ -730,24 +910,201 @@ pub(crate) mod tests {
         assert_eq!(text.matches("parola").count(), 4 + 2, "{}", text.as_str());
         assert!(shared.lock().unwrap().stable.is_empty());
         assert!(shared.lock().unwrap().provisional.is_empty());
-        let _ = commands.send(Command::Cancel);
+        let _ = commands.send(Event::Cancel);
         worker.join().unwrap();
     }
 
     #[test]
-    fn permission_denied_and_capture_failure_keep_no_text() {
+    fn permission_denied_and_missing_microphone_keep_no_text() {
+        use super::super::Fault;
         for (phase, state) in [
-            (SourcePhase::PermissionDenied, State::PermissionDenied),
-            (SourcePhase::Failed, State::Unavailable),
+            (
+                SourcePhase::PermissionDenied,
+                State::Error(Fault::PermissionDenied),
+            ),
+            (SourcePhase::Failed, State::Error(Fault::MicrophoneMissing)),
         ] {
             let mut source = InjectedSource::new(tone(2.0));
             source.after_start = phase;
+            let log = source.log.clone();
             let (shared, _commands, worker) = session_with(source);
             worker.join().unwrap();
             let s = shared.lock().unwrap();
-            assert_eq!(s.state, Some(state));
+            assert_eq!(s.machine.state(), state);
+            assert!(!s.machine.has_recorded());
             assert!(s.transcript.is_none() && s.stable.is_empty());
+            assert_eq!(*log.lock().unwrap(), ["start", "stop"]);
         }
+    }
+
+    /// Alternanza di 2 s di voce e 1 s di silenzio: una frase ogni 3 s.
+    fn speech(seconds: usize) -> Vec<f32> {
+        let mut audio = Vec::new();
+        for _ in 0..seconds / 3 {
+            audio.extend(tone(2.0));
+            audio.extend(silence(1.0));
+        }
+        audio
+    }
+
+    #[test]
+    fn microphone_lost_midway_stops_at_once_and_keeps_the_text_for_review() {
+        use super::super::Fault;
+        let mut source = InjectedSource::new(speech(30));
+        source.fail_at = Some(9 * 16_000);
+        let log = source.log.clone();
+        let (shared, _commands, worker) = session_with(source);
+        worker.join().unwrap();
+        let s = shared.lock().unwrap();
+        assert_eq!(s.machine.state(), State::Error(Fault::MicrophoneLost));
+        assert_eq!(s.machine.visible(), super::super::Visible::Error);
+        assert_eq!(*log.lock().unwrap(), ["start", "stop"], "microphone closed");
+        // Tre frasi da 2 s prima del distacco, nessuna dopo.
+        let text = s.transcript.clone().expect("text kept for review");
+        assert_eq!(text.matches("parola").count(), 3 * 4, "{}", text.as_str());
+        assert!(s.stable.is_empty() && s.provisional.is_empty());
+        assert!(s.machine.state().reviewable());
+    }
+
+    #[test]
+    fn a_silent_microphone_is_lost_after_the_stall_not_shown_as_recording() {
+        use super::super::Fault;
+        let mut source = InjectedSource::new(speech(30));
+        source.silent_from = Some(6 * 16_000);
+        let log = source.log.clone();
+        let (shared, _commands, worker) = session_with(source);
+        assert_eq!(wait(&shared, State::Recording), State::Recording);
+        // Il microfono resta aperto ma tace: entro STALL la registrazione si
+        // ferma in errore invece di restare «in registrazione» a vuoto.
+        let quiet = Instant::now();
+        let mut state = State::Recording;
+        while quiet.elapsed() < STALL + Duration::from_secs(2) {
+            state = shared.lock().unwrap().machine.state();
+            if state != State::Recording {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let detected = quiet.elapsed();
+        worker.join().unwrap();
+        assert_eq!(state, State::Error(Fault::MicrophoneLost));
+        assert!(
+            detected <= STALL + Duration::from_millis(500),
+            "{detected:?}"
+        );
+        assert_eq!(*log.lock().unwrap(), ["start", "stop"]);
+        let s = shared.lock().unwrap();
+        let text = s.transcript.clone().expect("text kept for review");
+        assert_eq!(text.matches("parola").count(), 2 * 4, "{}", text.as_str());
+    }
+
+    #[test]
+    fn pause_closes_the_microphone_and_resume_continues_the_same_text() {
+        let source = InjectedSource::paced(speech(600), 20.0);
+        let log = source.log.clone();
+        let session = WhisperSession::with_parts(
+            LoudnessDetector,
+            CountingDecoder::default(),
+            Box::new(source),
+        );
+        session.start();
+        assert_eq!(session.wait_for(&[State::Recording]), State::Recording);
+        let recording_seen = Instant::now();
+        while session.snapshot().3 < 2 {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        session.send(Event::Pause);
+        assert_eq!(session.wait_for(&[State::Paused]), State::Paused);
+        assert_eq!(*log.lock().unwrap(), ["start", "pause"]);
+        // Lo stato cambia al gesto; la frase aperta si trascrive subito dopo.
+        while session.shared_for_test().lock().unwrap().pauses_flushed < 1 {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        // In pausa: niente audio, niente testo nuovo, orologio fermo.
+        let before = (
+            session.stable_text(),
+            session.machine().elapsed(Instant::now()),
+        );
+        std::thread::sleep(Duration::from_millis(300));
+        let after = (
+            session.stable_text(),
+            session.machine().elapsed(Instant::now()),
+        );
+        assert_eq!(before.0.as_str(), after.0.as_str());
+        assert_eq!(before.1, after.1, "clock runs in pause");
+        assert!(
+            session.provisional_text().is_empty(),
+            "open sentence flushed"
+        );
+        let paused_words = before.0.matches("parola").count();
+        assert!(paused_words >= 8, "{}", before.0.as_str());
+        // Comandi illegali in pausa: ignorati.
+        session.send(Event::Pause);
+        session.send(Event::Start);
+        std::thread::sleep(Duration::from_millis(100));
+        assert_eq!(session.state(), State::Paused);
+        session.send(Event::Resume);
+        assert_eq!(session.wait_for(&[State::Recording]), State::Recording);
+        while session.stable_text().matches("parola").count() < paused_words + 8 {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        session.send(Event::Resume);
+        session.stop();
+        assert_eq!(session.wait_for(&[State::Review]), State::Review);
+        assert_eq!(*log.lock().unwrap(), ["start", "pause", "resume", "stop"]);
+        let text = session.transcript().unwrap();
+        assert!(text.starts_with(before.0.as_str()), "{}", text.as_str());
+        assert!(text.matches("parola").count() >= paused_words + 8);
+        // Il tempo trascorso esclude gli almeno 0,4 s di pausa e resta fermo
+        // dopo la fine.
+        let wall = recording_seen.elapsed();
+        let machine = session.machine();
+        let elapsed = machine.elapsed(Instant::now());
+        assert!(
+            elapsed + Duration::from_millis(250) < wall,
+            "{elapsed:?} {wall:?}"
+        );
+        assert_eq!(elapsed, machine.elapsed(Instant::now() + STALL));
+    }
+
+    #[test]
+    fn a_microphone_that_does_not_reopen_after_pause_is_lost_not_missing() {
+        use super::super::Fault;
+        let mut source = InjectedSource::paced(speech(30), 20.0);
+        source.fail_on_resume = true;
+        let log = source.log.clone();
+        let session = WhisperSession::with_parts(
+            LoudnessDetector,
+            CountingDecoder::default(),
+            Box::new(source),
+        );
+        session.start();
+        assert_eq!(session.wait_for(&[State::Recording]), State::Recording);
+        while session.snapshot().3 < 1 {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        session.send(Event::Pause);
+        assert_eq!(session.wait_for(&[State::Paused]), State::Paused);
+        while session.shared_for_test().lock().unwrap().pauses_flushed < 1 {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let kept = session.stable_text();
+        assert!(!kept.is_empty());
+        session.send(Event::Resume);
+        let lost = State::Error(Fault::MicrophoneLost);
+        assert_eq!(session.wait_for(&[lost]), lost);
+        assert_eq!(*log.lock().unwrap(), ["start", "pause", "resume", "stop"]);
+        // Lo stato d'errore arriva subito; il testo conservato subito dopo.
+        let mut text = None;
+        for _ in 0..1_000 {
+            text = session.transcript();
+            if text.is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let text = text.expect("text before the pause kept");
+        assert_eq!(text.as_str(), kept.as_str());
     }
 
     #[test]
@@ -756,10 +1113,10 @@ pub(crate) mod tests {
         source.after_start = SourcePhase::Running;
         let (shared, commands, worker) = session_with(source);
         assert_eq!(wait(&shared, State::Recording), State::Recording);
-        commands.send(Command::Cancel).unwrap();
+        commands.send(Event::Cancel).unwrap();
         worker.join().unwrap();
         let s = shared.lock().unwrap();
-        assert_eq!(s.state, Some(State::Cancelled));
+        assert_eq!(s.machine.state(), State::Cancelled);
         assert!(s.transcript.is_none() && s.stable.is_empty() && s.provisional.is_empty());
     }
 
@@ -781,8 +1138,8 @@ pub(crate) mod tests {
         );
         assert_eq!(session.state(), State::Disclosure);
         session.start();
-        assert_eq!(session.wait_for(&[State::Unavailable]), State::Unavailable);
-        assert_eq!(session.problem(), Some(Problem::ModelInvalid));
+        let invalid = State::Error(super::super::Fault::ModelInvalid);
+        assert_eq!(session.wait_for(&[invalid]), invalid);
         assert!(session.transcript().is_none());
         std::fs::remove_dir_all(directory).unwrap();
     }
@@ -876,7 +1233,7 @@ pub(crate) mod tests {
         let started = std::time::Instant::now();
         while !matches!(
             session.state(),
-            State::Review | State::Unavailable | State::Cancelled
+            State::Review | State::Error(_) | State::Cancelled
         ) {
             assert!(started.elapsed() < Duration::from_secs(300), "no review");
             std::thread::sleep(Duration::from_millis(20));

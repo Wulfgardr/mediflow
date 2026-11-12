@@ -1,6 +1,6 @@
 use super::*;
 use crate::chat_access::owner::{Pending, State as RequestState};
-use crate::local_voice::{Session, State, reviewed_text};
+use crate::local_voice::{Event, Fault, Session, State, Visible, reviewed_text};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Binding {
@@ -17,6 +17,24 @@ struct Work {
     state: State,
     /// Testo dal vivo già mostrato, per ridisegnare solo quando cambia.
     live: zeroize::Zeroizing<String>,
+    /// La trascrizione è già nell'editor di revisione.
+    filled: bool,
+    /// Tempo trascorso già mostrato: si ridisegna a ogni secondo che passa.
+    clock: String,
+}
+impl Work {
+    fn new(binding: Binding, pending: Pending, session: Session) -> Self {
+        let state = session.state();
+        Self {
+            binding,
+            pending,
+            session,
+            state,
+            live: Default::default(),
+            filled: false,
+            clock: String::new(),
+        }
+    }
 }
 pub(super) struct LocalVoice {
     work: Option<Work>,
@@ -57,7 +75,8 @@ impl ClinicalApp {
         let Some(work) = &self.chat_access.voice.work else {
             return Vec::new();
         };
-        if work.state != State::Review
+        if !work.state.reviewable()
+            || !work.filled
             || self.voice_binding().as_ref() != Some(&work.binding)
             || !work
                 .pending
@@ -154,14 +173,7 @@ impl ClinicalApp {
                 .editor
                 .update(cx, |input, cx| input.set_content("", cx));
             let session = Session::new(self.voice_vocabulary());
-            let state = session.state();
-            self.chat_access.voice.work = Some(Work {
-                binding,
-                pending: pending.clone(),
-                session,
-                state,
-                live: Default::default(),
-            });
+            self.chat_access.voice.work = Some(Work::new(binding, pending.clone(), session));
         }
         if let Ok(mut p) = pending.lock() {
             p.finish_voice_open(opened);
@@ -199,23 +211,39 @@ impl ClinicalApp {
             work.live = live;
             cx.notify();
         }
+        let transcript = (state.reviewable() && !work.filled)
+            .then(|| work.session.transcript())
+            .flatten();
+        // Una fine senza testo da rivedere è un errore, non una revisione vuota.
+        let state = if state == State::Review && !work.filled && transcript.is_none() {
+            State::Error(Fault::EngineFailed)
+        } else {
+            state
+        };
         if state != work.state {
             work.state = state;
-            if state == State::Review {
-                if let Some(text) = work.session.transcript() {
-                    self.chat_access
-                        .voice
-                        .editor
-                        .update(cx, |input, cx| input.set_content(text.as_str(), cx));
-                } else {
-                    work.state = State::Unavailable;
-                }
-            }
             cx.notify();
         }
-        self.chat_access.voice.editor.update(cx, |input, cx| {
-            input.configure(self.theme, work.state != State::Review, cx)
-        });
+        if let Some(text) = transcript {
+            self.chat_access
+                .voice
+                .editor
+                .update(cx, |input, cx| input.set_content(text.as_str(), cx));
+            work.filled = true;
+            cx.notify();
+        }
+        let clock = crate::local_voice::recording::clock(
+            work.session.machine().elapsed(std::time::Instant::now()),
+        );
+        if clock != work.clock {
+            work.clock = clock;
+            cx.notify();
+        }
+        let editable = work.state.reviewable() && work.filled;
+        self.chat_access
+            .voice
+            .editor
+            .update(cx, |input, cx| input.configure(self.theme, !editable, cx));
         let ranges = self
             .voice_drug_suggestions(cx)
             .into_iter()
@@ -306,12 +334,24 @@ impl ClinicalApp {
                     ),
                     self.theme,
                 ))
-                .child(notice(
-                    "chat-local-voice-state",
-                    work.session.message(work.state),
-                    self.theme,
-                    matches!(work.state, State::PermissionDenied | State::Unavailable),
-                ))
+                .child({
+                    // Il tempo compare dal primo audio registrato e resta
+                    // fermo in pausa, alla fine e all'errore.
+                    let machine = work.session.machine();
+                    voice_indicator(
+                        machine.visible_for(work.state),
+                        machine.has_recorded().then_some(work.clock.as_str()),
+                        self.theme,
+                    )
+                })
+                .when_some(work.state.message(), |el, message| {
+                    el.child(notice(
+                        "chat-local-voice-state",
+                        message,
+                        self.theme,
+                        matches!(work.state, State::Error(_)),
+                    ))
+                })
                 .when_some(work.session.model_action(work.state), |el, label| {
                     el.child(
                         button("chat-voice-model", label, self.theme, true, true).on_click(
@@ -334,7 +374,7 @@ impl ClinicalApp {
                             .child(live_runs(text.to_string(), provisional, self.theme)),
                     )
                 })
-                .when(work.state == State::Disclosure, |el| {
+                .when(work.session.machine().allows(Event::Start), |el| {
                     el.child(
                         button(
                             "chat-voice-start",
@@ -354,6 +394,30 @@ impl ClinicalApp {
                 })
                 .when(work.state == State::Recording, |el| {
                     el.child(
+                        button("chat-voice-pause", "Pausa", self.theme, false, true).on_click(
+                            cx.listener(|this, _, _, cx| {
+                                if let Some(work) = &this.chat_access.voice.work {
+                                    work.session.pause();
+                                }
+                                cx.notify();
+                            }),
+                        ),
+                    )
+                })
+                .when(work.state == State::Paused, |el| {
+                    el.child(
+                        button("chat-voice-resume", "Riprendi", self.theme, false, true).on_click(
+                            cx.listener(|this, _, _, cx| {
+                                if let Some(work) = &this.chat_access.voice.work {
+                                    work.session.resume();
+                                }
+                                cx.notify();
+                            }),
+                        ),
+                    )
+                })
+                .when(work.session.machine().allows(Event::Stop), |el| {
+                    el.child(
                         button(
                             "chat-voice-stop",
                             "Termina e trascrivi",
@@ -369,7 +433,7 @@ impl ClinicalApp {
                         })),
                     )
                 })
-                .when(work.state == State::Review, |el| {
+                .when(work.state.reviewable() && work.filled, |el| {
                     el.child(self.chat_access.voice.editor.clone())
                         .children(
                             self.voice_drug_suggestions(cx)
@@ -423,6 +487,84 @@ impl ClinicalApp {
     }
 }
 
+/// Indicatore dello stato della registrazione: forma, parola e tempo
+/// trascorso, così si distingue anche senza colori. VoiceOver lo legge come
+/// stato: «In registrazione, 03:12».
+fn voice_indicator(visible: Visible, clock: Option<&str>, theme: Theme) -> Stateful<Div> {
+    use crate::local_voice::recording::Shape;
+    let label = visible.label();
+    let spoken = clock.map_or_else(|| label.to_owned(), |clock| format!("{label}, {clock}"));
+    let color = match visible {
+        Visible::Recording | Visible::Error => theme.critical,
+        _ => theme.ink,
+    };
+    let size = px(14.);
+    let shape = match visible.shape() {
+        Shape::Ring => div()
+            .size(size)
+            .rounded_full()
+            .border_2()
+            .border_color(color),
+        Shape::Dot => div().size(size).rounded_full().bg(color),
+        Shape::Bars => div()
+            .size(size)
+            .flex()
+            .justify_between()
+            .child(div().w(px(4.)).h_full().bg(color))
+            .child(div().w(px(4.)).h_full().bg(color)),
+        Shape::Square => div().size(px(12.)).bg(color),
+        Shape::Alert => div()
+            .size(size)
+            .border_2()
+            .border_color(color)
+            .rounded(px(2.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_color(color)
+            .text_size(px(10.))
+            .child("!"),
+    };
+    let key = visible.key();
+    div()
+        .id("chat-voice-status")
+        .accessibility_id("chat-voice-status")
+        .role(Role::Status)
+        .aria_label(spoken)
+        .flex()
+        .flex_wrap()
+        .items_center()
+        .gap(px(8.))
+        .child(
+            div()
+                .flex_none()
+                .debug_selector(move || format!("chat-voice-shape-{key}"))
+                .child(shape),
+        )
+        .child(
+            div()
+                .text_color(color)
+                .type_role(theme, crate::theme::TextRole::Strong)
+                .child(observed("chat-voice-status-label", label)),
+        )
+        .when_some(clock, |el, clock| {
+            el.child(
+                div()
+                    .text_color(color)
+                    .type_role(theme, crate::theme::TextRole::Code)
+                    .child(observed("chat-voice-status-clock", clock.to_owned())),
+            )
+        })
+}
+
+/// Testo con un id suo; nelle prove lo leggono come VoiceOver.
+fn observed(id: &'static str, text: impl Into<SharedString>) -> impl IntoElement {
+    let text = gpui::text!(id = id, text);
+    #[cfg(test)]
+    let text = crate::shell::rendered_command::observe_ink(text);
+    text
+}
+
 /// Confermato nel grigio della vista, provvisorio a matita (inchiostro della
 /// proposta): un tono più chiaro, che asciuga quando due parziali concordano.
 fn live_highlights(
@@ -470,7 +612,7 @@ mod tests {
                 app.privacy_shield = false;
                 let binding = app.voice_binding().unwrap();
                 let state = if scenario == 1 { State::Recording } else { State::Review };
-                app.chat_access.voice.work = Some(Work { binding, pending: pending.clone(), session: Session::synthetic(state, TEXT), state, live: Default::default() });
+                app.chat_access.voice.work = Some(Work::new(binding, pending.clone(), Session::synthetic(state, TEXT)));
                 app.chat_access.voice.editor.update(cx, |input, cx| input.set_content(TEXT, cx));
                 assert!(app.form.is_none(), "transcription completion must not open a writer");
                 app.open_form(FormKind::Entry, window, cx);
@@ -527,10 +669,9 @@ mod tests {
             })).unwrap());
             let binding = app.voice_binding().unwrap();
             let session = Session::with_whisper(whisper);
-            let state = session.state();
-            assert_eq!(state, State::Disclosure);
+            assert_eq!(session.state(), State::Disclosure);
             session.start();
-            app.chat_access.voice.work = Some(Work { binding, pending: pending.clone(), session, state, live: Default::default() });
+            app.chat_access.voice.work = Some(Work::new(binding, pending.clone(), session));
         });
         let mut live = String::new();
         let mut provisional_seen = false;
@@ -649,8 +790,7 @@ mod tests {
                 "id":"patient-a","firstName":"Ada","lastName":"Esempio","taxCode":"SYNTHETIC","version":1
             })).unwrap());
             let binding = app.voice_binding().unwrap();
-            let state = session.state();
-            app.chat_access.voice.work = Some(Work { binding, pending, session, state, live: Default::default() });
+            app.chat_access.voice.work = Some(Work::new(binding, pending, session));
         });
         (view, cx, remote)
     }
@@ -929,7 +1069,7 @@ mod tests {
             },
         );
         assert!(!microphone.get(), "no microphone without the model");
-        assert_eq!(session.state(), State::ModelMissing);
+        assert_eq!(session.state(), State::Error(Fault::ModelMissing));
         assert!(session.transcript().is_none() && session.live_text().is_none());
         let (view, cx, _remote) = recording_app(cx, &host, session);
         cx.update_window_entity(&view, |app, _, cx| app.poll_chat_voice(cx));
@@ -1064,11 +1204,11 @@ mod tests {
                 app.poll_chat_voice(cx);
                 app.chat_access.voice.work.as_ref().unwrap().state
             });
-            if state == State::Unavailable {
+            if state == State::Error(Fault::ModelInvalid) {
                 break;
             }
         }
-        assert_eq!(state, State::Unavailable);
+        assert_eq!(state, State::Error(Fault::ModelInvalid));
         let (ids, labels) = voice_page(cx, "chat-voice");
         assert_eq!(
             ids,
@@ -1169,5 +1309,277 @@ mod tests {
         let s = shared.lock().unwrap();
         assert!(s.transcript.is_none() && s.stable.is_empty() && s.provisional.is_empty());
         assert_eq!(s.retained_after_cancel, Some(0), "audio buffers not wiped");
+    }
+
+    const SHAPES: [&str; 5] = [
+        "chat-voice-shape-ready",
+        "chat-voice-shape-recording",
+        "chat-voice-shape-paused",
+        "chat-voice-shape-stopped",
+        "chat-voice-shape-error",
+    ];
+
+    /// Forme disegnate nell'ultimo fotogramma.
+    fn shapes(cx: &mut gpui::VisualTestContext) -> Vec<&'static str> {
+        SHAPES
+            .into_iter()
+            .filter(|selector| cx.debug_bounds(selector).is_some())
+            .collect()
+    }
+
+    /// Ognuno dei cinque stati si vede con una forma, una parola e, dal primo
+    /// audio, il tempo trascorso; i comandi sono solo quelli che la macchina
+    /// ammette in quello stato.
+    #[gpui::test]
+    fn each_recording_state_has_its_own_shape_word_clock_and_commands(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use std::time::Duration;
+        let minute = Duration::from_secs(65);
+        let text = "Testo sintetico registrato prima dell'interruzione.";
+        /// Stato, tempo registrato, forma, parola, tempo mostrato, comandi.
+        type Case = (
+            State,
+            Duration,
+            &'static str,
+            &'static str,
+            Option<&'static str>,
+            &'static [&'static str],
+        );
+        let cases: [Case; 8] = [
+            (
+                State::Disclosure,
+                Duration::ZERO,
+                "chat-voice-shape-ready",
+                "Pronta",
+                None,
+                &["chat-voice-start", "chat-voice-discard"],
+            ),
+            (
+                State::Recording,
+                minute,
+                "chat-voice-shape-recording",
+                "In registrazione",
+                Some("01:05"),
+                &["chat-voice-pause", "chat-voice-stop", "chat-voice-discard"],
+            ),
+            (
+                State::Paused,
+                minute,
+                "chat-voice-shape-paused",
+                "In pausa",
+                Some("01:05"),
+                &["chat-voice-resume", "chat-voice-stop", "chat-voice-discard"],
+            ),
+            (
+                State::Finalizing,
+                minute,
+                "chat-voice-shape-stopped",
+                "Ferma",
+                Some("01:05"),
+                &["chat-voice-discard"],
+            ),
+            (
+                State::Review,
+                minute,
+                "chat-voice-shape-stopped",
+                "Ferma",
+                Some("01:05"),
+                &["chat-voice-transfer", "chat-voice-discard"],
+            ),
+            (
+                State::Error(Fault::MicrophoneMissing),
+                Duration::ZERO,
+                "chat-voice-shape-error",
+                "Errore",
+                None,
+                &["chat-voice-discard"],
+            ),
+            (
+                State::Error(Fault::MicrophoneLost),
+                minute,
+                "chat-voice-shape-error",
+                "Errore",
+                Some("01:05"),
+                &["chat-voice-transfer", "chat-voice-discard"],
+            ),
+            (
+                State::Error(Fault::PermissionDenied),
+                Duration::ZERO,
+                "chat-voice-shape-error",
+                "Errore",
+                None,
+                &["chat-voice-discard"],
+            ),
+        ];
+        let host = Host::new();
+        let (view, cx, _remote) =
+            recording_app(cx, &host, Session::synthetic(State::Disclosure, ""));
+        let requests = host.request_count();
+        for (state, elapsed, shape, word, clock, commands) in cases {
+            let keeps_text = elapsed > Duration::ZERO && state.reviewable();
+            cx.update_window_entity(&view, |app, _, cx| {
+                let work = app.chat_access.voice.work.as_mut().unwrap();
+                *work = Work::new(
+                    work.binding.clone(),
+                    work.pending.clone(),
+                    Session::synthetic_at(state, elapsed, if keeps_text { text } else { "" }),
+                );
+                app.chat_access
+                    .voice
+                    .editor
+                    .update(cx, |input, cx| input.set_content("", cx));
+                app.poll_chat_voice(cx);
+            });
+            let (ids, labels) = voice_page(cx, "chat-voice");
+            assert_eq!(ids, commands, "{state:?}: {labels:?}");
+            assert_eq!(shapes(cx), [shape], "{state:?}");
+            assert!(shows(&labels, word), "{state:?}: {labels:?}");
+            for other in ["Pronta", "In registrazione", "In pausa", "Ferma", "Errore"] {
+                assert!(
+                    other == word || !shows(&labels, other),
+                    "{state:?}: {labels:?}"
+                );
+            }
+            match clock {
+                Some(clock) => assert!(shows(&labels, clock), "{state:?}: {labels:?}"),
+                None => assert!(!labels.iter().any(|l| l.contains(":0")), "{labels:?}"),
+            }
+            if let State::Error(fault) = state {
+                assert!(shows(&labels, fault.message()), "{state:?}: {labels:?}");
+            }
+            cx.update_window_entity(&view, |app, _, cx| {
+                let shown = app.chat_access.voice.editor.read(cx).value().to_owned();
+                assert_eq!(shown, if keeps_text { text } else { "" }, "{state:?}");
+                assert!(app.form.is_none(), "{state:?}: a writer opened by itself");
+            });
+        }
+        assert_eq!(host.request_count(), requests, "no write and no model call");
+    }
+
+    /// Il tempo sullo schermo scorre in registrazione e resta fermo in pausa.
+    #[gpui::test]
+    fn the_clock_on_screen_runs_while_recording_and_stops_in_pause(cx: &mut gpui::TestAppContext) {
+        use std::time::{Duration, Instant};
+        let host = Host::new();
+        let start = Duration::from_millis(59_400);
+        let (view, cx, _remote) = recording_app(
+            cx,
+            &host,
+            Session::synthetic_at(State::Recording, start, ""),
+        );
+        cx.update_window_entity(&view, |app, _, cx| app.poll_chat_voice(cx));
+        let (_, labels) = voice_page(cx, "chat-voice");
+        assert!(shows(&labels, "00:59"), "{labels:?}");
+        let begun = Instant::now();
+        let mut redrawn = false;
+        while begun.elapsed() < Duration::from_secs(2) && !redrawn {
+            std::thread::sleep(Duration::from_millis(50));
+            redrawn = cx.update_window_entity(&view, |app, _, cx| {
+                app.poll_chat_voice(cx);
+                app.chat_access.voice.work.as_ref().unwrap().clock == "01:00"
+            });
+        }
+        assert!(redrawn, "clock did not advance");
+        let (_, labels) = voice_page(cx, "chat-voice");
+        assert!(shows(&labels, "01:00"), "{labels:?}");
+        cx.update_window_entity(&view, |app, _, cx| {
+            let work = app.chat_access.voice.work.as_mut().unwrap();
+            *work = Work::new(
+                work.binding.clone(),
+                work.pending.clone(),
+                Session::synthetic_at(State::Paused, start, ""),
+            );
+            app.poll_chat_voice(cx);
+        });
+        std::thread::sleep(Duration::from_millis(1_100));
+        cx.update_window_entity(&view, |app, _, cx| app.poll_chat_voice(cx));
+        let (_, labels) = voice_page(cx, "chat-voice");
+        assert!(shows(&labels, "00:59"), "{labels:?}");
+        assert!(
+            shows(&labels, "Microfono chiuso fino alla ripresa."),
+            "{labels:?}"
+        );
+    }
+
+    /// Il microfono si stacca a metà: la finestra lo dice subito, la cattura è
+    /// chiusa, il testo fin lì resta da rivedere e nulla si scrive senza gesto.
+    #[gpui::test]
+    fn microphone_lost_midway_is_shown_at_once_and_keeps_the_text_unsaved(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use crate::local_voice::listening::tests::{
+            CountingDecoder, LoudnessDetector, silence, tone,
+        };
+        use crate::local_voice::whisper::{WhisperSession, tests::InjectedSource};
+        let host = Host::new();
+        let mut audio = Vec::new();
+        for _ in 0..10 {
+            audio.extend(tone(2.0));
+            audio.extend(silence(1.0));
+        }
+        let mut source = InjectedSource::paced(audio, 10.0);
+        source.fail_at = Some(9 * 16_000);
+        let log = source.log.clone();
+        let whisper = WhisperSession::with_parts(
+            LoudnessDetector,
+            CountingDecoder::default(),
+            Box::new(source),
+        );
+        let (view, cx, _remote) = recording_app(cx, &host, Session::with_whisper(whisper));
+        let requests = host.request_count();
+        cx.update_window_entity(&view, |app, _, cx| {
+            app.chat_access.voice.work.as_ref().unwrap().session.start();
+            app.poll_chat_voice(cx);
+        });
+        let mut seen = Vec::new();
+        for _ in 0..2_000 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            let (state, filled) = cx.update_window_entity(&view, |app, _, cx| {
+                app.poll_chat_voice(cx);
+                let work = app.chat_access.voice.work.as_ref().unwrap();
+                (work.state, work.filled)
+            });
+            if seen.last() != Some(&state) {
+                seen.push(state);
+            }
+            if filled {
+                break;
+            }
+        }
+        let lost = State::Error(Fault::MicrophoneLost);
+        assert_eq!(seen.last(), Some(&lost), "{seen:?}");
+        assert!(seen.contains(&State::Recording), "{seen:?}");
+        assert_eq!(
+            *log.lock().unwrap(),
+            ["start", "stop"],
+            "microphone left open"
+        );
+        let (ids, labels) = voice_page(cx, "chat-voice");
+        assert_eq!(shapes(cx), ["chat-voice-shape-error"]);
+        assert!(shows(&labels, "Errore"), "{labels:?}");
+        assert!(
+            shows(&labels, Fault::MicrophoneLost.message()),
+            "{labels:?}"
+        );
+        assert!(!shows(&labels, "In registrazione"), "{labels:?}");
+        assert_eq!(
+            ids,
+            ["chat-voice-transfer", "chat-voice-discard"],
+            "{labels:?}"
+        );
+        let kept = cx.update_window_entity(&view, |app, _, cx| {
+            assert!(app.form.is_none(), "a writer opened by itself");
+            app.chat_access.voice.editor.read(cx).value().to_owned()
+        });
+        assert_eq!(kept.matches("parola").count(), 3 * 4, "{kept}");
+        assert_eq!(host.request_count(), requests, "nothing saved");
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.transfer_chat_voice(window, cx);
+            let form = app.form.as_ref().unwrap();
+            assert!(form.kind == FormKind::Entry && form.state == FormState::Draft);
+            assert_eq!(form.fields[2].editor.read(cx).value(), kept);
+        });
+        assert_eq!(host.request_count(), requests, "the draft is not saved");
     }
 }
