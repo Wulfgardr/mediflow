@@ -373,7 +373,7 @@ final class SettingsAmbulatoriesModel: ObservableObject {
         }
         guard isConflict else { return false }
         await load()
-        message = "I dati sono cambiati sull'host. La lista è stata aggiornata."
+        message = "I dati sono cambiati sull'home-base. La lista è stata aggiornata."
         return true
     }
 
@@ -417,7 +417,7 @@ final class SettingsAiFunctionsModel: ObservableObject {
     func load() async {
         guard let connection = connectionProvider() else {
             runtime = nil
-            state = .unavailable("Collega l'home-base e accedi con il PIN operatore per consultare le funzioni AI.")
+            state = .unavailable("Collega l'home-base e accedi con il PIN operatore per consultare le funzioni IA.")
             return
         }
 
@@ -626,9 +626,9 @@ struct SettingsWorkspaceView: View {
             case .access: "Accesso"
             case .profile: "Profilo"
             case .ambulatories: "Ambulatori"
-            case .ai: "Funzioni AI"
+            case .ai: "Funzioni IA"
             #if os(macOS)
-            case .aiPreferences: "Preferenze AI"
+            case .aiPreferences: "Preferenze IA"
             #endif
             case .appearance: "Aspetto"
             case .privacy: "Privacy"
@@ -762,7 +762,7 @@ struct SettingsWorkspaceView: View {
             settingsMessage("L’ascolto non è disponibile su questo computer. Puoi scrivere la voce a mano.")
         }
         #endif
-        Text("Stato dei servizi AI in sola lettura.")
+        Text("Stato dei servizi IA in sola lettura.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
 
@@ -771,10 +771,10 @@ struct SettingsWorkspaceView: View {
         if aiFunctionsModel.state == .loading {
             ProgressView()
         } else if let runtime = aiFunctionsModel.runtime, aiFunctionsModel.state == .loaded {
-            settingsStatusRow("Patient Insight", value: aiFunctionState(runtime.killSwitches.patientInsight))
+            settingsStatusRow("Quadro paziente", value: aiFunctionState(runtime.killSwitches.patientInsight))
             settingsStatusRow("Document Synthesis", value: aiFunctionState(runtime.killSwitches.documentSynthesis))
             settingsStatusRow("Smart Import", value: aiFunctionState(runtime.killSwitches.smartImport))
-            settingsStatusRow("Piano AI", value: runtime.plane)
+            settingsStatusRow("Piano IA", value: runtime.plane)
             settingsStatusRow("Modalità", value: runtime.mode)
             settingsStatusRow("Runtime locale", value: "\(runtime.localRuntime.state), \(runtime.localRuntime.provider)")
             settingsStatusRow("Runtime centrale", value: runtime.centralRuntime.state)

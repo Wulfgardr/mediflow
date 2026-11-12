@@ -4,6 +4,28 @@ import XCTest
 /// the app launches into the overview and the Liquid Glass tab bar drives the
 /// sections. These exercise the real navigation, not just that it compiles.
 final class MediFlowMobileAppUITests: XCTestCase {
+    func testWUL825CopyCaptures() {
+        app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+        launch()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-cell-")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        row.tap()
+        let edit = app.buttons["edit-patient-button"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 15))
+        attachScreenshot(named: "wul825-patient-chart")
+        edit.tap()
+        let year = app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Conosco solo l’anno")).firstMatch
+        for _ in 0..<8 where !year.isHittable { app.swipeUp() }
+        XCTAssertTrue(year.waitForExistence(timeout: 10))
+        attachScreenshot(named: "wul825-birth-year")
+        app.terminate()
+        launch()
+        let agenda = tab("Agenda")
+        XCTAssertTrue(agenda.waitForExistence(timeout: 15))
+        agenda.tap()
+        attachScreenshot(named: "wul825-agenda")
+    }
+
     func testPatientHeaderHillclimbCaptures() {
         for (theme, size) in [("Light", ""), ("Dark", ""), ("Light", "accessibility3")] {
             app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
@@ -82,7 +104,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["patient-detail-name"].waitForExistence(timeout: 10))
         let destinations: [(String, String, PatientSection)] = [
             ("therapies", "Apri Terapie attive, 1", .therapies),
-            ("measures", "Apri Misure, 5", .clinical),
+            ("measures", "Apri Parametri, 5", .clinical),
             ("diary", "Apri Diario, 3", .diary),
             ("scales", "Apri Scale, 0", .scales),
         ]

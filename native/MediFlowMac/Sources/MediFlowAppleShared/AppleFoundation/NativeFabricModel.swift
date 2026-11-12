@@ -6,7 +6,7 @@ import MediFlowCore
 final class NativeFabricModel: ObservableObject {
     enum Phase: Equatable { case idle, preparing, ready, generating, completed, closing, blocked }
     @Published private(set) var phase: Phase = .idle
-    @Published private(set) var message = "Usa la funzione locale già configurata sull’host."
+    @Published private(set) var message = "Usa la funzione locale già configurata sull’home-base."
     @Published private(set) var proposal: NativeOrdinaryJSON?
     @Published private(set) var selection: NativeFabricSelection?
     @Published private(set) var isWorking = false
@@ -81,7 +81,7 @@ final class NativeFabricModel: ObservableObject {
         do {
             let source = try snapshot().retained; original = source; generation &+= 1; let epoch = generation
             phase = .preparing; isWorking = true; preparationInFlight = true; expiry = .infinity
-            message = "Verifica delle fonti e della funzione locale sull’host…"
+            message = "Verifica delle fonti e della funzione locale sull’home-base…"
             let token = UUID(); authorityToken = token; preparationToken = token
             task = Task {
                 defer { if preparationToken == token { preparationInFlight = false; preparationToken = nil } }
@@ -108,7 +108,7 @@ final class NativeFabricModel: ObservableObject {
                     }
                     guard value.phase == "ready", value.attemptId != nil, let choice = value.selection, let deadline = value.expiresAt else { throw NativeOrdinaryContractError.invalid }
                     projection = nil; selection = choice; expiry = deadline; phase = .ready; isWorking = false
-                    message = "Fonti pronte. Genera sul Mac con il modello configurato dall’host."
+                    message = "Fonti pronte. Genera sul Mac con il modello configurato dall’home-base."
                     watch(epoch, source)
                 } catch { if generation == epoch { fail(error, source) } }
             }
@@ -118,14 +118,14 @@ final class NativeFabricModel: ObservableObject {
         guard phase == .ready, !isWorking, let source = original, let id = attemptId,
               let choice = selection, current(generation, source) else { invalidate(); return }
         let epoch = generation
-        phase = .generating; isWorking = true; message = "Elaborazione locale sull’host…"
+        phase = .generating; isWorking = true; message = "Elaborazione locale sull’home-base…"
         task = Task {
             do {
                 let response = try await services.command(.generate(id), source.connection)
                 guard current(epoch, source) else { if generation == epoch { invalidate() }; return }
                 proposal = try response.validatedProposal(function: function, attempt: id, expected: choice)
                 phase = .completed; isWorking = false
-                message = "Proposta locale da verificare sulle fonti. Nessuna modifica alla cartella."
+                message = "Proposta locale da verificare sulle fonti."
             } catch { if generation == epoch { fail(error, source) } }
         }
     }
@@ -171,14 +171,14 @@ final class NativeFabricModel: ObservableObject {
         let reason: String
         switch error {
         case let failure as NativeFabricFailure: reason = failure.code.message
-        case HomeBaseClientError.transport(.unreachable): reason = "Host non raggiungibile."
+        case HomeBaseClientError.transport(.unreachable): reason = "Home-base non raggiungibile."
         case HomeBaseClientError.transport(.timeout): reason = "Tempo di risposta scaduto."
         case NativeOrdinaryContractError.stale: reason = "Il contesto è cambiato o è scaduto."
         default: reason = "Funzione locale non disponibile o risposta non verificata."
         }
-        close(source, message: reason + " Nessuna alternativa avviata; nessuna modifica alla cartella.")
+        close(source, message: reason + " Nessuna alternativa avviata.")
     }
-    private func close(_ source: NativeOrdinarySnapshot, allowRetirement: Bool = false, message closedMessage: String = "Operazione chiusa. Nessuna modifica alla cartella.") {
+    private func close(_ source: NativeOrdinarySnapshot, allowRetirement: Bool = false, message closedMessage: String = "Operazione chiusa.") {
         let id = attemptId, plan = projection, epoch = generation
         phase = .closing; isWorking = true; message = "Chiusura dell’operazione locale…"
         task = Task {
@@ -207,7 +207,7 @@ final class NativeFabricModel: ObservableObject {
             } catch {
                 guard generation == epoch else { return }
                 phase = .blocked; isWorking = false
-                message = (closedMessage.hasPrefix("Operazione chiusa.") ? "" : closedMessage + " ") + "Chiusura non confermata. Verifica la chiusura prima di avviare un’altra proposta. Nessuna modifica alla cartella."
+                message = (closedMessage.hasPrefix("Operazione chiusa.") ? "" : closedMessage + " ") + "Chiusura non confermata. Verifica la chiusura prima di avviare un’altra proposta."
             }
         }
     }
