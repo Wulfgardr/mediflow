@@ -272,5 +272,23 @@
     "unresolvedVisibleBefore": 16,
     "unresolvedVisibleAfter": 33,
     "pass": true
+  },
+  "deliveryBaseMain": "7130e2405dca7cbc758466ce740b8857020c6936",
+  "deliveryUnitComparison": {
+    "main": {
+      "tests": 9218,
+      "pass": 9087,
+      "fail": 99,
+      "skipped": 32
+    },
+    "pr938": {
+      "tests": 9221,
+      "pass": 9090,
+      "fail": 99,
+      "skipped": 32
+    },
+    "commonFailedNames": 99,
+    "onlyMain": 0,
+    "onlyPr938": 0
   }
 }
