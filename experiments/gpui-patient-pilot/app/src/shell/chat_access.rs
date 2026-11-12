@@ -200,13 +200,14 @@ fn catalog_copy(prosthetics: bool) -> (&'static str, &'static str) {
 }
 
 impl ClinicalApp {
-    /// L'area della funzione generativa che la chat chiede: ogni funzione ha la sua,
+    /// L'area della funzione che la chat chiede: ogni funzione ha la sua,
     /// con il suo legame.
     fn chat_area(&mut self, function: Function) -> &mut dyn ChatArea {
         match function {
             Function::Insight => &mut self.patient.insight,
             Function::Synthesis => &mut self.patient.synthesis.area,
             Function::Import => &mut self.patient.smart_import,
+            Function::Icd => &mut self.who,
         }
     }
 
@@ -260,7 +261,7 @@ impl ClinicalApp {
         let access = self.local_host.access();
         let early = if occupied {
             Some(Stage::Busy)
-        } else if access.is_none() {
+        } else if access.is_none() && function != Function::Icd {
             Some(Stage::Unavailable)
         } else {
             None
@@ -280,11 +281,13 @@ impl ClinicalApp {
                 if !chat_access::owner::admit_function(&admitting) {
                     return Ok(None);
                 }
-                let access = access.unwrap();
                 let enabled = match function {
-                    Function::Insight => true,
-                    Function::Synthesis => access.document_synthesis_enabled().unwrap_or(false),
-                    Function::Import => access.smart_import_enabled().unwrap_or(false),
+                    Function::Insight | Function::Icd => true,
+                    Function::Synthesis => access
+                        .unwrap()
+                        .document_synthesis_enabled()
+                        .unwrap_or(false),
+                    Function::Import => access.unwrap().smart_import_enabled().unwrap_or(false),
                 };
                 Ok(Some(enabled))
             },
@@ -316,6 +319,18 @@ impl ClinicalApp {
                 }
                 this.chat_area(function).admitted();
                 match function {
+                    Function::Icd => {
+                        if this.patient_section != PatientSection::Overview {
+                            this.section_selected(PatientSection::Overview, cx);
+                        }
+                        this.who
+                            .open_for_patient(patient_id.clone(), &this.profile_scroll, cx);
+                        this.reference_search
+                            .update(cx, |input, cx| input.set_content("", cx));
+                        if let Ok(mut pending) = target.lock() {
+                            pending.finish_function_open(Stage::Opened);
+                        }
+                    }
                     Function::Insight => {
                         if this.patient_section != PatientSection::Overview {
                             this.section_selected(PatientSection::Overview, cx);

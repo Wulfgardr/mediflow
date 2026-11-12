@@ -51,6 +51,10 @@ impl State {
             Self::Generative(Function::Import, Stage::Unavailable) => "import-unavailable",
             Self::Generative(Function::Import, Stage::Busy) => "import-busy",
             Self::Generative(Function::Import, Stage::Closed) => "import-closed",
+            Self::Generative(Function::Icd, Stage::Opened) => "icd-opened",
+            Self::Generative(Function::Icd, Stage::Unavailable) => "icd-unavailable",
+            Self::Generative(Function::Icd, Stage::Busy) => "icd-busy",
+            Self::Generative(Function::Icd, Stage::Closed) => "icd-closed",
             Self::Preparing => "preparing",
             Self::Selecting => "selecting",
             Self::Challenge => "challenge",
@@ -69,10 +73,15 @@ pub(crate) enum Function {
     Insight,
     Synthesis,
     Import,
+    Icd,
 }
 impl Function {
-    pub(crate) const ALL: [Function; 3] =
-        [Function::Insight, Function::Synthesis, Function::Import];
+    pub(crate) const ALL: [Function; 4] = [
+        Function::Insight,
+        Function::Synthesis,
+        Function::Import,
+        Function::Icd,
+    ];
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1664,7 +1673,7 @@ pub(crate) mod tests {
     }
 
     /// Solo questi stati possono tornare alla chat dal comando del Quadro paziente.
-    const INSIGHT_WIRE: [&str; 14] = [
+    const INSIGHT_WIRE: [&str; 18] = [
         "requested",
         "preparing",
         "insight-opened",
@@ -1679,6 +1688,10 @@ pub(crate) mod tests {
         "import-unavailable",
         "import-busy",
         "import-closed",
+        "icd-opened",
+        "icd-unavailable",
+        "icd-busy",
+        "icd-closed",
     ];
     fn insight_reply(pending: &Pending) -> Value {
         let status = pending.lock().unwrap().status();
@@ -1726,7 +1739,11 @@ pub(crate) mod tests {
                 "import-opened",
                 "import-unavailable",
                 "import-busy",
-                "import-closed"
+                "import-closed",
+                "icd-opened",
+                "icd-unavailable",
+                "icd-busy",
+                "icd-closed"
             ]
         );
         assert!(super::super::is_synthesis_command(
@@ -3385,5 +3402,26 @@ pub(crate) mod tests {
             State::Write(ChatWriteResolution::Uncertain)
         );
         assert_eq!(request.safe_result().unwrap()["outcome"], "unknown");
+    }
+    #[test]
+    fn icd_command_carries_no_patient_query_or_write_fields() {
+        assert_eq!(
+            super::super::generative_function(&json!({"command":"icd-lookup"})),
+            Some(Function::Icd)
+        );
+        for field in [
+            "patientId",
+            "scope",
+            "query",
+            "code",
+            "apply",
+            "payload",
+            "model",
+            "token",
+        ] {
+            let mut command = json!({"command":"icd-lookup"});
+            command[field] = json!("foreign");
+            assert_eq!(super::super::generative_function(&command), None, "{field}");
+        }
     }
 }
