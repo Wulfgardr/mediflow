@@ -961,7 +961,10 @@ mod tests {
                 "response_invalid",
                 "La risposta dell'home-base non ha superato i controlli dell'app.",
             ),
-            ("codice-sconosciuto", "L'home-base ha rifiutato la richiesta."),
+            (
+                "codice-sconosciuto",
+                "L'home-base ha rifiutato la richiesta.",
+            ),
         ] {
             assert_eq!(document_synthesis_message(code), expected, "{code}");
         }

@@ -948,7 +948,9 @@ pub fn smart_import_message(code: &str) -> &'static str {
         | "request_replayed"
         | "broker_revoked"
         | "selection_busy"
-        | "owner_unavailable" => "La selezione sull’home-base è cambiata durante la richiesta. Riprova.",
+        | "owner_unavailable" => {
+            "La selezione sull’home-base è cambiata durante la richiesta. Riprova."
+        }
         "session_unavailable" | "session_ineligible" => {
             "La sessione dell’home-base non è più valida. Riapri l’accesso locale."
         }

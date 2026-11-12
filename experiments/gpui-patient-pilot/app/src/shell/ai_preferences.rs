@@ -267,7 +267,8 @@ impl ClinicalApp {
         };
         self.ai_preferences.working = Some(Working::Save);
         self.ai_preferences.failed = false;
-        self.ai_preferences.message = "Salvataggio e rilettura delle preferenze sull’home-base…".into();
+        self.ai_preferences.message =
+            "Salvataggio e rilettura delle preferenze sull’home-base…".into();
         self.run(
             move || session.apply_ai_preferences(&context, &preview),
             Self::receive_ai_preferences_readback,
@@ -285,7 +286,8 @@ impl ClinicalApp {
                 self.ai_preferences.observed(result.observed);
                 if result.matches_confirmation {
                     self.ai_preferences.draft = None;
-                    self.ai_preferences.message = "Preferenze salvate e rilette dall’home-base.".into();
+                    self.ai_preferences.message =
+                        "Preferenze salvate e rilette dall’home-base.".into();
                 } else {
                     self.ai_preferences.message = "L’home-base è cambiato dopo la conferma. Mostro la configurazione riletta; verifica la bozza prima di una nuova anteprima.".into();
                     self.ai_preferences.failed = true;
