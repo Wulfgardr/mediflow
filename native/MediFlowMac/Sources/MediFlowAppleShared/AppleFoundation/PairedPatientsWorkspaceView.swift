@@ -15,7 +15,6 @@ struct PairedPatientsWorkspaceView: View {
     @State private var summaryReturn: PatientChartSummaryReturn?
     #if os(macOS)
     @State private var macDetailWidth: CGFloat = 0
-    @EnvironmentObject private var recording: VisitRecordingLumeCoordinator
     #endif
     #if os(iOS)
     @StateObject private var chartScrollMemory = PatientChartScrollMemory()
@@ -96,9 +95,6 @@ struct PairedPatientsWorkspaceView: View {
 
     var body: some View {
         deleteDialogWorkspace
-        #if os(macOS)
-            .modifier(VisitRecordingWorkspaceScope(model: model))
-        #endif
     }
 
     private var platformWorkspace: some View {
@@ -1144,11 +1140,9 @@ struct PairedPatientsWorkspaceView: View {
                     }
                 }
                 Spacer(minLength: 8)
-                let listening = recording.state == .recording || recording.state == .finalizing || recording.state == .starting
-                if listening { Text("Ferma l’ascolto prima di registrare").font(.caption) }
                 Button("Registra") { Task { await model.createEntryForSelectedPatient() } }
                     .buttonStyle(LumePrimaryButtonStyle())
-                    .disabled(!model.canCreateEntry || listening)
+                    .disabled(!model.canCreateEntry)
                     .accessibilityIdentifier("homebase-create-entry-button")
             }
             .padding(16)

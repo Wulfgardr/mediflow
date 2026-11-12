@@ -4,9 +4,6 @@ import SwiftUI
 struct PairedDiaryComposerView: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @ObservedObject var capabilities: ClinicalWorkspaceCapabilitiesStore
-    #if os(macOS)
-    @EnvironmentObject private var recording: VisitRecordingLumeCoordinator
-    #endif
     @Binding var confirmsReplacingEntryTemplate: Bool
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.lumeGuardia) private var isGuardia
@@ -43,24 +40,12 @@ struct PairedDiaryComposerView: View {
         .buttonStyle(.bordered)
         #endif
         // Keep the opened form mounted through save/error and while reading.
-        // The workspace retains finalized recording review; hidden capture stops.
-    }
-
-    private var isListening: Bool {
-        #if os(macOS)
-        return recording.state == .recording || recording.state == .finalizing || recording.state == .starting
-        #else
-        return false
-        #endif
     }
 
     private var hasPendingNewEntry: Bool { model.hasNewEntryDraft || hasPendingVisitDraft }
 
     private var hasPendingVisitDraft: Bool {
-        #if os(macOS)
-        if recording.hasPendingReview { return true }
-        #endif
-        return !model.newEntryVisitTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !model.newEntryVisitTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || model.newEntryVisitDraftResponse != nil
     }
 
@@ -238,8 +223,7 @@ struct PairedDiaryComposerView: View {
             }
             if capabilities.hasCapability("network.compute.visit-draft") {
                 Divider()
-                // Opening is one-way for this mounted composer: collapsing the
-                // recording shell would cancel its local capture/review lifecycle.
+                // Opening is one-way for this mounted composer.
                 if hasOpenedVisitDraft {
                     VisitDraftComposerView(model: model)
                 } else {

@@ -86,7 +86,7 @@ final class ClinicalCardStyleTests: XCTestCase {
         let composer = try appleSource("AppleFoundation/PairedDiaryComposerView.swift")
         XCTAssertTrue(workspace.contains("private var macDiaryWritingThreshold"))
         XCTAssertTrue(workspace.contains(".keyboardShortcut(\"n\", modifiers: [.command, .shift])"))
-        XCTAssertTrue(workspace.contains(".disabled(!model.canCreateEntry || listening)"))
+        XCTAssertTrue(workspace.contains(".disabled(!model.canCreateEntry)"))
         XCTAssertFalse(composer.contains("homebase-create-entry-button"))
         XCTAssertFalse(composer.contains("homebase-open-new-entry-button"))
         XCTAssertTrue(composer.contains("minimumTextHeight: newEntryMinimumTextHeight"))

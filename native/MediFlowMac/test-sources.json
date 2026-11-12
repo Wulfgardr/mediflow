@@ -26,8 +26,7 @@
     "SQLitePatientStoreTests.swift",
     "SQLiteVendorTests.swift",
     "ServicePrescriptionParsingTests.swift",
-    "SyntheticSQLiteFixtureTestCase.swift",
-    "VisitRecordingStateContractTests.swift"
+    "SyntheticSQLiteFixtureTestCase.swift"
   ],
   "MediFlowAppleSharedTests": [
     "APIContractsTests.swift",
@@ -109,10 +108,6 @@
     "TherapyFilteringTests.swift",
     "TherapyPlanDocumentTests.swift",
     "TreatmentReasoningPresentationTests.swift",
-    "VersionConflictPresentationTests.swift",
-    "VisitRecordingCaptureTests.swift",
-    "VisitRecordingLumeCoordinatorTests.swift",
-    "VisitRecordingPreflightTests.swift",
-    "VisitRecordingSyntheticBenchmarkTests.swift"
+    "VersionConflictPresentationTests.swift"
   ]
 }
