@@ -124,8 +124,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     // reference from this entry. Validated against model.attachments via
     // HomeBaseAttachmentReferenceValidator immediately before sealing.
     @Published var newEntryAttachmentIds: Set<String> = []
-    // S7 (D5, ADR 0076 Classe E): system dictation transcript -> compute
-    // visit-draft-only, never auto-saved. See computeVisitDraftForNewEntry.
+    // S7 (D5, ADR 0076 Classe E): transcript -> compute visit-draft-only,
+    // never auto-saved. See computeVisitDraftForNewEntry.
     @Published var newEntryVisitTranscript = "" {
         didSet {
             guard oldValue != newEntryVisitTranscript else { return }
@@ -1736,6 +1736,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /// operator gets the same honest ceiling before sending, not just a 413
     /// after the fact.
     static let maxVisitDraftTranscriptChars = 12_000
+    static let maxVisitDraftTranscriptUTF8Bytes = 256 * 1_024
 
     var canComputeVisitDraft: Bool {
         selectedPatient != nil
@@ -1744,7 +1745,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && connectionState == .pairedOnline
             && !newEntryVisitTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && newEntryVisitTranscript.count <= Self.maxVisitDraftTranscriptChars
-            && newEntryVisitTranscript.utf8.count <= VisitRecordingLimits.standard.maxTranscriptUTF8Bytes
+            && newEntryVisitTranscript.utf8.count <= Self.maxVisitDraftTranscriptUTF8Bytes
             && !isWorking
     }
 
