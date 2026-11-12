@@ -24,10 +24,11 @@ ricontrollati nei sorgenti al momento dell'implementazione.
 | Apple Vision | anydoc-apple-vision-ocr, anydoc-ocr-acceptance, anydoc-current-source-composition |
 | OCR desktop | anydoc-desktop-ocr-real forza MEDIFLOW_TEST_TESSERACT_REAL |
 | Motore dati personali | gliner-redaction-runner: protocollo, sandbox e rifiuto pesi alterati. Non misura la qualità del modello |
-| Voce locale | local-voice: contratto e doppio sintetico Swift. Whisper reale resta WUL-828 |
+| Voce locale | local-voice: contratto e guardia contro il motore Apple |
+| Ascolto della visita | prove-ascolto-visita: modello whisper installato, visita inventata a due voci generata con `say`. Attribuzione su almeno l'80% del parlato e calcolo sotto il tempo reale |
+| Microfono vero | non provato: richiede la voce di Leonardo, elenco qui sotto |
 | Contenitore Mac | execution-mac-probe: confini del processo sintetico |
 | Archivio Mac | backup-destination-policy e native-patient-document |
-| Registrazione | run-visit-recording-synthetic-benchmark: corpus sintetico e ricevuta Swift, richiede macOS 26 e risorse Speech italiane |
 | Aspetto 0.9.1 | qualify-visual-091 con browser sandbox e rete loopback |
 | Identità UI | non provato: web-regression è vincolato al vecchio banco /Volumes/Vision e reference.json |
 
@@ -35,14 +36,30 @@ Gli skip di iPad D2, paired host, WHO, plugin installati, esecuzione di sorgenti
 Mac esterni, runtime redaction installer e prove Rust sperimentali restano nel
 censimento Q-8 e non diventano qualificati da questo comando. Non sono le prove
 D1/D3 scelte per questa lane. check-standalone-runtime-bundle controlla anche i vincoli Mac del runtime distribuito
-ed è incluso nel comando. VisitRecordingCaptureTests esercita la cattura sintetica Swift.
+ed è incluso nel comando.
 
-## Aggancio WUL-828
+## Ascolto della visita (WUL-828)
 
-Aggiungere una voce a `catalog(output)` in `scripts/prove-a-mano.mjs` sostituendo
-`voce-whisper-wul-828`. La voce espone `id`, `command` come array senza shell e
-`unavailable()` che restituisce il motivo quando mancano modello o strumenti.
-Usare solo audio sintetico e l'ambiente isolato fornito dal runner. Non avviare
-servizi sulle porte riservate. Uscita diversa da zero significa fallimento;
-un prerequisito assente deve essere dichiarato prima dell'avvio. Non scaricare
-modelli e non aprire il microfono nel controllo preliminare.
+`ascolto-visita-modello` lancia `scripts/prove-ascolto-visita.mjs` con i due file
+del modello installato da Impostazioni, Voce locale (nella HOME vera: il runner
+isola HOME). Genera con `say` una visita inventata a due voci, la passa al test
+Rust ignorato `real_model_long_session_in_segments` a blocchi come il microfono e
+controlla attribuzione e tempo di calcolo. Non scarica nulla e non apre il
+microfono. Senza macOS, cargo o modello la voce è dichiarata non provata prima
+dell'avvio.
+
+`ascolto-visita-microfono` resta non provata: va fatta a mano, con il microfono
+del Mac e la voce di Leonardo, nella seconda seduta.
+
+1. Dettatura: «Consenti e avvia», la forma diventa un cerchio pieno, la parola
+   «In registrazione», il tempo scorre. «Termina e trascrivi» porta a «Ferma».
+2. Pausa e ripresa: in pausa due barre, tempo fermo, indicatore arancione del
+   microfono di macOS spento. Alla ripresa il tempo riparte da dove era.
+3. Microfono staccato a metà (cuffia Bluetooth o USB): «Errore» entro due
+   secondi, nessuna registrazione dopo, testo fin lì da rivedere.
+4. Permesso negato in Impostazioni di Sistema: «Errore» con il percorso per
+   abilitarlo.
+5. Ascolto della visita con una seconda persona: righe «Medico:» e «Paziente:»,
+   «Scambia medico e paziente», nomi dei farmaci proposti, bozza preparata solo
+   con il gesto e mai salvata da sola.
+6. Visita oltre 20 minuti: la revisione riceve tutto il testo.
