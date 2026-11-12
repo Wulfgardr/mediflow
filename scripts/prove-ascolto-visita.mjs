@@ -70,15 +70,23 @@ export function assemble(clips) {
   return { audio, timeline };
 }
 
-/** Quota del parlato attribuita alla persona giusta: ogni frase conta per la sua sovrapposizione con le battute. */
+/**
+ * Quota del parlato di riferimento attribuita alla persona giusta. Il denominatore è tutto
+ * il parlato delle battute: le parti che il riconoscitore perde contano come sbagliate, e
+ * frasi sovrapposte sulla stessa battuta non contano due volte.
+ */
 export function attributionScore(segments, timeline) {
   let right = 0, total = 0;
-  for (const [start, end, , speaker] of segments) {
-    const role = speaker === 'Medico' ? 'M' : speaker === 'Paziente' ? 'P' : undefined;
-    for (const turn of timeline) {
-      const overlap = Math.max(0, Math.min(end, turn.end) - Math.max(start, turn.start));
-      total += overlap;
-      if (turn.role === role) right += overlap;
+  for (const turn of timeline) {
+    total += turn.end - turn.start;
+    const covered = segments
+      .filter(([, , , speaker]) => (speaker === 'Medico' ? 'M' : speaker === 'Paziente' ? 'P' : undefined) === turn.role)
+      .map(([start, end]) => [Math.max(start, turn.start), Math.min(end, turn.end)])
+      .filter(([start, end]) => end > start)
+      .sort((a, b) => a[0] - b[0]);
+    let reached = turn.start;
+    for (const [start, end] of covered) {
+      if (end > reached) { right += end - Math.max(start, reached); reached = end; }
     }
   }
   return total > 0 ? right / total : 0;
