@@ -6,7 +6,7 @@ import { SETTINGS_CARD_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_
 
 const messages: Record<string, string> = {
     reading_configuration: 'Lettura della configurazione salvata e dello stato locale. Nessuna attivazione in corso.',
-    verifying: 'Verifica locale e possibile caricamento del modello in memoria in corso. La verifica host ha un limite di 60 secondi.',
+    verifying: 'Verifica locale e possibile caricamento del modello in memoria in corso. La verifica home-base ha un limite di 60 secondi.',
     reading_result: 'Rilettura dello stato del collegamento prima di mostrare l’esito.',
     reading_functions: 'Lettura delle abilitazioni delle funzioni. Non viene eseguita una generazione.',
     missing: 'Collegamento locale da attivare. Controlla i passaggi preparatori, poi avvia la verifica.',
@@ -68,7 +68,7 @@ export function LocalProviderOnboardingPanel({ configurationRevision = 0 }: { co
                 <li>Scegli un modello già installato e salva la configurazione qui sopra.</li>
                 <li>Rileggi lo stato, controlla il modello mostrato e conferma la verifica.</li>
             </ol>
-            <p>Se il caricamento non termina nel limite della verifica, prepara il modello con gli strumenti dell’host. Poi riprendi dalla lettura dello stato: non sono previsti tentativi automatici.</p>
+            <p>Se il caricamento non termina nel limite della verifica, prepara il modello con gli strumenti dell’home-base. Poi riprendi dalla lettura dello stato: non sono previsti tentativi automatici.</p>
         </details>
         {status?.model && <p>Modello salvato: <strong>{status.model}</strong></p>}
         <ol aria-label="Fasi del collegamento locale" className="list-decimal space-y-2 pl-5">

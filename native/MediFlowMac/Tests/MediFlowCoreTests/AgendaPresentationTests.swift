@@ -67,4 +67,15 @@ final class AgendaPresentationTests: XCTestCase {
         ]
         XCTAssertEqual(AgendaPresentation.agendaCandidates(from: checkups, now: now, calendar: calendar).map(\.id), ["equal-first", "equal-second", "three", "four", "five", "six"])
     }
+    func testAgendaGroupCountsDoNotReplaceFullTotals() {
+        let now = date(2026, 11, 12, 12)
+        let checkups = (0..<8).map { checkup("synthetic-\($0)", date(2026, 11, 12 + $0)) }
+        let visible = AgendaPresentation.agendaCandidates(from: checkups, now: now, calendar: calendar)
+        let planned = AgendaPresentation.countPlannedCheckups(checkups, now: now, calendar: calendar)
+        XCTAssertEqual(visible.count, 6)
+        XCTAssertEqual(planned, 8)
+        XCTAssertNotEqual(visible.count, planned)
+        print("WUL825_AGENDA: gruppi=\(visible.count), pianificate=\(planned)")
+    }
+
 }

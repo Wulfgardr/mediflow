@@ -308,11 +308,11 @@ enum PairedPatientsConnectionState: Equatable {
         case .cached:
             return .secondary
         case .pairedOnline:
-            return .green
+            return PlatformColors.signal(.positive)
         case .pairedOfflineDegraded:
-            return .orange
+            return PlatformColors.signal(.attention)
         case .sessionExpired:
-            return .orange
+            return PlatformColors.signal(.attention)
         }
     }
 }

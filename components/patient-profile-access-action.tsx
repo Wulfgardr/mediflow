@@ -37,7 +37,7 @@ export function PatientProfileAccessAction({ patientId, ambulatoryId, embedded =
     return <Container className={`${workspaceStyles.headerActionsMenu} print:hidden`} data-testid="patient-profile-access-action">
         {!embedded ? <summary className={`${workspaceStyles.headerActionButton} cursor-pointer min-h-11`}>Accesso assistente</summary> : null}
         <div className={embedded ? "space-y-3 text-sm" : "mf-popover fixed left-2 right-2 top-20 z-40 max-h-[75dvh] overflow-y-auto space-y-3 p-4 text-sm sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 sm:max-w-[calc(100vw-1rem)]"}>
-            <p>Autorizza una lettura del paziente selezionato. Non consente modifiche né abilita provider AI.</p>
+            <p>Autorizza una lettura del paziente selezionato. Non consente modifiche né abilita provider IA.</p>
             <label className="mf-field-label">Dati consentiti
                 <select className="mf-input w-full mt-1" value={projection} disabled={busy || active}
                     onChange={event => setProjection(event.target.value as 'none' | 'notes' | 'profile')}>

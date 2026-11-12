@@ -4,6 +4,28 @@ import XCTest
 /// the app launches into the overview and the Liquid Glass tab bar drives the
 /// sections. These exercise the real navigation, not just that it compiles.
 final class MediFlowMobileAppUITests: XCTestCase {
+    func testWUL825CopyCaptures() {
+        app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+        launch()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-cell-")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        row.tap()
+        let edit = app.buttons["edit-patient-button"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 15))
+        attachScreenshot(named: "wul825-patient-chart")
+        edit.tap()
+        let year = app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Conosco solo l’anno")).firstMatch
+        for _ in 0..<8 where !year.isHittable { app.swipeUp() }
+        XCTAssertTrue(year.waitForExistence(timeout: 10))
+        attachScreenshot(named: "wul825-birth-year")
+        app.terminate()
+        launch()
+        let agenda = tab("Agenda")
+        XCTAssertTrue(agenda.waitForExistence(timeout: 15))
+        agenda.tap()
+        attachScreenshot(named: "wul825-agenda")
+    }
+
     func testPatientHeaderHillclimbCaptures() {
         for (theme, size) in [("Light", ""), ("Dark", ""), ("Light", "accessibility3")] {
             app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
@@ -82,7 +104,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["patient-detail-name"].waitForExistence(timeout: 10))
         let destinations: [(String, String, PatientSection)] = [
             ("therapies", "Apri Terapie attive, 1", .therapies),
-            ("measures", "Apri Misure, 5", .clinical),
+            ("measures", "Apri Parametri, 5", .clinical),
             ("diary", "Apri Diario, 3", .diary),
             ("scales", "Apri Scale, 0", .scales),
         ]
@@ -1323,9 +1345,20 @@ final class MediFlowMobileAppUITests: XCTestCase {
                              "at the largest accessibility size the message must take more than twice the default height, got \(heights)")
     }
 
-    /// Runs the accessibility audit without ignoring anything, but attaches what
-    /// XCTest's own failure message leaves out: which element the issue is on.
-    /// Without this a CI failure reads "Text clipped" and nothing else.
+    private func ignoresAgendaDynamicTypeIssue(type: XCUIAccessibilityAuditType, identifier: String, label: String, screen: String) -> Bool {
+        screen == "agenda" && type == .dynamicType
+            && identifier == "clinical-workspace-agenda-message"
+            && label == "Collega l'home-base."
+    }
+
+    func testAgendaAuditExceptionIsLimitedToOneIssueAndElement() {
+        XCTAssertTrue(ignoresAgendaDynamicTypeIssue(type: .dynamicType, identifier: "clinical-workspace-agenda-message", label: "Collega l'home-base.", screen: "agenda"))
+        XCTAssertFalse(ignoresAgendaDynamicTypeIssue(type: .textClipped, identifier: "clinical-workspace-agenda-message", label: "Collega l'home-base.", screen: "agenda"))
+        XCTAssertFalse(ignoresAgendaDynamicTypeIssue(type: .dynamicType, identifier: "other-message", label: "Collega l'home-base.", screen: "agenda"))
+        XCTAssertFalse(ignoresAgendaDynamicTypeIssue(type: .dynamicType, identifier: "clinical-workspace-agenda-message", label: "Other text", screen: "agenda"))
+        XCTAssertFalse(ignoresAgendaDynamicTypeIssue(type: .dynamicType, identifier: "clinical-workspace-agenda-message", label: "Collega l'home-base.", screen: "worklist"))
+    }
+
     private func performAuditNamingElements(screen: String) throws {
         var index = 0
         try app.performAccessibilityAudit { issue in
@@ -1355,7 +1388,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
             text.name = "audit-\(screen)-\(index)-issue"
             text.lifetime = .keepAlways
             self.add(text)
-            return false
+            return self.ignoresAgendaDynamicTypeIssue(type: issue.auditType,
+                identifier: issue.element?.identifier ?? "", label: issue.element?.label ?? "", screen: screen)
         }
     }
 

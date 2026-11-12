@@ -6,13 +6,19 @@
 use super::generation::{GenerationArea, GenerationPhase, Wipe, pencil_block};
 use super::*;
 use mediflow_runtime_client::{
-    LocalHostAccess, PatientInsightOutcome, PatientInsightProposal, PatientInsightRequest,
-    build_patient_insight_request, cited_sources, patient_insight_capture, patient_insight_message,
-    patient_insight_sources,
+    LocalHostAccess, PATIENT_INSIGHT_REVIEW_NOTICE, PatientInsightOutcome, PatientInsightProposal,
+    PatientInsightRequest, build_patient_insight_request, cited_sources, patient_insight_capture,
+    patient_insight_message, patient_insight_sources,
 };
 use serde_json::Value;
 use std::sync::Arc;
 use zeroize::Zeroize;
+
+// Nei test i testi dipinti del Quadro si leggono nell'ordine in cui compaiono.
+#[cfg(test)]
+macro_rules! text {
+    ($($args:tt)*) => { crate::shell::rendered_command::observe_ink(gpui::text!($($args)*)) };
+}
 
 pub(super) type InsightPhase = GenerationPhase<PatientInsightRequest, PatientInsightProposal>;
 /// Stato del Quadro paziente, legato a una sola scheda: cambia con `PatientData`.
@@ -103,7 +109,7 @@ impl ClinicalApp {
         }
         let Some(access) = self.local_host.access() else {
             self.patient.insight.end(InsightPhase::Unavailable(
-                "Host locale chiuso. Il Quadro paziente si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.".into(),
+                "Accesso locale chiuso. Il Quadro paziente si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.".into(),
             ));
             cx.notify();
             return;
@@ -180,7 +186,7 @@ impl ClinicalApp {
         let consented_revision = consented.patient_revision;
         let Some(access) = self.local_host.access() else {
             self.patient.insight.end(InsightPhase::Unavailable(
-                "Host locale chiuso. Nessun dato è stato inviato.".into(),
+                "Accesso locale chiuso. Nessun dato è stato inviato.".into(),
             ));
             cx.notify();
             return;
@@ -349,19 +355,19 @@ impl ClinicalApp {
                 if self.local_host.access().is_none() {
                     return pane.child(notice(
                         "patient-insight-host-closed",
-                        "Host locale chiuso. Il Quadro paziente si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.",
+                        "Accesso locale chiuso. Il Quadro paziente si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.",
                         theme,
                         false,
                     ));
                 }
                 pane = pane
-                    .child(muted("Un riepilogo temporaneo dal modello locale dell’host, da confrontare con la scheda. Nessun aggiornamento automatico.".into()))
-                    .child(prepare("Prepara la richiesta", true));
+                    .child(muted("Un riepilogo temporaneo dal modello locale dell’home-base, da confrontare con la scheda. Nessun aggiornamento automatico.".into()))
+                    .child(prepare("Genera proposta", true));
             }
             InsightPhase::Checking => {
                 pane = pane.child(notice(
                     "patient-insight-checking",
-                    "Verifica della funzione sull’host…",
+                    "Verifica della funzione sull’home-base…",
                     theme,
                     false,
                 ));
@@ -381,14 +387,14 @@ impl ClinicalApp {
             InsightPhase::Consent(request) => {
                 pane = pane
                     .child(line(format!(
-                        "Verranno inviati al modello locale dell’host: {} condizioni, {} terapie attive, {} voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati.",
+                        "Verranno inviati al modello locale dell’home-base: {} condizioni, {} terapie attive, {} voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati.",
                         request.condition_count(),
                         request.therapy_count(),
                         request.event_count()
                     )))
-                    .child(muted("Il testo non lascia il computer dell’host. La risposta resta una proposta: la scheda non cambia.".into()))
+                    .child(muted("Il testo non lascia il home-base. La cartella non cambia.".into()))
                     .child(
-                        button("patient-insight-confirm", "Invia e genera", theme, true, true)
+                        button("patient-insight-confirm", "Genera proposta", theme, true, true)
                             .on_click(cx.listener(|this, _, _, cx| this.insight_confirm(cx))),
                     )
                     .child(
@@ -400,7 +406,7 @@ impl ClinicalApp {
                 pane = pane
                     .child(notice(
                         "patient-insight-running",
-                        "Generazione in corso sul modello locale dell’host.",
+                        "Generazione in corso sul modello locale dell’home-base.",
                         theme,
                         false,
                     ))
@@ -422,12 +428,15 @@ impl ClinicalApp {
                             button("patient-insight-discard", "Chiudi", theme, false, true)
                                 .on_click(cx.listener(|this, _, _, cx| this.insight_discard(cx))),
                         )
-                        .child(prepare("Prepara una nuova richiesta", false));
+                        .child(prepare("Nuova proposta", false));
                 }
                 pane = pane
                     .child(
                         pencil_block(theme)
-                            .child(line("Proposta da rivedere. La scheda resta invariata.".into()))
+                            .child(line("Proposta da rivedere.".into()))
+                            // Il modello può scambiare ciò che è fatto con ciò che è da fare:
+                            // ogni frase si rilegge sulla sua fonte.
+                            .child(line(PATIENT_INSIGHT_REVIEW_NOTICE.into()))
                             .children(insight_lines(request, proposal).into_iter().enumerate().map(
                                 |(index, row)| {
                                     let warning = row.section == "Attenzioni proposte";
@@ -477,7 +486,7 @@ impl ClinicalApp {
                         theme,
                         false,
                     ))
-                    .child(prepare("Prepara la richiesta", false));
+                    .child(prepare("Genera proposta", false));
             }
             InsightPhase::Error(message) => {
                 pane = pane

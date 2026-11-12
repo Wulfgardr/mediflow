@@ -8,15 +8,15 @@ public enum HomeBaseWHOError: Error, LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .unsupported:
-            return "WHO non è disponibile tramite questo datasource. Usa una connessione paired all’home-base configurata dal responsabile dell’host. Nessun repertorio alternativo viene usato."
+            return "WHO non è disponibile tramite questo datasource. Usa una connessione paired all’home-base configurata dal responsabile dell’home-base. Nessun repertorio alternativo viene usato."
         case .invalidRequest:
             return "Inserisci una ricerca specifica (massimo 160 byte UTF-8) o un codice ICD-11 valido (massimo 32 caratteri)."
         case .unauthorized:
-            return "La sessione o il pairing non sono più validi. Ricollega l’home-base e accedi nuovamente prima di riprovare."
+            return "La sessione o il abbinamento non sono più validi. Ricollega l’home-base e accedi nuovamente prima di riprovare."
         case .forbidden:
-            return "Consultazione non autorizzata per questo dispositivo o ambulatorio. Verifica accesso e ambulatorio con il responsabile dell’host."
+            return "Consultazione non autorizzata per questo dispositivo o ambulatorio. Verifica accesso e ambulatorio con il responsabile dell’home-base."
         case .networkModeDisabled:
-            return "La modalità home-base non è attiva sull’host. È necessario l’intervento del responsabile dell’host."
+            return "La modalità home-base non è attiva sull’home-base. È necessario l’intervento del responsabile dell’home-base."
         case .releaseNotSupported:
             return "Il servizio richiede ICD-11 WHO, release 2026-01, lingua inglese. Verifica la versione dell’home-base."
         case .unavailable:

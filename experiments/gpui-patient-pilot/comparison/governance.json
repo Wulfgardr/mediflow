@@ -494,7 +494,7 @@
     "localControls": [
       {
         "lane": "patient_insight",
-        "label": "Patient Insight",
+        "label": "Quadro paziente",
         "key": "aiPatientInsightKillSwitch",
         "uiDriven": true,
         "state": "disabled"

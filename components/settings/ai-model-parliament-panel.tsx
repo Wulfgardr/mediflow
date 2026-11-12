@@ -118,7 +118,7 @@ export default function AiModelParliamentPanel() {
                 <div className={styles.headingBody}>
                     <Scale className={styles.icon} aria-hidden="true" />
                     <div>
-                        <h3 className={styles.title}>Confronto modelli AI</h3>
+                        <h3 className={styles.title}>Confronto modelli IA</h3>
                         <p className={styles.prose}>
                             Report in sola lettura su modello base, alternative, modelli protetti e candidati da rimuovere.
                         </p>
@@ -216,7 +216,7 @@ export default function AiModelParliamentPanel() {
                                     meta={typeof scorecard.summary.fastestAvgLatencyMs === 'number' ? `fastest ${scorecard.summary.fastestAvgLatencyMs.toFixed(1)} ms` : null}
                                 />
                                 <MetricRow
-                                    label="Aree AI"
+                                    label="Aree IA"
                                     value={`${scorecard.summary.competitiveLaneCount || 0} competitive`}
                                     meta={`${scorecard.summary.advisoryLaneCount || 0} consultive`}
                                 />
@@ -237,7 +237,7 @@ export default function AiModelParliamentPanel() {
 
                     {scorecard?.lanes && scorecard.lanes.length > 0 ? (
                         <div className={styles.section}>
-                            <h4 className={styles.title}>Copertura per area AI</h4>
+                            <h4 className={styles.title}>Copertura per area IA</h4>
                             <div className={styles.sections}>
                                 {scorecard.lanes.map((lane) => (
                                     <div

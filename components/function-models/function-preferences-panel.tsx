@@ -37,7 +37,7 @@ function PreferenceCard({ row, disabled, account, activationSupported, preview }
                 <option value="local">Provider locale · modello predefinito</option>
                 <option value="chatgpt_subscription">OpenAI · abbonamento ChatGPT</option>
         </ChoiceField>}
-        {remote && <p className={styles.hint}>Questa modifica riguarda solo l’interruttore condiviso della funzione; non seleziona né ammette un modello locale. La preferenza locale resta invariata. Per ogni proposta scegli OpenAI nella funzione: restano necessari opt-in dell’host, contesto corrente, consenso, accesso dedicato e catalogo del tentativo.</p>}
+        {remote && <p className={styles.hint}>Questa modifica riguarda solo l’interruttore condiviso della funzione; non seleziona né ammette un modello locale. La preferenza locale resta invariata. Per ogni proposta scegli OpenAI nella funzione: restano necessari opt-in dell’home-base, contesto corrente, consenso, accesso dedicato e catalogo del tentativo.</p>}
         {!remote && warning && <p className={styles.hint}>{warning}</p>}
         {!remote && <ChoiceField label="Modello locale predefinito" aria-label={`Modello predefinito · ${names[row.id]}`} value={model ?? ''} disabled={disabled} disabledReason="Attendi il completamento della modifica in corso." onChange={e => setModel(e.target.value || null)}>
                 <option value="">{computerDefault ? `${computerDefault.label} · ${providerName(computerDefault.provider)} · predefinito` : 'Predefinito del computer'}</option>

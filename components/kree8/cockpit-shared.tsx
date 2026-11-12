@@ -312,9 +312,9 @@ const REVIEW_AGENDA: Kree8AgendaRow[] = [
     id: 'review-agenda-1500',
     time: '15:00',
     title: 'Revisione documenti firmati',
-    sub: 'Coda decisioni AI · 7 casi',
+    sub: 'Coda decisioni IA · 7 casi',
     pill: 'plum',
-    pillLabel: 'AI',
+    pillLabel: 'IA',
     filterCategory: 'ai',
   },
   {

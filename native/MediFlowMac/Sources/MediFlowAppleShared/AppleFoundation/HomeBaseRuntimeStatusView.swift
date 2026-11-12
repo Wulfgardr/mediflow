@@ -229,11 +229,11 @@ public struct HomeBaseRuntimeStatusView: View {
     private func tintColor(for state: HomeBaseRuntimeComponentState) -> Color {
         switch state {
         case .ready:
-            return .green
+            return PlatformColors.signal(.positive)
         case .missing:
-            return .red
+            return PlatformColors.signal(.critical)
         case .mismatch:
-            return .orange
+            return PlatformColors.signal(.attention)
         case .unknown:
             return .secondary
         }

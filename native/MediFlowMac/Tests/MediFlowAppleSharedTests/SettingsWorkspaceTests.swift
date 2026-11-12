@@ -51,7 +51,7 @@ final class SettingsWorkspaceTests: XCTestCase {
         let fetchCount = await source.fetchAmbulatoriesCount
         XCTAssertEqual(model.state, ClinicalWorkspaceLoadState.loaded)
         XCTAssertEqual(model.ambulatories.first?.name, "Nome aggiornato")
-        XCTAssertEqual(model.message, "I dati sono cambiati sull'host. La lista è stata aggiornata.")
+        XCTAssertEqual(model.message, "I dati sono cambiati sull'home-base. La lista è stata aggiornata.")
         XCTAssertGreaterThanOrEqual(fetchCount, 2)
     }
 
@@ -69,7 +69,7 @@ final class SettingsWorkspaceTests: XCTestCase {
 
         let message = store.unavailableMessage(for: "network.ambulatories.write")
         XCTAssertTrue(message?.contains("gestione ambulatori") == true)
-        XCTAssertTrue(message?.hasSuffix("Aggiorna MediFlow sull'host, poi ripeti il pairing.") == true,
+        XCTAssertTrue(message?.hasSuffix("Aggiorna MediFlow sull'home-base, poi ripeti l’abbinamento.") == true,
                       "repairing after the update is the step that restores the section")
     }
 
@@ -109,7 +109,7 @@ final class SettingsWorkspaceTests: XCTestCase {
 
         await model.load()
 
-        XCTAssertEqual(model.state, .unavailable("Collega l'home-base e accedi con il PIN operatore per consultare le funzioni AI."))
+        XCTAssertEqual(model.state, .unavailable("Collega l'home-base e accedi con il PIN operatore per consultare le funzioni IA."))
         XCTAssertNil(model.runtime)
     }
 

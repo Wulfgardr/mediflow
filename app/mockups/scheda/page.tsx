@@ -64,7 +64,7 @@ const signals: ClinicalSignal[] = [
 
 const navItems: Kree8WorkspaceNavItem[] = [
     { href: '#quadro', label: 'Quadro' },
-    { href: '#insight', label: 'Sintesi AI' },
+    { href: '#insight', label: 'Quadro paziente' },
     { href: '#timeline', label: 'Timeline', meta: '23' },
     { href: '#diario', label: 'Diario', meta: '17' },
     { href: '#parametri', label: 'Parametri', meta: '24' },
@@ -134,7 +134,7 @@ export default function MockSchedaPage() {
                 <div className={workspaceStyles.primaryStack}>
                     {/* Narrativa clinica: aperta di default, in cima alla colonna larga. */}
                     <section id="insight" className="patient-detail-section border p-5 md:p-6 scroll-mt-28">
-                        <p className="section-kicker">Sintesi AI</p>
+                        <p className="section-kicker">Quadro paziente</p>
                         <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
                             <Activity className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
                             Quadro sintetico assistito
