@@ -103,8 +103,15 @@ fn empty_chart(app: &mut ClinicalApp) {
 #[gpui::test]
 fn chat_import_waits_for_native_preparation_and_consent(cx: &mut gpui::TestAppContext) {
     let (bench, cx) = bench(cx);
+    bench.view.read_with(cx, |app, _| {
+        assert!(app.directory, "selezione in anteprima nell’elenco")
+    });
     let (pending, _remote) = opened(&bench, cx);
     bench.view.read_with(cx, |app, _| {
+        assert!(
+            !app.directory,
+            "la chat deve aprire la scheda dall’anteprima dell’elenco"
+        );
         assert_eq!(app.patient_section, PatientSection::Documents);
         assert!(matches!(
             app.patient.smart_import.phase,

@@ -36,11 +36,14 @@ fn bench(cx: &mut gpui::TestAppContext) -> (Bench, &mut gpui::VisualTestContext)
     (Bench { host, view }, cx)
 }
 fn admission(host: &Host, code: u16) {
+    admission_at_epoch(host, code, 0);
+}
+fn admission_at_epoch(host: &Host, code: u16, epoch: u64) {
     host.plan(ELIGIBILITY)
         .send((code, json!({"status":"eligible"})))
         .unwrap();
     host.plan("GET /api/v1/network/patient-profile/selection-epoch")
-        .send((200, json!({"contractVersion":1,"selectionEpoch":0})))
+        .send((200, json!({"contractVersion":1,"selectionEpoch":epoch})))
         .unwrap();
 }
 fn open(bench: &Bench, cx: &mut gpui::VisualTestContext) -> (Pending, UnixStream) {
@@ -80,6 +83,7 @@ fn assert_read_only(host: &Host) {
     assert!(
         host.routes().iter().all(|route| route.starts_with("GET ")
             || route.starts_with("POST /api/auth/")
+            || route == "POST /api/v1/network/patients/patient-a/profile-query"
             || route == "POST /api/v1/network/pairing/confirm"),
         "{:?}",
         host.routes()
@@ -91,11 +95,31 @@ fn chat_icd_opens_in_the_selected_patient_without_local_host_or_search(
     cx: &mut gpui::TestAppContext,
 ) {
     let (bench, cx) = bench(cx);
-    admission(&bench.host, 200);
+    cx.simulate_resize(gpui::size(px(1440.), px(900.)));
+    bench
+        .view
+        .update(cx, |app, cx| app.select_patient("patient-a", false, cx));
+    cx.run_until_parked();
+    bench.view.read_with(cx, |app, _| {
+        assert!(
+            app.directory,
+            "il clic sulla riga apre l’anteprima nell’elenco"
+        );
+        assert_eq!(app.patient.detail.ready().unwrap().id, "patient-a");
+    });
+    admission_at_epoch(&bench.host, 200, 2);
     let (pending, _remote) = open(&bench, cx);
     cx.run_until_parked();
     assert_eq!(wire(&pending), json!({"status":"icd-opened"}));
     bench.view.read_with(cx, |app, _| {
+        assert!(
+            !app.directory,
+            "la chat deve aprire la scheda dall’anteprima dell’elenco"
+        );
+        assert!(
+            app.who_location(),
+            "la ricerca ICD deve essere utilizzabile"
+        );
         assert_eq!(app.area, Area::Patients);
         assert_eq!(app.patient_section, PatientSection::Overview);
         assert_eq!(app.selected_id.as_deref(), Some("patient-a"));
@@ -150,11 +174,13 @@ fn chat_icd_receipt_follows_the_real_reader_and_contains_only_status(
 #[gpui::test]
 fn chat_icd_permission_denied_never_opens_or_searches(cx: &mut gpui::TestAppContext) {
     let (bench, cx) = bench(cx);
+    bench.view.update(cx, |app, _| app.directory = true);
     admission(&bench.host, 403);
     let (pending, _remote) = open(&bench, cx);
     cx.run_until_parked();
     assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
     bench.view.read_with(cx, |app, _| {
+        assert!(app.directory, "il diniego conserva l’anteprima nell’elenco");
         assert_eq!(app.patient_section, PatientSection::Therapies)
     });
     assert!(
@@ -170,6 +196,7 @@ fn chat_icd_permission_denied_never_opens_or_searches(cx: &mut gpui::TestAppCont
 #[gpui::test]
 fn chat_icd_patient_changed_during_admission_never_opens(cx: &mut gpui::TestAppContext) {
     let (bench, cx) = bench(cx);
+    bench.view.update(cx, |app, _| app.directory = true);
     admission(&bench.host, 200);
     let (pending, _remote) = open(&bench, cx);
     bench.view.update(cx, |app, _| {
@@ -182,6 +209,7 @@ fn chat_icd_patient_changed_during_admission_never_opens(cx: &mut gpui::TestAppC
     });
     cx.run_until_parked();
     assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+    bench.view.read_with(cx, |app, _| assert!(app.directory));
     bench
         .view
         .read_with(cx, |app, _| assert!(matches!(app.who.rows, Load::Idle)));
