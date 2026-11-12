@@ -204,7 +204,7 @@ test('Funzioni: anteprima, applicazione e salvataggio avanzato restano distinti;
         await expect(draft).toHaveValue('9'); expect(mock.preferenceWrites).toHaveLength(1);
         mock.state.failSave = false;
         await region(page).getByRole('button', { name: /^(Salva Configurazione|Salva parametri avanzati)$/u }).click();
-        await expect(page.getByText('Configurazione AI salvata', { exact: true })).toBeVisible();
+        await expect(page.getByText('Configurazione IA salvata', { exact: true })).toBeVisible();
         expect(JSON.parse(mock.config.aiInsightManualConfig).maxDocuments).toBe(9);
         expect(mock.config.aiPatientInsightKillSwitch).toBe('enabled');
         expect(mock.blocked).toEqual([]); expect(egress.blocked).toEqual([]);
