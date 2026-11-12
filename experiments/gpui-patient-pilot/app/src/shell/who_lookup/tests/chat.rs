@@ -513,7 +513,10 @@ fn matrix_request(
         Function::Insight => Some("aiPatientInsightKillSwitch"),
         Function::Synthesis => Some("aiDocumentSynthesisKillSwitch"),
         Function::Import => Some("aiSmartImportKillSwitch"),
-        Function::Icd | Function::OpenLoops | Function::EvidenceQueue => None,
+        Function::Icd
+        | Function::OpenLoops
+        | Function::EvidenceQueue
+        | Function::ServiceMatching => None,
     };
     if let Some(key) = key {
         bench
@@ -545,6 +548,28 @@ fn matrix_request(
                 .unwrap();
         }
     }
+    if function == Function::ServiceMatching && code == 200 {
+        let empty = bench.view.read_with(cx, |app, _| {
+            app.patient.attachments.ready().is_some_and(Vec::is_empty)
+        });
+        bench
+            .host
+            .plan(MATCH_ITEMS)
+            .send((
+                200,
+                if empty {
+                    json!([])
+                } else {
+                    match_rows(1, false)
+                },
+            ))
+            .unwrap();
+        bench
+            .host
+            .plan(MATCH_CATALOG)
+            .send((200, match_catalog()))
+            .unwrap();
+    }
     let (pending, remote) = function_request(function);
     bench
         .view
@@ -569,6 +594,9 @@ fn matrix_request(
             }
             Function::EvidenceQueue => {
                 app.evidence_queue.follow_chat();
+            }
+            Function::ServiceMatching => {
+                app.service_matching.follow_chat();
             }
         }
         cx.notify();
@@ -595,6 +623,7 @@ fn matrix_frame(cx: &mut gpui::VisualTestContext) -> MatrixFrame {
         (Function::Icd, "clinical-workspace-reference-run-search"),
         (Function::OpenLoops, "clinical-open-loops-close"),
         (Function::EvidenceQueue, "evidence-queue-close"),
+        (Function::ServiceMatching, "service-matching-close"),
     ]
     .into_iter()
     .filter_map(|(function, id)| ids.iter().any(|found| found == id).then_some(function))
@@ -723,6 +752,11 @@ fn run_view_matrix(cx: &mut gpui::TestAppContext, only_followups: bool) {
                         } else {
                             "Verranno inviati al modello locale dell’home-base: 1 condizioni, 0 terapie attive, 0 voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
                         }],
+                        Function::ServiceMatching => vec![if empty {
+                            "Nessuna prestazione da abbinare."
+                        } else {
+                            "Prestazione da abbinare"
+                        }],
                         Function::EvidenceQueue => vec![if empty {
                             "Nessuna evidenza dai documenti."
                         } else {
@@ -770,7 +804,7 @@ fn run_view_matrix(cx: &mut gpui::TestAppContext, only_followups: bool) {
             }
         }
     }
-    assert_eq!(checked, if only_followups { 24 } else { 84 });
+    assert_eq!(checked, if only_followups { 28 } else { 112 });
     assert!(
         failures.is_empty(),
         "Viste o avvisi errati nella matrice:\n{}",
@@ -1215,4 +1249,411 @@ fn chat_evidence_refreshed_source_currentness_hides_the_previous_queue(
     crate::shell::notes_recovery_tests::draw(cx);
     assert!(cx.debug_bounds("evidence-queue-receipt").is_some());
     assert_read_only(&bench.host);
+}
+
+const MATCH_ITEMS: &str = "GET /api/v1/network/service-prescription-items?patientId=patient-a";
+const MATCH_CATALOG: &str = "GET /api/v1/network/service-catalog";
+const MATCH_PUT: &str = "PUT /api/v1/network/service-prescription-items/item-a";
+fn match_rows(version: u64, matched: bool) -> Value {
+    json!([{"id":"item-a","patientId":"patient-a","prescriptionId":"prescription-a","serviceName":"Prestazione sintetica",
+        "status":"prescribed","matchStatus":if matched{"manual"}else{"unmatched"},"version":version,
+        "serviceCode":if matched{Some("SYN-1")}else{None},"codeSystem":if matched{Some("SSR")}else{None},
+        "catalogEntryId":if matched{Some("catalog-a")}else{None},"catalogDisplayName":if matched{Some("Voce sintetica")}else{None}}])
+}
+fn match_catalog() -> Value {
+    json!([{"id":"catalog-a","codeSystem":"SSR","serviceCode":"SYN-1","displayName":"Voce sintetica","active":true}])
+}
+fn plan_matching(bench: &Bench) {
+    admission(&bench.host, 200);
+    bench
+        .host
+        .plan(MATCH_ITEMS)
+        .send((200, match_rows(1, false)))
+        .unwrap();
+    bench
+        .host
+        .plan(MATCH_CATALOG)
+        .send((200, match_catalog()))
+        .unwrap();
+}
+fn open_matching(bench: &Bench, cx: &mut gpui::VisualTestContext) -> (Pending, UnixStream) {
+    let function = Function::ALL
+        .into_iter()
+        .find(|f| State::Generative(*f, Stage::Opened).wire() == "matching-opened")
+        .expect("la chat offre l’abbinamento prestazioni");
+    let (pending, remote) = function_request(function);
+    bench
+        .view
+        .update(cx, |app, cx| app.open_chat_function(&pending, function, cx));
+    (pending, remote)
+}
+fn match_click(cx: &mut gpui::VisualTestContext, label: &'static str) {
+    crate::shell::notes_recovery_tests::draw(cx);
+    let bounds = cx.debug_bounds(label).expect("comando del medico visibile");
+    cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+    cx.run_until_parked();
+}
+fn choose_matching(cx: &mut gpui::VisualTestContext) {
+    match_click(cx, "control-label:Prestazione sintetica · Prescritta · v1");
+    match_click(cx, "control-label:SYN-1 · Voce sintetica");
+}
+#[gpui::test]
+fn chat_matching_opens_current_patient_and_only_explicit_confirmation_writes_with_version_and_receipt(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+    plan_matching(&bench);
+    let (pending, _remote) = open_matching(&bench, cx);
+    cx.run_until_parked();
+    assert_eq!(wire(&pending), json!({"status":"matching-opened"}));
+    bench.view.read_with(cx, |app, _| {
+        assert_eq!(app.selected_id.as_deref(), Some("patient-a"));
+        assert!(!app.directory);
+    });
+    assert_read_only(&bench.host);
+    choose_matching(cx);
+    assert_read_only(&bench.host);
+    bench
+        .host
+        .plan(MATCH_PUT)
+        .send((200, json!({"success":true})))
+        .unwrap();
+    bench
+        .host
+        .plan(MATCH_ITEMS)
+        .send((200, match_rows(2, true)))
+        .unwrap();
+    match_click(cx, "control-label:Conferma abbinamento");
+    assert_eq!(
+        wire(&pending),
+        json!({"status":"matching-closed"}),
+        "{:?}",
+        bench.host.requests_handle().lock().unwrap()
+    );
+    let requests = bench.host.requests_handle();
+    let requests = requests.lock().unwrap();
+    let puts = requests
+        .iter()
+        .filter(|(route, _)| route == MATCH_PUT)
+        .collect::<Vec<_>>();
+    assert_eq!(puts.len(), 1);
+    assert_eq!(puts[0].1["version"], 1);
+    assert_eq!(puts[0].1["matchStatus"], "manual");
+    assert_eq!(puts[0].1["serviceCode"], "SYN-1");
+    assert!(
+        puts[0].1["catalogDisplayName"]
+            .as_str()
+            .unwrap()
+            .starts_with("ENC:")
+    );
+    assert!(puts[0].1.get("patientId").is_none());
+    drop(requests);
+    crate::shell::notes_recovery_tests::draw(cx);
+    assert!(cx.debug_bounds("service-matching-receipt").is_some());
+    assert!(
+        cx.debug_bounds("control-label:Conferma abbinamento")
+            .is_none()
+    );
+}
+#[gpui::test]
+fn chat_matching_denied_admission_items_catalog_or_writer_never_has_success_receipt(
+    cx: &mut gpui::TestAppContext,
+) {
+    for denied in ["admission", "items", "catalog", "writer"] {
+        let (bench, cx) = bench(cx);
+        cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+        admission(&bench.host, if denied == "admission" { 403 } else { 200 });
+        if denied != "admission" {
+            bench
+                .host
+                .plan(MATCH_ITEMS)
+                .send((
+                    if denied == "items" { 403 } else { 200 },
+                    if denied == "items" {
+                        json!({"error":"denied"})
+                    } else {
+                        match_rows(1, false)
+                    },
+                ))
+                .unwrap();
+        }
+        if denied == "catalog" || denied == "writer" {
+            bench
+                .host
+                .plan(MATCH_CATALOG)
+                .send((
+                    if denied == "catalog" { 403 } else { 200 },
+                    if denied == "catalog" {
+                        json!({"error":"denied"})
+                    } else {
+                        match_catalog()
+                    },
+                ))
+                .unwrap();
+        }
+        let (pending, _remote) = open_matching(&bench, cx);
+        cx.run_until_parked();
+        if denied == "writer" {
+            choose_matching(cx);
+            bench
+                .host
+                .plan(MATCH_PUT)
+                .send((403, json!({"error":"denied"})))
+                .unwrap();
+            match_click(cx, "control-label:Conferma abbinamento");
+        }
+        assert_eq!(wire(&pending), json!({"status":"withdrawn"}), "{denied}");
+        crate::shell::notes_recovery_tests::draw(cx);
+        assert!(cx.debug_bounds("service-matching-receipt").is_none());
+        if denied != "writer" {
+            assert_read_only(&bench.host);
+        }
+    }
+}
+#[gpui::test]
+fn chat_matching_late_read_after_patient_change_or_revocation_never_offers_confirmation(
+    cx: &mut gpui::TestAppContext,
+) {
+    for revoke in [false, true] {
+        let (bench, cx) = bench(cx);
+        admission(&bench.host, 200);
+        let response = bench.host.plan(MATCH_ITEMS);
+        bench
+            .host
+            .plan(MATCH_CATALOG)
+            .send((200, match_catalog()))
+            .unwrap();
+        let (pending, _remote) = open_matching(&bench, cx);
+        let session = bench.host.session.clone();
+        let withdrawn = pending.clone();
+        let worker = after_request(&bench.host, MATCH_ITEMS, move || {
+            if revoke {
+                withdrawn.lock().unwrap().revoke();
+            } else {
+                session
+                    .select_profile_patient("scope-a", "patient-b")
+                    .unwrap();
+            }
+            response.send((200, match_rows(1, false))).unwrap();
+        });
+        cx.run_until_parked();
+        worker.join().unwrap();
+        assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+        crate::shell::notes_recovery_tests::draw(cx);
+        assert!(
+            cx.debug_bounds("control-label:Conferma abbinamento")
+                .is_none()
+        );
+        assert_read_only(&bench.host);
+    }
+}
+#[gpui::test]
+fn chat_matching_version_conflict_requires_reread_and_never_reports_applied(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+    plan_matching(&bench);
+    let (pending, _remote) = open_matching(&bench, cx);
+    cx.run_until_parked();
+    choose_matching(cx);
+    bench
+        .host
+        .plan(MATCH_PUT)
+        .send((409, json!({"error":"Version conflict"})))
+        .unwrap();
+    match_click(cx, "control-label:Conferma abbinamento");
+    assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+    crate::shell::notes_recovery_tests::draw(cx);
+    assert!(cx.debug_bounds("service-matching-receipt").is_none());
+    assert!(
+        cx.debug_bounds("control-label:Conferma abbinamento")
+            .is_none()
+    );
+    assert!(
+        cx.debug_bounds("control-label:Rileggi prestazioni")
+            .is_some()
+    );
+    assert_eq!(
+        bench
+            .host
+            .routes()
+            .iter()
+            .filter(|r| r.as_str() == MATCH_PUT)
+            .count(),
+        1
+    );
+}
+#[gpui::test]
+fn chat_matching_late_writer_response_after_revocation_has_no_receipt(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+    plan_matching(&bench);
+    let (pending, _remote) = open_matching(&bench, cx);
+    cx.run_until_parked();
+    choose_matching(cx);
+    let response = bench.host.plan(MATCH_PUT);
+    bench
+        .host
+        .plan(MATCH_ITEMS)
+        .send((200, match_rows(2, true)))
+        .unwrap();
+    let withdrawn = pending.clone();
+    let worker = after_request(&bench.host, MATCH_PUT, move || {
+        withdrawn.lock().unwrap().revoke();
+        response.send((200, json!({"success":true}))).unwrap();
+    });
+    match_click(cx, "control-label:Conferma abbinamento");
+    worker.join().unwrap();
+    assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+    crate::shell::notes_recovery_tests::draw(cx);
+    assert!(cx.debug_bounds("service-matching-receipt").is_none());
+    assert_eq!(
+        bench
+            .host
+            .routes()
+            .iter()
+            .filter(|r| r.as_str() == MATCH_PUT)
+            .count(),
+        1
+    );
+}
+#[gpui::test]
+fn chat_matching_foreign_patient_is_rejected_without_catalog_or_write(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    admission(&bench.host, 200);
+    let mut rows = match_rows(1, false);
+    rows[0]["patientId"] = json!("patient-b");
+    bench.host.plan(MATCH_ITEMS).send((200, rows)).unwrap();
+    let (pending, _remote) = open_matching(&bench, cx);
+    cx.run_until_parked();
+    assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+    assert!(
+        !bench
+            .host
+            .routes()
+            .iter()
+            .any(|r| r.starts_with(MATCH_CATALOG))
+    );
+    assert_read_only(&bench.host);
+}
+
+#[gpui::test]
+fn chat_matching_revocation_after_selection_prevents_the_confirmation_write(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+    plan_matching(&bench);
+    let (pending, _remote) = open_matching(&bench, cx);
+    cx.run_until_parked();
+    choose_matching(cx);
+    pending.lock().unwrap().revoke();
+    crate::shell::notes_recovery_tests::draw(cx);
+    if let Some(bounds) = cx.debug_bounds("control-label:Conferma abbinamento") {
+        cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+    }
+    assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+    assert_read_only(&bench.host);
+    assert!(cx.debug_bounds("service-matching-receipt").is_none());
+}
+
+#[gpui::test]
+fn chat_matching_acknowledgement_without_the_expected_readback_is_not_a_receipt(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+    plan_matching(&bench);
+    let (pending, _remote) = open_matching(&bench, cx);
+    cx.run_until_parked();
+    choose_matching(cx);
+    bench
+        .host
+        .plan(MATCH_PUT)
+        .send((200, json!({"success":true})))
+        .unwrap();
+    bench
+        .host
+        .plan(MATCH_ITEMS)
+        .send((200, match_rows(3, true)))
+        .unwrap();
+    match_click(cx, "control-label:Conferma abbinamento");
+    assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+    crate::shell::notes_recovery_tests::draw(cx);
+    assert!(cx.debug_bounds("service-matching-receipt").is_none());
+    assert_eq!(
+        bench
+            .host
+            .routes()
+            .iter()
+            .filter(|r| r.as_str() == MATCH_PUT)
+            .count(),
+        1
+    );
+}
+
+#[gpui::test]
+fn chat_matching_completed_receipt_view_yields_to_each_requested_function(
+    cx: &mut gpui::TestAppContext,
+) {
+    let matching = Function::ALL
+        .into_iter()
+        .find(|f| State::Generative(*f, Stage::Opened).wire() == "matching-opened")
+        .expect("abbinamento disponibile");
+    for requested in Function::ALL {
+        let (bench, cx) = bench(cx);
+        matrix_ready(&bench, cx);
+        let (first, _remote) = matrix_open(&bench, matching, cx);
+        assert_eq!(wire(&first), json!({"status":"matching-opened"}));
+        choose_matching(cx);
+        bench
+            .host
+            .plan(MATCH_PUT)
+            .send((200, json!({"success":true})))
+            .unwrap();
+        bench
+            .host
+            .plan(MATCH_ITEMS)
+            .send((200, match_rows(2, true)))
+            .unwrap();
+        match_click(cx, "control-label:Conferma abbinamento");
+        assert_eq!(wire(&first), json!({"status":"matching-closed"}));
+        let (next, _other) = matrix_open(&bench, requested, cx);
+        let stage = if requested == matching {
+            Stage::Busy
+        } else if matches!(
+            State::Generative(requested, Stage::Opened).wire(),
+            "loops-opened" | "evidence-opened"
+        ) {
+            Stage::Closed
+        } else {
+            Stage::Opened
+        };
+        assert_eq!(
+            wire(&next),
+            json!({"status":State::Generative(requested,stage).wire()})
+        );
+        assert_eq!(matrix_rendered(cx), [requested]);
+        assert_eq!(wire(&first), json!({"status":"matching-closed"}));
+        assert_eq!(
+            cx.debug_bounds("service-matching-receipt").is_some(),
+            requested == matching
+        );
+        assert_eq!(
+            bench
+                .host
+                .routes()
+                .iter()
+                .filter(|r| r.as_str() == MATCH_PUT)
+                .count(),
+            1
+        );
+    }
 }

@@ -282,3 +282,27 @@ test('service item ordinal defaults, omitted update and exact conversion survive
     assert.equal((await writer.updateHostServicePrescriptionItem(host, { version: 3, ordinal: '2x' })).status, 400);
     assert.deepEqual(snapshot(ids), before);
 });
+
+test('paired manual matching preserves the item, increments its version and audits once; stale confirmation has no effects', async () => {
+    const ids = seed(); insertParent(ids); insertItem(ids);
+    const context = { request, session: pairedSession, pairedClient, scopeAmbulatoryId: ambulatoryId, itemId: ids.itemId };
+    const body = { version: 3, codeSystem: 'SSR', serviceCode: 'SYN-1', catalogEntryId: 'synthetic-catalog',
+        catalogDisplayName: 'ENC:synthetic:catalog', matchStatus: 'manual' };
+    assert.deepEqual(await writer.updateNetworkScopedServicePrescriptionItem(context, body), { status: 200, value: { success: true } });
+    const after = snapshot(ids);
+    const item = after.item as Record<string, unknown>;
+    assert.equal(item.patient_id, ids.patientId);
+    assert.equal(item.service_name, 'ENC:synthetic:item');
+    assert.equal(item.status, 'prescribed');
+    assert.equal(item.match_status, 'manual');
+    assert.equal(item.service_code, 'SYN-1');
+    assert.equal(item.catalog_display_name, body.catalogDisplayName);
+    assert.equal(item.version, 4);
+    assert.equal(after.audit.length, 1);
+    const event = after.audit[0] as Record<string, unknown>;
+    assert.equal(event.actor_ref, pairedSession.userId);
+    assert.equal(event.source_surface, 'native');
+    assert.equal(JSON.parse(String(event.redacted_metadata)).resourceVersion, 4);
+    assert.equal((await writer.updateNetworkScopedServicePrescriptionItem(context, { ...body, serviceCode: 'SYN-2' })).status, 409);
+    assert.deepEqual(snapshot(ids), after);
+});

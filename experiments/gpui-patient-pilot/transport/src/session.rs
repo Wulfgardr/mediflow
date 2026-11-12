@@ -1,6 +1,7 @@
 pub mod evidence_queue;
 pub mod open_loops;
 pub mod patient_document;
+pub mod service_matching;
 use crate::{ChatWriteKind, ChatWriteOutcome, ChatWriteResolution};
 use crate::{
     account_profile::{
