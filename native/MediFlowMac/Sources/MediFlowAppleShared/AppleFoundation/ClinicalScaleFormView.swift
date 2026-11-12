@@ -97,7 +97,7 @@ struct ClinicalScaleFormView: View {
                 resultPanel
                 if let submissionError {
                     Text(submissionError)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(PlatformColors.signal(.critical))
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("scale-submission-error")
                 }

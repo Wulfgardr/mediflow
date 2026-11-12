@@ -312,6 +312,22 @@ private struct NativeOrdinaryExperience: View {
 
 }
 struct NativeOrdinaryProposalView: View {
+    /// Riga sopra le frasi del Quadro paziente, stesso testo del Web e di GPUI.
+    static let patientInsightReviewNotice = "Controlla ogni frase sulla fonte che cita: il modello può scambiare ciò che è fatto con ciò che è da fare."
+    enum PatientInsightRow: Equatable {
+        case notice(String), paragraph(String), heading(String), item(String)
+    }
+    /// Righe del Quadro paziente nell'ordine in cui la vista le disegna: prima la riga di controllo.
+    static func patientInsightRows(_ proposal: NativeOrdinaryJSON) -> [PatientInsightRow] {
+        var rows: [PatientInsightRow] = [.notice(patientInsightReviewNotice)]
+        if let summary = proposal["summary"].string, !summary.isEmpty { rows.append(.paragraph(summary)) }
+        for (title, key) in [("Quadro attuale", "currentState"), ("Elementi di attenzione", "alerts"),
+                             ("Passi da valutare", "nextSteps"), ("Informazioni mancanti", "gaps")] {
+            let items = proposal[key].array.compactMap(\.string)
+            if !items.isEmpty { rows.append(.heading(title)); rows += items.map(PatientInsightRow.item) }
+        }
+        return rows
+    }
     let function: NativeOrdinaryFunction
     let result: NativeOrdinaryJSON
     var body: some View {
@@ -319,12 +335,16 @@ struct NativeOrdinaryProposalView: View {
             Label("Proposta da rivedere", systemImage: "circle").font(.subheadline.weight(.semibold))
             switch function {
             case .patientInsight:
-                let proposal = result["preview"]["proposal"]
-                paragraph(proposal["summary"])
-                lines("Quadro attuale", proposal["currentState"])
-                lines("Elementi di attenzione", proposal["alerts"])
-                lines("Passi da valutare", proposal["nextSteps"])
-                lines("Informazioni mancanti", proposal["gaps"])
+                ForEach(Array(Self.patientInsightRows(result["preview"]["proposal"]).enumerated()), id: \.offset) { _, row in
+                    switch row {
+                    case .notice(let text):
+                        Text(text).font(.callout.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("clinical-workspace-patient_insight-review-notice")
+                    case .paragraph(let text): Text(text).chartProse()
+                    case .heading(let text): Text(text).font(.subheadline.bold())
+                    case .item(let text): Text(text)
+                    }
+                }
             case .smartImport:
                 let proposal = result["preview"]["proposal"]
                 paragraph(proposal["summary"])

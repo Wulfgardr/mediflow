@@ -11,6 +11,8 @@ import {
 import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 const MODEL = 'synthetic-patient-insight:latest';
+// WUL-826: same literal as PATIENT_INSIGHT_REVIEW_NOTICE, written out so the check does not depend on the constant.
+const REVIEW_NOTICE = 'Controlla ogni frase sulla fonte che cita: il modello può scambiare ciò che è fatto con ciò che è da fare.';
 const REVIEW_REF = `review_${'b'.repeat(32)}`;
 const MODEL_OPTION_ID = `model_option_${'a'.repeat(32)}`;
 const PATIENT_INSIGHT_CATALOG = {
@@ -91,6 +93,8 @@ function availablePreview(request: PatientInsightPreviewRequest) {
         provider: 'ollama',
         model: MODEL,
         preprocessing: ['context_minimization', 'envelope_validation'],
+        // the first local attempt was discarded: recorded in the provenance, never on screen.
+        attempts: 2,
       },
       reviewRef: REVIEW_REF,
     },
@@ -171,6 +175,12 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await expect(proposal).toContainText(`ollama · ${MODEL} · local_process · egress none`);
   await expect(proposal).toContainText('context_minimization → envelope_validation');
   await expect(proposal).toContainText('epoch 7 · revisione 1');
+  // WUL-826: one line above the sentences asks to check each of them against its source.
+  await expect(proposal.getByTestId('patient-insight-review-notice')).toHaveText(REVIEW_NOTICE);
+  const proposalText = await proposal.innerText();
+  expect(proposalText.split(REVIEW_NOTICE)).toHaveLength(2);
+  expect(proposalText.indexOf(REVIEW_NOTICE)).toBeLessThan(proposalText.indexOf('Sintesi Patient Insight sintetica da revisionare.'));
+  expect(proposalText).not.toMatch(/tentativ/iu);
 
   expect(previewCalls).toBe(1);
   expect(capturedRequest).not.toBeNull();
