@@ -33,6 +33,8 @@ mod patient_insight;
 #[cfg(test)]
 pub(crate) mod rendered_command;
 mod scales;
+#[cfg(unix)]
+mod service_matching;
 mod settings;
 mod smart_import;
 mod therapy_picker;
@@ -481,6 +483,8 @@ pub struct ClinicalApp {
     open_loops: open_loops::OpenLoops,
     #[cfg(unix)]
     evidence_queue: evidence_queue::EvidenceQueue,
+    #[cfg(unix)]
+    service_matching: service_matching::ServiceMatching,
     scales: ScaleArea,
     analytics: AnalyticsArea,
     selected_id: Option<String>,
@@ -758,6 +762,8 @@ impl ClinicalApp {
             open_loops: open_loops::OpenLoops::default(),
             #[cfg(unix)]
             evidence_queue: evidence_queue::EvidenceQueue::default(),
+            #[cfg(unix)]
+            service_matching: service_matching::ServiceMatching::default(),
             scales: ScaleArea::new(&area_scroll, theme, cx),
             analytics: AnalyticsArea::new(theme, cx),
             area_scroll,
@@ -967,6 +973,8 @@ impl ClinicalApp {
         self.open_loops.reset();
         #[cfg(unix)]
         self.evidence_queue.reset();
+        #[cfg(unix)]
+        self.service_matching.reset();
         self.patient.document_curation = document_curation::DocumentCuration::default();
         self.patient.document_details_id = None;
         self.patient.document_original = None;
@@ -2719,6 +2727,8 @@ impl ClinicalApp {
                 self.open_loops.reset();
                 #[cfg(unix)]
                 self.evidence_queue.reset();
+                #[cfg(unix)]
+                self.service_matching.reset();
             }
             #[cfg(unix)]
             {
@@ -5637,6 +5647,8 @@ impl Render for ClinicalApp {
         let theme = self.theme;
         self.local_host.prepare_render(theme, window, cx);
         self.prepare_document_curation_render(window, cx);
+        #[cfg(unix)]
+        self.prepare_service_matching_render(cx);
         if self.settings_page == SettingsPage::AiPreferences {
             self.ai_preferences.prepare_render(window, cx);
         }

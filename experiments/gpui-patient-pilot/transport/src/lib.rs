@@ -55,6 +55,7 @@ pub use scales::*;
 pub use session::evidence_queue::*;
 pub use session::open_loops::*;
 pub use session::patient_document::*;
+pub use session::service_matching::*;
 pub use session::{
     AiPreferencesContext, AmbulatoryCommandContext, ChatAccessContext, ChatBookingView,
     ChatWriteRecovery, FirstAmbulatoryContext, ProfileQueryIntent, RuntimeSession,

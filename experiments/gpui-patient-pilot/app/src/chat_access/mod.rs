@@ -381,6 +381,7 @@ fn generative_function(value: &Value) -> Option<owner::Function> {
         (Function::Icd, "icd-lookup"),
         (Function::OpenLoops, "open-loops"),
         (Function::EvidenceQueue, "evidence-queue"),
+        (Function::ServiceMatching, "service-matching"),
     ]
     .into_iter()
     .find(|(_, command)| *value == json!({ "command": command }))

@@ -63,6 +63,12 @@ impl State {
             Self::Generative(Function::EvidenceQueue, Stage::Unavailable) => "evidence-unavailable",
             Self::Generative(Function::EvidenceQueue, Stage::Busy) => "evidence-busy",
             Self::Generative(Function::EvidenceQueue, Stage::Closed) => "evidence-closed",
+            Self::Generative(Function::ServiceMatching, Stage::Opened) => "matching-opened",
+            Self::Generative(Function::ServiceMatching, Stage::Unavailable) => {
+                "matching-unavailable"
+            }
+            Self::Generative(Function::ServiceMatching, Stage::Busy) => "matching-busy",
+            Self::Generative(Function::ServiceMatching, Stage::Closed) => "matching-closed",
             Self::Preparing => "preparing",
             Self::Selecting => "selecting",
             Self::Challenge => "challenge",
@@ -84,15 +90,17 @@ pub(crate) enum Function {
     Icd,
     OpenLoops,
     EvidenceQueue,
+    ServiceMatching,
 }
 impl Function {
-    pub(crate) const ALL: [Function; 6] = [
+    pub(crate) const ALL: [Function; 7] = [
         Function::Insight,
         Function::Synthesis,
         Function::Import,
         Function::Icd,
         Function::OpenLoops,
         Function::EvidenceQueue,
+        Function::ServiceMatching,
     ];
 }
 
@@ -1685,7 +1693,7 @@ pub(crate) mod tests {
     }
 
     /// Solo questi stati possono tornare alla chat dal comando del Quadro paziente.
-    const INSIGHT_WIRE: [&str; 26] = [
+    const INSIGHT_WIRE: [&str; 30] = [
         "requested",
         "preparing",
         "insight-opened",
@@ -1712,6 +1720,10 @@ pub(crate) mod tests {
         "evidence-unavailable",
         "evidence-busy",
         "evidence-closed",
+        "matching-opened",
+        "matching-unavailable",
+        "matching-busy",
+        "matching-closed",
     ];
     fn insight_reply(pending: &Pending) -> Value {
         let status = pending.lock().unwrap().status();
@@ -1771,7 +1783,11 @@ pub(crate) mod tests {
                 "evidence-opened",
                 "evidence-unavailable",
                 "evidence-busy",
-                "evidence-closed"
+                "evidence-closed",
+                "matching-opened",
+                "matching-unavailable",
+                "matching-busy",
+                "matching-closed"
             ]
         );
         assert!(super::super::is_synthesis_command(
