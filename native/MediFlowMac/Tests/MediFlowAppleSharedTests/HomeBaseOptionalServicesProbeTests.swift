@@ -18,7 +18,7 @@ final class HomeBaseOptionalServicesProbeTests: XCTestCase {
 
         XCTAssertEqual(snapshot.services.map(\.id), ["optional-ollama"])
         XCTAssertTrue(snapshot.services.allSatisfy { $0.state == .ready })
-        XCTAssertTrue(snapshot.services.contains { $0.title == "Ollama (AI locale)" })
+        XCTAssertTrue(snapshot.services.contains { $0.title == "Ollama (IA locale)" })
         XCTAssertFalse(snapshot.services.contains { $0.title.localizedCaseInsensitiveContains("ICD") })
     }
 

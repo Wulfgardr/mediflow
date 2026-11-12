@@ -55,7 +55,7 @@ struct PatientClinicalOverview: View {
                     .overlay(alignment: .bottom) { Divider() }
                 }
             }
-            table("Misure recenti", count: count(measures.count, loaded: model.observations.count), identifier: "measures") {
+            table("Parametri recenti", count: count(measures.count, loaded: model.observations.count), identifier: "measures") {
                 if measures.isEmpty { Text("Nessuna misura caricata.").foregroundStyle(.secondary) }
                 ForEach(measures) { measure in
                     VStack(alignment: .leading, spacing: 4) {

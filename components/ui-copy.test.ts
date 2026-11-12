@@ -8,8 +8,8 @@ type CopyChange = { file: string; removed: string[]; added: string[] };
 const root = path.resolve(import.meta.dirname, '..');
 const productRoot = process.env.MEDIFLOW_COPY_ROOT ?? root;
 const read = (file: string) => fs.readFileSync(path.join(productRoot, file), 'utf8');
-for (const surface of ['web', 'gpui']) {
-    const rows = JSON.parse(execFileSync(process.execPath, ['scripts/ui-copy-census.mjs', `--surface=${surface}`, '--all'], { cwd: root, env: process.env, encoding: 'utf8' })) as { file: string; text: string }[];
+for (const surface of ['web', 'gpui', 'apple']) {
+    const rows = JSON.parse(execFileSync(process.execPath, ['scripts/ui-copy-census.mjs', `--surface=${surface}`, '--all'], { cwd: root, env: process.env, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })) as { file: string; text: string }[];
     const changes = JSON.parse(fs.readFileSync(path.join(root, `scripts/fixtures/wul825-${surface}-copy.json`), 'utf8')) as CopyChange[];
     for (const change of changes) test(`${surface} visible copy: ${change.file}`, () => {
         const visible = new Set(rows.filter(row => row.file === change.file).map(row => row.text));
@@ -46,4 +46,15 @@ test('GPUI proposal keeps source review with a single pre-generation chart notic
     assert.match(source, /La cartella non cambia\./);
     assert.doesNotMatch(source, /Proposta da rivedere\. La scheda resta invariata\./);
     assert.match(source, /prepare\("Genera proposta"/);
+});
+
+
+test('Apple consent, details and unavailable therapies keep one visible decision', () => {
+    const ordinary = read('native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/NativeOrdinaryViews.swift');
+    assert.match(ordinary, /DisclosureGroup\("Dettagli"/);
+    assert.equal(ordinary.split('Autorizzi l’invio a OpenAI').length - 1, 1);
+    assert.doesNotMatch(read('native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientTherapiesSection.swift'), /NativeTreatmentReasoningView\(/);
+    for (const name of ['NativeFabricViews', 'NativeOrdinaryViews']) {
+        assert.match(read(`native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/${name}.swift`), /model.phase != .completed \{ Text\("La cartella non cambia\."\)/);
+    }
 });
