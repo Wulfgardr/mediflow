@@ -676,15 +676,6 @@
       "prerequisites": "Existing patient-concurrency-smoke wrapper owns the synthetic server/bootstrap."
     },
     {
-      "id": "scripts/run-visit-recording-synthetic-benchmark.mjs",
-      "mode": "local",
-      "kind": "node-script",
-      "files": [
-        "scripts/run-visit-recording-synthetic-benchmark.mjs"
-      ],
-      "prerequisites": "macOS synthetic voices, local transcription assets and runtime required; no microphone/real patient data, not a CI qualification."
-    },
-    {
       "id": "app/api/ai/local-provider/onboarding/route.test.ts",
       "mode": "local",
       "kind": "strip-test",

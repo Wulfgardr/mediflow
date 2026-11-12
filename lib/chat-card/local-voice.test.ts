@@ -54,7 +54,7 @@ test('voice command opens only the native review and rejects unexpected transcri
 // WUL-828: la dettatura usa solo whisper. Nel codice non resta il motore
 // vocale Apple; le note storiche nei docs restano.
 const appleSpeechEngine = /\bimport\s+Speech\b|SFSpeech\w*|SpeechAnalyzer|SpeechTranscriber|DictationTranscriber|AssetInventory|NSSpeechRecognitionUsageDescription|webkitSpeechRecognition|\bSpeechRecognition\b|MFVoiceCreate|ChatLocalVoice|local_voice_apple|trascrizione Apple/u;
-const codeRoots = ['app', 'components', 'hooks', 'lib', 'packages', 'scripts', 'e2e', 'contracts', 'plugins', 'tools', '.github', 'experiments/gpui-patient-pilot'];
+const codeRoots = ['app', 'components', 'hooks', 'lib', 'packages', 'scripts', 'e2e', 'contracts', 'plugins', 'tools', '.github', 'experiments/gpui-patient-pilot', 'native'];
 const skippedDirectories = new Set(['node_modules', 'target', '.next', '.build', 'build', 'DerivedData']);
 const codeExtensions = /\.(?:swift|rs|m|h|ts|tsx|mts|js|mjs|cjs|json|ya?ml|plist|entitlements|pbxproj|toml|sh|py)$/u;
 
@@ -76,6 +76,7 @@ test('no Apple speech engine is left in the code: dictation is whisper only', ()
     const self = resolve(import.meta.filename);
     const files = codeRoots.flatMap(directory => codeFiles(join(root, directory)));
     assert.ok(files.some(file => file.endsWith('local_voice/whisper.rs')), 'whisper engine not scanned');
+    assert.ok(files.some(file => file.endsWith('PairedPatientsWorkspaceView.swift')), 'Apple client not scanned');
     const hits = files
         .filter(file => file !== self)
         .flatMap(file => readFileSync(file, 'utf8').split('\n')
