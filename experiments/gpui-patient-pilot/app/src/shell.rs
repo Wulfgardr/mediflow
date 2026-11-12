@@ -6030,7 +6030,10 @@ impl Render for ClinicalApp {
                                             .gap(px(12.))
                                             .track_scroll(&self.notice_scroll)
                                             .when(layout.magnified, |el| {
-                                                el.max_h(window.viewport_size().height * 0.25)
+                                                // Two lines at 1.5 line height plus control padding
+                                                // must fit even in the minimum-height window.
+                                                el.max_h((window.viewport_size().height * 0.25)
+                                                    .max(px(theme.body() * 3. + 32.)))
                                                     .overflow_y_scroll()
                                             })
                                             .when_some(self.copy_state, |el, state| {
