@@ -57,9 +57,6 @@ export async function openTreatmentReasoningDenial(page: Page, value: 'enabled' 
     await page.goto(`/patients/${fixture.patientId}/modules`);
     await openPatientSection(page, 'terapie');
     const proposals = page.locator('#terapie').getByRole('button', { name: 'Proposte', exact: true });
-    await expect(proposals).toHaveAttribute('aria-expanded', 'false');
-    await proposals.click();
-    await expect(proposals).toHaveAttribute('aria-expanded', 'true');
     const panel = page.getByTestId('treatment-reasoning-panel');
     const assertNoEffects = async () => {
       expect(calls).toEqual([]);
@@ -67,7 +64,8 @@ export async function openTreatmentReasoningDenial(page: Page, value: 'enabled' 
       expect((await (await page.request.get('/api/settings/aiTreatmentReasoningKillSwitch')).json()).value).toBe(value);
     };
     const assertDenied = async () => {
-      await expect(panel).toContainText('Non disponibile in questa versione');
+      await expect(panel).toHaveCount(0);
+      await expect(proposals).toHaveCount(0);
       await expect(panel.getByRole('button')).toHaveCount(0);
       await expect(panel.getByTestId('model-picker-treatment_reasoning')).toHaveCount(0);
       await expect(panel.getByTestId('treatment-reasoning-proposal')).toHaveCount(0);
