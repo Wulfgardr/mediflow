@@ -209,8 +209,8 @@ export function PatientProfileNotesReview({ patientId, mode }: Readonly<{ patien
             </> : null}
         </> : null}
         {value.kind === 'editing' ? <>
-            {value.expired ? <p role="status">La revisione è scaduta. La bozza è conservata: preparala di nuovo e verifica il contenuto.</p> : null}
-            {value.denied ? <p role="alert">Revisione non ammessa. Nessuna modifica salvata. La bozza è conservata: verifica la sessione e il PIN, poi prepara una nuova revisione.</p> : null}
+            {value.expired ? <p role="status">La bozza è intatta.</p> : null}
+            {value.denied ? <p role="alert">La bozza è intatta.</p> : null}
             <label className="block">Note da proporre
                 <textarea className="mf-input mt-2 min-h-48 w-full" value={value.draft.notes ?? ''}
                     onChange={event => setValue({ kind: 'editing', draft: { ...value.draft, notes: event.target.value } })} />

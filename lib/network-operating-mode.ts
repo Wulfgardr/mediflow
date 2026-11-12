@@ -124,7 +124,7 @@ function buildReplicaStateCatalog(): NetworkReplicaStateView[] {
         },
         {
             code: 'unpaired',
-            label: 'Pairing richiesto',
+            label: 'Abbinamento richiesto',
             title: 'Mirror pronto, associazione mancante',
             description: 'La modalita rete e attiva, ma finche non esiste una associazione non parte alcun riallineamento snapshot.',
             preview: false,
@@ -220,24 +220,24 @@ function pairingLabel(session: NetworkSessionSummary): string {
 function aiRuntimeLabel(aiRuntime: NetworkAiRuntimeSummary): string {
     switch (aiRuntime.mode) {
         case 'centralized-available':
-            return 'Stato AI host disponibile';
+            return 'Stato IA home-base disponibile';
         case 'centralized-unavailable':
-            return 'Stato AI host non disponibile';
+            return 'Stato IA home-base non disponibile';
         case 'local-ai':
         default:
-            return 'AI locale';
+            return 'IA locale';
     }
 }
 
 function aiRuntimeDescription(aiRuntime: NetworkAiRuntimeSummary): string {
     switch (aiRuntime.mode) {
         case 'centralized-available':
-            return 'Il nodo dichiara una configurazione AI locale. Lo stato non autorizza esecuzione AI dai dispositivi associati.';
+            return 'Il nodo dichiara una configurazione IA locale. Lo stato non autorizza esecuzione IA dai dispositivi associati.';
         case 'centralized-unavailable':
-            return 'La modalita rete e attiva, ma la configurazione AI locale del nodo non e pronta. Nessuna esecuzione paired e autorizzata.';
+            return 'La modalita rete e attiva, ma la configurazione IA locale del nodo non e pronta. Nessuna esecuzione paired e autorizzata.';
         case 'local-ai':
         default:
-            return 'Il nodo usa il runtime AI solo in locale e non promette inferenza remota o pairing AI.';
+            return 'Il nodo usa il runtime IA solo in locale e non promette inferenza remota o abbinamento IA.';
     }
 }
 
@@ -254,9 +254,9 @@ function aiLocalRuntimeLabel(aiRuntime: NetworkAiRuntimeSummary): string {
 function aiFallbackLabel(aiRuntime: NetworkAiRuntimeSummary): string {
     switch (aiRuntime.fallbackPolicy) {
         case 'ai-unavailable-no-automatic-fallback':
-            return 'Fallback automatico negato: se l AI non e disponibile, la richiesta fallisce';
+            return 'Fallback automatico negato: se l IA non e disponibile, la richiesta fallisce';
         default:
-            return 'Fallback non riconosciuto: AI non disponibile';
+            return 'Fallback non riconosciuto: IA non disponibile';
     }
 }
 
@@ -264,14 +264,14 @@ function aiRolloutGateLabel(aiRuntime: NetworkAiRuntimeSummary): string {
     switch (aiRuntime.rolloutGate) {
         case 'lane-benchmarks-and-rollout-governance-required':
         default:
-            return 'Benchmark per area AI e governance prima dell attivazione reale';
+            return 'Benchmark per area IA e governance prima dell attivazione reale';
     }
 }
 
 function aiSurfaceLabel(surface: NetworkAiRuntimeSummary['surfaces'][number]): string {
     switch (surface) {
         case 'patient-insight':
-            return 'Patient Insight';
+            return 'Quadro paziente';
         case 'smart-import':
             return 'Smart Import';
         case 'document-synthesis':
@@ -293,7 +293,7 @@ function replicaAuthorityLabel(replica: NetworkReplicaSummary): string {
 function replicaPendingActionLabel(replica: NetworkReplicaSummary): string {
     switch (replica.pendingAction) {
         case 'pairing-required':
-            return 'Serve pairing';
+            return 'Serve abbinamento';
         case 'queue-snapshot':
             return 'Riallinea snapshot';
         case 'manual-review':
@@ -374,7 +374,7 @@ function identityPairingBoundaryLabel(identity: NetworkIdentitySummary): string 
     switch (identity.pairingBoundary) {
         case 'device-pairing-separate-from-operator-login':
         default:
-            return 'Il pairing del device non sostituisce il login operatore';
+            return 'L’abbinamento del device non sostituisce il login operatore';
     }
 }
 

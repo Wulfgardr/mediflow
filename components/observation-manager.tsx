@@ -358,7 +358,7 @@ export default function ObservationManager({
     const count = readable ? formatCountLabel(observations.length, 'misura', 'misure') : undefined;
     const content = (
         <div className={styles.register} data-clinical-register="observations">
-            {!embedded && <header className={styles.therapyHeading}><h2>Misure <span>{count}</span></h2>{newButton}</header>}
+            {!embedded && <header className={styles.therapyHeading}><h2>Parametri <span>{count}</span></h2>{newButton}</header>}
             <div id={formId} hidden={!formOpen}>
             <form ref={formRef} onSubmit={saveObservation} className={styles.form + " grid grid-cols-1 gap-3 md:grid-cols-2"}>
                 {servicePrescriptionItemId && servicePrescriptionItem ? (
@@ -536,7 +536,7 @@ export default function ObservationManager({
             </div>}
         </div>
     );
-    return embedded ? <CollapsibleSection id="parametri" title="Misure" count={count} defaultOpen={formOpen}
+    return embedded ? <CollapsibleSection id="parametri" title="Parametri" count={count} defaultOpen={formOpen}
         headerAction={newButton} surfaceClassName={surfaceClassName} keepMounted>
         {content}
     </CollapsibleSection> : content;

@@ -371,7 +371,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                                 setValue('birthYear', null, { shouldDirty: true });
                                 setValue('birthDatePrecision', event.target.checked ? 'estimated' : 'unknown', { shouldDirty: true });
                             }} />
-                            Conosco solo l’anno (stima)
+                            Conosco solo l’anno
                         </label>
                         {ageLabel && <p>{ageLabel}</p>}
                         {errors.birthDate && <p className="mf-field-error" role="alert">{errors.birthDate.message}</p>}
@@ -415,7 +415,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="col-span-full space-y-1">
-                        <label className={FORM_LABEL_CLASS} htmlFor="patient-caregiver">Caregiver o riferimento</label>
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-caregiver">Caregiver</label>
                         <div className="relative">
                             <HeartHandshake className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-accent)' }} />
                             <input

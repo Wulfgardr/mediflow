@@ -40,7 +40,7 @@ export default function DiagnosticHub() {
         },
         {
             id: 'ai',
-            name: 'Provider AI',
+            name: 'Provider IA',
             icon: <Activity className="w-4 h-4" />,
             description: 'Controlla l’elenco dei modelli del provider configurato, senza generare contenuti.',
             checkFn: async () => {
@@ -81,9 +81,9 @@ export default function DiagnosticHub() {
         },
         {
             id: 'api',
-            name: 'Impostazioni AI',
+            name: 'Impostazioni IA',
             icon: <Server className="w-4 h-4" />,
-            description: 'Controlla la risposta alla richiesta delle impostazioni del provider AI.',
+            description: 'Controlla la risposta alla richiesta delle impostazioni del provider IA.',
             checkFn: async () => {
                 const start = performance.now();
                 const res = await fetch('/api/settings/aiProvider'); // Simple GET
