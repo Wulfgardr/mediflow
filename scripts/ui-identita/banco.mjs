@@ -6,7 +6,10 @@ import { fileURLToPath } from 'node:url';
 import net from 'node:net';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-export const scratch = '/Volumes/Vision/mf-ui-identita-20261107-scratch';
+export const visionScratch = '/Volumes/Vision/mf-ui-identita-20261107-scratch';
+// Vision è exFAT e chiede il contenitore APFS; uno scratch sul disco interno (prova.mjs) è già APFS.
+export const scratch = path.resolve(process.env.MF_BANCO_SCRATCH || visionScratch);
+const needsContainer = scratch === visionScratch;
 export const httpPort = port('MF_BANCO_HTTP_PORT', 3100);
 export const tlsPort = port('MF_BANCO_TLS_PORT', 3543);
 function port(name, fallback) {
@@ -18,7 +21,7 @@ const httpURL = `http://127.0.0.1:${httpPort}`;
 export const data = path.resolve(process.env.MEDIFLOW_DATA_DIR || `${scratch}/apfs/banco`);
 fs.mkdirSync(scratch, { recursive: true });
 function validateData() {
-  if (!fs.existsSync(`${scratch}/apfs`)) throw new Error('Montare prima il contenitore APFS: vedere README');
+  if (needsContainer && !fs.existsSync(`${scratch}/apfs`)) throw new Error('Montare prima il contenitore APFS: vedere README');
   if (!data.startsWith(`${scratch}/`)) throw new Error('SYNTHETIC_ONLY: data dir fuori dallo scratch rifiutata');
   let existing = data;
   while (!fs.existsSync(existing)) existing = path.dirname(existing);
@@ -66,8 +69,8 @@ async function stop() {
   console.log(JSON.stringify({ stopped: true, data }));
 }
 async function start() {
-  if (!execFileSync('/sbin/mount', { encoding: 'utf8' }).includes(` on ${scratch}/apfs (apfs,`)) throw new Error('Contenitore APFS non montato: vedere README');
-  if (process.version !== 'v24.22.0') throw new Error(`Richiesto Node v24.22.0: ${process.version}`);
+  if (needsContainer && !execFileSync('/sbin/mount', { encoding: 'utf8' }).includes(` on ${scratch}/apfs (apfs,`)) throw new Error('Contenitore APFS non montato: vedere README');
+  if (!process.version.startsWith('v24.')) throw new Error(`Richiesto Node 24: ${process.version}`);
   const previous = read();
   if (alive(previous.nextPid) && alive(previous.proxyPid)) { await seedReference(); return status(); }
   if (alive(previous.nextPid) || alive(previous.proxyPid)) await stop();
@@ -92,7 +95,7 @@ async function start() {
   const state = { data, ip, httpPort, tlsPort, nextPid: spawnOwned([`${root}/node_modules/next/dist/bin/next`, 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', String(httpPort)], env, 'next.log') };
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
   let ready = false;
-  for (let n = 0; n < 120; n++) { try { await request('/api/auth/check'); ready = true; break; } catch {} await sleep(1000); }
+  for (let n = 0; n < 300; n++) { try { await request('/api/auth/check'); ready = true; break; } catch {} await sleep(1000); }
   if (!ready) throw new Error('Next non pronto: consultare next.log');
   const tsconfig = `${root}/tsconfig.json`;
   fs.writeFileSync(tsconfig, fs.readFileSync(tsconfig, 'utf8').replace(/,\n\s*"(?:\/Volumes\/Vision\/mf-ui-identita-20261107-scratch\/|\.next-visual-ui-identita\/|node_modules\/\.cache\/mf-ui-identita(?:-[0-9a-f-]+)?\/)[^"]+"/g, ''));
