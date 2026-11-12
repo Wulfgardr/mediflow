@@ -26,7 +26,7 @@ public enum NativeOrdinaryFailureCode: String, CaseIterable, Equatable, Sendable
         switch self {
         case .treatmentReasoningUnavailableInRelease: return "Non disponibile in questa versione"
         case .unqualifiedBoundary: return "runtime locale non qualificato per questa operazione"
-        case .sessionExpired: return "sessione o pairing non più validi"
+        case .sessionExpired: return "sessione o abbinamento non più validi"
         case .notConnected: return "accesso OpenAI non disponibile"
         case .unsupportedAccount: return "account OpenAI non supportato"
         case .busy: return "operazione già in corso"

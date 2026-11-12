@@ -6,8 +6,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub const RETIREMENT_WARNING: &str = "Ritiro di una sessione locale non confermato. Verifica le sessioni dell’host prima di lasciare la postazione.";
-pub const RETIREMENT_ORPHAN_GUIDANCE: &str = "Il ritiro non confermato risale a un avvio dell’app ormai chiuso. Dopo aver verificato nell’host che la sessione non è più attiva, puoi chiudere l’avviso. I ritiri ancora in corso in un’altra finestra aperta restano segnalati.";
+pub const RETIREMENT_WARNING: &str = "Ritiro di una sessione locale non confermato. Verifica le sessioni dell’home-base prima di lasciare la postazione.";
+pub const RETIREMENT_ORPHAN_GUIDANCE: &str = "Il ritiro non confermato risale a un avvio dell’app ormai chiuso. Dopo aver verificato nell’home-base che la sessione non è più attiva, puoi chiudere l’avviso. I ritiri ancora in corso in un’altra finestra aperta restano segnalati.";
 
 struct State {
     /// Markers begun by this instance. The open file keeps an exclusive lock

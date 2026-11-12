@@ -210,7 +210,7 @@ test('rejects every non-canonical capability field and unexpected status key', (
         mutate(status);
         assert.throws(
             () => parseFabricSnapshotPair(status, observability),
-            /Registro capability Fabric non conforme/u,
+            /Registro delle funzioni Fabric non conforme/u,
             label,
         );
     }

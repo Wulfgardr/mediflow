@@ -45,7 +45,7 @@ function makeSources(overrides: Record<string, unknown> = {}) {
         denyPermit: () => true,
         readOpenLoops: async () => sourceResult(),
         writeAudit: async () => undefined,
-        timeoutMs: 250,
+        timeoutMs: 500,
         ...overrides,
     };
 }
@@ -75,7 +75,7 @@ test('maps the governed Open Loops read into one bounded review-first proposal',
         denyPermit: () => false,
         readOpenLoops: async () => { calls.push('read'); return sourceResult(); },
         writeAudit: async (audit: unknown) => { calls.push('audit'); audits.push(audit); },
-        timeoutMs: 250,
+        timeoutMs: 500,
     });
 
     const output = await service.propose(PERMIT, input());
@@ -116,7 +116,7 @@ test('fails closed with a PHI-safe denial audit when the governed read fails', a
         denyPermit: (execution: unknown) => { assert.equal(execution, EXECUTION); denied += 1; return true; },
         readOpenLoops: async () => { throw new Error('synthetic dependency failure'); },
         writeAudit: async (audit: unknown) => { audits.push(audit); },
-        timeoutMs: 250,
+        timeoutMs: 500,
     });
 
     await assert.rejects(service.propose(PERMIT, input()),
@@ -255,7 +255,7 @@ test('post-fences a blocking final-currentness callback before permit finalizati
         current: () => {
             currentnessChecks += 1;
             if (currentnessChecks === 2) {
-                const until = performance.now() + 275;
+                const until = performance.now() + 525;
                 while (performance.now() < until) { /* bounded synthetic hostile callback */ }
             }
             return record({ generation: 1 });
@@ -267,4 +267,23 @@ test('post-fences a blocking final-currentness callback before permit finalizati
         (error: unknown) => error instanceof PatientOpenLoopsFollowUpProposalV1Error
             && error.code === 'timeout');
     assert.equal(finalized, 0);
+});
+
+test('the pending proposal expires at exactly 500 ms', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    let denied = 0;
+    const service = createPatientOpenLoopsFollowUpProposalServiceV1(makeSources({
+        readOpenLoops: () => new Promise(() => {}),
+        denyPermit: () => { denied += 1; return true; },
+    }));
+    const pending = service.propose(PERMIT, input());
+    const rejected = assert.rejects(pending, (error: unknown) =>
+        error instanceof PatientOpenLoopsFollowUpProposalV1Error && error.code === 'timeout');
+    t.mock.timers.tick(499);
+    await Promise.resolve();
+    assert.equal(denied, 0);
+    t.mock.timers.tick(1);
+    await rejected;
+    assert.equal(denied, 1);
+    service.dispose();
 });

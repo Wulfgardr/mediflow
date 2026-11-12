@@ -75,7 +75,7 @@ final class ClinicalWorkspaceViewsTests: XCTestCase {
         await unavailable.loadIfNeeded(using: connection(S6MockDataSource(details: details(detail(id: "p1")))))
         let agendaMessage = unavailable.unavailableMessage(for: "network.replica.readonly-agenda")
         XCTAssertTrue(agendaMessage?.contains("agenda") == true, "the message names the missing section")
-        XCTAssertTrue(agendaMessage?.hasSuffix("Aggiorna MediFlow sull'host.") == true, "the message ends on the next step")
+        XCTAssertTrue(agendaMessage?.hasSuffix("Aggiorna MediFlow sull'home-base.") == true, "the message ends on the next step")
         XCTAssertFalse(agendaMessage?.contains("network.") ?? true, "no internal capability key on screen")
         XCTAssertFalse(agendaMessage?.contains("capability") ?? true, "no internal jargon on screen")
         let failing = AgendaWorkspaceModel(connectionProvider: { self.connection(S6MockDataSource(details: self.details(self.detail(id: "p1")), shouldFail: true)) })

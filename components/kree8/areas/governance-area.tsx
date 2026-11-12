@@ -41,11 +41,10 @@ function GovernanceArea() {
         <div>
           <p className={styles.areaCaption}>Sistema e impostazioni</p>
           <h1 className={styles.areaTitle}>
-            Controlli della postazione <em>· accessi, AI e backup</em>
+            Controlli della postazione <em>· accessi, IA e backup</em>
           <span aria-hidden="true">.</span></h1>
           <p className={styles.areaSubtitle}>
-            Account, funzioni AI, rete, backup, repertori e controlli locali
-            restano raggiungibili da qui.
+            Account, funzioni IA, rete, backup, repertori e controlli locali restano raggiungibili da qui.
           </p>
         </div>
       </header>
@@ -83,7 +82,7 @@ function GovernanceArea() {
 
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Funzioni AI</h2>
+            <h2 className={styles.panelTitle}>Funzioni IA</h2>
             <span className={styles.panelActions}>
               <PillBadge variant="plum">
                 <Sparkles size={11} /> a scelta
@@ -91,8 +90,7 @@ function GovernanceArea() {
             </span>
           </header>
           <p className={styles.panelSubtitle}>
-            Le funzioni AI restano spente o attive per area, con controlli
-            rapidi.
+            Le funzioni IA restano spente o attive per area, con controlli rapidi.
           </p>
 
           {[
@@ -298,7 +296,7 @@ function GovernanceArea() {
           <div className={styles.modeCard} style={{ marginTop: 8 }}>
             <span className={styles.modeIcon}><ShieldCheck size={16} /></span>
             <span>
-              <span className={styles.modeTitle}>Modelli AI</span>
+              <span className={styles.modeTitle}>Modelli IA</span>
               <br />
               <span className={styles.modeSub}>
                 1 modello attivo · 3 disponibili per prova

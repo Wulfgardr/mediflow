@@ -411,3 +411,8 @@ Dopo una thin slice verificata il claim massimo diventa:
 **MCP `stdio` locale modern-only con un tool di stato non-PHI; nessuna sessione
 AIP clinica, operazione Headless generale, proposta, write, Intelligent Host
 clinico, release readiness o release**.
+
+La proposta follow-up della Mini ha un budget di `500 ms`, allineato alla
+lettura che la contiene. Il precedente limite di `250 ms` poteva respingere
+proposte valide durante brevi rallentamenti del Mac dovuti a backup o Spotlight.
+Al superamento del budget restano attivi annullamento e chiusura della sessione.

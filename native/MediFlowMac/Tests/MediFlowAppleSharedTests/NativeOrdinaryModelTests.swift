@@ -292,7 +292,7 @@ final class NativeOrdinaryModelTests: XCTestCase {
             }))
         model.prepare(); await settle(model)
         XCTAssertEqual(model.phase, .idle)
-        XCTAssertEqual(model.message, "Operazione non completata (HTTP 503): servizio non disponibile o risposta non verificata. Operazione chiusa; nessuna modifica alla cartella.")
+        XCTAssertEqual(model.message, "Operazione non completata (HTTP 503): servizio non disponibile o risposta non verificata. Operazione chiusa.")
         XCTAssertFalse(model.message.contains("untrusted host payload"))
         let failureMessage = model.message
         model.invalidate()
@@ -309,7 +309,7 @@ final class NativeOrdinaryModelTests: XCTestCase {
                 return try F.decode(NativeOrdinaryResponse.self, closed)
             }))
         model.prepare(); await settle(model)
-        XCTAssertEqual(model.message, "Operazione non completata (upstream_error): preparazione locale non disponibile. Operazione chiusa; nessuna modifica alla cartella.")
+        XCTAssertEqual(model.message, "Operazione non completata (upstream_error): preparazione locale non disponibile. Operazione chiusa.")
     }
     func testPrepareFailureKeepsOnlyAllowlistedServerCodeAfterConfirmedCleanup() async throws {
         let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source() }, services: .init(
@@ -321,7 +321,7 @@ final class NativeOrdinaryModelTests: XCTestCase {
                 return try F.decode(NativeOrdinaryResponse.self, closed)
             }))
         model.prepare(); await settle(model)
-        XCTAssertEqual(model.message, "Operazione non completata (unqualified_boundary): runtime locale non qualificato per questa operazione. Operazione chiusa; nessuna modifica alla cartella.")
+        XCTAssertEqual(model.message, "Operazione non completata (unqualified_boundary): runtime locale non qualificato per questa operazione. Operazione chiusa.")
     }
     func testPendingLoginKeepsTheOriginalAttemptWithoutClosingOrRestarting() async throws {
         var completed = false, cancellations = 0

@@ -242,7 +242,7 @@ struct PairedPatientDetailSection: View {
             if showsClinical { macClinicalSummary }
             #endif
             if showsClinical, let aiSummary = cleanedPatientWorkspaceValue(detail.aiSummary) {
-                ChartGroup("Sintesi AI", systemImage: "sparkles") {
+                ChartGroup("Quadro paziente", systemImage: "sparkles") {
                     Text(aiSummary).chartProse()
                 }
                 .accessibilityIdentifier("patient-detail-ai-summary")
@@ -641,7 +641,7 @@ struct PairedPatientDetailSection: View {
                 TextField(PatientIdentityForm.label(model.editPatientIdentifierType), text: $model.editPatientTaxCode)
                     .accessibilityIdentifier("edit-patient-taxCode")
             }
-            Toggle("Conosco solo l’anno (stima)", isOn: $model.editPatientHasEstimatedBirthYear)
+            Toggle("Conosco solo l’anno", isOn: $model.editPatientHasEstimatedBirthYear)
                 .accessibilityIdentifier("edit-patient-estimated-birth")
                 .onChange(of: model.editPatientHasEstimatedBirthYear) { estimated in
                     if estimated { model.editPatientBirthDate = nil }
@@ -1066,7 +1066,7 @@ private extension PairedPatientDetailSection {
                 PatientChartGroup("Note") { PatientChartProse(text: notes) }
             }
             if let summary = cleanedPatientWorkspaceValue(detail.aiSummary) {
-                PatientChartGroup("Sintesi con IA") { PatientChartProse(text: summary) }
+                PatientChartGroup("Quadro paziente") { PatientChartProse(text: summary) }
                     .accessibilityIdentifier("patient-detail-ai-summary")
             }
             if let insights = cleanedPatientWorkspaceValue(detail.documentInsights) {
@@ -1110,7 +1110,7 @@ private extension PairedPatientDetailSection {
                 if detail.isAdi == true {
                     PatientChartField(label: "Modalità", value: .recorded("Assistenza domiciliare integrata"))
                 }
-                PatientChartField(label: "Persona di riferimento", value: .make(detail.caregiver,
+                PatientChartField(label: "Caregiver", value: .make(detail.caregiver,
                     isProtected: model.isPatientFieldLocked(.caregiver)))
                 PatientChartField(label: "Ambulatorio", value: .make(ambulatoryName))
                 PatientChartField(label: "Monitoraggio previsto", value: .make(detail.monitoringProfile))

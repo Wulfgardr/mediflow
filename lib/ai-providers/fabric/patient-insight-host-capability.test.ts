@@ -89,6 +89,7 @@ test('returns a typed review-only proposal after the fixed Fabric pipeline and t
     assert.equal(fixture.checks(), 2);
     assert.deepEqual(fixture.calls, ['kill', 'currentness', 'lifecycle', 'binding', 'readiness', 'router', 'clock', 'entropy', 'chat', 'kill', 'currentness']);
     assert.equal(result.writesPerformed, 0); assert.equal(result.apply, 'denied');
+    assert.equal(attemptsOf(result), 1, 'una sola chiamata, registrata nella provenienza');
     assert.match(result.reviewRef, /^review_[0-9a-f]{32}$/u);
     const serialized = JSON.stringify(result);
     for (const forbidden of ['raw-provider-marker', 'tokensIn', 'actor_', 'Synthetic condition', 'Synthetic therapy']) assert.doesNotMatch(serialized, new RegExp(forbidden, 'u'));
@@ -136,6 +137,10 @@ const tooLong = JSON.stringify({
     data: { currentState: [sentence(230)], alerts: [], nextSteps: [], gaps: [] },
 });
 const truncated = Object.freeze({ content: response.slice(0, 80), truncated: true as const });
+/* WUL-826: chiamate al modello registrate nella provenienza della proposta o dello scarto. */
+function attemptsOf(result: Awaited<ReturnType<ReturnType<typeof capability>['value']['preview']>>): unknown {
+    return result.provenance && 'attempts' in result.provenance ? result.provenance.attempts : undefined;
+}
 
 test('local: a first answer with a 230 character sentence is retried once and the valid second answer is published', async () => {
     assert.equal(sentence(230).length, 230);
@@ -146,12 +151,14 @@ test('local: a first answer with a 230 character sentence is retried once and th
     assert.deepEqual(fixture.calls, ['kill', 'currentness', 'lifecycle', 'binding', 'readiness', 'router', 'clock', 'entropy',
         'chat', 'kill', 'currentness', 'chat', 'kill', 'currentness']);
     if (result.status === 'available') assert.equal(result.proposal.summary, 'Synthetic summary [S1]');
+    assert.equal(attemptsOf(result), 2, 'il primo tentativo scartato resta nella provenienza');
 });
 
 test('local: a first answer cut at the token ceiling is retried once and the valid second answer is published', async () => {
     const fixture = capability({ answers: [truncated, response] });
     const result = await fixture.value.preview({ requestId, projection, currentness });
     assert.equal(result.status, 'available'); assert.equal(fixture.chats(), 2);
+    assert.equal(attemptsOf(result), 2);
 });
 
 test('local: an answer flagged as truncated is not published even when it parses', async () => {
@@ -165,6 +172,7 @@ test('local: two invalid answers fail with proposal_invalid after two calls, not
     const result = await fixture.value.preview({ requestId, projection, currentness });
     assert.equal(result.status, 'failed'); assert.equal(result.code, 'proposal_invalid'); assert.equal(result.proposal, null);
     assert.equal(fixture.chats(), 2);
+    assert.equal(attemptsOf(result), 2);
 });
 
 test('local: revoking the function between the attempts stops before the second call and publishes nothing', async () => {
@@ -181,10 +189,12 @@ test('local: a selection or revision change between the attempts stops before th
     const result = await fixture.value.preview({ requestId, projection, currentness });
     assert.equal(result.status, 'failed'); assert.equal(result.code, 'source_stale'); assert.equal(result.proposal, null);
     assert.equal(fixture.chats(), 1);
+    assert.equal(attemptsOf(result), 1);
 });
 
 test('local: a provider error is not retried', async () => {
     const fixture = capability({ answers: [new Error('synthetic transport failure'), response] });
     const result = await fixture.value.preview({ requestId, projection, currentness });
     assert.equal(result.status, 'failed'); assert.equal(result.code, 'provider_failed'); assert.equal(fixture.chats(), 1);
+    assert.equal(attemptsOf(result), 1);
 });

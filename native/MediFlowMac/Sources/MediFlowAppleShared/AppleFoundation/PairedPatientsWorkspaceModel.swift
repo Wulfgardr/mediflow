@@ -632,12 +632,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             tlsPin = synthetic.configuration.tlsPin
             ambulatoryId = "AMB-1"
             if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_VISIT_OFFLINE"] == "1" {
-                statusMessage = "Fixture sintetica senza sessione host. Apri Visita senza rete per gli appunti già conservati."
+                statusMessage = "Fixture sintetica senza sessione home-base. Apri Visita senza rete per gli appunti già conservati."
                 return
             }
             configurePairedOnlineForTests(credentials: synthetic.credentials, sessionCookie: "mediflow_session=synthetic-prepared",
                 operatorId: "synthetic-operator", masterKey: MobileVisitSyntheticRuntime.key, patients: [synthetic.patient])
-            statusMessage = "Solo dati sintetici: host e autenticazione dispositivo simulati. Nessuna prova del Keychain fisico."
+            statusMessage = "Solo dati sintetici: home-base e autenticazione dispositivo simulati. Nessuna prova del Keychain fisico."
             return
         }
         #endif

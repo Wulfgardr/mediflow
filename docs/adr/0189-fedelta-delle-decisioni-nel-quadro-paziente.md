@@ -130,6 +130,25 @@ nelle proposte accettate il modello scrive ancora come da fare una visita
 cardiologica già avvenuta e «necessario intensificare» dove la fonte dice
 «valutare intensificazione».
 
+### Una bozza da rileggere, con i tentativi nel registro
+
+Decisione di Leonardo dopo la misura: in 6 delle 10 proposte accettate e
+lette a mano almeno una frase cambiava lo stato delle cose, quindi il Quadro
+resta e si presenta come bozza da rileggere frase per frase. Sopra ogni
+proposta, sul Web, in GPUI e nell'app Apple, c'è la stessa riga
+(`PATIENT_INSIGHT_REVIEW_NOTICE` nel contratto e nel trasporto GPUI,
+`patientInsightReviewNotice` in Swift):
+
+> Controlla ogni frase sulla fonte che cita: il modello può scambiare ciò che è
+> fatto con ciò che è da fare.
+
+Il secondo tentativo sul modello locale non si vede a schermo. La provenienza
+locale della proposta, e quella di uno scarto, registra `attempts`: 1, oppure
+2 quando il primo tentativo è stato scartato. L'host lo scrive sempre; Web e
+GPUI leggono ancora la ricevuta di un host precedente, senza il campo, e non
+inventano un numero. Un valore diverso da 1 o 2 rende la risposta non valida.
+Il percorso in rete fa una sola chiamata e la sua provenienza non cambia.
+
 ## Limiti
 
 - Le regole leggono parole, non significati. Restano fuori le forme implicite
@@ -158,3 +177,7 @@ cardiologica già avvenuta e «necessario intensificare» dove la fonte dice
   trasporto GPUI (`transport/src/local_host/patient_insight.rs`) ammettono
   `proposal_unfaithful`. Un client che non lo conosce tratta la risposta come
   non valida e non mostra alcuna proposta.
+- Con `attempts` la provenienza locale ha un campo in più: un GPUI precedente,
+  che legge la provenienza a campi esatti, rifiuta la risposta di un host
+  nuovo e non mostra la proposta. Host e GPUI escono insieme; l'app Apple non
+  legge il campo.

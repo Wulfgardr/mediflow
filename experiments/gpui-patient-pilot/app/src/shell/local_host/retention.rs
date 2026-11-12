@@ -397,7 +397,8 @@ impl ClinicalApp {
                 area.busy = false;
                 match result {
                     Ok(RetentionOutcome::Done(_)) => {
-                        area.message = Some(("Registrato. Stato riletto dall’host.".into(), false));
+                        area.message =
+                            Some(("Registrato. Stato riletto dall’home-base.".into(), false));
                         area.hold_document
                             .update(cx, |input, cx| input.set_content("", cx));
                     }
@@ -841,7 +842,7 @@ mod tests {
             );
             assert_eq!(
                 app.local_host.retention.message,
-                Some(("Registrato. Stato riletto dall’host.".into(), false))
+                Some(("Registrato. Stato riletto dall’home-base.".into(), false))
             );
             // Un valore fuori intervallo resta nella pagina con il motivo, senza comando.
             app.local_host.retention.windows[1].update(cx, |input, cx| input.set_content("0", cx));

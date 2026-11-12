@@ -163,7 +163,7 @@ export default function SettingsAiFabricPage() {
             <section className={SETTINGS_CARD_CLASS} aria-labelledby="fabric-local-title" data-testid="fabric-local-setup">
                 <header className={styles.fabricBlockHeader}>
                     <h3 id="fabric-local-title">Modelli locali e funzioni</h3>
-                    <p>Ollama segue la configurazione e l’ammissione locali. Le preferenze mostrano soltanto le opzioni del catalogo host; salvarle non prova che una funzione sia pronta.</p>
+                    <p>Ollama segue la configurazione e l’ammissione locali. Le preferenze mostrano soltanto le opzioni del catalogo home-base; salvarle non prova che una funzione sia pronta.</p>
                 </header>
                 <nav aria-label="Configura Intelligence Fabric" className={serviceStyles.fabricActions}>
                     <Link href="/settings/ai/modelli" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Modelli e hardware</Link>
