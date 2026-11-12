@@ -4273,7 +4273,7 @@ impl ClinicalApp {
                     .gap(px(8.))
                     .child(overview_heading(
                         "clinical-overview-observations",
-                        "Misure recenti",
+                        "Parametri recenti",
                         self.patient
                             .observations
                             .ready()

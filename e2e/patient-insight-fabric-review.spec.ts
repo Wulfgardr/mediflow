@@ -373,3 +373,20 @@ for (const width of [1440, 390]) test(`copy anagrafica e note ${width}`, async (
   await expect(notes).toHaveValue('Bozza sintetica da conservare.');
   if (directory) await page.screenshot({ path: `${directory}/${width}-errore-note.png`, animations: 'disabled' });
 });
+
+for (const width of [1440, 390]) test(`copy titolo parametri recenti ${width}`, async ({ page }) => {
+  test.setTimeout(180_000);
+  const baseline = process.env.WUL825_BASELINE === '1';
+  await page.setViewportSize({ width, height: 1000 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const patientId = await createSyntheticPatient(page);
+  await page.goto(`/patients/${patientId}/modules`);
+  const section = page.locator('#quadro').getByRole('region', { name: baseline ? 'Misure recenti' : 'Parametri recenti', exact: true });
+  await expect(section).toBeVisible();
+  await section.scrollIntoViewIfNeeded();
+  const directory = process.env.PATIENT_INSIGHT_CAPTURES;
+  if (directory) {
+    await mkdir(directory, { recursive: true });
+    await page.screenshot({ path: `${directory}/${width}-parametri-recenti.png`, fullPage: true, animations: 'disabled' });
+  }
+});
