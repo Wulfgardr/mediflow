@@ -67,7 +67,7 @@ export function cargoTestCommand(root) {
 
 const gpuiDirectory = 'experiments/gpui-patient-pilot';
 const gpuiWorkflow = '.github/workflows/rust-gpui-pilot.yml';
-const gpuiPaths = ['native/MediFlowMac/Sources/MediFlowCore/VisitRecordingStateContract.swift', 'native/MediFlowMac/Sources/MediFlowAppleShared/VisitRecording*.swift', 'native/MediFlowMac/Sources/MediFlowAppleShared/AppleVisitRecordingRuntime.swift',`${gpuiDirectory}/**`, 'app/fonts/**', 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**',
+const gpuiPaths = [`${gpuiDirectory}/**`, 'app/fonts/**', 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**',
   'docs/design/punto-inchiostro/tokens/punto-inchiostro.tokens.json', 'docs/design/lume/tokens/lume.tokens.json',
   'public/brand/mediflow/*.svg', 'native/contracts/crypto-golden-vectors.v3.json', 'native/contracts/recovery-backup-golden.v1.json', 'native/contracts/dossier-conformance/**', 'scripts/*dossier*', 'app/api/**', 'lib/**', 'drizzle/**',
   'packages/web-auth-lifecycle-owner/**', 'package.json', 'package-lock.json', 'scripts/prepare-e2e-db.mjs',
