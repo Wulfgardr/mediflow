@@ -118,6 +118,12 @@ impl WhoLookup {
 
 #[cfg(unix)]
 impl ChatArea for WhoLookup {
+    fn can_show(&self) -> bool {
+        self.patient.is_some() && self.chat_ready()
+    }
+    fn close_view(&mut self) {
+        self.reset();
+    }
     fn occupied(&self) -> bool {
         self.chat.0.is_some() || self.patient.is_some() || self.busy() || self.query.is_some()
     }
