@@ -18,14 +18,14 @@ comparatore dei protocolli `paired-v3-snapshot-*`.
 
 ## Esecuzione completa
 
-Servono Linux, Node 24, le dipendenze già installate con `npm ci` e il probe
+Servono Linux o macOS, Node 24, le dipendenze già installate con `npm ci` e il probe
 Rust compilato in modalità ottimizzata. Le dipendenze JavaScript del nuovo
-harness sono soltanto moduli standard Node; Next e il bootstrap SQLite
-riusano le dipendenze già fissate dal progetto.
+harness riusano i moduli standard Node e `better-sqlite3`, già fissato dal
+progetto. Next e il bootstrap SQLite riusano le stesse dipendenze.
 
 ```sh
-cargo build --manifest-path experiments/gpui-patient-pilot/Cargo.toml --locked --release -p mediflow-runtime-client --bin mediflow-runtime-probe
-node experiments/gpui-patient-pilot/comparison/run.mjs --rust-probe experiments/gpui-patient-pilot/target/release/mediflow-runtime-probe --output-dir /tmp/mediflow-comparison-report --samples 5
+(cd experiments/gpui-patient-pilot && CARGO_TARGET_DIR=/percorso/target-privato cargo build --locked --offline --release -p mediflow-runtime-client --bin mediflow-runtime-probe)
+node experiments/gpui-patient-pilot/comparison/run.mjs --rust-probe /percorso/target-privato/release/mediflow-runtime-probe --output-dir /tmp/mediflow-comparison-report --samples 5
 ```
 
 La cartella di output deve essere vuota. Il runner segue il recipe di
@@ -39,7 +39,7 @@ Il processo crea un percorso privato `/tmp/mediflow-transition-*`, ascolta
 solo su `127.0.0.1` a una porta assegnata dal sistema, genera nuove credenziali,
 disabilita la copia legacy e i provider, e verifica la readiness con il bearer
 amministrativo casuale. Il preparatore adotta la passphrase v3 attraverso il
-normale endpoint e conferma un pairing Linux attraverso il normale flusso di
+normale endpoint e conferma un pairing della piattaforma corrente attraverso il normale flusso di
 abbinamento. Il pairing nuovo richiede esplicitamente anche le capability di
 Agenda, Diario globale, cataloghi e `network.replica.write-patient-lifecycle`
 per la creazione anagrafica; il preparatore verifica che i grant emessi
@@ -53,6 +53,20 @@ campione apre e chiude una sessione ordinaria. In `finally` arresta il gruppo
 di processi che ha creato e rimuove archivio, chiavi, credenziali e log privati.
 Conserva solo ricevute e proiezioni senza testo clinico. Un errore produce una
 ricevuta fallita e un exit code diverso da zero.
+
+Su macOS si usa lo stesso gruppo di processi POSIX posseduto dal runner;
+non serve il wrapper Linux `local-subreaper.py`. Il confronto esercita il
+trasporto Rust usato da GPUI e il client JavaScript, senza aprire finestre.
+Non prova il bundle installato, l'anteprima visibile o l'interazione nativa.
+
+`audit-comparison.json` verifica nel SQLite sintetico una registrazione per
+ogni mutazione accettata e nessuna registrazione clinica aggiuntiva dopo i
+tentativi obsoleti o ripetuti. Per entrambi i client controlla tipo, esito,
+operatore, tipo di soggetto e identificativo presente, superficie paired nativa e versione. Le fasi esigono
+rispettivamente 2, 7 e 3 registrazioni: due omissioni uguali non passano per
+parità. Questo confronto non copre l'audit degli altri writer del censimento.
+I casi negativi del verificatore sono in `scripts/gpui-comparison-audit.test.mjs`,
+selezionati dalla suite unit.
 
 ## Corpus e provenienza
 
