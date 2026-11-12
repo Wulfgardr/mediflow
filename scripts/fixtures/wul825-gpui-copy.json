@@ -29,11 +29,13 @@
     "file": "experiments/gpui-patient-pilot/app/src/shell.rs",
     "removed": [
       "Ho verificato le sessioni dell’host",
+      "Misure recenti",
       "Salvataggio delle preferenze AI non verificato. {}",
       "Sessione bloccata. Un salvataggio AI era in corso: rileggi le preferenze dopo l’accesso."
     ],
     "added": [
       "Ho verificato le sessioni dell’home-base",
+      "Parametri recenti",
       "Salvataggio delle preferenze IA non verificato. {}",
       "Sessione bloccata. Un salvataggio IA era in corso: rileggi le preferenze dopo l’accesso."
     ]

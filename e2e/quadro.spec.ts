@@ -6,7 +6,7 @@ import { bootstrapUnlockedSession, assertNoHorizontalOverflow, openPatientSectio
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 const quadro = (page: Page) => page.locator('#quadro');
-const names = ['Problemi', 'Terapie attive', 'Misure recenti', 'Controlli aperti'];
+const names = ['Problemi', 'Terapie attive', 'Parametri recenti', 'Controlli aperti'];
 async function fixture(page: Page, count = 1) {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const id = await page.evaluate(async count => {
@@ -47,7 +47,7 @@ for (const count of [0, 1, 8]) test(`quattro tabelle e conteggi con ${count} rec
     }
 });
 
-test('Misure recenti conta i parametri e conserva lo storico completo in Misure', async ({ page }) => {
+test('Parametri recenti conta i parametri e conserva lo storico completo in Parametri', async ({ page }) => {
     test.setTimeout(180_000);
     const id = await fixture(page, 0);
     await page.evaluate(async patientId => {
@@ -60,7 +60,7 @@ test('Misure recenti conta i parametri e conserva lo storico completo in Misure'
         }
     }, id);
     await page.goto(`/patients/${id}/modules`);
-    const measures = quadro(page).getByRole('region', { name: 'Misure recenti', exact: true });
+    const measures = quadro(page).getByRole('region', { name: 'Parametri recenti', exact: true });
     await expect(measures.getByRole('heading')).toContainText('2 parametri');
     await expect(measures.locator('tbody tr')).toHaveCount(2);
     await expect(measures.getByRole('cell', { name: '81 kg', exact: true })).toBeVisible();
@@ -78,7 +78,7 @@ test('Misure recenti conta i parametri e conserva lo storico completo in Misure'
     await expect(history.getByRole('cell', { name: '70000 g', exact: true })).toBeVisible();
 });
 
-for (const [route, sectionName] of [['therapies', 'Terapie attive'], ['observations', 'Misure recenti'], ['checkups', 'Controlli aperti']]) test(`errore ${route} distinto dal vuoto`, async ({ page }) => {
+for (const [route, sectionName] of [['therapies', 'Terapie attive'], ['observations', 'Parametri recenti'], ['checkups', 'Controlli aperti']]) test(`errore ${route} distinto dal vuoto`, async ({ page }) => {
     test.setTimeout(180_000);
     const id = await fixture(page, 0);
     await page.route(`**/api/${route}?**`, route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic read failure' }) }));
@@ -92,7 +92,7 @@ for (const [route, sectionName] of [['therapies', 'Terapie attive'], ['observati
 });
 
 
-for (const [routeName, sectionName] of [['therapies', 'Terapie attive'], ['observations', 'Misure recenti'], ['checkups', 'Controlli aperti']]) test(`caricamento ${routeName} senza zeri o vuoti`, async ({ page }) => {
+for (const [routeName, sectionName] of [['therapies', 'Terapie attive'], ['observations', 'Parametri recenti'], ['checkups', 'Controlli aperti']]) test(`caricamento ${routeName} senza zeri o vuoti`, async ({ page }) => {
     test.setTimeout(180_000);
     const id = await fixture(page, 0);
     let release!: () => void;
