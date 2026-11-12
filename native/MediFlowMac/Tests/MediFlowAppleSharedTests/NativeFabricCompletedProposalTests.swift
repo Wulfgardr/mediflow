@@ -103,6 +103,18 @@ final class NativeFabricCompletedProposalTests: XCTestCase {
 /// WUL-826: sopra le frasi del Quadro paziente una sola riga chiede di controllarle
 /// sulla fonte. La vista disegna queste righe nell'ordine dato.
 final class NativePatientInsightReviewNoticeTests: XCTestCase {
+    #if os(macOS)
+    func testWebAdministrationKeepsTheTechnicalLocalhostAddress() throws {
+        XCTAssertEqual(HostAdminError.forbidden.errorDescription,
+            "L'home-base riserva questa lettura alla console web. Un client nativo abbinato non vi accede, nemmeno con un account amministratore: si consulta da localhost.")
+        let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let view = try String(contentsOf: package.appendingPathComponent("Sources/MediFlowAppleShared/AppleFoundation/HostAdminWorkspaceView.swift"), encoding: .utf8)
+        XCTAssertTrue(view.contains("si usano da localhost."))
+        XCTAssertFalse(view.contains("localhome-base"))
+    }
+    #endif
+
     @MainActor
     func testProposalCopySnapshot() throws {
         let proposal = NativeOrdinaryJSON.object(["preview": .object(["proposal": .object([

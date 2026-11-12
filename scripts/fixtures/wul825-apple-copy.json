@@ -38,7 +38,7 @@
       "modelli AI"
     ],
     "added": [
-      "Backup e ripristino, riparazione database, correzione orfani, migrazione many-to-many, import repertori AIFA ed esenzioni, conversazioni IA e Smart Import esistono sull'home-base e si usano da localhome-base. Sono operazioni che modificano o esportano l'archivio clinico: qui arrivano con conferma esplicita e prova di esito, non prima.",
+      "Backup e ripristino, riparazione database, correzione orfani, migrazione many-to-many, import repertori AIFA ed esenzioni, conversazioni IA e Smart Import esistono sull'home-base e si usano da localhost. Sono operazioni che modificano o esportano l'archivio clinico: qui arrivano con conferma esplicita e prova di esito, non prima.",
       "Collega l'home-base per leggere lo stato dell'home-base.",
       "L'home-base limita questa lettura a 200 eventi: i conteggi qui sopra descrivono gli ultimi 200, non l'intero periodo.",
       "Non supportata su questo home-base",
@@ -305,7 +305,7 @@
       "La sessione operatore è scaduta. Accedi di nuovo per gestire l'host."
     ],
     "added": [
-      "L'home-base riserva questa lettura alla console web. Un client nativo abbinato non vi accede, nemmeno con un account amministratore: si consulta da localhome-base.",
+      "L'home-base riserva questa lettura alla console web. Un client nativo abbinato non vi accede, nemmeno con un account amministratore: si consulta da localhost.",
       "La sessione operatore è scaduta. Accedi di nuovo per gestire l'home-base."
     ]
   },

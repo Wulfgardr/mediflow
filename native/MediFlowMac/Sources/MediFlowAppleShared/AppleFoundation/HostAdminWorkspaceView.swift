@@ -340,7 +340,7 @@ struct HostAdminWorkspaceView: View {
     /// backup and database repair reads as if this host had neither.
     private var pendingSection: some View {
         section("Non ancora in questa app", systemImage: "ellipsis.circle") {
-            Text("Backup e ripristino, riparazione database, correzione orfani, migrazione many-to-many, import repertori AIFA ed esenzioni, conversazioni IA e Smart Import esistono sull'home-base e si usano da localhome-base. Sono operazioni che modificano o esportano l'archivio clinico: qui arrivano con conferma esplicita e prova di esito, non prima.")
+            Text("Backup e ripristino, riparazione database, correzione orfani, migrazione many-to-many, import repertori AIFA ed esenzioni, conversazioni IA e Smart Import esistono sull'home-base e si usano da localhost. Sono operazioni che modificano o esportano l'archivio clinico: qui arrivano con conferma esplicita e prova di esito, non prima.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
