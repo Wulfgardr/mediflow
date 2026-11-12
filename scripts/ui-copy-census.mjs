@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = process.env.MEDIFLOW_COPY_ROOT ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const selected = process.argv.find(a => a.startsWith('--surface='))?.split('=')[1];
-const oldNames = /Patient Insight|Sintesi del quadro paziente|Supporto al ragionamento clinico|Sintesi con IA|Sintesi AI|Quadro attuale|Conosco solo l[’']anno \(stima\)|\bAI\b|\b[Hh]ost\b|\b[Pp]airing\b|\b[Cc]apability\b/;
+const oldNames = /localhome-base|Patient Insight|Sintesi del quadro paziente|Supporto al ragionamento clinico|Sintesi con IA|Sintesi AI|Quadro attuale|Conosco solo l[’']anno \(stima\)|\bAI\b|\b[Hh]ost\b|\b[Pp]airing\b|\b[Cc]apability\b/;
 const variants = ['Misure', 'Controlli', 'Parametri', 'Scale', 'Valutazione', 'Caregiver', 'Persona di riferimento'];
 const presentationLibraries = [
     'lib/fabric-settings-view.ts', 'lib/function-models/browser.ts', 'lib/function-models/ordinary-browser.ts', 'lib/function-models/preview-client.ts', 'lib/ai-rollout-model-guard.ts', 'lib/ai-rollout-readiness-storage.ts', 'lib/network-operating-mode.ts',
@@ -52,12 +52,13 @@ export function census() {
         const text = value.replace(/\s+/g, ' ').trim();
         if (text && !/^(?:Patient Insight preview input is unavailable\.|Network .*boundary excludes AI)/.test(text) && (text.includes(' ') || /^(AI|Host|Pairing|Capability|Misure|Controlli|Parametri|Scale|Valutazione|Caregiver|Patient Insight|Quadro attuale)$/.test(text)) && !/^(?:@?\/?(?:api|settings|lib|components)\/|#|npm run )/.test(text) && !/Intelligent Host/.test(text)) rows.push({ surface, file, line: source.slice(0, start).split('\n').length, text });
     };
-    for (const file of [...files('app', /\.tsx$/), ...files('components', /\.tsx$/), ...presentationLibraries]) {
+    for (const file of [...files('app', /\.tsx$/), ...files('components', /\.tsx$/), ...files('lib/hooks', /\.ts$/), ...files('hooks', /\.ts$/), ...presentationLibraries]) {
         const source = fs.readFileSync(path.join(root, file), 'utf8');
         const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
         function visit(node) {
             if (ts.isJsxText(node)) add('web', file, source, node.pos, node.text);
             else if (ts.isStringLiteralLike(node) || ts.isTemplateSpan(node) && ts.isTemplateTail(node.literal)) {
+                if (ts.isCallExpression(node.parent) && ts.isPropertyAccessExpression(node.parent.expression) && node.parent.expression.expression.getText(ast) === 'console') return;
                 if (ts.isImportDeclaration(node.parent) || ts.isExportDeclaration(node.parent) || ts.isImportSpecifier(node.parent)) return;
                 if (ts.isJsxAttribute(node.parent) && /^(data-|className|id$|href$|src$|key$|type$|role$|name$|value$)/.test(node.parent.name.getText(ast))) return;
                 if (ts.isPropertyAssignment(node.parent) && node.parent.name === node) return;

@@ -140,7 +140,7 @@ for (const route of ['modelli', 'funzioni'] as const) {
         await input.fill('gemma4:e4b');
         await expect(input).toHaveValue('gemma4:e4b');
         await save.click();
-        await expect(page.getByText('Configurazione AI salvata', { exact: true })).toBeVisible();
+        await expect(page.getByText('Configurazione IA salvata', { exact: true })).toBeVisible();
         await expect(input).toHaveValue('gemma4:e4b');
         const storedModel = await page.evaluate(async () => {
           const response = await fetch('/api/settings/aiModel_clinical');

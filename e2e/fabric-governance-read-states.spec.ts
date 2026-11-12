@@ -126,14 +126,14 @@ for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, 
                 target = baseline ? technical : marker.locator('p').first();
             }
         } else {
-            const panel = surface.getByRole('heading', { name: 'Confronto modelli AI', exact: true }).locator('..').locator('..').locator('..').locator('..');
+            const panel = surface.getByRole('heading', { name: 'Confronto modelli IA', exact: true }).locator('..').locator('..').locator('..').locator('..');
             await expect(surface.getByTestId('ai-rollout-readiness-panel')).toContainText('Nessuna verifica');
             const loading = panel.getByText('Lettura del report salvato…', { exact: true });
             if (scenario === 'pending') {
                 await expect(loading).toHaveCount(baseline ? 0 : 1);
                 if (!baseline) await expect(loading).toBeVisible();
                 observations.push({ loadingNodeCount: await loading.count(), reportShown: await panel.getByText('Stato confronto:', { exact: false }).count() });
-                target = baseline ? panel.getByRole('heading', { name: 'Confronto modelli AI', exact: true }) : loading;
+                target = baseline ? panel.getByRole('heading', { name: 'Confronto modelli IA', exact: true }) : loading;
             } else if (scenario === 'error') {
                 const alert = panel.getByRole('alert'), raw = alert.getByText('HTTP 503', { exact: true });
                 await expect(alert).toHaveCount(1); await expect(alert).toBeVisible();
