@@ -45,6 +45,13 @@ function readInsightSources(patientId: string) {
 
 /* scoped control geometry overrides the legacy shared button chrome. */
 const actionStyle = { borderRadius: 'var(--lume-control-radius, 10px)', fontSize: '0.875rem', minHeight: 'var(--lume-control-height, 44px)' };
+const VENUE_LABELS = { local_process: 'Processo locale', cloud: 'Servizio esterno' } as const;
+const EGRESS_LABELS = { none: 'Nessuna uscita dati', redacted_explicit_consent: 'Contenuti oscurati inviati con consenso' } as const;
+const PREPROCESSING_LABELS = {
+    context_minimization: 'Riduzione del contesto', layer1_redaction: 'Primo passaggio di oscuramento',
+    layer2_redaction: 'Secondo passaggio di oscuramento', envelope_validation: 'Verifica del formato',
+} as const;
+
 
 function InsightList({ items, warning = false }: Readonly<{ items: readonly string[]; warning?: boolean }>) {
     if (items.length === 0) return null;
@@ -230,8 +237,8 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
                             <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="h-4 w-4" aria-hidden="true" />Ricevuta, provenienza e validità</p>
                             <p>0 scritture · Applicazione non consentita</p>
                             <dl className="grid min-w-0 gap-3 sm:grid-cols-2">
-                                <div><dt>Esecuzione</dt><dd className="text-[color:var(--lume-ink)]">{preview.receipt.provider} · {preview.receipt.model} · processo locale · nessuna uscita dati</dd></div>
-                                <div><dt>Provenienza</dt><dd className="text-[color:var(--lume-ink)]">{preview.provenance.preprocessing.map(step => step === 'context_minimization' ? 'Riduzione del contesto' : 'verifica del formato').join(' → ')}</dd></div>
+                                <div><dt>Esecuzione</dt><dd className="text-[color:var(--lume-ink)]">{preview.receipt.provider} · {preview.receipt.model} · {VENUE_LABELS[preview.receipt.venue]} · {EGRESS_LABELS[preview.receipt.egress]}</dd></div>
+                                <div><dt>Provenienza</dt><dd className="text-[color:var(--lume-ink)]">{preview.provenance.preprocessing.map(step => PREPROCESSING_LABELS[step]).join(' → ')}</dd></div>
                                 <div><dt>Validità</dt><dd className="text-[color:var(--lume-ink)]">Selezione {preview.proposal.currentness.selectionEpoch} · revisione {preview.proposal.currentness.patientRevision}</dd></div>
                                 <div><dt>Cattura / verifica</dt><dd className="text-[color:var(--lume-ink)]">{new Date(preview.proposal.currentness.capturedAt).toLocaleString('it-IT')} · {new Date(preview.proposal.currentness.verifiedAt).toLocaleString('it-IT')}</dd></div>
                             </dl>
