@@ -1,5 +1,8 @@
 use zeroize::Zeroizing;
 
+#[cfg(unix)]
+pub(crate) mod drug_review;
+
 #[cfg(target_os = "macos")]
 pub(crate) mod listening;
 #[cfg(target_os = "macos")]
