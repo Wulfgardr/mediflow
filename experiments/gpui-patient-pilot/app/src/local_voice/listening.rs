@@ -296,11 +296,13 @@ impl Agreement {
 
 /// Frase definitiva con la sua posizione nella registrazione, in campioni
 /// di audio registrato (le pause non contano).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Segment {
     pub(crate) start: usize,
     pub(crate) end: usize,
     pub(crate) text: Zeroizing<String>,
+    /// Impronta della voce, solo nell'ascolto della visita a due voci.
+    pub(crate) voice: Option<super::voices::VoicePrint>,
 }
 
 /// Dettatura completa: frasi definitive accumulate e testo stabile da mostrare.
@@ -312,6 +314,11 @@ pub(crate) struct Dictation<V, D> {
     segments: Vec<Segment>,
     /// Audio registrato oltre il quale la registrazione si ferma.
     max_recording: usize,
+    /// Ascolto della visita: ogni frase definitiva riceve l'impronta della voce.
+    two_voices: bool,
+    /// Per le prove e le misure: millisecondi di calcolo di ogni impronta.
+    #[cfg(test)]
+    pub(crate) print_ms: Vec<f64>,
     agreement: Agreement,
     /// Ultimo istante della griglia da 0,5 s in cui si è decodificato un parziale.
     partial_tick: usize,
@@ -329,6 +336,9 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
             finals_count: 0,
             segments: Vec::new(),
             max_recording: MAX_RECORDING,
+            two_voices: false,
+            #[cfg(test)]
+            print_ms: Vec::new(),
             agreement: Agreement::default(),
             partial_tick: 0,
             #[cfg(test)]
@@ -349,10 +359,21 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
                 self.finals.push(' ');
             }
             self.finals.push_str(text);
+            #[cfg(test)]
+            let started = std::time::Instant::now();
+            let voice = self
+                .two_voices
+                .then(|| super::voices::voice_print(&closed.audio))
+                .flatten();
+            #[cfg(test)]
+            if self.two_voices {
+                self.print_ms.push(started.elapsed().as_secs_f64() * 1000.0);
+            }
             self.segments.push(Segment {
                 start: closed.start,
                 end: closed.end,
                 text: Zeroizing::new(text.to_owned()),
+                voice,
             });
         }
         Ok(())
@@ -426,6 +447,11 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
     pub(crate) fn with_max_recording(mut self, samples: usize) -> Self {
         self.max_recording = samples;
         self
+    }
+
+    /// Ascolto della visita a due voci: impronta della voce per ogni frase.
+    pub(crate) fn set_two_voices(&mut self, two_voices: bool) {
+        self.two_voices = two_voices;
     }
 
     /// Campioni che si possono ancora registrare prima della durata massima.
