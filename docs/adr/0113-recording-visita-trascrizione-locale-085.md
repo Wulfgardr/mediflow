@@ -1,7 +1,13 @@
 # ADR 0113: recording visita e trascrizione locale nella 0.8.5
 
 Date: 2026-09-01
-Status: Accepted
+Status: Accepted; motore Apple ritirato l'11 novembre 2026
+
+Aggiornamento dell'11 novembre 2026 (WUL-828, punto 1): per decisione di Leonardo
+la dettatura usa solo whisper e il motore vocale Apple esce dal prodotto. Il client
+Apple per Mac non ha più l'ascolto della visita con SpeechAnalyzer; runtime,
+preflight degli asset e test relativi sono stati tolti. Il resto di questo ADR resta
+come nota storica. L'ascolto dell'intera visita tornerà con whisper (WUL-828, punto 3).
 
 Issue: [GitHub #280](https://github.com/Wulfgardr/mediflow/issues/280)
 
