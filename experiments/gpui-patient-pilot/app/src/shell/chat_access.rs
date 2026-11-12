@@ -208,6 +208,7 @@ impl ClinicalApp {
             Function::Synthesis => &mut self.patient.synthesis.area,
             Function::Import => &mut self.patient.smart_import,
             Function::Icd => &mut self.who,
+            Function::OpenLoops => &mut self.open_loops,
         }
     }
 
@@ -261,7 +262,7 @@ impl ClinicalApp {
         let access = self.local_host.access();
         let early = if occupied {
             Some(Stage::Busy)
-        } else if access.is_none() && function != Function::Icd {
+        } else if access.is_none() && !matches!(function, Function::Icd | Function::OpenLoops) {
             Some(Stage::Unavailable)
         } else {
             None
@@ -282,7 +283,7 @@ impl ClinicalApp {
                     return Ok(None);
                 }
                 let enabled = match function {
-                    Function::Insight | Function::Icd => true,
+                    Function::Insight | Function::Icd | Function::OpenLoops => true,
                     Function::Synthesis => access
                         .unwrap()
                         .document_synthesis_enabled()
@@ -323,7 +324,14 @@ impl ClinicalApp {
                 this.focus_after_render = true;
                 this.chat_area(function).admitted();
                 match function {
+                    Function::OpenLoops => {
+                        if let Ok(mut pending) = target.lock() {
+                            pending.finish_function_open(Stage::Opened);
+                        }
+                        this.open_patient_loops(cx);
+                    }
                     Function::Icd => {
+                        this.open_loops.reset();
                         if this.patient_section != PatientSection::Overview {
                             this.section_selected(PatientSection::Overview, cx);
                         }
@@ -336,6 +344,7 @@ impl ClinicalApp {
                         }
                     }
                     Function::Insight => {
+                        this.open_loops.reset();
                         if this.patient_section != PatientSection::Overview {
                             this.section_selected(PatientSection::Overview, cx);
                         }

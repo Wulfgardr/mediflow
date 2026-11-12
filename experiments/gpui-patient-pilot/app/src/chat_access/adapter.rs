@@ -65,6 +65,10 @@ fn checked_reply(command: &str, bytes: &[u8]) -> io::Result<Value> {
             "icd-unavailable",
             "icd-busy",
             "icd-closed",
+            "loops-opened",
+            "loops-unavailable",
+            "loops-busy",
+            "loops-closed",
             "preparing",
             "selecting",
             "challenge",
@@ -89,9 +93,9 @@ fn checked_reply(command: &str, bytes: &[u8]) -> io::Result<Value> {
         || state.is_none()
         || ((matches!(
             command,
-            "patient-insight" | "document-synthesis" | "smart-import" | "icd-lookup"
+            "patient-insight" | "document-synthesis" | "smart-import" | "icd-lookup" | "open-loops"
         ) || state.is_some_and(|state| {
-            ["insight-", "synthesis-", "import-", "icd-"]
+            ["insight-", "synthesis-", "import-", "icd-", "loops-"]
                 .iter()
                 .any(|prefix| state.starts_with(prefix))
         })) && fields != Some(1))
@@ -170,7 +174,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["model"]}}},
                 {"name": CONTROL, "description":"Scheda sintetica monouso dopo consenso nella GPUI; payload riservato alla vista.",
-                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","clinical-profile","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","patient-insight","document-synthesis","receipt","drugs","prosthetics","agenda","booking","icd-lookup","booking-receipt","smart-import"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
+                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","clinical-profile","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","patient-insight","document-synthesis","receipt","drugs","prosthetics","agenda","booking","icd-lookup","booking-receipt","smart-import","open-loops"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
                     "annotations":{"readOnlyHint":false,"destructiveHint":true,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["app"]}}}]}),
             "resources/list" => {
@@ -261,6 +265,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                             "document-synthesis",
                             "smart-import",
                             "icd-lookup",
+                            "open-loops",
                             "status",
                             "consume",
                             "revoke",

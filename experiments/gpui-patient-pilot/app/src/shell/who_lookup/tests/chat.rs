@@ -270,3 +270,194 @@ fn chat_icd_search_permission_denied_has_no_success_receipt(cx: &mut gpui::TestA
         .read_with(cx, |app, _| assert!(app.who.rows.ready().is_none()));
     assert_read_only(&bench.host);
 }
+
+const OPEN_LOOPS: &str = "GET /api/v1/network/patients/patient-a/open-loops";
+fn loops_response() -> Value {
+    json!({"contractVersion":1,"patientId":"patient-a","ambulatoryId":"scope-a",
+        "groups":[{"prescriptionId":"prescription-a","prescribedAt":"2026-10-01T00:00:00.000Z","loops":[{
+            "kind":"results_pending","label":"Referto sintetico","sinceDate":"2026-10-01T00:00:00.000Z",
+            "elapsedDays":42,"typicalIntervalDays":null,
+            "source":{"type":"service_prescription_item","id":"item-a","prescriptionId":"prescription-a"}}]}],
+        "standaloneLoops":[],"receipt":{"operation":"patient-open-loops.read.v1","outcome":"read",
+            "readAt":"2026-11-12T01:00:00.000Z","itemCount":1,"snapshotHash":"a".repeat(64)}})
+}
+fn open_loops(bench: &Bench, cx: &mut gpui::VisualTestContext) -> (Pending, UnixStream) {
+    let function = Function::ALL
+        .into_iter()
+        .find(|function| State::Generative(*function, Stage::Opened).wire() == "loops-opened")
+        .expect("la chat offre i follow-up aperti");
+    let (pending, remote) = function_request(function);
+    bench
+        .view
+        .update(cx, |app, cx| app.open_chat_function(&pending, function, cx));
+    (pending, remote)
+}
+fn after_request(
+    host: &Host,
+    route: &'static str,
+    action: impl FnOnce() + Send + 'static,
+) -> std::thread::JoinHandle<()> {
+    let requests = host.requests_handle();
+    std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !requests
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(request, _)| request == route)
+        {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "request not observed: {route}"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        action();
+    })
+}
+
+#[gpui::test]
+fn chat_followups_opens_the_current_patient_and_returns_only_the_read_receipt_status(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    admission(&bench.host, 200);
+    bench
+        .host
+        .plan(OPEN_LOOPS)
+        .send((200, loops_response()))
+        .unwrap();
+    let (pending, _remote) = open_loops(&bench, cx);
+    cx.run_until_parked();
+    assert_eq!(wire(&pending), json!({"status":"loops-closed"}));
+    assert!(bench.host.routes().iter().any(|route| route == OPEN_LOOPS));
+    bench.view.read_with(cx, |app, _| {
+        assert_eq!(app.selected_id.as_deref(), Some("patient-a"));
+        assert_eq!(app.patient.detail.ready().unwrap().id, "patient-a");
+        assert_eq!(app.patient_section, PatientSection::Overview);
+    });
+    assert_read_only(&bench.host);
+}
+
+#[gpui::test]
+fn chat_followups_denied_admission_or_reader_has_no_success_receipt(cx: &mut gpui::TestAppContext) {
+    for admission_denied in [true, false] {
+        let (bench, cx) = bench(cx);
+        admission(&bench.host, if admission_denied { 403 } else { 200 });
+        if !admission_denied {
+            bench
+                .host
+                .plan(OPEN_LOOPS)
+                .send((403, json!({"error":"denied"})))
+                .unwrap();
+        }
+        let (pending, _remote) = open_loops(&bench, cx);
+        cx.run_until_parked();
+        assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+        assert_eq!(
+            bench.host.routes().iter().any(|route| route == OPEN_LOOPS),
+            !admission_denied
+        );
+        assert_read_only(&bench.host);
+    }
+}
+
+#[gpui::test]
+fn chat_followups_patient_changed_during_admission_never_reads(cx: &mut gpui::TestAppContext) {
+    let (bench, cx) = bench(cx);
+    admission(&bench.host, 200);
+    let (pending, _remote) = open_loops(&bench, cx);
+    bench.view.update(cx, |app, _| {
+        bench
+            .host
+            .session
+            .select_profile_patient("scope-a", "patient-b")
+            .unwrap();
+        app.selected_id = Some("patient-b".into());
+    });
+    cx.run_until_parked();
+    assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+    assert!(!bench.host.routes().iter().any(|route| route == OPEN_LOOPS));
+    assert_read_only(&bench.host);
+}
+
+#[gpui::test]
+fn chat_followups_late_http_result_after_patient_change_or_revoke_is_discarded(
+    cx: &mut gpui::TestAppContext,
+) {
+    for revoke in [false, true] {
+        let (bench, cx) = bench(cx);
+        admission(&bench.host, 200);
+        let response = bench.host.plan(OPEN_LOOPS);
+        let (pending, _remote) = open_loops(&bench, cx);
+        let session = bench.host.session.clone();
+        let withdrawn = pending.clone();
+        let worker = after_request(&bench.host, OPEN_LOOPS, move || {
+            if revoke {
+                withdrawn.lock().unwrap().revoke();
+            } else {
+                session
+                    .select_profile_patient("scope-a", "patient-b")
+                    .unwrap();
+            }
+            response.send((200, loops_response())).unwrap();
+        });
+        cx.run_until_parked();
+        worker.join().unwrap();
+        assert_eq!(wire(&pending), json!({"status":"withdrawn"}));
+        assert_read_only(&bench.host);
+    }
+}
+
+#[gpui::test]
+fn chat_followups_rejects_foreign_patient_and_malformed_read_receipts(
+    cx: &mut gpui::TestAppContext,
+) {
+    for mutation in ["patient", "count", "operation", "source", "extra"] {
+        let (bench, cx) = bench(cx);
+        admission(&bench.host, 200);
+        let mut response = loops_response();
+        match mutation {
+            "patient" => response["patientId"] = json!("patient-b"),
+            "count" => response["receipt"]["itemCount"] = json!(0),
+            "operation" => response["receipt"]["operation"] = json!("write"),
+            "source" => {
+                response["groups"][0]["loops"][0]["source"]["prescriptionId"] = json!("other")
+            }
+            _ => response["extra"] = json!("unexpected"),
+        }
+        bench.host.plan(OPEN_LOOPS).send((200, response)).unwrap();
+        let (pending, _remote) = open_loops(&bench, cx);
+        cx.run_until_parked();
+        assert_eq!(wire(&pending), json!({"status":"withdrawn"}), "{mutation}");
+        assert_read_only(&bench.host);
+    }
+}
+
+#[gpui::test]
+fn chat_followups_second_request_is_busy_without_replacing_the_owner(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    admission(&bench.host, 200);
+    bench
+        .host
+        .plan(OPEN_LOOPS)
+        .send((200, loops_response()))
+        .unwrap();
+    let (first, _first_remote) = open_loops(&bench, cx);
+    let (second, _second_remote) = open_loops(&bench, cx);
+    assert_eq!(wire(&second), json!({"status":"loops-busy"}));
+    cx.run_until_parked();
+    assert_eq!(wire(&first), json!({"status":"loops-closed"}));
+    assert_eq!(
+        bench
+            .host
+            .routes()
+            .iter()
+            .filter(|route| route.as_str() == OPEN_LOOPS)
+            .count(),
+        1
+    );
+    assert_read_only(&bench.host);
+}
