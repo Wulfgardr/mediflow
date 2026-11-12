@@ -278,6 +278,10 @@ fn review_notice_is_painted_above_the_proposal_lines(cx: &mut gpui::TestAppConte
         .into_iter()
         .map(|ink| ink.label)
         .collect();
+    println!(
+        "WUL825_COPY_SNAPSHOT_BEGIN\n{}\nWUL825_COPY_SNAPSHOT_END",
+        labels.join("\n")
+    );
     let position = |text: &str| labels.iter().position(|label| label == text);
     let notice = position(mediflow_runtime_client::PATIENT_INSIGHT_REVIEW_NOTICE)
         .unwrap_or_else(|| panic!("riga di controllo non dipinta: {labels:#?}"));
@@ -288,7 +292,15 @@ fn review_notice_is_painted_above_the_proposal_lines(cx: &mut gpui::TestAppConte
             .count(),
         1
     );
-    let heading = position("Proposta da rivedere. La scheda resta invariata.").unwrap();
+    let heading = position("Proposta da rivedere.").unwrap();
+    assert!(position("Stato attuale").is_some(), "{labels:#?}");
+    assert!(
+        labels
+            .iter()
+            .all(|label| !label.contains("scheda resta invariata")
+                && !label.contains("cartella non cambia")),
+        "{labels:#?}"
+    );
     let sentence = position(&first).unwrap_or_else(|| panic!("prima riga: {labels:#?}"));
     assert!(heading < notice && notice < sentence, "{labels:#?}");
     assert!(
@@ -324,7 +336,7 @@ fn kill_switch_off_is_unavailable_without_generation(cx: &mut gpui::TestAppConte
     cx.run_until_parked();
     assert!(bench.phase(cx, |phase| matches!(
         phase,
-        InsightPhase::Unavailable(m) if m.contains("spento sull'host")
+        InsightPhase::Unavailable(m) if m.contains("spento sull'home-base")
     )));
     assert!(bench.host.bodies(PREVIEW).is_empty());
     let buttons = rendered_buttons(&bench, cx);
@@ -344,7 +356,7 @@ fn host_closed_is_unavailable_without_any_call(cx: &mut gpui::TestAppContext) {
     cx.run_until_parked();
     assert!(bench.phase(
         cx,
-        |phase| matches!(phase, InsightPhase::Unavailable(m) if m.contains("Host locale chiuso"))
+        |phase| matches!(phase, InsightPhase::Unavailable(m) if m.contains("Accesso locale chiuso"))
     ));
     assert!(bench.host.bodies(SETTING).is_empty());
     assert!(bench.host.bodies(PREVIEW).is_empty());
@@ -356,12 +368,12 @@ fn host_closed_is_unavailable_without_any_call(cx: &mut gpui::TestAppContext) {
 fn server_refusals_are_readable_and_create_no_proposal(cx: &mut gpui::TestAppContext) {
     let (bench, cx) = bench(cx);
     for (name, unavailable, text) in [
-        ("response-function-disabled", true, "spento sull'host"),
-        ("response-kill-switch", true, "spento sull'host"),
+        ("response-function-disabled", true, "spento sull'home-base"),
+        ("response-kill-switch", true, "spento sull'home-base"),
         (
             "response-proposal-invalid",
             false,
-            "non ha superato i controlli dell'host",
+            "non ha superato i controlli dell'home-base",
         ),
         (
             "response-proposal-unfaithful",
@@ -416,7 +428,7 @@ fn altered_response_is_an_error_not_a_proposal(cx: &mut gpui::TestAppContext) {
     cx.run_until_parked();
     assert!(bench.phase(cx, |phase| matches!(
         phase,
-        InsightPhase::Error(m) if m == "La risposta dell'host non ha superato i controlli dell'app."
+        InsightPhase::Error(m) if m == "La risposta dell'home-base non ha superato i controlli dell'app."
     )));
 }
 

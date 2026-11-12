@@ -83,7 +83,7 @@ pub(super) fn timestamp(value: &str) -> String {
 }
 pub(super) fn readiness_label(status: &str) -> &'static str {
     match status {
-        "available" => "Disponibile secondo la risposta dell’host",
+        "available" => "Disponibile secondo la risposta dell’home-base",
         "configured" => "Configurato, non ancora raggiunto",
         "configuration_required" => "Configurazione richiesta",
         "disabled" => "Disattivato",
@@ -379,7 +379,7 @@ impl ClinicalApp {
         if let Some(command) = &area.rollback {
             pane=pane.child(section("who-rollback-review","Ripristina il catalogo precedente",theme))
                 .child(governance::fact("Revisione del catalogo da sostituire",command.revision().to_string(),theme))
-                .child(text!("Verrà riattivata la versione precedente conservata sull’host. I suoi dettagli saranno disponibili dopo il ripristino. Le voci cliniche salvate restano invariate."))
+                .child(text!("Verrà riattivata la versione precedente conservata sull’home-base. I suoi dettagli saranno disponibili dopo il ripristino. Le voci cliniche salvate restano invariate."))
                 .child(button("who-rollback-confirm","Conferma ripristino WHO",theme,true,enabled).on_click(cx.listener(|this,_,_,cx|this.confirm_who_administration_rollback(cx))))
                 .child(button("who-rollback-cancel","Conserva il catalogo attuale",theme,false,enabled).on_click(cx.listener(|this,_,_,cx|{if !this.local_host.has_work(){this.local_host.who_administration.rollback=None;cx.notify();}})));
         } else {
@@ -449,10 +449,10 @@ impl ClinicalApp {
             };
             let instructions = [
                 "Sul computer che ospita MediFlow servono Node.js 24 e un runtime Docker locale già avviato con motore Linux. Controlla lo spazio per immagine, catalogo e recupero. Se la porta 8382 è occupata, conserva il servizio esistente e consulta il gestore.",
-                "Leggi i termini WHO prima dell’installazione. L’eventuale accettazione viene richiesta e registrata dalla procedura sull’host; questa guida non registra un consenso.",
-                "Esegui il comando dalla cartella di MediFlow sul computer host. La procedura verifica immagine e dataset previsti dal pacchetto. Copiare il comando non lo esegue.",
+                "Leggi i termini WHO prima dell’installazione. L’eventuale accettazione viene richiesta e registrata dalla procedura sull’home-base; questa guida non registra un consenso.",
+                "Esegui il comando dalla cartella di MediFlow sull’home-base. La procedura verifica immagine e dataset previsti dal pacchetto. Copiare il comando non lo esegue.",
                 "Al termine rileggi la disponibilità, esegui la verifica con termine di esempio e controlla la fonte. Configurato e risposta dalla cache non equivalgono a un servizio raggiunto.",
-                "Se l’avvio non riesce, usa le indicazioni di recupero della procedura sull’host. Conserva catalogo e copie precedenti; questa pagina non arresta né rimuove servizi.",
+                "Se l’avvio non riesce, usa le indicazioni di recupero della procedura sull’home-base. Conserva catalogo e copie precedenti; questa pagina non arresta né rimuove servizi.",
             ];
             let mut steps = div().id("who-guide-steps").flex().flex_wrap().gap(px(6.));
             for (i, label) in [

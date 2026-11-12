@@ -427,7 +427,7 @@ pub(crate) fn synthetic_catalog() -> Value {
     json!({"contractVersion":1, "preparationVersion":SCALE_PREPARATION_VERSION,
         "catalogRevision":format!("sha256:{}", "a".repeat(64)),
         "scales":ScaleId::ALL.iter().map(|id| json!({"id":id, "title":format!("Strumento sintetico {}", id.as_str()),
-            "description":"Descrizione sintetica restituita dall'host.",
+            "description":"Descrizione sintetica restituita dall'home-base.",
             "questions":[{"id":"synthetic-choice", "text":"Domanda sintetica", "type":"choice",
                 "options":[{"label":"Prima risposta", "value":0}, {"label":"Seconda risposta", "value":1}]}],
             "useContract":{

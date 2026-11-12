@@ -72,7 +72,7 @@ fn services_view(services: &HostServices, theme: Theme) -> Div {
         .gap(px(8.))
         .child(section("controls-services", "Servizi della postazione", theme))
         .child(text!("Risposte dei controlli di questa lettura. Non provano che un modello possa eseguire un’analisi."))
-        .child(fact("Indirizzo dell’host", &services.address, theme));
+        .child(fact("Indirizzo dell’home-base", &services.address, theme));
     if let Some(error) = section_state("controls-auth-error", &services.authentication, theme) {
         pane = pane.child(error);
     }
@@ -88,7 +88,7 @@ fn services_view(services: &HostServices, theme: Theme) -> Div {
     }
     if let Ok(status) = &services.runtime {
         pane = pane.child(fact(
-            "Runtime AI locale",
+            "Runtime IA locale",
             local_runtime_label(status.local_runtime.state),
             theme,
         ));

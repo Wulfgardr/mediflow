@@ -719,9 +719,9 @@ fn run_view_matrix(cx: &mut gpui::TestAppContext, only_followups: bool) {
                     }
                     let expected: Vec<&str> = match requested {
                         Function::Insight => vec![if empty {
-                            "Verranno inviati al modello locale dell’host: 0 condizioni, 0 terapie attive, 0 voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
+                            "Verranno inviati al modello locale dell’home-base: 0 condizioni, 0 terapie attive, 0 voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
                         } else {
-                            "Verranno inviati al modello locale dell’host: 1 condizioni, 0 terapie attive, 0 voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
+                            "Verranno inviati al modello locale dell’home-base: 1 condizioni, 0 terapie attive, 0 voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
                         }],
                         Function::EvidenceQueue => vec![if empty {
                             "Nessuna evidenza dai documenti."

@@ -346,7 +346,7 @@ impl PatientInsightProposal {
             lines.push(("Sintesi proposta", self.summary.as_str()));
         }
         for (title, items) in [
-            ("Quadro attuale", &self.current_state),
+            ("Stato attuale", &self.current_state),
             ("Attenzioni proposte", &self.alerts),
             ("Follow-up proposto", &self.next_steps),
             ("Dati mancanti", &self.gaps),
@@ -400,9 +400,9 @@ const UNAVAILABLE_CODES: [&str; 11] = [
 pub fn patient_insight_message(code: &str) -> &'static str {
     match code {
         "kill_switch_disabled" | "function_disabled" => {
-            "Il Quadro paziente è spento sull'host. Si riattiva in Impostazioni, Funzioni AI."
+            "Il Quadro paziente è spento sull'home-base. Si riattiva in Impostazioni, Funzioni IA."
         }
-        "kill_switch_unavailable" => "Lo stato della funzione sull'host non è leggibile.",
+        "kill_switch_unavailable" => "Lo stato della funzione sull'home-base non è leggibile.",
         "lifecycle_missing"
         | "lifecycle_corrupt"
         | "lifecycle_unavailable"
@@ -410,14 +410,14 @@ pub fn patient_insight_message(code: &str) -> &'static str {
         | "provider_unready"
         | "model_unavailable"
         | "provider_unavailable" => {
-            "Il modello locale dell'host non è disponibile. Verifica Impostazioni, Modelli locali."
+            "Il modello locale dell'home-base non è disponibile. Verifica Impostazioni, Modelli locali."
         }
-        "fabric_denied" => "L'host non ha autorizzato l'esecuzione sul modello locale.",
+        "fabric_denied" => "L'home-base non ha autorizzato l'esecuzione sul modello locale.",
         "source_stale" => {
             "I dati della scheda sono cambiati durante la generazione. Rileggi la scheda e riprova."
         }
         "provider_failed" => "Il modello locale non ha completato la risposta.",
-        "proposal_invalid" => "La risposta del modello non ha superato i controlli dell'host.",
+        "proposal_invalid" => "La risposta del modello non ha superato i controlli dell'home-base.",
         // ADR 0189: stesso testo del Web (`PATIENT_INSIGHT_UNFAITHFUL_MESSAGE`).
         "proposal_unfaithful" => {
             "Il modello ha dato per presa una decisione ancora aperta nella scheda, o per urgente qualcosa che la scheda non segnala come urgente."
@@ -426,10 +426,10 @@ pub fn patient_insight_message(code: &str) -> &'static str {
             "La configurazione dei modelli è cambiata durante la richiesta. Riprova."
         }
         "session_unavailable" => {
-            "La sessione dell'host locale non è più valida. Riapri l'accesso locale."
+            "La sessione dell'home-base non è più valida. Riapri l'accesso locale."
         }
-        "response_invalid" => "La risposta dell'host non ha superato i controlli dell'app.",
-        _ => "L'host ha rifiutato la richiesta.",
+        "response_invalid" => "La risposta dell'home-base non ha superato i controlli dell'app.",
+        _ => "L'home-base ha rifiutato la richiesta.",
     }
 }
 
@@ -1049,11 +1049,11 @@ mod tests {
         );
         assert_eq!(
             patient_insight_message("codice-sconosciuto"),
-            "L'host ha rifiutato la richiesta."
+            "L'home-base ha rifiutato la richiesta."
         );
         assert_eq!(
             patient_insight_message("proposal_invalid"),
-            "La risposta del modello non ha superato i controlli dell'host."
+            "La risposta del modello non ha superato i controlli dell'home-base."
         );
         assert_eq!(
             patient_insight_message("proposal_unfaithful"),
@@ -1061,7 +1061,7 @@ mod tests {
         );
         assert_eq!(
             patient_insight_message("response_invalid"),
-            "La risposta dell'host non ha superato i controlli dell'app."
+            "La risposta dell'home-base non ha superato i controlli dell'app."
         );
         // Nessun messaggio d'esito ripete la proposta mancante o nomina GPUI.
         for code in [
