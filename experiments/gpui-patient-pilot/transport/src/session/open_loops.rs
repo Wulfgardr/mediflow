@@ -158,3 +158,33 @@ impl Drop for OpenLoopRow {
         self.label.zeroize();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn followup_rows_keep_source_kind_interval_and_transport_fields_consistent() {
+        let value = json!({"kind":"series_stalled","label":"Serie sintetica",
+            "sinceDate":"2026-10-01T00:00:00Z","elapsedDays":42,"typicalIntervalDays":10,
+            "source":{"type":"observation_series","codeSystem":"LOINC","code":"SYN"}});
+        let row: OpenLoopRow = serde_json::from_value(value.clone()).unwrap();
+        assert!(row.valid());
+        for (key, invalid) in [
+            ("kind", json!("results_pending")),
+            ("typicalIntervalDays", json!(null)),
+            ("typicalIntervalDays", json!(0)),
+            ("sinceDate", json!("unknown")),
+            ("label", json!("")),
+        ] {
+            let mut mutation = value.clone();
+            mutation[key] = invalid;
+            let row: OpenLoopRow = serde_json::from_value(mutation).unwrap();
+            assert!(!row.valid(), "{key}");
+        }
+        let mut extra = value;
+        extra["promote"] = json!(true);
+        assert!(serde_json::from_value::<OpenLoopRow>(extra).is_err());
+    }
+}
