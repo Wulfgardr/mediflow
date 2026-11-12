@@ -8,6 +8,8 @@ pub(crate) mod listening;
 #[cfg(target_os = "macos")]
 pub(crate) mod model;
 #[cfg(target_os = "macos")]
+pub(crate) mod voices;
+#[cfg(target_os = "macos")]
 pub(crate) mod whisper;
 
 pub(crate) mod recording;
@@ -188,6 +190,16 @@ impl Session {
         let _ = command;
     }
     pub(crate) fn start(&self) {
+        self.send(Event::Start);
+    }
+    /// Ascolto della visita: come l'avvio, ma ogni frase va a medico o paziente.
+    // Il pulsante arriva con la revisione della bozza (WUL-828, parte D).
+    #[allow(dead_code)]
+    pub(crate) fn start_visit(&self) {
+        #[cfg(target_os = "macos")]
+        if let Backend::Whisper(whisper) = &self.backend {
+            whisper.set_two_voices(true);
+        }
         self.send(Event::Start);
     }
     pub(crate) fn pause(&self) {

@@ -5,6 +5,7 @@
 use super::listening::{Decoder, Dictation, EngineFailure, Segment, SpeechDetector};
 use super::model::{self, ModelFile, ModelStatus};
 use super::recording::Machine;
+use super::voices::{self, Speaker};
 use super::{Event, State};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
@@ -170,6 +171,15 @@ pub(crate) struct Shared {
     pub(crate) segments: Vec<Segment>,
     /// La registrazione si è fermata da sola alla durata massima.
     pub(crate) limit_reached: bool,
+    /// Ascolto della visita: le frasi si attribuiscono a medico e paziente.
+    pub(crate) two_voices: bool,
+    /// Voce di ogni frase, nell'ordine di `segments`, con il testo da rivedere.
+    pub(crate) speakers: Vec<Speaker>,
+    /// Per le misure: millisecondi di ogni impronta e dell'attribuzione.
+    #[cfg(test)]
+    pub(crate) print_ms: Vec<f64>,
+    #[cfg(test)]
+    pub(crate) attribution_ms: f64,
     #[cfg(test)]
     windows: Vec<(usize, usize, usize)>,
     /// Per le prove: massimo di campioni audio trattenuti dal ciclo.
@@ -291,6 +301,31 @@ impl WhisperSession {
     pub(crate) fn limit_reached(&self) -> bool {
         self.read(|s| s.limit_reached).unwrap_or(false)
     }
+    /// Ascolto della visita a due voci; vale solo prima dell'avvio.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn set_two_voices(&self, two_voices: bool) {
+        publish(&self.shared, |s| {
+            if s.machine.state() == State::Disclosure {
+                s.two_voices = two_voices;
+            }
+        });
+    }
+    /// Frasi attribuite a medico o paziente, solo con il testo da rivedere
+    /// dell'ascolto a due voci.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn attributed(&self) -> Vec<(Speaker, Zeroizing<String>)> {
+        self.read(|s| {
+            if !(s.two_voices && s.machine.state().reviewable() && s.transcript.is_some()) {
+                return Vec::new();
+            }
+            s.speakers
+                .iter()
+                .zip(&s.segments)
+                .map(|(speaker, segment)| (*speaker, segment.text.clone()))
+                .collect()
+        })
+        .unwrap_or_default()
+    }
     pub(crate) fn transcript(&self) -> Option<Zeroizing<String>> {
         self.read(|s| {
             s.machine
@@ -381,6 +416,7 @@ impl Drop for WhisperSession {
                 segment.text.zeroize();
             }
             s.segments.clear();
+            s.speakers.clear();
         }
         let _ = self.commands.send(Event::Cancel);
         drop(self.worker.take());
@@ -428,6 +464,7 @@ fn fail(shared: &Mutex<Shared>, event: Event) {
         s.provisional.zeroize();
         s.transcript = None;
         s.segments.clear();
+        s.speakers.clear();
     });
 }
 
@@ -472,6 +509,30 @@ fn run(
     listener(source.as_mut(), &commands, &shared);
 }
 
+/// Nell'ascolto a due voci, la voce di ogni frase definitiva.
+fn attribute<V: SpeechDetector, D: Decoder>(
+    shared: &Mutex<Shared>,
+    dictation: &Dictation<V, D>,
+) -> Vec<Speaker> {
+    if !shared.lock().is_ok_and(|s| s.two_voices) {
+        return Vec::new();
+    }
+    #[cfg(test)]
+    let started = Instant::now();
+    let prints: Vec<_> = dictation.segments().iter().map(|s| s.voice).collect();
+    let speakers = voices::attribute(&prints);
+    #[cfg(test)]
+    {
+        let elapsed = started.elapsed().as_secs_f64() * 1000.0;
+        let print_ms = dictation.print_ms.clone();
+        publish(shared, |s| {
+            s.attribution_ms = elapsed;
+            s.print_ms = print_ms;
+        });
+    }
+    speakers
+}
+
 /// Oltre la durata massima l'audio non entra: si azzera e si scarta.
 fn keep_room<V: SpeechDetector, D: Decoder>(blocks: &mut Vec<f32>, dictation: &Dictation<V, D>) {
     let room = dictation.room();
@@ -513,6 +574,9 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
     if matches!(commands.try_recv(), Ok(Event::Cancel)) {
         fail(shared, Event::Cancel);
         return;
+    }
+    if shared.lock().is_ok_and(|s| s.two_voices) {
+        dictation.set_two_voices(true);
     }
     source.start();
     let mut blocks = Zeroizing::new(Vec::with_capacity(super::listening::MAX_UTTERANCE));
@@ -619,12 +683,14 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
             blocks.zeroize();
             let transcript = Zeroizing::new(dictation.transcript().to_owned());
             let segments = dictation.segments().to_vec();
+            let speakers = attribute(shared, &dictation);
             dictation.wipe();
             publish(shared, |s| {
                 s.stable.zeroize();
                 s.provisional.zeroize();
                 let kept = finished.is_ok() && !transcript.trim().is_empty();
                 s.segments = if kept { segments } else { Vec::new() };
+                s.speakers = if kept { speakers } else { Vec::new() };
                 s.transcript = kept.then_some(transcript);
             });
             return;
@@ -656,6 +722,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
     }
     let transcript = Zeroizing::new(dictation.transcript().to_owned());
     let segments = dictation.segments().to_vec();
+    let speakers = attribute(shared, &dictation);
     let finals = dictation.finals_count();
     #[cfg(test)]
     let windows = dictation.windows.clone();
@@ -663,6 +730,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
     publish(shared, |s| {
         s.finals = finals;
         s.segments = segments;
+        s.speakers = speakers;
         #[cfg(test)]
         {
             s.windows = windows;
@@ -1064,6 +1132,66 @@ pub(crate) mod tests {
         assert!(last.start >= 59 * 60 * SAMPLE_RATE);
         assert_eq!(MAX_RECORDING, 60 * 60 * SAMPLE_RATE);
         assert!(super::super::LIMIT_REACHED.contains("60 minuti"));
+    }
+
+    /// Visita sintetica a due voci: frasi alternate fra una voce grave che
+    /// apre e una acuta, con silenzi; ogni frase va alla persona giusta e il
+    /// testo da rivedere le tiene nell'ordine in cui sono state dette.
+    #[test]
+    fn a_two_voice_visit_attributes_each_sentence_to_doctor_or_patient() {
+        use super::super::voices::tests::synthetic_voice;
+        let mut audio = silence(0.5);
+        let mut truth = Vec::new();
+        for turn in 0..10u32 {
+            let seconds = 1.0 + (turn % 3) as f32 * 0.5;
+            if turn % 2 == 0 {
+                audio.extend(synthetic_voice(seconds, 115.0, 600.0, 1_100.0, turn));
+                truth.push(Speaker::Doctor);
+            } else {
+                audio.extend(synthetic_voice(seconds, 210.0, 850.0, 1_900.0, turn));
+                truth.push(Speaker::Patient);
+            }
+            audio.extend(silence(1.0));
+        }
+        let session = WhisperSession::with_parts(
+            LoudnessDetector,
+            CountingDecoder::default(),
+            Box::new(InjectedSource::new(audio)),
+        );
+        session.set_two_voices(true);
+        session.start();
+        assert_eq!(session.wait_for(&[State::Review]), State::Review);
+        let attributed = session.attributed();
+        let speakers: Vec<Speaker> = attributed.iter().map(|(s, _)| *s).collect();
+        assert_eq!(speakers, truth);
+        let joined: Vec<&str> = attributed.iter().map(|(_, t)| t.as_str()).collect();
+        assert_eq!(session.transcript().unwrap().as_str(), joined.join(" "));
+        // Dopo l'avvio la modalità non cambia più.
+        session.set_two_voices(false);
+        assert_eq!(session.attributed().len(), 10);
+    }
+
+    /// La dettatura a una voce non calcola impronte né attribuisce frasi.
+    #[test]
+    fn dictation_keeps_one_voice_and_computes_no_print() {
+        use super::super::voices::tests::synthetic_voice;
+        let mut audio = synthetic_voice(1.5, 115.0, 600.0, 1_100.0, 1);
+        audio.extend(silence(1.0));
+        audio.extend(synthetic_voice(1.5, 210.0, 850.0, 1_900.0, 2));
+        audio.extend(silence(1.0));
+        let session = WhisperSession::with_parts(
+            LoudnessDetector,
+            CountingDecoder::default(),
+            Box::new(InjectedSource::new(audio)),
+        );
+        session.start();
+        assert_eq!(session.wait_for(&[State::Review]), State::Review);
+        assert!(session.attributed().is_empty());
+        let shared = session.shared_for_test();
+        let s = shared.lock().unwrap();
+        assert_eq!(s.segments.len(), 2);
+        assert!(s.segments.iter().all(|segment| segment.voice.is_none()));
+        assert!(s.print_ms.is_empty());
     }
 
     fn session_with(source: InjectedSource) -> (Arc<Mutex<Shared>>, Sender<Event>, JoinHandle<()>) {
@@ -1477,6 +1605,7 @@ pub(crate) mod tests {
         }
         let seconds = audio.len() as f64 / 16_000.0;
         let prompt = std::env::var("MEDIFLOW_VOCE_PROMPT").unwrap_or_default();
+        let two_voices = std::env::var("MEDIFLOW_VOCE_DUE").is_ok_and(|v| v == "1");
         let rss_before_model = rss();
         let session = WhisperSession::with_parts(
             SileroDetector::load(&vad_path).unwrap(),
@@ -1484,6 +1613,7 @@ pub(crate) mod tests {
             Box::new(InjectedSource::new(audio)),
         );
         let rss_loaded = rss();
+        session.set_two_voices(two_voices);
         let started = Instant::now();
         session.start();
         let mut samples: Vec<(f64, u64)> = Vec::new();
@@ -1501,17 +1631,39 @@ pub(crate) mod tests {
         let wall = started.elapsed().as_secs_f64();
         assert_eq!(session.state(), State::Review);
         let text = session.transcript().unwrap();
-        let segments: Vec<_> = session
+        let speakers: Vec<&str> = session
+            .attributed()
+            .iter()
+            .map(|(s, _)| s.label())
+            .collect();
+        let segments: Vec<serde_json::Value> = session
             .segments()
             .iter()
-            .map(|s| {
-                (
+            .enumerate()
+            .map(|(i, s)| {
+                let mut row = serde_json::json!([
                     s.start as f64 / 16_000.0,
                     s.end as f64 / 16_000.0,
-                    s.text.to_string(),
-                )
+                    s.text.as_str()
+                ]);
+                if let Some(speaker) = speakers.get(i) {
+                    row.as_array_mut().unwrap().push((*speaker).into());
+                }
+                row
             })
             .collect();
+        let (print_ms, attribution_ms) = {
+            let shared = session.shared_for_test();
+            let s = shared.lock().unwrap();
+            (s.print_ms.clone(), s.attribution_ms)
+        };
+        let mut sorted = print_ms.clone();
+        sorted.sort_by(f64::total_cmp);
+        let percentile = |q: f64| {
+            sorted
+                .get(((sorted.len() as f64 - 1.0) * q).round() as usize)
+                .copied()
+        };
         let max_rss = samples.iter().map(|s| s.1).max().unwrap_or(0);
         let shared = session.shared_for_test();
         let max_retained = shared.lock().unwrap().max_retained;
@@ -1523,6 +1675,14 @@ pub(crate) mod tests {
             "caratteri": text.chars().count(), "caratteri_al_minuto": text.chars().count() as f64 / (seconds / 60.0),
             "frasi": segments, "testo": text.as_str(),
         });
+        let mut report = report;
+        if two_voices {
+            report["tempi_impronta_ms"] = serde_json::json!({
+                "frasi": print_ms.len(), "mediana": percentile(0.5), "p95": percentile(0.95),
+                "massimo": sorted.last(), "totale": print_ms.iter().sum::<f64>(),
+            });
+            report["tempo_attribuzione_ms"] = attribution_ms.into();
+        }
         std::fs::write(
             var("MEDIFLOW_VOCE_OUT"),
             serde_json::to_string_pretty(&report).unwrap(),
@@ -1532,6 +1692,10 @@ pub(crate) mod tests {
             "audio {seconds:.0} s, calcolo {wall:.0} s, RSS massimo {max_rss} MB, {} caratteri",
             text.chars().count()
         );
+        // Il thread di lavoro libera il contesto Metal prima dell'uscita del
+        // processo di prova.
+        drop(session);
+        std::thread::sleep(Duration::from_secs(2));
         assert!(max_retained <= RETAINED_BOUND);
     }
 
