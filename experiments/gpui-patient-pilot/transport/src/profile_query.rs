@@ -37,7 +37,10 @@ const PROFILE_FIELDS: &[&str] = &[
     "firstName",
     "lastName",
     "taxCode",
+    "identifierType",
     "birthDate",
+    "birthDatePrecision",
+    "birthYear",
     "address",
     "phone",
     "caregiver",
@@ -123,6 +126,19 @@ pub(crate) fn parse_profile_response(value: Value, started: Instant) -> Result<P
             let field = &fields[*key];
             match *key {
                 "firstName" | "lastName" | "taxCode" => !field.is_string(),
+                "identifierType" => !matches!(
+                    field.as_str(),
+                    Some("cf" | "stp" | "eni" | "passport" | "other" | "none")
+                ),
+                "birthDatePrecision" => {
+                    !matches!(field.as_str(), Some("exact" | "estimated" | "unknown"))
+                }
+                "birthYear" => {
+                    !field.is_null()
+                        && !field
+                            .as_i64()
+                            .is_some_and(|year| (0..=i32::MAX as i64).contains(&year))
+                }
                 "isAdi" | "isArchived" => !field.is_null() && !field.is_boolean(),
                 _ => !field.is_null() && !field.is_string(),
             }
@@ -153,7 +169,10 @@ pub(crate) fn display_profile(
         first_name: String,
         last_name: String,
         tax_code: String,
+        identifier_type: String,
         birth_date: Option<String>,
+        birth_date_precision: String,
+        birth_year: Option<i32>,
         address: Option<String>,
         phone: Option<String>,
         caregiver: Option<String>,
@@ -173,9 +192,9 @@ pub(crate) fn display_profile(
         first_name: field.first_name,
         last_name: field.last_name,
         tax_code: field.tax_code.into(),
-        identifier_type: None,
-        birth_date_precision: None,
-        birth_year: None,
+        identifier_type: Some(field.identifier_type),
+        birth_date_precision: Some(field.birth_date_precision),
+        birth_year: field.birth_year,
         birth_date: field.birth_date,
         address: field.address,
         phone: field.phone,
@@ -208,6 +227,7 @@ mod tests {
             "handle":format!("pph_{}", "a".repeat(64)),"projection":"profile",
             "currentness":{"revision":7,"selectionEpoch":3,"observedAt":1000,"expiresAt":61000},
             "profile":{"firstName":"Amina","lastName":"Sintetica","taxCode":"SYNTHETIC","birthDate":null,
+                "identifierType":"other","birthDatePrecision":"unknown","birthYear":null,
                 "address":null,"phone":null,"caregiver":null,"diagnoses":null,"exemptions":null,"notes":null,
                 "isAdi":false,"isArchived":false,"statusReason":null,"archiveReason":null,"archiveNote":null}})
     }
@@ -226,6 +246,53 @@ mod tests {
         assert_eq!(row.version, 7);
         assert!(row.ambulatory_id.is_none());
         assert_eq!(row.first_name, "Amina");
+    }
+
+    #[test]
+    fn wul839_scoped_identity_metadata_survives_the_native_decoder() {
+        for (identifier, precision, date, year) in [
+            ("other", "unknown", Value::Null, Value::Null),
+            ("cf", "estimated", Value::Null, json!(1940)),
+            ("cf", "exact", json!("1980-01-01"), Value::Null),
+        ] {
+            let mut value = response();
+            value["profile"]["identifierType"] = json!(identifier);
+            value["profile"]["birthDatePrecision"] = json!(precision);
+            value["profile"]["birthDate"] = date;
+            value["profile"]["birthYear"] = year.clone();
+            let parsed = parse_profile_response(value, Instant::now()).unwrap();
+            let row = display_profile(
+                parsed.fields,
+                "selected-synthetic-patient",
+                parsed.lease.currentness,
+                vec![],
+            )
+            .unwrap();
+            assert_eq!(row.identifier_type.as_deref(), Some(identifier));
+            assert_eq!(row.birth_date_precision.as_deref(), Some(precision));
+            assert_eq!(row.birth_year, year.as_i64().map(|v| v as i32));
+        }
+    }
+
+    #[test]
+    fn wul839_scoped_identity_metadata_rejects_invalid_values() {
+        for (field, invalid) in [
+            ("identifierType", json!("sql")),
+            ("identifierType", Value::Null),
+            ("birthDatePrecision", json!("year")),
+            ("birthDatePrecision", Value::Null),
+            ("birthYear", json!("1940")),
+            ("birthYear", json!(-1)),
+            ("birthYear", json!(1940.5)),
+            ("birthYear", json!(i64::MAX)),
+        ] {
+            let mut value = response();
+            value["profile"][field] = invalid;
+            assert!(matches!(
+                parse_profile_response(value, Instant::now()),
+                Err(RuntimeError::InvalidResponse)
+            ));
+        }
     }
 
     #[test]

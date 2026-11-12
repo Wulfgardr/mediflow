@@ -126,6 +126,7 @@ impl Host {
                             "handle":format!("pph_{}", "a".repeat(64)), "projection":"profile",
                             "currentness":{"revision":state.version,"selectionEpoch":state.epoch,"observedAt":1000,"expiresAt":61000},
                             "profile":{"firstName":"Amina","lastName":"Sintetica","taxCode":"SYNTHETIC","birthDate":null,
+                                "identifierType":"other","birthDatePrecision":"unknown","birthYear":null,
                                 "address":null,"phone":null,"caregiver":null,"diagnoses":null,"exemptions":null,"notes":state.notes,
                                 "isAdi":false,"isArchived":state.archived,"statusReason":null,"archiveReason":null,"archiveNote":null}})
                     }
