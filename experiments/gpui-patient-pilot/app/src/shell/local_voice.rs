@@ -352,6 +352,14 @@ impl ClinicalApp {
                         matches!(work.state, State::Error(_)),
                     ))
                 })
+                .when(work.session.limit_reached(), |el| {
+                    el.child(notice(
+                        "chat-local-voice-limit",
+                        crate::local_voice::LIMIT_REACHED,
+                        self.theme,
+                        false,
+                    ))
+                })
                 .when_some(work.session.model_action(work.state), |el, label| {
                     el.child(
                         button("chat-voice-model", label, self.theme, true, true).on_click(
@@ -1581,5 +1589,57 @@ mod tests {
             assert_eq!(form.fields[2].editor.read(cx).value(), kept);
         });
         assert_eq!(host.request_count(), requests, "the draft is not saved");
+    }
+
+    /// Alla durata massima la registrazione si ferma da sola e la finestra
+    /// lo dice; il testo resta da rivedere e nulla si salva da solo.
+    #[gpui::test]
+    fn a_recording_stopped_at_the_maximum_duration_says_so(cx: &mut gpui::TestAppContext) {
+        use crate::local_voice::listening::{
+            Dictation, SAMPLE_RATE,
+            tests::{CountingDecoder, LoudnessDetector, tone},
+        };
+        use crate::local_voice::whisper::{WhisperSession, tests::InjectedSource};
+        let host = Host::new();
+        let dictation = Dictation::new(LoudnessDetector, CountingDecoder::default())
+            .with_max_recording(6 * SAMPLE_RATE);
+        let whisper =
+            WhisperSession::with_dictation(dictation, Box::new(InjectedSource::new(tone(20.0))));
+        let (view, cx, _remote) = recording_app(cx, &host, Session::with_whisper(whisper));
+        let requests = host.request_count();
+        cx.update_window_entity(&view, |app, _, _| {
+            app.chat_access.voice.work.as_ref().unwrap().session.start();
+        });
+        let mut filled = false;
+        for _ in 0..2_000 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            filled = cx.update_window_entity(&view, |app, _, cx| {
+                app.poll_chat_voice(cx);
+                app.chat_access.voice.work.as_ref().unwrap().filled
+            });
+            if filled {
+                break;
+            }
+        }
+        assert!(filled, "no review text");
+        let (ids, labels) = voice_page(cx, "chat-voice");
+        assert_eq!(
+            ids,
+            ["chat-voice-transfer", "chat-voice-discard"],
+            "{labels:?}"
+        );
+        assert!(shows(&labels, "Ferma"), "{labels:?}");
+        assert!(
+            shows(&labels, crate::local_voice::LIMIT_REACHED),
+            "{labels:?}"
+        );
+        cx.update_window_entity(&view, |app, _, cx| {
+            let text = app.chat_access.voice.editor.read(cx).value().to_owned();
+            // 6 s di voce, una parola finta ogni 0,5 s: l'ultimo mezzo secondo
+            // tagliato al limite resta incerto.
+            assert_eq!(text.matches("parola").count(), 11, "{text}");
+            assert!(app.form.is_none());
+        });
+        assert_eq!(host.request_count(), requests);
     }
 }
