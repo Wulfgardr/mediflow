@@ -339,7 +339,6 @@ impl ClinicalApp {
         }
     }
 
-    /// Il passo che la chat lascia al medico, in cima ai documenti.
     pub(super) fn import_chat_notice(&self) -> Option<&'static str> {
         #[cfg(unix)]
         if self.patient.smart_import.chat.0.is_some()
@@ -367,7 +366,10 @@ impl ClinicalApp {
                 "smart-import-heading",
                 "IMPORT ASSISTITO · PROPOSTA",
                 theme,
-            ));
+            ))
+            .when_some(self.import_chat_notice(), |el, message| {
+                el.child(notice("smart-import-chat-step", message, theme, false))
+            });
         let muted = |text: String| {
             div()
                 .min_w_0()
