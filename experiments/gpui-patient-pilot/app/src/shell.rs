@@ -377,6 +377,8 @@ struct PatientData {
     insight: patient_insight::PatientInsightArea,
     synthesis: document_synthesis::DocumentSynthesisArea,
     smart_import: smart_import::SmartImportArea,
+    #[cfg(unix)]
+    chat_function: Option<crate::chat_access::owner::Function>,
     document_details_id: Option<String>,
     document_original: Option<document_details::DocumentOriginal>,
 }
@@ -394,6 +396,8 @@ impl Default for PatientData {
             insight: patient_insight::PatientInsightArea::default(),
             synthesis: document_synthesis::DocumentSynthesisArea::default(),
             smart_import: smart_import::SmartImportArea::default(),
+            #[cfg(unix)]
+            chat_function: None,
             document_details_id: None,
             document_original: None,
         }
@@ -927,6 +931,10 @@ impl ClinicalApp {
     }
 
     fn next_presentation_epoch(&mut self) {
+        #[cfg(unix)]
+        {
+            self.patient.chat_function = None;
+        }
         self.patient.dossier = dossier_import::DossierArea::default();
         self.interrupt_insight();
         self.interrupt_synthesis();
@@ -1665,6 +1673,14 @@ impl ClinicalApp {
             self.menu_targets
                 .iter()
                 .any(|target| target.reveal_if_focused(window, cx));
+        } else if self.area == Area::Patients
+            && self.patient_section == PatientSection::Overview
+            && self
+                .selected_id
+                .as_deref()
+                .is_some_and(|id| self.who.patient_is(id))
+        {
+            self.who.reveal_if_focused(window, cx);
         } else if self.area == Area::Patients && self.directory {
             let magnified = Layout::for_window(
                 f32::from(window.viewport_size().width),
@@ -2687,6 +2703,17 @@ impl ClinicalApp {
             self.message = None;
             self.verified = None;
             self.patient_section = section;
+            #[cfg(unix)]
+            {
+                self.patient.chat_function = None;
+            }
+            if section != PatientSection::Overview
+                && self
+                    .who
+                    .patient_is(self.selected_id.as_deref().unwrap_or(""))
+            {
+                self.who.reset();
+            }
             self.show_sections = false;
         }
         cx.notify();
@@ -4003,20 +4030,28 @@ impl ClinicalApp {
                     .child(div().flex_1().min_w_0().child(self.form_view(cx))),
             );
         } else {
-            content = match self.patient_section {
-                PatientSection::Overview => content.child(
-                    div()
-                        .flex()
-                        .when(!layout.wide, |el| el.flex_col())
-                        .gap(px(layout.gap))
-                        .child(div().flex_1().min_w_0().child(self.overview(patient, cx)))
-                        .child(div().flex_1().min_w_0().child(self.diary_view(cx))),
-                ),
-                PatientSection::Diary => content.child(self.diary_view(cx)),
-                PatientSection::Therapies => content.child(self.therapies_view(cx)),
-                PatientSection::Documents => content.child(self.documents_view(cx)),
-                PatientSection::Observations => content.child(self.observations_view(cx)),
-                PatientSection::Checkups => content.child(self.checkups_view(cx)),
+            #[cfg(unix)]
+            let function_view = self.chat_function_view(cx);
+            #[cfg(not(unix))]
+            let function_view: Option<Div> = None;
+            content = if let Some(view) = function_view {
+                content.child(view)
+            } else {
+                match self.patient_section {
+                    PatientSection::Overview => content.child(
+                        div()
+                            .flex()
+                            .when(!layout.wide, |el| el.flex_col())
+                            .gap(px(layout.gap))
+                            .child(div().flex_1().min_w_0().child(self.overview(patient, cx)))
+                            .child(div().flex_1().min_w_0().child(self.diary_view(cx))),
+                    ),
+                    PatientSection::Diary => content.child(self.diary_view(cx)),
+                    PatientSection::Therapies => content.child(self.therapies_view(cx)),
+                    PatientSection::Documents => content.child(self.documents_view(cx)),
+                    PatientSection::Observations => content.child(self.observations_view(cx)),
+                    PatientSection::Checkups => content.child(self.checkups_view(cx)),
+                }
             };
         }
         self.confirmation_plane(
@@ -6430,6 +6465,7 @@ impl ClinicalApp {
         self.next_epoch();
         let session = self.session.as_ref().expect("active session").clone();
         if self.reference_kind == ReferenceKind::Who {
+            self.who.set_scroll(&self.area_scroll, cx);
             // Opening/navigating never submits a WHO query or probes a service.
             self.reference_rows = Load::Idle;
             cx.notify();

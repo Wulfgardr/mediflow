@@ -65,7 +65,9 @@ Il frame automatizzato a 390 e 1440 px non sostituisce queste due prove.
 | Farmaci | `RuntimeSession.chat_drug_search` → `drug_count` / `search_drugs`, servizio AIFA comune | Ricerca AIC/nome/principio attivo, massimo 20 risultati, solo vista app | Sessione, scope e selezione correnti; revisione byte e conferma nativa monouso | Spec frame e test Rust catalogo | Data di aggiornamento non verificata; qualificare i due host, nessuna prescrizione |
 | Protesica | `RuntimeSession.chat_prosthetics_search` → `createProstheticsCatalog.search` | Ricerca repertorio locale, massimo 20 voci, solo vista app | Capability lettura protesica, sessione, scope, selezione e conferma nativa monouso | Spec frame, test route e Rust owner | Prescrizioni archivio non collegate; qualificare i due host |
 | Quadro paziente | Patient Insight: vista GPUI `patient_insight`, route Web `patient-insight/preview` | Comando `patient-insight`: apre il Quadro nella finestra; consenso, proposta, fonti e ricevuta restano lì; alla chat solo stati | Sessione abbinata, selezione corrente, riammissione sul server (account, archivio, epoca), host locale aperto, interruttore della funzione | Rust `chat_access::owner` e `chat_access::tests`, `shell::patient_insight::tests::chat`, `lib/chat-card/patient-insight.test.ts`, spec frame | Due host da qualificare; Ollama e ChatGPT reali; budget end-to-end |
-| Riassunto dei documenti | Document Synthesis | Nessuna generazione chat collegata | Nessun grant chat | Nessuna prova chat | Vista GPUI in `main` (#899); raccordo chat previsto nella nota C-7, non collegato |
+| Riassunto dei documenti | Document Synthesis, vista GPUI e percorso Web esistenti | Comando `document-synthesis`: scelta e proposta nella finestra; solo stati alla chat (#920) | Riammissione della sessione e della selezione, interruttore della funzione | Test della carta, owner e `shell::document_synthesis::tests::chat` | Due host da qualificare |
+| Import assistito | Smart Import, sola anteprima GPUI | Comando `smart-import`: preparazione e proposta nella finestra; solo stati alla chat (#923) | Riammissione della sessione e della selezione, interruttore della funzione | Test della carta, owner e `shell::smart_import::tests::chat` | Due host da qualificare; nessuna applicazione dalla chat |
+| Ricerca ICD | Vista GPUI `who_lookup`, lettore paired `RuntimeSession.search_who` | Comando `icd-lookup` senza argomenti: apre la ricerca dentro la scheda corrente | Riammissione chat, account, archivio e selezione; permessi WHO esistenti a ogni lettura | `lib/chat-card/icd-lookup.test.ts`, spec frame, `shell::who_lookup::chat_tests`, owner e adapter | Solo ICD-11 WHO locale; due host da qualificare; nessuna codifica in scheda |
 | Stato terapia | `createChatTherapyStatusService`, `executeTherapyStatusInTransaction` | active/suspended/completed e rilettura ricevuta | Native admin, tre capability network, selezione/archivio correnti, CAS, PIN e conferma nativa | `chat-therapy-status.test.ts`, `native-chat-write-approval.test.ts`, spec frame, Rust owner | Due host reali, disponibilità controlli per ruolo/versione/capacità |
 | Nuovo paziente da PDF | `lib/native-patient-document.ts`, `lib/patient-document-create-command.ts` | Apre revisione nativa; nessun allegato chat usato | Selezione file e campi visti dal medico, revisione e conferma nativa, writer comune | `native-patient-document.test.ts`, `patient-document-create-command.test.ts`, spec frame | Due host reali; apertura non equivale a creazione |
 | Altri comandi clinici | Servizi applicativi esistenti | Non collegati | Nessun grant generico | Nessuna prova chat | Censire ogni comando prima del grant; nessuna esecuzione libera |
@@ -83,15 +85,15 @@ raccordo nei due host.
 | Capability | Servizio/entry point dal catalogo | Stato effettivo chat | Residuo |
 | --- | --- | --- | --- |
 | `patient_insight` | `app/api/ai/patient-insight/preview/route.ts` | Collegata, app-only: apre il Quadro nella finestra, alla chat solo stati; prova di componente | Due host da qualificare; provider reali e budget end-to-end |
-| `smart_import` | `app/api/ai/smart-import/preview/route.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
-| `document_synthesis` | `app/api/ai/document-synthesis/preview/route.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
+| `smart_import` | `app/api/ai/smart-import/preview/route.ts` | Apertura app-only nella finestra (#923), solo stati alla chat | Due host da qualificare |
+| `document_synthesis` | `app/api/ai/document-synthesis/preview/route.ts` | Apertura app-only nella finestra (#920), solo stati alla chat | Due host da qualificare |
 | `ocr` | `nessuno` | Indisponibile nel catalogo | Mostrare indisponibilità, non sostituire AnyDoc/Apple Vision |
 | `treatment_reasoning` | `app/api/ai/treatment-reasoning/preview/route.ts` | Esclusa dalla 0.9.1, diniego comune | Verificare diniego nei due host; nessuna generazione |
-| `icd_lookup` | `lib/icd-service.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
+| `icd_lookup` | `RuntimeSession.search_who`, vista `who_lookup`; Web ordinario `lib/icd-service.ts` | `icd-lookup`: ricerca nella scheda selezionata, soli stati alla chat | Prove di componente e frame; due host reali da qualificare |
 | `aifa_drug_search` | `RuntimeSession.chat_drug_search`, servizio AIFA comune | Ricerca locale in sola lettura, conferma nativa, risultato app-only | Qualifica nei due host; aggiornamento del catalogo non verificato |
-| `service_prescription_matching` | `lib/service-prescription-write.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
-| `evidence_absorption` | `lib/domain/documents/evidence-queue-contract.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
-| `patient_open_loops` | `lib/patient-open-loops.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
+| `service_prescription_matching` | `lib/service-prescription-write.ts` | Non collegata | Residuo WUL-829: il writer conserva `matchStatus`; manca una vista GPUI di abbinamento, distinta dal repertorio e dalle prescrizioni |
+| `evidence_absorption` | `lib/domain/documents/evidence-queue-contract.ts` | Non collegata | Residuo WUL-829: la coda alimenta `lib/ai-context.ts`; manca un lettore con vista GPUI della coda, distinta da Documenti e import dossier |
+| `patient_open_loops` | `lib/patient-open-loops.ts` | Non collegata | Residuo WUL-829: il Web proietta prescrizioni, elementi e osservazioni; GPUI non ha il lettore e la vista corrispondenti. L’agenda non equivale ai follow-up aperti |
 | `fhir_export` | `lib/fhir/bundle-generator.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
 | `document_classification` | `lib/domain/documents/document-class-router.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
 | `document_identity_resolution` | `lib/domain/documents/document-identity-resolution.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
@@ -379,3 +381,49 @@ C-9b resta aperta per le prove sui due desktop reali, non eseguite qui.
 Candidati da calendario, calendari personali, attività territoriali e invii
 istituzionali restano non collegati. Il profilo clinico della PR #765 non viene
 modificato.
+
+
+## WUL-829: ricerca ICD aperta dalla chat
+
+Il comando `{"command":"icd-lookup"}` non accetta paziente, ambulatorio,
+query, codice, modello o richiesta di applicazione. Riusa l’ammissione delle
+funzioni aperte dalla chat (#896, #920 e #923). L’host locale amministrativo
+non è necessario: la consultazione usa il servizio WHO già accessibile alla
+sessione abbinata. L’ammissione chat e i permessi del lettore restano necessari.
+
+La finestra apre la ricerca nella Panoramica del paziente corrente, mantenendo
+visibile l’intestazione della scheda. Il medico scrive la query nella finestra.
+L’apertura non legge il repertorio e non genera testo. Risultati, provenienza
+e ricevuta WHO restano nella vista nativa. La carta Web riceve soltanto
+`icd-opened`, `icd-busy`, `icd-unavailable`, `icd-closed` o gli stati comuni
+di attesa e ritiro. `icd-closed` attesta la fine della consultazione, senza
+attestare una scrittura o fornire una ricevuta clinica durevole come quella
+della terapia (#924). Un errore di lettura non produce `icd-closed`.
+
+Cambio di paziente, cambio di sezione, blocco, revoca e perdita del contesto
+ritirano il legame. Le risposte tardive non entrano nella vista. Dopo la lettura
+riuscita il legame termina e i risultati restano consultabili in MediFlow;
+chiudere la ricerca o cambiare contesto li cancella. Non è aggiunto un comando
+di applicazione del codice alla scheda.
+
+Le altre tre funzioni richieste restano residui espliciti nella matrice:
+non si presenta l’agenda come follow-up aperti, la lista dei documenti come
+coda delle evidenze o il repertorio prestazioni come abbinamento. Per ciascuna
+manca una verticale GPUI riutilizzabile: servono un lettore nominato e una vista
+con le rispettive fonti, ricevute e prove di diniego prima del raccordo chat.
+I test dei soli servizi esistenti non provano questi percorsi.
+
+Le quattro aperture alla finestra (Quadro, sintesi, import e ICD) selezionano
+una sola funzione visibile. Una nuova apertura ammessa sostituisce il pannello
+precedente e ritira la richiesta ancora aperta; una proposta già conclusa
+resta nello stato nativo. Una funzione già occupata rimostra la propria area
+senza sostituirne il lavoro; se attende ancora l’ammissione, conserva la vista
+precedente. Il render della finestra è coperto dalla matrice
+`chat_function_view_matrix_renders_only_the_requested_function`, con tutte le
+coppie e con ICD anche dopo una ricerca conclusa. La richiesta negata durante
+l’ammissione lascia visibile la funzione precedente.
+
+La matrice copre anche le schede senza fonti e controlla i testi degli stati
+vuoti. L’import isolato conserva l’avviso che invita ad aggiungere una nota,
+una voce di diario o una sintesi, oppure a revocare la richiesta dalla chat.
+Lo stesso avviso compare una sola volta nella vista completa dei Documenti.
