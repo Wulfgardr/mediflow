@@ -190,7 +190,7 @@ public enum HostAdminError: Error, LocalizedError, Equatable {
             //
             // Saying "you need an admin account" would send an operator who
             // already is an admin looking for permissions they hold.
-            "L'home-base riserva questa lettura alla console web. Un client nativo abbinato non vi accede, nemmeno con un account amministratore: si consulta da localhome-base."
+            "L'home-base riserva questa lettura alla console web. Un client nativo abbinato non vi accede, nemmeno con un account amministratore: si consulta da localhost."
         case let .status(code):
             "Il runtime locale ha risposto \(code)."
         case let .decoding(detail):
