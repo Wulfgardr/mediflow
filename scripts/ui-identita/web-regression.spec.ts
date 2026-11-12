@@ -5,12 +5,17 @@ import { fetchInterceptedRequest } from '../../e2e/fixtures/trusted-web-request'
 
 const data = process.env.MEDIFLOW_DATA_DIR!;
 function reference() {
-  if (!data?.startsWith('/Volumes/Vision/mf-ui-identita-20261107-scratch/') || !fs.existsSync(`${data}/SYNTHETIC_ONLY`)) throw new Error('Solo archivio sintetico');
+  const scratch = process.env.MF_BANCO_SCRATCH || '/Volumes/Vision/mf-ui-identita-20261107-scratch';
+  if (!data?.startsWith(`${scratch}/`) || !fs.existsSync(`${data}/SYNTHETIC_ONLY`)) throw new Error('Solo archivio sintetico');
   return JSON.parse(fs.readFileSync(`${data}/reference.json`, 'utf8')).referenceId as string;
 }
 async function navigate(page: Page, path: string) {
   await page.goto(path);
-  if (await isVisible(page.getByLabel('PIN operatore').first(), 2500)) await unlockIfNeeded(page, '314159');
+  if (await isVisible(page.getByLabel('PIN operatore').first(), 2500)) {
+    // Lo sblocco resta occupato finché la sessione aperta dal banco non è chiusa: si agisce dopo.
+    await expect(page.locator('form[aria-busy="true"]')).toHaveCount(0, { timeout: 30_000 });
+    await unlockIfNeeded(page, '314159');
+  }
   await expect(page.getByLabel('MediFlow lock screen')).toBeHidden();
 }
 
@@ -29,8 +34,7 @@ test('errore di lettura critico nella colonna e ripetizione funzionante', async 
   await expect(page.getByRole('heading', { name: 'Rossi Sintetica Maria', exact: true })).toBeVisible();
 });
 
-test('formattazione compatta lascia almeno 200 px di testo sopra la soglia', async ({ page }) => {
-  test.skip(test.info().project.name.endsWith('1440'));
+test('formattazione compatta lascia almeno 200 px di testo sopra la soglia', { tag: '@stretto' }, async ({ page }) => {
   page.on('dialog', dialog => dialog.type() === 'beforeunload' ? dialog.accept() : dialog.dismiss());
   for (const route of ['entries/new', 'modules?voce=nuova']) {
   await navigate(page, `/patients/${reference()}/${route}`);
@@ -53,8 +57,7 @@ test('formattazione compatta lascia almeno 200 px di testo sopra la soglia', asy
   }
 });
 
-test('elenco a 1440 per 900 mostra 14 pazienti con righe di 40 px', async ({ page }) => {
-  test.skip(!test.info().project.name.endsWith('1440'));
+test('elenco a 1440 per 900 mostra 14 pazienti con righe di 40 px', { tag: '@largo' }, async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await navigate(page, '/?area=incarico');
   const rows = page.getByTestId('lume-patient-row');
@@ -85,7 +88,8 @@ test('voce con data ora tipo luogo e autore conserva provenienza e stato', async
   await openPatientSection(page, 'diario');
   const row = page.locator('#diario article').filter({ hasText: 'Pressione 132/78' });
   await expect(row).toBeVisible();
-  await expect.soft(row.locator('[data-ink="dry"]')).toHaveText('Registrata da Ada Sintetica');
+  // ADR 0183: l'autore nei metadati non attesta chi ha registrato; vale l'operatore autenticato.
+  await expect(row.locator('[data-ink="dry"]')).toHaveText(/^Registrata da Benchmark sintetico il \d{2} \p{L}+ \d{4} alle \d{2}:\d{2}$/u);
   await expect.soft(row.locator('[class*="identity"] > span').first()).toHaveCSS('font-weight', '600');
   await expect(row).toContainText('Ambulatorio');
   await expect(row).toContainText('Fonte sintetica');
@@ -110,8 +114,7 @@ test('Nuova voce dalla scheda conserva identità quadro e diario', async ({ page
   expect((await header.boundingBox())!.y).toBeGreaterThanOrEqual(0);
 });
 
-test('Impostazioni compatte con sezioni scorrevoli e margini di 16 px', async ({ page }) => {
-  test.skip(test.info().project.name.endsWith('1440'));
+test('Impostazioni compatte con sezioni scorrevoli e margini di 16 px', { tag: '@stretto' }, async ({ page }) => {
   await navigate(page, '/settings');
   const strip = page.locator('[data-settings-strip]');
   expect((await page.getByTestId('settings-subroute-content').boundingBox())!.x).toBe(16);
@@ -126,8 +129,7 @@ test('Impostazioni compatte con sezioni scorrevoli e margini di 16 px', async ({
 });
 
 
-test('pagina separata: metadati entro il piano alla soglia delle due colonne', async ({ page }) => {
-  test.skip(test.info().project.name !== 'giorno-1440');
+test('pagina separata: metadati entro il piano alla soglia delle due colonne', { tag: '@giorno-largo' }, async ({ page }) => {
   page.on('dialog', dialog => dialog.type() === 'beforeunload' ? dialog.accept() : dialog.dismiss());
   await navigate(page, `/patients/${reference()}/entries/new`);
   const composer = page.getByTestId('progressive-entry-composer');
