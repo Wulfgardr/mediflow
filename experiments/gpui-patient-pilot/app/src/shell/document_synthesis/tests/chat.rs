@@ -402,7 +402,7 @@ fn an_active_synthesis_or_proposal_is_never_replaced(cx: &mut gpui::TestAppConte
 }
 
 #[gpui::test]
-fn synthesis_and_insight_have_independent_chat_ownership(cx: &mut gpui::TestAppContext) {
+fn opening_insight_retires_synthesis_without_cross_revocation(cx: &mut gpui::TestAppContext) {
     let (bench, cx) = bench(cx);
     let (synthesis, _remote) = opened(&bench, cx);
     admission(&bench, true);
@@ -423,7 +423,7 @@ fn synthesis_and_insight_have_independent_chat_ownership(cx: &mut gpui::TestAppC
         app.patient.insight.follow_chat();
     });
     assert_eq!(reply(&insight), json!({"status":"insight-opened"}));
-    assert_eq!(reply(&synthesis), json!({"status":"synthesis-opened"}));
+    assert_eq!(reply(&synthesis), json!({"status":"withdrawn"}));
     synthesis.lock().unwrap().revoke();
     follow(&bench, cx);
     assert_eq!(reply(&insight), json!({"status":"insight-opened"}));

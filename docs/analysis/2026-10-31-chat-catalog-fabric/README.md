@@ -442,3 +442,19 @@ Le prove di componente sono in `lib/chat-card/icd-lookup.test.ts`,
 `lib/patient-open-loops.test.ts`, `lib/network-cross-patient-read.test.ts`
 e nei test GPUI `chat_followups_*`. Il banco usa il trasporto HTTP paired
 contro un host sintetico. Non qualifica i desktop autenticati o l’uso clinico.
+
+Le cinque aperture alla finestra (Quadro, sintesi, import, ICD e follow-up) selezionano
+una sola funzione visibile. Una nuova apertura ammessa sostituisce il pannello
+precedente e ritira la richiesta ancora aperta; una proposta già conclusa
+resta nello stato nativo. Una funzione già occupata rimostra la propria area
+senza sostituirne il lavoro; se attende ancora l’ammissione, conserva la vista
+precedente. Il render della finestra è coperto dalla matrice
+`chat_function_view_matrix_renders_only_the_requested_function`, con 60 casi: tutte le coppie su archivi vuoti e popolati, ICD anche dopo una ricerca conclusa e follow-up
+con ricevuta di lettura già disponibile. Altri venti casi verificano le direzioni
+da e verso i follow-up. La richiesta negata durante
+l’ammissione lascia visibile la funzione precedente.
+
+La matrice copre anche le schede senza fonti e controlla i testi degli stati
+vuoti. L’import isolato conserva l’avviso che invita ad aggiungere una nota,
+una voce di diario o una sintesi, oppure a revocare la richiesta dalla chat.
+Lo stesso avviso compare una sola volta nella vista completa dei Documenti.
