@@ -145,7 +145,7 @@ test('Modelli: letture chiuse, scelta e bozza, gerarchia e attivazione soltanto 
         }
         await selector('clinical').getByRole('combobox').selectOption(clinical); await selector('reasoning').getByRole('combobox').selectOption(reasoning);
         mock.state.failSave = true; await save.click(); await expect(page.getByText('Salvataggio non riuscito', { exact: true })).toBeVisible(); expect(mock.writes).toHaveLength(1);
-        mock.state.failSave = false; await save.click(); await expect(page.getByText('Configurazione AI salvata', { exact: true })).toBeVisible();
+        mock.state.failSave = false; await save.click(); await expect(page.getByText('Configurazione IA salvata', { exact: true })).toBeVisible();
         for (const key of ['aiPatientInsightKillSwitch', 'aiDocumentSynthesisKillSwitch', 'aiSmartImportKillSwitch', 'aiTreatmentReasoningKillSwitch']) expect(mock.config.get(key)).toBe('disabled');
         while (await page.getByRole('button', { name: 'Chiudi notifica', exact: true }).count()) await page.getByRole('button', { name: 'Chiudi notifica', exact: true }).first().click();
         await page.getByRole('button', { name: 'Verifica connessione', exact: true }).click(); await expect(page.getByRole('status').filter({ hasText: 'Ollama è raggiungibile:' })).toContainText('2 modelli presenti');
