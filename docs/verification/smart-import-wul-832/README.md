@@ -29,8 +29,8 @@ La calibrazione v1 non decide la PR. Il suo criterio lessicale segnava come erra
 
 - Modello reale: `qwen3.5:35b-a3b`, digest `26025611beeb3fe9e4850b1fdae686bebba7cdfa7f13ddb04955f19872ee022a`.
 - Ollama 0.40.6, solo `127.0.0.1:64812`, Node 24.18.0, temperatura 0.4, thinking disattivato.
-- Main misurato: `4145a471b0985402f3d01ad81636d917230a3947`, prodotto corrispondente a main `dbf207b14`. La base finale `11cb03ea5` aggiunge correzioni GPUI/Mini e lascia invariato il percorso misurato.
-- #938 misurata: `8d466b895e4834c69c96535ddbc5986c21e7d2f7`, dopo l’aggiornamento sulla base finale. Le modifiche successive di questa lane non cambiano il prodotto misurato.
+- Main misurato: `4145a471b0985402f3d01ad81636d917230a3947`, prodotto corrispondente a main `dbf207b14`. Gli aggiornamenti di main fino alla base di consegna `7130e2405` lasciano invariato il percorso misurato.
+- #938 misurata: `8d466b895e4834c69c96535ddbc5986c21e7d2f7`, dopo l’aggiornamento sulla base `11cb03ea5`. La successiva integrazione di main `7130e2405` conserva le impronte dei cinque file di prodotto misurati. Le modifiche successive di questa lane non cambiano il prodotto misurato.
 - Corpus SHA-256: `469f876ca016c377b4ca89cf0cc0a543b405a0c7a845a6286f18eef03b985ca9`.
 
 Sono usati la vera capability dell’host, il registro, l’adapter Ollama, il router e i controlli di risposta. Consenso, broker, ciclo di vita e readiness ricevono fixture sintetiche. L’adapter esegue comunque l’attestazione reale del server/modello. La sonda aggiunge soltanto il seme al trasporto. Non apre un archivio clinico. Non misura UI, GPUI, cattura delle fonti, applicazione o persistenza.
@@ -44,7 +44,7 @@ Anche con payload e semi uguali il runtime non restituisce sempre lo stesso test
 - [Sonda](run.mjs), [classificatore](analizza.py), [controesempio della citazione](prova-citazione.py), [rigioco derivato dallo script precedente](rigioca-import.mjs), [verifica dei payload](verifica-payload.py).
 - [Risultati aggregati e metadati](risultati.json).
 - 707 test selezionati verdi dopo l’aggiornamento su main, inclusi prompt, schema, capability e golden. Il test che pretende i quattro enum è rosso sul prodotto main e verde sul ramo.
-- Suite unitaria completa: main 9.210 test, 100 fallimenti, 32 saltati. Ramo 9.213 test, 99 fallimenti, 32 saltati. I 99 nomi falliti sul ramo sono tutti presenti anche su main, nessun fallimento nuovo. La prova FHIR sulla terminazione del gruppo del validatore fallisce solo su main. Le suite non sono globalmente verdi.
+- Suite unitaria completa: main di consegna 9.218 test, 99 fallimenti, 32 saltati. Ramo 9.221 test, gli stessi 99 fallimenti, 32 saltati. I 99 nomi falliti sul ramo sono tutti presenti anche su main, nessun fallimento nuovo. Le suite non sono globalmente verdi.
 - `npm run typecheck` e `npm run lint`: verdi. Tutti i 25 comandi di controllo del job `repository-guards` sono verdi, inclusi `never-regress`, il confine di import del database e le prove negative. Dipendenze tramite il symlink consentito, senza eseguire installazione o preparazione sulle dipendenze condivise. La build Next non è stata eseguita in questa lane.
 
 Per ripetere una corsa, da una revisione del prodotto indicata sopra, con questo corpus ed Ollama compatibile già avviato sulla porta del banco:
