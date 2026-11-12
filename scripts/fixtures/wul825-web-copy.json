@@ -349,6 +349,15 @@
     ]
   },
   {
+    "file": "lib/hooks/use-ai-settings-controller.ts",
+    "removed": [
+      "Configurazione AI salvata"
+    ],
+    "added": [
+      "Configurazione IA salvata"
+    ]
+  },
+  {
     "file": "lib/network-operating-mode.ts",
     "removed": [
       "AI locale",
