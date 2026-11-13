@@ -389,7 +389,10 @@ impl Record {
                     // The ordinary update maps explicit empty optional strings to null.
                     aic: row.aic.clone().filter(|value| !value.is_empty()),
                     atc: row.atc.clone().filter(|value| !value.is_empty()),
-                    active_principle: row.active_principle.clone().filter(|value| !value.is_empty()),
+                    active_principle: row
+                        .active_principle
+                        .clone()
+                        .filter(|value| !value.is_empty()),
                     diagnosis_code: row
                         .diagnosis_code
                         .as_ref()
@@ -1285,9 +1288,15 @@ mod tests {
         }))
         .unwrap();
         let record = Record::Therapy(original.clone());
-        let mut values: Vec<_> = record.fields().into_iter().map(|field| field.value).collect();
+        let mut values: Vec<_> = record
+            .fields()
+            .into_iter()
+            .map(|field| field.value)
+            .collect();
         values[1] = "Dose corretta esplicitamente".into();
-        let Draft::Therapy(draft) = record.draft(&values, None).unwrap() else { panic!() };
+        let Draft::Therapy(draft) = record.draft(&values, None).unwrap() else {
+            panic!()
+        };
         // The ordinary network update maps explicit empty optional strings to null.
         let mut readback = original;
         readback.version = 2;
@@ -1295,9 +1304,15 @@ mod tests {
         readback.aic = None;
         readback.atc = None;
         readback.active_principle = None;
-        assert!(therapy_matches(&readback, &draft), "a committed dose change must be confirmed");
+        assert!(
+            therapy_matches(&readback, &draft),
+            "a committed dose change must be confirmed"
+        );
         readback.dosage = "Dose precedente".into();
-        assert!(!therapy_matches(&readback, &draft), "a missing clinical change must still fail");
+        assert!(
+            !therapy_matches(&readback, &draft),
+            "a missing clinical change must still fail"
+        );
     }
 
     #[test]
