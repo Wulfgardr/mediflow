@@ -83,6 +83,30 @@ record prima di qualsiasi riconciliazione. Un segnale inviato, IPC disconnesso,
 Un'installazione aggiornata deve prima fermare i vecchi processi non partecipanti:
 assenza di lease non dimostra che un vecchio runner non stia operando.
 
+### Recupero del solo gate dopo un processo terminato (WUL-795)
+
+Un arresto può interrompere la chiusura dopo la pubblicazione di `gate/owner.json`
+e prima del `finally` che rimuove il gate. Lo standalone di produzione resta
+allora senza accesso all'archivio, anche se SQLite è integro. Per questo solo
+mutex breve si ammette il recupero quando il record è completo, ha versione,
+UUID e target canonici e `process.kill(pid, 0)` restituisce esattamente `ESRCH`.
+Un processo vivo, un errore di permesso, un PID riusato o un record ambiguo
+mantengono HOLD; l'età del marker non viene usata.
+
+Il recupero rinomina atomicamente la directory non vuota in
+`gate-retired-<uuid-del-record>` e la conserva. Due osservatori dello stesso
+record usano la stessa destinazione: il secondo non può sovrascriverla con
+un gate nuovo appartenente a un processo vivo. Le directory ritirate sono
+ammesse solo con il record originale integro e corrispondente al nome.
+
+Non si eliminano lease o intent e non si deduce un drain da un PID terminato.
+Un lease rimasto dopo il crash continua a impedire la manutenzione; un intent,
+un residuo di swap o una scrittura incompleta del protocollo resta HOLD. Il
+recupero del gate consente una nuova ammissione ordinaria, non autorizza snapshot,
+swap o replay di operazioni. Le directory ritirate restano evidenza locale del
+protocollo; non contengono dati clinici. La prova copre morte del processo e
+concorrenza sul filesystem locale, non perdita di alimentazione o storage remoto.
+
 ## Integrazione operativa Web
 
 Il lifecycle Web deve impedire nuovo lavoro, attendere le operazioni già
