@@ -91,6 +91,7 @@ const EXTRACTION_LABEL: Record<string, string> = {
 const ACQUIRE_LABEL: Record<string, string> = {
     stored: 'Originale salvato e riletto identico', reused: 'Già in MediFlow: riusato, non duplicato',
     duplicate_in_selection: 'Copia identica di un altro file selezionato', excluded: 'Escluso da te', unreadable: 'Non leggibile dal browser',
+    unsupported_format: 'Formato non ammesso',
     source_changed: 'Il file è cambiato dopo la lettura: rileggi la cartella', too_large: 'Oltre il limite di dimensione dell’archivio',
     readback_mismatch: 'Rilettura diversa dall’originale', write_failed: 'Salvataggio non confermato', artifact_conflict: 'Artefatto esistente non compatibile o non leggibile',
 };
@@ -242,7 +243,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
 
     const setExcluded = (groupKey: string, sourceKey: string, excluded: boolean) => {
         setGroups((current) => current.map((group) => group.key !== groupKey ? group : { ...group, sources: group.sources.map((source) =>
-            source.key !== sourceKey || source.status === 'duplicate_in_selection' || source.status === 'unreadable' ? source
+            source.key !== sourceKey || source.status === 'duplicate_in_selection' || source.status === 'unreadable' || source.status === 'unsupported_format' ? source
                 : { ...source, status: excluded ? 'excluded' : 'ready' }) }));
         setConfirmations((current) => ({ ...current, [groupKey]: false }));
     };
@@ -338,7 +339,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                                 <td role="cell" data-label="Esito">
                                                     {outcome ? <strong data-testid="dossier-acquire-outcome">{ACQUIRE_LABEL[outcome.status === 'failed' || outcome.status === 'skipped' ? outcome.reason : outcome.status]}</strong>
                                                         : source.status === 'duplicate_in_selection' ? ACQUIRE_LABEL.duplicate_in_selection
-                                                        : source.status === 'unreadable' ? ACQUIRE_LABEL.unreadable : null}
+                                                        : source.status === 'unreadable' || source.status === 'unsupported_format' ? ACQUIRE_LABEL[source.status] : null}
                                                     {measured[source.key] ? <small>Spazio misurato: originale {measured[source.key].original} byte cifrati, testo e artefatto {measured[source.key].artifact} byte cifrati</small> : null}
                                                     {source.status === 'ready' || source.status === 'excluded' ? <label className={styles.consent}>
                                                         <input type="checkbox" checked={source.status === 'excluded'} disabled={Boolean(busy)}

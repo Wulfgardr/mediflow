@@ -265,7 +265,7 @@ test('Dossier: estrazione preparata su una cartella mista di più pazienti, cita
         const b = await letter(CF_Q, 'Bisoprololo 2,5 mg 1 cp');
         writeFileSync(path.join(inbox, 'lettera-a.pdf'), a);
         writeFileSync(path.join(inbox, 'lettera-b.pdf'), b);
-        writeFileSync(path.join(inbox, 'appunto.txt'), 'Appunto sintetico senza estrazione preparata.');
+        writeFileSync(path.join(inbox, 'appunto.pdf'), await textPdf(['Appunto sintetico senza estrazione preparata.']));
         const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
         const entry = (bytes: Uint8Array, code: string, drug: string, dosage: string, quote: string) => ({
             sha256: sha(bytes), fileName: 'lettera.pdf', documentDate: iso, documentType: 'lettera_dimissione',
@@ -298,7 +298,7 @@ test('Dossier: estrazione preparata su una cartella mista di più pazienti, cita
         // Il CF suggerisce la scheda, che viene preselezionata: il collegamento resta da confermare.
         await expect(groupA).toHaveAttribute('data-identity', 'matched');
         await expect(groupB).toHaveAttribute('data-identity', 'matched');
-        await expect(panel.getByTestId('dossier-source').filter({ hasText: 'appunto.txt' })).toContainText('Assente dall’estrazione preparata');
+        await expect(panel.getByTestId('dossier-source').filter({ hasText: 'appunto.pdf' })).toContainText('Assente dall’estrazione preparata');
         await expect(groupA.getByLabel('Scheda di destinazione')).toHaveValue(patientA);
         await expect(groupB.getByLabel('Scheda di destinazione')).toHaveValue(patientB);
 

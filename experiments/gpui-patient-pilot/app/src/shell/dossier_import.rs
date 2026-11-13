@@ -42,6 +42,11 @@ fn rows(v: &Value) -> &[Value] {
 fn text_value(v: &Value) -> &str {
     v.as_str().unwrap_or("")
 }
+fn has_ready_sources(group: &Value) -> bool {
+    rows(&group["sources"])
+        .iter()
+        .any(|source| source["status"] == "ready")
+}
 fn group_identity(group: &Value, patients: &[Value], patient: Option<&str>) -> Value {
     let documents: Vec<_> = rows(&group["sources"])
         .iter()
@@ -182,6 +187,9 @@ impl ClinicalApp {
         else {
             return;
         };
+        if !has_ready_sources(group) {
+            return;
+        }
         if group_identity(
             group,
             rows(&self.patient.dossier.preview["patients"]),
@@ -283,6 +291,7 @@ impl ClinicalApp {
                 patient.map(String::as_str),
             );
             let blocked = identity["blocking"] == true;
+            let ready = has_ready_sources(group);
             let mut card = div()
                 .min_w_0()
                 .flex()
@@ -358,6 +367,11 @@ impl ClinicalApp {
                         source_state(text_value(&source["status"])),
                         extraction_state(text_value(&source["extraction"]["state"]))
                     )));
+                if source["status"] == "unsupported_format" {
+                    card = card.child(text!(
+                        text_value(&source["classification"]["reason"]).to_owned()
+                    ));
+                }
                 for note in rows(&source["prepared"]["notes"]) {
                     card = card.child(
                         div()
@@ -423,13 +437,16 @@ impl ClinicalApp {
                     "Accetta il verificato e applica",
                     theme,
                     true,
-                    !state.busy && !blocked && patient.is_some(),
+                    !state.busy && !blocked && ready && patient.is_some(),
                 )
-                .when(!state.busy && !blocked && patient.is_some(), |el| {
-                    el.on_click(
-                        cx.listener(move |this, _, _, cx| this.apply_dossier(&groupkey, cx)),
-                    )
-                }),
+                .when(
+                    !state.busy && !blocked && ready && patient.is_some(),
+                    |el| {
+                        el.on_click(
+                            cx.listener(move |this, _, _, cx| this.apply_dossier(&groupkey, cx)),
+                        )
+                    },
+                ),
             );
             if let Some(outcome) = state.outcomes.get(key) {
                 let applied = &outcome["applied"];
@@ -512,8 +529,18 @@ fn source_state(status: &str) -> &str {
         "duplicate_in_selection" => "Copia nella selezione",
         "unreadable" => "File non leggibile",
         "excluded" => "Escluso",
+        "unsupported_format" => "Formato non ammesso",
         _ => "Da verificare",
     }
+}
+
+#[test]
+fn rejected_txt_is_labelled_and_cannot_enable_dossier_apply() {
+    let rejected = json!({"sources":[{"status":"unsupported_format"}]});
+    assert_eq!(source_state("unsupported_format"), "Formato non ammesso");
+    assert!(!has_ready_sources(&rejected));
+    let mixed = json!({"sources":[{"status":"unsupported_format"},{"status":"ready"}]});
+    assert!(has_ready_sources(&mixed));
 }
 fn extraction_state(status: &str) -> &str {
     match status {
