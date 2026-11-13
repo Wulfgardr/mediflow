@@ -40,8 +40,16 @@ test('I-0 copre esattamente le sei celle del gate e separa API opzionali e Treat
     for (const cell of [...register.cells, ...register.conditionalCells]) {
         assert.equal(cell.conditional, register.conditionalCells.includes(cell));
         assert.equal(cell.qualification, 'not_qualified');
-        assert.equal(cell.modelIdentity, null);
-        assert.equal(cell.proof, null);
+        if (cell.provider === 'ollama') {
+            const evidence = JSON.parse(readFileSync(new URL(cell.proof.path, root), 'utf8'));
+            assert.deepEqual(cell.modelIdentity, evidence.modelIdentity);
+            assert.equal(cell.proof.status, 'blocked_before_inference');
+            assert.equal(evidence.qualification, false);
+            assert.equal(evidence.attestation.code, 'provider_version_unsupported');
+        } else {
+            assert.equal(cell.modelIdentity, null);
+            assert.equal(cell.proof, null);
+        }
         assert.equal(cell.dataClass, 'synthetic_only');
         assert.ok(cell.blockedBy.length > 0);
         assert.ok(cell.blockedBy.every((criterion: string) => !['I-3', 'I-3b', 'I-7'].includes(criterion)));
