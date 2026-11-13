@@ -1,0 +1,501 @@
+{
+  "schemaVersion": 1,
+  "data": "2026-11-13",
+  "baseSHA": "8954e9c97b4ea2016c20c8433b43ee0f5231607a",
+  "condizioni": {
+    "runtime": "sviluppo",
+    "bundler": "webpack",
+    "node": "24.18.0",
+    "viewport": "1440x960",
+    "sintetico": true
+  },
+  "regola": "click detail > 0 e keydown che non scrivono testo; caratteri e cancellazioni separati; soli modificatori e IME esclusi",
+  "risposta": "event.timeStamp al primo requestAnimationFrame; non prova un aggiornamento applicativo completato",
+  "gate": "gesti, clic, tasti e comandi non possono aumentare; tempi e tetti obiettivo non fanno fallire",
+  "compiti": [
+    {
+      "id": "1",
+      "compito": "Trovare un paziente",
+      "tettoObiettivo": 2,
+      "stato": "misurato",
+      "gesti": 3,
+      "clic": 3,
+      "tasti": 17,
+      "comandi": 0,
+      "rispostaPeggioreMs": 10,
+      "percorso": [
+        "Elenco pazienti",
+        "Clic ricerca",
+        "Scrivi Sintetico<suffisso> (due omonimi)",
+        "Seleziona il nato nel 1972",
+        "Apri scheda"
+      ],
+      "modoMinore": "puntatore"
+    },
+    {
+      "id": "2",
+      "compito": "Nuova scheda senza codice fiscale",
+      "tettoObiettivo": 5,
+      "stato": "misurato",
+      "gesti": 9,
+      "clic": 7,
+      "tasti": 22,
+      "comandi": 2,
+      "rispostaPeggioreMs": 14,
+      "percorso": [
+        "Ricerca senza esito",
+        "Nuova scheda",
+        "Nome Caso",
+        "Cognome Nuovo + suffisso sintetico",
+        "Identificativo: Nessun identificativo per ora (Tab, n)",
+        "Conosco solo l’anno: 1994",
+        "Crea scheda",
+        "Rilettura scheda"
+      ],
+      "modoMinore": "puntatore"
+    },
+    {
+      "id": "3",
+      "compito": "Visita",
+      "tettoObiettivo": 4,
+      "stato": "misurato",
+      "gesti": 3,
+      "clic": 3,
+      "tasti": 40,
+      "comandi": 0,
+      "rispostaPeggioreMs": 27,
+      "percorso": [
+        "Scheda aperta",
+        "Nuova voce",
+        "Resoconto: Visita sintetica. Pressione 135/80 mmHg.",
+        "Registra nel diario",
+        "Rilettura voce di diario"
+      ],
+      "modoMinore": "puntatore"
+    },
+    {
+      "id": "4a",
+      "compito": "Terapia abituale confermata o ripetuta",
+      "tettoObiettivo": 4,
+      "stato": "non eseguibile oggi",
+      "motivo": "Non esiste un comando che registri la revisione di una terapia invariata. Modifica, Sospendi, Concludi e Riattiva hanno altri effetti.",
+      "gesti": null,
+      "clic": null,
+      "tasti": null,
+      "comandi": null,
+      "rispostaPeggioreMs": null,
+      "percorso": [],
+      "alternativa": "4a-alternativa"
+    },
+    {
+      "id": "4b",
+      "compito": "Terapia nuova",
+      "tettoObiettivo": 6,
+      "stato": "misurato",
+      "gesti": 5,
+      "clic": 5,
+      "tasti": 32,
+      "comandi": 0,
+      "rispostaPeggioreMs": 8,
+      "percorso": [
+        "Scheda aperta",
+        "Terapie",
+        "Nuova terapia",
+        "Farmaco sintetico dal catalogo, dose 20 mg",
+        "Posologia: 1 compressa la sera",
+        "Salva terapia",
+        "Rilettura terapia"
+      ],
+      "modoMinore": "puntatore"
+    },
+    {
+      "id": "5",
+      "compito": "Documento in arrivo",
+      "tettoObiettivo": 4,
+      "stato": "non eseguibile oggi",
+      "motivo": "Manca una coda di documenti non ancora associati. La revisione live e il caricamento partono da un paziente già scelto.",
+      "gesti": null,
+      "clic": null,
+      "tasti": null,
+      "comandi": null,
+      "rispostaPeggioreMs": null,
+      "percorso": [],
+      "alternativa": "5-alternativa"
+    }
+  ],
+  "measurements": [
+    {
+      "id": "1",
+      "modo": "puntatore",
+      "gesti": 3,
+      "clic": 3,
+      "tasti": 17,
+      "comandi": 0,
+      "rispostaPeggioreMs": 10,
+      "percorso": [
+        "Elenco pazienti",
+        "Clic ricerca",
+        "Scrivi Sintetico<suffisso> (due omonimi)",
+        "Seleziona il nato nel 1972",
+        "Apri scheda"
+      ],
+      "tettoObiettivo": 2,
+      "stato": "misurato",
+      "sequenzaGesti": [
+        "clic",
+        "clic",
+        "clic"
+      ]
+    },
+    {
+      "id": "2",
+      "modo": "puntatore",
+      "gesti": 9,
+      "clic": 7,
+      "tasti": 22,
+      "comandi": 2,
+      "rispostaPeggioreMs": 14,
+      "percorso": [
+        "Ricerca senza esito",
+        "Nuova scheda",
+        "Nome Caso",
+        "Cognome Nuovo + suffisso sintetico",
+        "Identificativo: Nessun identificativo per ora (Tab, n)",
+        "Conosco solo l’anno: 1994",
+        "Crea scheda",
+        "Rilettura scheda"
+      ],
+      "tettoObiettivo": 5,
+      "stato": "misurato",
+      "sequenzaGesti": [
+        "clic",
+        "clic",
+        "clic",
+        "Tab",
+        "n",
+        "clic",
+        "clic",
+        "clic",
+        "clic"
+      ]
+    },
+    {
+      "id": "3",
+      "modo": "puntatore",
+      "gesti": 3,
+      "clic": 3,
+      "tasti": 40,
+      "comandi": 0,
+      "rispostaPeggioreMs": 27,
+      "percorso": [
+        "Scheda aperta",
+        "Nuova voce",
+        "Resoconto: Visita sintetica. Pressione 135/80 mmHg.",
+        "Registra nel diario",
+        "Rilettura voce di diario"
+      ],
+      "tettoObiettivo": 4,
+      "stato": "misurato",
+      "sequenzaGesti": [
+        "clic",
+        "clic",
+        "clic"
+      ]
+    },
+    {
+      "id": "4b",
+      "modo": "puntatore",
+      "gesti": 5,
+      "clic": 5,
+      "tasti": 32,
+      "comandi": 0,
+      "rispostaPeggioreMs": 8,
+      "percorso": [
+        "Scheda aperta",
+        "Terapie",
+        "Nuova terapia",
+        "Farmaco sintetico dal catalogo, dose 20 mg",
+        "Posologia: 1 compressa la sera",
+        "Salva terapia",
+        "Rilettura terapia"
+      ],
+      "tettoObiettivo": 6,
+      "stato": "misurato",
+      "sequenzaGesti": [
+        "clic",
+        "clic",
+        "clic",
+        "clic",
+        "clic"
+      ]
+    },
+    {
+      "id": "4a-alternativa",
+      "modo": "puntatore",
+      "gesti": 3,
+      "clic": 3,
+      "tasti": 0,
+      "comandi": 0,
+      "rispostaPeggioreMs": 9,
+      "percorso": [
+        "Scheda aperta",
+        "Terapie",
+        "Modifica una terapia attiva",
+        "Aggiorna terapia senza cambiare i valori",
+        "Rilettura terapia (non è una conferma di revisione)"
+      ],
+      "tettoObiettivo": 4,
+      "stato": "misurato",
+      "limite": "Aggiornamento dei dati invariati, privo della semantica di revisione della terapia.",
+      "sequenzaGesti": [
+        "clic",
+        "clic",
+        "clic"
+      ]
+    },
+    {
+      "id": "5-alternativa",
+      "modo": "puntatore",
+      "gesti": 2,
+      "clic": 2,
+      "tasti": 0,
+      "comandi": 0,
+      "rispostaPeggioreMs": 8,
+      "percorso": [
+        "Scheda già scelta (nessuna coda documenti in arrivo)",
+        "Documenti, eventualmente sotto Altro",
+        "Carica documenti",
+        "Selezione TXT sintetico nel selettore nativo: non misurata",
+        "Allegato salvato e riletto nella scheda"
+      ],
+      "tettoObiettivo": 4,
+      "stato": "misurato",
+      "limite": "Solo eventi nella pagina: scelta del file nel dialogo nativo non misurata. Paziente già scelto.",
+      "sequenzaGesti": [
+        "clic",
+        "clic"
+      ]
+    },
+    {
+      "id": "1",
+      "modo": "tastiera",
+      "gesti": 4,
+      "clic": 0,
+      "tasti": 17,
+      "comandi": 4,
+      "rispostaPeggioreMs": 12,
+      "percorso": [
+        "Elenco pazienti",
+        "/ apre ricerca",
+        "Scrivi Sintetico<suffisso> (due omonimi)",
+        "Seleziona il nato nel 1972",
+        "Apri scheda"
+      ],
+      "tettoObiettivo": 2,
+      "stato": "misurato",
+      "sequenzaGesti": [
+        "/",
+        "Tab",
+        "j",
+        "Enter"
+      ]
+    },
+    {
+      "id": "2",
+      "modo": "tastiera",
+      "gesti": 24,
+      "clic": 0,
+      "tasti": 22,
+      "comandi": 24,
+      "rispostaPeggioreMs": 10,
+      "percorso": [
+        "Ricerca senza esito",
+        "Nuova scheda",
+        "Nome Caso",
+        "Cognome Nuovo + suffisso sintetico",
+        "Identificativo: Nessun identificativo per ora (Tab, n)",
+        "Conosco solo l’anno: 1994",
+        "Crea scheda",
+        "Rilettura scheda"
+      ],
+      "tettoObiettivo": 5,
+      "stato": "misurato",
+      "sequenzaGesti": [
+        "Tab",
+        "n",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "n",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        " ",
+        "Shift+Tab",
+        "Enter",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Enter"
+      ]
+    },
+    {
+      "id": "3",
+      "modo": "tastiera",
+      "gesti": 25,
+      "clic": 0,
+      "tasti": 40,
+      "comandi": 25,
+      "rispostaPeggioreMs": 8,
+      "percorso": [
+        "Scheda aperta",
+        "Nuova voce",
+        "Resoconto: Visita sintetica. Pressione 135/80 mmHg.",
+        "Registra nel diario",
+        "Rilettura voce di diario"
+      ],
+      "tettoObiettivo": 4,
+      "stato": "misurato",
+      "sequenzaGesti": [
+        "Tab",
+        "Enter",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Enter"
+      ]
+    },
+    {
+      "id": "4b",
+      "modo": "tastiera",
+      "gesti": 13,
+      "clic": 0,
+      "tasti": 32,
+      "comandi": 13,
+      "rispostaPeggioreMs": 10,
+      "percorso": [
+        "Scheda aperta",
+        "Terapie",
+        "Nuova terapia",
+        "Farmaco sintetico dal catalogo, dose 20 mg",
+        "Posologia: 1 compressa la sera",
+        "Salva terapia",
+        "Rilettura terapia"
+      ],
+      "tettoObiettivo": 6,
+      "stato": "misurato",
+      "sequenzaGesti": [
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Enter",
+        "Tab",
+        "Enter",
+        "ArrowDown",
+        "Enter",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Enter"
+      ]
+    },
+    {
+      "id": "4a-alternativa",
+      "modo": "tastiera",
+      "gesti": 11,
+      "clic": 0,
+      "tasti": 0,
+      "comandi": 11,
+      "rispostaPeggioreMs": 14,
+      "percorso": [
+        "Scheda aperta",
+        "Terapie",
+        "Modifica una terapia attiva",
+        "Aggiorna terapia senza cambiare i valori",
+        "Rilettura terapia (non è una conferma di revisione)"
+      ],
+      "tettoObiettivo": 4,
+      "stato": "misurato",
+      "limite": "Aggiornamento dei dati invariati, privo della semantica di revisione della terapia.",
+      "sequenzaGesti": [
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Enter",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Enter",
+        "Enter"
+      ]
+    },
+    {
+      "id": "5-alternativa",
+      "modo": "tastiera",
+      "gesti": 10,
+      "clic": 0,
+      "tasti": 0,
+      "comandi": 10,
+      "rispostaPeggioreMs": 12,
+      "percorso": [
+        "Scheda già scelta (nessuna coda documenti in arrivo)",
+        "Documenti, eventualmente sotto Altro",
+        "Carica documenti",
+        "Selezione TXT sintetico nel selettore nativo: non misurata",
+        "Allegato salvato e riletto nella scheda"
+      ],
+      "tettoObiettivo": 4,
+      "stato": "misurato",
+      "limite": "Solo eventi nella pagina: scelta del file nel dialogo nativo non misurata. Paziente già scelto.",
+      "sequenzaGesti": [
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Tab",
+        "Enter",
+        "Tab",
+        "Tab",
+        "Enter"
+      ]
+    }
+  ],
+  "ripetibilita": {
+    "esecuzioniConsecutive": 5,
+    "contiIdentici": true,
+    "durataMinimaMs": 25093,
+    "durataMassimaMs": 41983,
+    "CI": "job e2e shard 1, runtime sintetico posseduto, sviluppo webpack"
+  }
+}
