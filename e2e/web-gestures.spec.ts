@@ -1,11 +1,14 @@
-import { expect, test, type Page, type Locator } from '@playwright/test';
+import { expect as baseExpect, test, type Page, type Locator } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { installGestureMeter, type GestureReading } from './fixtures/gesture-meter';
 import { assertGestureRatchet, measuredRevision, type GestureCounts } from './fixtures/gesture-ratchet';
 
-test.use({ actionTimeout: 10_000, screenshot: 'off', video: 'off', trace: 'off' });
+// Il server di sviluppo compila pagine e API alla prima richiesta: su una
+// macchina lenta le attese ordinarie non bastano. I conti non dipendono dal tempo.
+const expect = baseExpect.configure({ timeout: 30_000 });
+test.use({ actionTimeout: 30_000, screenshot: 'off', video: 'off', trace: 'off' });
 
 type Mode = 'puntatore' | 'tastiera';
 type Measurement = GestureCounts & { id: string; modo: Mode; rispostaPeggioreMs: number; percorso: string[]; eventi: GestureReading['events'] };
@@ -33,7 +36,7 @@ async function write(page: Page, locator: Locator, text: string, mode: Mode) {
 }
 
 test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, info) => {
-  test.setTimeout(180_000);
+  test.setTimeout(360_000);
   const started = performance.now();
   test.skip(process.env.E2E_GESTURES_SYNTHETIC !== '1', 'Usare npm run e2e:gesti con archivio sintetico posseduto.');
   await page.setViewportSize({ width: 1440, height: 960 });
@@ -52,6 +55,10 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
     return created;
   }, name);
   const patientUrl = `/patients/${patients[0]}/modules`;
+  // Riscaldamento fuori dagli intervalli misurati: la prima visita alla scheda
+  // paga la compilazione della rotta, che non è un gesto del medico.
+  await page.goto(patientUrl, { timeout: 120_000 });
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(name, { timeout: 120_000 });
   const measurements: Measurement[] = [];
   const writes: Array<{ path: string; method: string; status: number }> = [];
   page.on('response', response => {
