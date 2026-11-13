@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { isInstalledOllamaModel } from '@/lib/installed-ollama-models';
 import { db } from '@/lib/db';
 import { AI_CONFIGURATION_KEYS, type AiConfigurationSnapshot } from '@/lib/ai-settings-configuration';
+import type { FunctionModelPreferences } from '@/lib/function-models/browser';
 import { useToast } from '@/components/ui/toast-provider';
 import {
     DEFAULT_TEXT_MODEL,
@@ -194,6 +195,40 @@ export function useAiSettingsController() {
         finally { saving.current = false; if (mounted.current) setIsSavingAi(false); }
     };
 
+    const syncFunctionPreferences = async (dto: FunctionModelPreferences) => {
+        const switches = [
+            ['patient_insight', AI_PATIENT_INSIGHT_KILL_SWITCH_KEY, setPatientInsightEnabled],
+            ['document_synthesis', AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY, setDocumentSynthesisEnabled],
+            ['smart_import', AI_SMART_IMPORT_KILL_SWITCH_KEY, setSmartImportEnabled],
+        ] as const;
+        const treatment = dto.functions.find(row => row.id === 'treatment_reasoning');
+        if (treatment) setTreatmentReasoningEnabled(treatment.enabled);
+        if (!expectedValues.current || saving.current) return;
+        saving.current = true;
+        setIsSavingAi(true);
+        try {
+            const observed = await Promise.all(switches.map(async ([id, key, setEnabled]) => {
+                const row = dto.functions.find(row => row.id === id);
+                const stored = await db.settings.get(key);
+                const value = stored?.value ?? null;
+                if (!row || isAiPatientInsightEnabledValue(value) !== row.enabled) throw new Error('Function settings changed');
+                return { key, value, enabled: row.enabled, setEnabled };
+            }));
+            if (!mounted.current) return;
+            // Only accept the switches represented by the confirmed preferences read.
+            // Keep the original advanced-parameter read-set so concurrent edits still conflict.
+            for (const { key, value, enabled, setEnabled } of observed) {
+                expectedValues.current[key] = value;
+                setEnabled(enabled);
+            }
+        } catch {
+            if (mounted.current) setAiSettingsConflict('conflict');
+        } finally {
+            saving.current = false;
+            if (mounted.current) setIsSavingAi(false);
+        }
+    };
+
     const applyHardwareProfile = (profile: Exclude<HardwareProfile, 'custom'>) => {
         setHardwareProfile(profile);
         if (profile === 'low') {
@@ -365,6 +400,7 @@ export function useAiSettingsController() {
         aiSettingsConflict,
         aiSettingsReadback,
         rereadAiConfig,
+        syncFunctionPreferences,
         aiTestStatus,
         aiHealth,
         patientInsightEnabled,

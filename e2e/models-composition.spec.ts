@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { buildFunctionStatus } from '../lib/function-status';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
+import { applyAiConfigurationMock } from './fixtures/ai-settings-configuration';
 
 const clinical = 'synthetic-clinical:latest', reasoning = 'synthetic-reasoning:latest';
 const baseline = process.env.MODELS_COMPOSITION_BASELINE === '1';
@@ -26,6 +27,13 @@ async function installClosedMocks(page: Page, baseURL: string) {
             if (method === 'POST' && path === '/api/settings/ai/chatgpt/login/cancel') { state.accountWaiting = false; return route.fulfill({ json: { status: accountStatus() } }); }
             if (path !== '/api/settings/ai/chatgpt/status' || method !== 'GET') { blocked.push(`${method} ${path}`); return route.abort(); }
             return route.fulfill({ json: accountStatus() });
+        }
+        if (path === '/api/settings/ai/configuration' && method === 'PUT') {
+            const body = request.postDataJSON(), values = Object.fromEntries(config);
+            record(body); writes.push(body);
+            const response = applyAiConfigurationMock(values, body, state.failSave);
+            if (response.status === 200) for (const [key, value] of Object.entries(values)) config.set(key, value);
+            return route.fulfill(response);
         }
         if (path === '/api/settings' || path.startsWith('/api/settings/')) {
             const body = method === 'GET' ? undefined : request.postDataJSON();
