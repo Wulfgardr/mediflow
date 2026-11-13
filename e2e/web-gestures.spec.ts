@@ -1,10 +1,9 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { installGestureMeter, type GestureReading } from './fixtures/gesture-meter';
-import { assertGestureRatchet, type GestureCounts } from './fixtures/gesture-ratchet';
+import { assertGestureRatchet, measuredRevision, type GestureCounts } from './fixtures/gesture-ratchet';
 
 test.use({ actionTimeout: 10_000, screenshot: 'off', video: 'off', trace: 'off' });
 
@@ -200,7 +199,7 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
       expect((await persisted.json()).identifierType).toBe('none');
     }
   } finally {
-    const report = { schemaVersion: 1, durationMs: Math.round(performance.now() - started), baseSHA: execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { encoding: 'utf8' }).trim(),
+    const report = { schemaVersion: 1, durationMs: Math.round(performance.now() - started), baseSHA: measuredRevision(),
       condizioni: { runtime: process.env.GESTURE_RUNTIME, bundler: process.env.GESTURE_BUNDLER, node: process.versions.node, viewport: '1440x960', sintetico: true }, measurements };
     const body = JSON.stringify(report, null, 2) + '\n';
     if (process.env.GESTURE_RESULT_PATH) writeFileSync(process.env.GESTURE_RESULT_PATH, body);
