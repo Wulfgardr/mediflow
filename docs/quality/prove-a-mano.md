@@ -68,7 +68,7 @@ il suo schema li deve rifiutare. Un errore del runtime è **non provato**, senza
 contarlo come identificativo fermato. Tre controlli privi di identificativi
 rivelano un eventuale rifiuto indiscriminato o una perdita del testo clinico.
 
-Il [risultato del 13 novembre 2026](./cb-redaction-20261113.json) è rosso:
+Il [risultato del primo giro, 13 novembre 2026](./cb-redaction-20261113.json) è rosso:
 
 | Famiglia | Attesi | Redattore: fermati | Sfuggiti | Scheda: fermati | Sfuggiti |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -105,6 +105,121 @@ Il criterio zero falsi negativi non è raggiunto. Il dato riguarda questo corpus
 e questi pesi: non qualifica consenso, governance del broker, invio, desktop,
 canali osservati, equivalenza clinica o dati reali. Non viene scritta alcuna
 ammissione all'uscita. Il processo che riceve una chat non viene avviato.
+
+## C-B: correzioni e riserva, secondo giro
+
+Il [secondo risultato del 13 novembre](./cb-redaction-20261113-giro2.json)
+conserva il confronto prima/dopo sullo stesso runner e sugli stessi pesi.
+La [riserva](../../scripts/fixtures/cb-redaction-reserve.json) è stata scritta,
+annotata e misurata sulla base prima delle correzioni: 25 casi, 23 identificativi,
+almeno tre varianti per ognuna delle sette classi. Il digest congelato è
+`f6bf3b96f4996527acd8e4677665e1d9adf871628514bbe08329040d539c05c6`.
+
+| Serie | Identificativi | Sfuggiti prima | Sfuggiti dopo | Nella scheda prima | Dopo |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Originale | 43 | 8 | 0 | 2 | 0 |
+| Riserva | 23 | 14 | 0 | 0 | 0 |
+
+I conteggi per famiglia sono nel JSON. Le misure finali durano 58,614 s e
+32,446 s. Per la riserva aggiungere al comando già documentato
+`--corpus scripts/fixtures/cb-redaction-reserve.json`. Il negativo usa la stessa
+opzione: restano 19 sfuggiti nell'originale e uno nella riserva.
+
+Le regole in `lib/redaction-identifier-spans.ts` sono comuni alla redazione e al
+rifiuto della scheda: grammatica del CF attraverso separatori e ritorni a capo,
+email e telefoni dettati, formati di file Office/OpenDocument, contesti
+geografici nelle frasi e nelle coppie chiave/valore importate. Le chiavi cliniche
+non vengono cancellate indiscriminatamente. Il contesto funziona anche nei
+lotti concatenati della preparazione. Non ci sono dizionari di persone o luoghi,
+né valori delle fixture nel codice di produzione. I luoghi privi di indizio
+geografico dipendono ancora dal modello: il caso di riserva è rilevato dal runner
+reale e sfugge al negativo vuoto.
+
+Gli undici test nuovi hanno 9 fallimenti e 2 pass sulla base, tutti verdi dopo
+la modifica. I 148 test pertinenti, incluse le prove preesistenti, passano senza
+cambiarne le attese.
+
+**Il flag aggregato del comando resta `passed: false`, con uscita 1.** Richiede
+che tutti i controlli clinici siano conservati integralmente, condizione già
+falsa prima della modifica. Non è stato allentato. Il requisito di questo giro
+è misurato separatamente: zero identificativi sfuggiti e nessuna perdita
+clinica aggiuntiva. Con le stesse entità neurali, confrontate nelle sessioni
+prima e dopo, nessun carattere prima visibile è stato rimosso. Nell'originale
+restano 0/3 controlli integri e 0/8 parole visibili; nella riserva 1/3 controlli
+integri e 13/16 parole visibili, prima e dopo. Le parole sono contate per
+occorrenza con lettere e cifre, senza contare punteggiatura e numeri isolati.
+La conservazione integrale dei controlli rimane un limite della redazione.
+
+Questa misura qualifica le due serie sintetiche fissate. Consenso, ammissione
+del broker, canali e uso dei desktop restano fuori dalla prova.
+
+## C-B: falsi positivi locali, terzo giro
+
+La [misura dei falsi positivi](./cb-clinical-fp-20261113-summary.json) confronta
+le sole regole locali della base `56f9dd5cd` con la correzione, senza modello
+e senza identificativi noti forniti dal chiamante. Prima di misurare sono stati
+congelati 332 testi unici da 18 fonti sintetiche della repository (427 frasi,
+2.454 parole) e 36 frasi difficili (257 parole). I corpus C-B precedenti sono
+esclusi dalla raccolta indipendente. Le fonti, le trasformazioni e gli hash
+sono nella [raccolta](../../scripts/fixtures/cb-clinical-independent.json).
+
+| Corpus | Span nuovi prima | Falsi positivi prima | Parole cliniche cancellate prima | Span nuovi dopo | Falsi positivi dopo | Parole cliniche cancellate dopo |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Testi interni | 8 | 8 | 20 | 0 | 0 | 0 |
+| Frasi difficili | 22 | 21 | 98 | 4 | 0 | 0 |
+
+I quattro span restanti sono città annotate come identificativi. Gli elenchi
+completi [prima](./cb-clinical-fp-20261113-before.json) e
+[dopo](./cb-clinical-fp-20261113-after.json) conservano, per ogni testo, span
+base/correzione, intervalli aggiunti e frase attorno. La
+[classificazione](./cb-clinical-fp-20261113-classification.json) spiega ogni
+intervallo nuovo; gli span misti con città e terapia sono falsi positivi.
+
+```bash
+nice -n 19 node scripts/run-strip-types.mjs scripts/measure-cb-clinical-fp.ts --out /percorso/nuovo-confronto.json
+```
+
+Il confronto storico del giro 3 eseguiva la funzione della base da Git.
+Il banco attuale usa invece i suoi span già congelati nel JSON `before`, con
+SHA-256 fissato, e importa staticamente soltanto il redattore attuale.
+Non scrive né importa codice storico e non richiede la storia Git per la misura.
+Il budget conservato nel repository è **zero nuove
+parole cliniche cancellate** su entrambi i corpus, con hash obbligatori.
+Trentacinque regressioni falliscono sulla testa `5067bc0f1` e passano dopo,
+incluse le due osservazioni della review. Il controllo del budget resta nella
+suite unit. Con i test pertinenti si contano 183 pass, senza skip.
+
+La grammatica CF richiede mese/giorno compatibili, delimitatori limitati e
+almeno due cifre effettive, oppure un checksum valido per l'omocodia. I CF
+candidati OCR con cifre continuano ad essere trattati anche con checksum errato.
+Le clausole geografiche si fermano prima di una proposizione clinica coordinata;
+i trasferimenti fra reparti e le condizioni di vita non sono luoghi. Le
+sequenze di numeri dettati richiedono un contesto di recapito. Una chiave
+geografica importata non basta a cancellare tutta la sua cella, che può
+contenere istruzioni cliniche.
+
+La [nuova prova col modello](./cb-redaction-20261113-giro3.json) conferma zero
+sfuggiti su 43 identificativi originali e 23 di riserva, anche nella preparazione
+clinica. Il negativo resta rosso (20 e 1 sfuggiti). Il limite del flag aggregato
+`passed: false` del banco storico rimane quello già documentato: i falsi positivi
+neurali preesistenti non sono corretti da questo giro. La misura locale prova
+l'assenza di **perdita aggiuntiva** nei corpus fissati, senza estenderla a tutto
+il testo clinico possibile.
+
+## C-B: banco con base congelata, quarto giro
+
+La [misura rieseguita](./cb-clinical-fp-20261113-giro4.json) conserva zero nuove
+parole cliniche cancellate; tutti i risultati per testo coincidono con il giro 3.
+La base è il campo `baselineSpans` del report `before`, rilevato sul codice
+`56f9dd5cd`. Il banco verifica lo SHA-256 del report, gli hash dei corpus, gli ID,
+i testi e i limiti degli span. Gli span della correzione precedente presenti
+nello stesso report non vengono usati come base.
+
+È rimosso il caricamento dinamico che faceva fallire i tre inventari Web.
+Gli inventari e le loro eccezioni restano invariati. Il test di budget esistente
+continua a eseguire il redattore corrente contro la base congelata, senza
+concedere autorità runtime al codice storico. Nessun codice di produzione
+modificato rispetto a `0ca731dbf`; la prova dei pesi del giro 3 rimane invariata.
 
 ## Ascolto della visita (WUL-828)
 

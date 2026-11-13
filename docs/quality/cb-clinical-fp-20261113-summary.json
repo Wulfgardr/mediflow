@@ -1,0 +1,266 @@
+{
+  "schema": "mediflow.cb-clinical-fp-summary.v1",
+  "freeze": {
+    "frozenAt": "2026-11-13T00:05:57.251Z",
+    "head": "5067bc0f12bda8769f3690b4460645952dd18a22",
+    "files": {
+      "scripts/fixtures/cb-clinical-independent.json": {
+        "sha256": "3f5e48faf1106960bba0e5911ee2f93022c4e23fd5a0389b3c0d09bc0ab71175",
+        "counts": {
+          "texts": 332,
+          "sourceOccurrences": 374,
+          "sentences": 427,
+          "words": 2454
+        }
+      },
+      "scripts/fixtures/cb-clinical-challenge.json": {
+        "sha256": "b3869d36fb3a8d0f4d22ecb42a4fcf42359192b8b833aa8b624ee8532dbce831",
+        "counts": {
+          "texts": 36,
+          "sentences": 36,
+          "words": 257
+        }
+      }
+    },
+    "sourceCount": 18,
+    "measurementRun": false
+  },
+  "sourceStatistics": [
+    {
+      "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+      "sha256": "4e64c6d2104676e9e7a9d3f4ebd61889db34a0354860de3261487e4172ce2d60",
+      "uniqueTexts": 36,
+      "sentences": 49,
+      "words": 355,
+      "extraction": "Clinical text fields only; excludes expected/gold. Patient insight only [Sx] source lines. HTML tags stripped, whitespace folded."
+    },
+    {
+      "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+      "sha256": "7c487337b14f2b49cca83448527e1f1f69e6ba6a61867d8764a5300af50f7116",
+      "uniqueTexts": 60,
+      "sentences": 60,
+      "words": 397,
+      "extraction": "Clinical text fields only; excludes expected/gold. Patient insight only [Sx] source lines. HTML tags stripped, whitespace folded."
+    },
+    {
+      "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+      "sha256": "42b014d7d1331d7e03557405acdb940bf3b2c51df4b4a0d95981076c7e385ca3",
+      "uniqueTexts": 11,
+      "sentences": 14,
+      "words": 81,
+      "extraction": "Clinical text fields only; excludes expected/gold. Patient insight only [Sx] source lines. HTML tags stripped, whitespace folded."
+    },
+    {
+      "path": "scripts/fixtures/clinical-facts-observation-corpus.json",
+      "sha256": "adb5670afb0ff0fdaf9ac55bfa6e69be6cb759f09c537897034bfe14776ee237",
+      "uniqueTexts": 6,
+      "sentences": 7,
+      "words": 39,
+      "extraction": "Clinical text fields only; excludes expected/gold. Patient insight only [Sx] source lines. HTML tags stripped, whitespace folded."
+    },
+    {
+      "path": "scripts/fixtures/clinical-entities-benchmark-corpus.json",
+      "sha256": "94350abd0c333ad334ecff28575f13e605a46e72a0d22a530f8593beacd6c2ed",
+      "uniqueTexts": 10,
+      "sentences": 19,
+      "words": 125,
+      "extraction": "Clinical text fields only; excludes expected/gold. Patient insight only [Sx] source lines. HTML tags stripped, whitespace folded."
+    },
+    {
+      "path": "docs/verification/smart-import-wul-832/corpus.json",
+      "sha256": "469f876ca016c377b4ca89cf0cc0a543b405a0c7a845a6286f18eef03b985ca9",
+      "uniqueTexts": 47,
+      "sentences": 78,
+      "words": 432,
+      "extraction": "Clinical text fields only; excludes expected/gold. Patient insight only [Sx] source lines. HTML tags stripped, whitespace folded."
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+      "sha256": "060ae0bfb858847e3e0dcf29d1b0ea9c2b960eb8872d3137d6b382e88dce8383",
+      "uniqueTexts": 13,
+      "sentences": 19,
+      "words": 112,
+      "extraction": "Clinical text fields only; excludes expected/gold. Patient insight only [Sx] source lines. HTML tags stripped, whitespace folded."
+    },
+    {
+      "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+      "sha256": "b832fb2ed3028a27b7cc65277cf4d1e37aae877c22108eddb875d5d7f1bf2987",
+      "uniqueTexts": 36,
+      "sentences": 38,
+      "words": 124,
+      "extraction": "Clinical text fields only; excludes expected/gold. Patient insight only [Sx] source lines. HTML tags stripped, whitespace folded."
+    },
+    {
+      "path": "lib/seeder.ts",
+      "sha256": "8603dfc32eadf00a0aee5b59bcdc7d722189eb3c969c880a685f31366064089f",
+      "uniqueTexts": 71,
+      "sentences": 76,
+      "words": 181,
+      "extraction": "Static TS/JS literals, never executes seed/test modules. Clinical lexical filter fixed before measurement; CONDITIONS vocabulary included."
+    },
+    {
+      "path": "scripts/seed-performance-baseline.mjs",
+      "sha256": "668693ab7f6f2e913080b2fb3381e0fadaba887ae692b5a23cd073614aab0be5",
+      "uniqueTexts": 2,
+      "sentences": 2,
+      "words": 17,
+      "extraction": "Static TS/JS literals, never executes seed/test modules. Clinical lexical filter fixed before measurement; CONDITIONS vocabulary included."
+    },
+    {
+      "path": "e2e/smart-import.spec.ts",
+      "sha256": "759b7e7bb44541544ce14a9f4aacff725341596ba774ffd70e3d7d015ed0771d",
+      "uniqueTexts": 3,
+      "sentences": 4,
+      "words": 17,
+      "extraction": "Static TS/JS literals, never executes seed/test modules. Clinical lexical filter fixed before measurement; CONDITIONS vocabulary included."
+    },
+    {
+      "path": "e2e/dossier-import.spec.ts",
+      "sha256": "29d8b33b52fdd497982180e9bd0fcedc39b6a0816f9c82d723ec442ddaa3d5ee",
+      "uniqueTexts": 23,
+      "sentences": 24,
+      "words": 130,
+      "extraction": "Static TS/JS literals, never executes seed/test modules. Clinical lexical filter fixed before measurement; CONDITIONS vocabulary included."
+    },
+    {
+      "path": "e2e/document-import.spec.ts",
+      "sha256": "e799fc7575748e11b7becf8d3fec7b08e09fc00750dd80ab5fc524667d92af30",
+      "uniqueTexts": 0,
+      "sentences": 0,
+      "words": 0,
+      "extraction": "Static TS/JS literals, never executes seed/test modules. Clinical lexical filter fixed before measurement; CONDITIONS vocabulary included."
+    },
+    {
+      "path": "e2e/document-synthesis-fabric-review.spec.ts",
+      "sha256": "0874c0b1c8b63c793f9f27cc98e7a06dae0da51baff5fe8fd164a911155ef0bf",
+      "uniqueTexts": 2,
+      "sentences": 2,
+      "words": 14,
+      "extraction": "Static TS/JS literals, never executes seed/test modules. Clinical lexical filter fixed before measurement; CONDITIONS vocabulary included."
+    },
+    {
+      "path": "lib/smart-import-production-root.test.ts",
+      "sha256": "d3f388d27d5244f24a4781022e518470e365f5a993ebb49946191622a4cf0129",
+      "uniqueTexts": 0,
+      "sentences": 0,
+      "words": 0,
+      "extraction": "Static TS/JS literals, never executes seed/test modules. Clinical lexical filter fixed before measurement; CONDITIONS vocabulary included."
+    },
+    {
+      "path": "lib/ai-providers/fabric/document-synthesis-contract-regression.test.ts",
+      "sha256": "bab7a7bba2e103fdbd28e281f43483a4da02fa04a6b50c47b05a60d44125cdb4",
+      "uniqueTexts": 0,
+      "sentences": 0,
+      "words": 0,
+      "extraction": "Static TS/JS literals, never executes seed/test modules. Clinical lexical filter fixed before measurement; CONDITIONS vocabulary included."
+    },
+    {
+      "path": "lib/ai-providers/fabric/document-synthesis-multi-source-prompt.test.ts",
+      "sha256": "3c9a33683074cff4e79d83a283077d64d89a8a716e21ffa869a4d84dc9fec049",
+      "uniqueTexts": 9,
+      "sentences": 28,
+      "words": 376,
+      "extraction": "Static TS/JS literals, never executes seed/test modules. Clinical lexical filter fixed before measurement; CONDITIONS vocabulary included."
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/demo.rs",
+      "sha256": "e6fd5367e4ac26e4c0f0db8918f0e909d24108e4abf38e33c8bcd2769b8c5724",
+      "uniqueTexts": 5,
+      "sentences": 9,
+      "words": 71,
+      "extraction": "Static Some(string) note literals; no cargo or application execution."
+    }
+  ],
+  "metric": "Unique source texts; words begin with Unicode letters and continue with letters/marks/digits. Any newly covered character removes the word once. Annotated identifying cities are excluded from clinical words. Source subtotals overlap when texts occur in multiple sources.",
+  "localMeasurement": {
+    "before": {
+      "generatedAt": "2026-11-13T00:07:08.489Z",
+      "elapsedMs": 61,
+      "sets": [
+        {
+          "name": "cb-clinical-independent",
+          "corpusSha256": "3f5e48faf1106960bba0e5911ee2f93022c4e23fd5a0389b3c0d09bc0ab71175",
+          "counts": {
+            "texts": 332,
+            "sourceOccurrences": 374,
+            "sentences": 427,
+            "words": 2454
+          },
+          "newSpans": 8,
+          "falsePositiveSpans": 8,
+          "newlyRemovedClinicalWords": 20
+        },
+        {
+          "name": "cb-clinical-challenge",
+          "corpusSha256": "b3869d36fb3a8d0f4d22ecb42a4fcf42359192b8b833aa8b624ee8532dbce831",
+          "counts": {
+            "texts": 36,
+            "sentences": 36,
+            "words": 257
+          },
+          "newSpans": 22,
+          "falsePositiveSpans": 21,
+          "newlyRemovedClinicalWords": 98
+        }
+      ]
+    },
+    "after": {
+      "generatedAt": "2026-11-13T00:13:30.893Z",
+      "elapsedMs": 61,
+      "sets": [
+        {
+          "name": "cb-clinical-independent",
+          "corpusSha256": "3f5e48faf1106960bba0e5911ee2f93022c4e23fd5a0389b3c0d09bc0ab71175",
+          "counts": {
+            "texts": 332,
+            "sourceOccurrences": 374,
+            "sentences": 427,
+            "words": 2454
+          },
+          "newSpans": 0,
+          "falsePositiveSpans": 0,
+          "newlyRemovedClinicalWords": 0
+        },
+        {
+          "name": "cb-clinical-challenge",
+          "corpusSha256": "b3869d36fb3a8d0f4d22ecb42a4fcf42359192b8b833aa8b624ee8532dbce831",
+          "counts": {
+            "texts": 36,
+            "sentences": 36,
+            "words": 257
+          },
+          "newSpans": 4,
+          "falsePositiveSpans": 0,
+          "newlyRemovedClinicalWords": 0
+        }
+      ]
+    }
+  },
+  "regressions": {
+    "head": "5067bc0f12bda8769f3690b4460645952dd18a22",
+    "headAssertionFailures": 35,
+    "modifiedPasses": 35,
+    "allRelevantTests": 183,
+    "skipped": 0,
+    "testSourceSha256": "4d5d3b9518ed816c572f4419523dde5d4d9af47d1a22407a63d311d4480b6838"
+  },
+  "budget": {
+    "schema": "mediflow.cb-clinical-fp-budget.v1",
+    "definition": "Maximum newly removed clinical word occurrences relative to 56f9dd5cd, excluding annotated identifiers. Fixed before production corrections in round 3.",
+    "corpora": {
+      "cb-clinical-independent": {
+        "sha256": "3f5e48faf1106960bba0e5911ee2f93022c4e23fd5a0389b3c0d09bc0ab71175",
+        "maximumNewClinicalWords": 0
+      },
+      "cb-clinical-challenge": {
+        "sha256": "b3869d36fb3a8d0f4d22ecb42a4fcf42359192b8b833aa8b624ee8532dbce831",
+        "maximumNewClinicalWords": 0
+      }
+    }
+  },
+  "remainingNewFalsePositiveSpans": 0,
+  "remainingNewClinicalWordsRemoved": 0,
+  "realMeasurement": "cb-redaction-20261113-giro3.json",
+  "limits": "This is a delta against the historical local rules, on frozen synthetic texts. It does not measure all baseline or neural false positives, nor transmission, desktop or clinical admission.",
+  "measurementToolSha256": "a333584c47fa852b622e01ffe2755623bb691e9b4ef0d8794fbde856c8d99785"
+}

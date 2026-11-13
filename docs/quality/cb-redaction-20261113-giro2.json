@@ -1,0 +1,1353 @@
+{
+  "schema": "mediflow.cb-correction-measurement.v1",
+  "base": "56f9dd5cdd4cec86d98347736f8d2e6d7170cf4b",
+  "reserveFreeze": {
+    "frozenAt": "2026-11-12T23:37:43.318754+00:00",
+    "sha256": "f6bf3b96f4996527acd8e4677665e1d9adf871628514bbe08329040d539c05c6",
+    "base": "56f9dd5cdd4cec86d98347736f8d2e6d7170cf4b",
+    "cases": 25,
+    "identifiers": 23,
+    "classes": {
+      "cf_separato": 3,
+      "cf_multilinea": 3,
+      "luogo_narrativo": 4,
+      "luogo_chiave_ignota": 3,
+      "identificatore_composto": 3,
+      "email_dettata": 3,
+      "telefono_dettato": 3,
+      "controllo_clinico": 3
+    },
+    "productionChanged": false,
+    "inferenceRun": false
+  },
+  "series": {
+    "original": {
+      "before": {
+        "generatedAt": "2026-11-12T23:30:24.734Z",
+        "mode": "real",
+        "elapsedMs": 75279,
+        "corpusSha256": "93d8a71e4f91e0471e55e3452331462f76ac5d2cbd2245d00da6d1135f460b37",
+        "gitHead": "e88e51020d3e4501208b63b1571bdf2c35048245",
+        "sources": {
+          "scripts/measure-cb-redaction.ts": "3cc350a928358830d60671f4910796ba7f09c95ad05f880a59e9663711b67c25",
+          "lib/gliner-redaction-runner.ts": "918a1b79a7042e7ae1acd418440144d5cd4e75adaf6bdc640761c484430935e0",
+          "scripts/gliner-redaction-worker.py": "6676afbddd6b30d3516183f87290613969dfcd89b027ca61985a03f49f8fb71d",
+          "lib/redaction-runtime-identity.ts": "118b018880196920cf9527ffaaa6bd9f576efd1b08677122ffa5496f0a5b1d06",
+          "lib/ai-redaction-session.ts": "90bc845738fd7b8996747813f73df65fa80ff813e40008495aed4ad56c07202c",
+          "lib/ai-egress-gate.ts": "56821da2f04a4699836b942547bf3dc49f45b76f769c0e1073daf17eb95e0df1",
+          "lib/chat-card/clinical-preparation.ts": "40634d28f91b682a1e132bd37785240fd5001635170c20b5387e15139f281e21",
+          "lib/chat-card/clinical-identifiers.ts": "d3605dc538bb5a285d594bf03000305074c93ccfa5672bde6f8ed76accc31ef1",
+          "lib/chat-card/clinical-profile.ts": "686f3d5deeba7e2283bf9f9f6e7f6cb6bed5d7b667dd11347f0b565edcf519bd"
+        },
+        "runtimeIdentity": {
+          "schema": "mediflow.redaction-runtime-binding.v1",
+          "adapter": "mediflow.layer1-gliner.runtime.v1",
+          "model": "gliner2-pii",
+          "revision": "c153999da5f4c509df4322b0c6a1baf3d2c284d7",
+          "workerSha256": "6676afbddd6b30d3516183f87290613969dfcd89b027ca61985a03f49f8fb71d",
+          "pythonSha256": "2fb4683f9ab944ee39c46ff4184c985cd00b3431610440cf60b9fb8e2d1c8528",
+          "files": {
+            "model.safetensors": "0280f6f39f6012da50b6640bad438d9b7e763a1b0102094115d1b710c4dd79b6",
+            "config.json": "164f17362bcf9d114067d3465e7374bfdd79ce6b605acb745de5a49dabb9595c",
+            "encoder_config/config.json": "f27dd63cc43a248d2566f0b6ad7a115db353676ce0561dcbca45bac766464c1a",
+            "tokenizer.json": "f6df10ec83bea993035b2dd7c39345a3d4fcf23421c2adb6cb4ffc1e6d1bc4b5",
+            "tokenizer_config.json": "8c916ee43ae43bf5945499f0405cac73da2b31f3ba04cf8c74a41cbd152b6330"
+          },
+          "packages": {
+            "gliner2": "2.0.0",
+            "torch": "2.14.0",
+            "transformers": "4.57.6",
+            "huggingface-hub": "0.36.2"
+          }
+        },
+        "families": {
+          "cf_ocr": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 4,
+              "escaped": 2
+            },
+            "clinical": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "terze_persone": {
+            "redactor": {
+              "expected": 7,
+              "stopped": 7,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 7,
+              "stopped": 7,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "luoghi": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 3,
+              "escaped": 2
+            },
+            "clinical": {
+              "expected": 5,
+              "stopped": 3,
+              "escaped": 2
+            },
+            "unproven": 0
+          },
+          "nascita": {
+            "redactor": {
+              "expected": 8,
+              "stopped": 8,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 8,
+              "stopped": 8,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "nomi_file": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "campi_ignoti": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 3,
+              "escaped": 2
+            },
+            "clinical": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "identita_nota": {
+            "redactor": {
+              "expected": 3,
+              "stopped": 3,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 3,
+              "stopped": 3,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "contatti": {
+            "redactor": {
+              "expected": 4,
+              "stopped": 2,
+              "escaped": 2
+            },
+            "clinical": {
+              "expected": 4,
+              "stopped": 4,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "controlli_clinici": {
+            "redactor": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          }
+        },
+        "misses": [
+          {
+            "caseId": "cf-04",
+            "family": "cf_ocr",
+            "type": "tax_id",
+            "text": "N V N Z L M 7 4 D 5 2 Z 9 9 9 X",
+            "start": 3,
+            "end": 34,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 3,
+                "end": 34,
+                "text": "N V N Z L M 7 4 D 5 2 Z 9 9 9 X"
+              }
+            ]
+          },
+          {
+            "caseId": "cf-06",
+            "family": "cf_ocr",
+            "type": "tax_id",
+            "text": "NVNZLM74D52\nZ999X",
+            "start": 21,
+            "end": 38,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 21,
+                "end": 38,
+                "text": "NVNZLM74D52\nZ999X"
+              }
+            ]
+          },
+          {
+            "caseId": "luogo-04",
+            "family": "luoghi",
+            "type": "address",
+            "text": "Valleverde Inventato",
+            "start": 14,
+            "end": 34,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 14,
+                "end": 34,
+                "text": "Valleverde Inventato"
+              }
+            ]
+          },
+          {
+            "caseId": "luogo-04",
+            "family": "luoghi",
+            "type": "address",
+            "text": "Rocca Sintetica",
+            "start": 37,
+            "end": 52,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 37,
+                "end": 52,
+                "text": "Rocca Sintetica"
+              }
+            ]
+          },
+          {
+            "caseId": "ignoto-02",
+            "family": "campi_ignoti",
+            "type": "address",
+            "text": "Rocca Sintetica",
+            "start": 2,
+            "end": 17,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 2,
+                "end": 17,
+                "text": "Rocca Sintetica"
+              }
+            ]
+          },
+          {
+            "caseId": "ignoto-04",
+            "family": "campi_ignoti",
+            "type": "identifier",
+            "text": "Ada_Serralumi",
+            "start": 33,
+            "end": 46,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 33,
+                "end": 46,
+                "text": "Ada_Serralumi"
+              }
+            ]
+          },
+          {
+            "caseId": "contatto-02",
+            "family": "contatti",
+            "type": "email",
+            "text": "lidia punto zanfelli chiocciola example punto invalid",
+            "start": 10,
+            "end": 63,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 10,
+                "end": 63,
+                "text": "lidia punto zanfelli chiocciola example punto invalid"
+              }
+            ]
+          },
+          {
+            "caseId": "contatto-03",
+            "family": "contatti",
+            "type": "phone",
+            "text": "tre tre tre zero zero zero zero zero quattro sette",
+            "start": 9,
+            "end": 59,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 12,
+                "end": 13,
+                "text": " "
+              },
+              {
+                "start": 16,
+                "end": 17,
+                "text": " "
+              },
+              {
+                "start": 20,
+                "end": 59,
+                "text": " zero zero zero zero zero quattro sette"
+              }
+            ]
+          }
+        ],
+        "clinicalEscapes": [
+          "luogo-04"
+        ],
+        "unproven": [],
+        "controlsPassed": false
+      },
+      "after": {
+        "generatedAt": "2026-11-12T23:50:51.632Z",
+        "mode": "real",
+        "elapsedMs": 58614,
+        "corpusSha256": "93d8a71e4f91e0471e55e3452331462f76ac5d2cbd2245d00da6d1135f460b37",
+        "gitHead": "56f9dd5cdd4cec86d98347736f8d2e6d7170cf4b",
+        "sources": {
+          "scripts/measure-cb-redaction.ts": "34553882564d85b737dab09f406f3abae0767d9ebabb073faa6f1ffc7e16edd7",
+          "lib/gliner-redaction-runner.ts": "918a1b79a7042e7ae1acd418440144d5cd4e75adaf6bdc640761c484430935e0",
+          "scripts/gliner-redaction-worker.py": "6676afbddd6b30d3516183f87290613969dfcd89b027ca61985a03f49f8fb71d",
+          "lib/redaction-runtime-identity.ts": "118b018880196920cf9527ffaaa6bd9f576efd1b08677122ffa5496f0a5b1d06",
+          "lib/ai-redaction-session.ts": "464209f47b37508f2053b4d11621164a1946f1cf66f476c9f0e29995c4d1905d",
+          "lib/ai-egress-gate.ts": "56821da2f04a4699836b942547bf3dc49f45b76f769c0e1073daf17eb95e0df1",
+          "lib/chat-card/clinical-preparation.ts": "40634d28f91b682a1e132bd37785240fd5001635170c20b5387e15139f281e21",
+          "lib/chat-card/clinical-identifiers.ts": "0ae29b1397175ccc8c9d3caa93aa02981cccd2df51a49d9f1daa2370afadaef1",
+          "lib/chat-card/clinical-profile.ts": "686f3d5deeba7e2283bf9f9f6e7f6cb6bed5d7b667dd11347f0b565edcf519bd",
+          "lib/redaction-identifier-spans.ts": "202cf1c37f43d4c0647012dee9152fe5992ace787abb6dbcf230cc67c1b5e9b5"
+        },
+        "runtimeIdentity": {
+          "schema": "mediflow.redaction-runtime-binding.v1",
+          "adapter": "mediflow.layer1-gliner.runtime.v1",
+          "model": "gliner2-pii",
+          "revision": "c153999da5f4c509df4322b0c6a1baf3d2c284d7",
+          "workerSha256": "6676afbddd6b30d3516183f87290613969dfcd89b027ca61985a03f49f8fb71d",
+          "pythonSha256": "2fb4683f9ab944ee39c46ff4184c985cd00b3431610440cf60b9fb8e2d1c8528",
+          "files": {
+            "model.safetensors": "0280f6f39f6012da50b6640bad438d9b7e763a1b0102094115d1b710c4dd79b6",
+            "config.json": "164f17362bcf9d114067d3465e7374bfdd79ce6b605acb745de5a49dabb9595c",
+            "encoder_config/config.json": "f27dd63cc43a248d2566f0b6ad7a115db353676ce0561dcbca45bac766464c1a",
+            "tokenizer.json": "f6df10ec83bea993035b2dd7c39345a3d4fcf23421c2adb6cb4ffc1e6d1bc4b5",
+            "tokenizer_config.json": "8c916ee43ae43bf5945499f0405cac73da2b31f3ba04cf8c74a41cbd152b6330"
+          },
+          "packages": {
+            "gliner2": "2.0.0",
+            "torch": "2.14.0",
+            "transformers": "4.57.6",
+            "huggingface-hub": "0.36.2"
+          }
+        },
+        "families": {
+          "cf_ocr": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "terze_persone": {
+            "redactor": {
+              "expected": 7,
+              "stopped": 7,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 7,
+              "stopped": 7,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "luoghi": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "nascita": {
+            "redactor": {
+              "expected": 8,
+              "stopped": 8,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 8,
+              "stopped": 8,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "nomi_file": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "campi_ignoti": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "identita_nota": {
+            "redactor": {
+              "expected": 3,
+              "stopped": 3,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 3,
+              "stopped": 3,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "contatti": {
+            "redactor": {
+              "expected": 4,
+              "stopped": 4,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 4,
+              "stopped": 4,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "controlli_clinici": {
+            "redactor": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          }
+        },
+        "misses": [],
+        "clinicalEscapes": [],
+        "unproven": [],
+        "controlsPassed": false
+      },
+      "zeroIdentifiersEscaped": true,
+      "legacyOverallPassed": false,
+      "commandExitCode": 1,
+      "negative": {
+        "mode": "negative_empty_runner",
+        "expected": 43,
+        "escaped": 19,
+        "commandExitCode": 1,
+        "families": {
+          "cf_ocr": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 5,
+              "escaped": 1
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "terze_persone": {
+            "redactor": {
+              "expected": 7,
+              "stopped": 0,
+              "escaped": 7
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "luoghi": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 4,
+              "escaped": 1
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "nascita": {
+            "redactor": {
+              "expected": 8,
+              "stopped": 2,
+              "escaped": 6
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "nomi_file": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 4,
+              "escaped": 1
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "campi_ignoti": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 3,
+              "escaped": 2
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "identita_nota": {
+            "redactor": {
+              "expected": 3,
+              "stopped": 2,
+              "escaped": 1
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "contatti": {
+            "redactor": {
+              "expected": 4,
+              "stopped": 4,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "controlli_clinici": {
+            "redactor": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          }
+        }
+      }
+    },
+    "reserve": {
+      "before": {
+        "generatedAt": "2026-11-12T23:39:06.404Z",
+        "mode": "real",
+        "elapsedMs": 48679,
+        "corpusSha256": "f6bf3b96f4996527acd8e4677665e1d9adf871628514bbe08329040d539c05c6",
+        "gitHead": "56f9dd5cdd4cec86d98347736f8d2e6d7170cf4b",
+        "sources": {
+          "scripts/measure-cb-redaction.ts": "3dfd07fa998a9a6a6337abab274b65b490a92139e5b90097a3bb2fa1d1daa761",
+          "lib/gliner-redaction-runner.ts": "918a1b79a7042e7ae1acd418440144d5cd4e75adaf6bdc640761c484430935e0",
+          "scripts/gliner-redaction-worker.py": "6676afbddd6b30d3516183f87290613969dfcd89b027ca61985a03f49f8fb71d",
+          "lib/redaction-runtime-identity.ts": "118b018880196920cf9527ffaaa6bd9f576efd1b08677122ffa5496f0a5b1d06",
+          "lib/ai-redaction-session.ts": "90bc845738fd7b8996747813f73df65fa80ff813e40008495aed4ad56c07202c",
+          "lib/ai-egress-gate.ts": "56821da2f04a4699836b942547bf3dc49f45b76f769c0e1073daf17eb95e0df1",
+          "lib/chat-card/clinical-preparation.ts": "40634d28f91b682a1e132bd37785240fd5001635170c20b5387e15139f281e21",
+          "lib/chat-card/clinical-identifiers.ts": "d3605dc538bb5a285d594bf03000305074c93ccfa5672bde6f8ed76accc31ef1",
+          "lib/chat-card/clinical-profile.ts": "686f3d5deeba7e2283bf9f9f6e7f6cb6bed5d7b667dd11347f0b565edcf519bd"
+        },
+        "runtimeIdentity": {
+          "schema": "mediflow.redaction-runtime-binding.v1",
+          "adapter": "mediflow.layer1-gliner.runtime.v1",
+          "model": "gliner2-pii",
+          "revision": "c153999da5f4c509df4322b0c6a1baf3d2c284d7",
+          "workerSha256": "6676afbddd6b30d3516183f87290613969dfcd89b027ca61985a03f49f8fb71d",
+          "pythonSha256": "2fb4683f9ab944ee39c46ff4184c985cd00b3431610440cf60b9fb8e2d1c8528",
+          "files": {
+            "model.safetensors": "0280f6f39f6012da50b6640bad438d9b7e763a1b0102094115d1b710c4dd79b6",
+            "config.json": "164f17362bcf9d114067d3465e7374bfdd79ce6b605acb745de5a49dabb9595c",
+            "encoder_config/config.json": "f27dd63cc43a248d2566f0b6ad7a115db353676ce0561dcbca45bac766464c1a",
+            "tokenizer.json": "f6df10ec83bea993035b2dd7c39345a3d4fcf23421c2adb6cb4ffc1e6d1bc4b5",
+            "tokenizer_config.json": "8c916ee43ae43bf5945499f0405cac73da2b31f3ba04cf8c74a41cbd152b6330"
+          },
+          "packages": {
+            "gliner2": "2.0.0",
+            "torch": "2.14.0",
+            "transformers": "4.57.6",
+            "huggingface-hub": "0.36.2"
+          }
+        },
+        "families": {
+          "cf_ocr": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 3,
+              "escaped": 3
+            },
+            "clinical": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "luoghi": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "campi_ignoti": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 1,
+              "escaped": 5
+            },
+            "clinical": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "contatti": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 0,
+              "escaped": 6
+            },
+            "clinical": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "controlli_clinici": {
+            "redactor": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          }
+        },
+        "misses": [
+          {
+            "caseId": "ris-cfsp-01",
+            "family": "cf_ocr",
+            "type": "tax_id",
+            "text": "F.N.T.L.R.Z.8.3.M.1.7.Z.1.2.3.Y",
+            "start": 15,
+            "end": 46,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 15,
+                "end": 45,
+                "text": "F.N.T.L.R.Z.8.3.M.1.7.Z.1.2.3."
+              }
+            ]
+          },
+          {
+            "caseId": "ris-cfsp-02",
+            "family": "cf_ocr",
+            "type": "tax_id",
+            "text": "R P L D N A 9 1 A 4 6 Z 4 5 6 K",
+            "start": 7,
+            "end": 38,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 7,
+                "end": 38,
+                "text": "R P L D N A 9 1 A 4 6 Z 4 5 6 K"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-cfsp-03",
+            "family": "cf_ocr",
+            "type": "tax_id",
+            "text": "BRTNZL_65_E_20_Z_678_J",
+            "start": 13,
+            "end": 35,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 13,
+                "end": 35,
+                "text": "BRTNZL_65_E_20_Z_678_J"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-key-01",
+            "family": "campi_ignoti",
+            "type": "address",
+            "text": "Poggio delle Querce Immaginarie",
+            "start": 2,
+            "end": 33,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 2,
+                "end": 33,
+                "text": "Poggio delle Querce Immaginarie"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-key-02",
+            "family": "campi_ignoti",
+            "type": "address",
+            "text": "Porto Luminario",
+            "start": 2,
+            "end": 17,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 2,
+                "end": 17,
+                "text": "Porto Luminario"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-key-03",
+            "family": "campi_ignoti",
+            "type": "address",
+            "text": "Riva Cerulea Inventata",
+            "start": 10,
+            "end": 32,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 10,
+                "end": 32,
+                "text": "Riva Cerulea Inventata"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-id-02",
+            "family": "campi_ignoti",
+            "type": "identifier",
+            "text": "Quirino.Salmori",
+            "start": 21,
+            "end": 36,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 21,
+                "end": 36,
+                "text": "Quirino.Salmori"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-id-03",
+            "family": "campi_ignoti",
+            "type": "identifier",
+            "text": "Dafne_Bresaldi__cartella",
+            "start": 10,
+            "end": 34,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 10,
+                "end": 34,
+                "text": "Dafne_Bresaldi__cartella"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-email-01",
+            "family": "contatti",
+            "type": "email",
+            "text": "olinda punto mersanti chiocciola example punto invalid",
+            "start": 11,
+            "end": 65,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 17,
+                "end": 65,
+                "text": " punto mersanti chiocciola example punto invalid"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-email-02",
+            "family": "contatti",
+            "type": "email",
+            "text": "quirino trattino basso salmori chiocciola posta punto example punto invalid",
+            "start": 7,
+            "end": 82,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 7,
+                "end": 82,
+                "text": "quirino trattino basso salmori chiocciola posta punto example punto invalid"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-email-03",
+            "family": "contatti",
+            "type": "email",
+            "text": "dafne punto bresaldi chiocciola example punto invalid",
+            "start": 9,
+            "end": 62,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 9,
+                "end": 62,
+                "text": "dafne punto bresaldi chiocciola example punto invalid"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-tel-01",
+            "family": "contatti",
+            "type": "phone",
+            "text": "tre quattro sette zero zero zero uno due tre quattro",
+            "start": 11,
+            "end": 63,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 11,
+                "end": 63,
+                "text": "tre quattro sette zero zero zero uno due tre quattro"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-tel-02",
+            "family": "contatti",
+            "type": "phone",
+            "text": "più trentanove tre due nove zero zero zero cinque sei sette otto",
+            "start": 20,
+            "end": 84,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 20,
+                "end": 84,
+                "text": "più trentanove tre due nove zero zero zero cinque sei sette otto"
+              }
+            ]
+          },
+          {
+            "caseId": "ris-tel-03",
+            "family": "contatti",
+            "type": "phone",
+            "text": "zero zero tre nove zero due zero zero zero otto sette sei cinque",
+            "start": 9,
+            "end": 73,
+            "fullyCovered": false,
+            "stopped": false,
+            "visibleFragments": [
+              {
+                "start": 9,
+                "end": 73,
+                "text": "zero zero tre nove zero due zero zero zero otto sette sei cinque"
+              }
+            ]
+          }
+        ],
+        "clinicalEscapes": [],
+        "unproven": [],
+        "controlsPassed": false
+      },
+      "after": {
+        "generatedAt": "2026-11-12T23:51:24.629Z",
+        "mode": "real",
+        "elapsedMs": 32446,
+        "corpusSha256": "f6bf3b96f4996527acd8e4677665e1d9adf871628514bbe08329040d539c05c6",
+        "gitHead": "56f9dd5cdd4cec86d98347736f8d2e6d7170cf4b",
+        "sources": {
+          "scripts/measure-cb-redaction.ts": "34553882564d85b737dab09f406f3abae0767d9ebabb073faa6f1ffc7e16edd7",
+          "lib/gliner-redaction-runner.ts": "918a1b79a7042e7ae1acd418440144d5cd4e75adaf6bdc640761c484430935e0",
+          "scripts/gliner-redaction-worker.py": "6676afbddd6b30d3516183f87290613969dfcd89b027ca61985a03f49f8fb71d",
+          "lib/redaction-runtime-identity.ts": "118b018880196920cf9527ffaaa6bd9f576efd1b08677122ffa5496f0a5b1d06",
+          "lib/ai-redaction-session.ts": "464209f47b37508f2053b4d11621164a1946f1cf66f476c9f0e29995c4d1905d",
+          "lib/ai-egress-gate.ts": "56821da2f04a4699836b942547bf3dc49f45b76f769c0e1073daf17eb95e0df1",
+          "lib/chat-card/clinical-preparation.ts": "40634d28f91b682a1e132bd37785240fd5001635170c20b5387e15139f281e21",
+          "lib/chat-card/clinical-identifiers.ts": "0ae29b1397175ccc8c9d3caa93aa02981cccd2df51a49d9f1daa2370afadaef1",
+          "lib/chat-card/clinical-profile.ts": "686f3d5deeba7e2283bf9f9f6e7f6cb6bed5d7b667dd11347f0b565edcf519bd",
+          "lib/redaction-identifier-spans.ts": "202cf1c37f43d4c0647012dee9152fe5992ace787abb6dbcf230cc67c1b5e9b5"
+        },
+        "runtimeIdentity": {
+          "schema": "mediflow.redaction-runtime-binding.v1",
+          "adapter": "mediflow.layer1-gliner.runtime.v1",
+          "model": "gliner2-pii",
+          "revision": "c153999da5f4c509df4322b0c6a1baf3d2c284d7",
+          "workerSha256": "6676afbddd6b30d3516183f87290613969dfcd89b027ca61985a03f49f8fb71d",
+          "pythonSha256": "2fb4683f9ab944ee39c46ff4184c985cd00b3431610440cf60b9fb8e2d1c8528",
+          "files": {
+            "model.safetensors": "0280f6f39f6012da50b6640bad438d9b7e763a1b0102094115d1b710c4dd79b6",
+            "config.json": "164f17362bcf9d114067d3465e7374bfdd79ce6b605acb745de5a49dabb9595c",
+            "encoder_config/config.json": "f27dd63cc43a248d2566f0b6ad7a115db353676ce0561dcbca45bac766464c1a",
+            "tokenizer.json": "f6df10ec83bea993035b2dd7c39345a3d4fcf23421c2adb6cb4ffc1e6d1bc4b5",
+            "tokenizer_config.json": "8c916ee43ae43bf5945499f0405cac73da2b31f3ba04cf8c74a41cbd152b6330"
+          },
+          "packages": {
+            "gliner2": "2.0.0",
+            "torch": "2.14.0",
+            "transformers": "4.57.6",
+            "huggingface-hub": "0.36.2"
+          }
+        },
+        "families": {
+          "cf_ocr": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "luoghi": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 5,
+              "stopped": 5,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "campi_ignoti": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "contatti": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "controlli_clinici": {
+            "redactor": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          }
+        },
+        "misses": [],
+        "clinicalEscapes": [],
+        "unproven": [],
+        "controlsPassed": false
+      },
+      "zeroIdentifiersEscaped": true,
+      "legacyOverallPassed": false,
+      "commandExitCode": 1,
+      "negative": {
+        "mode": "negative_empty_runner",
+        "expected": 23,
+        "escaped": 1,
+        "commandExitCode": 1,
+        "families": {
+          "cf_ocr": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "luoghi": {
+            "redactor": {
+              "expected": 5,
+              "stopped": 4,
+              "escaped": 1
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "campi_ignoti": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "contatti": {
+            "redactor": {
+              "expected": 6,
+              "stopped": 6,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          },
+          "controlli_clinici": {
+            "redactor": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "clinical": {
+              "expected": 0,
+              "stopped": 0,
+              "escaped": 0
+            },
+            "unproven": 0
+          }
+        }
+      }
+    }
+  },
+  "controls": {
+    "sources": {
+      "lib/ai-redaction-session.ts": "464209f47b37508f2053b4d11621164a1946f1cf66f476c9f0e29995c4d1905d",
+      "lib/chat-card/clinical-identifiers.ts": "0ae29b1397175ccc8c9d3caa93aa02981cccd2df51a49d9f1daa2370afadaef1",
+      "lib/redaction-identifier-spans.ts": "202cf1c37f43d4c0647012dee9152fe5992ace787abb6dbcf230cc67c1b5e9b5"
+    },
+    "schema": "mediflow.cb-clinical-controls.v1",
+    "runtimeIdentity": {
+      "schema": "mediflow.redaction-runtime-binding.v1",
+      "adapter": "mediflow.layer1-gliner.runtime.v1",
+      "model": "gliner2-pii",
+      "revision": "c153999da5f4c509df4322b0c6a1baf3d2c284d7",
+      "workerSha256": "6676afbddd6b30d3516183f87290613969dfcd89b027ca61985a03f49f8fb71d",
+      "pythonSha256": "2fb4683f9ab944ee39c46ff4184c985cd00b3431610440cf60b9fb8e2d1c8528",
+      "files": {
+        "model.safetensors": "0280f6f39f6012da50b6640bad438d9b7e763a1b0102094115d1b710c4dd79b6",
+        "config.json": "164f17362bcf9d114067d3465e7374bfdd79ce6b605acb745de5a49dabb9595c",
+        "encoder_config/config.json": "f27dd63cc43a248d2566f0b6ad7a115db353676ce0561dcbca45bac766464c1a",
+        "tokenizer.json": "f6df10ec83bea993035b2dd7c39345a3d4fcf23421c2adb6cb4ffc1e6d1bc4b5",
+        "tokenizer_config.json": "8c916ee43ae43bf5945499f0405cac73da2b31f3ba04cf8c74a41cbd152b6330"
+      },
+      "packages": {
+        "gliner2": "2.0.0",
+        "torch": "2.14.0",
+        "transformers": "4.57.6",
+        "huggingface-hub": "0.36.2"
+      }
+    },
+    "baseline": "56f9dd5cdd4cec86d98347736f8d2e6d7170cf4b",
+    "termDefinition": "Unicode letter/alphanumeric words, counted by source occurrence; full source range must remain visible",
+    "results": [
+      {
+        "id": "controllo-01",
+        "series": "original",
+        "inputText": "Ipertensione arteriosa",
+        "totalTerms": 2,
+        "beforeTerms": [],
+        "afterTerms": [],
+        "newlyRemoved": "",
+        "beforePreserved": false,
+        "afterPreserved": false
+      },
+      {
+        "id": "controllo-02",
+        "series": "original",
+        "inputText": "Diabete mellito tipo 2",
+        "totalTerms": 3,
+        "beforeTerms": [],
+        "afterTerms": [],
+        "newlyRemoved": "",
+        "beforePreserved": false,
+        "afterPreserved": false
+      },
+      {
+        "id": "controllo-03",
+        "series": "original",
+        "inputText": "Vitamina D3 1000 UI",
+        "totalTerms": 3,
+        "beforeTerms": [],
+        "afterTerms": [],
+        "newlyRemoved": "",
+        "beforePreserved": false,
+        "afterPreserved": false
+      },
+      {
+        "id": "ris-controllo-01",
+        "series": "reserve",
+        "inputText": "Pressione arteriosa 120/80 mmHg, frequenza 72 bpm.",
+        "totalTerms": 5,
+        "beforeTerms": [
+          "Pressione",
+          "arteriosa",
+          "mmHg",
+          "frequenza",
+          "bpm"
+        ],
+        "afterTerms": [
+          "Pressione",
+          "arteriosa",
+          "mmHg",
+          "frequenza",
+          "bpm"
+        ],
+        "newlyRemoved": "",
+        "beforePreserved": true,
+        "afterPreserved": true
+      },
+      {
+        "id": "ris-controllo-02",
+        "series": "reserve",
+        "inputText": "Metformina 500 mg due volte al giorno.",
+        "totalTerms": 6,
+        "beforeTerms": [
+          "mg",
+          "due",
+          "volte",
+          "al",
+          "giorno"
+        ],
+        "afterTerms": [
+          "mg",
+          "due",
+          "volte",
+          "al",
+          "giorno"
+        ],
+        "newlyRemoved": "",
+        "beforePreserved": false,
+        "afterPreserved": false
+      },
+      {
+        "id": "ris-controllo-03",
+        "series": "reserve",
+        "inputText": "HbA1c 7,2%, controllo tra tre mesi.",
+        "totalTerms": 5,
+        "beforeTerms": [
+          "HbA1c",
+          "controllo",
+          "tra"
+        ],
+        "afterTerms": [
+          "HbA1c",
+          "controllo",
+          "tra"
+        ],
+        "newlyRemoved": "",
+        "beforePreserved": false,
+        "afterPreserved": false
+      }
+    ],
+    "passed": true
+  },
+  "unitRegressions": {
+    "baseline": {
+      "tests": 11,
+      "passed": 2,
+      "failed": 9
+    },
+    "modified": {
+      "tests": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    "testSourceSha256": "772e5c66b61b7bbd8cef00b3b7f165fcfb7ca00fc1633bb7fe0c53fe957c2290",
+    "baselineProduction": {
+      "baseline": "56f9dd5cdd4cec86d98347736f8d2e6d7170cf4b",
+      "originMainAtBaseline": "c842df2eb123c664ecb0d19e26b376e83b7e129c",
+      "baselineProduction": {
+        "lib/ai-redaction-session.ts": {
+          "sha256": "90bc845738fd7b8996747813f73df65fa80ff813e40008495aed4ad56c07202c",
+          "sameAsOriginMain": true
+        },
+        "lib/chat-card/clinical-identifiers.ts": {
+          "sha256": "d3605dc538bb5a285d594bf03000305074c93ccfa5672bde6f8ed76accc31ef1",
+          "sameAsOriginMain": true
+        },
+        "lib/gliner-redaction-runner.ts": {
+          "sha256": "918a1b79a7042e7ae1acd418440144d5cd4e75adaf6bdc640761c484430935e0",
+          "sameAsOriginMain": true
+        },
+        "scripts/gliner-redaction-worker.py": {
+          "sha256": "6676afbddd6b30d3516183f87290613969dfcd89b027ca61985a03f49f8fb71d",
+          "sameAsOriginMain": true
+        }
+      },
+      "transform": "Only module specifiers point at existing repository dependencies; executable bodies unchanged."
+    }
+  },
+  "existingAndRegressionTests": {
+    "tests": 148,
+    "passed": 148,
+    "failed": 0,
+    "skipped": 0,
+    "files": [
+      "lib/redaction-class-regressions.test.ts",
+      "lib/ai-redaction-session.test.ts",
+      "lib/ai-egress-gate.test.ts",
+      "lib/gliner-redaction-runner.test.ts",
+      "lib/chat-card/clinical-identifiers.test.ts",
+      "lib/chat-card/clinical-card-broker.test.ts",
+      "lib/ai-preparation/preparation-core.test.ts",
+      "scripts/measure-cb-redaction.test.ts"
+    ]
+  },
+  "interpretation": "Zero escaped identifiers is met on both fixed corpora. The unchanged CLI composite passed flag also requires all clinical controls to survive completely and remains false, as on the baseline. R5 instead requires no additional loss: exact same neural detections were passed to baseline and modified sessions, and no previously visible character was removed.",
+  "limits": "Synthetic local qualification of redactor and clinical preparation; no broker admission, consent, chat transmission, desktop qualification or universal coverage claim. Unannounced places still depend on neural detection; the real runner detects the unannounced reserve case, while its empty-runner control misses it."
+}

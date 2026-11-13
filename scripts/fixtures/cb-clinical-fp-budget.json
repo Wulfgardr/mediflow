@@ -1,0 +1,14 @@
+{
+  "schema": "mediflow.cb-clinical-fp-budget.v1",
+  "definition": "Maximum newly removed clinical word occurrences relative to 56f9dd5cd, excluding annotated identifiers. Fixed before production corrections in round 3.",
+  "corpora": {
+    "cb-clinical-independent": {
+      "sha256": "3f5e48faf1106960bba0e5911ee2f93022c4e23fd5a0389b3c0d09bc0ab71175",
+      "maximumNewClinicalWords": 0
+    },
+    "cb-clinical-challenge": {
+      "sha256": "b3869d36fb3a8d0f4d22ecb42a4fcf42359192b8b833aa8b624ee8532dbce831",
+      "maximumNewClinicalWords": 0
+    }
+  }
+}

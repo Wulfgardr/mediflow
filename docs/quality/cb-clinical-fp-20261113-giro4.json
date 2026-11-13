@@ -1,0 +1,49 @@
+{
+  "schema": "mediflow.cb-clinical-fp-frozen-baseline.v1",
+  "baseline": "56f9dd5cdd4cec86d98347736f8d2e6d7170cf4b",
+  "baselineSnapshot": {
+    "path": "docs/quality/cb-clinical-fp-20261113-before.json",
+    "sha256": "824aa322d17436a44ecd312bc147cfe1e50b4dffa131061335bf1fc69c2495fd"
+  },
+  "baselineSourceSha256": "90bc845738fd7b8996747813f73df65fa80ff813e40008495aed4ad56c07202c",
+  "generatedAt": "2026-11-13T01:09:28.992Z",
+  "elapsedMs": 43,
+  "sources": {
+    "lib/ai-redaction-session.ts": "464209f47b37508f2053b4d11621164a1946f1cf66f476c9f0e29995c4d1905d",
+    "lib/ai-egress-gate.ts": "56821da2f04a4699836b942547bf3dc49f45b76f769c0e1073daf17eb95e0df1",
+    "lib/redaction-identifier-spans.ts": "fbaa20fc496b6956dfa80ed7b3d26a8ba8f6d0ca6cbedb7872506cad4f562ad8"
+  },
+  "measurementToolSha256": "62c070c8bfbb53ee0455cd5eb3aebf18b36451ca2165ef0400c820f14698f80a",
+  "allTextResultsIdenticalTo": "cb-clinical-fp-20261113-after.json",
+  "resultSetsSha256": "3b411fe32ab895273b862217655c114006c323c14d45e7741e965e8273745014",
+  "sets": [
+    {
+      "name": "cb-clinical-independent",
+      "corpusSha256": "3f5e48faf1106960bba0e5911ee2f93022c4e23fd5a0389b3c0d09bc0ab71175",
+      "counts": {
+        "texts": 332,
+        "sourceOccurrences": 374,
+        "sentences": 427,
+        "words": 2454
+      },
+      "newSpans": 0,
+      "falsePositiveSpans": 0,
+      "newlyRemovedClinicalWords": 0
+    },
+    {
+      "name": "cb-clinical-challenge",
+      "corpusSha256": "b3869d36fb3a8d0f4d22ecb42a4fcf42359192b8b833aa8b624ee8532dbce831",
+      "counts": {
+        "texts": 36,
+        "sentences": 36,
+        "words": 257
+      },
+      "newSpans": 4,
+      "falsePositiveSpans": 0,
+      "newlyRemovedClinicalWords": 0
+    }
+  ],
+  "productionChanged": false,
+  "budgetTest": "lib/redaction-clinical-fp.test.ts",
+  "resultSetsSha256Method": "SHA-256 of UTF-8 JSON.stringify(report.sets), with no trailing newline"
+}

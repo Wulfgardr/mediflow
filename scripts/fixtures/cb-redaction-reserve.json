@@ -1,0 +1,417 @@
+{
+  "schema": "mediflow.cb-reserve.v1",
+  "syntheticOnly": true,
+  "description": "Riserva scritta e annotata prima di qualsiasi inferenza o correzione del giro 2. Nomi, luoghi, codici e recapiti inventati. Offset UTF-16 e criterio identici alla serie originale.",
+  "families": {
+    "cf_ocr": {
+      "cases": 6,
+      "identifiers": 6
+    },
+    "luoghi": {
+      "cases": 4,
+      "identifiers": 5
+    },
+    "campi_ignoti": {
+      "cases": 6,
+      "identifiers": 6
+    },
+    "contatti": {
+      "cases": 6,
+      "identifiers": 6
+    },
+    "controlli_clinici": {
+      "cases": 3,
+      "identifiers": 0
+    }
+  },
+  "cases": [
+    {
+      "id": "ris-cfsp-01",
+      "series": "reserve",
+      "defectClass": "cf_separato",
+      "family": "cf_ocr",
+      "inputText": "Identificativo F.N.T.L.R.Z.8.3.M.1.7.Z.1.2.3.Y.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "F.N.T.L.R.Z.8.3.M.1.7.Z.1.2.3.Y",
+          "start": 15,
+          "end": 46
+        }
+      ]
+    },
+    {
+      "id": "ris-cfsp-02",
+      "series": "reserve",
+      "defectClass": "cf_separato",
+      "family": "cf_ocr",
+      "inputText": "Sigla: R P L D N A 9 1 A 4 6 Z 4 5 6 K.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "R P L D N A 9 1 A 4 6 Z 4 5 6 K",
+          "start": 7,
+          "end": 38
+        }
+      ]
+    },
+    {
+      "id": "ris-cfsp-03",
+      "series": "reserve",
+      "defectClass": "cf_separato",
+      "family": "cf_ocr",
+      "inputText": "Campo codice BRTNZL_65_E_20_Z_678_J.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "BRTNZL_65_E_20_Z_678_J",
+          "start": 13,
+          "end": 35
+        }
+      ]
+    },
+    {
+      "id": "ris-cfnl-01",
+      "series": "reserve",
+      "defectClass": "cf_multilinea",
+      "family": "cf_ocr",
+      "inputText": "Sigla scansione RPLDNA91A46Z\n456K.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "RPLDNA91A46Z\n456K",
+          "start": 16,
+          "end": 33
+        }
+      ]
+    },
+    {
+      "id": "ris-cfnl-02",
+      "series": "reserve",
+      "defectClass": "cf_multilinea",
+      "family": "cf_ocr",
+      "inputText": "Il documento riporta BRTN\nZL65E20Z678J.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "BRTN\nZL65E20Z678J",
+          "start": 21,
+          "end": 38
+        }
+      ]
+    },
+    {
+      "id": "ris-cfnl-03",
+      "series": "reserve",
+      "defectClass": "cf_multilinea",
+      "family": "cf_ocr",
+      "inputText": "Codice stampato: FNTLRZ83M17Z1\n23Y.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "FNTLRZ83M17Z1\n23Y",
+          "start": 17,
+          "end": 34
+        }
+      ]
+    },
+    {
+      "id": "ris-luogo-01",
+      "series": "reserve",
+      "defectClass": "luogo_narrativo",
+      "family": "luoghi",
+      "inputText": "Domiciliata a Poggio delle Querce Immaginarie, vive da sola.",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Poggio delle Querce Immaginarie",
+          "start": 14,
+          "end": 45
+        }
+      ]
+    },
+    {
+      "id": "ris-luogo-02",
+      "series": "reserve",
+      "defectClass": "luogo_narrativo",
+      "family": "luoghi",
+      "inputText": "Si trasferisce da Colle di Nebbiosa a Porto Luminario.",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Colle di Nebbiosa",
+          "start": 18,
+          "end": 35
+        },
+        {
+          "type": "address",
+          "text": "Porto Luminario",
+          "start": 38,
+          "end": 53
+        }
+      ]
+    },
+    {
+      "id": "ris-luogo-03",
+      "series": "reserve",
+      "defectClass": "luogo_narrativo",
+      "family": "luoghi",
+      "inputText": "Abita nel comune di Riva Cerulea Inventata.",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Riva Cerulea Inventata",
+          "start": 20,
+          "end": 42
+        }
+      ]
+    },
+    {
+      "id": "ris-luogo-04",
+      "series": "reserve",
+      "defectClass": "luogo_narrativo",
+      "family": "luoghi",
+      "inputText": "Il foglio contiene Montefumo Fantastico.",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Montefumo Fantastico",
+          "start": 19,
+          "end": 39
+        }
+      ],
+      "contextLimit": "Toponimo inventato senza indizio geografico nella frase."
+    },
+    {
+      "id": "ris-key-01",
+      "series": "reserve",
+      "defectClass": "luogo_chiave_ignota",
+      "family": "campi_ignoti",
+      "inputText": "{\"Poggio delle Querce Immaginarie\":\"residenza\"}",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Poggio delle Querce Immaginarie",
+          "start": 2,
+          "end": 33
+        }
+      ],
+      "unknownField": {
+        "Poggio delle Querce Immaginarie": "residenza"
+      }
+    },
+    {
+      "id": "ris-key-02",
+      "series": "reserve",
+      "defectClass": "luogo_chiave_ignota",
+      "family": "campi_ignoti",
+      "inputText": "{\"Porto Luminario\":\"domicilio\",\"testo\":\"asma\"}",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Porto Luminario",
+          "start": 2,
+          "end": 17
+        }
+      ],
+      "unknownField": {
+        "Porto Luminario": "domicilio"
+      }
+    },
+    {
+      "id": "ris-key-03",
+      "series": "reserve",
+      "defectClass": "luogo_chiave_ignota",
+      "family": "campi_ignoti",
+      "inputText": "{\"meta\":{\"Riva Cerulea Inventata\":\"provenienza\"}}",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Riva Cerulea Inventata",
+          "start": 10,
+          "end": 32
+        }
+      ],
+      "unknownField": {
+        "meta": {
+          "Riva Cerulea Inventata": "provenienza"
+        }
+      }
+    },
+    {
+      "id": "ris-id-01",
+      "series": "reserve",
+      "defectClass": "identificatore_composto",
+      "family": "campi_ignoti",
+      "inputText": "{\"metadata\":{\"originalFilename\":\"Olinda_Mersanti.rtf\"}}",
+      "expected": [
+        {
+          "type": "identifier",
+          "text": "Olinda_Mersanti",
+          "start": 33,
+          "end": 48
+        }
+      ],
+      "unknownField": {
+        "metadata": {
+          "originalFilename": "Olinda_Mersanti.rtf"
+        }
+      }
+    },
+    {
+      "id": "ris-id-02",
+      "series": "reserve",
+      "defectClass": "identificatore_composto",
+      "family": "campi_ignoti",
+      "inputText": "{\"campox\":{\"titolo\":\"Quirino.Salmori.odp\"}}",
+      "expected": [
+        {
+          "type": "identifier",
+          "text": "Quirino.Salmori",
+          "start": 21,
+          "end": 36
+        }
+      ],
+      "unknownField": {
+        "campox": {
+          "titolo": "Quirino.Salmori.odp"
+        }
+      }
+    },
+    {
+      "id": "ris-id-03",
+      "series": "reserve",
+      "defectClass": "identificatore_composto",
+      "family": "campi_ignoti",
+      "inputText": "{\"extra\":\"Dafne_Bresaldi__cartella.odf\"}",
+      "expected": [
+        {
+          "type": "identifier",
+          "text": "Dafne_Bresaldi__cartella",
+          "start": 10,
+          "end": 34
+        }
+      ],
+      "unknownField": {
+        "extra": "Dafne_Bresaldi__cartella.odf"
+      }
+    },
+    {
+      "id": "ris-email-01",
+      "series": "reserve",
+      "defectClass": "email_dettata",
+      "family": "contatti",
+      "inputText": "Scrivere a olinda punto mersanti chiocciola example punto invalid.",
+      "expected": [
+        {
+          "type": "email",
+          "text": "olinda punto mersanti chiocciola example punto invalid",
+          "start": 11,
+          "end": 65
+        }
+      ]
+    },
+    {
+      "id": "ris-email-02",
+      "series": "reserve",
+      "defectClass": "email_dettata",
+      "family": "contatti",
+      "inputText": "Email: quirino trattino basso salmori chiocciola posta punto example punto invalid.",
+      "expected": [
+        {
+          "type": "email",
+          "text": "quirino trattino basso salmori chiocciola posta punto example punto invalid",
+          "start": 7,
+          "end": 82
+        }
+      ]
+    },
+    {
+      "id": "ris-email-03",
+      "series": "reserve",
+      "defectClass": "email_dettata",
+      "family": "contatti",
+      "inputText": "Recapito dafne punto bresaldi chiocciola example punto invalid per informazioni.",
+      "expected": [
+        {
+          "type": "email",
+          "text": "dafne punto bresaldi chiocciola example punto invalid",
+          "start": 9,
+          "end": 62
+        }
+      ]
+    },
+    {
+      "id": "ris-tel-01",
+      "series": "reserve",
+      "defectClass": "telefono_dettato",
+      "family": "contatti",
+      "inputText": "Cellulare: tre quattro sette zero zero zero uno due tre quattro.",
+      "expected": [
+        {
+          "type": "phone",
+          "text": "tre quattro sette zero zero zero uno due tre quattro",
+          "start": 11,
+          "end": 63
+        }
+      ]
+    },
+    {
+      "id": "ris-tel-02",
+      "series": "reserve",
+      "defectClass": "telefono_dettato",
+      "family": "contatti",
+      "inputText": "Recapito telefonico più trentanove tre due nove zero zero zero cinque sei sette otto.",
+      "expected": [
+        {
+          "type": "phone",
+          "text": "più trentanove tre due nove zero zero zero cinque sei sette otto",
+          "start": 20,
+          "end": 84
+        }
+      ]
+    },
+    {
+      "id": "ris-tel-03",
+      "series": "reserve",
+      "defectClass": "telefono_dettato",
+      "family": "contatti",
+      "inputText": "Chiamare zero zero tre nove zero due zero zero zero otto sette sei cinque.",
+      "expected": [
+        {
+          "type": "phone",
+          "text": "zero zero tre nove zero due zero zero zero otto sette sei cinque",
+          "start": 9,
+          "end": 73
+        }
+      ]
+    },
+    {
+      "id": "ris-controllo-01",
+      "series": "reserve",
+      "defectClass": "controllo_clinico",
+      "family": "controlli_clinici",
+      "inputText": "Pressione arteriosa 120/80 mmHg, frequenza 72 bpm.",
+      "expected": [],
+      "preserveText": true
+    },
+    {
+      "id": "ris-controllo-02",
+      "series": "reserve",
+      "defectClass": "controllo_clinico",
+      "family": "controlli_clinici",
+      "inputText": "Metformina 500 mg due volte al giorno.",
+      "expected": [],
+      "preserveText": true
+    },
+    {
+      "id": "ris-controllo-03",
+      "series": "reserve",
+      "defectClass": "controllo_clinico",
+      "family": "controlli_clinici",
+      "inputText": "HbA1c 7,2%, controllo tra tre mesi.",
+      "expected": [],
+      "preserveText": true
+    }
+  ]
+}
