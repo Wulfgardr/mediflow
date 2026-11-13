@@ -16,6 +16,31 @@ const driver = code => {
   return result.stdout.trim();
 };
 
+test('native regeneration provenance qualifies changed manifest metadata before admission pins are committed', t => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-bootstrap-regeneration-')));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const files = ['lib/windows-bootstrap-provenance.test.ts', 'scripts/verify-windows-bootstrap-rebuild.mjs', 'scripts/scheduled-backup-runtime-contract.mjs'];
+  for (const arch of ['x64', 'arm64']) {
+    for (const name of ['system-directory.node', 'manifest.json']) files.push(`scripts/windows-launcher-bootstrap/prebuilds/win32-${arch}/${name}`);
+  }
+  for (const file of files) {
+    const destination = path.join(root, file);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.copyFileSync(new URL(`../${file}`, import.meta.url), destination);
+  }
+  const manifestFile = path.join(root, 'scripts/windows-launcher-bootstrap/prebuilds/win32-x64/manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+  manifest.build.node = 'v24.999.0';
+  fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + '\n');
+  const env = { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' };
+  delete env.NODE_TEST_CONTEXT;
+  const result = spawnSync(process.execPath, ['--test', path.join(root, 'lib/windows-bootstrap-provenance.test.ts')],
+    { env, encoding: 'utf8', timeout: 20000 });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /real verification CLI/u);
+});
+
 test('Windows native-source resolver rejects invalid paths and caches only a canonical positive before stop', t => {
   t.diagnostic(driver(`
     import assert from 'node:assert/strict';import fs from 'node:fs';import {registerHooks} from 'node:module';
