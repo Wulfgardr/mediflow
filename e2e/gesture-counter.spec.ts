@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { installGestureMeter } from './fixtures/gesture-meter';
-import { assertGestureRatchet } from './fixtures/gesture-ratchet';
+import { assertGestureRatchet, measuredRevision } from './fixtures/gesture-ratchet';
 
 test.use({ actionTimeout: 10_000, screenshot: 'off', video: 'off', trace: 'off' });
 
@@ -45,4 +45,17 @@ test('cricchetto: stesso conto verde, un gesto in più rosso', () => {
     expect(() => assertGestureRatchet({ ...base, [metric]: base[metric] + 1 }, base, 'prova')).toThrow(`${metric} ${base[metric] + 1} > base ${base[metric]}`);
   // Deliberate persistent falsification switch; never updates the baseline.
   assertGestureRatchet({ ...base, gesti: base.gesti + (process.env.GESTURE_PROVE_RED === '1' ? 1 : 0) }, base, 'prova');
+});
+
+test('revisione misurata: senza storia usa HEAD e non lancia mai', () => {
+  const base = 'a'.repeat(40), head = 'b'.repeat(40);
+  const senzaStoria = (args: string[]) => {
+    if (args[0] === 'merge-base') throw new Error('fatal: Not a valid object name origin/main');
+    return `${head}\n`;
+  };
+  expect(measuredRevision(args => (args[0] === 'merge-base' ? `${base}\n` : `${head}\n`))).toBe(base);
+  expect(measuredRevision(senzaStoria)).toBe(head);
+  expect(measuredRevision(() => { throw new Error('git assente'); })).toBe('non disponibile');
+  expect(measuredRevision(() => 'non uno sha')).toBe('non disponibile');
+  expect(measuredRevision()).toMatch(/^[0-9a-f]{40}$/);
 });
