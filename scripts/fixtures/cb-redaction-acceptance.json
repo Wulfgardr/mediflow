@@ -1,0 +1,588 @@
+{
+  "schema": "mediflow.cb-acceptance.v1",
+  "syntheticOnly": true,
+  "description": "Persone, codici, luoghi e indirizzi inventati; contatti example.invalid. Nessuna fonte clinica o anagrafica reale. Annotazione per occorrenza con offset UTF-16; nei file si annota il basename identificante, senza estensione. Un residuo leggibile anche parziale è uno sfuggito; soli spazi e caratteri di formato Unicode non identificano. I controlli clinici documentano anche le sovraredazioni.",
+  "families": {
+    "cf_ocr": {
+      "cases": 6,
+      "identifiers": 6
+    },
+    "terze_persone": {
+      "cases": 5,
+      "identifiers": 7
+    },
+    "luoghi": {
+      "cases": 4,
+      "identifiers": 5
+    },
+    "nascita": {
+      "cases": 4,
+      "identifiers": 8
+    },
+    "nomi_file": {
+      "cases": 4,
+      "identifiers": 5
+    },
+    "campi_ignoti": {
+      "cases": 4,
+      "identifiers": 5
+    },
+    "identita_nota": {
+      "cases": 3,
+      "identifiers": 3
+    },
+    "contatti": {
+      "cases": 3,
+      "identifiers": 4
+    },
+    "controlli_clinici": {
+      "cases": 3,
+      "identifiers": 0
+    }
+  },
+  "cases": [
+    {
+      "id": "cf-01",
+      "family": "cf_ocr",
+      "inputText": "Codice fiscale: NVNZLM74D52Z999X.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "NVNZLM74D52Z999X",
+          "start": 16,
+          "end": 32
+        }
+      ]
+    },
+    {
+      "id": "cf-02",
+      "family": "cf_ocr",
+      "inputText": "Il documento riporta NVNZLM74D5ZZ999X, letto con OCR.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "NVNZLM74D5ZZ999X",
+          "start": 21,
+          "end": 37
+        }
+      ]
+    },
+    {
+      "id": "cf-03",
+      "family": "cf_ocr",
+      "inputText": "Identificativo letto: NVNZLM74D52Z99OX.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "NVNZLM74D52Z99OX",
+          "start": 22,
+          "end": 38
+        }
+      ]
+    },
+    {
+      "id": "cf-04",
+      "family": "cf_ocr",
+      "inputText": "CF N V N Z L M 7 4 D 5 2 Z 9 9 9 X.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "N V N Z L M 7 4 D 5 2 Z 9 9 9 X",
+          "start": 3,
+          "end": 34
+        }
+      ]
+    },
+    {
+      "id": "cf-05",
+      "family": "cf_ocr",
+      "inputText": "Sigla trascritta: NVNZLM74​D52Z999X.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "NVNZLM74​D52Z999X",
+          "start": 18,
+          "end": 35
+        }
+      ]
+    },
+    {
+      "id": "cf-06",
+      "family": "cf_ocr",
+      "inputText": "Codice da scansione: NVNZLM74D52\nZ999X.",
+      "expected": [
+        {
+          "type": "tax_id",
+          "text": "NVNZLM74D52\nZ999X",
+          "start": 21,
+          "end": 38
+        }
+      ]
+    },
+    {
+      "id": "terzi-01",
+      "family": "terze_persone",
+      "inputText": "Accompagnata dalla sorella Lidia Zanfelli e dal marito Terenzio Brumazzi.",
+      "expected": [
+        {
+          "type": "person",
+          "text": "Lidia Zanfelli",
+          "start": 27,
+          "end": 41
+        },
+        {
+          "type": "person",
+          "text": "Terenzio Brumazzi",
+          "start": 55,
+          "end": 72
+        }
+      ]
+    },
+    {
+      "id": "terzi-02",
+      "family": "terze_persone",
+      "inputText": "La caregiver è Ada Serralumi; il referente è Nives Pelladori.",
+      "expected": [
+        {
+          "type": "person",
+          "text": "Ada Serralumi",
+          "start": 15,
+          "end": 28
+        },
+        {
+          "type": "person",
+          "text": "Nives Pelladori",
+          "start": 45,
+          "end": 60
+        }
+      ]
+    },
+    {
+      "id": "terzi-03",
+      "family": "terze_persone",
+      "inputText": "Il vicino zio Remigio Faldori consegna i referti.",
+      "expected": [
+        {
+          "type": "person",
+          "text": "Remigio Faldori",
+          "start": 14,
+          "end": 29
+        }
+      ]
+    },
+    {
+      "id": "terzi-04",
+      "family": "terze_persone",
+      "inputText": "Accompagnatore: A.d.a S3rralumi.",
+      "expected": [
+        {
+          "type": "person",
+          "text": "A.d.a S3rralumi",
+          "start": 16,
+          "end": 31
+        }
+      ]
+    },
+    {
+      "id": "terzi-05",
+      "family": "terze_persone",
+      "inputText": "📎 La figlia è lidia zanfelli, contattare lei.",
+      "expected": [
+        {
+          "type": "person",
+          "text": "lidia zanfelli",
+          "start": 15,
+          "end": 29
+        }
+      ]
+    },
+    {
+      "id": "luogo-01",
+      "family": "luoghi",
+      "inputText": "Residenza: Via delle Nuvole Inventate 47, Borgo Fittizio.",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Via delle Nuvole Inventate 47, Borgo Fittizio",
+          "start": 11,
+          "end": 56
+        }
+      ]
+    },
+    {
+      "id": "luogo-02",
+      "family": "luoghi",
+      "inputText": "Vive a Borgo Fittizio con il coniuge.",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Borgo Fittizio",
+          "start": 7,
+          "end": 21
+        }
+      ]
+    },
+    {
+      "id": "luogo-03",
+      "family": "luoghi",
+      "inputText": "Il domicilio è in vicolo delle Lune Sintetiche 83.",
+      "expected": [
+        {
+          "type": "address",
+          "text": "vicolo delle Lune Sintetiche 83",
+          "start": 18,
+          "end": 49
+        }
+      ]
+    },
+    {
+      "id": "luogo-04",
+      "family": "luoghi",
+      "inputText": "Trasferita da Valleverde Inventato a Rocca Sintetica.",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Valleverde Inventato",
+          "start": 14,
+          "end": 34
+        },
+        {
+          "type": "address",
+          "text": "Rocca Sintetica",
+          "start": 37,
+          "end": 52
+        }
+      ]
+    },
+    {
+      "id": "nascita-01",
+      "family": "nascita",
+      "inputText": "Nata il 12/04/1974 a Borgo Fittizio.",
+      "expected": [
+        {
+          "type": "date",
+          "text": "12/04/1974",
+          "start": 8,
+          "end": 18
+        },
+        {
+          "type": "address",
+          "text": "Borgo Fittizio",
+          "start": 21,
+          "end": 35
+        }
+      ]
+    },
+    {
+      "id": "nascita-02",
+      "family": "nascita",
+      "inputText": "Luogo di nascita: Rocca Sintetica; data di nascita: 7 maggio 1963.",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Rocca Sintetica",
+          "start": 18,
+          "end": 33
+        },
+        {
+          "type": "date",
+          "text": "7 maggio 1963",
+          "start": 52,
+          "end": 65
+        }
+      ]
+    },
+    {
+      "id": "nascita-03",
+      "family": "nascita",
+      "inputText": "Nascita 1963-05-07, comune Valleverde Inventato.",
+      "expected": [
+        {
+          "type": "date",
+          "text": "1963-05-07",
+          "start": 8,
+          "end": 18
+        },
+        {
+          "type": "address",
+          "text": "Valleverde Inventato",
+          "start": 27,
+          "end": 47
+        }
+      ]
+    },
+    {
+      "id": "nascita-04",
+      "family": "nascita",
+      "inputText": "Nata a Borgo Fittizio il 7 / 5 / 1963.",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Borgo Fittizio",
+          "start": 7,
+          "end": 21
+        },
+        {
+          "type": "date",
+          "text": "7 / 5 / 1963",
+          "start": 25,
+          "end": 37
+        }
+      ]
+    },
+    {
+      "id": "file-01",
+      "family": "nomi_file",
+      "inputText": "Allegato Zelmira_Inventini_19740412.pdf.",
+      "expected": [
+        {
+          "type": "identifier",
+          "text": "Zelmira_Inventini_19740412",
+          "start": 9,
+          "end": 35
+        }
+      ]
+    },
+    {
+      "id": "file-02",
+      "family": "nomi_file",
+      "inputText": "Fonte: \"/synthetic/Lidia Zanfelli/referto_Lidia_Zanfelli.docx\".",
+      "expected": [
+        {
+          "type": "person",
+          "text": "Lidia Zanfelli",
+          "start": 19,
+          "end": 33
+        },
+        {
+          "type": "identifier",
+          "text": "referto_Lidia_Zanfelli",
+          "start": 34,
+          "end": 56
+        }
+      ]
+    },
+    {
+      "id": "file-03",
+      "family": "nomi_file",
+      "inputText": "File NVNZLM74D52Z999X_scan.png.",
+      "expected": [
+        {
+          "type": "identifier",
+          "text": "NVNZLM74D52Z999X_scan",
+          "start": 5,
+          "end": 26
+        }
+      ]
+    },
+    {
+      "id": "file-04",
+      "family": "nomi_file",
+      "inputText": "Documento Ada_Serralumi.odt.",
+      "expected": [
+        {
+          "type": "identifier",
+          "text": "Ada_Serralumi",
+          "start": 10,
+          "end": 23
+        }
+      ]
+    },
+    {
+      "id": "ignoto-01",
+      "family": "campi_ignoti",
+      "inputText": "{\"extraCaregiver\":\"Lidia Zanfelli\",\"note\":\"asma\"}",
+      "expected": [
+        {
+          "type": "person",
+          "text": "Lidia Zanfelli",
+          "start": 19,
+          "end": 33
+        }
+      ],
+      "unknownField": {
+        "extraCaregiver": "Lidia Zanfelli"
+      }
+    },
+    {
+      "id": "ignoto-02",
+      "family": "campi_ignoti",
+      "inputText": "{\"Rocca Sintetica\":\"domicilio\",\"note\":\"asma\"}",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Rocca Sintetica",
+          "start": 2,
+          "end": 17
+        }
+      ],
+      "unknownField": {
+        "Rocca Sintetica": "domicilio"
+      }
+    },
+    {
+      "id": "ignoto-03",
+      "family": "campi_ignoti",
+      "inputText": "{\"extra\":{\"birthPlace\":\"Borgo Fittizio\",\"birthDate\":\"7 maggio 1963\"}}",
+      "expected": [
+        {
+          "type": "address",
+          "text": "Borgo Fittizio",
+          "start": 24,
+          "end": 38
+        },
+        {
+          "type": "date",
+          "text": "7 maggio 1963",
+          "start": 53,
+          "end": 66
+        }
+      ],
+      "unknownField": {
+        "extra": {
+          "birthPlace": "Borgo Fittizio",
+          "birthDate": "7 maggio 1963"
+        }
+      }
+    },
+    {
+      "id": "ignoto-04",
+      "family": "campi_ignoti",
+      "inputText": "{\"metadata\":{\"originalFilename\":\"Ada_Serralumi.odt\"}}",
+      "expected": [
+        {
+          "type": "identifier",
+          "text": "Ada_Serralumi",
+          "start": 33,
+          "end": 46
+        }
+      ],
+      "unknownField": {
+        "metadata": {
+          "originalFilename": "Ada_Serralumi.odt"
+        }
+      }
+    },
+    {
+      "id": "noto-01",
+      "family": "identita_nota",
+      "inputText": "Zelmira Inventini assume metformina.",
+      "expected": [
+        {
+          "type": "person",
+          "text": "Zelmira Inventini",
+          "start": 0,
+          "end": 17
+        }
+      ],
+      "knownIdentifiers": {
+        "names": [
+          "Zelmira Inventini"
+        ]
+      }
+    },
+    {
+      "id": "noto-02",
+      "family": "identita_nota",
+      "inputText": "La paziente ZELMIRA INVENTINI riferisce asma.",
+      "expected": [
+        {
+          "type": "person",
+          "text": "ZELMIRA INVENTINI",
+          "start": 12,
+          "end": 29
+        }
+      ],
+      "knownIdentifiers": {
+        "names": [
+          "Zelmira Inventini"
+        ]
+      }
+    },
+    {
+      "id": "noto-03",
+      "family": "identita_nota",
+      "inputText": "Z3lmira Inv3ntini riferisce asma.",
+      "expected": [
+        {
+          "type": "person",
+          "text": "Z3lmira Inv3ntini",
+          "start": 0,
+          "end": 17
+        }
+      ],
+      "knownIdentifiers": {
+        "names": [
+          "Zelmira",
+          "Inventini"
+        ]
+      }
+    },
+    {
+      "id": "contatto-01",
+      "family": "contatti",
+      "inputText": "Contatto lidia.zanfelli@example.invalid, telefono +39 333 000 0047.",
+      "expected": [
+        {
+          "type": "email",
+          "text": "lidia.zanfelli@example.invalid",
+          "start": 9,
+          "end": 39
+        },
+        {
+          "type": "phone",
+          "text": "+39 333 000 0047",
+          "start": 50,
+          "end": 66
+        }
+      ]
+    },
+    {
+      "id": "contatto-02",
+      "family": "contatti",
+      "inputText": "Recapito: lidia punto zanfelli chiocciola example punto invalid.",
+      "expected": [
+        {
+          "type": "email",
+          "text": "lidia punto zanfelli chiocciola example punto invalid",
+          "start": 10,
+          "end": 63
+        }
+      ]
+    },
+    {
+      "id": "contatto-03",
+      "family": "contatti",
+      "inputText": "Telefono tre tre tre zero zero zero zero zero quattro sette.",
+      "expected": [
+        {
+          "type": "phone",
+          "text": "tre tre tre zero zero zero zero zero quattro sette",
+          "start": 9,
+          "end": 59
+        }
+      ]
+    },
+    {
+      "id": "controllo-01",
+      "family": "controlli_clinici",
+      "inputText": "Ipertensione arteriosa",
+      "expected": [],
+      "preserveText": true
+    },
+    {
+      "id": "controllo-02",
+      "family": "controlli_clinici",
+      "inputText": "Diabete mellito tipo 2",
+      "expected": [],
+      "preserveText": true
+    },
+    {
+      "id": "controllo-03",
+      "family": "controlli_clinici",
+      "inputText": "Vitamina D3 1000 UI",
+      "expected": [],
+      "preserveText": true
+    }
+  ]
+}
