@@ -16,6 +16,11 @@ Il client è un bundle macOS collegato all’host: non contiene Node né l’arc
 La qualifica riguarda Mac17,10, M5 Max, **48 GiB**, macOS 27.3 `26C5035r`.
 Il minimo del pacchetto resta macOS 11 su Apple Silicon; non è una qualifica di altri Mac.
 GPUI Windows/Linux, VoiceOver e reset con PIN precedente sono fuori dal gate per decisioni già registrate.
+Per decisione di Leonardo del 13 novembre, anche l'ingrandimento oltre il 200% è fuori dal gate:
+restano testo al 100% e al 200% senza tagli o collisioni, Giorno/Grafite, tastiera e focus,
+AccessKit come struttura esposta, minimo GPUI di 390 punti e ridimensionamento.
+Le osservazioni storiche al 400% sotto restano come evidenze e regressioni,
+senza obbligo di ripeterle sul candidato ([emendamento del contratto](../releases/0.9.1-contract.md#emendamento-del-13-novembre-2026-ingrandimento-al-400-fuori-dal-gate)).
 Download/rimozione dei modelli Ollama restano in Ollama per emendamento; la gestione del modello voce whisper è nativa.
 
 ## Significato delle prove
@@ -344,7 +349,9 @@ restano l’autorità degli ingressi server. Questo documento censisce i consuma
 
 Il [CSV delle singole righe](./2026-10-23-gpui-spec-coverage.csv) è riallineato alle tabelle dei cinque documenti
 sul candidato: requisito completo, posizione attuale, G, fonte del consumer e stato installato. Nessuna colonna Apple è usata per escludere GPUI sul Mac.
-Le prove con VoiceOver storico non rientrano nel gate; tastiera, AccessKit, Giorno/Grafite, 390 px e 100/200/400% restano obbligatori.
+Le prove con VoiceOver storico non rientrano nel gate; restano obbligatori tastiera e focus,
+AccessKit come struttura esposta, Giorno/Grafite, 390 punti, ridimensionamento e testo al 100% e al 200% senza tagli o collisioni.
+L'ingrandimento oltre il 200% è fuori dal gate per l'emendamento del 13 novembre 2026.
 Tracking 0,05 em nel pin GPUI non viene dichiarato renderizzato: la sua accettazione rimane non provata.
 
 | G | Evidenza presente | Esito sul bundle installato |
@@ -357,7 +364,7 @@ Tracking 0,05 em nel pin GPUI non viene dichiarato renderizzato: la sua accettaz
 | G-5 | [patient_insight.rs](../../experiments/gpui-patient-pilot/app/src/shell/patient_insight.rs), [document_synthesis.rs](../../experiments/gpui-patient-pilot/app/src/shell/document_synthesis.rs), [smart_import.rs](../../experiments/gpui-patient-pilot/app/src/shell/smart_import.rs) | O2: indisponibilità TR e provider non ammesso osservate. Generazioni locali e ChatGPT, consenso/fonti/ricevuta/revoca per tutte le combinazioni non provati. |
 | G-6 | [clinical_forms.rs](../../experiments/gpui-patient-pilot/app/src/shell/clinical_forms.rs), [protocol.md](../../experiments/gpui-patient-pilot/comparison/protocol.md) | O3/O7/O8/O9: writer nominati con preview, CAS/audit/rilettura dove descritti. Nuova scheda fallisce D01. C1: 24 mutazioni; 28 famiglie non provate integralmente. |
 | G-7 | [view_state.rs](../../experiments/gpui-patient-pilot/app/src/shell/view_state.rs), [agenda_flow.rs](../../experiments/gpui-patient-pilot/app/src/shell/agenda_flow.rs) | O1/O3/O7/O8/O10/O11: vuoto, errori documenti, offline, obsoleto/conflitto, bozza e cambio archivio osservati. Matrice per ogni vista non provata. |
-| G-8 | [theme.rs](../../experiments/gpui-patient-pilot/app/src/theme.rs), [components.rs](../../experiments/gpui-patient-pilot/app/src/components.rs), [navigation.rs](../../experiments/gpui-patient-pilot/app/src/navigation.rs), [macos_preferences.rs](../../experiments/gpui-patient-pilot/app/src/shell/local_host/macos_preferences.rs) | O6/O11: temi, 100/200/400%, privacy/tastiera/AccessKit parziali. Frame398, contenuto390 non attestato; 400% con avvisi fallisce D02. Correzione di sorgente non qualificata sul bundle; catture WUL-809 ad altra lane. |
+| G-8 | [theme.rs](../../experiments/gpui-patient-pilot/app/src/theme.rs), [components.rs](../../experiments/gpui-patient-pilot/app/src/components.rs), [navigation.rs](../../experiments/gpui-patient-pilot/app/src/navigation.rs), [macos_preferences.rs](../../experiments/gpui-patient-pilot/app/src/shell/local_host/macos_preferences.rs) | Gate: Giorno/Grafite, testo al 100% e al 200% senza tagli o collisioni, tastiera/focus, AccessKit, minimo 390 punti e ridimensionamento. O6/O11 restano osservazioni parziali; O13 osserva il minimo 390 punti. D02 e D10 al 400% restano evidenze storiche e regressioni fuori dal gate. Correzioni non qualificate sul bundle; matrice completa G-8 non provata. |
 | G-9 | [README.md](../../experiments/gpui-patient-pilot/packaging/README.md) | O6: build/firma/installazione, accesso utile, aggiornamento manuale e recupero delimitato osservati sul M5 Max. Distribuzione ad hoc e host separato dichiarati; nessuna notarizzazione o migrazione host dedotta. |
 
 ## Disposizioni correnti ed esclusioni proposte
