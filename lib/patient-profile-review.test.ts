@@ -16,7 +16,7 @@ import { currentArchiveGeneration } from './security/archive-session-generation'
 import { ambulatories, auditEvents, observations, patients, patientsToAmbulatories, physicianReviewAttestations, users } from './schema';
 import { isProfileReviewView, PROFILE_REVIEW_POLICY, type ProfileReviewView } from '../packages/patient-profile-contracts/src/review';
 import { decryptData, encryptData } from './security/security';
-import { isProfileResult, PROFILE_FIELD_NAMES } from '../packages/patient-profile-contracts/src/query';
+import { isHttpProfileResult, HTTP_PROFILE_FIELD_NAMES } from '../packages/patient-profile-contracts/src/query';
 import { isProfileNotesCommitReceipt, isProfileNotesCommitView, PROFILE_NOTES_COMMIT_POLICY,
     type ProfileNotesCommitView } from '../packages/patient-profile-contracts/src/notes-commit';
 
@@ -272,9 +272,9 @@ test('reviewed notes retain encrypted identity, membership and a clinical sentin
         const scopedResponse = await queryRoute.POST(request({ kind: 'open', contractVersion: 1, projection: 'profile',
             expectedSelectionEpoch: (await epochResponse.json()).selectionEpoch }, `${path}/profile-query`), context);
         assert.equal(scopedResponse.status, 200, await scopedResponse.clone().text());
-        const scoped: unknown = await scopedResponse.json(); assert.ok(isProfileResult(scoped));
+        const scoped: unknown = await scopedResponse.json(); assert.ok(isHttpProfileResult(scoped));
         assert.equal(scoped.projection, 'profile'); assert.equal(scoped.currentness.revision, version);
-        assert.deepEqual(scoped.profile, Object.fromEntries(PROFILE_FIELD_NAMES.map(field => [field, legacy[field]])));
+        assert.deepEqual(scoped.profile, Object.fromEntries(HTTP_PROFILE_FIELD_NAMES.map(field => [field, legacy[field]])));
         assert.deepEqual(snapshot(), beforeRead);
     }
 

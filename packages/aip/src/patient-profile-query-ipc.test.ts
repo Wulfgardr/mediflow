@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { PROFILE_QUERY_MAX_RESULT_BYTES, assertProfileResultBudget, isProfileResult } from '../../patient-profile-contracts/src/query.ts';
+import { PROFILE_QUERY_MAX_RESULT_BYTES, assertProfileResultBudget, isProfileResult, isHttpProfileResult } from '../../patient-profile-contracts/src/query.ts';
 import { encodePatientProfileQueryIpcFrameV1 as encode, decodePatientProfileQueryIpcFrameV1 as decode } from './patient-profile-query-ipc.ts';
 const request = { schemaVersion: 'mediflow.patient-profile.ipc.v1', type: 'query',
   requestRef: `ppqr_${'a'.repeat(32)}`, operationId: 'patient-profile.read.v1',
@@ -46,5 +46,25 @@ test('shares the32KiB JSON UTF-8 result budget including Unicode and escaping wi
     candidate.profile.notes += 'x';
     assert.throws(() => assertProfileResultBudget(candidate), (e: unknown) => (e as {code: string}).code === 'output_too_large');
     assert.throws(() => encode({ ...frame, result: candidate }));
+  }
+});
+
+
+test('agent IPC admits fifteen profile fields and rejects the valid HTTP extension and notes metadata', () => {
+  const frame = { schemaVersion: request.schemaVersion, type: 'query_result', requestRef: request.requestRef,
+    operationId: request.operationId, outcome: 'completed', result };
+  const profile = { firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTHETIC', birthDate: null,
+    address: null, phone: null, caregiver: null, diagnoses: null, exemptions: null, notes: 'Synthetic note',
+    isAdi: false, isArchived: false, statusReason: null, archiveReason: null, archiveNote: null };
+  const full = { ...result, projection: 'profile', profile };
+  assert.deepEqual(JSON.parse(encode({ ...frame, result: full })).result.profile, profile);
+  const metadata = { identifierType: 'other', birthDatePrecision: 'estimated', birthYear: 1940 };
+  const http = { ...full, profile: { ...profile, ...metadata } };
+  assert.equal(isHttpProfileResult(http), true);
+  assert.throws(() => encode({ ...frame, result: http }), /patient_profile_ipc_invalid/u);
+  assert.throws(() => decode(JSON.stringify({ ...frame, result: http })), /patient_profile_ipc_invalid/u);
+  for (const [key, value] of Object.entries(metadata)) {
+    assert.throws(() => encode({ ...frame, result: { ...full, profile: { ...profile, [key]: value } } }), /patient_profile_ipc_invalid/u);
+    assert.throws(() => encode({ ...frame, result: { ...result, profile: { ...result.profile, [key]: value } } }), /patient_profile_ipc_invalid/u);
   }
 });

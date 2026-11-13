@@ -1,7 +1,7 @@
 'use client';
 
-import { isProfileResult, assertProfileResultBudget, type ProfileProjection, type ProfileQuery,
-    type ProfileResult, type ProfileQueryErrorCode } from '../packages/patient-profile-contracts/src/query';
+import { isHttpProfileResult, assertProfileResultBudget, type ProfileProjection, type ProfileQuery,
+    type HttpProfileResult, type ProfileQueryErrorCode } from '../packages/patient-profile-contracts/src/query';
 
 type ErrorCode = ProfileQueryErrorCode | 'operation_superseded' | 'response_invalid';
 type Sources = Readonly<{ fetch?: typeof fetch; now?: () => number }>;
@@ -39,7 +39,7 @@ export function createPatientProfileScopedBrowserAdapter(sources: Sources = {}) 
     const request: typeof fetch = sources.fetch ?? ((input, init) => globalThis.fetch(input, init));
     const now = sources.now ?? Date.now;
     let generation = 0, intent = 0, pending: AbortController | null = null;
-    let current: { patientId: string; result: ProfileResult } | null = null;
+    let current: { patientId: string; result: HttpProfileResult } | null = null;
     const reset = () => { generation++; intent++; current = null; pending?.abort(); pending = null; };
     const begin = (sessionSignal?: AbortSignal) => {
         if (sessionSignal?.aborted) return fail('session_unavailable');
@@ -64,18 +64,18 @@ export function createPatientProfileScopedBrowserAdapter(sources: Sources = {}) 
         let body: unknown;
         try { body = await response.json(); } catch { operation.guard(); return fail('response_invalid'); }
         operation.guard();
-        if (!isProfileResult(body) || body.projection !== input.projection || body.currentness.expiresAt <= now()) return fail('response_invalid');
+        if (!isHttpProfileResult(body) || body.projection !== input.projection || body.currentness.expiresAt <= now()) return fail('response_invalid');
         try { assertProfileResultBudget(body); } catch { return fail('output_too_large'); }
         if (input.kind === 'read' && (body.handle !== input.handle || body.currentness.revision !== input.expectedRevision
             || body.currentness.selectionEpoch !== current?.result.currentness.selectionEpoch)) return fail('response_invalid');
         const result = Object.freeze({ ...body, currentness: Object.freeze({ ...body.currentness }),
-            profile: Object.freeze({ ...body.profile }) }) as ProfileResult;
+            profile: Object.freeze({ ...body.profile }) }) as HttpProfileResult;
         current = { patientId: id, result };
         return result;
     };
     return Object.freeze({
         reset,
-        async open(idValue: unknown, projection: ProfileProjection, sessionSignal?: AbortSignal): Promise<ProfileResult> {
+        async open(idValue: unknown, projection: ProfileProjection, sessionSignal?: AbortSignal): Promise<HttpProfileResult> {
             const id = patientId(idValue);
             if (projection !== 'notes' && projection !== 'profile') return fail('input_invalid');
             const operation = begin(sessionSignal); current = null;
@@ -89,7 +89,7 @@ export function createPatientProfileScopedBrowserAdapter(sources: Sources = {}) 
             operation.guard(); const expectedSelectionEpoch = epoch(value);
             return query(id, { kind: 'open', contractVersion: 1, projection, expectedSelectionEpoch }, operation);
         },
-        async read(sessionSignal?: AbortSignal): Promise<ProfileResult> {
+        async read(sessionSignal?: AbortSignal): Promise<HttpProfileResult> {
             const selected = current;
             if (!selected) return fail('handle_unavailable');
             if (selected.result.currentness.expiresAt <= now()) { current = null; return fail('handle_expired'); }

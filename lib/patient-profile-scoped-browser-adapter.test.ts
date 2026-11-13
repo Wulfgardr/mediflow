@@ -70,3 +70,26 @@ test('lock/reset, malformed epoch, mismatched projection and over-budget respons
         response(init.method === 'GET' ? { contractVersion: 1, selectionEpoch: 7 } : { ...result, profile: { notes: '😀'.repeat(9000) } }) });
     await assert.rejects(oversized.open('synthetic-patient', 'notes'), rejects('output_too_large'));
 });
+
+
+test('HTTP browser readback retains identity metadata and rejects agent-only or widened notes shapes', async () => {
+    const full = { ...result, projection: 'profile', profile: {
+        firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTHETIC', birthDate: null,
+        identifierType: 'other', birthDatePrecision: 'estimated', birthYear: 1940,
+        address: null, phone: null, caregiver: null, diagnoses: null, exemptions: null, notes: 'Synthetic notes',
+        isAdi: false, isArchived: false, statusReason: null, archiveReason: null, archiveNote: null,
+    } };
+    const adapter = (wire: unknown) => createPatientProfileScopedBrowserAdapter({ now: () => 2000,
+        fetch: async (_url, init = {}) => response(init.method === 'GET' ? { contractVersion: 1, selectionEpoch: 7 } : wire) });
+    const client = adapter(full);
+    const opened = await client.open('synthetic-patient', 'profile');
+    assert.deepEqual(opened.profile, full.profile);
+    assert.deepEqual((await client.read()).profile, full.profile);
+    for (const key of ['identifierType', 'birthDatePrecision', 'birthYear']) {
+        const profile = { ...full.profile };
+        Reflect.deleteProperty(profile, key);
+        await assert.rejects(adapter({ ...full, profile }).open('synthetic-patient', 'profile'), rejects('response_invalid'));
+        await assert.rejects(adapter({ ...result, profile: { ...result.profile, [key]: Reflect.get(full.profile, key) } })
+            .open('synthetic-patient', 'notes'), rejects('response_invalid'));
+    }
+});

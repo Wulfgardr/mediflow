@@ -13,7 +13,7 @@ import { clearAllSessions, createNativeServerSession, captureNativeLoginSessionF
 import { bindSessionToArchive, currentArchiveGeneration } from './security/archive-session-generation';
 import { serializeNetworkPairingState, NETWORK_PAIRING_STATE_KEY } from './network-pairing-model';
 import { ambulatories, patients, patientsToAmbulatories, settings, users } from './schema';
-import { isProfileResult, PROFILE_FIELD_NAMES, PROFILE_QUERY_MAX_RESULT_BYTES, assertProfileResultBudget,
+import { isHttpProfileResult, HTTP_PROFILE_FIELD_NAMES, isProfileResult, PROFILE_FIELD_NAMES, PROFILE_QUERY_MAX_RESULT_BYTES, assertProfileResultBudget,
     type ProfileQuery, type ProfileResult } from '../packages/patient-profile-contracts/src/query';
 
 const load = createRequire(import.meta.url);
@@ -100,7 +100,7 @@ for (const lane of ['web', 'network'] as const) test(`${lane}: real scoped adapt
     reset(); select(lane); const before = snapshot();
     const response = await query(lane, open(await epoch(lane))); assert.equal(response.status, 200, await response.clone().text());
     const result = await response.json() as ProfileResult;
-    assert.equal(isProfileResult(result), true); assert.deepEqual(Object.keys(result.profile).sort(), [...PROFILE_FIELD_NAMES].sort());
+    assert.equal(isHttpProfileResult(result), true); assert.deepEqual(Object.keys(result.profile).sort(), [...HTTP_PROFILE_FIELD_NAMES].sort());
     assert.equal(result.profile.notes, notes); assert.equal(JSON.stringify(result).includes('synthetic-internal-id-only-blob'), false);
     assert.equal(JSON.stringify(result).includes(patientA), false); assert.equal(JSON.stringify(result).includes('scope-a'), false);
     assert.equal(response.headers.get('cache-control'), 'no-store');
@@ -125,10 +125,34 @@ for (const lane of ['web', 'network'] as const) {
             assert.equal(result.profile[key], identity[key], `creation confirmation needs ${key}`);
         }
         assert.equal(result.profile.birthDate, identity.birthDate?.toISOString() ?? null);
-        assert.equal(isProfileResult(result), true);
+        assert.equal(isHttpProfileResult(result), true);
         assert.deepEqual(snapshot(), before, 'readback must not write or emit clinical audit');
     });
 }
+
+test('agent host port retains fifteen fields and narrows to notes without HTTP identity metadata', async () => {
+    reset();
+    dbServer.update(patients).set({ identifierType: 'other', birthDatePrecision: 'estimated', birthYear: 1940 })
+        .where(eq(patients.id, patientA)).run();
+    const selected = await (await query('web', open(0))).json() as ProfileResult;
+    const port = await acquirePatientProfileQueryHostPort('profile', Date.now() + 60_000); assert.ok(port);
+    const before = snapshot();
+    try {
+        const full = await port.executeProfileQuery(open(selected.currentness.selectionEpoch));
+        assert.equal(isProfileResult(full), true);
+        assert.equal(isHttpProfileResult(full), false);
+        assert.deepEqual(Object.keys(full.profile).sort(), [...PROFILE_FIELD_NAMES].sort());
+        for (const key of ['identifierType', 'birthDatePrecision', 'birthYear']) {
+            assert.equal(Object.hasOwn(full.profile, key), false, key);
+        }
+        const again = await port.executeProfileQuery(reread(full));
+        assert.deepEqual(again.profile, full.profile);
+        const narrowed = await port.executeProfileQuery(reread(full, 'notes'));
+        assert.deepEqual(narrowed.profile, { notes });
+        assert.equal((await query('web', reread(full))).status, 409, 'agent handles cannot cross into HTTP');
+        assert.deepEqual(snapshot(), before);
+    } finally { port.dispose(); }
+});
 
 test('real adapters reject forged, wrong-patient, wrong-scope, wrong-revision, widened and superseded references', async () => {
     reset(); const first = await (await query('web', open(0, 'notes'))).json() as ProfileResult;
