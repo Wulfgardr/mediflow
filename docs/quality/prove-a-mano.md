@@ -14,6 +14,16 @@ le variabili ereditate dai figli. Rifiuta porte 3000 e 3443 del runtime nativo
 (HomeBaseRuntimeSupervisor.swift), 11434 e 11435 dei provider. Non usa Ollama.
 La qualifica visiva crea a sua volta un archivio proprio e una porta effimera.
 
+Per adattamento e focus, il gate 0.9.1 richiede testo al 100% e al 200%
+senza tagli o collisioni, nei temi Giorno e Grafite. Restano tastiera,
+focus visibile, AccessKit come struttura esposta, ridimensionamento e
+larghezza minima GPUI di 390 punti (320/390 px sul Web dove già previsto).
+L'ingrandimento oltre il 200% e il lettore di schermo sono fuori dal gate,
+secondo gli [emendamenti del contratto](../releases/0.9.1-contract.md).
+I test di regressione al 400% già presenti restano e non qualificano il
+candidato. Il comando automatico e i suoi esiti non sostituiscono le prove
+di composizione richieste sul candidato finale.
+
 ## Censimento Q-8
 
 Fonti: matrice 0.9.1 v6, Q-8 D1/D3 e censimento skip del 9 novembre,
