@@ -14,6 +14,28 @@ import { openAdmittedSqlite, runWithSqliteMaintenance, SqliteMaintenanceHoldErro
 
 const root = process.cwd();
 const store = (target: string) => target + '.maintenance-admission';
+function interruptedClose(f: ReturnType<typeof fixture>, releaseName = 'release-close') {
+    return child(`
+        import fs from 'node:fs'; import path from 'node:path';
+        import { openAdmittedSqlite } from './lib/sqlite-maintenance-admission.mjs';
+        const target = path.join(fs.realpathSync(process.env.MEDIFLOW_DATA_DIR), 'medical.db');
+        const participant = openAdmittedSqlite(target);
+        const gate = path.join(target + '.maintenance-admission', 'gate', 'owner.json');
+        const opened = new Map(), open = fs.openSync, close = fs.closeSync, sync = fs.fsyncSync;
+        fs.openSync = function(file, ...args) { const fd = open.call(this, file, ...args); opened.set(fd, String(file)); return fd; };
+        fs.closeSync = function(fd, ...args) { opened.delete(fd); return close.call(this, fd, ...args); };
+        fs.fsyncSync = function(fd, ...args) {
+            const result = sync.call(this, fd, ...args);
+            if (opened.get(fd) === gate) {
+                process.send({ stage: 'closed-native-handle-with-durable-gate' });
+                const waiter = new Int32Array(new SharedArrayBuffer(4));
+                while (!fs.existsSync(path.join(process.env.MEDIFLOW_DATA_DIR, ${JSON.stringify(releaseName)}))) Atomics.wait(waiter, 0, 0, 5);
+            }
+            return result;
+        };
+        participant.closeSync(); process.exit(0);
+    `, f.dir);
+}
 function fixture() {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-admission-'));
     const target = path.join(dir, 'medical.db');
@@ -71,6 +93,106 @@ test('lease spans native open and close; successful maintenance admits the next 
         const next = openAdmittedSqlite(f.target);
         await next.close();
     } finally { f.cleanup(); }
+});
+
+test('a durable gate left by a terminated closer admits the next opener without reaping its lease', async () => {
+    const f = fixture();
+    const w = interruptedClose(f);
+    try {
+        await message(w.worker);
+        w.worker.kill('SIGKILL'); await w.terminal;
+        const directory = store(f.target), owner = fs.readFileSync(path.join(directory, 'gate', 'owner.json'), 'utf8');
+        const leasesBefore = fs.readdirSync(path.join(directory, 'leases')).map(name => [name, fs.readFileSync(path.join(directory, 'leases', name), 'utf8')]);
+        const bytes = fs.readFileSync(f.target);
+        const next = openAdmittedSqlite(f.target);
+        await next.close();
+        const retired = path.join(directory, `gate-retired-${JSON.parse(owner).id}`);
+        assert.equal(fs.readFileSync(path.join(retired, 'owner.json'), 'utf8'), owner);
+        assert.equal(fs.existsSync(path.join(directory, 'gate')), false);
+        assert.deepEqual(fs.readdirSync(path.join(directory, 'leases')).map(name => [name, fs.readFileSync(path.join(directory, 'leases', name), 'utf8')]), leasesBefore);
+        assert.deepEqual(fs.readFileSync(f.target), bytes);
+        await assert.rejects(runWithSqliteMaintenance(f.target, { timeoutMs: 20 }, () => assert.fail('stale lease is not a drain receipt')), /drain_timeout/);
+    } finally {
+        if (w.worker.exitCode === null && w.worker.signalCode === null) w.worker.kill('SIGKILL');
+        await w.terminal; f.cleanup();
+    }
+});
+
+test('a second live process cannot retire the gate of a paused closer', async () => {
+    const f = fixture(), w = interruptedClose(f);
+    try {
+        await message(w.worker);
+        const owner = fs.readFileSync(path.join(store(f.target), 'gate', 'owner.json'), 'utf8');
+        assert.equal(JSON.parse(owner).pid, w.worker.pid);
+        assert.doesNotThrow(() => process.kill(w.worker.pid!, 0));
+        assert.throws(() => openAdmittedSqlite(f.target), /admission_busy/);
+        assert.equal(fs.readFileSync(path.join(store(f.target), 'gate', 'owner.json'), 'utf8'), owner);
+        assert.deepEqual(fs.readdirSync(store(f.target)).filter(name => name.startsWith('gate-retired-')), []);
+        fs.writeFileSync(path.join(f.dir, 'release-close'), 'release');
+        assert.equal(await w.terminal, 0);
+        const next = openAdmittedSqlite(f.target); await next.close();
+    } finally {
+        if (w.worker.exitCode === null && w.worker.signalCode === null) w.worker.kill('SIGKILL');
+        await w.terminal; f.cleanup();
+    }
+});
+
+test('a stale recovery observer cannot rename a replacement live gate', async () => {
+    const f = fixture(), dead = interruptedClose(f);
+    let observer: ReturnType<typeof child> | undefined, live: ReturnType<typeof child> | undefined;
+    try {
+        await message(dead.worker); dead.worker.kill('SIGKILL'); await dead.terminal;
+        observer = child(`
+            import fs from 'node:fs'; import path from 'node:path'; import assert from 'node:assert/strict';
+            import { openAdmittedSqlite } from './lib/sqlite-maintenance-admission.mjs';
+            const target = path.join(fs.realpathSync(process.env.MEDIFLOW_DATA_DIR), 'medical.db');
+            const rename = fs.renameSync; let paused = false;
+            fs.renameSync = function(from, to) {
+                if (!paused && from === path.join(target + '.maintenance-admission', 'gate')) {
+                    paused = true; process.send('observed-terminated-owner');
+                    const waiter = new Int32Array(new SharedArrayBuffer(4));
+                    while (!fs.existsSync(path.join(process.env.MEDIFLOW_DATA_DIR, 'release-observer'))) Atomics.wait(waiter, 0, 0, 5);
+                }
+                return rename.call(this, from, to);
+            };
+            assert.throws(() => openAdmittedSqlite(target), /admission_busy/);
+            console.log('live replacement preserved'); process.exit(0);
+        `, f.dir);
+        await message(observer.worker);
+        live = child(`
+            import fs from 'node:fs'; import path from 'node:path';
+            import { openAdmittedSqlite } from './lib/sqlite-maintenance-admission.mjs';
+            const target = path.join(fs.realpathSync(process.env.MEDIFLOW_DATA_DIR), 'medical.db');
+            const gate = path.join(target + '.maintenance-admission', 'gate', 'owner.json');
+            const handles = new Map(), open = fs.openSync, close = fs.closeSync, sync = fs.fsyncSync;
+            fs.openSync = function(file, ...args) { const fd = open.call(this, file, ...args); handles.set(fd, String(file)); return fd; };
+            fs.closeSync = function(fd, ...args) { handles.delete(fd); return close.call(this, fd, ...args); };
+            fs.fsyncSync = function(fd, ...args) {
+                const result = sync.call(this, fd, ...args);
+                if (handles.get(fd) === gate && !fs.existsSync(path.join(process.env.MEDIFLOW_DATA_DIR, 'release-live'))) {
+                    process.send('replacement-gate-live'); const waiter = new Int32Array(new SharedArrayBuffer(4));
+                    while (!fs.existsSync(path.join(process.env.MEDIFLOW_DATA_DIR, 'release-live'))) Atomics.wait(waiter, 0, 0, 5);
+                }
+                return result;
+            };
+            const participant = openAdmittedSqlite(target); participant.closeSync(); process.exit(0);
+        `, f.dir);
+        await message(live.worker);
+        const gate = path.join(store(f.target), 'gate', 'owner.json'), owner = fs.readFileSync(gate, 'utf8');
+        assert.equal(JSON.parse(owner).pid, live.worker.pid);
+        fs.writeFileSync(path.join(f.dir, 'release-observer'), 'release');
+        assert.equal(await observer.terminal, 0, observer.output());
+        assert.equal(fs.readFileSync(gate, 'utf8'), owner);
+        assert.doesNotThrow(() => process.kill(live!.worker.pid!, 0));
+        fs.writeFileSync(path.join(f.dir, 'release-live'), 'release');
+        assert.equal(await live.terminal, 0, live.output());
+    } finally {
+        for (const w of [dead, observer, live]) if (w) {
+            if (w.worker.exitCode === null && w.worker.signalCode === null) w.worker.kill('SIGKILL');
+            await w.terminal;
+        }
+        f.cleanup();
+    }
 });
 
 test('default async close shares the synchronous admission budget under gate contention', async () => {
