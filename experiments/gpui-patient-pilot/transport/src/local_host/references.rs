@@ -52,6 +52,9 @@ pub struct PreparedReferenceImport {
     cancellation: Option<Box<RequestContext>>,
 }
 impl PreparedReferenceImport {
+    pub fn can_submit(&self) -> bool {
+        self.can_commit() && !self.submitted.load(Ordering::Acquire)
+    }
     pub fn cancel_acquisition(&self) {
         if let Some(context) = &self.cancellation {
             context.cancel();
@@ -668,6 +671,9 @@ pub struct PreparedProstheticsDocument {
     submitted: AtomicBool,
 }
 impl PreparedProstheticsDocument {
+    pub fn can_submit(&self) -> bool {
+        !self.submitted.load(Ordering::Acquire)
+    }
     pub fn review(&self) -> Value {
         json!({"sourceId":self.payload["sourceId"],"revision":self.payload["revision"],"name":self.payload["name"],"sha256":self.sha256,"page":self.payload["page"]})
     }
