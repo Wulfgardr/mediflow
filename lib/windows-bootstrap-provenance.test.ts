@@ -5,8 +5,22 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
+import { SCHEDULED_BACKUP_RUNTIME_ROSTER } from '../scripts/scheduled-backup-runtime-contract.mjs';
 import * as provenance from '../scripts/verify-windows-bootstrap-rebuild.mjs';
 import { assertBootstrapBytesEqual, peByteDifferences } from '../scripts/verify-windows-bootstrap-rebuild.mjs';
+
+test('committed Windows bootstrap pairs match the scheduled backup runtime admission pins', () => {
+    for (const arch of ['x64', 'arm64']) {
+        for (const name of ['system-directory.node', 'manifest.json']) {
+            const relative = `scripts/windows-launcher-bootstrap/prebuilds/win32-${arch}/${name}`;
+            const entry = SCHEDULED_BACKUP_RUNTIME_ROSTER.find(item => item.path === relative);
+            assert.ok(entry, relative);
+            const bytes = fs.readFileSync(new URL(`../${relative}`, import.meta.url));
+            assert.equal(createHash('sha256').update(bytes).digest('hex'), entry.sha256, relative);
+        }
+    }
+});
 
 for (const arch of ['x64', 'arm64']) {
     test(`Windows ${arch} provenance comparison rejects every changed byte including timestamps`, () => {
