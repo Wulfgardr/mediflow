@@ -37,6 +37,9 @@ jobs:
         with:
           node-version: 24
           architecture: ${{ matrix.arch }}
+      - name: Inspect native bootstrap toolchain and installed MSVC versions
+        shell: pwsh
+        run: ./scripts/inspect-windows-bootstrap-toolchain.ps1 -Architecture '${{ matrix.arch }}' -Output "$env:RUNNER_TEMP/bootstrap-toolchain.json"
       - name: Prepare native bootstrap regeneration
         if: github.event_name == 'workflow_dispatch' && inputs.regenerate_bootstrap
         run: node -e "const fs=require('node:fs'); for(const name of ['system-directory.node','manifest.json']) fs.unlinkSync('scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/'+name);"
