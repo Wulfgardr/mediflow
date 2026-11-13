@@ -3,8 +3,7 @@
 import { INSIGHT_LIMITS } from '@/lib/insight-parameters-contract';
 
 import { FunctionPreferencesPanel } from '@/components/function-models/function-preferences-panel';
-import { useCallback, useState } from 'react';
-import type { FunctionModelPreferences } from '@/lib/function-models/browser';
+import { useState } from 'react';
 import Link from 'next/link';
 
 // WUL-297 Funzioni cliniche AI: moved from the monolithic settings page.
@@ -35,10 +34,7 @@ export default function SettingsAiFunctionsPage() {
         isSavingAi,
         aiSettingsLoadState,
         aiSettingsConflict, aiSettingsReadback, rereadAiConfig,
-        setPatientInsightEnabled,
-        setDocumentSynthesisEnabled,
-        setSmartImportEnabled,
-        setTreatmentReasoningEnabled,
+        syncFunctionPreferences,
         documentRouterControlFlowMode,
         setDocumentRouterControlFlowMode,
         selectedInsightMode,
@@ -46,16 +42,6 @@ export default function SettingsAiFunctionsPage() {
         updateManualInsightConfig,
         saveAiConfig,
     } = useAiSettingsController();
-
-    /* mirror confirmed switches into the existing shared configuration draft. */
-    const syncPreferences = useCallback((dto: FunctionModelPreferences) => {
-        for (const row of dto.functions) {
-            if (row.id === 'patient_insight') setPatientInsightEnabled(row.enabled);
-            if (row.id === 'smart_import') setSmartImportEnabled(row.enabled);
-            if (row.id === 'document_synthesis') setDocumentSynthesisEnabled(row.enabled);
-            if (row.id === 'treatment_reasoning') setTreatmentReasoningEnabled(row.enabled);
-        }
-    }, [setPatientInsightEnabled, setSmartImportEnabled, setDocumentSynthesisEnabled, setTreatmentReasoningEnabled]);
 
     return (
         <section className={styles.page} data-testid="settings-ai-functions-section">
@@ -78,7 +64,7 @@ export default function SettingsAiFunctionsPage() {
             <fieldset disabled={aiSettingsLoadState !== 'ready'} aria-busy={aiSettingsLoadState === 'loading'}
                 aria-label="Impostazioni delle funzioni locali" data-testid="ai-settings-controls"
                 className={styles.controls}>
-            <FunctionPreferencesPanel onRead={syncPreferences} onProposalChange={setHasPreferencesPreview} />
+            <FunctionPreferencesPanel onRead={syncFunctionPreferences} onProposalChange={setHasPreferencesPreview} />
 
             <section className={styles.advanced} aria-labelledby="functions-advanced-title">
                 <h3 id="functions-advanced-title">Parametri avanzati</h3>

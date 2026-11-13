@@ -8,6 +8,7 @@ import { harness } from './ai-settings-controller.test-support.ts';
 import { installNetworkPatientCookieFixture } from '../network-patient-authority-test-fixture';
 import { syntheticLoopbackRequest } from '../security/loopback-ingress-test-fixture';
 import { issueSyntheticWebSessionContext, retireSyntheticWebSession } from '../security/web-auth-lifecycle-owner-test-fixture';
+import { readFunctionModelPreferences } from '../ai-providers/fabric/function-model-preferences';
 
 const root = mkdtempSync(join(tmpdir(), 'mf-d06-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = root;
@@ -175,4 +176,23 @@ test('required audit failure after configuration revocation rolls back the whole
         assert.deepEqual(responses, [500]);
         assert.deepEqual(snapshot(), before, 'configuration generation and earlier audit events roll back');
     } finally { sql.exec('DROP TRIGGER synthetic_d06_audit_failure'); }
+});
+
+for (const concurrentParameters of [false, true]) test(`confirmed preference switches refresh only their preconditions; concurrent parameters=${concurrentParameters}`, async t => {
+    reset(); t.mock.method(globalThis, 'fetch', boundary); active = clientA;
+    const a = await mount(); t.after(a.close);
+    a.render().setAiInsightSettings(previous => ({ ...previous, mode: 'balanced' }));
+    await boundary('/api/settings/aiPatientInsightKillSwitch', { method: 'PUT', body: JSON.stringify({ value: 'enabled' }) });
+    if (concurrentParameters) await boundary('/api/settings/aiInsightMode', { method: 'PUT', body: JSON.stringify({ value: 'full_auto' }) });
+    const rows = sql.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[];
+    const dto = readFunctionModelPreferences({ settings: Object.fromEntries(rows.map(row => [row.key, row.value])), ollamaLifecycle: { status: 'denied', reason: 'missing' } }, 'v2');
+    const before = snapshot();
+    await a.render().syncFunctionPreferences(dto);
+    assert.deepEqual(snapshot(), before, 'synchronizing the confirmed switches is read-only');
+    assert.equal(a.render().aiInsightSettings.mode, 'balanced');
+    responses.length = 0;
+    await a.render().saveAiConfig();
+    assert.deepEqual(responses, [concurrentParameters ? 409 : 200]);
+    if (concurrentParameters) assert.deepEqual(snapshot(), before, 'switch readback cannot authorize a stale parameter draft');
+    else { assert.equal(value('aiPatientInsightKillSwitch'), 'enabled'); assert.equal(value('aiInsightMode'), 'balanced'); }
 });
