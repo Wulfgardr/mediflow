@@ -1,7 +1,7 @@
 {
   "schema": "mediflow.intelligence-release-register.v1",
   "release": "0.9.1",
-  "sourceRevision": "8954e9c97b4ea2016c20c8433b43ee0f5231607a",
+  "sourceRevision": "3e8455fe40243a0c45e471529058442946afc451",
   "contract": "docs/releases/0.9.1-contract.md",
   "contractSha256": "49cbf931356ea217f9446644a10b3b2ed7bd299e8d4070a1feccd7c7dd7ca4ba",
   "purpose": "coverage_only_no_runtime_admission",
@@ -28,7 +28,12 @@
         "C-7",
         "C-8"
       ],
-      "runtimeProof": null
+      "runtimeProof": {
+        "path": "docs/quality/intelligence/2026-11-13-ollama/measurements.json",
+        "sourceRevision": "3e8455fe40243a0c45e471529058442946afc451",
+        "status": "partial_http_execution",
+        "qualification": false
+      }
     },
     {
       "descriptor": {
@@ -52,7 +57,12 @@
         "C-7",
         "C-8"
       ],
-      "runtimeProof": null
+      "runtimeProof": {
+        "path": "docs/quality/intelligence/2026-11-13-ollama/measurements.json",
+        "sourceRevision": "3e8455fe40243a0c45e471529058442946afc451",
+        "status": "partial_http_execution",
+        "qualification": false
+      }
     },
     {
       "descriptor": {
@@ -76,7 +86,12 @@
         "C-7",
         "C-8"
       ],
-      "runtimeProof": null
+      "runtimeProof": {
+        "path": "docs/quality/intelligence/2026-11-13-ollama/measurements.json",
+        "sourceRevision": "3e8455fe40243a0c45e471529058442946afc451",
+        "status": "blocked_local_extraction",
+        "qualification": false
+      }
     },
     {
       "descriptor": {
@@ -409,15 +424,16 @@
         "headless": "not_verified"
       },
       "proof": {
-        "path": "docs/quality/intelligence/2026-11-13-ollama/admission.json",
-        "status": "blocked_before_inference",
-        "sourceRevision": "8954e9c97b4ea2016c20c8433b43ee0f5231607a"
+        "path": "docs/quality/intelligence/2026-11-13-ollama/measurements.json",
+        "sourceRevision": "3e8455fe40243a0c45e471529058442946afc451",
+        "status": "partial_http_execution"
       },
       "blockedBy": [
-        "provider_version_unsupported",
-        "I-2_not_executed",
-        "C-L_baseline_missing"
-      ]
+        "C-L_errors_or_incomplete_qualification",
+        "physical_revocation_not_proved",
+        "gpu_memory_not_measured"
+      ],
+      "modelObservedInOperation": true
     },
     {
       "id": "patient_insight/chatgpt",
@@ -465,15 +481,16 @@
         "headless": "not_verified"
       },
       "proof": {
-        "path": "docs/quality/intelligence/2026-11-13-ollama/admission.json",
-        "status": "blocked_before_inference",
-        "sourceRevision": "8954e9c97b4ea2016c20c8433b43ee0f5231607a"
+        "path": "docs/quality/intelligence/2026-11-13-ollama/measurements.json",
+        "sourceRevision": "3e8455fe40243a0c45e471529058442946afc451",
+        "status": "partial_http_execution"
       },
       "blockedBy": [
-        "provider_version_unsupported",
-        "I-2_not_executed",
-        "C-L_baseline_missing"
-      ]
+        "C-L_errors_or_incomplete_qualification",
+        "physical_revocation_not_proved",
+        "gpu_memory_not_measured"
+      ],
+      "modelObservedInOperation": true
     },
     {
       "id": "smart_import/chatgpt",
@@ -521,15 +538,17 @@
         "headless": "not_verified"
       },
       "proof": {
-        "path": "docs/quality/intelligence/2026-11-13-ollama/admission.json",
-        "status": "blocked_before_inference",
-        "sourceRevision": "8954e9c97b4ea2016c20c8433b43ee0f5231607a"
+        "path": "docs/quality/intelligence/2026-11-13-ollama/measurements.json",
+        "sourceRevision": "3e8455fe40243a0c45e471529058442946afc451",
+        "status": "blocked_local_extraction"
       },
       "blockedBy": [
-        "provider_version_unsupported",
+        "nested_process_sandbox",
         "I-2_not_executed",
-        "C-L_baseline_missing"
-      ]
+        "C-L_errors",
+        "gpu_memory_not_measured"
+      ],
+      "modelObservedInOperation": false
     },
     {
       "id": "document_synthesis/chatgpt",
@@ -591,12 +610,41 @@
     "concurrentModelLoads": 1,
     "memoryBudgetBytes": null,
     "latencyBudgetMs": null,
-    "status": "blocked_before_inference",
+    "status": "partial_measurement_not_qualified",
     "modelIdentifier": "Mac17,10",
     "memoryBytes": 51539607552,
     "os": "macOS 27.3",
     "osBuild": "26C5035r",
-    "budgetReason": "provider_version_unsupported_no_end_to_end_baseline"
+    "budgetReason": "DS_blocked_C-L_errors_gpu_memory_unmeasured",
+    "measuredBudgets": {
+      "evidence": "docs/quality/intelligence/2026-11-13-ollama/measurements.json",
+      "cells": {
+        "patient_insight": {
+          "scope": "single_I2_baseline_not_C-L_qualification",
+          "latencyMs": 3807,
+          "rssBytes": 956517581,
+          "gpuMemoryIncluded": false,
+          "source": "i2/complete",
+          "error": null
+        },
+        "smart_import": {
+          "scope": "single_I2_baseline_not_C-L_qualification",
+          "latencyMs": 4008,
+          "rssBytes": 1071022080,
+          "gpuMemoryIncluded": false,
+          "source": "i2/complete",
+          "error": null
+        },
+        "document_synthesis": {
+          "scope": "single_I2_baseline_not_C-L_qualification",
+          "latencyMs": null,
+          "rssBytes": null,
+          "gpuMemoryIncluded": false,
+          "source": "i2/complete",
+          "error": "unsupported_local_extraction"
+        }
+      }
+    }
   },
   "localRunPrecheck": {
     "date": "2026-10-30",
@@ -890,11 +938,11 @@
     }
   ],
   "localRunMeasurement20261113": {
-    "sourceRevision": "8954e9c97b4ea2016c20c8433b43ee0f5231607a",
-    "evidence": "docs/quality/intelligence/2026-11-13-ollama/admission.json",
-    "status": "blocked_before_inference",
+    "sourceRevision": "3e8455fe40243a0c45e471529058442946afc451",
+    "candidateRevision": "8954e9c97b4ea2016c20c8433b43ee0f5231607a",
+    "evidence": "docs/quality/intelligence/2026-11-13-ollama/measurements.json",
+    "status": "partial_measurement_not_qualified",
     "qualification": false,
-    "inferenceAttempts": 0,
-    "methodSha256": "1fde46cad29a803d95c4c4303c8fb87adbcc3f02af14eb0475de2a5c22bbe0dd"
+    "methodSha256": "c1e49c9f94a6926753771b34b8f682a4943ca7e18e78695455cbbd4408134549"
   }
 }
