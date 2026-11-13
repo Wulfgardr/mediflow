@@ -19,6 +19,7 @@ struct Store {
     lock_after_first: bool,
     writes: usize,
     clinical: usize,
+    extractions: usize,
     fail_second: bool,
     deny_after_first: Option<u16>,
 }
@@ -139,6 +140,7 @@ impl Fixture {
                             .collect::<Vec<_>>()
                     )
                 } else if first.starts_with("POST /api/documents/dossier-extraction ") {
+                    store.extractions += 1;
                     json!({"status":"extracted","markdown":text,"ocr":null})
                 } else if first.starts_with("GET /api/attachments?") {
                     json!(store.attachments)
@@ -315,6 +317,39 @@ fn string(v: &Value) -> &str {
     v.as_str().unwrap_or("")
 }
 const TEXT: &str = "Data referto: 20/10/2026\nPaziente: Ada Sintetica\nIl paziente assume Ramipril 5 mg al mattino.\nIl paziente assume Metformina 500 mg alla sera.";
+#[test]
+fn dossier_txt_is_refused_by_embedded_worker_before_extraction_and_storage() {
+    let mut fixture = Fixture::new(TEXT);
+    let txt = fixture.file.with_extension("txt");
+    std::fs::remove_file(&fixture.file).unwrap();
+    fixture.file = txt;
+    std::fs::write(
+        &fixture.file,
+        include_bytes!("../../../../lib/domain/documents/fixtures/dossier-source-f09.txt"),
+    )
+    .unwrap();
+    let worker = fixture.worker();
+    // Anche con proposte preparate abbinate per hash, la fonte resta respinta.
+    let preview = fixture.review(&worker, "5 mg", "Ada");
+    let source = &preview["groups"][0]["sources"][0];
+    assert_eq!(source["status"], "unsupported_format");
+    assert_eq!(source["classification"]["extractable"], false);
+    assert!(string(&source["classification"]["reason"]).contains("TXT non ammesso"));
+    assert_eq!(source["extraction"]["state"], "not_extracted");
+    assert_eq!(source["facts"], json!([]));
+    assert!(source["text"].is_null());
+    let result = worker
+        .apply(string(&preview["groups"][0]["key"]), "p-a", false)
+        .unwrap();
+    assert_eq!(result["acquired"][0]["status"], "skipped");
+    assert_eq!(result["acquired"][0]["reason"], "unsupported_format");
+    let store = fixture.store.lock().unwrap();
+    assert_eq!(store.extractions, 0);
+    assert_eq!(store.writes, 0);
+    assert_eq!(store.clinical, 0);
+    drop(store);
+    worker.retire();
+}
 #[test]
 fn dossier_cancel_identity_name_and_forgery_never_write() {
     for (text, dose, proposed, blocked) in [

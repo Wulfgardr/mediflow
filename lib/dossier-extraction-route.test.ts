@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test, { after } from 'node:test';
 import Database from 'better-sqlite3';
+import { createDossierPorts } from './document-dossier-ports';
+import { acquireDossierGroup, buildDossierInventory, type DossierInputFile } from './document-dossier-session';
 
 // Archivio sintetico migrato: la route non deve scrivervi nulla.
 const root = process.cwd();
@@ -86,4 +88,49 @@ test('an unsupported source is a declared failure, not text', async () => {
     assert.equal(body.status, 'failed');
     assert.equal(typeof body.detail, 'string');
     assert.equal(body.markdown, undefined);
+});
+
+test('D05: TXT is refused at selection through the real import producer; RTF still reaches the real route without writes', async () => {
+    const before = rowCounts();
+    const txt = fs.readFileSync(path.join(root, 'lib/domain/documents/fixtures/dossier-source-f09.txt'));
+    const direct = await invoke(local(txt));
+    assert.deepEqual(await direct.json(), { status: 'failed', detail: 'unsupported_format' });
+    const requests: string[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+        assert.equal(input, '/api/documents/dossier-extraction');
+        requests.push(String(input));
+        return invoke(local(init!.body!));
+    };
+    const inputFile = (name: string, type: string, bytes: Uint8Array): DossierInputFile => ({
+        name, type, size: bytes.byteLength, relativePath: `Sintetico/${name}`, lastModified: 0,
+        read: async () => new Uint8Array(bytes),
+    });
+    const ports = { ...createDossierPorts(), exemptionCodes: async () => new Set<string>(),
+        listPatients: async () => [{ id: 'synthetic-patient', firstName: 'Ada', lastName: 'Sintetica', taxCode: '', diagnoses: [], exemptions: [] }] };
+    const live = { signal: new AbortController().signal, isCurrent: () => true };
+    try {
+        const [group] = await buildDossierInventory(ports, [
+            inputFile('fonte.txt', 'text/plain', txt),
+            inputFile('fonte-senza-estensione', 'text/plain; charset=utf-8', Buffer.concat([txt, Buffer.from('\n')])),
+            inputFile('lettera.rtf', 'application/rtf', RTF),
+        ], live);
+        const source = group.sources[0];
+        assert.equal(source.status, 'unsupported_format', 'TXT must be refused before extraction, not accepted and failed later');
+        assert.equal(source.classification.extractable, false);
+        assert.match(source.classification.reason, /TXT non ammesso.*PDF.*immagine.*Office/u);
+        assert.deepEqual(source.extraction, { state: 'not_extracted', reason: 'text' });
+        assert.equal(source.text, null);
+        assert.deepEqual(source.facts, []);
+        assert.equal(group.sources[1].status, 'unsupported_format');
+        assert.equal(group.sources[1].classification.extractable, false);
+        assert.equal(group.sources[2].status, 'ready');
+        assert.equal(group.sources[2].extraction.state, 'extracted');
+        assert.match(group.sources[2].text!, /Glucosio 110 mg\/dL/u);
+        assert.equal(requests.length, 1, 'only the supported RTF reaches the real route');
+        const rejectedOnly = { ...group, sources: [source] };
+        const acquired = await acquireDossierGroup(ports, { group: rejectedOnly, patientId: 'synthetic-patient', confirmed: true, ...live });
+        assert.deepEqual(acquired, [{ key: source.key, status: 'skipped', reason: 'unsupported_format' }]);
+        assert.deepEqual(rowCounts(), before);
+    } finally { globalThis.fetch = originalFetch; }
 });

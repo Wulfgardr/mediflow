@@ -35,6 +35,23 @@ test('classification identifies p7m, archives and e-mail as preserved-only, PDFs
     assert.equal(classifyDossierSource({ name: 'x.eml', size: 3, head: enc.encode('Fro') }).extractable, false);
 });
 
+test('D05: TXT and text/plain never promise extraction, including invalid UTF-8 and disguised binary', () => {
+    for (const [name, declaredType, head] of [
+        ['fonte.TXT', '', enc.encode('Solo testo sintetico')],
+        ['senza-estensione', 'Text/Plain; charset=utf-8', enc.encode('Solo testo sintetico')],
+        ['binario.txt', 'text/plain', new Uint8Array([0, 1, 0xff, 2])],
+        ['invalido.txt', '', new Uint8Array([0xc3, 0x28])],
+    ] as const) {
+        const classification = classifyDossierSource({ name, declaredType, size: head.length, head });
+        assert.equal(classification.extractable, false, name);
+        assert.equal(classification.kind, 'text');
+        assert.match(classification.reason, /TXT non ammesso.*PDF.*immagine.*Office/u);
+    }
+    // La firma effettiva continua a riconoscere i formati già supportati.
+    assert.equal(classifyDossierSource({ name: 'referto.txt', declaredType: 'text/plain', size: 10, head: enc.encode('%PDF-1.7') }).kind, 'pdf');
+    assert.equal(classifyDossierSource({ name: 'immagine.png', size: 10, head: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) }).extractable, true);
+});
+
 test('page units come only from sequential OCR markers; otherwise one document unit', () => {
     const text = '## Pagina 1\n\nuno\n\n---\n\n## Pagina 2\n\ndue';
     const pages = splitDossierUnits(text, 2);

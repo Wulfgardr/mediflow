@@ -96,6 +96,10 @@ export function classifyDossierSource(input: { name: string; size: number; decla
         || startsWith(input.head, [0x66, 0x74, 0x79, 0x70], 4);
     if (image || IMAGE_EXTENSIONS.has(extension)) return { kind: 'image', mediaType, extractable: true, reason: 'Immagine' };
     if (OFFICE_EXTENSIONS.has(extension)) return { kind: 'office', mediaType, extractable: true, reason: 'Documento Office' };
+    if (extension === 'txt' || declared.split(';', 1)[0].trim() === 'text/plain') {
+        return { kind: 'text', mediaType: 'text/plain', extractable: false,
+            reason: 'Formato TXT non ammesso nel dossier. Scegli un PDF, un’immagine o un documento Office.' };
+    }
     if (TEXT_EXTENSIONS.has(extension) || declared.startsWith('text/')) return { kind: 'text', mediaType: MEDIA_TYPES[extension] ?? 'text/plain', extractable: true, reason: 'Testo' };
     return { kind: 'unknown', mediaType, extractable: false, reason: 'Formato non riconosciuto: si conserva l’originale senza estrazione.' };
 }
