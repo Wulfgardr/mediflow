@@ -590,6 +590,15 @@ impl ClinicalApp {
         if self.local_host.has_work() {
             return;
         }
+        if self
+            .local_host
+            .references
+            .preview
+            .as_ref()
+            .is_none_or(|command| !command.can_submit())
+        {
+            return;
+        }
         let Some(access) = self.local_host.access() else {
             return;
         };
@@ -632,7 +641,8 @@ impl ClinicalApp {
                         _=>{area.snapshot=None;area.message=Some(format!("{} Rilettura non riuscita. Rileggi lo stato.", aifa_outcome(&receipt)));}
                     }
                 },
-                Err(e)=>{area.snapshot=None;area.message=Some(format!("{} L’esito potrebbe non essere noto. Rileggi lo stato prima di una nuova anteprima.",ui_error(e)));}
+                Err(e) if e.retires_session()=>{this.disconnect(cx);this.message=Some((ui_error(e),true));cx.notify();return;},
+                Err(e)=>{area.preview=Some(retained);area.snapshot=None;area.message=Some(format!("{} L’esito potrebbe non essere noto. Rileggi lo stato prima di una nuova anteprima.",ui_error(e)));}
             } cx.notify();
         },cx);
         cx.notify();
@@ -785,7 +795,7 @@ impl ClinicalApp {
                         },
                         theme,
                         false,
-                        enabled,
+                        enabled && preview.can_submit(),
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.commit_reference_import(cx))),
                 );
@@ -1225,7 +1235,7 @@ impl ClinicalApp {
                         "Conferma allegato originale",
                         self.theme,
                         true,
-                        enabled,
+                        enabled && command.can_submit(),
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.attach_prosthetics_original(cx))),
                 )
@@ -1447,6 +1457,15 @@ impl ClinicalApp {
         if self.local_host.has_work() {
             return;
         }
+        if self
+            .local_host
+            .references
+            .document
+            .as_ref()
+            .is_none_or(|command| !command.can_submit())
+        {
+            return;
+        }
         let (Some(access), Some(command)) = (
             self.local_host.access(),
             self.local_host.references.document.take(),
@@ -1454,7 +1473,8 @@ impl ClinicalApp {
             return;
         };
         self.local_host.references.busy = true;
-        self.run_local_host(move||{let receipt=access.attach_prosthetics_document(&command)?;let current=access.read_reference_catalog(ReferenceCatalog::Prosthetics);Ok((receipt,current))},|this,result,cx|{
+        let retained = command.clone();
+        self.run_local_host(move||{let receipt=access.attach_prosthetics_document(&command)?;let current=access.read_reference_catalog(ReferenceCatalog::Prosthetics);Ok((receipt,current))},move|this,result,cx|{
             let area=&mut this.local_host.references;area.busy=false;
             match result {
                 Ok((receipt,Ok(current)))=>{
@@ -1462,7 +1482,8 @@ impl ClinicalApp {
                     area.snapshot=Some(current);area.receipt=Some(receipt);area.message=Some(if found {"Originale allegato e riletto."}else{"Originale registrato. La rilettura non ne conferma la presenza: rileggi le fonti prima di riprovare."}.into());
                 },
                 Ok((receipt,Err(_)))=>{area.receipt=Some(receipt);area.snapshot=None;area.message=Some("Originale registrato; rilettura non riuscita. Rileggi le fonti.".into());},
-                Err(e)=>{area.snapshot=None;area.message=Some(format!("{} Rileggi le fonti prima di riprovare.",ui_error(e)));}
+                Err(e) if e.retires_session()=>{this.disconnect(cx);this.message=Some((ui_error(e),true));cx.notify();return;},
+                Err(e)=>{area.document=Some(retained);area.snapshot=None;area.message=Some(format!("{} Rileggi le fonti prima di riprovare.",ui_error(e)));}
             }cx.notify();
         },cx);
     }
@@ -1554,6 +1575,113 @@ mod tests {
             json!({})
         );
     }
+    #[gpui::test]
+    fn reference_conflicts_keep_the_exact_review_without_resubmitting(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        for (catalog, route) in [
+            (ReferenceCatalog::Exemptions, "/api/exemptions/import"),
+            (ReferenceCatalog::Prosthetics, "/api/prosthetics/catalog"),
+            (ReferenceCatalog::Who, "/api/icd/catalog"),
+        ] {
+            let prepare_route = if catalog == ReferenceCatalog::Who {
+                format!("POST {route}")
+            } else {
+                format!("POST {route}/preview")
+            };
+            host.plan(&prepare_route).send((200, if catalog == ReferenceCatalog::Who {
+                json!({"previewId":"synthetic-preview","expectedRevision":1,"manifest":{}})
+            } else {
+                json!({"valid":true,"proof":"synthetic-proof","manifest":{},"sample":[],"diagnostics":[]})
+            })).unwrap();
+            let command = Arc::new(if catalog == ReferenceCatalog::Who {
+                access.prepare_who_acquisition().unwrap()
+            } else {
+                access
+                    .prepare_reference_file(
+                        catalog,
+                        "catalogo.csv",
+                        b"codice;descrizione\nSYN;Sintetica",
+                        Value::Null,
+                    )
+                    .unwrap()
+            });
+            view.update(cx, |app, _| {
+                app.session = Some(host.session.clone());
+                app.area = Area::Settings;
+                app.settings_page = SettingsPage::References;
+                app.local_host.authority = Authority::Open(access.clone());
+                app.local_host.references.catalog = catalog;
+                app.local_host.references.preview = Some(command.clone());
+            });
+            let commit_route = if catalog == ReferenceCatalog::Who {
+                format!("POST {route}")
+            } else {
+                format!("POST {route}/commit")
+            };
+            host.plan(&commit_route)
+                .send((409, json!({"code":"REVISION_CONFLICT"})))
+                .unwrap();
+            view.update(cx, |app, cx| app.commit_reference_import(cx));
+            cx.run_until_parked();
+            view.read_with(cx, |app, _| {
+                assert!(app.local_host.references.preview.as_ref().is_some_and(|retained| Arc::ptr_eq(retained, &command)),
+                    "{catalog:?}: preserve the selected bytes, mapping and exact review after conflict");
+            });
+            let requests = host.bodies(&commit_route).len();
+            view.update(cx, |app, cx| app.commit_reference_import(cx));
+            cx.run_until_parked();
+            assert_eq!(
+                host.bodies(&commit_route).len(),
+                requests,
+                "a consumed command cannot be resent"
+            );
+        }
+        let command = Arc::new(
+            access
+                .prepare_prosthetics_document(
+                    "source-synthetic",
+                    &"a".repeat(64),
+                    "originale.txt",
+                    b"Fonte sintetica",
+                    Some("1"),
+                )
+                .unwrap(),
+        );
+        view.update(cx, |app, _| {
+            app.local_host.references.document = Some(command.clone())
+        });
+        host.plan("POST /api/prosthetics/catalog/documents")
+            .send((409, json!({"code":"REVISION_CONFLICT"})))
+            .unwrap();
+        view.update(cx, |app, cx| app.attach_prosthetics_original(cx));
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert!(
+                app.local_host
+                    .references
+                    .document
+                    .as_ref()
+                    .is_some_and(|retained| Arc::ptr_eq(retained, &command))
+            );
+        });
+        let requests = host.request_count();
+        view.update(cx, |app, cx| app.attach_prosthetics_original(cx));
+        cx.run_until_parked();
+        assert_eq!(host.request_count(), requests);
+    }
+
     #[gpui::test]
     fn aifa_busy_download_keeps_progress_and_cancellation_reachable(cx: &mut gpui::TestAppContext) {
         let host = notes_recovery_tests::Host::new();
