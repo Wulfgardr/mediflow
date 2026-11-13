@@ -153,6 +153,57 @@ La conservazione integrale dei controlli rimane un limite della redazione.
 Questa misura qualifica le due serie sintetiche fissate. Consenso, ammissione
 del broker, canali e uso dei desktop restano fuori dalla prova.
 
+## C-B: falsi positivi locali, terzo giro
+
+La [misura dei falsi positivi](./cb-clinical-fp-20261113-summary.json) confronta
+le sole regole locali della base `56f9dd5cd` con la correzione, senza modello
+e senza identificativi noti forniti dal chiamante. Prima di misurare sono stati
+congelati 332 testi unici da 18 fonti sintetiche della repository (427 frasi,
+2.454 parole) e 36 frasi difficili (257 parole). I corpus C-B precedenti sono
+esclusi dalla raccolta indipendente. Le fonti, le trasformazioni e gli hash
+sono nella [raccolta](../../scripts/fixtures/cb-clinical-independent.json).
+
+| Corpus | Span nuovi prima | Falsi positivi prima | Parole cliniche cancellate prima | Span nuovi dopo | Falsi positivi dopo | Parole cliniche cancellate dopo |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Testi interni | 8 | 8 | 20 | 0 | 0 | 0 |
+| Frasi difficili | 22 | 21 | 98 | 4 | 0 | 0 |
+
+I quattro span restanti sono città annotate come identificativi. Gli elenchi
+completi [prima](./cb-clinical-fp-20261113-before.json) e
+[dopo](./cb-clinical-fp-20261113-after.json) conservano, per ogni testo, span
+base/correzione, intervalli aggiunti e frase attorno. La
+[classificazione](./cb-clinical-fp-20261113-classification.json) spiega ogni
+intervallo nuovo; gli span misti con città e terapia sono falsi positivi.
+
+```bash
+nice -n 19 node scripts/run-strip-types.mjs scripts/measure-cb-clinical-fp.ts --out /percorso/nuovo-confronto.json
+```
+
+Il comando carica la funzione storica da Git e la confronta con quella attuale.
+Non esegue seed, test E2E o modelli. Serve la storia Git locale, presente nel
+checkout completo della CI. Il budget conservato nel repository è **zero nuove
+parole cliniche cancellate** su entrambi i corpus, con hash obbligatori.
+Trentacinque regressioni falliscono sulla testa `5067bc0f1` e passano dopo,
+incluse le due osservazioni della review. Il controllo del budget resta nella
+suite unit. Con i test pertinenti si contano 183 pass, senza skip.
+
+La grammatica CF richiede mese/giorno compatibili, delimitatori limitati e
+almeno due cifre effettive, oppure un checksum valido per l'omocodia. I CF
+candidati OCR con cifre continuano ad essere trattati anche con checksum errato.
+Le clausole geografiche si fermano prima di una proposizione clinica coordinata;
+i trasferimenti fra reparti e le condizioni di vita non sono luoghi. Le
+sequenze di numeri dettati richiedono un contesto di recapito. Una chiave
+geografica importata non basta a cancellare tutta la sua cella, che può
+contenere istruzioni cliniche.
+
+La [nuova prova col modello](./cb-redaction-20261113-giro3.json) conferma zero
+sfuggiti su 43 identificativi originali e 23 di riserva, anche nella preparazione
+clinica. Il negativo resta rosso (20 e 1 sfuggiti). Il limite del flag aggregato
+`passed: false` del banco storico rimane quello già documentato: i falsi positivi
+neurali preesistenti non sono corretti da questo giro. La misura locale prova
+l'assenza di **perdita aggiuntiva** nei corpus fissati, senza estenderla a tutto
+il testo clinico possibile.
+
 ## Ascolto della visita (WUL-828)
 
 `ascolto-visita-modello` lancia `scripts/prove-ascolto-visita.mjs` con i due file
