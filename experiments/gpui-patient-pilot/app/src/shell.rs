@@ -460,6 +460,8 @@ pub struct ClinicalApp {
     global_date_error: Option<String>,
     global_apply_target: ScrollTarget,
     area_scroll: ScrollHandle,
+    notice_scroll: ScrollHandle,
+    retirement_dismiss_target: ScrollTarget,
     menu_targets: [ScrollTarget; 8],
     reference_kind: ReferenceKind,
     reference_rows: Load<ReferenceRows>,
@@ -564,6 +566,7 @@ impl ClinicalApp {
         let login_scroll = ScrollHandle::new();
         let profile_scroll = ScrollHandle::new();
         let area_scroll = ScrollHandle::new();
+        let notice_scroll = ScrollHandle::new();
         let privacy_scroll = ScrollHandle::new();
         let directory_scroll = ScrollHandle::new();
         let review_focus = cx.focus_handle().tab_stop(true);
@@ -767,6 +770,8 @@ impl ClinicalApp {
             scales: ScaleArea::new(&area_scroll, theme, cx),
             analytics: AnalyticsArea::new(theme, cx),
             area_scroll,
+            retirement_dismiss_target: ScrollTarget::new(&notice_scroll, cx),
+            notice_scroll,
             reference_kind: ReferenceKind::Drugs,
             reference_rows: Load::Idle,
             reference_search,
@@ -1618,6 +1623,9 @@ impl ClinicalApp {
     }
 
     fn reveal_focused(&self, window: &mut Window, cx: &mut App) {
+        if self.retirement_dismiss_target.reveal_if_focused(window, cx) {
+            return;
+        }
         #[cfg(unix)]
         if self.patient_document.reveal(window, cx) {
             return;
@@ -6006,33 +6014,58 @@ impl Render for ClinicalApp {
                                     )
                                 },
                             )
-                            .when_some(self.copy_state, |el, state| {
-                                let (message, error) = state.notice();
-                                el.child(
-                                    notice("clinical-workspace-copy-state", message, theme, error)
-                                        .flex_shrink_0(),
-                                )
-                            })
                             .children(chat_recovery)
                             .children(document_recovery)
-                            .when(self.local_host.retirement.pending(), |el| {
-                                el.child(
-                                    notice(
-                                        "local-session-retirement-warning",
-                                        local_host::RETIREMENT_WARNING,
-                                        theme,
-                                        true,
-                                    )
-                                    .debug_selector(|| "local-session-retirement-warning".into())
-                                    .flex_shrink_0(),
-                                )
-                                .when(
-                                    self.local_host.retirement.orphaned(),
-                                    |el| {
-                                        // One row under the warning: the guidance reads
-                                        // first, the action keeps its own width and wraps
-                                        // below the text in a narrow window.
-                                        el.child(
+                            .when(
+                                self.copy_state.is_some() || self.local_host.retirement.pending(),
+                                |el| {
+                                    el.child(
+                                        div()
+                                            .id("clinical-workspace-notices")
+                                            .debug_selector(|| "clinical-workspace-notices".into())
+                                            .min_w_0()
+                                            .flex()
+                                            .flex_col()
+                                            .flex_shrink_0()
+                                            .gap(px(12.))
+                                            .track_scroll(&self.notice_scroll)
+                                            .when(layout.magnified, |el| {
+                                                // Two lines at 1.5 line height plus control padding
+                                                // must fit even in the minimum-height window.
+                                                el.max_h((window.viewport_size().height * 0.25)
+                                                    .max(px(theme.body() * 3. + 32.)))
+                                                    .overflow_y_scroll()
+                                            })
+                                            .when_some(self.copy_state, |el, state| {
+                                                let (message, error) = state.notice();
+                                                el.child(
+                                                    notice(
+                                                        "clinical-workspace-copy-state",
+                                                        message,
+                                                        theme,
+                                                        error,
+                                                    )
+                                                    .flex_shrink_0(),
+                                                )
+                                            })
+                                            .when(self.local_host.retirement.pending(), |el| {
+                                                el.child(
+                                                    notice(
+                                                        "local-session-retirement-warning",
+                                                        local_host::RETIREMENT_WARNING,
+                                                        theme,
+                                                        true,
+                                                    )
+                                                    .debug_selector(|| {
+                                                        "local-session-retirement-warning".into()
+                                                    })
+                                                    .flex_shrink_0(),
+                                                )
+                                                .when(self.local_host.retirement.orphaned(), |el| {
+                                                    // One row under the warning: the guidance reads
+                                                    // first, the action keeps its own width and wraps
+                                                    // below the text in a narrow window.
+                                                    el.child(
                                             div()
                                                 .flex()
                                                 .flex_wrap()
@@ -6055,24 +6088,27 @@ impl Render for ClinicalApp {
                                                     .bg(gpui::transparent_black()),
                                                 )
                                                 .child(
-                                                    button(
+                                                    self.retirement_dismiss_target.attach(button(
                                                         "local-session-retirement-dismiss",
-                                                        "Ho verificato le sessioni dell’home-base",
+                                                        if layout.magnified { "Verificato" } else { "Ho verificato le sessioni dell’home-base" },
                                                         theme,
                                                         false,
                                                         true,
                                                     )
+                                                    .aria_label("Ho verificato le sessioni dell’home-base")
                                                     .debug_selector(|| {
                                                         "local-session-retirement-dismiss".into()
                                                     })
                                                     .on_click(cx.listener(|this, _, _, cx| {
                                                         this.dismiss_orphaned_retirement(cx)
-                                                    })),
+                                                    }))),
                                                 ),
                                         )
-                                    },
-                                )
-                            })
+                                                })
+                                            }),
+                                    )
+                                },
+                            )
                             .child(content),
                     ),
             )
