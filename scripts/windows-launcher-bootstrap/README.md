@@ -131,5 +131,10 @@ Manual regeneration compares two new builds; its artifacts require review and
 commit before the ordinary delivered-artifact comparison qualifies the checkout.
 It copies the measured toolchain into the artifact only for the explicit
 `regenerate_bootstrap` dispatch. A routine run cannot update that record.
+The ARM64 pair was regenerated from [CI run 43515447333](https://github.com/Wulfgardr/mediflow/actions/runs/43515447333)
+after runner image 20261112.217.1 removed the previous MSVC 14.51 toolset.
+The unchanged source and build scripts produce SHA-256
+`91b32b74693e2f6908823b3e21dfd6b446e22fecaccc90516ff5f1c84e044213`
+with the recorded MSVC 14.52 tools. The x64 binary and manifest remain unchanged.
 The Windows DACL test checks a newly restricted directory before payload and
 requires rejection after an actual grant to the Users SID.
