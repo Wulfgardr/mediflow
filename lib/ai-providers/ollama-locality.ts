@@ -11,6 +11,8 @@ export type OllamaLocalityFailure =
 
 export const OLLAMA_LOCAL_KEEP_ALIVE = '30m';
 export const OLLAMA_METADATA_TIMEOUT_MS = 5_000;
+// Cold load observed at 31-33 s on external storage; ADR 0136, WUL-840.
+export const OLLAMA_PRELOAD_TIMEOUT_MS = 45_000;
 export const OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES = 674;
 // Versioni osservate per il confine locale: ADR 0136, WUL-694, WUL-602 e WUL-840.
 const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^(?:0\.32\.\d+(?:[-+].+)?|0\.33\.3|0\.34\.2|0\.40\.4|0\.40\.5|0\.40\.6|0\.40\.16)$/;
@@ -168,6 +170,8 @@ export async function attestLocalOllamaModel(
         throw new OllamaLocalityError('model_not_local');
     }
 
+    const preloadTimeout = AbortSignal.timeout(OLLAMA_PRELOAD_TIMEOUT_MS);
+    const preloadSignal = signal ? AbortSignal.any([signal, preloadTimeout]) : preloadTimeout;
     const preloadData = await fetchJson(`${baseUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -175,7 +179,7 @@ export async function attestLocalOllamaModel(
             model: canonicalModel,
             keep_alive: OLLAMA_LOCAL_KEEP_ALIVE,
         }),
-        signal,
+        signal: preloadSignal,
     });
     if (hasRemoteMarker(preloadData) || !sameModel(modelName(preloadData), canonicalModel)) {
         throw new OllamaLocalityError('model_not_local');
