@@ -179,9 +179,11 @@ intervallo nuovo; gli span misti con città e terapia sono falsi positivi.
 nice -n 19 node scripts/run-strip-types.mjs scripts/measure-cb-clinical-fp.ts --out /percorso/nuovo-confronto.json
 ```
 
-Il comando carica la funzione storica da Git e la confronta con quella attuale.
-Non esegue seed, test E2E o modelli. Serve la storia Git locale, presente nel
-checkout completo della CI. Il budget conservato nel repository è **zero nuove
+Il confronto storico del giro 3 eseguiva la funzione della base da Git.
+Il banco attuale usa invece i suoi span già congelati nel JSON `before`, con
+SHA-256 fissato, e importa staticamente soltanto il redattore attuale.
+Non scrive né importa codice storico e non richiede la storia Git per la misura.
+Il budget conservato nel repository è **zero nuove
 parole cliniche cancellate** su entrambi i corpus, con hash obbligatori.
 Trentacinque regressioni falliscono sulla testa `5067bc0f1` e passano dopo,
 incluse le due osservazioni della review. Il controllo del budget resta nella
@@ -203,6 +205,21 @@ clinica. Il negativo resta rosso (20 e 1 sfuggiti). Il limite del flag aggregato
 neurali preesistenti non sono corretti da questo giro. La misura locale prova
 l'assenza di **perdita aggiuntiva** nei corpus fissati, senza estenderla a tutto
 il testo clinico possibile.
+
+## C-B: banco con base congelata, quarto giro
+
+La [misura rieseguita](./cb-clinical-fp-20261113-giro4.json) conserva zero nuove
+parole cliniche cancellate; tutti i risultati per testo coincidono con il giro 3.
+La base è il campo `baselineSpans` del report `before`, rilevato sul codice
+`56f9dd5cd`. Il banco verifica lo SHA-256 del report, gli hash dei corpus, gli ID,
+i testi e i limiti degli span. Gli span della correzione precedente presenti
+nello stesso report non vengono usati come base.
+
+È rimosso il caricamento dinamico che faceva fallire i tre inventari Web.
+Gli inventari e le loro eccezioni restano invariati. Il test di budget esistente
+continua a eseguire il redattore corrente contro la base congelata, senza
+concedere autorità runtime al codice storico. Nessun codice di produzione
+modificato rispetto a `0ca731dbf`; la prova dei pesi del giro 3 rimane invariata.
 
 ## Ascolto della visita (WUL-828)
 
