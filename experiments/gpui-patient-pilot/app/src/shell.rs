@@ -4554,9 +4554,9 @@ impl ClinicalApp {
                     .child(if entry.locked_fields.iter().any(|field| field == "content") {
                         self.unreadable_field("clinical-workspace-entry-unreadable", cx).into_any_element()
                     } else { clinical_text::render(&entry.content, WritingInk::Dry, theme) })
-                    .child(div().id(SharedString::from(format!("clinical-workspace-entry-status-{id}"))).role(Role::Status).aria_label(SharedString::from(diary_registration(entry.recorded_by.as_deref(), entry.created_at.as_deref(), &chrono::Local))).flex().flex_wrap().gap(px(6.)).type_role(theme, crate::theme::TextRole::Meta).text_color(theme.ink)
+                    .child(div().id(SharedString::from(format!("clinical-workspace-entry-status-{id}"))).role(Role::Status).aria_label(SharedString::from(diary_registration(entry.recorded_by.as_deref(), entry.created_at.as_deref(), &chrono::Local))).min_w_0().max_w_full().flex().items_start().gap(px(6.)).type_role(theme, crate::theme::TextRole::Meta).text_color(theme.ink)
                         .child(crate::components::writing_dot(WritingInk::Dry, WritingSurface::Plane, theme))
-                        .child(text!(diary_registration(entry.recorded_by.as_deref(), entry.created_at.as_deref(), &chrono::Local))))
+                        .child(div().min_w_0().flex_1().debug_selector(|| format!("clinical-workspace-entry-registration-{id}")).child(text!(diary_registration(entry.recorded_by.as_deref(), entry.created_at.as_deref(), &chrono::Local)))))
                     .child(button(format!("clinical-workspace-edit-entry-{id}"), "Modifica voce", theme, false, editable)
                         .when(editable, |el| el.on_click(cx.listener(move |this, _, _, cx| this.edit_record(editing::Kind::Entry, &edit_id, cx)))))
                     .when(!unavailable, |el| el.child(div().flex().child(button(format!("clinical-workspace-copy-entry-{id}"), "Copia voce", theme, false, true)
@@ -8751,6 +8751,51 @@ mod review706b_callers {
             })
         }
     }
+    #[cfg(target_os = "macos")]
+    #[gpui::test]
+    fn diary_registration_keeps_author_and_time_inside_the_narrow_page(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let mut native = gpui::TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        let (view, cx) = native.add_window_view(|window, cx| Hcg5Page {
+            app: cx.new(|cx| make_app(window, cx)),
+        });
+        for dark in [false, true] {
+            view.update(cx, |view, cx| view.app.update(cx, |app, cx| {
+                app.area = Area::Patients;
+                app.patient_section = PatientSection::Diary;
+                app.patient.entries = ReadLoad::Ready(vec![serde_json::from_value(serde_json::json!({
+                    "id":"synthetic-attribution", "patientId":"review706b-patient", "version":1,
+                    "date":"2026-11-12T00:00:00Z", "title":"Visita sintetica", "type":"note", "content":"Testo sintetico",
+                    "recordedBy":"Medico sintetico di prova", "createdAt":"2026-11-13T01:30:00Z",
+                })).unwrap()]);
+                app.text_scale = 1.;
+                app.theme = Theme::for_dark(dark);
+                cx.notify();
+            }));
+            cx.simulate_resize(gpui::size(px(390.), px(872.)));
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            let attribution = cx
+                .debug_bounds("clinical-workspace-entry-registration-synthetic-attribution")
+                .unwrap();
+            assert!(
+                attribution.right() <= px(374.1),
+                "the author and registration time must wrap inside the page: {attribution:?}"
+            );
+            assert!(
+                attribution.size.height > px(20.),
+                "the complete attribution requires multiple lines"
+            );
+        }
+    }
+
     #[gpui::test]
     fn hcg5_page_inks_and_fields_contrast(cx: &mut gpui::TestAppContext) {
         let (view, cx) = cx.add_window_view(|window, cx| Hcg5Page {
