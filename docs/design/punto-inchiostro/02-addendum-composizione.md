@@ -377,7 +377,9 @@ Per le unità di prodotto servono catture sintetiche prima e dopo dello stesso
 stato, in Giorno e Grafite a 1440 e 768 px. Ogni serie riporta lo SHA realmente
 eseguito: il prima appartiene alla base, il dopo alla revisione modificata;
 i confronti fra temi e larghezze della stessa serie usano lo stesso SHA.
-Quando si toccano adattamento o fuoco si aggiungono 320 e 390 px e zoom al
-200% e 400%, come richiesto da `DESIGN.md`. La guardia dei token non prova
+Quando si toccano adattamento o fuoco si aggiungono 320 e 390 px con testo al
+100% e al 200%, come richiesto da `DESIGN.md`. L'ingrandimento oltre il 200%
+è fuori dal gate 0.9.1
+([emendamento del 13 novembre 2026](../../releases/0.9.1-contract.md#emendamento-del-13-novembre-2026-ingrandimento-al-400-fuori-dal-gate)). La guardia dei token non prova
 composizione, accessibilità o comportamento. Questa unità documentale non
 produce nuove catture né dichiara corretti gli stati fotografati.

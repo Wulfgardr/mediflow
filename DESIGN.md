@@ -194,7 +194,9 @@ piattaforma. Tastiera e puntatore mantengono uno stato di focus visibile.
 
 - Usare semantica HTML nativa e struttura web responsive.
 - Supportare viewport di 320, 390, 768 e 1440 pixel.
-- Conservare contenuti e azioni con zoom del browser al 200% e al 400%.
+- Conservare contenuti e azioni al 100% e con zoom del browser al 200%.
+  Per la 0.9.1 l'ingrandimento oltre il 200% è fuori dal gate, secondo
+  l'[emendamento del 13 novembre 2026](docs/releases/0.9.1-contract.md#emendamento-del-13-novembre-2026-ingrandimento-al-400-fuori-dal-gate).
 - Rendere espliciti ordine da tastiera, visibilità del focus e struttura per
   lettori di schermo.
 
