@@ -1027,6 +1027,99 @@ mod tests {
     }
 
     #[gpui::test]
+    fn retention_search_finds_a_patient_created_after_the_directory_was_read(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        host.plan("POST /api/v1/network/patients")
+            .send((201, json!({"id":"patient-a", "version":1})))
+            .unwrap();
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.patients = Load::Ready(vec![]);
+            app.local_host.authority = Authority::Open(access);
+            app.new_patient(cx);
+            for (index, value) in [
+                (0, "Amina"),
+                (1, "Sintetica"),
+                (2, "SYNTHETIC"),
+                (8, "other"),
+            ] {
+                app.form.as_mut().unwrap().fields[index]
+                    .editor
+                    .update(cx, |input, cx| input.set_content(value, cx));
+            }
+            app.form.as_mut().unwrap().state = FormState::Review;
+            app.confirm_form(cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, _| {
+            assert!(
+                app.form.is_none(),
+                "creation must be verified: {:?}",
+                app.message
+            );
+            assert_eq!(app.patient.detail.ready().unwrap().id, "patient-a");
+        });
+
+        let mut empty = overview(0, json!({}));
+        empty["review"] = json!([]);
+        host.plan(&format!("GET {ROUTE}"))
+            .send((200, empty))
+            .unwrap();
+        host.plan("GET /api/v1/network/patients")
+            .send((
+                200,
+                json!([
+                    {"id":"patient-a","firstName":"Amina","lastName":"Sintetica","birthDate":null,
+                     "taxCode":"SYNTHETIC","version":1}
+                ]),
+            ))
+            .unwrap();
+        view.update(cx, |app, cx| {
+            app.area = Area::Settings;
+            app.settings_page = SettingsPage::Retention;
+            app.read_retention(cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            app.local_host
+                .retention
+                .hold_patient
+                .update(cx, |input, cx| input.set_content("Sintetica", cx));
+            cx.notify();
+        });
+        let commands = rendered_command::button_ids(|| {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            })
+        });
+        assert!(
+            commands.iter().any(|id| id == "retention-hold-place-0"),
+            "a newly created patient must be searchable without reopening Patients: {commands:?}"
+        );
+        assert_eq!(
+            host.routes()
+                .iter()
+                .filter(|route| route.as_str() == "POST /api/v1/network/patients")
+                .count(),
+            1
+        );
+    }
+
+    #[gpui::test]
     fn retention_page_saves_windows_holds_a_patient_and_reports_a_refused_discard(
         cx: &mut gpui::TestAppContext,
     ) {
