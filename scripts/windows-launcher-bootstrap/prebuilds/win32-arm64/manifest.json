@@ -12,7 +12,7 @@
   "napiVersion": 1,
   "binary": "system-directory.node",
   "bytes": 12288,
-  "sha256": "35666d8b5e9aa882c66dd28300634ac23128f85c178d3b2beb69561b3cbffb3c",
+  "sha256": "91b32b74693e2f6908823b3e21dfd6b446e22fecaccc90516ff5f1c84e044213",
   "dependencies": [
     "advapi32.dll",
     "kernel32.dll",
@@ -27,11 +27,11 @@
     "librarySha256": "2c0c3215d59c09d7c136da4949696dae121a299e9bdfc64cd9130a58610af63d"
   },
   "build": {
-    "node": "v24.22.1",
+    "node": "v24.22.3",
     "arch": "arm64",
     "machine": "arm64",
     "uv": "1.52.1",
-    "compiler": "19.51.36260.0",
-    "architecture": "arm64"
+    "architecture": "arm64",
+    "compiler": "19.52.37029.0"
   }
 }
