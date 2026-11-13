@@ -22,7 +22,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { ambulatories, settings, users } from './schema';
 import { apiFailure, archiveReplacementResponse } from './api-error-response';
-import { parseProfileQuery, ProfileQueryError, PROFILE_FIELD_NAMES, PROFILE_QUERY_RESULT_SCHEMA,
+import { parseProfileQuery, ProfileQueryError, PROFILE_FIELD_NAMES, HTTP_PROFILE_FIELD_NAMES, PROFILE_QUERY_RESULT_SCHEMA,
     PROFILE_QUERY_OPERATION_ID, assertProfileResultBudget, type ProfileFields, type ProfileProjection,
     type ProfileQuery, type ProfileResult } from '../packages/patient-profile-contracts/src/query';
 import { acquireAuthenticatedWebSessionProjectionOwnerContext } from './security/server-auth';
@@ -278,9 +278,10 @@ function references(context: ScopedContext): ScopedReferences {
     return state;
 }
 
-function scopedProjection(snapshot: PatientProfileView, projection: ProfileProjection): ProfileFields | Readonly<{ notes: string | null }> {
+function scopedProjection(snapshot: PatientProfileView, projection: ProfileProjection, lane: ScopedContext['lane']): ProfileFields | Readonly<{ notes: string | null }> {
     if (projection === 'notes') return Object.freeze({ notes: snapshot.notes });
-    const profile = Object.fromEntries(PROFILE_FIELD_NAMES.map(key => [key, snapshot[key]])) as ProfileFields;
+    const fields = lane === 'web' || lane === 'network' ? HTTP_PROFILE_FIELD_NAMES : PROFILE_FIELD_NAMES;
+    const profile = Object.fromEntries(fields.map(key => [key, snapshot[key]])) as ProfileFields;
     return Object.freeze(profile);
 }
 
@@ -326,7 +327,7 @@ function executeScopedProfile(context: ScopedContext, query: ProfileQuery, expec
                 const output = Object.freeze({ schemaVersion: PROFILE_QUERY_RESULT_SCHEMA, operationId: PROFILE_QUERY_OPERATION_ID,
                     contractVersion: 1 as const, handle, projection: query.projection,
                     currentness: Object.freeze({ revision: snapshot.version, selectionEpoch: state.epoch, observedAt, expiresAt }),
-                    profile: scopedProjection(snapshot, query.projection) }) as ProfileResult;
+                    profile: scopedProjection(snapshot, query.projection, context.lane) }) as ProfileResult;
                 assertProfileResultBudget(output);
                 if (signal?.aborted) return scopedFail('cancelled');
                 if (context.currentScope() !== ambulatoryId) return scopedFail('scope_denied');

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assertProfileResultBudget, isProfileResult, parseProfileQuery } from '../src/query.ts';
+import { assertProfileResultBudget, isProfileResult, isHttpProfileResult, PROFILE_FIELD_NAMES, parseProfileQuery } from '../src/query.ts';
 import { isProfileReviewView, parseProfileReviewInput } from '../src/review.ts';
 import { isProfileNotesCommitReceipt, isProfileNotesCommitView,
     parseProfileNotesCommitInput, parseProfileNotesCommitJournal } from '../src/notes-commit.ts';
@@ -40,6 +40,32 @@ test('profile result budget counts UTF-8 bytes and preserves notes without reser
     assertProfileResultBudget({ ...result, profile: { notes: 'a'.repeat(20_000) } });
     assert.throws(() => assertProfileResultBudget({ ...result, profile: { notes: '🩺'.repeat(10_000) } }),
         { code: 'output_too_large' });
+});
+
+test('HTTP full profile readback retains typed identity and birth metadata without widening authority', () => {
+    const result = { schemaVersion: 'mediflow.patient.profile-view.v1', operationId: 'patient-profile.read.v1',
+        contractVersion: 1, handle: `pph_${'4'.repeat(64)}`, projection: 'profile',
+        currentness: { revision: 1, selectionEpoch: 2, observedAt: 10_000, expiresAt: 40_000 },
+        profile: { firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTHETIC', identifierType: 'other',
+            birthDate: null, birthDatePrecision: 'estimated', birthYear: 1940, address: null, phone: null,
+            caregiver: null, diagnoses: null, exemptions: null, notes: null, isAdi: false, isArchived: false,
+            statusReason: null, archiveReason: null, archiveNote: null } };
+    assert.equal(isHttpProfileResult(result), true);
+    assert.equal(isProfileResult(result), false);
+    const agent = { ...result, profile: Object.fromEntries(PROFILE_FIELD_NAMES.map(key => [key, result.profile[key]])) };
+    assert.equal(isProfileResult(agent), true);
+    assert.equal(isHttpProfileResult(agent), false);
+    for (const [key, value] of Object.entries({ identifierType: 'other', birthDatePrecision: 'estimated', birthYear: 1940 })) {
+        assert.equal(isProfileResult({ ...agent, profile: { ...agent.profile, [key]: value } }), false, key);
+        const narrowed = { ...result, projection: 'notes', profile: { notes: enc, [key]: value } };
+        assert.equal(isProfileResult(narrowed), false, key);
+        assert.equal(isHttpProfileResult(narrowed), false, key);
+    }
+    for (const patch of [{ identifierType: 'invented' }, { identifierType: null }, { birthDatePrecision: 'year' },
+        { birthDatePrecision: null }, { birthYear: '1940' }, { birthYear: 1940.5 }, { birthYear: -1 },
+        { patientId: 'forbidden' }]) {
+        assert.equal(isHttpProfileResult({ ...result, profile: { ...result.profile, ...patch } }), false);
+    }
 });
 
 test('review and notes commit preserve ENC and keep their policies distinct', () => {
