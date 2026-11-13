@@ -133,13 +133,34 @@ static void checkImage(CGPDFStreamRef stream) {
     CFRelease(bytes);
 }
 static void walk(CGPDFObjectRef object, size_t depth);
-struct WalkContext { size_t depth; };
+struct WalkContext { size_t depth; bool catalog; };
 static void entry(const char *key, CGPDFObjectRef value, void *info) {
+    struct WalkContext *context = info;
     if (!strcmp(key, "Parent")) return; // structural backlink, not content
-    walk(value, ((struct WalkContext *)info)->depth + 1);
+    // Pages are admitted individually, with their own image pixel budget.
+    if (context->catalog && !strcmp(key, "Pages")) return;
+    walk(value, context->depth + 1);
 }
-static void checkDictionary(CGPDFDictionaryRef d, size_t depth) {
-    if (present(d, "Annots")) { failure = "annotations"; return; }
+static void checkDictionary(CGPDFDictionaryRef d, size_t depth, bool catalog) {
+    if (present(d, "Annots")) {
+        CGPDFArrayRef annotations = NULL;
+        // pdf-lib emits /Annots [] even when there are no annotations. Resolve
+        // indirect arrays too; malformed values still fail closed.
+        if (!CGPDFDictionaryGetArray(d, "Annots", &annotations) || CGPDFArrayGetCount(annotations) != 0) {
+            failure = "annotations"; return;
+        }
+    }
+    for (const char **key = (const char *[]){"AcroForm", "OpenAction", "AA", "JS", "JavaScript", NULL}; *key; key++) {
+        if (present(d, *key)) { failure = "annotations"; return; }
+    }
+    if (named(d, "Type", "Action")) { failure = "annotations"; return; }
+    const char *action = NULL;
+    if (CGPDFDictionaryGetName(d, "S", &action)) {
+        const char *actions[] = {"GoTo", "GoToR", "GoToE", "GoToDp", "Launch", "Thread", "URI", "Sound", "Movie", "Hide", "Named", "SubmitForm", "ResetForm", "ImportData", "JavaScript", "SetOCGState", "Rendition", "Trans", "GoTo3DView", "RichMediaExecute", NULL};
+        for (const char **kind = actions; *kind; kind++) {
+            if (!strcmp(action, *kind)) { failure = "annotations"; return; }
+        }
+    }
     if (present(d, "SMask") || present(d, "Mask")) { failure = "image_mask"; return; }
     if (named(d,"Subtype","Form")) { failure = "nested_graphics"; return; }
     if (named(d,"Subtype","Type3")) { failure = "font"; return; }
@@ -169,7 +190,7 @@ static void checkDictionary(CGPDFDictionaryRef d, size_t depth) {
             CFRelease(data);
         }
     }
-    struct WalkContext context = {depth};
+    struct WalkContext context = {depth, catalog};
     CGPDFDictionaryApplyFunction(d, entry, &context);
 }
 static void walk(CGPDFObjectRef object, size_t depth) {
@@ -182,7 +203,7 @@ static void walk(CGPDFObjectRef object, size_t depth) {
     CGPDFObjectType type = CGPDFObjectGetType(object);
     if (type == kCGPDFObjectTypeDictionary) {
         CGPDFDictionaryRef dict; CGPDFObjectGetValue(object, type, &dict);
-        checkDictionary(dict, depth);
+        checkDictionary(dict, depth, false);
     } else if (type == kCGPDFObjectTypeArray) {
         CGPDFArrayRef array; CGPDFObjectGetValue(object, type, &array);
         for (size_t n = 0; n < CGPDFArrayGetCount(array) && !failure; n++) {
@@ -194,7 +215,7 @@ static void walk(CGPDFObjectRef object, size_t depth) {
         CGPDFStreamRef stream; CGPDFObjectGetValue(object, type, &stream);
         CGPDFDictionaryRef dict = CGPDFStreamGetDictionary(stream);
         if (named(dict,"Subtype","Image")) checkImage(stream);
-        checkDictionary(dict, depth);
+        checkDictionary(dict, depth, false);
     }
     [active removeObject:key];
     [visited addObject:key];
@@ -385,6 +406,13 @@ int MFDocumentPreviewWorker(size_t page) {
             pages = pdf.pageCount;
             if (!failure && (pages == 0 || pages > 500 || page > pages)) failure = "limit";
             visited = [NSMutableSet new]; active = [NSMutableSet new];
+            if (!failure) {
+                CGPDFPageRef first = [pdf pageAtIndex:0].pageRef;
+                CGPDFDocumentRef document = first ? CGPDFPageGetDocument(first) : NULL;
+                CGPDFDictionaryRef catalog = document ? CGPDFDocumentGetCatalog(document) : NULL;
+                if (!catalog) failure = "invalid";
+                else checkDictionary(catalog, 0, true);
+            }
             for (size_t n = 0; n < pages && !failure; n++) {
                 pageImagePixels = 0;
                 [visited removeAllObjects];
@@ -393,7 +421,7 @@ int MFDocumentPreviewWorker(size_t page) {
                 size_t w, h;
                 if (!cg || !canvas([p boundsForBox:kPDFDisplayBoxMediaBox], &w, &h)) { failure = "limit"; break; }
                 CGPDFDictionaryRef dict = CGPDFPageGetDictionary(cg);
-                checkDictionary(dict, 0);
+                checkDictionary(dict, 0, false);
                 // Resources are inheritable page attributes. Validate the first
                 // effective dictionary, not only the page's direct entries.
                 CGPDFDictionaryRef ancestor = dict;

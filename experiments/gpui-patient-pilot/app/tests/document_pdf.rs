@@ -6,6 +6,155 @@ use std::{
     process::{Command, Stdio},
 };
 
+// Exercise the app's response parser as well as its isolated binary entry.
+const MAX_DOCUMENT_BYTES: usize = 10 * 1024 * 1024;
+#[allow(dead_code)]
+mod preview {
+    include!("../src/documents/pdf.rs");
+
+    #[test]
+    fn pdf_lib_original_reaches_the_preview_parser() {
+        let source = include_bytes!("../test_support/pdf-producers/referto-QSette-Lucia.pdf");
+        let output = super::worker(source, "1");
+        assert!(output.status.success());
+        let preview = parse_output(Arc::new(Zeroizing::new(source.to_vec())), 1, &output.stdout)
+            .unwrap_or_else(|error| panic!("original preview refused: {error:?}"));
+        assert_eq!(preview.pages, 1);
+        assert_eq!(preview.source.as_slice(), source);
+        let pixels = preview.image.as_bytes(0).unwrap();
+        assert!(
+            pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|pixel| pixel[..3] != [255; 3])
+        );
+    }
+
+    fn assert_refused(source: &[u8]) {
+        let output = super::worker(source, "1");
+        assert!(output.status.success());
+        assert_eq!(
+            parse_output(Arc::new(Zeroizing::new(source.to_vec())), 1, &output.stdout).err(),
+            Some(Error::Annotations),
+            "worker output: {:?}",
+            output.stdout
+        );
+    }
+
+    #[test]
+    fn fields_and_actions_in_the_catalog_are_refused() {
+        for entries in [
+            b"/AcroForm << /Fields [] >>".as_slice(),
+            b"/AcroForm << /Fields [<< /FT /Tx /T (Synthetic field) >>] >>",
+            b"/OpenAction << /S /URI /URI (https://example.invalid/) >>",
+            b"/AA << /WC << /S /JavaScript /JS (app.alert(1)) >> >>",
+            b"/Names << /JavaScript << /Names [(test) << /S /JavaScript /JS (app.alert(1)) >>] >> >>",
+            b"/Outlines << /First << /Title (Synthetic) /A << /Type /Action /S /URI /URI (https://example.invalid/) >> >> >>",
+        ] {
+            assert_refused(&super::fixture::catalog_with_extra_entries(entries));
+        }
+        assert_refused(include_bytes!(
+            "../test_support/pdf-producers/outline-action.pdf"
+        ));
+    }
+
+    #[test]
+    fn a_font_resource_named_a_is_not_an_action() {
+        let source = super::fixture::with_resources(
+            b"BT /A 12 Tf 10 25 Td (OK) Tj ET",
+            b"<< /Font << /A << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>",
+            &[],
+        );
+        let output = super::worker(&source, "1");
+        assert!(output.status.success());
+        assert!(parse_output(Arc::new(Zeroizing::new(source)), 1, &output.stdout).is_ok());
+    }
+
+    #[test]
+    fn actual_and_malformed_annotations_are_refused_on_every_page() {
+        for entries in [
+            b"/Annots [<< /Type /Annot /Subtype /Text /Rect [0 0 10 10] >>]".as_slice(),
+            b"/Annots [<< /Subtype /Widget /Rect [0 0 10 10] >>]",
+            b"/Annots [<< /Subtype /Link /Rect [0 0 10 10] /A << /S /URI /URI (https://example.invalid/) >> >>]",
+            b"/Annots null", b"/Annots 0", b"/Annots << >>", b"/Annots [null]",
+            b"/AA << /O << /S /JavaScript /JS (app.alert(1)) >> >>",
+        ] {
+            assert_refused(&super::fixture::page_with_extra_entries(entries));
+        }
+        assert_refused(include_bytes!(
+            "../test_support/pdf-producers/annotated-object-stream.pdf"
+        ));
+        assert_refused(include_bytes!(
+            "../test_support/pdf-producers/annotated-second-page.pdf"
+        ));
+    }
+
+    #[test]
+    fn only_an_empty_annotation_array_is_admitted() {
+        for source in [
+            super::fixture::page_with_extra_entries(b"/Annots []"),
+            include_bytes!("../test_support/pdf-producers/empty-indirect-object-stream.pdf")
+                .to_vec(),
+        ] {
+            let output = super::worker(&source, "1");
+            assert!(output.status.success());
+            assert!(parse_output(Arc::new(Zeroizing::new(source)), 1, &output.stdout).is_ok());
+        }
+        // An empty annotation array cannot hide a page action.
+        assert_refused(&super::fixture::page_with_extra_entries(
+            b"/Annots [] /AA << /O << /S /JavaScript /JS (app.alert(1)) >> >>",
+        ));
+    }
+
+    #[test]
+    fn other_pdf_producers_reach_the_same_parser_with_nonempty_rasters() {
+        for (producer, source, pages) in [
+            (
+                "CoreGraphics",
+                include_bytes!("../test_support/pdf-producers/coregraphics-two-pages.pdf")
+                    .as_slice(),
+                2,
+            ),
+            (
+                "Ghostscript",
+                include_bytes!("../test_support/pdf-producers/ghostscript.pdf").as_slice(),
+                1,
+            ),
+            (
+                "ReportLab",
+                include_bytes!("../test_support/pdf-producers/reportlab.pdf").as_slice(),
+                1,
+            ),
+        ] {
+            for page in 1..=pages {
+                let output = super::worker(source, &page.to_string());
+                assert!(output.status.success(), "{producer}, page {page}");
+                let preview = parse_output(
+                    Arc::new(Zeroizing::new(source.to_vec())),
+                    page,
+                    &output.stdout,
+                )
+                .unwrap_or_else(|error| panic!("{producer}, page {page}: {error:?}"));
+                assert_eq!(preview.pages, pages, "{producer}");
+                assert_eq!(preview.source.as_slice(), source);
+                assert_eq!(preview.image.as_bytes(0).unwrap().len(), 300 * 180 * 4);
+                assert!(
+                    preview
+                        .image
+                        .as_bytes(0)
+                        .unwrap()
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
+                        .any(|pixel| pixel[..3] != [255; 3]),
+                    "{producer}, page {page}: blank raster"
+                );
+            }
+        }
+    }
+}
+
 fn worker(source: &[u8], page: &str) -> std::process::Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_mediflow-gpui-patient-pilot"))
         .args(["--document-preview-worker", page])
@@ -45,7 +194,10 @@ fn binary_entry_point_emits_only_complete_bounded_pixels_or_an_error() {
         serde_json::from_slice::<serde_json::Value>(&over_page_limit.stdout).unwrap(),
         serde_json::json!({"error":"limit"})
     );
-    let annotated = worker(&fixture::page_with_extra_entries(b"/Annots []"), "1");
+    let annotated = worker(
+        &fixture::page_with_extra_entries(b"/Annots [<< /Subtype /Text /Rect [0 0 10 10] >>]"),
+        "1",
+    );
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(&annotated.stdout).unwrap(),
         serde_json::json!({"error":"annotations"})
