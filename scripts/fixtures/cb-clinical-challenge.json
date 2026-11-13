@@ -1,0 +1,288 @@
+{
+  "schema": "mediflow.cb-clinical-challenge.v1",
+  "syntheticOnly": true,
+  "selection": "Written and annotated before measuring head 5067bc0f1. Includes both coordinator-required counterexamples.",
+  "counts": {
+    "texts": 36,
+    "sentences": 36,
+    "words": 257
+  },
+  "entries": [
+    {
+      "id": "hard-01",
+      "category": "tax-prose",
+      "text": "Autonomia ridotta.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-02",
+      "category": "tax-prose",
+      "text": "Movimento ridotto.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-03",
+      "category": "tax-prose",
+      "text": "Movimenti ridotti.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-04",
+      "category": "tax-prose",
+      "text": "Polmonite risolta.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-05",
+      "category": "dosage",
+      "text": "Tre compresse due volte al giorno per sette giorni.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-06",
+      "category": "dosage",
+      "text": "Pressione centotrenta su ottanta, polso settantadue.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-07",
+      "category": "spoken-sequence",
+      "text": "Durante il test ripetere tre due nove uno sette quattro sei cinque.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-08",
+      "category": "spoken-sequence",
+      "text": "Sequenza dello screening: zero due uno tre quattro cinque sei sette otto.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-09",
+      "category": "spoken-sequence",
+      "text": "Valori della scala: uno due tre quattro cinque sei sette otto nove.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-10",
+      "category": "dosage",
+      "text": "Somministrare uno due tre quattro cinque sei sette mg secondo lo schema.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-11",
+      "category": "dosage",
+      "text": "Ripetere tre tre tre zero zero zero zero per la prova di memoria.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-12",
+      "category": "anatomy",
+      "text": "Al punto di sutura la cute non mostra segni di infezione.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-13",
+      "category": "anatomy",
+      "text": "La chiocciola è una struttura dell’orecchio interno.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-14",
+      "category": "anatomy",
+      "text": "Esame della chiocciola: punto doloroso assente.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-15",
+      "category": "atc",
+      "text": "Metformina, codice ATC A10BA02; Apixaban B01AF02.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-16",
+      "category": "lot",
+      "text": "Lotto del reagente QRTFLA80A01Z123V, controllo analitico nella norma.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-17",
+      "category": "lab-code",
+      "text": "Esame LOINC 8480-6: pressione sistolica nella norma.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-18",
+      "category": "report-code",
+      "text": "Referto tecnico LAB_2026_001, potassio nella norma.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-19",
+      "category": "department",
+      "text": "Trasferito da Cardiologia.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-20",
+      "category": "department",
+      "text": "Trasferita in Neurologia per completamento diagnostico.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-21",
+      "category": "department",
+      "text": "Trasferito da Cardiologia a Medicina interna per monitoraggio.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-22",
+      "category": "place-coordination",
+      "text": "Vive a Milano e assume metformina 500 mg al giorno.",
+      "expectedIdentifiers": [
+        {
+          "start": 7,
+          "end": 13,
+          "text": "Milano"
+        }
+      ],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-23",
+      "category": "place-coordination",
+      "text": "Vive a Torino ed esegue Emocromo ogni mese.",
+      "expectedIdentifiers": [
+        {
+          "start": 7,
+          "end": 13,
+          "text": "Torino"
+        }
+      ],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-24",
+      "category": "place-coordination",
+      "text": "Abita a Genova ma riferisce dolore lombare.",
+      "expectedIdentifiers": [
+        {
+          "start": 8,
+          "end": 14,
+          "text": "Genova"
+        }
+      ],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-25",
+      "category": "place-coordination",
+      "text": "Risiede a Verona, assume Ramipril 5 mg.",
+      "expectedIdentifiers": [
+        {
+          "start": 10,
+          "end": 16,
+          "text": "Verona"
+        }
+      ],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-26",
+      "category": "department",
+      "text": "Trasferito da Cardiologia e prosegue Ramipril 5 mg.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-27",
+      "category": "department",
+      "text": "Ricoverato in Medicina per polmonite.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-28",
+      "category": "clinical-context",
+      "text": "Dolore a riposo e dispnea da sforzo, senza febbre.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-29",
+      "category": "department",
+      "text": "Valutazione presso Endocrinologia, da rivalutare in ambulatorio.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-30",
+      "category": "capitalized-clinical",
+      "text": "Metformina 500 mg, Ramipril 5 mg, Emocromo e Creatinina di controllo.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-31",
+      "category": "imported-key",
+      "text": "{\"domicilio\":\"riposo a letto per tre giorni\"}",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-32",
+      "category": "imported-key",
+      "text": "{\"provenienza\":\"Cardiologia\"}",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-33",
+      "category": "imported-key",
+      "text": "{\"residenza\":\"non rilevante per la terapia attuale\"}",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-34",
+      "category": "imported-key",
+      "text": "{\"HbA1c\":\"7,2%\",\"terapia\":\"Metformina 500 mg\"}",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-35",
+      "category": "clinical-context",
+      "text": "Vive in autonomia e gestisce la terapia senza aiuto.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    },
+    {
+      "id": "hard-36",
+      "category": "clinical-context",
+      "text": "Vive in assenza di dolore e prosegue la riabilitazione.",
+      "expectedIdentifiers": [],
+      "annotation": "All remaining words are clinical/non-identifying; lot/technical codes are not patient identifiers."
+    }
+  ]
+}

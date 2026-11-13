@@ -1,0 +1,5651 @@
+{
+  "schema": "mediflow.cb-local-false-positives.v1",
+  "generatedAt": "2026-11-13T00:13:30.893Z",
+  "baseline": "56f9dd5cdd4cec86d98347736f8d2e6d7170cf4b",
+  "baselineSourceSha256": "90bc845738fd7b8996747813f73df65fa80ff813e40008495aed4ad56c07202c",
+  "currentHead": "5067bc0f12bda8769f3690b4460645952dd18a22",
+  "sources": {
+    "lib/ai-redaction-session.ts": "464209f47b37508f2053b4d11621164a1946f1cf66f476c9f0e29995c4d1905d",
+    "lib/ai-egress-gate.ts": "56821da2f04a4699836b942547bf3dc49f45b76f769c0e1073daf17eb95e0df1",
+    "lib/redaction-identifier-spans.ts": "fbaa20fc496b6956dfa80ed7b3d26a8ba8f6d0ca6cbedb7872506cad4f562ad8"
+  },
+  "method": "No model, no knownIdentifiers. New spans are current source coverage minus baseline coverage. A clinical word is counted once if any character becomes newly covered; annotated identifiers are excluded. Source occurrences are counted per unique text. Mixed identifier/clinical spans are false positives.",
+  "elapsedMs": 61,
+  "sets": [
+    {
+      "name": "cb-clinical-independent",
+      "corpusSha256": "3f5e48faf1106960bba0e5911ee2f93022c4e23fd5a0389b3c0d09bc0ab71175",
+      "counts": {
+        "texts": 332,
+        "sourceOccurrences": 374,
+        "sentences": 427,
+        "words": 2454
+      },
+      "newSpans": 0,
+      "falsePositiveSpans": 0,
+      "newlyRemovedClinicalWords": 0,
+      "results": [
+        {
+          "id": "repo-0001",
+          "text": "Metformina 850 mg 1 cp x 2/die e Ramipril 5 mg 1 cp/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/0/payload/therapyCandidateHints/0/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0002",
+          "text": "Diabete mellito tipo 2 in scarso compenso e ipertensione arteriosa in follow-up territoriale.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/0/payload/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0003",
+          "text": "Terapia domiciliare attiva: Metformina 850 mg 1 cp x 2/die e Ramipril 5 mg 1 cp/die.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/0/payload/sources/1/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0004",
+          "text": "Controllo diabetologico recente: diabete mellito tipo 2 non compensato.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/0/payload/sources/2/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0005",
+          "text": "Apixaban 5 mg 1 cp x 2/die in terapia domiciliare",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/1/payload/therapyCandidateHints/0/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0006",
+          "text": "Familiarita materna per carcinoma mammario. Nega BPCO. Pregressa frattura di polso sinistro guarita.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/1/payload/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0007",
+          "text": "Attualmente fibrillazione atriale parossistica in follow-up cardiologico; terapia domiciliare con Apixaban 5 mg 1 cp x 2/die.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/1/payload/sources/1/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0008",
+          "text": "sospendere bisoprololo 1,25 mg e passare a nebivololo 5 mg 1 cp",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/2/payload/therapyCandidateHints/0/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0009",
+          "text": "Furosemide: dose da verificare",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/2/payload/therapyCandidateHints/1/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0010",
+          "text": "Insufficienza cardiaca cronica nota in compenso clinico.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/2/payload/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0011",
+          "text": "Per ipotensione sospendere bisoprololo 1,25 mg e passare a nebivololo 5 mg 1 cp; Furosemide dose da verificare.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/2/payload/sources/1/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0012",
+          "text": "Bisoprololo EG",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/3/payload/currentActiveTherapies/0/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0013",
+          "text": "2,5 mg 1 cp/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/3/payload/currentActiveTherapies/0/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0014",
+          "text": "Ramipril EG",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/3/payload/currentActiveTherapies/1/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0015",
+          "text": "5 mg 1 cp/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/3/payload/currentActiveTherapies/1/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0016",
+          "text": "Sospendere bisoprololo 2,5 mg, introdurre nebivololo 5 mg e torasemide 10 mg",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/3/payload/therapyCandidateHints/0/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0017",
+          "text": "Dimissione cardiologica: scompenso cardiaco cronico riacutizzato e fibrillazione atriale parossistica. Alla dimissione sospendere Bisoprololo 2,5 mg 1 cp/die e sostituire con Nebivololo 5 mg 1 cp/die; iniziare Torasemide 10 mg 1 cp al mattino. Confermare Ramipril 5 mg 1 cp/die.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/3/payload/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0018",
+          "text": "Tamsulosina 0,4 mg per 10 giorni; ketorolac sospeso dopo controllo del dolore",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/4/payload/therapyCandidateHints/0/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0019",
+          "text": "Accesso in pronto soccorso per colica renale destra da calcolo ureterale distale. Dimesso con Tamsulosina 0,4 mg 1 cps/die per 10 giorni; ketorolac sospeso dopo controllo del dolore. Nega dolore toracico e dispnea.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/4/payload/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0020",
+          "text": "Insulina glargine",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/5/payload/currentActiveTherapies/0/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0021",
+          "text": "12 UI la sera",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/5/payload/currentActiveTherapies/0/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0022",
+          "text": "Metformina",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/5/payload/currentActiveTherapies/1/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0023",
+          "text": "1000 mg 1 cp x 2/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/5/payload/currentActiveTherapies/1/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0024",
+          "text": "Aumentare insulina glargine a 16 UI serali",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/5/payload/therapyCandidateHints/0/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0025",
+          "text": "Diabete mellito tipo 2 noto. Segni di polineuropatia diabetica sensitivo-motoria. Aumentare insulina glargine a 16 UI serali; continuare Metformina 1000 mg 1 cp x 2/die.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/5/payload/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0026",
+          "text": "Quetiapina 25 mg la sera da rivalutare entro 7 giorni",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/6/payload/therapyCandidateHints/0/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0027",
+          "text": "Relazione geriatrica territoriale: quadro compatibile con demenza vascolare moderata con disorientamento temporo-spaziale. Per agitazione serale proporre Quetiapina 25 mg la sera, da rivalutare entro 7 giorni. Necessaria supervisione nelle ADL.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/6/payload/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0028",
+          "text": "Levotiroxina",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/7/payload/currentActiveTherapies/0/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0029",
+          "text": "75 mcg 1 cp/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/7/payload/currentActiveTherapies/0/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0030",
+          "text": "Richiesta di visita endocrinologica di controllo per ipotiroidismo autoimmune gia noto; valutare TSH e FT4. Continuare terapia domiciliare come da piano in corso.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/7/payload/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0031",
+          "text": "Enoxaparina",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/8/payload/currentActiveTherapies/0/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0032",
+          "text": "4000 UI 1 fiala/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/8/payload/currentActiveTherapies/0/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0033",
+          "text": "Clopidogrel",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/8/payload/currentActiveTherapies/1/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0034",
+          "text": "75 mg 1 cp/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/8/payload/currentActiveTherapies/1/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0035",
+          "text": "Sospendere enoxaparina 4000 UI; proseguire clopidogrel 75 mg",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/8/payload/therapyCandidateHints/0/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0036",
+          "text": "Relazione ADI: paziente con esiti di ictus ischemico ed emiparesi destra. Comparsa ulcera da pressione sacrale stadio II. Alla rivalutazione sospendere Enoxaparina 4000 UI; proseguire Clopidogrel 75 mg 1 cp/die.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+              "locator": "/8/payload/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0037",
+          "text": "ADI attiva, monitoraggio domiciliare infermieristico.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "0/context:line12"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0038",
+          "text": "Note scheda: dispnea da sforzo moderato e limitazione funzionale recente.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "0/context:line13"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0039",
+          "text": "ICD-10 J44.9: BPCO (14/03/2026)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "0/context:line16"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 20,
+              "end": 30
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 20,
+              "end": 30
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0040",
+          "text": "ICD-10 I10: Ipertensione essenziale (11/01/2026)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "0/context:line17"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 37,
+              "end": 47
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 37,
+              "end": 47
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0041",
+          "text": "Tiotropio 18 mcg 1 cps/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "0/context:line20"
+            },
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "5/context:line20"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0042",
+          "text": "Ramipril 5 mg 1 cp/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "0/context:line21"
+            },
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "5/context:line21"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0043",
+          "text": "SpO2 (59408-5) = 91 % [18/03/2026]",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "0/context:line24"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 23,
+              "end": 33
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 23,
+              "end": 33
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0044",
+          "text": "Frequenza cardiaca (8867-4) = 96 /min [18/03/2026]",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "0/context:line25"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 39,
+              "end": 49
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 39,
+              "end": 49
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0045",
+          "text": "28/03/2026: controllo MMG per rivalutazione dispnea",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "0/context:line28"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0046",
+          "text": "[18/03/2026] VISIT: peggioramento della dispnea nelle ultime due settimane, senza febbre.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "0/context:line31"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0047",
+          "text": "lettera_dimissione_bpco.pdf: riacutizzazione BPCO trattata con broncodilatatori; consigliato follow-up pneumologico precoce.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "0/context:line34"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 27
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 27
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0048",
+          "text": "ADI no.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "1/context:line12"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0049",
+          "text": "Profilo monitoraggio: diabete con follow-up trimestrale.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "1/context:line13"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0050",
+          "text": "ICD-10 E11.9: Diabete mellito tipo 2 (02/02/2026)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "1/context:line16"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 38,
+              "end": 48
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 38,
+              "end": 48
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0051",
+          "text": "ICD-10 N18.3: Malattia renale cronica stadio 3 (15/02/2026)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "1/context:line17"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 48,
+              "end": 58
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 48,
+              "end": 58
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0052",
+          "text": "Metformina 500 mg 1 cp x 2/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "1/context:line20"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0053",
+          "text": "Insulina glargine 16 UI serale",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "1/context:line21"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0054",
+          "text": "Glicemia (2339-0) = 182 mg/dL [19/03/2026]",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "1/context:line24"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 31,
+              "end": 41
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 31,
+              "end": 41
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0055",
+          "text": "Peso (29463-7) = 84 kg [19/03/2026]",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "1/context:line25"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 24,
+              "end": 34
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 24,
+              "end": 34
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0056",
+          "text": "04/04/2026: prelievo HbA1c e creatinina",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "1/context:line28"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0057",
+          "text": "[19/03/2026] NOTE: riferisce aderenza incerta alla dieta nelle ultime settimane.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "1/context:line31"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0058",
+          "text": "Anagrafica clinica: Gialli Rosella, eta 67, CF GRLSLL59S66H501O.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "2/context:line13"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 47,
+              "end": 63
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 47,
+              "end": 63
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0059",
+          "text": "ADI: si.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "2/context:line14"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0060",
+          "text": "ICD-10 C50.9: Storia personale di neoplasia maligna del seno (12/05/2018)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "2/context:line17"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 62,
+              "end": 72
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 62,
+              "end": 72
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0061",
+          "text": "ICD-10 E66.9: Obesita (18/09/2024)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "2/context:line18"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 23,
+              "end": 33
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 23,
+              "end": 33
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0062",
+          "text": "ICD-10 R73.0: Tolleranza alterata al glucosio (18/09/2024)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "2/context:line19"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 47,
+              "end": 57
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 47,
+              "end": 57
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0063",
+          "text": "ICD-10 Z72.0: Uso di tabacco (18/09/2024)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "2/context:line20"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 30,
+              "end": 40
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 30,
+              "end": 40
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0064",
+          "text": "ICD-10 Z72.1: Consumo di alcol (18/09/2024)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "2/context:line21"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 32,
+              "end": 42
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 32,
+              "end": 42
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0065",
+          "text": "26/03/2026: controllo ortopedico post-intervento femore sinistro",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "2/context:line30"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0066",
+          "text": "[20/03/2026] NOTE: dimessa dopo intervento per frattura pertrocanterica del femore sinistro; recupero funzionale da rivalutare.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "2/context:line33"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0067",
+          "text": "lettera_dimissione_ortopedia.pdf: frattura pertrocanterica femore sinistro trattata chirurgicamente; consigliato follow-up ortopedico e riabilitazione motoria.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "2/context:line36"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 32
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 32
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0068",
+          "text": "ADI attiva con supporto infermieristico domiciliare.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "3/context:line12"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0069",
+          "text": "Paziente con follow-up condiviso MMG + diabetologo.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "3/context:line13"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0070",
+          "text": "ICD-10 I48.9: Fibrillazione atriale (15/11/2025)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "3/context:line16"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 37,
+              "end": 47
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 37,
+              "end": 47
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0071",
+          "text": "ICD-10 E11.9: Diabete mellito tipo 2 (03/01/2026)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "3/context:line17"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 38,
+              "end": 48
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 38,
+              "end": 48
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0072",
+          "text": "Xarelto 20 mg 1 cp/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "3/context:line20"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0073",
+          "text": "Metformina 850 mg 1 cp x 2/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "3/context:line21"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0074",
+          "text": "Pressione arteriosa (85354-9) = 132/74 mmHg [21/03/2026]",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "3/context:line24"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 45,
+              "end": 55
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 45,
+              "end": 55
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0075",
+          "text": "02/04/2026: rivalutazione ematologica per gestione anticoagulante",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "3/context:line27"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0076",
+          "text": "07/04/2026: follow-up diabetologico territoriale",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "3/context:line28"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0077",
+          "text": "[21/03/2026] PS: accesso per epistassi; indicato stop temporaneo di Xarelto fino a rivalutazione specialistica.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "3/context:line31"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0078",
+          "text": "RefertoCittadino.pdf: epistassi risolta in PS, confermata necessita di rivalutare la ripresa dell'anticoagulante; mantenere follow-up diabetologico e ADI domiciliare.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "3/context:line34"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 20
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 20
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0079",
+          "text": "ADI attiva.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "4/context:line12"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0080",
+          "text": "Mobilita ridotta dopo ricovero recente, supporto familiare presente.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "4/context:line13"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0081",
+          "text": "ICD-10 M79.7: Fibromialgia (14/10/2024)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "4/context:line16"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 28,
+              "end": 38
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 28,
+              "end": 38
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0082",
+          "text": "ICD-10 E03.9: Ipotiroidismo (14/10/2024)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "4/context:line17"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 29,
+              "end": 39
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 29,
+              "end": 39
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0083",
+          "text": "Duloxetina 60 mg 1 cp/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "4/context:line20"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0084",
+          "text": "Pregabalin 75 mg 1 cp x 2/die",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "4/context:line21"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0085",
+          "text": "15/04/2026: controllo ortopedico post-dimissione",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "4/context:line27"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0086",
+          "text": "[24/03/2026] NOTE: dimessa dopo ricovero ortopedico, necessita supporto per recupero della deambulazione.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "4/context:line30"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0087",
+          "text": "lettera_dimissione_ortopedia.pdf: frattura pertrocanterica del femore sinistro trattata chirurgicamente; carico con deambulatore, FKT domiciliare 2-3 volte/settimana, emocromo di controllo e visita ortopedica.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "4/context:line33"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 32
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 32
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0088",
+          "text": "ADI attiva con supporto caregiver serale.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "5/context:line12"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0089",
+          "text": "Tosse produttiva in riduzione, persiste facile affaticamento dopo episodio respiratorio recente.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "5/context:line13"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0090",
+          "text": "ICD-10 J44.9: BPCO (10/01/2026)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "5/context:line16"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 20,
+              "end": 30
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 20,
+              "end": 30
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0091",
+          "text": "ICD-10 I10: Ipertensione essenziale (10/01/2026)",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "5/context:line17"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 37,
+              "end": 47
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 37,
+              "end": 47
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0092",
+          "text": "SpO2 (59408-5) = 93 % [26/03/2026]",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "5/context:line24"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 23,
+              "end": 33
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 23,
+              "end": 33
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0093",
+          "text": "02/04/2026: controllo MMG per rivalutazione respiratoria",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "5/context:line27"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 10
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0094",
+          "text": "[26/03/2026] NOTE: referto RX recente con addensamento basale destro; da organizzare valutazione pneumologica.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "5/context:line30"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 1,
+              "end": 11
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0095",
+          "text": "follow-up-pneumo.pdf (27/03/2026): controllo pneumologico ravvicinato da programmare per addensamento basale destro; valutare RX torace di controllo.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "5/context:line33"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 20
+            },
+            {
+              "start": 22,
+              "end": 32
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 20
+            },
+            {
+              "start": 22,
+              "end": 32
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0096",
+          "text": "profilo-cronico.pdf (12/02/2026): Sintesi: BPCO stabile, follow-up annuale pneumologico senza urgenze.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+              "locator": "5/context:line34"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 19
+            },
+            {
+              "start": 21,
+              "end": 31
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 19
+            },
+            {
+              "start": 21,
+              "end": 31
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0097",
+          "text": "Dimissione sintetica con follow-up ortopedico.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/0/documents/0/summary"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0098",
+          "text": "Indicazioni alla dimissione Controllo ortopedico tra 7 giorni. Stato funzionale Deambulazione con ausilio.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/0/documents/0/rawMarkdown"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0099",
+          "text": "Il paziente riferisce miglioramento della deambulazione e attende controllo ortopedico.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/0/diaryEntries/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0100",
+          "text": "No",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/1/documents/0/summary"
+            },
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/1/documents/0/rawMarkdown"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0101",
+          "text": "Referto sintetico con negazione.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/1/documents/1/summary"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0102",
+          "text": "Valutazione clinica Non evidenza di scompenso cardiaco. Follow-up Controllo ortopedico tra 7 giorni.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/1/documents/1/rawMarkdown"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0103",
+          "text": "Voce annullata con informazioni non piu attive.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/1/diaryEntries/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0104",
+          "text": "Relazione sintetica con indicazione fisiatrica.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/2/documents/0/summary"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0105",
+          "text": "Indicazioni FKT domiciliare da proseguire per due settimane. Follow-up Rivalutazione fisiatrica programmata.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/2/documents/0/rawMarkdown"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0106",
+          "text": "Documento sintetico sostituito.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/3/documents/0/summary"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0107",
+          "text": "Follow-up Controllo sintetico non piu attuale.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/evidence-absorption-benchmark-corpus.json",
+              "locator": "/3/documents/0/rawMarkdown"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0108",
+          "text": "PA 120/80 mmHg, FC 72 bpm, SpO2 96% in aria ambiente.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-facts-observation-corpus.json",
+              "locator": "/0/text"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0109",
+          "text": "Temperatura corporea 37.2 °C, peso 80 kg.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-facts-observation-corpus.json",
+              "locator": "/1/text"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0110",
+          "text": "Glicemia capillare 110 mg/dL a digiuno.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-facts-observation-corpus.json",
+              "locator": "/2/text"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0111",
+          "text": "Pressione arteriosa 140/90, dato riferito dal caregiver.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-facts-observation-corpus.json",
+              "locator": "/3/text"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0112",
+          "text": "Frequenza cardiaca 88 bpm, ritmo regolare.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-facts-observation-corpus.json",
+              "locator": "/4/text"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0113",
+          "text": "Paziente stanco, da rivalutare domani. Nessun parametro vitale riportato.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-facts-observation-corpus.json",
+              "locator": "/5/text"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0114",
+          "text": "Paziente con diabete mellito tipo 2 in trattamento con metformina 850 mg due volte al giorno.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-entities-benchmark-corpus.json",
+              "locator": "/0/inputText"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0115",
+          "text": "Scompenso cardiaco cronico. Terapia attuale: furosemide 25 mg al mattino e bisoprololo 1,25 mg.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-entities-benchmark-corpus.json",
+              "locator": "/1/inputText"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0116",
+          "text": "BPCO con dispnea da sforzo. Assume umeclidinio/vilanterolo una inalazione al giorno.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-entities-benchmark-corpus.json",
+              "locator": "/2/inputText"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0117",
+          "text": "Osteoporosi post-menopausale. Prosegue denosumab 60 mg sottocute ogni 6 mesi.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-entities-benchmark-corpus.json",
+              "locator": "/3/inputText"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0118",
+          "text": "Ipertensione arteriosa e fibrillazione atriale permanente. Terapia in corso: apixaban 5 mg due volte al giorno e bisoprololo 2,5 mg.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-entities-benchmark-corpus.json",
+              "locator": "/4/inputText"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0119",
+          "text": "Diabete mellito tipo 2 scarsamente controllato; HbA1c 8,2%. Avviata semaglutide 0,25 mg una volta a settimana.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-entities-benchmark-corpus.json",
+              "locator": "/5/inputText"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0120",
+          "text": "Lombalgia meccanica in miglioramento. Terapia consigliata: stretching quotidiano e riposo; nessun farmaco attivo.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-entities-benchmark-corpus.json",
+              "locator": "/6/inputText"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0121",
+          "text": "Asma persistente lieve. Prosegue salmeterolo/fluticasone due inalazioni al giorno.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-entities-benchmark-corpus.json",
+              "locator": "/7/inputText"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0122",
+          "text": "Controllo programmato. Creatinina 1,0 mg/dL, Hb 13,4 g/dL. Nessuna terapia in corso.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-entities-benchmark-corpus.json",
+              "locator": "/8/inputText"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0123",
+          "text": "Pregressa trombosi venosa profonda, attualmente in terapia con rivaroxaban 20 mg la sera.",
+          "sourceRefs": [
+            {
+              "path": "scripts/fixtures/clinical-entities-benchmark-corpus.json",
+              "locator": "/9/inputText"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0124",
+          "text": "Atorvastatina 20 mg",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/currentActiveTherapies/0/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0125",
+          "text": "1 compressa la sera",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/currentActiveTherapies/0/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0126",
+          "text": "Ramipril 5 mg",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/currentActiveTherapies/1/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0127",
+          "text": "1 compressa al mattino",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/currentActiveTherapies/1/dosage"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/currentActiveTherapies/0/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0128",
+          "text": "Da decidere: aumento ramipril a 10 mg e aggiunta di amlodipina 5 mg come suggerito.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/therapyCandidateHints/0/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0129",
+          "text": "Creatinina 0,9 mg/dL",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/therapyCandidateHints/1/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0130",
+          "text": "colesterolo LDL 162 mg/dL",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/therapyCandidateHints/2/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0131",
+          "text": "glicemia 94 mg/dL.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/therapyCandidateHints/3/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0132",
+          "text": "potassio 4,4 mmol/L",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/therapyCandidateHints/4/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0133",
+          "text": "Iniziata atorvastatina 20 mg la sera.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/therapyCandidateHints/5/excerpt"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/4/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0134",
+          "text": "In terapia con ramipril 5 mg/die, buona aderenza riferita.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/therapyCandidateHints/6/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0135",
+          "text": "Nota clinica sintetica ripetibile per il benchmark locale.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/0/content"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/sources/0/content"
+            },
+            {
+              "path": "scripts/seed-performance-baseline.mjs",
+              "locator": "line:213"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0136",
+          "text": "Visto il referto cardiologico del 02/11: ipertrofia ventricolare sinistra lieve, FE 55%. PA 150/94 mmHg. Lieve edema perimalleolare serale.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/1/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0137",
+          "text": "Da decidere: aumento ramipril a 10 mg e aggiunta di amlodipina 5 mg come suggerito. Controllo creatinina e potassio fra 2 settimane.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/2/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0138",
+          "text": "Creatinina 0,9 mg/dL, potassio 4,4 mmol/L, colesterolo LDL 162 mg/dL, glicemia 94 mg/dL.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/3/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0139",
+          "text": "Diario pressorio domiciliare: media 150/95 mmHg. Dispnea da sforzo moderato (due rampe di scale). Nessun dolore toracico.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/5/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0140",
+          "text": "Richiesto ecocardiogramma e visita cardiologica.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/6/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0141",
+          "text": "PA 148/92 mmHg in due misurazioni, FC 76. Riferisce cefalea mattutina occasionale. In terapia con ramipril 5 mg/die, buona aderenza riferita.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/7/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0142",
+          "text": "Piano: automisurazione domiciliare per 2 settimane, rivalutare.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/8/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0143",
+          "text": "Contenuto clinico sintetico con lunghezza stabile per la baseline.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/9/content"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/10/content"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/sources/5/content"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/sources/6/content"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/sources/7/content"
+            },
+            {
+              "path": "scripts/seed-performance-baseline.mjs",
+              "locator": "line:229"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0144",
+          "text": "Sintesi documentale sintetica, sempre soggetta a revisione.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/11/content"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/0/projection/sources/12/content"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/sources/8/content"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/sources/9/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0145",
+          "text": "Amlodipina 5 mg",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/currentActiveTherapies/0/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0146",
+          "text": "Metformina 1000 mg",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/currentActiveTherapies/1/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0147",
+          "text": "1 compressa due volte al giorno ai pasti",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/currentActiveTherapies/1/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0148",
+          "text": "Valutare intensificazione della terapia (SGLT2 inibitore considerando eGFR e microalbuminuria).",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/therapyCandidateHints/0/excerpt"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/sources/2/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0149",
+          "text": "HbA1c 8,1% (in aumento da 7,4% di aprile)",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/therapyCandidateHints/1/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0150",
+          "text": "eGFR 58 mL/min",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/therapyCandidateHints/2/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0151",
+          "text": "glicemia a digiuno 162 mg/dL",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/therapyCandidateHints/3/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0152",
+          "text": "microalbuminuria 45 mg/g.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/therapyCandidateHints/4/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0153",
+          "text": "In terapia con metformina 1000 mg due volte al giorno.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/therapyCandidateHints/5/excerpt"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0154",
+          "text": "Esame del piede: sensibilita conservata al monofilamento, polsi periferici presenti. Ultimo fundus oculi oltre 2 anni fa: da prenotare.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/sources/1/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0155",
+          "text": "HbA1c 8,1% (in aumento da 7,4% di aprile), glicemia a digiuno 162 mg/dL, eGFR 58 mL/min, microalbuminuria 45 mg/g.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/sources/3/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0156",
+          "text": "Peso 92 kg, BMI 31. PA 138/86 mmHg. In terapia con metformina 1000 mg due volte al giorno. Dieta seguita con difficolta, poca attivita fisica.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/1/projection/sources/4/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0157",
+          "text": "Levotiroxina 50 microgrammi",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/2/projection/currentActiveTherapies/0/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0158",
+          "text": "al mattino",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/2/projection/currentActiveTherapies/0/dosage"
+            },
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/4/projection/currentActiveTherapies/0/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0159",
+          "text": "Diagnosi attuale: anemia sideropenica. Hb 10,2 g/dL, ferritina 8 ng/mL. Si prescrive solfato ferroso 105 mg una compressa al giorno. Controllo emocromo e ferritina fra 6 settimane.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/2/projection/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0160",
+          "text": "TSH 2,1 mUI/L. Prosegue levotiroxina 50 microgrammi al mattino. Nessun sanguinamento evidente.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/2/projection/sources/1/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0161",
+          "text": "Pregressa polmonite nel 2019, risolta. Familiarita per diabete mellito. Non segni di infezione attuale.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/2/projection/sources/2/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0162",
+          "text": "Tiotropio 18 microgrammi",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/3/projection/currentActiveTherapies/0/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0163",
+          "text": "una inalazione al giorno",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/3/projection/currentActiveTherapies/0/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0164",
+          "text": "Diagnosi: bronchiectasie cilindriche bilaterali, attualmente sintomatiche con tosse produttiva. Non addensamenti polmonari. Indicata visita pneumologica e fisioterapia respiratoria.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/3/projection/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0165",
+          "text": "SpO2 95% in aria ambiente. Prosegue tiotropio 18 microgrammi una inalazione al giorno. Nessuna riacutizzazione infettiva in atto.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/3/projection/sources/1/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0166",
+          "text": "Ex fumatore. Padre con asma. Pregressa frattura del radio consolidata, senza esiti.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/3/projection/sources/2/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0167",
+          "text": "Losartan 50 mg",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/4/projection/currentActiveTherapies/0/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0168",
+          "text": "Diagnosi attuale: fibrillazione atriale persistente, documentata all ECG. Frequenza ventricolare media 82 bpm. Iniziato apixaban 5 mg due volte al giorno. Richiesto controllo cardiologico tra un mese.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/4/projection/sources/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0169",
+          "text": "PA domiciliare 132/78 mmHg. Prosegue losartan 50 mg al mattino. Assenza di dolore toracico e di segni di scompenso.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/4/projection/sources/1/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0170",
+          "text": "Colecistectomia nel 2010 senza complicanze. Madre con diabete tipo 2. Nessuna cardiopatia ischemica documentata.",
+          "sourceRefs": [
+            {
+              "path": "docs/verification/smart-import-wul-832/corpus.json",
+              "locator": "/cases/4/projection/sources/2/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0171",
+          "text": "Archivio dimostrativo. Elena preferisce comunicazioni chiare; visita e dati sono interamente sintetici. Caffè, città e simboli Unicode: 🩺.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/patients/0/notes"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0172",
+          "text": "Fixture di scrittura condivisa: versione iniziale. Città e 🩺.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/patients/1/notes"
+            },
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/patients/2/notes"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0173",
+          "text": "Scheda senza diario, terapie o documenti: verifica degli stati vuoti.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/patients/3/notes"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0174",
+          "text": "Paziente archiviata nel corpus sintetico.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/patients/4/notes"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0175",
+          "text": "Colloquio sintetico in ambulatorio. Contesto di prova Riga annidata con città e caffè . Nessuna indicazione clinica reale.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/entries/0/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0176",
+          "text": "Seconda voce del diario per verificare ordine, date e rilettura. Tutti i contenuti sono inventati.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/entries/1/content"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0177",
+          "text": "Farmaco di prova A",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/therapies/0/drugName"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0178",
+          "text": "1 unità al mattino — dato sintetico",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/therapies/0/dosage"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0179",
+          "text": "Terapia inventata per il confronto delle interfacce.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/therapies/0/motivation"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0180",
+          "text": "Misura sintetica uno.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/observations/0/notes"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0181",
+          "text": "Misura sintetica due.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/observations/1/notes"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0182",
+          "text": "Promemoria inventato per verificare le scadenze.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/checkups/0/notes"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0183",
+          "text": "Documento esclusivamente sintetico per confrontare elenco, decifratura e apertura dei documenti MediFlow.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+              "locator": "/attachments/0/text"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0184",
+          "text": "Nota clinica senza markup",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/1/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0185",
+          "text": "Visita di controllo",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/2/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0186",
+          "text": "Prima riga Seconda riga",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/3/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0187",
+          "text": "Allergia nota",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/4/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0188",
+          "text": "Da confermare",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/5/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0189",
+          "text": "Dato rilevante",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/6/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0190",
+          "text": "Terapia sospesa",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/7/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0191",
+          "text": "Emocromo PCR",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/8/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0192",
+          "text": "Valutare Ricontrollare",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/9/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0193",
+          "text": "Diario clinico",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/10/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0194",
+          "text": "Valutazione",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/11/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0195",
+          "text": "Piano",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/12/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0196",
+          "text": "Riferito dal caregiver",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/13/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0197",
+          "text": "Paragrafo legacy",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/14/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0198",
+          "text": "Importante",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/15/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0199",
+          "text": "Osservazione",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/16/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0200",
+          "text": "Non attuale",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/17/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0201",
+          "text": "Rimosso",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/18/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0202",
+          "text": "Prima alert(1) Dopo",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/19/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0203",
+          "text": "body{display:none} Visibile",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/20/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0204",
+          "text": "segreto Sicuro",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/21/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0205",
+          "text": "payload Sicuro",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/22/input"
+            },
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/23/input"
+            },
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/24/input"
+            },
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/25/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0206",
+          "text": "Contenuto",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/26/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0207",
+          "text": "Prima Dopo",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/27/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0208",
+          "text": "Testo",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/28/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0209",
+          "text": "Esami Emocromo Creatinina Controllo",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/29/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0210",
+          "text": "Caregiver Paziente",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/30/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0211",
+          "text": "Heading degradato",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/31/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0212",
+          "text": "Dose 2",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/32/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0213",
+          "text": "& &lt; &gt; &quot; &#39;",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/33/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0214",
+          "text": "Valore non chiuso",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/34/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0215",
+          "text": "Incrocio",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/35/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0216",
+          "text": "Febbre 38,5 °C • caffè 🩺 👩‍⚕️",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/36/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0217",
+          "text": "Follow-up complesso Sintesi: quadro stabile con monitoraggio domiciliare. Pressione mattino e sera Controllo esami tra 7 giorni Segnalare subito nuovi sintomi respiratori o neurologici. Rivalutazione programmata.",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/37/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0218",
+          "text": "S: motivo della visita, sintomi riferiti, contesto funzionale O: parametri, esame obiettivo, elementi documentali A: valutazione clinica da rivedere P: piano, follow-up, indicazioni condivise",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/38/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0219",
+          "text": "Uno Due",
+          "sourceRefs": [
+            {
+              "path": "native/contracts/clinical-rich-text-fixtures.v1.json",
+              "locator": "/39/input"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0220",
+          "text": "Diabete mellito di tipo 2",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:52"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0221",
+          "text": "Metformina 500mg",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:54"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0222",
+          "text": "1 cpr x 3/die",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:54"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0223",
+          "text": "diabete",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:54"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:55"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:56"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0224",
+          "text": "Metformina 850mg",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:55"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0225",
+          "text": "1 cpr x 2/die",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:55"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:78"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0226",
+          "text": "Gliclazide 30mg",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:56"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0227",
+          "text": "1 cpr colazione",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:56"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0228",
+          "text": "polidipsia",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:58"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0229",
+          "text": "poliuria",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:58"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0230",
+          "text": "astenia",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:58"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:81"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0231",
+          "text": "parestesie",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:58"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0232",
+          "text": "glycemia",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:59"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0233",
+          "text": "weight",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:59"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:82"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0234",
+          "text": "BA00",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:62"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0235",
+          "text": "Ipertensione essenziale",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:63"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0236",
+          "text": "Ramipril 5mg",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:65"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0237",
+          "text": "1 cpr/die",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:65"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:66"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:67"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:77"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:79"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0238",
+          "text": "ipertensione",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:65"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:66"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0239",
+          "text": "Amlodipina 5mg",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:66"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0240",
+          "text": "Bisoprololo 2.5mg",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:67"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0241",
+          "text": "cardiaco",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:67"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:77"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0242",
+          "text": "Furosemide 25mg",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:68"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:78"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0243",
+          "text": "1 cpr mattino",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:68"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0244",
+          "text": "diuretico",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:68"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:78"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:79"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0245",
+          "text": "cefalea nucale",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:70"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0246",
+          "text": "vertigini",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:70"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0247",
+          "text": "ronzii auricolari",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:70"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0248",
+          "text": "blood_pressure",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:71"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:82"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0249",
+          "text": "CA40",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:74"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0250",
+          "text": "Insufficienza cardiaca",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:75"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0251",
+          "text": "Bisoprololo 1.25mg",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:77"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0252",
+          "text": "Spironolattone 25mg",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:79"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0253",
+          "text": "dispnea da sforzo",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:81"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0254",
+          "text": "edemi declivi",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:81"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0255",
+          "text": "ortopnea",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:81"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0256",
+          "text": "sp02",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:82"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:92"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0257",
+          "text": "DB90",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:85"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0258",
+          "text": "Broncopneumopatia cronica ostruttiva (BPCO)",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:86"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0259",
+          "text": "Salbutamolo spray",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:88"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0260",
+          "text": "al bisogno",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:88"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0261",
+          "text": "respiratorio",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:88"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:89"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0262",
+          "text": "Tiotropio inalatore",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:89"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0263",
+          "text": "1 puff/die",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:89"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0264",
+          "text": "tosse produttiva",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:91"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0265",
+          "text": "dispnea",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:91"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0266",
+          "text": "respiro sibilante",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:91"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0267",
+          "text": "MA14",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:95"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0268",
+          "text": "Artrosi polidistrettuale",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:96"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0269",
+          "text": "Paracetamolo 1000mg",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:98"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0270",
+          "text": "1 cpr al bisogno",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:98"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0271",
+          "text": "dolore",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:98"
+            },
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:99"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0272",
+          "text": "Ibuprofene 600mg",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:99"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0273",
+          "text": "1 cpr a stomaco pieno",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:99"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0274",
+          "text": "dolore articolare",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:101"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0275",
+          "text": "rigidità mattutina",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:101"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0276",
+          "text": "limitazione funzionale",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:101"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0277",
+          "text": "adl",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:102"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0278",
+          "text": "pain",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:102"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0279",
+          "text": "Controllo routine patologia cronica.",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:167"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0280",
+          "text": "Conclusioni: Parametri sostanzialmente nella norma, salvo evidenziati.",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:195"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0281",
+          "text": "Paziente in buone condizioni generali. Riferisce lieve astenia.",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:199"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0282",
+          "text": "Torace: MV fisiologico. Cuore: toni ritmici, pause libere.",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:201"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0283",
+          "text": "Addome: trattabile, non dolente. Arti inf: no edemi.",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:202"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0284",
+          "text": "Si consiglia prosecuzione terapia in atto.",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:204"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0285",
+          "text": "Visita di Controllo",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:338"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0286",
+          "text": "Paziente valutato in ambulatorio. Parametri vitali stabili.",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:339"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0287",
+          "text": "Colloquio con paziente/caregiver per aggiornamento terapia.",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:346"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0288",
+          "text": "Osservazione clinica. Parametri stabili, il paziente riferisce benessere generale.",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:349"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0289",
+          "text": "Visionati referti esami recenti.",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:352"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0290",
+          "text": "[Allegato generato: Referto PDF]",
+          "sourceRefs": [
+            {
+              "path": "lib/seeder.ts",
+              "locator": "line:377"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0291",
+          "text": "Diagnosi sintetica in revisione. Terapia sintetica 10 mg una compressa al giorno.",
+          "sourceRefs": [
+            {
+              "path": "e2e/smart-import.spec.ts",
+              "locator": "line:52"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0292",
+          "text": "1 diagnosi · 0 terapie · 0 prestazioni",
+          "sourceRefs": [
+            {
+              "path": "e2e/smart-import.spec.ts",
+              "locator": "line:207"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0293",
+          "text": "Fonte Note paziente",
+          "sourceRefs": [
+            {
+              "path": "e2e/smart-import.spec.ts",
+              "locator": "line:279"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0294",
+          "text": "Referto di laboratorio sintetico",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:33"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0295",
+          "text": "Anamnesi: madre deceduta per ca. mammella ICD-10 C50",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:97"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0296",
+          "text": "Diagnosi: ICD-10 I10 Ipertensione essenziale",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:98"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0297",
+          "text": "Nega diabete ICD-10 E11.9 diabete mellito",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:98"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0298",
+          "text": "Terapia domiciliare: Ramipril 5 mg 1 cp al mattino; Bisoprololo 2,5 mg 1 cp",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:99"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0299",
+          "text": "referto-nuovo.pdf",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:103"
+            }
+          ],
+          "baselineSpans": [
+            {
+              "start": 0,
+              "end": 17
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 0,
+              "end": 17
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0300",
+          "text": "Referto sintetico per una nuova scheda",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:103"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0301",
+          "text": "Diagnosi: asma bronchiale",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:104"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0302",
+          "text": "[data-testid=\"dossier-fact\"][data-kind=\"diagnosis\"]",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:156"
+            },
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:216"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0303",
+          "text": "[data-testid=\"dossier-fact\"][data-kind=\"anamnesis\"]",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:160"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0304",
+          "text": "input[value=\"Ramipril\"]",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:161"
+            },
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:317"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0305",
+          "text": "input[value=\"Creatinina\"]",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:170"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0306",
+          "text": "Lettera di dimissione sintetica",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:262"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0307",
+          "text": "Diagnosi: Ipertensione arteriosa essenziale",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:263"
+            },
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:276"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0308",
+          "text": "Il paziente riferisce dispnea da sforzo da circa due mesi.",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:263"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0309",
+          "text": "Ramipril 5 mg 1 cp al mattino",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:264"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0310",
+          "text": "Ricovero per ipertensione; dispnea da sforzo da circa due mesi.",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:273"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0311",
+          "text": "Ipertensione arteriosa essenziale",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:276"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0312",
+          "text": "Metformina 500 mg due volte al giorno",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:278"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0313",
+          "text": "Terapia: Ramipril 5 mg 1 cp al mattino",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:283"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0314",
+          "text": "Terapia: Bisoprololo 2,5 mg 1 cp",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:284"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0315",
+          "text": "input[value=\"Metformina\"]",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:315"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0316",
+          "text": "[data-testid=\"dossier-fact\"][data-kind=\"diagnosis\"][data-origin=\"prepared\"]",
+          "sourceRefs": [
+            {
+              "path": "e2e/dossier-import.spec.ts",
+              "locator": "line:321"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0317",
+          "text": "# Documento sintetico Fonte clinica sintetica di sola prova.",
+          "sourceRefs": [
+            {
+              "path": "e2e/document-synthesis-fabric-review.spec.ts",
+              "locator": "line:14"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0318",
+          "text": "Fonte clinica sintetica di sola prova.",
+          "sourceRefs": [
+            {
+              "path": "e2e/document-synthesis-fabric-review.spec.ts",
+              "locator": "line:15"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0319",
+          "text": "Output shape example only; replace example values with supported content: {\"schemaVersion\":\"mediflow.ai.extract.v1\",\"task\":\"document_synthesis\",\"summary\":\" \",\"data\":{\"qualityLevel\":\"yellow\",\"medications\":[],\"diagnoses\":[],\"problemStatements\":[],\"therapyCandidates\":[],\"servicePrescriptions\":[]}}. None of these fields may be omitted; output must not be empty.",
+          "sourceRefs": [
+            {
+              "path": "lib/ai-providers/fabric/document-synthesis-multi-source-prompt.test.ts",
+              "locator": "line:35"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0320",
+          "text": "summary is nonempty text of at most 700 characters. qualityLevel is exactly green, yellow, or red. data may also contain qualityReason, nonempty text of at most 220 characters. Use empty arrays when the sources provide no supported items; do not invent clinical facts or codes. Output text values must be NFC, nonempty, single-line, and free of control characters.",
+          "sourceRefs": [
+            {
+              "path": "lib/ai-providers/fabric/document-synthesis-multi-source-prompt.test.ts",
+              "locator": "line:37"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0321",
+          "text": "medications contains at most 64 strings, each at most 180 characters. diagnoses, problemStatements, therapyCandidates, and servicePrescriptions each contain at most 32 items.",
+          "sourceRefs": [
+            {
+              "path": "lib/ai-providers/fabric/document-synthesis-multi-source-prompt.test.ts",
+              "locator": "line:38"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0322",
+          "text": "Each diagnosis requires code (text, at most 120), description (text, at most 300), and system (ICD-9, ICD-10, or ICD-11). Optional fields: evidence (text, at most 400), confidence. Every confidence value is high, medium, or low.",
+          "sourceRefs": [
+            {
+              "path": "lib/ai-providers/fabric/document-synthesis-multi-source-prompt.test.ts",
+              "locator": "line:39"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0323",
+          "text": "Each servicePrescription requires serviceName (text, at most 180), confidence, and evidence (text, at most 400). Optional category is lab, imaging, visit, rehab, screening, procedure, or other. Optional text fields, each at most 180: priority, codeSystem, serviceCode, clinicalQuestion, provider, prescribedAt, requestReference. Here provider means the clinical service provider, never AI provider metadata. Optional items contains at most 32 records, each requiring serviceName (text, at most 180), confidence, evidence (text, at most 400), with optional category from the same category enum and optional text fields codeSystem and serviceCode (each at most 160).",
+          "sourceRefs": [
+            {
+              "path": "lib/ai-providers/fabric/document-synthesis-multi-source-prompt.test.ts",
+              "locator": "line:42"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0324",
+          "text": "claims must contain exactly one record per canonical output path, in this order: summary; data.qualityLevel; data.qualityReason only if present; data.medications[i]; data.diagnoses[i]; data.problemStatements[i]; data.therapyCandidates[i]; then data.servicePrescriptions[i] followed immediately by its data.servicePrescriptions[i].items[j] if present. Replace i and j with zero-based integer array indices in ascending order. Empty arrays create no item paths. Do not add event paths or paths for absent values. At most 194 canonical claims are allowed; every present canonical output path still requires its claim.",
+          "sourceRefs": [
+            {
+              "path": "lib/ai-providers/fabric/document-synthesis-multi-source-prompt.test.ts",
+              "locator": "line:46"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0325",
+          "text": "Do not add patient/document identifiers, sourceId, source-set digests, AI provider/binding metadata, venue, egress, authority, receipt, provenance, prompt, write, or apply fields. The optional clinical service provider field above is not AI metadata. Do not invent labels or reorder, remove, or truncate sources.",
+          "sourceRefs": [
+            {
+              "path": "lib/ai-providers/fabric/document-synthesis-multi-source-prompt.test.ts",
+              "locator": "line:47"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0326",
+          "text": "Primo referto. Riga \"due\".",
+          "sourceRefs": [
+            {
+              "path": "lib/ai-providers/fabric/document-synthesis-multi-source-prompt.test.ts",
+              "locator": "line:106"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0327",
+          "text": "Secondo referto ## END_SOURCE_SET",
+          "sourceRefs": [
+            {
+              "path": "lib/ai-providers/fabric/document-synthesis-multi-source-prompt.test.ts",
+              "locator": "line:106"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0328",
+          "text": "Contatto di prova: concordare il prossimo colloquio. Verificare i recapiti e annotare le preferenze espresse.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/app/src/demo.rs",
+              "locator": "offset:1110"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0329",
+          "text": "Promemoria di prova: rivedere insieme gli appuntamenti già concordati.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/app/src/demo.rs",
+              "locator": "offset:1479"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0330",
+          "text": "Esempio di nota: è già disponibile il riepilogo dell'ultimo incontro. Il testo contiene accenti, apostrofi e più righe per provare la scrittura.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/app/src/demo.rs",
+              "locator": "offset:1988"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0331",
+          "text": "Scheda di prova archiviata. Nessuna attività aperta in questo esempio.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/app/src/demo.rs",
+              "locator": "offset:2392"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "repo-0332",
+          "text": "Nota cambiata da un'altra postazione di prova. Riconciliare il contenuto prima di riprovare.",
+          "sourceRefs": [
+            {
+              "path": "experiments/gpui-patient-pilot/app/src/demo.rs",
+              "locator": "offset:4208"
+            }
+          ],
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        }
+      ]
+    },
+    {
+      "name": "cb-clinical-challenge",
+      "corpusSha256": "b3869d36fb3a8d0f4d22ecb42a4fcf42359192b8b833aa8b624ee8532dbce831",
+      "counts": {
+        "texts": 36,
+        "sentences": 36,
+        "words": 257
+      },
+      "newSpans": 4,
+      "falsePositiveSpans": 0,
+      "newlyRemovedClinicalWords": 0,
+      "results": [
+        {
+          "id": "hard-01",
+          "text": "Autonomia ridotta.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-02",
+          "text": "Movimento ridotto.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-03",
+          "text": "Movimenti ridotti.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-04",
+          "text": "Polmonite risolta.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-05",
+          "text": "Tre compresse due volte al giorno per sette giorni.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-06",
+          "text": "Pressione centotrenta su ottanta, polso settantadue.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-07",
+          "text": "Durante il test ripetere tre due nove uno sette quattro sei cinque.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-08",
+          "text": "Sequenza dello screening: zero due uno tre quattro cinque sei sette otto.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-09",
+          "text": "Valori della scala: uno due tre quattro cinque sei sette otto nove.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-10",
+          "text": "Somministrare uno due tre quattro cinque sei sette mg secondo lo schema.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-11",
+          "text": "Ripetere tre tre tre zero zero zero zero per la prova di memoria.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-12",
+          "text": "Al punto di sutura la cute non mostra segni di infezione.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-13",
+          "text": "La chiocciola è una struttura dell’orecchio interno.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-14",
+          "text": "Esame della chiocciola: punto doloroso assente.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-15",
+          "text": "Metformina, codice ATC A10BA02; Apixaban B01AF02.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-16",
+          "text": "Lotto del reagente QRTFLA80A01Z123V, controllo analitico nella norma.",
+          "baselineSpans": [
+            {
+              "start": 19,
+              "end": 35
+            }
+          ],
+          "currentSpans": [
+            {
+              "start": 19,
+              "end": 35
+            }
+          ],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-17",
+          "text": "Esame LOINC 8480-6: pressione sistolica nella norma.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-18",
+          "text": "Referto tecnico LAB_2026_001, potassio nella norma.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-19",
+          "text": "Trasferito da Cardiologia.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-20",
+          "text": "Trasferita in Neurologia per completamento diagnostico.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-21",
+          "text": "Trasferito da Cardiologia a Medicina interna per monitoraggio.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-22",
+          "text": "Vive a Milano e assume metformina 500 mg al giorno.",
+          "baselineSpans": [],
+          "currentSpans": [
+            {
+              "start": 7,
+              "end": 13
+            }
+          ],
+          "newSpans": [
+            {
+              "start": 7,
+              "end": 13,
+              "text": "Milano",
+              "classification": "identifier",
+              "clinicalWords": [],
+              "context": "Vive a Milano e assume metformina 500 mg al giorno."
+            }
+          ],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-23",
+          "text": "Vive a Torino ed esegue Emocromo ogni mese.",
+          "baselineSpans": [],
+          "currentSpans": [
+            {
+              "start": 7,
+              "end": 13
+            }
+          ],
+          "newSpans": [
+            {
+              "start": 7,
+              "end": 13,
+              "text": "Torino",
+              "classification": "identifier",
+              "clinicalWords": [],
+              "context": "Vive a Torino ed esegue Emocromo ogni mese."
+            }
+          ],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-24",
+          "text": "Abita a Genova ma riferisce dolore lombare.",
+          "baselineSpans": [],
+          "currentSpans": [
+            {
+              "start": 8,
+              "end": 14
+            }
+          ],
+          "newSpans": [
+            {
+              "start": 8,
+              "end": 14,
+              "text": "Genova",
+              "classification": "identifier",
+              "clinicalWords": [],
+              "context": "Abita a Genova ma riferisce dolore lombare."
+            }
+          ],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-25",
+          "text": "Risiede a Verona, assume Ramipril 5 mg.",
+          "baselineSpans": [],
+          "currentSpans": [
+            {
+              "start": 10,
+              "end": 16
+            }
+          ],
+          "newSpans": [
+            {
+              "start": 10,
+              "end": 16,
+              "text": "Verona",
+              "classification": "identifier",
+              "clinicalWords": [],
+              "context": "Risiede a Verona, assume Ramipril 5 mg."
+            }
+          ],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-26",
+          "text": "Trasferito da Cardiologia e prosegue Ramipril 5 mg.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-27",
+          "text": "Ricoverato in Medicina per polmonite.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-28",
+          "text": "Dolore a riposo e dispnea da sforzo, senza febbre.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-29",
+          "text": "Valutazione presso Endocrinologia, da rivalutare in ambulatorio.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-30",
+          "text": "Metformina 500 mg, Ramipril 5 mg, Emocromo e Creatinina di controllo.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-31",
+          "text": "{\"domicilio\":\"riposo a letto per tre giorni\"}",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-32",
+          "text": "{\"provenienza\":\"Cardiologia\"}",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-33",
+          "text": "{\"residenza\":\"non rilevante per la terapia attuale\"}",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-34",
+          "text": "{\"HbA1c\":\"7,2%\",\"terapia\":\"Metformina 500 mg\"}",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-35",
+          "text": "Vive in autonomia e gestisce la terapia senza aiuto.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        },
+        {
+          "id": "hard-36",
+          "text": "Vive in assenza di dolore e prosegue la riabilitazione.",
+          "baselineSpans": [],
+          "currentSpans": [],
+          "newSpans": [],
+          "newlyRemovedClinicalWords": []
+        }
+      ]
+    }
+  ]
+}

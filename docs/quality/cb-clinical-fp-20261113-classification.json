@@ -1,0 +1,1113 @@
+{
+  "schema": "mediflow.cb-clinical-fp-adjudication.v1",
+  "reviewedBy": "implementation agent; every new interval read in its source sentence",
+  "beforeIntervals": 30,
+  "beforeFalsePositiveIntervals": 29,
+  "beforeClinicalWords": 118,
+  "afterIntervals": 4,
+  "afterFalsePositiveIntervals": 0,
+  "afterClinicalWords": 0,
+  "records": [
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-independent",
+      "id": "repo-0017",
+      "start": 171,
+      "end": 190,
+      "text": "con Nebivololo 5 mg",
+      "context": "illazione atriale parossistica. Alla dimissione sospendere Bisoprololo 2,5 mg 1 cp/die e sostituire con Nebivololo 5 mg 1 cp/die; iniziare Torasemide 10 mg 1 cp al mattino. Confermare Ramipril 5 mg 1 cp/die.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 171,
+          "end": 174,
+          "text": "con"
+        },
+        {
+          "start": 175,
+          "end": 185,
+          "text": "Nebivololo"
+        },
+        {
+          "start": 188,
+          "end": 190,
+          "text": "mg"
+        }
+      ],
+      "reason": "Parole cliniche o della nota sintetica concatenate dalla grammatica CF; nessun identificativo nel testo marcato.",
+      "sourceRefs": [
+        {
+          "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+          "locator": "/3/payload/sources/0/content"
+        }
+      ]
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-independent",
+      "id": "repo-0025",
+      "start": 63,
+      "end": 80,
+      "text": "sensitivo-motoria",
+      "context": "Diabete mellito tipo 2 noto. Segni di polineuropatia diabetica sensitivo-motoria. Aumentare insulina glargine a 16 UI serali; continuare Metformina 1000 mg 1 cp x 2/die.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 63,
+          "end": 72,
+          "text": "sensitivo"
+        },
+        {
+          "start": 73,
+          "end": 80,
+          "text": "motoria"
+        }
+      ],
+      "reason": "Parole cliniche o della nota sintetica concatenate dalla grammatica CF; nessun identificativo nel testo marcato.",
+      "sourceRefs": [
+        {
+          "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+          "locator": "/5/payload/sources/0/content"
+        }
+      ]
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-independent",
+      "id": "repo-0030",
+      "start": 49,
+      "end": 66,
+      "text": "per ipotiroidismo",
+      "context": "Richiesta di visita endocrinologica di controllo per ipotiroidismo autoimmune gia noto; valutare TSH e FT4. Continuare terapia domiciliare come da piano in corso.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 49,
+          "end": 52,
+          "text": "per"
+        },
+        {
+          "start": 53,
+          "end": 66,
+          "text": "ipotiroidismo"
+        }
+      ],
+      "reason": "Parole cliniche o della nota sintetica concatenate dalla grammatica CF; nessun identificativo nel testo marcato.",
+      "sourceRefs": [
+        {
+          "path": "scripts/fixtures/smart-import-benchmark-corpus.json",
+          "locator": "/7/payload/sources/0/content"
+        }
+      ]
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-independent",
+      "id": "repo-0078",
+      "start": 22,
+      "end": 39,
+      "text": "epistassi risolta",
+      "context": "RefertoCittadino.pdf: epistassi risolta in PS, confermata necessita di rivalutare la ripresa dell'anticoagulante; mantenere follow-up diabe",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 22,
+          "end": 31,
+          "text": "epistassi"
+        },
+        {
+          "start": 32,
+          "end": 39,
+          "text": "risolta"
+        }
+      ],
+      "reason": "Parole cliniche o della nota sintetica concatenate dalla grammatica CF; nessun identificativo nel testo marcato.",
+      "sourceRefs": [
+        {
+          "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
+          "locator": "3/context:line34"
+        }
+      ]
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-independent",
+      "id": "repo-0128",
+      "start": 13,
+      "end": 31,
+      "text": "aumento ramipril a",
+      "context": "Da decidere: aumento ramipril a 10 mg e aggiunta di amlodipina 5 mg come suggerito.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 13,
+          "end": 20,
+          "text": "aumento"
+        },
+        {
+          "start": 21,
+          "end": 29,
+          "text": "ramipril"
+        },
+        {
+          "start": 30,
+          "end": 31,
+          "text": "a"
+        }
+      ],
+      "reason": "Parole cliniche o della nota sintetica concatenate dalla grammatica CF; nessun identificativo nel testo marcato.",
+      "sourceRefs": [
+        {
+          "path": "docs/verification/smart-import-wul-832/corpus.json",
+          "locator": "/cases/0/projection/therapyCandidateHints/0/excerpt"
+        }
+      ]
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-independent",
+      "id": "repo-0137",
+      "start": 13,
+      "end": 31,
+      "text": "aumento ramipril a",
+      "context": "Da decidere: aumento ramipril a 10 mg e aggiunta di amlodipina 5 mg come suggerito. Controllo creatinina e potassio fra 2 settimane",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 13,
+          "end": 20,
+          "text": "aumento"
+        },
+        {
+          "start": 21,
+          "end": 29,
+          "text": "ramipril"
+        },
+        {
+          "start": 30,
+          "end": 31,
+          "text": "a"
+        }
+      ],
+      "reason": "Parole cliniche o della nota sintetica concatenate dalla grammatica CF; nessun identificativo nel testo marcato.",
+      "sourceRefs": [
+        {
+          "path": "docs/verification/smart-import-wul-832/corpus.json",
+          "locator": "/cases/0/projection/sources/2/content"
+        }
+      ]
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-independent",
+      "id": "repo-0279",
+      "start": 0,
+      "end": 17,
+      "text": "Controllo routine",
+      "context": "Controllo routine patologia cronica.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 0,
+          "end": 9,
+          "text": "Controllo"
+        },
+        {
+          "start": 10,
+          "end": 17,
+          "text": "routine"
+        }
+      ],
+      "reason": "Parole cliniche o della nota sintetica concatenate dalla grammatica CF; nessun identificativo nel testo marcato.",
+      "sourceRefs": [
+        {
+          "path": "lib/seeder.ts",
+          "locator": "line:167"
+        }
+      ]
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-independent",
+      "id": "repo-0330",
+      "start": 53,
+      "end": 72,
+      "text": "ultimo incontro. Il",
+      "context": "Esempio di nota: è già disponibile il riepilogo dell'ultimo incontro. Il testo contiene accenti, apostrofi e più righe per provare la scrittura.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 53,
+          "end": 59,
+          "text": "ultimo"
+        },
+        {
+          "start": 60,
+          "end": 68,
+          "text": "incontro"
+        },
+        {
+          "start": 70,
+          "end": 72,
+          "text": "Il"
+        }
+      ],
+      "reason": "Parole cliniche o della nota sintetica concatenate dalla grammatica CF; nessun identificativo nel testo marcato.",
+      "sourceRefs": [
+        {
+          "path": "experiments/gpui-patient-pilot/app/src/demo.rs",
+          "locator": "offset:1988"
+        }
+      ]
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-01",
+      "start": 0,
+      "end": 17,
+      "text": "Autonomia ridotta",
+      "context": "Autonomia ridotta.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 0,
+          "end": 9,
+          "text": "Autonomia"
+        },
+        {
+          "start": 10,
+          "end": 17,
+          "text": "ridotta"
+        }
+      ],
+      "reason": "Osservazione clinica in prosa, non CF.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-02",
+      "start": 0,
+      "end": 17,
+      "text": "Movimento ridotto",
+      "context": "Movimento ridotto.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 0,
+          "end": 9,
+          "text": "Movimento"
+        },
+        {
+          "start": 10,
+          "end": 17,
+          "text": "ridotto"
+        }
+      ],
+      "reason": "Osservazione clinica in prosa, non CF.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-03",
+      "start": 0,
+      "end": 17,
+      "text": "Movimenti ridotti",
+      "context": "Movimenti ridotti.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 0,
+          "end": 9,
+          "text": "Movimenti"
+        },
+        {
+          "start": 10,
+          "end": 17,
+          "text": "ridotti"
+        }
+      ],
+      "reason": "Osservazione clinica in prosa, non CF.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-04",
+      "start": 0,
+      "end": 17,
+      "text": "Polmonite risolta",
+      "context": "Polmonite risolta.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 0,
+          "end": 9,
+          "text": "Polmonite"
+        },
+        {
+          "start": 10,
+          "end": 17,
+          "text": "risolta"
+        }
+      ],
+      "reason": "Osservazione clinica in prosa, non CF.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-07",
+      "start": 25,
+      "end": 66,
+      "text": "tre due nove uno sette quattro sei cinque",
+      "context": "Durante il test ripetere tre due nove uno sette quattro sei cinque.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 25,
+          "end": 28,
+          "text": "tre"
+        },
+        {
+          "start": 29,
+          "end": 32,
+          "text": "due"
+        },
+        {
+          "start": 33,
+          "end": 37,
+          "text": "nove"
+        },
+        {
+          "start": 38,
+          "end": 41,
+          "text": "uno"
+        },
+        {
+          "start": 42,
+          "end": 47,
+          "text": "sette"
+        },
+        {
+          "start": 48,
+          "end": 55,
+          "text": "quattro"
+        },
+        {
+          "start": 56,
+          "end": 59,
+          "text": "sei"
+        },
+        {
+          "start": 60,
+          "end": 66,
+          "text": "cinque"
+        }
+      ],
+      "reason": "Sequenza numerica di un test clinico, non recapito.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-08",
+      "start": 26,
+      "end": 72,
+      "text": "zero due uno tre quattro cinque sei sette otto",
+      "context": "Sequenza dello screening: zero due uno tre quattro cinque sei sette otto.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 26,
+          "end": 30,
+          "text": "zero"
+        },
+        {
+          "start": 31,
+          "end": 34,
+          "text": "due"
+        },
+        {
+          "start": 35,
+          "end": 38,
+          "text": "uno"
+        },
+        {
+          "start": 39,
+          "end": 42,
+          "text": "tre"
+        },
+        {
+          "start": 43,
+          "end": 50,
+          "text": "quattro"
+        },
+        {
+          "start": 51,
+          "end": 57,
+          "text": "cinque"
+        },
+        {
+          "start": 58,
+          "end": 61,
+          "text": "sei"
+        },
+        {
+          "start": 62,
+          "end": 67,
+          "text": "sette"
+        },
+        {
+          "start": 68,
+          "end": 72,
+          "text": "otto"
+        }
+      ],
+      "reason": "Sequenza numerica di un test clinico, non recapito.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-09",
+      "start": 20,
+      "end": 66,
+      "text": "uno due tre quattro cinque sei sette otto nove",
+      "context": "Valori della scala: uno due tre quattro cinque sei sette otto nove.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 20,
+          "end": 23,
+          "text": "uno"
+        },
+        {
+          "start": 24,
+          "end": 27,
+          "text": "due"
+        },
+        {
+          "start": 28,
+          "end": 31,
+          "text": "tre"
+        },
+        {
+          "start": 32,
+          "end": 39,
+          "text": "quattro"
+        },
+        {
+          "start": 40,
+          "end": 46,
+          "text": "cinque"
+        },
+        {
+          "start": 47,
+          "end": 50,
+          "text": "sei"
+        },
+        {
+          "start": 51,
+          "end": 56,
+          "text": "sette"
+        },
+        {
+          "start": 57,
+          "end": 61,
+          "text": "otto"
+        },
+        {
+          "start": 62,
+          "end": 66,
+          "text": "nove"
+        }
+      ],
+      "reason": "Sequenza numerica di un test clinico, non recapito.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-10",
+      "start": 14,
+      "end": 33,
+      "text": "uno due tre quattro",
+      "context": "Somministrare uno due tre quattro cinque sei sette mg secondo lo schema.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 14,
+          "end": 17,
+          "text": "uno"
+        },
+        {
+          "start": 18,
+          "end": 21,
+          "text": "due"
+        },
+        {
+          "start": 22,
+          "end": 25,
+          "text": "tre"
+        },
+        {
+          "start": 26,
+          "end": 33,
+          "text": "quattro"
+        }
+      ],
+      "reason": "Dose/somministrazione, non CF o recapito.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-11",
+      "start": 9,
+      "end": 40,
+      "text": "tre tre tre zero zero zero zero",
+      "context": "Ripetere tre tre tre zero zero zero zero per la prova di memoria.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 9,
+          "end": 12,
+          "text": "tre"
+        },
+        {
+          "start": 13,
+          "end": 16,
+          "text": "tre"
+        },
+        {
+          "start": 17,
+          "end": 20,
+          "text": "tre"
+        },
+        {
+          "start": 21,
+          "end": 25,
+          "text": "zero"
+        },
+        {
+          "start": 26,
+          "end": 30,
+          "text": "zero"
+        },
+        {
+          "start": 31,
+          "end": 35,
+          "text": "zero"
+        },
+        {
+          "start": 36,
+          "end": 40,
+          "text": "zero"
+        }
+      ],
+      "reason": "Dose/somministrazione, non CF o recapito.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-19",
+      "start": 14,
+      "end": 25,
+      "text": "Cardiologia",
+      "context": "Trasferito da Cardiologia.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 14,
+          "end": 25,
+          "text": "Cardiologia"
+        }
+      ],
+      "reason": "Reparto o disciplina clinica, non luogo identificante.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-20",
+      "start": 14,
+      "end": 24,
+      "text": "Neurologia",
+      "context": "Trasferita in Neurologia per completamento diagnostico.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 14,
+          "end": 24,
+          "text": "Neurologia"
+        }
+      ],
+      "reason": "Reparto o disciplina clinica, non luogo identificante.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-21",
+      "start": 14,
+      "end": 44,
+      "text": "Cardiologia a Medicina interna",
+      "context": "Trasferito da Cardiologia a Medicina interna per monitoraggio.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 14,
+          "end": 25,
+          "text": "Cardiologia"
+        },
+        {
+          "start": 26,
+          "end": 27,
+          "text": "a"
+        },
+        {
+          "start": 28,
+          "end": 36,
+          "text": "Medicina"
+        },
+        {
+          "start": 37,
+          "end": 44,
+          "text": "interna"
+        }
+      ],
+      "reason": "Reparto o disciplina clinica, non luogo identificante.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-22",
+      "start": 7,
+      "end": 50,
+      "text": "Milano e assume metformina 500 mg al giorno",
+      "context": "Vive a Milano e assume metformina 500 mg al giorno.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 14,
+          "end": 15,
+          "text": "e"
+        },
+        {
+          "start": 16,
+          "end": 22,
+          "text": "assume"
+        },
+        {
+          "start": 23,
+          "end": 33,
+          "text": "metformina"
+        },
+        {
+          "start": 38,
+          "end": 40,
+          "text": "mg"
+        },
+        {
+          "start": 41,
+          "end": 43,
+          "text": "al"
+        },
+        {
+          "start": 44,
+          "end": 50,
+          "text": "giorno"
+        }
+      ],
+      "reason": "Lo span contiene una città annotata e anche una proposizione clinica: la parte clinica è un falso positivo.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-23",
+      "start": 7,
+      "end": 42,
+      "text": "Torino ed esegue Emocromo ogni mese",
+      "context": "Vive a Torino ed esegue Emocromo ogni mese.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 14,
+          "end": 16,
+          "text": "ed"
+        },
+        {
+          "start": 17,
+          "end": 23,
+          "text": "esegue"
+        },
+        {
+          "start": 24,
+          "end": 32,
+          "text": "Emocromo"
+        },
+        {
+          "start": 33,
+          "end": 37,
+          "text": "ogni"
+        },
+        {
+          "start": 38,
+          "end": 42,
+          "text": "mese"
+        }
+      ],
+      "reason": "Lo span contiene una città annotata e anche una proposizione clinica: la parte clinica è un falso positivo.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-24",
+      "start": 8,
+      "end": 42,
+      "text": "Genova ma riferisce dolore lombare",
+      "context": "Abita a Genova ma riferisce dolore lombare.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 15,
+          "end": 17,
+          "text": "ma"
+        },
+        {
+          "start": 18,
+          "end": 27,
+          "text": "riferisce"
+        },
+        {
+          "start": 28,
+          "end": 34,
+          "text": "dolore"
+        },
+        {
+          "start": 35,
+          "end": 42,
+          "text": "lombare"
+        }
+      ],
+      "reason": "Lo span contiene una città annotata e anche una proposizione clinica: la parte clinica è un falso positivo.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-25",
+      "start": 10,
+      "end": 16,
+      "text": "Verona",
+      "context": "Risiede a Verona, assume Ramipril 5 mg.",
+      "classification": "identifier",
+      "clinicalWords": [],
+      "reason": "Città esplicitamente annotata come identificativo prima della misura; nessuna parola clinica inclusa.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-26",
+      "start": 14,
+      "end": 50,
+      "text": "Cardiologia e prosegue Ramipril 5 mg",
+      "context": "Trasferito da Cardiologia e prosegue Ramipril 5 mg.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 14,
+          "end": 25,
+          "text": "Cardiologia"
+        },
+        {
+          "start": 26,
+          "end": 27,
+          "text": "e"
+        },
+        {
+          "start": 28,
+          "end": 36,
+          "text": "prosegue"
+        },
+        {
+          "start": 37,
+          "end": 45,
+          "text": "Ramipril"
+        },
+        {
+          "start": 48,
+          "end": 50,
+          "text": "mg"
+        }
+      ],
+      "reason": "Reparto o disciplina clinica, non luogo identificante.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-31",
+      "start": 14,
+      "end": 43,
+      "text": "riposo a letto per tre giorni",
+      "context": "{\"domicilio\":\"riposo a letto per tre giorni\"}",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 14,
+          "end": 20,
+          "text": "riposo"
+        },
+        {
+          "start": 21,
+          "end": 22,
+          "text": "a"
+        },
+        {
+          "start": 23,
+          "end": 28,
+          "text": "letto"
+        },
+        {
+          "start": 29,
+          "end": 32,
+          "text": "per"
+        },
+        {
+          "start": 33,
+          "end": 36,
+          "text": "tre"
+        },
+        {
+          "start": 37,
+          "end": 43,
+          "text": "giorni"
+        }
+      ],
+      "reason": "Istruzione o contenuto clinico nella cella, non valore geografico.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-32",
+      "start": 16,
+      "end": 27,
+      "text": "Cardiologia",
+      "context": "{\"provenienza\":\"Cardiologia\"}",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 16,
+          "end": 27,
+          "text": "Cardiologia"
+        }
+      ],
+      "reason": "Istruzione o contenuto clinico nella cella, non valore geografico.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-33",
+      "start": 14,
+      "end": 50,
+      "text": "non rilevante per la terapia attuale",
+      "context": "{\"residenza\":\"non rilevante per la terapia attuale\"}",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 14,
+          "end": 17,
+          "text": "non"
+        },
+        {
+          "start": 18,
+          "end": 27,
+          "text": "rilevante"
+        },
+        {
+          "start": 28,
+          "end": 31,
+          "text": "per"
+        },
+        {
+          "start": 32,
+          "end": 34,
+          "text": "la"
+        },
+        {
+          "start": 35,
+          "end": 42,
+          "text": "terapia"
+        },
+        {
+          "start": 43,
+          "end": 50,
+          "text": "attuale"
+        }
+      ],
+      "reason": "Istruzione o contenuto clinico nella cella, non valore geografico.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-35",
+      "start": 8,
+      "end": 51,
+      "text": "autonomia e gestisce la terapia senza aiuto",
+      "context": "Vive in autonomia e gestisce la terapia senza aiuto.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 8,
+          "end": 17,
+          "text": "autonomia"
+        },
+        {
+          "start": 18,
+          "end": 19,
+          "text": "e"
+        },
+        {
+          "start": 20,
+          "end": 28,
+          "text": "gestisce"
+        },
+        {
+          "start": 29,
+          "end": 31,
+          "text": "la"
+        },
+        {
+          "start": 32,
+          "end": 39,
+          "text": "terapia"
+        },
+        {
+          "start": 40,
+          "end": 45,
+          "text": "senza"
+        },
+        {
+          "start": 46,
+          "end": 51,
+          "text": "aiuto"
+        }
+      ],
+      "reason": "Condizione di autonomia o dolore, non contesto geografico.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "before",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-36",
+      "start": 8,
+      "end": 54,
+      "text": "assenza di dolore e prosegue la riabilitazione",
+      "context": "Vive in assenza di dolore e prosegue la riabilitazione.",
+      "classification": "false_positive",
+      "clinicalWords": [
+        {
+          "start": 8,
+          "end": 15,
+          "text": "assenza"
+        },
+        {
+          "start": 16,
+          "end": 18,
+          "text": "di"
+        },
+        {
+          "start": 19,
+          "end": 25,
+          "text": "dolore"
+        },
+        {
+          "start": 26,
+          "end": 27,
+          "text": "e"
+        },
+        {
+          "start": 28,
+          "end": 36,
+          "text": "prosegue"
+        },
+        {
+          "start": 37,
+          "end": 39,
+          "text": "la"
+        },
+        {
+          "start": 40,
+          "end": 54,
+          "text": "riabilitazione"
+        }
+      ],
+      "reason": "Condizione di autonomia o dolore, non contesto geografico.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "after",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-22",
+      "start": 7,
+      "end": 13,
+      "text": "Milano",
+      "context": "Vive a Milano e assume metformina 500 mg al giorno.",
+      "classification": "identifier",
+      "clinicalWords": [],
+      "reason": "Città esplicitamente annotata come identificativo prima della misura; nessuna parola clinica inclusa.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "after",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-23",
+      "start": 7,
+      "end": 13,
+      "text": "Torino",
+      "context": "Vive a Torino ed esegue Emocromo ogni mese.",
+      "classification": "identifier",
+      "clinicalWords": [],
+      "reason": "Città esplicitamente annotata come identificativo prima della misura; nessuna parola clinica inclusa.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "after",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-24",
+      "start": 8,
+      "end": 14,
+      "text": "Genova",
+      "context": "Abita a Genova ma riferisce dolore lombare.",
+      "classification": "identifier",
+      "clinicalWords": [],
+      "reason": "Città esplicitamente annotata come identificativo prima della misura; nessuna parola clinica inclusa.",
+      "sourceRefs": []
+    },
+    {
+      "stage": "after",
+      "corpus": "cb-clinical-challenge",
+      "id": "hard-25",
+      "start": 10,
+      "end": 16,
+      "text": "Verona",
+      "context": "Risiede a Verona, assume Ramipril 5 mg.",
+      "classification": "identifier",
+      "clinicalWords": [],
+      "reason": "Città esplicitamente annotata come identificativo prima della misura; nessuna parola clinica inclusa.",
+      "sourceRefs": []
+    }
+  ]
+}
