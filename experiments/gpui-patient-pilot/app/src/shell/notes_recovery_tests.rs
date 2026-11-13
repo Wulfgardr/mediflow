@@ -1455,6 +1455,121 @@ fn enlarged_draft_keeps_a_readable_editor_and_reaches_review_in_the_same_scroll(
 }
 
 #[gpui::test]
+fn wul839_copy_and_retirement_notices_leave_room_for_the_enlarged_draft(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(bind_keys);
+    let host = Host::new();
+    let pending = mediflow_runtime_client::RetirementNotice::new(None);
+    let access = Arc::new(
+        host.session
+            .authenticate_local_host("Synthetic scales fixture passphrase", pending.clone())
+            .unwrap(),
+    );
+    let _retiring = access.begin_retirement();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    open(&view, &host, cx);
+    for dark in [false, true] {
+        for width in [390., 398., 1200.] {
+            for retirement in [false, true] {
+                cx.simulate_resize(gpui::size(px(width), px(872.)));
+                view.update(cx, |app, cx| {
+                    app.text_scale = 4.;
+                    app.dark_override = Some(dark);
+                    app.copy_state = Some(documents::CopyState::Finished(Ok(())));
+                    app.local_host.retirement = if retirement {
+                        pending.clone()
+                    } else {
+                        mediflow_runtime_client::RetirementNotice::new(None)
+                    };
+                    cx.notify();
+                });
+                draw(cx);
+                let viewport = cx.debug_bounds("threshold-scroll").unwrap();
+                assert!(
+                    viewport.size.height >= px(300.),
+                    "copy/retirement notices hid the draft: {width}/{dark}/{retirement}: {viewport:?}"
+                );
+                assert_eq!(
+                    view.read_with(cx, |app, _| app.core.draft_notes().to_owned()),
+                    DRAFT
+                );
+            }
+        }
+    }
+    assert!(host.writes().is_empty());
+}
+
+#[gpui::test]
+fn wul839_orphan_retirement_confirmation_scrolls_into_view_with_large_text(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(bind_keys);
+    let fixture = local_preferences::tests::Fixture::new();
+    let path = fixture.0.join("retirement.json");
+    let directory = path.with_extension("pending");
+    std::fs::create_dir_all(&fixture.0).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700)
+        .create(&directory)
+        .unwrap();
+    #[cfg(windows)]
+    mediflow_local_state::create_directory(&directory).unwrap();
+    let marker = "0f0e0d0c-0b0a-4908-8706-050403020100";
+    #[cfg(unix)]
+    std::fs::write(directory.join(marker), marker).unwrap();
+    #[cfg(windows)]
+    std::io::Write::write_all(
+        &mut mediflow_local_state::create_file(&directory.join(marker)).unwrap(),
+        marker.as_bytes(),
+    )
+    .unwrap();
+    let notice = mediflow_runtime_client::RetirementNotice::new(Some(path));
+    let host = Host::new();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    open(&view, &host, cx);
+    cx.simulate_resize(gpui::size(px(390.), px(640.)));
+    view.update(cx, |app, cx| {
+        app.text_scale = 4.;
+        app.copy_state = Some(documents::CopyState::Finished(Ok(())));
+        app.local_host.retirement = notice.clone();
+        cx.notify();
+    });
+    for body in [14., 16.] {
+        view.update(cx, |app, cx| {
+            app.test_body_size = Some(body);
+            cx.notify();
+        });
+        draw(cx);
+        cx.update_window_entity(&view, |app, window, cx| {
+            window.focus(&app.retirement_dismiss_target.focus, cx);
+            app.reveal_focused(window, cx);
+        });
+        draw(cx);
+        let viewport = cx.debug_bounds("clinical-workspace-notices").unwrap();
+        let action = cx.debug_bounds("local-session-retirement-dismiss").unwrap();
+        assert!(
+            viewport.size.height >= px(body * 4. * 3. + 32.),
+            "two-line confirmation has no room: {body}: {viewport:?}"
+        );
+        assert!(
+            action.top() >= viewport.top() && action.bottom() <= viewport.bottom(),
+            "retirement confirmation is clipped: {body}: {action:?} / {viewport:?}"
+        );
+    }
+    cx.simulate_keystrokes("enter");
+    cx.simulate_event(gpui::KeyUpEvent {
+        keystroke: gpui::Keystroke::parse("enter").unwrap(),
+    });
+    cx.run_until_parked();
+    assert!(
+        !notice.pending(),
+        "keyboard confirmation did not dismiss the orphan"
+    );
+    assert!(host.writes().is_empty());
+}
+
+#[gpui::test]
 fn hcg1_connected_confirmation_geometry_and_theme_match_the_recipient(
     cx: &mut gpui::TestAppContext,
 ) {
