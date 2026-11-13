@@ -162,8 +162,10 @@ export async function buildDossierInventory(
         const sha256 = await ports.sha256(bytes);
         const classification = classifyDossierSource({ name: file.name, size: bytes.byteLength, declaredType: file.type, head: bytes.subarray(0, 16) });
         const duplicateOf = firstBySha.get(sha256);
-        if (!duplicateOf) firstBySha.set(sha256, key);
-        if (classification.kind === 'text' && !classification.extractable) {
+        const refusedText = classification.kind === 'text' && !classification.extractable;
+        // Solo una fonte ammessa rappresenta i suoi byte: un TXT rifiutato non deve nascondere una copia leggibile.
+        if (!duplicateOf && !refusedText) firstBySha.set(sha256, key);
+        if (refusedText) {
             bytes.fill(0);
             sources.push({ key, group: groupKeyOf(file.relativePath), relativePath: file.relativePath, fileName: file.name, size: file.size, sha256,
                 classification, extraction: { state: 'not_extracted', reason: 'text' }, text: null, taxCodes: [], patientNames: [], documentDate: null,
