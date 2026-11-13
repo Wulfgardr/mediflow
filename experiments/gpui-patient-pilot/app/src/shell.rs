@@ -3852,6 +3852,7 @@ impl ClinicalApp {
                         .child(
                             div()
                                 .flex_1()
+                                .when(layout.magnified, |el| el.flex_none().w_full())
                                 .min_w_0()
                                 .flex()
                                 .flex_col()
@@ -3868,9 +3869,15 @@ impl ClinicalApp {
                                     div()
                                         .flex()
                                         .flex_wrap()
+                                        .min_w_0()
+                                        .max_w_full()
+                                        .when(layout.compact, |el| el.flex_col())
                                         .gap(px(8.))
                                         .type_role(theme, crate::theme::TextRole::Meta)
                                         .text_color(theme.secondary)
+                                        .debug_selector(|| {
+                                            "clinical-workspace-patient-birth".into()
+                                        })
                                         .child(text!(format!(
                                             "Nascita {}{}{}",
                                             crate::patient_text::birth_text(
@@ -8888,6 +8895,55 @@ mod review706b_callers {
             assert!(
                 samples[0].1 < 4.5,
                 "invisible mode {mode} escaped: {samples:?}"
+            );
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[gpui::test]
+    fn patient_header_reflows_birth_date_above_actions_at_four_hundred_percent(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let mut native = gpui::TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        let (view, cx) = native.add_window_view(|window, cx| Hcg5Page {
+            app: cx.new(|cx| make_app(window, cx)),
+        });
+        for (width, dark) in [(390., false), (390., true), (1440., false), (1440., true)] {
+            view.update(cx, |view, cx| {
+                view.app.update(cx, |app, cx| {
+                    app.install_patient(
+                        serde_json::from_value(serde_json::json!({
+                            "id":"synthetic-header", "firstName":"Persona", "lastName":"Sintetica",
+                            "birthDate":"1980-01-01", "taxCode":"SYNTHETIC", "version":1,
+                        }))
+                        .unwrap(),
+                    );
+                    app.area = Area::Patients;
+                    app.text_scale = 4.;
+                    app.theme = Theme::for_dark(dark).sized(4., false);
+                    cx.notify();
+                })
+            });
+            cx.simulate_resize(gpui::size(px(width), px(872.)));
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            let birth = cx.debug_bounds("clinical-workspace-patient-birth").unwrap();
+            let back = cx
+                .debug_bounds("clinical-workspace-back-directory")
+                .unwrap();
+            assert!(
+                birth.right() <= px(width - 15.9),
+                "date must wrap inside the page: {birth:?}"
+            );
+            assert!(
+                back.top() >= birth.bottom(),
+                "actions must not overlap the birth date: {back:?} / {birth:?}"
             );
         }
     }
