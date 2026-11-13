@@ -55,10 +55,6 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
     return created;
   }, name);
   const patientUrl = `/patients/${patients[0]}/modules`;
-  // Riscaldamento fuori dagli intervalli misurati: la prima visita alla scheda
-  // paga la compilazione della rotta, che non è un gesto del medico.
-  await page.goto(patientUrl, { timeout: 120_000 });
-  await expect(page.getByRole('heading', { level: 1 })).toContainText(name, { timeout: 120_000 });
   const measurements: Measurement[] = [];
   const writes: Array<{ path: string; method: string; status: number }> = [];
   page.on('response', response => {

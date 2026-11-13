@@ -57,6 +57,13 @@ if (process.argv[2] === '--server') {
       await delay(500);
     }
     if (!ready) throw new Error('Server non pronto.');
+    // Il server di sviluppo compila ogni rotta alla prima richiesta, e dopo una pagina
+    // nuova il browser può ricaricarsi e tornare allo sblocco. Le rotte si compilano qui,
+    // prima che un browser apra la sessione: la misura non paga la compilazione.
+    for (const route of ['/', '/patients/riscaldamento/modules', '/api/patients', '/api/entries', '/api/therapies', '/api/attachments', '/api/observations', '/api/checkups']) {
+      try { await fetch(`${url}${route}`, { redirect: 'manual', signal: AbortSignal.timeout(180_000) }); }
+      catch (error) { console.log(`Riscaldamento ${route}: ${error instanceof Error ? error.message : error}`); }
+    }
     const fixture = new Database(path.join(data, 'medical.db'));
     fixture.prepare("INSERT INTO drugs (aic,name,active_principle,name_search,active_principle_search,packaging,packaging_search) VALUES (?,?,?,?,?,?,?)").run('SYNTHETIC-GESTURES', 'MISURASTATINA 20 mg', 'Principio sintetico', 'misurastatina 20 mg', 'principio sintetico', '20 mg', '20 mg');
     fixture.close();
