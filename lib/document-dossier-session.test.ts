@@ -335,7 +335,7 @@ test('patient version conflict (409) is not success and is not retried blindly',
 
 test('missing date and negation block application; historical therapy stays non-active; reported scale is not an administered scale', async () => {
     const text = 'Lettera sintetica\nNega diabete ICD-10 E11.9 diabete tipo 2\nGlucosio 110 mg/dL 70-99';
-    const { files, ports, records, counts } = setup([['D/R/lettera.txt', text]]);
+    const { files, ports, records, counts } = setup([['D/R/lettera.pdf', `%PDF-1.4 sintetico\n${text}`]]);
     const [group] = await buildDossierInventory(ports, files, live);
     assert.equal(group.sources[0].documentDate, null);
     const [stored] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });

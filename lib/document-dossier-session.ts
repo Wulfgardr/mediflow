@@ -91,7 +91,7 @@ export interface DossierInputFile {
     read(): Promise<Uint8Array>;
 }
 
-export type DossierSourceStatus = 'ready' | 'duplicate_in_selection' | 'excluded' | 'unreadable';
+export type DossierSourceStatus = 'ready' | 'duplicate_in_selection' | 'excluded' | 'unreadable' | 'unsupported_format';
 
 export interface DossierDraftSource {
     key: string;
@@ -163,6 +163,15 @@ export async function buildDossierInventory(
         const classification = classifyDossierSource({ name: file.name, size: bytes.byteLength, declaredType: file.type, head: bytes.subarray(0, 16) });
         const duplicateOf = firstBySha.get(sha256);
         if (!duplicateOf) firstBySha.set(sha256, key);
+        if (classification.kind === 'text' && !classification.extractable) {
+            bytes.fill(0);
+            sources.push({ key, group: groupKeyOf(file.relativePath), relativePath: file.relativePath, fileName: file.name, size: file.size, sha256,
+                classification, extraction: { state: 'not_extracted', reason: 'text' }, text: null, taxCodes: [], patientNames: [], documentDate: null,
+                facts: [], classificationResult: 'unknown', status: duplicateOf ? 'duplicate_in_selection' : 'unsupported_format',
+                ...(duplicateOf ? { duplicateOf } : {}), file });
+            options.onProgress?.(index + 1, files.length);
+            continue;
+        }
         let extraction: DossierExtraction = { state: 'not_extracted', reason: classification.kind };
         let text: string | null = null;
         if (!duplicateOf && classification.extractable) {
@@ -244,7 +253,7 @@ async function boundary<T>(guard: Guard, operation: () => Promise<T>): Promise<T
 
 export type DossierAcquireOutcome =
     | { key: string; status: 'stored' | 'reused'; attachmentId: string; verified: boolean; measured?: { original: number; artifact: number } }
-    | { key: string; status: 'skipped'; reason: 'duplicate_in_selection' | 'excluded' | 'unreadable' }
+    | { key: string; status: 'skipped'; reason: 'duplicate_in_selection' | 'excluded' | 'unreadable' | 'unsupported_format' }
     | { key: string; status: 'failed'; reason: 'source_changed' | 'too_large' | 'readback_mismatch' | 'write_failed' | 'artifact_conflict'; attachmentId?: string };
 
 function dataEqual(left: Uint8Array, right: Uint8Array): boolean {
