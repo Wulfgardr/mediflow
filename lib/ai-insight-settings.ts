@@ -187,12 +187,13 @@ export function resolveAIInsightRuntimeSettings(input: AIInsightStoredSettings &
     };
 }
 
-export async function loadAIInsightStoredSettings(): Promise<AIInsightStoredSettings> {
+export async function loadAIInsightStoredSettings(store?: { get(key: string): Promise<{ value?: string } | undefined> }): Promise<AIInsightStoredSettings> {
     const { db } = await import('./db');
+    const settings = store ?? db.settings;
     const [modeSetting, manualConfigSetting, hardwareSetting] = await Promise.all([
-        db.settings.get(AI_INSIGHT_MODE_KEY),
-        db.settings.get(AI_INSIGHT_MANUAL_CONFIG_KEY),
-        db.settings.get('hardwareProfile'),
+        settings.get(AI_INSIGHT_MODE_KEY),
+        settings.get(AI_INSIGHT_MANUAL_CONFIG_KEY),
+        settings.get('hardwareProfile'),
     ]);
 
     return {

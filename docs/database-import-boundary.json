@@ -413,6 +413,17 @@
       "classification": "legacy-node-http"
     },
     {
+      "file": "app/api/settings/ai/configuration/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "host-settings-revocation"
+    },
+    {
       "file": "app/api/siss-handoffs/[id]/route.ts",
       "target": "lib/db-server.ts",
       "capability": "server:lib/db-server.ts",

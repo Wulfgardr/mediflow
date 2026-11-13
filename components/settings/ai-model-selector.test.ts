@@ -38,7 +38,7 @@ test('salvataggio riuscito rilegge il passo 4 senza attivare; errore di salvatag
     const bundle = result.outputFiles.find(file => file.path.endsWith('.js'))!.text;
     const settings = new Map(Object.entries({ aiModelDefaultVersion: 'qwen35-default-v1' }));
     let failSave = false; let reads = 0; let posts = 0; let pulls = 0;
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({ headless: true, chromiumSandbox: true });
     try {
         const page = await browser.newPage({ viewport: { width: 1000, height: 900 } });
         const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
@@ -49,6 +49,15 @@ test('salvataggio riuscito rilegge il passo 4 senza attivare; errore di salvatag
                 await route.fulfill({ contentType: 'text/html', body: '<div id="root"></div><script src="/bundle.js"></script>' }); return;
             }
             if (url.pathname === '/bundle.js') { await route.fulfill({ contentType: 'text/javascript', body: bundle }); return; }
+            if (url.pathname === '/api/settings/ai/configuration') {
+                if (failSave) { await route.fulfill({ status: 500, json: {} }); return; }
+                const { expectedValues, values } = request.postDataJSON();
+                if (Object.entries(expectedValues).some(([key, value]) => (settings.get(key) ?? null) !== value)) {
+                    await route.fulfill({ status: 409, json: { code: 'AI_CONFIGURATION_CONFLICT' } }); return;
+                }
+                for (const [key, value] of Object.entries(values)) settings.set(key, value as string);
+                await route.fulfill({ json: { success: true, values } }); return;
+            }
             if (url.pathname.startsWith('/fixture/settings/')) {
                 const key = url.pathname.split('/').pop()!;
                 if (request.method() === 'PUT') {
@@ -94,5 +103,18 @@ test('salvataggio riuscito rilegge il passo 4 senza attivare; errore di salvatag
         await expect(page.getByText('Salvataggio non riuscito', { exact: true })).toBeVisible();
         assert.equal(reads, before + 1); assert.equal(posts, 0); assert.equal(pulls, 0);
         assert.deepEqual(errors, []);
+
+        failSave = false;
+        settings.set('aiModel_clinical', 'synthetic-concurrent');
+        await page.getByRole('button', { name: 'Salva configurazione', exact: true }).click();
+        await expect(page.getByText('Le impostazioni sono cambiate. La bozza è conservata.', { exact: false })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Salva configurazione', exact: true })).toBeDisabled();
+        await expect(selector.getByRole('combobox')).toHaveValue('synthetic-local');
+        await page.getByRole('button', { name: 'Rileggi impostazioni', exact: true }).click();
+        await expect(page.getByRole('definition').filter({ hasText: 'synthetic-concurrent' })).toBeVisible();
+        await expect(selector.getByRole('combobox')).toHaveValue('synthetic-local');
+        await page.getByRole('button', { name: 'Salva configurazione', exact: true }).click();
+        await expect(page.getByRole('button', { name: 'Rileggi impostazioni', exact: true })).toHaveCount(0);
+        assert.equal(settings.get('aiModel_clinical'), 'synthetic-local');
     } finally { await browser.close(); }
 });

@@ -18,6 +18,7 @@ import {
 } from '@/lib/ai-insight-settings';
 import { cn } from '@/lib/utils';
 import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller';
+import { AiSettingsConflict } from '@/components/settings/ai-settings-conflict';
 import {
     SETTINGS_INPUT_CLASS,
     SETTINGS_PRIMARY_BUTTON_CLASS,
@@ -33,6 +34,7 @@ export default function SettingsAiFunctionsPage() {
         setAiInsightSettings,
         isSavingAi,
         aiSettingsLoadState,
+        aiSettingsConflict, aiSettingsReadback, rereadAiConfig,
         setPatientInsightEnabled,
         setDocumentSynthesisEnabled,
         setSmartImportEnabled,
@@ -72,6 +74,7 @@ export default function SettingsAiFunctionsPage() {
                 {aiSettingsLoadState === 'loading' ? 'Caricamento delle impostazioni…'
                     : 'Impossibile leggere le impostazioni. Ricarica questa pagina prima di modificarle.'}
             </p>}
+            <AiSettingsConflict conflict={aiSettingsConflict} readback={aiSettingsReadback} busy={isSavingAi} onReread={rereadAiConfig} />
             <fieldset disabled={aiSettingsLoadState !== 'ready'} aria-busy={aiSettingsLoadState === 'loading'}
                 aria-label="Impostazioni delle funzioni locali" data-testid="ai-settings-controls"
                 className={styles.controls}>
@@ -243,7 +246,7 @@ export default function SettingsAiFunctionsPage() {
                     <div className="flex flex-wrap items-center gap-3">
                         <button
                 onClick={saveAiConfig}
-                disabled={isSavingAi}
+                disabled={isSavingAi || aiSettingsConflict === 'conflict'}
                 className={hasPreferencesPreview ? SETTINGS_SECONDARY_BUTTON_CLASS : SETTINGS_PRIMARY_BUTTON_CLASS}
                         >
                 <Save className="w-4 h-4" />
