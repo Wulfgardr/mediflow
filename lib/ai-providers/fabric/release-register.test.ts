@@ -43,9 +43,9 @@ test('I-0 copre esattamente le sei celle del gate e separa API opzionali e Treat
         if (cell.provider === 'ollama') {
             const evidence = JSON.parse(readFileSync(new URL(cell.proof.path, root), 'utf8'));
             assert.deepEqual(cell.modelIdentity, evidence.modelIdentity);
-            assert.equal(cell.proof.status, 'blocked_before_inference');
+            assert.ok(['partial_http_execution', 'blocked_local_extraction'].includes(cell.proof.status));
             assert.equal(evidence.qualification, false);
-            assert.equal(evidence.attestation.code, 'provider_version_unsupported');
+            assert.equal(evidence.admission.status, 'passed');
         } else {
             assert.equal(cell.modelIdentity, null);
             assert.equal(cell.proof, null);
@@ -65,7 +65,10 @@ test('I-0 censisce ogni descriptor corrente senza cambiare ammissioni o maschera
     assert.throws(() => getFabricCapabilityDescriptor('unknown_release_capability'), /capability_unknown/);
     for (const row of register.capabilities) {
         assert.deepEqual(row.chatCriteria, row.descriptor.id === 'treatment_reasoning' ? [] : ['C-7', 'C-8']);
-        assert.equal(row.runtimeProof, null);
+        if (['patient_insight', 'smart_import', 'document_synthesis'].includes(row.descriptor.id)) {
+            assert.equal(row.runtimeProof.qualification, false);
+            assert.ok(existsSync(new URL(row.runtimeProof.path, root)));
+        } else assert.equal(row.runtimeProof, null);
         if (row.descriptor.entryPoint) assert.ok(existsSync(new URL(row.descriptor.entryPoint, root)), row.descriptor.id);
     }
     assert.deepEqual(register.additionalContractRequirements.map((row: { id: string }) => row.id), ['search', 'navigation']);
