@@ -220,3 +220,50 @@ La prova riguarda solo questo binario e questo modello. Non promuove
 `available_unqualified`, non attribuisce causalità al digest e non qualifica
 UI, latenza, qualità clinica o uso clinico. Le misure successive sul prodotto
 restano prove distinte.
+
+## Caricamento a freddo con tetto separato, WUL-840, 14 novembre 2026
+
+Le prove del 13 novembre sul Mac17,10 con 48 GB, Ollama.app 0.40.16 e
+`qwen3.5:35b-a3b` su disco esterno hanno osservato il caricamento in 31-33
+secondi. Il comando CLI di attivazione ha negato l'ammissione dopo 30,38
+secondi con `local_attestation_failed`; il precaricamento tecnico successivo
+ha richiesto 32,33 secondi e lo stesso comando a modello residente 0,43
+secondi. Il precaricamento manuale non chiude il percorso utente a freddo.
+
+Il solo stadio di precaricamento senza prompt ha ora un tetto di **45
+secondi**, applicato nell'attestor condiviso. Il margine è di 12 secondi,
+circa il 36% oltre i 33 osservati, per tollerare variazioni del disco esterno.
+Non garantisce il caricamento su ogni disco o macchina. Versione, tags,
+show e processi caricati conservano ciascuno il limite di **5 secondi**.
+Il comando CLI sostituisce il limite globale di 30 secondi con la somma
+dei cinque tetti, **65 secondi**; un singolo stadio non può usare il tempo
+riservato agli altri.
+
+Il Web conserva il budget host di **60 secondi**, l'attesa pagina di **70
+secondi**, la lettura di 10 secondi e il corpo HTTP di 5 secondi. Prevale
+sempre la prima scadenza o cancellazione. Il tempo aggiunto non estende
+sessioni, resource-use o autorità. Riautenticazione, scadenza monotona,
+revoca, revisione del binding e CAS lifecycle rimangono obbligatori.
+Non si introduce un retry o un'ammissione dopo una risposta tardiva.
+
+Restano i cinque stadi, endpoint loopback, versione ammessa, assenza di
+marker remoti e confronto del digest caricato con quello installato.
+Il precaricamento invia solo modello e `keep_alive`, senza prompt,
+`messages`, download o generazione di testo. Il limite riguarda anche i
+consumer dell'attestor condiviso, mentre i loro budget più brevi conservano
+precedenza. Non cambia l'ammissione puntuale delle versioni né lo stato
+`available_unqualified`.
+
+I testi di attesa non cambiano. Il Web comunica «Verifica locale e possibile
+caricamento del modello in memoria in corso. La verifica home-base ha un
+limite di 60 secondi.», con pulsante «Verifica in corso…» e annullamento.
+La GPUI usa lo stesso endpoint Web, mostra «Verifica o rilettura in corso…»
+e permette di interrompere il collegamento. Non espone i singoli stadi.
+
+La regressione persistente usa HTTP loopback con ritardi e scadenze scalati
+nella stessa proporzione: un caricamento di 32 secondi simulati attraversa
+il comando CLI e tutti i cinque stadi. Sulla base il comando nega per il
+limite di 30 secondi. I controesempi negano superamento dei 45 secondi,
+trasporto interrotto, cancellazione, digest cambiato e risposta remota,
+senza scrittura lifecycle. Un test fissa esattamente i quattro tetti da 5
+secondi. Queste prove non attestano UI renderizzata, qualità o uso clinico.
