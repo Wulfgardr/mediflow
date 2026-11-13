@@ -2541,6 +2541,9 @@ impl ClinicalApp {
                 match result {
                     Ok(patient_forms::Creation::Verified(row)) => {
                         this.archived = false;
+                        // Other views (including retention search) consume the
+                        // directory too; its snapshot predates this creation.
+                        this.patients = Load::Idle;
                         this.install_patient(*row);
                         this.saved("Scheda creata e dati anagrafici riletti dall'archivio.", cx);
                         this.load_sections(cx);
