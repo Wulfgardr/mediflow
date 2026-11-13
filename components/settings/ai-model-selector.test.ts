@@ -3,6 +3,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium, expect } from '@playwright/test';
+import { secureLaunch } from '../../e2e/fixtures/secure-browser';
 
 test('salvataggio riuscito rilegge il passo 4 senza attivare; errore di salvataggio non rilegge', async () => {
     const result = await build({
@@ -38,7 +39,7 @@ test('salvataggio riuscito rilegge il passo 4 senza attivare; errore di salvatag
     const bundle = result.outputFiles.find(file => file.path.endsWith('.js'))!.text;
     const settings = new Map(Object.entries({ aiModelDefaultVersion: 'qwen35-default-v1' }));
     let failSave = false; let reads = 0; let posts = 0; let pulls = 0;
-    const browser = await chromium.launch({ headless: true, chromiumSandbox: true });
+    const browser = await chromium.launch(secureLaunch({ headless: true }));
     try {
         const page = await browser.newPage({ viewport: { width: 1000, height: 900 } });
         const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
