@@ -62,6 +62,14 @@ applicativa o un fotogramma già aggiornato. Sviluppo, compilazione e scheduling
 rendono i tempi inadatti al gate dei 100 ms. Il cricchetto confronta gesti, clic,
 comandi e tasti, senza usare i tempi o i tetti di progetto come soglie.
 
+I campi data e ora nativi hanno segmenti interni decisi dal sistema: con l’orologio
+a dodici ore c’è un segmento in più (AM/PM), e ogni segmento è una fermata di Tab.
+Sulla macchina della CI la visita da tastiera costa per questo 26 gesti, contro i
+25 della base. Il contatore segna i tasti premuti dentro quei campi
+(`fermateDataOra`) e il cricchetto li confronta a parte: fuori dai campi il
+confronto resta esatto, dentro è ammessa una sola fermata oltre la base, e solo
+dove la base attraversava già il campo.
+
 La pressione della visita è scritta nel resoconto, insieme alla nota. Il percorso
 non registra un’osservazione strutturata separata. I file vengono verificati
 nella scheda che il test ha scelto. I gesti del selettore file del sistema

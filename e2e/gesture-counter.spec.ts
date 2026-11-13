@@ -6,7 +6,7 @@ test.use({ actionTimeout: 10_000, screenshot: 'off', video: 'off', trace: 'off' 
 
 test('contatore: clic, Tab, Invio, freccia, Esc, scorciatoia e testo separato', async ({ page }) => {
   await page.route('http://127.0.0.1:39999/counter', route => route.fulfill({ body:
-    '<input aria-label="Testo"><button>Comando</button><div role="textbox" contenteditable="true" aria-label="Nota"></div>', contentType: 'text/html' }));
+    '<input aria-label="Testo"><button>Comando</button><div role="textbox" contenteditable="true" aria-label="Nota"></div><input type="datetime-local" aria-label="Quando">', contentType: 'text/html' }));
   await page.addInitScript(installGestureMeter);
   await page.goto('http://127.0.0.1:39999/counter');
   await page.evaluate(() => window.gestureMeter.start());
@@ -36,6 +36,13 @@ test('contatore: clic, Tab, Invio, freccia, Esc, scorciatoia e testo separato', 
   await page.keyboard.press('Backspace');
   for (const key of ['Shift', 'Control', 'Meta', 'Alt']) await page.keyboard.press(key);
   expect(await page.evaluate(() => window.gestureMeter.stop())).toMatchObject({ gesti: 0, tasti: 11 });
+  // Dentro un campo data e ora nativo ogni Tab è un gesto, segnato a parte.
+  await page.getByLabel('Quando').focus();
+  await page.evaluate(() => window.gestureMeter.start());
+  await page.keyboard.press('Tab');
+  reading = await page.evaluate(() => window.gestureMeter.stop());
+  expect(reading).toMatchObject({ gesti: 1, comandi: 1 });
+  expect(reading.events.map(event => [event.key, event.target, event.dataOra])).toEqual([['Tab', 'Quando', true]]);
 });
 
 test('cricchetto: stesso conto verde, un gesto in più rosso', () => {
@@ -43,6 +50,16 @@ test('cricchetto: stesso conto verde, un gesto in più rosso', () => {
   expect(() => assertGestureRatchet(base, base, 'prova')).not.toThrow();
   for (const metric of ['gesti', 'clic', 'tasti', 'comandi'] as const)
     expect(() => assertGestureRatchet({ ...base, [metric]: base[metric] + 1 }, base, 'prova')).toThrow(`${metric} ${base[metric] + 1} > base ${base[metric]}`);
+  // Campo data e ora nativo: una fermata in più dentro il campo passa (orologio a
+  // dodici ore), due no; un gesto in più fuori dal campo fallisce sempre, anche se
+  // dentro ce ne sono meno.
+  const withDate = { ...base, gesti: 10, comandi: 8, fermateDataOra: 4 };
+  expect(() => assertGestureRatchet({ ...withDate, gesti: 11, comandi: 9, fermateDataOra: 5 }, withDate, 'prova')).not.toThrow();
+  expect(() => assertGestureRatchet({ ...withDate, fermateDataOra: 3, gesti: 9, comandi: 7 }, withDate, 'prova')).not.toThrow();
+  expect(() => assertGestureRatchet({ ...withDate, gesti: 12, comandi: 10, fermateDataOra: 6 }, withDate, 'prova')).toThrow('fermateDataOra 6 > base 4 + 1');
+  expect(() => assertGestureRatchet({ ...withDate, gesti: 11, comandi: 9 }, withDate, 'prova')).toThrow('gesti 7 > base 6 fuori dai campi data e ora');
+  expect(() => assertGestureRatchet({ ...withDate, fermateDataOra: 3 }, withDate, 'prova')).toThrow('gesti 7 > base 6 fuori dai campi data e ora');
+  expect(() => assertGestureRatchet({ ...base, gesti: 5, comandi: 3, fermateDataOra: 1 }, base, 'prova')).toThrow('fermateDataOra 1 > base 0 + 0');
   // Deliberate persistent falsification switch; never updates the baseline.
   assertGestureRatchet({ ...base, gesti: base.gesti + (process.env.GESTURE_PROVE_RED === '1' ? 1 : 0) }, base, 'prova');
 });
