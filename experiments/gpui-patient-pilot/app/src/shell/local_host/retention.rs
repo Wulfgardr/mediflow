@@ -137,7 +137,7 @@ impl RetentionArea {
                 _ => String::new(),
             };
             let baseline = self.window_baselines.get(id).map_or("", String::as_str);
-            if normalized_window_text(&self.windows[i].read(cx).value()) == baseline {
+            if normalized_window_text(self.windows[i].read(cx).value()) == baseline {
                 self.windows[i].update(cx, |input, cx| input.set_content(text.clone(), cx));
             }
             self.window_baselines.insert(id.clone(), text);
@@ -151,7 +151,7 @@ impl RetentionArea {
             .enumerate()
             .take(self.windows.len())
         {
-            let raw = normalized_window_text(&self.windows[i].read(cx).value());
+            let raw = normalized_window_text(self.windows[i].read(cx).value());
             if raw.is_empty() {
                 continue;
             }
