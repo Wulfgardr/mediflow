@@ -21,7 +21,7 @@ export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['scripts/run-scheduled-backup.mjs', 'd7dca9909424e871ad0102e5326f06486c3869445b7d7c9272cb623545655578'],
   ['scripts/backup-destination-policy.mjs', 'e8092ad74fe3ce830ada88210348d159c1263ddc20591872a2e0087775536257'],
   ['scripts/scheduled-backup-date-fields.mjs', '91779e9df7f34bd71bce6329ca1577070cfb3a12fbc55365272982d8fb4fb1a0'],
-  ['lib/sqlite-maintenance-admission.mjs', 'd5a74f882934a3175f17476b4633effd5325ae6985c28e9baccfb73789088356'],
+  ['lib/sqlite-maintenance-admission.mjs', '87ed364e8bd5dbb7ca36684a1bba7e5dbb72c13dfbaac40fc90c1e9336ea80de'],
   ['lib/sqlite-durability.mjs', '75dc15f8a383bf040d6a0b494a2889d136be248772f5ddca7cd29651d5a4a103'],
   ['lib/therapy-status-command-backup.ts', '1606ac41684c18ed2f7ff6de19e378e0ef1baac5645d1a160c4906faba4bab92'],
   ['lib/therapy-status-command-contract.ts', '3432124d9b5f8b3113265d9779fa12e1411e508b0964cfd2e1bc532f49f4a7fe'],
