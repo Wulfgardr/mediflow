@@ -165,6 +165,22 @@ test('mixed group (two patient codes) is blocked as a whole', async () => {
     assert.equal(attachments.size, 0);
 });
 
+test('D05: a refused TXT does not hide a supported copy with the same bytes, in either order', async () => {
+    const rtf = `{\\rtf1\\ansi Referto di laboratorio. Paziente: Mario Rossi codice fiscale ${CF_A}. Data prelievo: 10/01/2025. Glucosio 110 mg/dL 70-99 H.}`;
+    const asText = (text: string): DossierHostExtraction => ({ status: 'extracted', markdown: text.slice(12, -1), ocr: null });
+    const first = setup([['D/R/nota.txt', rtf], ['D/R/lettera.rtf', rtf]], asText);
+    const [txtFirst] = await buildDossierInventory(first.ports, first.files, live);
+    assert.deepEqual(txtFirst.sources.map((item) => item.status), ['unsupported_format', 'ready']);
+    assert.equal(txtFirst.sources[1].duplicateOf, undefined);
+    assert.equal(txtFirst.sources[1].extraction.state, 'extracted');
+    const second = setup([['D/R/lettera.rtf', rtf], ['D/R/nota.txt', rtf]], asText);
+    const [rtfFirst] = await buildDossierInventory(second.ports, second.files, live);
+    assert.deepEqual(rtfFirst.sources.map((item) => item.status), ['ready', 'duplicate_in_selection']);
+    const twice = setup([['D/R/nota.txt', rtf], ['D/R/copia.txt', rtf], ['D/R/lettera.rtf', rtf]], asText);
+    const [twoTxt] = await buildDossierInventory(twice.ports, twice.files, live);
+    assert.deepEqual(twoTxt.sources.map((item) => item.status), ['unsupported_format', 'unsupported_format', 'ready']);
+});
+
 test('re-selecting the folder reuses the verified original; a changed file on disk is refused; in-selection copies are skipped', async () => {
     const { files, ports, attachments, counts } = setup([['D/R/a.pdf', labText(CF_A)], ['D/R/copia.pdf', labText(CF_A)]]);
     const [group] = await buildDossierInventory(ports, files, live);
@@ -335,7 +351,7 @@ test('patient version conflict (409) is not success and is not retried blindly',
 
 test('missing date and negation block application; historical therapy stays non-active; reported scale is not an administered scale', async () => {
     const text = 'Lettera sintetica\nNega diabete ICD-10 E11.9 diabete tipo 2\nGlucosio 110 mg/dL 70-99';
-    const { files, ports, records, counts } = setup([['D/R/lettera.txt', text]]);
+    const { files, ports, records, counts } = setup([['D/R/lettera.pdf', `%PDF-1.4 sintetico\n${text}`]]);
     const [group] = await buildDossierInventory(ports, files, live);
     assert.equal(group.sources[0].documentDate, null);
     const [stored] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
