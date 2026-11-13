@@ -11,7 +11,7 @@
   },
   "regola": "click detail > 0 e keydown che non scrivono testo; caratteri e cancellazioni separati; soli modificatori e IME esclusi",
   "risposta": "event.timeStamp al primo requestAnimationFrame; non prova un aggiornamento applicativo completato",
-  "gate": "gesti, clic, tasti e comandi non possono aumentare; tempi e tetti obiettivo non fanno fallire",
+  "gate": "gesti, clic, tasti e comandi non possono aumentare; i tasti premuti dentro un campo data e ora nativo (fermateDataOra) si confrontano a parte, con una fermata di margine per l'orologio a dodici ore; tempi e tetti obiettivo non fanno fallire",
   "compiti": [
     {
       "id": "1",
@@ -131,6 +131,7 @@
       "clic": 3,
       "tasti": 17,
       "comandi": 0,
+      "fermateDataOra": 0,
       "rispostaPeggioreMs": 10,
       "percorso": [
         "Elenco pazienti",
@@ -154,6 +155,7 @@
       "clic": 7,
       "tasti": 22,
       "comandi": 2,
+      "fermateDataOra": 0,
       "rispostaPeggioreMs": 14,
       "percorso": [
         "Ricerca senza esito",
@@ -186,6 +188,7 @@
       "clic": 3,
       "tasti": 40,
       "comandi": 0,
+      "fermateDataOra": 0,
       "rispostaPeggioreMs": 27,
       "percorso": [
         "Scheda aperta",
@@ -209,6 +212,7 @@
       "clic": 5,
       "tasti": 32,
       "comandi": 0,
+      "fermateDataOra": 0,
       "rispostaPeggioreMs": 8,
       "percorso": [
         "Scheda aperta",
@@ -236,6 +240,7 @@
       "clic": 3,
       "tasti": 0,
       "comandi": 0,
+      "fermateDataOra": 0,
       "rispostaPeggioreMs": 9,
       "percorso": [
         "Scheda aperta",
@@ -260,6 +265,7 @@
       "clic": 2,
       "tasti": 0,
       "comandi": 0,
+      "fermateDataOra": 0,
       "rispostaPeggioreMs": 8,
       "percorso": [
         "Scheda già scelta (nessuna coda documenti in arrivo)",
@@ -283,6 +289,7 @@
       "clic": 0,
       "tasti": 17,
       "comandi": 4,
+      "fermateDataOra": 0,
       "rispostaPeggioreMs": 12,
       "percorso": [
         "Elenco pazienti",
@@ -307,6 +314,7 @@
       "clic": 0,
       "tasti": 22,
       "comandi": 24,
+      "fermateDataOra": 4,
       "rispostaPeggioreMs": 10,
       "percorso": [
         "Ricerca senza esito",
@@ -354,6 +362,7 @@
       "clic": 0,
       "tasti": 40,
       "comandi": 25,
+      "fermateDataOra": 6,
       "rispostaPeggioreMs": 8,
       "percorso": [
         "Scheda aperta",
@@ -399,6 +408,7 @@
       "clic": 0,
       "tasti": 32,
       "comandi": 13,
+      "fermateDataOra": 0,
       "rispostaPeggioreMs": 10,
       "percorso": [
         "Scheda aperta",
@@ -434,6 +444,7 @@
       "clic": 0,
       "tasti": 0,
       "comandi": 11,
+      "fermateDataOra": 0,
       "rispostaPeggioreMs": 14,
       "percorso": [
         "Scheda aperta",
@@ -466,6 +477,7 @@
       "clic": 0,
       "tasti": 0,
       "comandi": 10,
+      "fermateDataOra": 0,
       "rispostaPeggioreMs": 12,
       "percorso": [
         "Scheda già scelta (nessuna coda documenti in arrivo)",

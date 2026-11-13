@@ -81,6 +81,7 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
     expect(reading.gesti).toBe(reading.clic + reading.comandi);
     expect(reading.events.every(event => event.responseMs !== null)).toBe(true);
     measurements.push({ id, modo: mode, gesti: reading.gesti, clic: reading.clic, tasti: reading.tasti, comandi: reading.comandi,
+      fermateDataOra: reading.events.filter(event => event.dataOra).length,
       rispostaPeggioreMs: Math.max(0, ...reading.events.map(event => event.responseMs!)), percorso, eventi: reading.events });
   };
   try {
@@ -207,7 +208,7 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
     const body = JSON.stringify(report, null, 2) + '\n';
     if (process.env.GESTURE_RESULT_PATH) writeFileSync(process.env.GESTURE_RESULT_PATH, body);
     await info.attach('conti.json', { body, contentType: 'application/json' });
-    console.log(JSON.stringify(measurements.map(({ id, modo, gesti, clic, tasti, comandi }) => ({ id, modo, gesti, clic, tasti, comandi }))));
+    console.log(JSON.stringify(measurements.map(({ id, modo, gesti, clic, tasti, comandi, fermateDataOra }) => ({ id, modo, gesti, clic, tasti, comandi, fermateDataOra }))));
   }
   if (process.env.GESTURE_RECORD !== '1') {
     const baseline = JSON.parse(readFileSync(baselinePath, 'utf8')) as Baseline;
