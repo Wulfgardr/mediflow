@@ -230,14 +230,19 @@ secondi con `local_attestation_failed`. Il precaricamento tecnico successivo
 ha richiesto 32,33 secondi e lo stesso comando a modello residente 0,43
 secondi. Il precaricamento manuale non chiude il percorso utente a freddo.
 
-Il solo stadio di precaricamento senza prompt ha ora un tetto di **45
-secondi**, applicato nell'attestor condiviso. Il margine è di 12 secondi,
-circa il 36% oltre i 33 osservati, per tollerare variazioni del disco esterno.
-Non garantisce il caricamento su ogni disco o macchina. Versione, tags,
-show e processi caricati conservano ciascuno il limite di **5 secondi**.
-Il comando CLI sostituisce il limite globale di 30 secondi con la somma
-dei cinque tetti, **65 secondi**. Un singolo stadio non può usare il tempo
-riservato agli altri.
+Il solo stadio di precaricamento senza prompt ha ora un tetto di **60
+secondi**, applicato nell'attestor condiviso. Il valore coincide con il
+budget host Web già esistente: il Web non si restringe. Il precedente
+candidato `f30ef1dfa`, con tetto di 45 secondi, negava anche dal Web un
+caricamento di 50 secondi che prima poteva completarsi entro il budget host.
+Il limite di 30 secondi che causava il difetto era soltanto nel comando CLI.
+
+Il margine rispetto ai 31-33 secondi osservati serve anche per dischi esterni
+più lenti, ma non garantisce il caricamento su ogni disco o macchina.
+Versione, tags, show e processi caricati conservano ciascuno il limite di
+**5 secondi**. Il comando CLI sostituisce il limite globale di 30 secondi
+con la somma dei cinque tetti, **80 secondi**. Un singolo stadio non può
+usare il tempo riservato agli altri.
 
 Il Web conserva il budget host di **60 secondi**, l'attesa pagina di **70
 secondi**, la lettura di 10 secondi e il corpo HTTP di 5 secondi. Prevale
@@ -263,10 +268,16 @@ e permette di interrompere il collegamento. Non espone i singoli stadi.
 La regressione persistente usa HTTP loopback con ritardi e scadenze scalati
 nella stessa proporzione: un caricamento di 32 secondi simulati attraversa
 il comando CLI e tutti i cinque stadi. Sulla base il comando nega per il
-limite di 30 secondi. I controesempi negano superamento dei 45 secondi,
+limite di 30 secondi. La regressione aggiuntiva nega sulla testa
+`f30ef1dfa` e ammette sulla correzione un precaricamento di 50 secondi
+simulati, sia attraverso il servizio Web con budget host sia dal CLI.
+I controesempi negano superamento dei 60 secondi,
 trasporto interrotto, cancellazione, digest cambiato e risposta remota,
 senza scrittura lifecycle. Un test fissa esattamente i quattro tetti da 5
-secondi. Queste prove non attestano UI renderizzata, qualità o uso clinico.
+secondi. I test del servizio e della pagina fissano anche i limiti esatti
+di 60 e 70 secondi: il primo resta attivo fino a 59.999 ms e interrompe
+a 60.000 ms, la seconda fino a 69.999 ms e interrompe a 70.000 ms.
+Queste prove non attestano UI renderizzata, qualità o uso clinico.
 
 La build di produzione `25e07608a` ha completato tre attivazioni HTTP su
 archivi sintetici nuovi, senza modello residente prima di ogni prova,
