@@ -36,6 +36,19 @@ export type ProfileResult = ProfileResultBase & (
     | Readonly<{ projection: 'notes'; profile: Readonly<{ notes: string | null }> }>
 );
 
+// HTTP readback needs identity metadata; agent ports retain their fifteen-field contract.
+export const HTTP_PROFILE_FIELD_NAMES = Object.freeze([
+    ...PROFILE_FIELD_NAMES, 'identifierType', 'birthDatePrecision', 'birthYear',
+] as const);
+export type HttpProfileFields = ProfileFields & Readonly<{
+    identifierType: 'cf' | 'stp' | 'eni' | 'passport' | 'other' | 'none';
+    birthDatePrecision: 'exact' | 'estimated' | 'unknown'; birthYear: number | null;
+}>;
+export type HttpProfileResult = ProfileResultBase & (
+    | Readonly<{ projection: 'profile'; profile: HttpProfileFields }>
+    | Readonly<{ projection: 'notes'; profile: Readonly<{ notes: string | null }> }>
+);
+
 export type ProfileQueryErrorCode =
     | 'input_invalid' | 'session_unavailable' | 'scope_denied' | 'selection_conflict'
     | 'handle_unavailable' | 'handle_expired' | 'revision_conflict' | 'query_unavailable' | 'output_too_large' | 'cancelled';
@@ -88,6 +101,14 @@ export function parseProfileQuery(value: unknown): ProfileQuery | null {
 }
 
 export function isProfileResult(value: unknown): value is ProfileResult {
+    return isProfileResultWithFields(value, PROFILE_FIELD_NAMES);
+}
+
+export function isHttpProfileResult(value: unknown): value is HttpProfileResult {
+    return isProfileResultWithFields(value, HTTP_PROFILE_FIELD_NAMES);
+}
+
+function isProfileResultWithFields(value: unknown, profileFields: readonly string[]): boolean {
     const result = exact(value, ['schemaVersion', 'operationId', 'contractVersion', 'handle', 'projection', 'currentness', 'profile']);
     if (!result || result.schemaVersion !== PROFILE_QUERY_RESULT_SCHEMA || result.operationId !== PROFILE_QUERY_OPERATION_ID
         || result.contractVersion !== PROFILE_QUERY_CONTRACT_VERSION || typeof result.handle !== 'string'
@@ -95,12 +116,15 @@ export function isProfileResult(value: unknown): value is ProfileResult {
     const current = exact(result.currentness, ['revision', 'selectionEpoch', 'observedAt', 'expiresAt']);
     if (!current || !integer(current.revision, 1) || !integer(current.selectionEpoch, 1)
         || !integer(current.observedAt, 0) || !integer(current.expiresAt, 1) || current.expiresAt <= current.observedAt) return false;
-    const fields = result.projection === 'profile' ? PROFILE_FIELD_NAMES : result.projection === 'notes' ? ['notes'] : null;
+    const fields = result.projection === 'profile' ? profileFields : result.projection === 'notes' ? ['notes'] : null;
     if (!fields) return false;
     const profile = exact(result.profile, fields);
     if (!profile) return false;
     return fields.every(key => {
         const field = profile[key];
+        if (key === 'identifierType') return ['cf', 'stp', 'eni', 'passport', 'other', 'none'].some(value => value === field);
+        if (key === 'birthDatePrecision') return ['exact', 'estimated', 'unknown'].some(value => value === field);
+        if (key === 'birthYear') return field === null || integer(field, 0);
         if (key === 'isAdi' || key === 'isArchived') return field === null || typeof field === 'boolean';
         if (key === 'firstName' || key === 'lastName' || key === 'taxCode') return typeof field === 'string';
         return field === null || typeof field === 'string';
