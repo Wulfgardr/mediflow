@@ -15,8 +15,8 @@ export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['scripts/prepare-windows-launcher-bootstrap.mjs', 'aa77ba7c1815c059f69496c3a08a78586f11f6d8eb5d3ee0b9242af9295c55e0', true],
   ['scripts/windows-launcher-bootstrap/prebuilds/win32-x64/manifest.json', 'cc1803f2f20a06afa8417fa3c1c592757893a49e7415c51c6b61a6e390efe525', true],
   ['scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node', 'bdacc6372dc221e94bfd1d9a13e650d53398d48575ead751a1ee0c762f55384f', true],
-  ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/manifest.json', 'f39f01aab5c84671461fd9f7f0abf96e7b64a9069eaa084afec4754d10982a95', true],
-  ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/system-directory.node', '35666d8b5e9aa882c66dd28300634ac23128f85c178d3b2beb69561b3cbffb3c', true],
+  ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/manifest.json', '7c1b35d5e673c01bb6f5080fc4c4ff542d74e0764149d4552095214553087b65', true],
+  ['scripts/windows-launcher-bootstrap/prebuilds/win32-arm64/system-directory.node', '91b32b74693e2f6908823b3e21dfd6b446e22fecaccc90516ff5f1c84e044213', true],
 
   ['scripts/run-scheduled-backup.mjs', 'd7dca9909424e871ad0102e5326f06486c3869445b7d7c9272cb623545655578'],
   ['scripts/backup-destination-policy.mjs', 'e8092ad74fe3ce830ada88210348d159c1263ddc20591872a2e0087775536257'],

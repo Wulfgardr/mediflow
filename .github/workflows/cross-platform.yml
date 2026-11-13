@@ -37,15 +37,25 @@ jobs:
         with:
           node-version: 24
           architecture: ${{ matrix.arch }}
+      - name: Inspect native bootstrap toolchain and installed MSVC versions
+        shell: pwsh
+        run: ./scripts/inspect-windows-bootstrap-toolchain.ps1 -Architecture '${{ matrix.arch }}' -Output "$env:RUNNER_TEMP/bootstrap-toolchain.json"
       - name: Prepare native bootstrap regeneration
         if: github.event_name == 'workflow_dispatch' && inputs.regenerate_bootstrap
-        run: node -e "const fs=require('node:fs'); for(const name of ['system-directory.node','manifest.json']) fs.unlinkSync('scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/'+name);"
+        shell: pwsh
+        run: |
+          node -e "const fs=require('node:fs'); for(const name of ['system-directory.node','manifest.json']) fs.unlinkSync('scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/'+name);"
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot prepare bootstrap regeneration' }
+          Copy-Item -LiteralPath "$env:RUNNER_TEMP/bootstrap-toolchain.json" -Destination 'scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/toolchain.json'
       - name: Build native Windows bootstrap (development only)
         if: hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/system-directory.node', matrix.arch)) == '' && hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/manifest.json', matrix.arch)) == ''
         run: node scripts/prepare-windows-launcher-bootstrap.mjs build
       - name: Compare delivered native bootstrap with source rebuild
         id: compare
-        run: node scripts/verify-windows-bootstrap-rebuild.mjs
+        shell: pwsh
+        run: node scripts/verify-windows-bootstrap-rebuild.mjs --toolchain "$env:RUNNER_TEMP/bootstrap-toolchain.json"
+      - name: Test bootstrap provenance denial and complete byte comparison
+        run: node --test lib/windows-bootstrap-provenance.test.ts
       - name: Verify private backup DACL with Windows system tools
         run: node --test lib/windows-private-directory.test.ts
       - name: Verify delivered artifact and OS path
@@ -63,6 +73,7 @@ jobs:
           path: |
             scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node
             scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/manifest.json
+            scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/toolchain.json
           if-no-files-found: error
 
   headless-contracts:
