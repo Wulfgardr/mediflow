@@ -325,7 +325,6 @@ impl ClinicalApp {
                         ));
                     }
                     Ok(DrugCatalogCommit::CatalogChanged(message)) => {
-                        area.preview = None;
                         area.reduction = None;
                         area.message = Some((message, true));
                     }
@@ -829,12 +828,26 @@ mod tests {
         cx.run_until_parked();
         view.update(cx, |app, _| {
             let area = &app.local_host.references.drug;
-            assert!(area.preview.is_none() && area.command.is_none() && area.receipt.is_none());
+            let retained = area
+                .preview
+                .as_ref()
+                .expect("a conflict must preserve the selected file and mapping");
+            assert_eq!(retained.file_name(), "catalogo.csv");
+            assert_eq!(retained.bytes().as_ref(), b"a;b\n1;2\n");
+            assert!(area.command.is_none() && area.receipt.is_none());
             assert_eq!(
                 area.message.as_ref().map(|(m, _)| m.as_str()),
                 Some("Il catalogo è cambiato dopo l’anteprima: ripeti l’anteprima.")
             );
         });
+        let requests = host.request_count();
+        view.update(cx, |app, cx| app.commit_drug_catalog(cx));
+        cx.run_until_parked();
+        assert_eq!(
+            host.request_count(),
+            requests,
+            "no implicit retry after conflict"
+        );
         assert!(
             !host
                 .routes()
