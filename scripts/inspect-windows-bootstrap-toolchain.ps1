@@ -24,4 +24,5 @@ $toolchain = [ordered]@{
   windowsSdk = $env:WindowsSDKVersion.TrimEnd('\')
 }
 Write-Host (ConvertTo-Json -Compress @{ type = 'bootstrap-toolchain'; tools = $toolchain; compilerPath = $compiler; linkerPath = $linker; sdkPath = $env:WindowsSdkDir })
-$toolchain | ConvertTo-Json | Set-Content -LiteralPath $Output -Encoding utf8
+$json = ($toolchain | ConvertTo-Json).Replace("`r`n", "`n") + "`n"
+[System.IO.File]::WriteAllText($Output, $json, [System.Text.UTF8Encoding]::new($false))
