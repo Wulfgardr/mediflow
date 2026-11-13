@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test';
+import { applyAiConfigurationMock } from './ai-settings-configuration';
 import { createFunctionModelPreferencesService, FUNCTION_SWITCH_KEYS, type FunctionModelSources } from '../../lib/ai-providers/fabric/function-model-preferences';
 
 export type FunctionsScenario = 'list' | 'off' | 'unavailable' | 'configured' | 'pending' | 'auth-error' | 'read-error';
@@ -82,6 +83,10 @@ export async function installFunctionsMocks(page: Page, baseURL: string, scenari
             }
         } catch { return deny(); }
         calls.push({ path, method, ...(body === undefined ? {} : { body }) });
+        if (path === '/api/settings/ai/configuration' && method === 'PUT') {
+            settingsWrites.push(structuredClone(body));
+            return route.fulfill(applyAiConfigurationMock(config, body, state.failSave));
+        }
         if (path === '/api/settings/ai/functions' || path === '/api/settings/ai/functions/preview') {
             if (state.pending) await gate;
             if (state.preferenceStatus !== 200) return route.fulfill({ status: state.preferenceStatus, json: { error: 'Synthetic unavailable' } });
