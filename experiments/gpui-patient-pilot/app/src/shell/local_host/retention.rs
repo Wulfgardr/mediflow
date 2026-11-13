@@ -14,6 +14,13 @@ const WINDOW_IDS: [&str; 8] = [
     "retention-window-7",
 ];
 
+fn normalized_window_text(raw: &str) -> String {
+    let text = raw.trim().to_lowercase();
+    text.parse::<u64>()
+        .map(|years| years.to_string())
+        .unwrap_or(text)
+}
+
 /// Conservazione dei dati sanitari (ADR 0178): profilo, finestre del titolare, blocchi e scarto.
 pub(super) struct RetentionArea {
     pub(super) busy: bool,
@@ -130,7 +137,7 @@ impl RetentionArea {
                 _ => String::new(),
             };
             let baseline = self.window_baselines.get(id).map_or("", String::as_str);
-            if self.windows[i].read(cx).value() == baseline {
+            if normalized_window_text(&self.windows[i].read(cx).value()) == baseline {
                 self.windows[i].update(cx, |input, cx| input.set_content(text.clone(), cx));
             }
             self.window_baselines.insert(id.clone(), text);
@@ -144,7 +151,7 @@ impl RetentionArea {
             .enumerate()
             .take(self.windows.len())
         {
-            let raw = self.windows[i].read(cx).value().trim().to_lowercase();
+            let raw = normalized_window_text(&self.windows[i].read(cx).value());
             if raw.is_empty() {
                 continue;
             }
@@ -768,6 +775,114 @@ mod tests {
     }
     fn archived_patient() -> Value {
         json!([{"id":"patient-a","firstName":"Amina","lastName":"Sintetica","birthDate":"1940-01-01","taxCode":"SYNTHETIC","version":4,"isArchived":true,"deletedAt":null}])
+    }
+
+    fn saved_noncanonical_window_follows_host(
+        cx: &mut gpui::TestAppContext,
+        draft: &str,
+        saved_term: Value,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, _| {
+            app.session = Some(host.session.clone());
+            app.patients = Load::Ready(Vec::new());
+            app.local_host.authority = Authority::Open(access);
+        });
+        let plan_read = |revision, windows| {
+            host.plan(&format!("GET {ROUTE}"))
+                .send((200, overview(revision, windows)))
+                .unwrap();
+            plan_identities(&host, archived_patient());
+        };
+        plan_read(1, json!({"ambulatory_record":{"kind":"years","years":11}}));
+        view.update(cx, |app, cx| app.read_retention(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            app.local_host.retention.windows[0]
+                .update(cx, |input, cx| input.set_content(draft, cx));
+            app.prepare_retention_windows(cx);
+        });
+        let saved_windows = json!({"ambulatory_record":saved_term});
+        host.plan(&format!("PUT {ROUTE}"))
+            .send((
+                200,
+                json!({"schemaVersion":"mediflow.retention.v1","revision":2,"windows":saved_windows}),
+            ))
+            .unwrap();
+        plan_read(2, saved_windows.clone());
+        view.update(cx, |app, cx| app.confirm_retention(cx));
+        cx.run_until_parked();
+        assert_eq!(
+            host.bodies(&format!("PUT {ROUTE}")),
+            vec![json!({"confirmed":true,"expectedRevision":1,"windows":saved_windows})]
+        );
+        view.update(cx, |app, _| {
+            assert!(!app.local_host.retention.message.as_ref().unwrap().1);
+            assert_eq!(
+                app.local_host.retention.overview.as_ref().unwrap()["windowsRevision"],
+                2
+            );
+        });
+
+        let concurrent_windows = json!({"ambulatory_record":{"kind":"years","years":14}});
+        plan_read(3, concurrent_windows);
+        view.update(cx, |app, cx| app.read_retention(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert_eq!(
+                app.local_host.retention.windows[0].read(cx).value(),
+                "14",
+                "accepted draft {draft:?} must become clean and follow a later host revision"
+            );
+            app.local_host.retention.windows[1].update(cx, |input, cx| input.set_content("16", cx));
+            app.prepare_retention_windows(cx);
+        });
+        let next_windows = json!({
+            "ambulatory_record":{"kind":"years","years":14},
+            "imaging_iconography":{"kind":"years","years":16}
+        });
+        host.plan(&format!("PUT {ROUTE}"))
+            .send((
+                200,
+                json!({"schemaVersion":"mediflow.retention.v1","revision":4,"windows":next_windows}),
+            ))
+            .unwrap();
+        plan_read(4, next_windows.clone());
+        view.update(cx, |app, cx| app.confirm_retention(cx));
+        cx.run_until_parked();
+        assert_eq!(
+            host.bodies(&format!("PUT {ROUTE}")),
+            vec![
+                json!({"confirmed":true,"expectedRevision":1,"windows":saved_windows}),
+                json!({"confirmed":true,"expectedRevision":3,"windows":next_windows})
+            ],
+            "saving another category must not resubmit the old accepted draft"
+        );
+    }
+
+    #[gpui::test]
+    fn retention_saved_leading_zero_window_follows_host(cx: &mut gpui::TestAppContext) {
+        saved_noncanonical_window_follows_host(cx, "012", json!({"kind":"years","years":12}));
+    }
+
+    #[gpui::test]
+    fn retention_saved_trailing_space_window_follows_host(cx: &mut gpui::TestAppContext) {
+        saved_noncanonical_window_follows_host(cx, "12 ", json!({"kind":"years","years":12}));
+    }
+
+    #[gpui::test]
+    fn retention_saved_uppercase_unlimited_window_follows_host(cx: &mut gpui::TestAppContext) {
+        saved_noncanonical_window_follows_host(cx, "ILLIMITATA", json!({"kind":"unlimited"}));
     }
 
     #[gpui::test]
