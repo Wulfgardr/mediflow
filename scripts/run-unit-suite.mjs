@@ -25,7 +25,7 @@ try {
   if (!signal && bootstrap.status !== 0) exitCode = bootstrap.status;
   else if (!signal) {
     for (const unitArgs of unitInvocations) {
-      const unit = run(unitArgs, env);
+      const unit = run([unitArgs[0], ...process.argv.slice(2), ...unitArgs.slice(1)], env);
       signal = unit.signal;
       exitCode = unit.status;
       if (signal || exitCode !== 0) break;

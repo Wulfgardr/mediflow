@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { LocalProviderOnboardingPanel } from '@/components/settings/local-provider-onboarding-panel';
 import { Bot, Cpu, RefreshCw, Save } from 'lucide-react';
 import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller';
+import { AiSettingsConflict } from '@/components/settings/ai-settings-conflict';
 import AiRolloutGuardNotice from '@/components/settings/ai-rollout-guard-notice';
 import { ModelSelector } from '@/components/settings/ai-model-selector';
 import styles from '@/components/settings/guided-local-models.module.css';
@@ -26,7 +27,8 @@ const recommended = [
 
 export default function SettingsAiModelsPage() {
     const { hardwareProfile, aiConfig, setAiConfig, isSavingAi, aiSettingsLoadState, aiTestStatus, aiHealth,
-        applyHardwareProfile, saveAiConfig, savedConfigurationRevision, testAiConnection } = useAiSettingsController();
+        applyHardwareProfile, saveAiConfig, savedConfigurationRevision, testAiConnection,
+        aiSettingsConflict, aiSettingsReadback, rereadAiConfig } = useAiSettingsController();
 
     return (
         <section className={`${styles.surface} ${composition.page}`} data-testid="settings-ai-models-section">
@@ -40,6 +42,7 @@ export default function SettingsAiModelsPage() {
                 title={aiSettingsLoadState === 'loading' ? 'Caricamento delle impostazioni…' : 'Impossibile leggere le impostazioni.'}
                 detail={aiSettingsLoadState === 'loading' ? undefined : 'Ricarica questa pagina prima di modificarle.'}
             />}
+            <AiSettingsConflict conflict={aiSettingsConflict} readback={aiSettingsReadback} busy={isSavingAi} onReread={rereadAiConfig} />
             <fieldset disabled={aiSettingsLoadState !== 'ready'} aria-busy={aiSettingsLoadState === 'loading'}
                 aria-label="Impostazioni dei modelli locali" data-testid="ai-settings-controls"
                 className={`min-w-0 border-0 p-0 ${styles.surface}`}>
@@ -122,7 +125,7 @@ export default function SettingsAiModelsPage() {
             <div className={`${composition.section} ${styles.stack}`}>
                 <h3 className={composition.title}>3. Salva e verifica le funzioni</h3>
                 <div className={styles.actions}>
-                    <button type="button" onClick={saveAiConfig} disabled={isSavingAi} className={SETTINGS_PRIMARY_BUTTON_CLASS}>
+                    <button type="button" onClick={saveAiConfig} disabled={isSavingAi || aiSettingsConflict === 'conflict'} className={SETTINGS_PRIMARY_BUTTON_CLASS}>
                         <Save aria-hidden="true" className="h-4 w-4" />
                         {isSavingAi ? 'Salvataggio...' : 'Salva configurazione'}
                     </button>

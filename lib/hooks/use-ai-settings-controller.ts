@@ -4,6 +4,7 @@ import { formatCountLabel } from '../format-count';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { isInstalledOllamaModel } from '@/lib/installed-ollama-models';
 import { db } from '@/lib/db';
+import { AI_CONFIGURATION_KEYS, type AiConfigurationSnapshot } from '@/lib/ai-settings-configuration';
 import { useToast } from '@/components/ui/toast-provider';
 import {
     DEFAULT_TEXT_MODEL,
@@ -14,7 +15,7 @@ import {
     AI_INSIGHT_MODE_OPTIONS,
     DEFAULT_AI_INSIGHT_MANUAL_CONFIG,
     loadAIInsightStoredSettings,
-    saveAIInsightStoredSettings,
+    sanitizeAIInsightManualConfig,
     type AIInsightManualConfig,
     type AIInsightMode,
 } from '@/lib/ai-insight-settings';
@@ -91,6 +92,11 @@ export function useAiSettingsController() {
         manualConfig: { ...DEFAULT_AI_INSIGHT_MANUAL_CONFIG },
     });
     const [isSavingAi, setIsSavingAi] = useState(false);
+    const expectedValues = useRef<AiConfigurationSnapshot | null>(null);
+    const saving = useRef(false);
+    const mounted = useRef(true);
+    const [aiSettingsConflict, setAiSettingsConflict] = useState<'conflict' | 'review' | null>(null);
+    const [aiSettingsReadback, setAiSettingsReadback] = useState<AiConfigurationSnapshot | null>(null);
     const [savedConfigurationRevision, setSavedConfigurationRevision] = useState(0);
     const [aiSettingsLoadState, setAiSettingsLoadState] = useState<'loading' | 'ready' | 'failed'>('loading');
     const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -113,27 +119,42 @@ export function useAiSettingsController() {
         return () => { generation.value++; };
     }, [aiConfig]);
 
-    async function loadAiConfig(isCurrent: () => boolean) {
+    async function loadAiConfig(isCurrent: () => boolean, preserveDraft = false) {
         try {
             await ensureTextModelDefaultsUpgraded();
-            const hardware = await db.settings.get('hardwareProfile');
-            const modelClinical = await db.settings.get('aiModel_clinical');
-            const modelReasoning = await db.settings.get('aiModel_reasoning');
-            const legacyModel = await db.settings.get('aiModel');
-            const genericUrl = await db.settings.get('aiUrl');
-            const legacyUrl = await db.settings.get('ollamaUrl');
-            const patientInsightKillSwitch = await db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY);
-            const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
-            const smartImportKillSwitch = await db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY);
-            const treatmentReasoningKillSwitch = await db.settings.get(AI_TREATMENT_REASONING_KILL_SWITCH_KEY);
-            const documentRouterControlFlow = await db.settings.get(DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY);
+            const observed = new Map<string, { value?: string } | undefined>();
+            const readSetting = async (key: string) => {
+                if (!observed.has(key)) observed.set(key, await db.settings.get(key));
+                return observed.get(key);
+            };
+            // Capture exactly the raw values used to build this draft, including missing keys.
+            const hardware = await readSetting('hardwareProfile');
+            const modelClinical = await readSetting('aiModel_clinical');
+            const modelReasoning = await readSetting('aiModel_reasoning');
+            const legacyModel = await readSetting('aiModel');
+            const genericUrl = await readSetting('aiUrl');
+            const legacyUrl = await readSetting('ollamaUrl');
+            await readSetting('aiProvider');
+            const patientInsightKillSwitch = await readSetting(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY);
+            const documentSynthesisKillSwitch = await readSetting(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
+            const smartImportKillSwitch = await readSetting(AI_SMART_IMPORT_KILL_SWITCH_KEY);
+            const treatmentReasoningKillSwitch = await readSetting(AI_TREATMENT_REASONING_KILL_SWITCH_KEY);
+            const documentRouterControlFlow = await readSetting(DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY);
 
             let currentUrl = genericUrl?.value;
             if (!currentUrl) currentUrl = legacyUrl?.value;
             if (!currentUrl || currentUrl.includes(':8080')) currentUrl = 'http://127.0.0.1:11434/v1';
 
-            const insightSettings = await loadAIInsightStoredSettings();
+            const insightSettings = await loadAIInsightStoredSettings({ get: readSetting });
             if (!isCurrent()) return;
+            const snapshot = Object.fromEntries(AI_CONFIGURATION_KEYS.map(key => [key, observed.get(key)?.value ?? null])) as AiConfigurationSnapshot;
+            expectedValues.current = snapshot;
+            if (preserveDraft) {
+                setAiSettingsReadback(snapshot);
+                setAiSettingsConflict('review');
+                setAiSettingsLoadState('ready');
+                return;
+            }
             setHardwareProfile((hardware?.value as HardwareProfile) || 'custom');
             setAiConfig({
                 provider: 'ollama',
@@ -160,9 +181,18 @@ export function useAiSettingsController() {
 
     useEffect(() => {
         let current = true;
+        mounted.current = true;
         void loadAiConfig(() => current);
-        return () => { current = false; };
+        return () => { current = false; mounted.current = false; };
     }, []);
+
+    const rereadAiConfig = async () => {
+        if (saving.current) return;
+        saving.current = true;
+        setIsSavingAi(true);
+        try { await loadAiConfig(() => mounted.current, true); }
+        finally { saving.current = false; if (mounted.current) setIsSavingAi(false); }
+    };
 
     const applyHardwareProfile = (profile: Exclude<HardwareProfile, 'custom'>) => {
         setHardwareProfile(profile);
@@ -198,28 +228,38 @@ export function useAiSettingsController() {
     };
 
     const saveAiConfig = async () => {
-        if (aiSettingsLoadState !== 'ready') return;
+        if (aiSettingsLoadState !== 'ready' || aiSettingsConflict === 'conflict' || saving.current || !expectedValues.current || !mounted.current) return;
+        saving.current = true;
         setIsSavingAi(true);
         try {
-            await db.settings.put({ key: 'hardwareProfile', value: hardwareProfile });
-            await saveLocalOllamaBinding(aiConfig);
-            await db.settings.put({
-                key: DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY,
-                value: documentRouterControlFlowMode,
+            const values = {
+                hardwareProfile, aiProvider: 'ollama', aiModel_clinical: aiConfig.model_clinical,
+                aiModel_reasoning: aiConfig.model_reasoning, aiModel: aiConfig.model_clinical,
+                aiUrl: aiConfig.url, ollamaUrl: aiConfig.url,
+                documentRouterControlFlow: documentRouterControlFlowMode,
+                aiPatientInsightKillSwitch: serializeAiPatientInsightKillSwitchState(patientInsightEnabled),
+                aiDocumentSynthesisKillSwitch: serializeAiDocumentSynthesisKillSwitchState(documentSynthesisEnabled),
+                aiSmartImportKillSwitch: serializeAiSmartImportKillSwitchState(smartImportEnabled),
+                aiInsightMode: aiInsightSettings.mode,
+                aiInsightManualConfig: JSON.stringify(sanitizeAIInsightManualConfig(aiInsightSettings.manualConfig)),
+            };
+            const response = await fetch('/api/settings/ai/configuration', {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ expectedValues: expectedValues.current, values }),
             });
-            await db.settings.put({
-                key: AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
-                value: serializeAiPatientInsightKillSwitchState(patientInsightEnabled),
-            });
-            await db.settings.put({
-                key: AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
-                value: serializeAiDocumentSynthesisKillSwitchState(documentSynthesisEnabled),
-            });
-            await db.settings.put({
-                key: AI_SMART_IMPORT_KILL_SWITCH_KEY,
-                value: serializeAiSmartImportKillSwitchState(smartImportEnabled),
-            });
-            await saveAIInsightStoredSettings(aiInsightSettings);
+            if (response.status === 409) {
+                if (mounted.current) {
+                    setAiSettingsConflict('conflict');
+                    setAiSettingsReadback(null);
+                    showToast({ tone: 'error', title: 'Le impostazioni sono cambiate. Rileggi prima di confermare la bozza.' });
+                }
+                return;
+            }
+            if (!response.ok) throw new Error('Configuration save failed');
+            if (!mounted.current) return;
+            expectedValues.current = values;
+            setAiSettingsConflict(null);
+            setAiSettingsReadback(null);
             setAiTestStatus('idle');
             setSavedConfigurationRevision(previous => previous + 1);
             showToast({ tone: 'success', title: 'Configurazione IA salvata' });
@@ -227,7 +267,8 @@ export function useAiSettingsController() {
             console.error(e);
             showToast({ tone: 'error', title: 'Salvataggio non riuscito' });
         } finally {
-            setIsSavingAi(false);
+            saving.current = false;
+            if (mounted.current) setIsSavingAi(false);
         }
     };
 
@@ -321,6 +362,9 @@ export function useAiSettingsController() {
         setAiInsightSettings,
         isSavingAi,
         aiSettingsLoadState,
+        aiSettingsConflict,
+        aiSettingsReadback,
+        rereadAiConfig,
         aiTestStatus,
         aiHealth,
         patientInsightEnabled,
