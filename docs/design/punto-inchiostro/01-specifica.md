@@ -171,8 +171,10 @@ Classi di larghezza, misurate sul contenitore dell'applicazione:
 | Media | da 700 a 1000 px | Navigazione stretta, colonne a 24 px, colonne secondarie nascoste |
 | Estesa | oltre 1000 px | Navigazione, due colonne, anteprima |
 
-Sul web restano obbligatorie le verifiche a 320, 390, 768 e 1440 px e con
-zoom al 200% e 400%, come chiede `DESIGN.md`.
+Sul web restano obbligatorie le verifiche a 320, 390, 768 e 1440 px con
+testo al 100% e al 200%, come chiede `DESIGN.md`. Per la 0.9.1 l'ingrandimento
+oltre il 200% è fuori dal gate
+([emendamento del 13 novembre 2026](../../releases/0.9.1-contract.md#emendamento-del-13-novembre-2026-ingrandimento-al-400-fuori-dal-gate)).
 
 ## Il punto e i tre inchiostri
 
@@ -323,7 +325,7 @@ la forma completa: non esiste una soglia fissa di zoom.
 La domanda di conferma è «Registrare N elementi nella scheda di Nome
 Cognome?». Per un solo elemento indica il tipo: «Registrare 1 terapia nella
 scheda di Moretti Elena?». Il titolo va a capo, di norma entro due righe;
-a 390 px con testo al 400% si conserva tutto il testo anche oltre due
+a 390 punti con testo al 100% e al 200% si conserva tutto il testo anche oltre due
 righe, senza troncare il destinatario né ridurre il carattere. Il punto
 interrogativo resta unito all’ultima parola, anche nelle domande della
 nuova anagrafica e delle Scale. I comandi
@@ -372,6 +374,10 @@ anche la geometria effettiva. Una nuova etichetta entra automaticamente
 nella verifica. Se supera tre righe, **va accorciata**: il principale non si
 comprime, non si tronca e non scorre. Non è previsto un adattamento a runtime
 per etichette che violano questo vincolo.
+
+Le verifiche e gli esempi al 400% che seguono descrivono le regressioni già
+presenti. Restano documentati con le loro metriche, ma non sono requisiti di
+qualifica della 0.9.1: il gate richiede il 100% e il 200% senza tagli o collisioni.
 
 **Limite geometrico.** Alla finestra minima nativa **390×640**, fino al
 **400%**, con corpo base **14 px** (Linux/Windows) o **16 px** (macOS), il
