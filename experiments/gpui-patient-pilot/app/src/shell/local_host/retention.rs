@@ -22,6 +22,7 @@ pub(super) struct RetentionArea {
     pub(super) message: Option<(String, bool)>,
     hold_reason: usize,
     windows: Vec<Entity<TextInput>>,
+    window_baselines: std::collections::HashMap<String, String>,
     hold_patient: Entity<TextInput>,
     hold_document: Entity<TextInput>,
     /// Nomi dei fascicoli citati da revisione e blocchi, letti da tutte le sedi, archiviati compresi.
@@ -50,6 +51,7 @@ impl RetentionArea {
             command: None,
             message: None,
             hold_reason: 0,
+            window_baselines: Default::default(),
             windows: WINDOW_IDS
                 .iter()
                 .map(|id| {
@@ -80,6 +82,7 @@ impl RetentionArea {
         self.busy = false;
         self.overview = None;
         self.identities.clear();
+        self.window_baselines.clear();
         self.command = None;
         self.message = None;
         for input in self.inputs() {
@@ -109,8 +112,8 @@ impl RetentionArea {
             })
             .unwrap_or_default()
     }
-    /// Le finestre già salvate tornano nei campi a ogni lettura.
-    fn fill_windows(&self, cx: &mut Context<ClinicalApp>) {
+    /// Refresh clean fields; a concurrent revision must not replace a local draft.
+    fn fill_windows(&mut self, cx: &mut Context<ClinicalApp>) {
         let Some(overview) = &self.overview else {
             return;
         };
@@ -126,7 +129,11 @@ impl RetentionArea {
                 Some("unlimited") => "illimitata".into(),
                 _ => String::new(),
             };
-            self.windows[i].update(cx, |input, cx| input.set_content(text, cx));
+            let baseline = self.window_baselines.get(id).map_or("", String::as_str);
+            if self.windows[i].read(cx).value() == baseline {
+                self.windows[i].update(cx, |input, cx| input.set_content(text.clone(), cx));
+            }
+            self.window_baselines.insert(id.clone(), text);
         }
     }
     fn windows_value(&self, cx: &App) -> std::result::Result<Value, String> {
@@ -761,6 +768,87 @@ mod tests {
     }
     fn archived_patient() -> Value {
         json!([{"id":"patient-a","firstName":"Amina","lastName":"Sintetica","birthDate":"1940-01-01","taxCode":"SYNTHETIC","version":4,"isArchived":true,"deletedAt":null}])
+    }
+
+    #[gpui::test]
+    fn retention_conflict_preserves_window_draft_for_explicit_new_confirmation(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, _| {
+            app.session = Some(host.session.clone());
+            app.patients = Load::Ready(Vec::new());
+            app.local_host.authority = Authority::Open(access);
+        });
+        let windows = |years| json!({"ambulatory_record":{"kind":"years","years":years}});
+        let plan_read = |revision, years| {
+            host.plan(&format!("GET {ROUTE}"))
+                .send((200, overview(revision, windows(years))))
+                .unwrap();
+            plan_identities(&host, archived_patient());
+        };
+        plan_read(1, 11);
+        view.update(cx, |app, cx| app.read_retention(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            app.local_host.retention.windows[0].update(cx, |input, cx| input.set_content("12", cx));
+            app.prepare_retention_windows(cx);
+        });
+        host.plan(&format!("PUT {ROUTE}"))
+            .send((409, json!({"code":"conflict"})))
+            .unwrap();
+        plan_read(2, 14);
+        view.update(cx, |app, cx| app.confirm_retention(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert_eq!(
+                app.local_host.retention.windows[0].read(cx).value(),
+                "12",
+                "a rejected write must not replace the clinician's draft with the concurrent value"
+            );
+            assert_eq!(
+                app.local_host.retention.overview.as_ref().unwrap()["windowsRevision"],
+                2
+            );
+            assert!(app.local_host.retention.command.is_none());
+            assert!(app.local_host.retention.message.as_ref().unwrap().1);
+            app.prepare_retention_windows(cx);
+            let command = app.local_host.retention.command.as_ref().unwrap();
+            assert_eq!(command.body()["expectedRevision"], 2);
+            assert_eq!(command.body()["windows"], windows(12));
+        });
+        assert_eq!(
+            host.bodies(&format!("PUT {ROUTE}")).len(),
+            1,
+            "no automatic retry"
+        );
+        host.plan(&format!("PUT {ROUTE}"))
+            .send((
+                200,
+                json!({"schemaVersion":"mediflow.retention.v1","revision":3,"windows":windows(12)}),
+            ))
+            .unwrap();
+        plan_read(3, 12);
+        view.update(cx, |app, cx| app.confirm_retention(cx));
+        cx.run_until_parked();
+        // Once the accepted draft has been read back, a later clean field follows the host.
+        plan_read(4, 15);
+        view.update(cx, |app, cx| app.read_retention(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert_eq!(app.local_host.retention.windows[0].read(cx).value(), "15");
+        });
+        assert_eq!(host.bodies(&format!("PUT {ROUTE}")).len(), 2);
     }
 
     #[gpui::test]
