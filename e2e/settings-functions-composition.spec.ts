@@ -198,9 +198,11 @@ test('Funzioni: anteprima, applicazione e salvataggio avanzato restano distinti;
         expect(mock.preferenceWrites).toHaveLength(1); expect(mock.settingsWrites).toEqual([]);
         await advancedToggle.click();
         await expect(draft).toHaveValue('9');
+        const beforeFailedSave = structuredClone(mock.config);
         mock.state.failSave = true;
         await region(page).getByRole('button', { name: /^(Salva Configurazione|Salva parametri avanzati)$/u }).click();
         await expect(page.getByText('Salvataggio non riuscito', { exact: true })).toBeVisible();
+        expect(mock.config).toEqual(beforeFailedSave);
         await expect(draft).toHaveValue('9'); expect(mock.preferenceWrites).toHaveLength(1);
         mock.state.failSave = false;
         await region(page).getByRole('button', { name: /^(Salva Configurazione|Salva parametri avanzati)$/u }).click();
@@ -219,6 +221,47 @@ test('Funzioni: anteprima, applicazione e salvataggio avanzato restano distinti;
             }
         } finally { await mock.close(); await egress.close(); }
     }
+});
+
+test('D06 Funzioni: conflitto conserva la bozza, rilettura e nuova conferma salvano esplicitamente', async ({ page, baseURL }) => {
+    requireSynthetic(baseURL);
+    const egress = await installFunctionsEgressGuard(page, baseURL);
+    const mock = await installFunctionsMocks(page, baseURL, 'off');
+    try {
+        await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+        await page.goto('/settings/ai/funzioni');
+        await expect(region(page).getByTestId('function-preferences').getByRole('switch')).toHaveCount(3);
+        const save = region(page).getByRole('button', { name: 'Salva parametri avanzati', exact: true });
+        await expect(save).toBeEnabled();
+        await region(page).getByRole('button', { name: 'Regola contesto e lunghezza delle sintesi', exact: true }).click();
+        const draft = region(page).getByRole('spinbutton', { name: 'Documenti massimi', exact: true });
+        await draft.fill('9');
+        mock.config.aiInsightMode = 'full_auto';
+        const concurrent = structuredClone(mock.config);
+        const responses: number[] = [];
+        page.on('response', response => {
+            if (new URL(response.url()).pathname === '/api/settings/ai/configuration') responses.push(response.status());
+        });
+        await save.click();
+        await expect(region(page).getByText('Le impostazioni sono cambiate. La bozza è conservata.', { exact: false })).toBeVisible();
+        expect(responses).toEqual([409]);
+        expect(mock.config).toEqual(concurrent);
+        await expect(draft).toHaveValue('9');
+        await expect(save).toBeDisabled();
+        await region(page).getByRole('status').filter({ hasText: 'La bozza è conservata.' })
+            .getByRole('button', { name: 'Rileggi impostazioni', exact: true }).click();
+        await expect(region(page).getByRole('definition').filter({ hasText: /^Automatica$/u })).toBeVisible();
+        await expect(draft).toHaveValue('9');
+        await expect(save).toBeEnabled();
+        expect(mock.config).toEqual(concurrent);
+        expect(responses).toEqual([409]);
+        await save.click();
+        await expect(page.getByText('Configurazione IA salvata', { exact: true })).toBeVisible();
+        expect(responses).toEqual([409, 200]);
+        expect(JSON.parse(mock.config.aiInsightManualConfig).maxDocuments).toBe(9);
+        expect(mock.config.aiInsightMode).toBe('manual');
+        expect(mock.blocked).toEqual([]); expect(egress.blocked).toEqual([]);
+    } finally { await mock.close(); await egress.close(); }
 });
 
 for (const preset of ['Ripristina predefiniti', 'Spegni tutte']) test(`Preset ${preset}: conserva Treatment Reasoning enabled senza renderlo disponibile`, async ({ page, baseURL }) => {
