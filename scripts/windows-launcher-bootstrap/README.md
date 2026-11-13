@@ -120,7 +120,16 @@ to the development evidence, not the distributed addon or portable closure.
 
 The MSVC linker uses `/Brepro`. The ordinary native jobs rebuild the source and
 compare every delivered binary byte, including timestamps, with no exclusions.
+The CI also records `toolchain.json` beside each manifest: native architecture,
+compiler and linker file versions, MSVC toolset directory version and Windows SDK
+version. `inspect-windows-bootstrap-toolchain.ps1` logs the installed toolsets and
+measures the selected tools before each comparison. The verifier requires every
+recorded version to match, and checks the compiler against both delivered and
+rebuilt manifests. Toolchain drift fails even if the binary bytes happen to match.
+The record is CI provenance, not an additional runtime dependency.
 Manual regeneration compares two new builds; its artifacts require review and
 commit before the ordinary delivered-artifact comparison qualifies the checkout.
+It copies the measured toolchain into the artifact only for the explicit
+`regenerate_bootstrap` dispatch. A routine run cannot update that record.
 The Windows DACL test checks a newly restricted directory before payload and
 requires rejection after an actual grant to the Users SID.
