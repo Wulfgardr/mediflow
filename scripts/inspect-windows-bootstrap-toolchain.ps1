@@ -14,8 +14,8 @@ foreach ($installation in $installations) {
 $installation = & $vswhere -latest -products '*' -requires $component -property installationPath
 & (Join-Path $installation 'Common7\Tools\Launch-VsDevShell.ps1') -Arch $Architecture -HostArch $Architecture -SkipAutomaticLocation
 if (!$?) { throw 'Cannot initialize native MSVC development environment' }
-$compiler = (Get-Command cl.exe -CommandType Application).Source
-$linker = (Get-Command link.exe -CommandType Application).Source
+$compiler = (Get-Command cl.exe -CommandType Application | Select-Object -First 1).Source
+$linker = (Get-Command link.exe -CommandType Application | Select-Object -First 1).Source
 $toolchain = [ordered]@{
   architecture = $Architecture
   compiler = (Get-Item -LiteralPath $compiler).VersionInfo.FileVersion
