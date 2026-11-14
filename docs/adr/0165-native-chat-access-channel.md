@@ -142,7 +142,7 @@ pseudonimizzato in `_meta`. L'adapter MCP non riceve il mapping o la fonte
 ricomposta. Il verifier PIN paired mantiene il proprio purpose di conferma
 nativa; non emette proof trasferibili né nuove sessioni.
 
-Il [rapporto del contributo](../analysis/2026-10-30-chat-native-broker/README.md)
+Il rapporto del contributo
 distingue prove automatiche, GLiNER reale e prove desktop ancora aperte.
 Questa composizione resta esplicitamente sintetica, non modifica writer,
 ammissione clinica o qualificazione desktop del canale.
@@ -182,7 +182,7 @@ Apple. Il ponte Swift cattura l'audio e lo passa a Rust; stati, Review e trasfer
 restano quelli descritti sopra. L'installazione parte soltanto dal pulsante «Installa»
 in Impostazioni, Voce locale; aprire la pagina non apre connessioni, e
 `MEDIFLOW_NETWORK_DISABLED` la impedisce come per il catalogo AIFA (ADR 0125). Dettagli e misure:
-[nota di progetto](../analysis/2026-11-10-gpui-voce-whisper-locale.md).
+nota di progetto.
 
 Aggiornamento dell'11 novembre 2026 (WUL-828): il motore Apple esce dal prodotto.
 La dettatura usa solo whisper; senza il modello installato la vista dice che manca e
@@ -377,7 +377,7 @@ risposta già in volo non compare. Una proposta mostrata appartiene alla
 finestra e non si lega più alla chat. Il frame rifiuta ogni risposta con campi
 oltre allo stato. Le prove sono di componente con host sintetici; i due host
 desktop, i provider reali e il budget end-to-end restano alla seconda seduta.
-La [nota C-7](../analysis/2026-10-31-chat-catalog-fabric/raccordi-c7-funzioni-generative.md)
+La nota C-7
 descrive anche i raccordi previsti per sintesi dei documenti e import assistito.
 
 
@@ -460,7 +460,7 @@ nella scheda fino alla chiusura o al cambio di contesto. Non viene concessa
 alcuna autorità di scrittura alla chat.
 
 Abbinamento delle prestazioni, coda delle evidenze e follow-up aperti restano
-non collegati: i residui del [catalogo C-7](../analysis/2026-10-31-chat-catalog-fabric/README.md#wul-829-ricerca-icd-aperta-dalla-chat)
+non collegati: i residui del catalogo C-7
 indicano quali lettori e viste GPUI mancano. I banchi sintetici non qualificano
 i desktop Claude e Codex reali.
 

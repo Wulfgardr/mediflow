@@ -23,10 +23,7 @@ la cartella, non importa i servizi clinici e non riceve dati del runtime.
 La separazione deve rimanere riconoscibile anche quando codice, documentazione
 e materiali pubblici sono vicini nello stesso albero.
 
-[Inizia qui](./start-here.md) introduce il progetto;
-[readiness 0.8.5](./release-085-readiness.md) conserva la valutazione di quella
-candidata; il [piano editoriale](./getmediflow-editorial-proposal.md) riguarda
-sito e organizzazione della documentazione. La release 0.8.6 distribuisce
+[Inizia qui](./start-here.md) introduce il progetto. La release 0.8.6 distribuisce
 sorgenti: né questa mappa né la presenza del codice nativo attestano installer
 firmati, notarizzazione o ammissione a un deployment clinico.
 
