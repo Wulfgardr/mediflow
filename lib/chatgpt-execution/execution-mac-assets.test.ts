@@ -17,7 +17,7 @@ for (const bundle of [false, true]) {
         const value = installedFixture(t, bundle), before = snapshot(value.directory);
         assert.deepEqual(resolveInstalledMacExecutionAssets(value.root), {
             binaryPath: value.binaryPath, nativeSourcePath: join(value.assets, 'mac-owner.c'),
-            schemaDirectory: join(value.assets, 'schema'), c1ReceiptPath: join(value.assets, 'C1-RECEIPT.json'),
+            schemaDirectory: join(value.assets, 'schema'), c1ReceiptPath: join(value.assets, 'C1-RECEIPT.json'), publicCaPath: join(value.assets, 'public-ca.pem'),
         });
         assert.equal(existsSync(join(value.assets, 'codex')), !bundle);
         assert.deepEqual(snapshot(value.directory), before);

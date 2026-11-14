@@ -11,6 +11,7 @@ export const testLoader = path.join(repositoryRoot, 'scripts/fixtures/mac-packag
 export const assetParts = ['resources', 'chatgpt-execution', 'mac', 'codex-0.153.4'];
 export const helperParts = ['Helpers'];
 export const syntheticFiles = Object.freeze({
+  'public-ca.pem': fs.readFileSync(path.join(repositoryRoot, 'assets/chatgpt-execution/public-ca.pem')),
   codex: Buffer.concat([Buffer.from([0xfe, 0xed, 0xfa, 0xcf]), Buffer.from('SYNTHETIC PACKAGING ONLY\n')]),
   'mac-owner.c': Buffer.from('/* synthetic native source, never compiled */\n'),
   'C1-RECEIPT.json': Buffer.from('{"synthetic":"C1 receipt, not qualification"}\n'),
@@ -34,7 +35,7 @@ export function fixture(t) {
   const source = path.join(directory, 'public-input');
   for (const [name, bytes] of Object.entries(syntheticFiles)) write(path.join(source, name), bytes, name === 'codex' ? 0o755 : 0o644);
   return { directory, installationRoot, source, binary: path.join(source, 'codex'), nativeSource: path.join(source, 'mac-owner.c'),
-    schemaDirectory: path.join(source, 'schema'), c1Receipt: path.join(source, 'C1-RECEIPT.json') };
+    schemaDirectory: path.join(source, 'schema'), c1Receipt: path.join(source, 'C1-RECEIPT.json'), publicCa: path.join(source, 'public-ca.pem') };
 }
 export function appRoot(directory, name = 'MediFlow.app') {
   const contents = path.join(directory, name, 'Contents');
@@ -57,7 +58,7 @@ export function installedFixture(t, bundle = false) {
 export function runStage(input, options = {}) {
   const args = options.args ?? ['--installation-root', input.installationRoot,
     '--binary', input.binary, '--native-source', input.nativeSource,
-    '--schema-directory', input.schemaDirectory, '--c1-receipt', input.c1Receipt];
+    '--schema-directory', input.schemaDirectory, '--c1-receipt', input.c1Receipt, '--public-ca', input.publicCa];
   return spawnSync(process.execPath, ['--import', testLoader,
     path.join(repositoryRoot, 'scripts/stage-chatgpt-execution-mac-assets.ts'), ...args], {
     cwd: repositoryRoot, encoding: 'utf8', timeout: 30_000,

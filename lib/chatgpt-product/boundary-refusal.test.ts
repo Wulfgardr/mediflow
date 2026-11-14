@@ -36,7 +36,7 @@ const audit = (boundaryProbe: MacBoundaryProbeRecord | null): MacQualificationAu
 test('a failed probe on a new build is recorded and refuses the preparation', async () => {
     const failure = new MacQualificationFailure('probe', audit(probe('26C10', ['home_read', 'external_network'])), null);
     const platform = createMacProductPlatformManager({ reservationDirectory: () => directory,
-        assets: () => ({ binaryPath: '/synthetic', nativeSourcePath: '/synthetic', schemaDirectory: '/synthetic', c1ReceiptPath: '/synthetic' }),
+        assets: () => ({ binaryPath: '/synthetic', nativeSourcePath: '/synthetic', schemaDirectory: '/synthetic', c1ReceiptPath: '/synthetic', publicCaPath: '/synthetic/public-ca.pem' }),
         async prepare() { throw failure; } }).createPlatform();
     await assert.rejects(platform.prepare!(new AbortController().signal, 60_000), error => error === failure);
     assert.notEqual(platform.snapshot().state, 'qualified');
@@ -64,4 +64,20 @@ test('names outside the fixed checks never reach the interface', () => {
 test('a refusal before the probe still says that nothing was sent', () => {
     for (const stage of ['sources', 'build', 'platform', undefined])
         assert.match(boundaryPreparationError({ code: 'unqualified_boundary', ...(stage ? { boundary: { stage, osBuild: null, probe: null, failed: [] } } : {}) }), /Nessun dato è stato inviato/u);
+});
+
+test('CA refusal survives resolver and issuer failures without paths or exception text', async () => {
+    const { ExecutionError } = await import('../chatgpt-execution/execution-contract.ts');
+    const { publicCaPreparationReason } = await import('../function-models/ordinary-browser.ts');
+    for (const failure of [new ExecutionError('unqualified_boundary', null, 'public_ca_mismatch'),
+        new MacQualificationFailure('sources', audit(null), '/private/retained-never-public', 'public_ca_mismatch')]) {
+        const response = ordinaryFailure(failure), body = await response.json();
+        assert.equal(response.status, 503);
+        assert.equal(body.code, 'unqualified_boundary');
+        assert.deepEqual(body.boundary, { reason: 'public_ca_mismatch' });
+        assert.equal(publicCaPreparationReason(body), 'public_ca_mismatch');
+        assert.match(boundaryPreparationError(body), /autorità di certificazione/u);
+        assert.doesNotMatch(JSON.stringify(body), /private|retained|Error|stack/);
+    }
+    assert.equal(publicCaPreparationReason({ boundary: { reason: '/private/arbitrary' } }), null);
 });
