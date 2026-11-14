@@ -1,0 +1,293 @@
+{
+  "syntheticOnly": true,
+  "population": "one invented frail older adult, not a representative sample",
+  "history": "Storia pluriennale di multimorbilita, autonomia ridotta, politerapia, cento contatti ambulatoriali e domiciliari brevi. Nessuna identita reale.",
+  "conditions": [
+    {
+      "description": "Diabete mellito tipo 2",
+      "code": "E11"
+    },
+    {
+      "description": "Scompenso cardiaco cronico a frazione preservata",
+      "code": "I50"
+    },
+    {
+      "description": "Fibrillazione atriale permanente",
+      "code": "I48"
+    },
+    {
+      "description": "Malattia renale cronica stadio 3b",
+      "code": "N18.3"
+    },
+    {
+      "description": "Ipertensione arteriosa",
+      "code": "I10"
+    },
+    {
+      "description": "Broncopneumopatia cronica ostruttiva",
+      "code": "J44"
+    },
+    {
+      "description": "Artrosi delle ginocchia e ridotta mobilita",
+      "code": "M17"
+    },
+    {
+      "description": "Anemia cronica lieve",
+      "code": "D64.9"
+    }
+  ],
+  "therapies": [
+    {
+      "drugName": "Apixaban",
+      "dosage": "5 mg due volte al giorno",
+      "status": "active"
+    },
+    {
+      "drugName": "Bisoprololo",
+      "dosage": "2,5 mg al mattino",
+      "status": "active"
+    },
+    {
+      "drugName": "Ramipril",
+      "dosage": "2,5 mg al giorno",
+      "status": "active"
+    },
+    {
+      "drugName": "Furosemide",
+      "dosage": "25 mg al mattino",
+      "status": "active"
+    },
+    {
+      "drugName": "Empagliflozin",
+      "dosage": "10 mg al giorno",
+      "status": "active"
+    },
+    {
+      "drugName": "Metformina",
+      "dosage": "500 mg due volte al giorno",
+      "status": "active"
+    },
+    {
+      "drugName": "Atorvastatina",
+      "dosage": "20 mg la sera",
+      "status": "active"
+    },
+    {
+      "drugName": "Tiotropio",
+      "dosage": "18 microgrammi per inalazione al giorno",
+      "status": "active"
+    },
+    {
+      "drugName": "Paracetamolo",
+      "dosage": "500 mg al bisogno, massimo 2 g al giorno",
+      "status": "active"
+    },
+    {
+      "drugName": "Colecalciferolo",
+      "dosage": "1000 UI al giorno",
+      "status": "active"
+    },
+    {
+      "drugName": "Trattamento storico concluso 1",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 2",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 3",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 4",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 5",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 6",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 7",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 8",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 9",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 10",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 11",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 12",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 13",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 14",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 15",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 16",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 17",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 18",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 19",
+      "dosage": "non in uso",
+      "status": "completed"
+    },
+    {
+      "drugName": "Trattamento storico concluso 20",
+      "dosage": "non in uso",
+      "status": "completed"
+    }
+  ],
+  "visits": [
+    "Controllo domiciliare: dispnea solo camminando, peso stabile, edemi malleolari lievi. Pressione 126/72, frequenza 76. Terapia invariata.",
+    "Esami: creatinina 1,62 mg/dL, eGFR 39, potassio 4,6, emoglobina 11,2. Da rivalutare la funzione renale al prossimo controllo.",
+    "Diabete: HbA1c 7,4%, nessuna ipoglicemia riferita. Da discutere obiettivo individuale nel contesto della fragilita.",
+    "Riferita caduta senza trauma cranico, ginocchio dolente. Uso del deambulatore. Proposta valutazione fisioterapica, ancora da concordare.",
+    "Controllo BPCO: nessuna riacutizzazione recente. Tecnica inalatoria rivista. Saturazione 95% in aria ambiente.",
+    "Anticoagulazione: nessun sanguinamento riferito. Rivedere dose dopo nuovo peso e creatinina, decisione ancora aperta.",
+    "Alvo alterno, appetito ridotto. Peso 67 kg. Consigliato diario alimentare, supporto domiciliare da valutare.",
+    "Revisione farmaci: ibuprofene sospeso in passato per rischio renale. Non riprenderlo senza confronto con il medico.",
+    "Affaticamento nelle attivita quotidiane. Figlia aiuta con portapillole. Aderenza riferita buona, nessuna modifica concordata.",
+    "Controllo pressione a domicilio 118-138/64-78. Capogiri solo al cambio postura. Valutare ortostatismo al prossimo accesso.",
+    "Scompenso: peso salito di 1 kg in una settimana, senza dispnea a riposo. Da rivalutare clinicamente, nessun aumento diuretico gia deciso.",
+    "Programmazione: esami renali e visita di controllo da concordare. Nessuna urgenza descritta nelle fonti.",
+    "Controllo domiciliare: dispnea solo camminando, peso stabile, edemi malleolari lievi. Pressione 126/72, frequenza 76. Terapia invariata.",
+    "Esami: creatinina 1,62 mg/dL, eGFR 39, potassio 4,6, emoglobina 11,2. Da rivalutare la funzione renale al prossimo controllo.",
+    "Diabete: HbA1c 7,4%, nessuna ipoglicemia riferita. Da discutere obiettivo individuale nel contesto della fragilita.",
+    "Riferita caduta senza trauma cranico, ginocchio dolente. Uso del deambulatore. Proposta valutazione fisioterapica, ancora da concordare.",
+    "Controllo BPCO: nessuna riacutizzazione recente. Tecnica inalatoria rivista. Saturazione 95% in aria ambiente.",
+    "Anticoagulazione: nessun sanguinamento riferito. Rivedere dose dopo nuovo peso e creatinina, decisione ancora aperta.",
+    "Alvo alterno, appetito ridotto. Peso 67 kg. Consigliato diario alimentare, supporto domiciliare da valutare.",
+    "Revisione farmaci: ibuprofene sospeso in passato per rischio renale. Non riprenderlo senza confronto con il medico.",
+    "Affaticamento nelle attivita quotidiane. Figlia aiuta con portapillole. Aderenza riferita buona, nessuna modifica concordata.",
+    "Controllo pressione a domicilio 118-138/64-78. Capogiri solo al cambio postura. Valutare ortostatismo al prossimo accesso.",
+    "Scompenso: peso salito di 1 kg in una settimana, senza dispnea a riposo. Da rivalutare clinicamente, nessun aumento diuretico gia deciso.",
+    "Programmazione: esami renali e visita di controllo da concordare. Nessuna urgenza descritta nelle fonti.",
+    "Controllo domiciliare: dispnea solo camminando, peso stabile, edemi malleolari lievi. Pressione 126/72, frequenza 76. Terapia invariata.",
+    "Esami: creatinina 1,62 mg/dL, eGFR 39, potassio 4,6, emoglobina 11,2. Da rivalutare la funzione renale al prossimo controllo.",
+    "Diabete: HbA1c 7,4%, nessuna ipoglicemia riferita. Da discutere obiettivo individuale nel contesto della fragilita.",
+    "Riferita caduta senza trauma cranico, ginocchio dolente. Uso del deambulatore. Proposta valutazione fisioterapica, ancora da concordare.",
+    "Controllo BPCO: nessuna riacutizzazione recente. Tecnica inalatoria rivista. Saturazione 95% in aria ambiente.",
+    "Anticoagulazione: nessun sanguinamento riferito. Rivedere dose dopo nuovo peso e creatinina, decisione ancora aperta.",
+    "Alvo alterno, appetito ridotto. Peso 67 kg. Consigliato diario alimentare, supporto domiciliare da valutare.",
+    "Revisione farmaci: ibuprofene sospeso in passato per rischio renale. Non riprenderlo senza confronto con il medico.",
+    "Affaticamento nelle attivita quotidiane. Figlia aiuta con portapillole. Aderenza riferita buona, nessuna modifica concordata.",
+    "Controllo pressione a domicilio 118-138/64-78. Capogiri solo al cambio postura. Valutare ortostatismo al prossimo accesso.",
+    "Scompenso: peso salito di 1 kg in una settimana, senza dispnea a riposo. Da rivalutare clinicamente, nessun aumento diuretico gia deciso.",
+    "Programmazione: esami renali e visita di controllo da concordare. Nessuna urgenza descritta nelle fonti.",
+    "Controllo domiciliare: dispnea solo camminando, peso stabile, edemi malleolari lievi. Pressione 126/72, frequenza 76. Terapia invariata.",
+    "Esami: creatinina 1,62 mg/dL, eGFR 39, potassio 4,6, emoglobina 11,2. Da rivalutare la funzione renale al prossimo controllo.",
+    "Diabete: HbA1c 7,4%, nessuna ipoglicemia riferita. Da discutere obiettivo individuale nel contesto della fragilita.",
+    "Riferita caduta senza trauma cranico, ginocchio dolente. Uso del deambulatore. Proposta valutazione fisioterapica, ancora da concordare.",
+    "Controllo BPCO: nessuna riacutizzazione recente. Tecnica inalatoria rivista. Saturazione 95% in aria ambiente.",
+    "Anticoagulazione: nessun sanguinamento riferito. Rivedere dose dopo nuovo peso e creatinina, decisione ancora aperta.",
+    "Alvo alterno, appetito ridotto. Peso 67 kg. Consigliato diario alimentare, supporto domiciliare da valutare.",
+    "Revisione farmaci: ibuprofene sospeso in passato per rischio renale. Non riprenderlo senza confronto con il medico.",
+    "Affaticamento nelle attivita quotidiane. Figlia aiuta con portapillole. Aderenza riferita buona, nessuna modifica concordata.",
+    "Controllo pressione a domicilio 118-138/64-78. Capogiri solo al cambio postura. Valutare ortostatismo al prossimo accesso.",
+    "Scompenso: peso salito di 1 kg in una settimana, senza dispnea a riposo. Da rivalutare clinicamente, nessun aumento diuretico gia deciso.",
+    "Programmazione: esami renali e visita di controllo da concordare. Nessuna urgenza descritta nelle fonti.",
+    "Controllo domiciliare: dispnea solo camminando, peso stabile, edemi malleolari lievi. Pressione 126/72, frequenza 76. Terapia invariata.",
+    "Esami: creatinina 1,62 mg/dL, eGFR 39, potassio 4,6, emoglobina 11,2. Da rivalutare la funzione renale al prossimo controllo.",
+    "Diabete: HbA1c 7,4%, nessuna ipoglicemia riferita. Da discutere obiettivo individuale nel contesto della fragilita.",
+    "Riferita caduta senza trauma cranico, ginocchio dolente. Uso del deambulatore. Proposta valutazione fisioterapica, ancora da concordare.",
+    "Controllo BPCO: nessuna riacutizzazione recente. Tecnica inalatoria rivista. Saturazione 95% in aria ambiente.",
+    "Anticoagulazione: nessun sanguinamento riferito. Rivedere dose dopo nuovo peso e creatinina, decisione ancora aperta.",
+    "Alvo alterno, appetito ridotto. Peso 67 kg. Consigliato diario alimentare, supporto domiciliare da valutare.",
+    "Revisione farmaci: ibuprofene sospeso in passato per rischio renale. Non riprenderlo senza confronto con il medico.",
+    "Affaticamento nelle attivita quotidiane. Figlia aiuta con portapillole. Aderenza riferita buona, nessuna modifica concordata.",
+    "Controllo pressione a domicilio 118-138/64-78. Capogiri solo al cambio postura. Valutare ortostatismo al prossimo accesso.",
+    "Scompenso: peso salito di 1 kg in una settimana, senza dispnea a riposo. Da rivalutare clinicamente, nessun aumento diuretico gia deciso.",
+    "Programmazione: esami renali e visita di controllo da concordare. Nessuna urgenza descritta nelle fonti.",
+    "Controllo domiciliare: dispnea solo camminando, peso stabile, edemi malleolari lievi. Pressione 126/72, frequenza 76. Terapia invariata.",
+    "Esami: creatinina 1,62 mg/dL, eGFR 39, potassio 4,6, emoglobina 11,2. Da rivalutare la funzione renale al prossimo controllo.",
+    "Diabete: HbA1c 7,4%, nessuna ipoglicemia riferita. Da discutere obiettivo individuale nel contesto della fragilita.",
+    "Riferita caduta senza trauma cranico, ginocchio dolente. Uso del deambulatore. Proposta valutazione fisioterapica, ancora da concordare.",
+    "Controllo BPCO: nessuna riacutizzazione recente. Tecnica inalatoria rivista. Saturazione 95% in aria ambiente.",
+    "Anticoagulazione: nessun sanguinamento riferito. Rivedere dose dopo nuovo peso e creatinina, decisione ancora aperta.",
+    "Alvo alterno, appetito ridotto. Peso 67 kg. Consigliato diario alimentare, supporto domiciliare da valutare.",
+    "Revisione farmaci: ibuprofene sospeso in passato per rischio renale. Non riprenderlo senza confronto con il medico.",
+    "Affaticamento nelle attivita quotidiane. Figlia aiuta con portapillole. Aderenza riferita buona, nessuna modifica concordata.",
+    "Controllo pressione a domicilio 118-138/64-78. Capogiri solo al cambio postura. Valutare ortostatismo al prossimo accesso.",
+    "Scompenso: peso salito di 1 kg in una settimana, senza dispnea a riposo. Da rivalutare clinicamente, nessun aumento diuretico gia deciso.",
+    "Programmazione: esami renali e visita di controllo da concordare. Nessuna urgenza descritta nelle fonti.",
+    "Controllo domiciliare: dispnea solo camminando, peso stabile, edemi malleolari lievi. Pressione 126/72, frequenza 76. Terapia invariata.",
+    "Esami: creatinina 1,62 mg/dL, eGFR 39, potassio 4,6, emoglobina 11,2. Da rivalutare la funzione renale al prossimo controllo.",
+    "Diabete: HbA1c 7,4%, nessuna ipoglicemia riferita. Da discutere obiettivo individuale nel contesto della fragilita.",
+    "Riferita caduta senza trauma cranico, ginocchio dolente. Uso del deambulatore. Proposta valutazione fisioterapica, ancora da concordare.",
+    "Controllo BPCO: nessuna riacutizzazione recente. Tecnica inalatoria rivista. Saturazione 95% in aria ambiente.",
+    "Anticoagulazione: nessun sanguinamento riferito. Rivedere dose dopo nuovo peso e creatinina, decisione ancora aperta.",
+    "Alvo alterno, appetito ridotto. Peso 67 kg. Consigliato diario alimentare, supporto domiciliare da valutare.",
+    "Revisione farmaci: ibuprofene sospeso in passato per rischio renale. Non riprenderlo senza confronto con il medico.",
+    "Affaticamento nelle attivita quotidiane. Figlia aiuta con portapillole. Aderenza riferita buona, nessuna modifica concordata.",
+    "Controllo pressione a domicilio 118-138/64-78. Capogiri solo al cambio postura. Valutare ortostatismo al prossimo accesso.",
+    "Scompenso: peso salito di 1 kg in una settimana, senza dispnea a riposo. Da rivalutare clinicamente, nessun aumento diuretico gia deciso.",
+    "Programmazione: esami renali e visita di controllo da concordare. Nessuna urgenza descritta nelle fonti.",
+    "Controllo domiciliare: dispnea solo camminando, peso stabile, edemi malleolari lievi. Pressione 126/72, frequenza 76. Terapia invariata.",
+    "Esami: creatinina 1,62 mg/dL, eGFR 39, potassio 4,6, emoglobina 11,2. Da rivalutare la funzione renale al prossimo controllo.",
+    "Diabete: HbA1c 7,4%, nessuna ipoglicemia riferita. Da discutere obiettivo individuale nel contesto della fragilita.",
+    "Riferita caduta senza trauma cranico, ginocchio dolente. Uso del deambulatore. Proposta valutazione fisioterapica, ancora da concordare.",
+    "Controllo BPCO: nessuna riacutizzazione recente. Tecnica inalatoria rivista. Saturazione 95% in aria ambiente.",
+    "Anticoagulazione: nessun sanguinamento riferito. Rivedere dose dopo nuovo peso e creatinina, decisione ancora aperta.",
+    "Alvo alterno, appetito ridotto. Peso 67 kg. Consigliato diario alimentare, supporto domiciliare da valutare.",
+    "Revisione farmaci: ibuprofene sospeso in passato per rischio renale. Non riprenderlo senza confronto con il medico.",
+    "Affaticamento nelle attivita quotidiane. Figlia aiuta con portapillole. Aderenza riferita buona, nessuna modifica concordata.",
+    "Controllo pressione a domicilio 118-138/64-78. Capogiri solo al cambio postura. Valutare ortostatismo al prossimo accesso.",
+    "Scompenso: peso salito di 1 kg in una settimana, senza dispnea a riposo. Da rivalutare clinicamente, nessun aumento diuretico gia deciso.",
+    "Programmazione: esami renali e visita di controllo da concordare. Nessuna urgenza descritta nelle fonti.",
+    "Controllo domiciliare: dispnea solo camminando, peso stabile, edemi malleolari lievi. Pressione 126/72, frequenza 76. Terapia invariata.",
+    "Esami: creatinina 1,62 mg/dL, eGFR 39, potassio 4,6, emoglobina 11,2. Da rivalutare la funzione renale al prossimo controllo.",
+    "Diabete: HbA1c 7,4%, nessuna ipoglicemia riferita. Da discutere obiettivo individuale nel contesto della fragilita.",
+    "Riferita caduta senza trauma cranico, ginocchio dolente. Uso del deambulatore. Proposta valutazione fisioterapica, ancora da concordare."
+  ]
+}

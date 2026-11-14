@@ -43,7 +43,7 @@ test('I-0 copre esattamente le sei celle del gate e separa API opzionali e Treat
         if (cell.provider === 'ollama') {
             const evidence = JSON.parse(readFileSync(new URL(cell.proof.path, root), 'utf8'));
             assert.deepEqual(cell.modelIdentity, evidence.modelIdentity);
-            assert.ok(['partial_http_execution', 'blocked_local_extraction'].includes(cell.proof.status));
+            assert.equal(cell.proof.status, 'executed_with_limits');
             assert.equal(evidence.qualification, false);
             assert.equal(evidence.admission.status, 'passed');
         } else {

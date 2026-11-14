@@ -11,8 +11,6 @@ const digest='26025611beeb3fe9e4850b1fdae686bebba7cdfa7f13ddb04955f19872ee022a';
 const base='http://127.0.0.1:38492';
 
 async function exerciseWarmAttestation(failPreload=false) {
-    // Execute the bank's actual request wrapper and actual warm-attestation
-    // statement. No bank import, archive, child process, listener or inference.
     const wrapperStart=source.indexOf('const nativeFetch=');
     const wrapperEnd=source.indexOf('globalThis.fetch=request;',wrapperStart);
     const warmStart=source.indexOf('const attestation=',source.indexOf("for(const mode of ['cold','warm'])"));
