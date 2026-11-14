@@ -14,6 +14,18 @@ import {
 } from '../scripts/scheduled-backup-runtime-contract.mjs';
 
 const sourceRoot = fileURLToPath(new URL('../', import.meta.url));
+test('committed Windows bootstrap pairs match the scheduled backup runtime admission pins', () => {
+  for (const arch of ['x64', 'arm64']) {
+    for (const name of ['system-directory.node', 'manifest.json']) {
+      const relative = `scripts/windows-launcher-bootstrap/prebuilds/win32-${arch}/${name}`;
+      const entry = SCHEDULED_BACKUP_RUNTIME_ROSTER.find(item => item.path === relative);
+      assert.ok(entry, relative);
+      const bytes = fs.readFileSync(path.join(sourceRoot, relative));
+      assert.equal(createHash('sha256').update(bytes).digest('hex'), entry.sha256, relative);
+    }
+  }
+});
+
 // Only fixture construction uses this explicit local dependency source. The
 // production checker never inherits it and never resolves from this checkout.
 const dependencyRoot = process.env.C15_SCHEDULER_DEPENDENCY_ROOT ?? path.join(sourceRoot, 'node_modules');
