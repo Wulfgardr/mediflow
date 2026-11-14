@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { createLocalProviderBindingReader, HOST_LOCAL_PROVIDER_SETTING_KEYS } from '../lib/ai-providers/local-provider-binding-reader';
-import { attestLocalOllamaModel } from '../lib/ai-providers/ollama-locality';
+import { attestLocalOllamaModel, OLLAMA_METADATA_TIMEOUT_MS, OLLAMA_PRELOAD_TIMEOUT_MS } from '../lib/ai-providers/ollama-locality';
 import { createHostProviderLifecycleService } from '../lib/ai-providers/fabric/provider-lifecycle-service';
 import { advanceOnboarding, startOnboarding } from '../lib/ai-providers/fabric/onboarding';
 
@@ -72,7 +72,7 @@ export async function runLocalProviderSetup(command: Command, attest: typeof att
     const endpoint = binding.resolution.adapter.getBaseUrl();
     let checkedAt: string;
     try {
-        const observation = await attest(endpoint, model, AbortSignal.timeout(30_000));
+        const observation = await attest(endpoint, model, AbortSignal.timeout(OLLAMA_PRELOAD_TIMEOUT_MS + 4 * OLLAMA_METADATA_TIMEOUT_MS));
         checkedAt = observation.checkedAt;
     } catch { deny('local_attestation_failed'); }
     const current = await readBinding(command.dataDir);
