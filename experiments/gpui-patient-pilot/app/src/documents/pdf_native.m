@@ -139,7 +139,14 @@ static void entry(const char *key, CGPDFObjectRef value, void *info) {
     walk(value, ((struct WalkContext *)info)->depth + 1);
 }
 static void checkDictionary(CGPDFDictionaryRef d, size_t depth) {
-    if (present(d, "Annots")) { failure = "annotations"; return; }
+    if (present(d, "Annots")) {
+        CGPDFArrayRef annotations = NULL;
+        // pdf-lib emits /Annots [] even when there are no annotations. Resolve
+        // indirect arrays too; malformed values still fail closed.
+        if (!CGPDFDictionaryGetArray(d, "Annots", &annotations) || CGPDFArrayGetCount(annotations) != 0) {
+            failure = "annotations"; return;
+        }
+    }
     if (present(d, "SMask") || present(d, "Mask")) { failure = "image_mask"; return; }
     if (named(d,"Subtype","Form")) { failure = "nested_graphics"; return; }
     if (named(d,"Subtype","Type3")) { failure = "font"; return; }
@@ -385,6 +392,21 @@ int MFDocumentPreviewWorker(size_t page) {
             pages = pdf.pageCount;
             if (!failure && (pages == 0 || pages > 500 || page > pages)) failure = "limit";
             visited = [NSMutableSet new]; active = [NSMutableSet new];
+            if (!failure) {
+                CGPDFPageRef first = [pdf pageAtIndex:0].pageRef;
+                CGPDFDocumentRef document = first ? CGPDFPageGetDocument(first) : NULL;
+                CGPDFDictionaryRef catalog = document ? CGPDFDocumentGetCatalog(document) : NULL;
+                if (!catalog) failure = "invalid";
+                else {
+                    CGPDFDictionaryRef form = NULL;
+                    CGPDFArrayRef fields = NULL;
+                    // Field values need not be painted in the page content;
+                    // the raster cannot stand in for their appearances.
+                    if (CGPDFDictionaryGetDictionary(catalog, "AcroForm", &form) &&
+                        CGPDFDictionaryGetArray(form, "Fields", &fields) &&
+                        CGPDFArrayGetCount(fields) != 0) failure = "annotations";
+                }
+            }
             for (size_t n = 0; n < pages && !failure; n++) {
                 pageImagePixels = 0;
                 [visited removeAllObjects];

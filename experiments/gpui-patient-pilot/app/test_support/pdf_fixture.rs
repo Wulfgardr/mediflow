@@ -132,11 +132,24 @@ pub fn many_pages(count: usize) -> Vec<u8> {
 }
 
 pub fn page_with_extra_entries(entries: &[u8]) -> Vec<u8> {
-    let mut page = b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 60] /Contents 4 0 R ".to_vec();
+    with_extra_entries(b"", entries)
+}
+
+pub fn catalog_with_extra_entries(entries: &[u8]) -> Vec<u8> {
+    with_extra_entries(entries, b"")
+}
+
+fn with_extra_entries(catalog: &[u8], entries: &[u8]) -> Vec<u8> {
+    let mut root = b"<< /Type /Catalog /Pages 2 0 R ".to_vec();
+    root.extend_from_slice(catalog);
+    root.extend_from_slice(b" >>");
+    let mut page =
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 60] /Resources << >> /Contents 4 0 R "
+            .to_vec();
     page.extend_from_slice(entries);
     page.extend_from_slice(b" >>");
     serialize(&[
-        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        root,
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
         page,
         stream(b"", b"0 0 1 rg 10 10 80 40 re f"),
