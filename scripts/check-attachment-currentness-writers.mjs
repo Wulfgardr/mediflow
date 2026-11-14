@@ -40,6 +40,12 @@ export const CONTRACT = [
     record('scripts/backup-restore-drill.mjs', 'raw-insert-into', 'cf2517df076aea5c', 1),
     record('scripts/document-evidence-backfill-currentness-cas.ts', 'raw-update', 'cc1a0df941d5c333', 1),
     record('scripts/seed-performance-baseline.mjs', 'raw-insert-into', '0cefbe788a72c137', 1),
+    // WUL-840 synthetic PDFs use the encrypted facade and an observed collection, like the seeder.
+    record('scripts/measure-local-interventions.mjs', 'facade-add', '3590f063fffd5f2b', 1, 'delegated'),
+    record('scripts/measure-local-load.mjs', 'facade-add', '3590f063fffd5f2b', 1, 'delegated'),
+    record('scripts/measure-local-load.mjs', 'facade-add', '797383cf5f12d213', 1, 'delegated'),
+    record('scripts/measure-local-load.mjs', 'facade-add', 'cb55c55d852d067b', 1, 'delegated'),
+    record('scripts/measure-local-paths.mjs', 'facade-add', '3590f063fffd5f2b', 1, 'delegated'),
     // Synthetic 0.9.0 archive: the tag code writes the fixture, the candidate one attachment in the return run.
     record('scripts/archive-v090/produce-fixture.mjs', 'raw-insert-into', '7bc92dd819b8c247', 1),
     record('scripts/archive-v090/return-to-v090.mjs', 'raw-insert-into', '4ca73ca6ad651908', 1),
