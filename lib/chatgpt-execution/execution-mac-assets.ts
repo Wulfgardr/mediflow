@@ -4,7 +4,7 @@ import { lstatSync, readdirSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, normalize, parse, relative, sep } from 'node:path';
 import { MAC_C1_RECEIPT, MAC_CONFIG_SOURCE, readPinnedMacFile } from './execution-mac-config';
 import { MAC_NATIVE_SOURCE } from './execution-mac-native';
-import { EXECUTION_SUBSTRATE } from './execution-sandbox';
+import { EXECUTION_SUBSTRATE, executionPublicCaBundle } from './execution-sandbox';
 import { ExecutionError } from './execution-contract';
 
 export const MAC_EXECUTION_HELPER_NAME = 'mediflow-chatgpt-codex';
@@ -23,6 +23,7 @@ export type InstalledMacExecutionAssets = Readonly<{
     nativeSourcePath: string;
     schemaDirectory: string;
     c1ReceiptPath: string;
+    publicCaPath: string;
 }>;
 export type MacExecutionAssetLayout = Readonly<{
     installationRoot: string;
@@ -81,12 +82,13 @@ export function macExecutionAssetLayout(installationRoot: string): MacExecutionA
         ? child(bundleContents, 'Helpers') : assetDirectory;
     return Object.freeze({ installationRoot: root, bundleContents, assetDirectory, binaryDirectory,
         assets: Object.freeze({ binaryPath: child(binaryDirectory, bundleContents ? MAC_EXECUTION_HELPER_NAME : 'codex'), nativeSourcePath: child(assetDirectory, 'mac-owner.c'),
-            schemaDirectory: child(assetDirectory, 'schema'), c1ReceiptPath: child(assetDirectory, 'C1-RECEIPT.json') }) });
+            schemaDirectory: child(assetDirectory, 'schema'), c1ReceiptPath: child(assetDirectory, 'C1-RECEIPT.json'), publicCaPath: child(assetDirectory, 'public-ca.pem') }) });
 }
 
 /** Used by the build-time stager for its explicit public inputs too. This checks
  * bytes only; it cannot issue an authority or select a runtime executable. */
 export function verifyMacExecutionAssetFiles(assets: InstalledMacExecutionAssets): void {
+    verifyPublicCaAsset(assets.publicCaPath);
     physicalMacAssetPath(assets.schemaDirectory, 'directory');
     for (const [name, pin] of MAC_EXECUTION_SCHEMA_FILES) readPinnedMacFile(physicalMacAssetPath(child(assets.schemaDirectory, name), 'file'), pin);
     readPinnedMacFile(physicalMacAssetPath(assets.c1ReceiptPath, 'file'), MAC_C1_RECEIPT);
@@ -97,7 +99,13 @@ export function verifyMacExecutionAssetFiles(assets: InstalledMacExecutionAssets
     // Rewalk containment after hashing. Runtime qualification separately copies,
     // pins and protects its own bytes; this resolver is not a TOCTOU lease.
     for (const path of [assets.binaryPath, assets.nativeSourcePath, assets.c1ReceiptPath]) physicalMacAssetPath(path, 'file');
+    verifyPublicCaAsset(assets.publicCaPath);
     physicalMacAssetPath(assets.schemaDirectory, 'directory');
+}
+
+function verifyPublicCaAsset(path: string): void {
+    try { executionPublicCaBundle(physicalMacAssetPath(path, 'file')); }
+    catch { throw new ExecutionError('unqualified_boundary', null, 'public_ca_mismatch'); }
 }
 
 function exactEntries(path: string, expected: readonly string[]): void {
@@ -110,12 +118,16 @@ function exactEntries(path: string, expected: readonly string[]): void {
 export function resolveInstalledMacExecutionAssets(installationRoot: string = process.cwd()): InstalledMacExecutionAssets {
     try {
         const layout = macExecutionAssetLayout(installationRoot);
+        verifyPublicCaAsset(layout.assets.publicCaPath);
         exactEntries(layout.assetDirectory, layout.bundleContents
-            ? ['C1-RECEIPT.json', 'mac-owner.c', 'schema'] : ['C1-RECEIPT.json', 'codex', 'mac-owner.c', 'schema']);
+            ? ['C1-RECEIPT.json', 'mac-owner.c', 'public-ca.pem', 'schema'] : ['C1-RECEIPT.json', 'codex', 'mac-owner.c', 'public-ca.pem', 'schema']);
         exactEntries(layout.assets.schemaDirectory, MAC_EXECUTION_SCHEMA_FILES.map(([name]) => name));
         if (layout.bundleContents) physicalMacAssetPath(layout.binaryDirectory, 'directory');
         verifyMacExecutionAssetFiles(layout.assets);
         macExecutionAssetLayout(installationRoot);
         return layout.assets;
-    } catch { return fail(); }
+    } catch (error) {
+        if (error instanceof ExecutionError && error.reason === 'public_ca_mismatch') throw error;
+        return fail();
+    }
 }

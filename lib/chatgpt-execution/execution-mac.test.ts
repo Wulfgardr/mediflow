@@ -69,7 +69,7 @@ test('JSON/prototype copies, absent authorities and arbitrary booleans cannot mi
 });
 test('foreign-platform producer rejects before file reads, build, startup or egress', { skip: process.platform === 'darwin' }, async () => {
     await assert.rejects(prepareMacProductQualification({ binaryPath: '/never-read', nativeSourcePath: '/never-read',
-        schemaDirectory: '/never-read', c1ReceiptPath: '/never-read' }), e => e instanceof MacQualificationFailure
+        schemaDirectory: '/never-read', c1ReceiptPath: '/never-read', publicCaPath: '/never-read' }), e => e instanceof MacQualificationFailure
         && e.stage === 'platform' && e.audit.readbackSha256 === null && e.retainedRoot === null);
 });
 test('same-run status framing rejects replay, wrong nonce, oversized, negative pid, extra text', () => {

@@ -7,7 +7,7 @@ import {
     type InstalledMacExecutionAssets, type MacExecutionAssetLayout,
 } from '../lib/chatgpt-execution/execution-mac-assets';
 
-const REQUIRED = ['installation-root', 'binary', 'native-source', 'schema-directory', 'c1-receipt'] as const;
+const REQUIRED = ['installation-root', 'binary', 'native-source', 'schema-directory', 'c1-receipt', 'public-ca'] as const;
 type ArgumentName = typeof REQUIRED[number];
 type Mode = 'stage' | 'check' | 'relocate-bundle';
 function fail(message: string): never { throw new Error(`CHATGPT_EXECUTION_MAC_ASSETS: ${message}`); }
@@ -62,7 +62,7 @@ function exactEntries(path: string, names: readonly string[]): void {
 
 function sourceSet(values: Partial<Record<ArgumentName, string>>): InstalledMacExecutionAssets {
     const source = Object.freeze({ binaryPath: values.binary!, nativeSourcePath: values['native-source']!,
-        schemaDirectory: values['schema-directory']!, c1ReceiptPath: values['c1-receipt']! });
+        schemaDirectory: values['schema-directory']!, c1ReceiptPath: values['c1-receipt']!, publicCaPath: values['public-ca']! });
     try { verifyMacExecutionAssetFiles(source); }
     catch { fail('sorgente non fisica o pin pubblico non valido'); }
     return source;
@@ -90,6 +90,7 @@ function stage(layout: MacExecutionAssetLayout, sources: InstalledMacExecutionAs
     if (layout.bundleContents) safeDirectories(layout.bundleContents, layout.binaryDirectory);
     copy(sources.binaryPath, layout.assets.binaryPath, 0o755);
     copy(sources.nativeSourcePath, layout.assets.nativeSourcePath, 0o644);
+    copy(sources.publicCaPath, layout.assets.publicCaPath, 0o644);
     copy(sources.c1ReceiptPath, layout.assets.c1ReceiptPath, 0o644);
     for (const [name] of MAC_EXECUTION_SCHEMA_FILES) copy(join(sources.schemaDirectory, name), join(layout.assets.schemaDirectory, name), 0o644);
     resolveInstalledMacExecutionAssets(layout.installationRoot);
@@ -107,10 +108,10 @@ function relocateBundle(layout: MacExecutionAssetLayout): void {
         resolveInstalledMacExecutionAssets(layout.installationRoot); // Idempotent only for the complete split layout.
         return;
     }
-    exactEntries(layout.assetDirectory, ['C1-RECEIPT.json', 'codex', 'mac-owner.c', 'schema']);
+    exactEntries(layout.assetDirectory, ['C1-RECEIPT.json', 'codex', 'mac-owner.c', 'public-ca.pem', 'schema']);
     exactEntries(layout.assets.schemaDirectory, MAC_EXECUTION_SCHEMA_FILES.map(([name]) => name));
     const legacy = { ...layout.assets, binaryPath: legacyBinary };
-    verifyMacExecutionAssetFiles(legacy); // All seven pins, before creating Helpers.
+    verifyMacExecutionAssetFiles(legacy); // All eight pins, before creating Helpers.
     if (exists(layout.assets.binaryPath)) {
         verifyMacExecutionAssetFiles(layout.assets);
     } else {

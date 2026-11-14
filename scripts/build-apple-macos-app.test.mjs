@@ -124,7 +124,7 @@ switch (command) {
 function buildFixture(t) {
   const input = fixture(t), root = path.join(input.directory, 'repo with spaces');
   // Gli ingressi; i moduli che importano si ricavano dagli import reali.
-  for (const file of localImportClosure(repositoryRoot, ['package.json', 'scripts/build-input-metadata.mjs', 'scripts/build-apple-macos-app.sh', 'scripts/macos-native-artifact.py', 'scripts/check-macos-web-runtime-native-payload.sh',
+  for (const file of localImportClosure(repositoryRoot, ['package.json', 'assets/chatgpt-execution/public-ca.pem', 'scripts/build-input-metadata.mjs', 'scripts/build-apple-macos-app.sh', 'scripts/macos-native-artifact.py', 'scripts/check-macos-web-runtime-native-payload.sh',
     'scripts/stage-chatgpt-execution-mac-assets.ts', 'scripts/run-strip-types.mjs',
     'scripts/local-api-tls-proxy.mjs', 'lib/security/loopback-ingress.mjs', 'lib/security/network-ingress-policy.mjs',
     'scripts/check-standalone-runtime-bundle.mjs', 'scripts/scheduled-backup-runtime-contract.mjs', 'scripts/anydoc-pdf-smoke-diagnostics.mjs',

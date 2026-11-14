@@ -86,6 +86,7 @@ function snapshot(entry: Entry): OrdinaryFlowState {
 function reply(value: unknown, status = 200) { return Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } }); }
 /** What the station lacks, by fixed names only: no paths, OS prose or digests. */
 function boundaryNotice(error: unknown) {
+    if (error instanceof ExecutionError && error.reason === 'public_ca_mismatch') return Object.freeze({ reason: 'public_ca_mismatch' });
     if (!(error instanceof MacQualificationFailure)) return null;
     const probe = error.audit.boundaryProbe;
     return Object.freeze({ stage: error.stage, osBuild: error.audit.osBuild, probe: probe?.outcome ?? null,
