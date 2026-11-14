@@ -174,7 +174,7 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
   ([#536](https://github.com/Wulfgardr/mediflow/pull/536),
   [#545](https://github.com/Wulfgardr/mediflow/pull/545),
   [#551](https://github.com/Wulfgardr/mediflow/pull/551)).
-- [Riflessione sulle prestazioni](./docs/analysis/2026-10-15-riflessione-prestazioni.md)
+- [Riflessione sulle prestazioni](https://github.com/Wulfgardr/mediflow/blob/4c7f140ff1becd9066ff45fabdf1862bcd14fd9c/docs/analysis/2026-10-15-riflessione-prestazioni.md)
   della 0.9.0, con le misure da cui partire
   ([#526](https://github.com/Wulfgardr/mediflow/pull/526)).
 
@@ -215,7 +215,7 @@ addenda close the native PIN source-contract defect (`cefa5c78`) and verify
 the attachment-budget fix (`be923328`, integrated at `11a42f68`). No reportable
 finding remains in the reviewed source. This entry describes the source scope;
 the GitHub Release records the final CI, merge, tag and source-package identity.
-[Release verification](./docs/analysis/2026-09-07-086-release-verification.md)
+[Release verification](https://github.com/Wulfgardr/mediflow/blob/4c7f140ff1becd9066ff45fabdf1862bcd14fd9c/docs/analysis/2026-09-07-086-release-verification.md)
 records exact sources, receipt hashes and limits. The final local unit run on
 `9be09c583` passed 3267 tests with one expected skip and no failures. Earlier
 failures and the separate 13/13 run remain historical evidence.
@@ -240,7 +240,7 @@ production-signed installer claim is made.
 - Synthetic access checks cover login, application lock, logout and administrative recovery. Code and regulatory inventories record evidence and remaining decisions.
 - The simulator builder uses the existing Xcode project and installs only on explicit request; the paired smoke no longer calls a retired builder.
 - FHIR export retains the DTO generation timestamp. Coverage tests document existing FHIR/PDF exclusions without claiming a complete data-subject export.
-- [Integrated local closeout](./docs/analysis/2026-09-06-086-integrated-closeout.md) records checks, integration corrections and remaining WHO provisioning, regulatory and distribution boundaries.
+- [Integrated local closeout](https://github.com/Wulfgardr/mediflow/blob/4c7f140ff1becd9066ff45fabdf1862bcd14fd9c/docs/analysis/2026-09-06-086-integrated-closeout.md) records checks, integration corrections and remaining WHO provisioning, regulatory and distribution boundaries.
 
 ## [0.8.5] - 2026-09-03
 
@@ -255,7 +255,7 @@ production-signed installer claim is made.
 - Native FHIR DTO carries lifecycle fields; FHIRv2 parity remains separate debt.
 - ATHENA runner configuration is passed only to the Web child. Analytics counts distinct patients per existing diagnosis key.
 - Fabric/context and operational review links filter patient tombstones while retaining historical link rows.
-- README and documentation offer progressive entry points; [candidate readiness](./docs/release-085-readiness.md) records verified scope and open Apple/distribution gates.
+- README and documentation offer progressive entry points; [candidate readiness](https://github.com/Wulfgardr/mediflow/blob/4c7f140ff1becd9066ff45fabdf1862bcd14fd9c/docs/release-085-readiness.md) records verified scope and open Apple/distribution gates.
 
 ### Review-only Intelligence Fabric
 

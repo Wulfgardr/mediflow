@@ -5,7 +5,7 @@ Date: 2026-09-26
 Status: Proposed — non accettato, nessun collegamento al runtime
 
 Issue: [WUL-706](https://linear.app/wulfgardr/issue/WUL-706). Evidenze e decisione
-di questa preparazione nel [dossier](../analysis/2026-09-26-rust-boundary-evaluation.md).
+di questa preparazione nel dossier.
 Il testo del 26 settembre conserva il suo contesto; l'aggiornamento del
 17 ottobre in fondo registra la tranche successiva senza accettare l'ADR.
 
@@ -155,7 +155,7 @@ WUL-573/WUL-580 restano prerequisiti dell'integrazione del servizio Rust.
 La verticale selezionata per WUL-574 è scheda paziente / modifica delle sole
 note, proposta come `ReadPatientProfile` e
 `UpdatePatientNotes(id, expectedVersion, notes)`. La
-[caratterizzazione cifrata continua](../analysis/2026-10-17-patient-notes-pilot.md)
+caratterizzazione cifrata continua
 usa le route Web e API v1 e il writer TypeScript condiviso già esistente.
 La [mappa C01](../authority-census.md) registra anche l'autorità Swift locale
 opzionale; la sua destinazione resta in WUL-582. Non si deduce che gli ingressi
@@ -166,7 +166,7 @@ porta in Rust lo stato del client di questa verticale e una finestra nativa
 funzionante con servizio sintetico in memoria. È una preparazione concreta
 di WUL-706/WUL-714: consente di riesaminare selezione, bozza, conferma,
 correlazione delle risposte, conflitto e rilettura usando lo stesso percorso.
-Il [verbale](../analysis/2026-10-17-rust-gpui-patient-pilot.md) distingue il
+Il verbale distingue il
 build della UI, i test e le dimensioni ancora da misurare.
 
 Questo contributo **non sceglie IPC o FFI** per l'autorità del prodotto.

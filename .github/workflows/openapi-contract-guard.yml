@@ -68,6 +68,16 @@ jobs:
       - name: Never-regress guard
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:never-regress
+      - name: New comments ratchet and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:new-comments
+          npm run check:new-comments
+      - name: useEffect ratchet and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:use-effect-ratchet
+          npm run check:use-effect-ratchet
 
       - name: Fabric generative runtime crosswalk
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}

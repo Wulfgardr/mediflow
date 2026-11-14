@@ -29,7 +29,7 @@ La legge dei materiali vale identica: le card che contengono dati clinici sono c
 ### Contratto mobile 0.8.6: armonizzazione del 6 settembre 2026
 
 La slice mobile applica la gerarchia documentale del
-[candidato Mac](../../2026-09-06-086-macos-redesign.md) e i criteri della
+candidato Mac e i criteri della
 [raccolta illustrata Breccia](../../2026-09-06-breccia-apple-reference.md).
 Le catture sintetiche Mac mostrano una testata continua e sezioni testuali.
 I fotogrammi pubblici sostengono vicinanza, orientamento e profondità

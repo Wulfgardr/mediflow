@@ -54,12 +54,7 @@ candidato `e964e4382` del 12 novembre 2026: 66 righe di parità, route Web,
 consumer nativi, scritture e specifica Punto d’inchiostro. Distingue test di
 trasporto e servizi dall’uso del bundle installato; le nuove proposte di
 esclusione aspettano Leonardo e mantengono aperti i relativi obblighi.
-Il [rapporto G-2 su accesso e modelli](./analysis/2026-10-30-gpui-g2-settings/README.md)
-parte dal censimento delle lacune e registra i consumer Web aggiunti, le prove
-sintetiche e le funzioni ancora aperte. Non attesta la chiusura complessiva G-2.
 Il [filone CU](./analysis/2026-10-23-computer-use-procedures.md), aggiunto in coda il 23 ottobre, propone procedure clinico-amministrative con identità locale: [contratti](./analysis/2026-10-23-computer-use-procedure-contracts.md), [fonti verificate e limiti](./analysis/2026-10-23-computer-use-sources.md), [ADR 0162 Proposed](./adr/0162-local-computer-use-executor.md). Il [nucleo CU-1a](./local-operation-core.md) implementa il protocollo e il servizio locale con adapter simulato; CU-1b deve completare la verticale PRREG sintetica. CU-1 resta incompleta fino all'accettazione di entrambe; nessun servizio istituzionale è qualificato.
-La [prima tranche locale del 26 settembre](./analysis/2026-09-26-090-first-tranche.md)
-distingue inventario, correzioni pazienti, audit pilota e prove dal rilascio.
 
 L’[elenco dei writer audit](./audit-writers.md) classifica obblighi, stato corrente
 e residui clinici consegnati da C04 a C05. Il [roster delle scritture cliniche](./clinical-write-roster.md)
@@ -80,30 +75,17 @@ La 0.9.0 consolida il prodotto attuale; servizi condivisi, Rust,
 interoperabilità e distribuzione nativa hanno tappe successive distinte.
 I precedenti rinvii generici alla 1.0 restano storia, non il piano corrente.
 
-La [preparazione Rust/GPUI del 26 settembre](./analysis/2026-09-26-rust-boundary-evaluation.md)
-separa il codec sperimentale dalla futura verticale clinica e dalla scelta
-della shell. [ADR 0137](./adr/0137-rust-boundary-pilot-proposal.md) resta Proposed;
+[ADR 0137](./adr/0137-rust-boundary-pilot-proposal.md) resta Proposed;
 non sostituisce i prerequisiti 0.9.0/0.9.1 né autorizza una migrazione runtime.
 
-La [verticale paziente Rust/GPUI del 17 ottobre](./analysis/2026-10-17-rust-gpui-patient-pilot.md)
-aggiunge un [pilota nativo avviabile](../experiments/gpui-patient-pilot/README.md)
-con stato del client in Rust, revisione e rilettura su dati inventati.
-La [baseline cifrata delle note](./analysis/2026-10-17-patient-notes-pilot.md)
-caratterizza separatamente i due ingressi Web/API v1 correnti per WUL-574.
-Le prove e i limiti di entrambe le attività sono nei rispettivi verbali;
+Il [pilota nativo avviabile](../experiments/gpui-patient-pilot/README.md)
+porta lo stato del client in Rust, con revisione e rilettura su dati inventati;
 la migrazione del writer e la decisione IPC/FFI restano nel percorso
 0.9.1/0.9.2. Il successivo [ADR 0145](./adr/0145-rust-gpui-connected-client.md)
 definisce il client Rust/GPUI collegato: interfaccia coerente con la release,
 sessione paired v3, piattaforme Windows/Linux esplicite e confronto old/new.
-Il [verbale del client collegato](./analysis/2026-10-17-rust-gpui-connected-client.md)
-documenta l'integrazione reale, la matrice delle schermate, la revisione della
-UI e il confronto riproducibile JavaScript/Rust di letture e scritture.
 L'integrazione del client non equivale alla sostituzione del writer o delle
 superfici mobile.
-La [porta comune del profilo paziente](./analysis/2026-10-17-patient-profile-port.md)
-estrae lettura e preparazione dell'aggiornamento dai quattro adattatori,
-conservando il commit SQLite e l'audit nell'operazione autorevole esistente.
-Il verbale documenta le nuove prove di conformità e HTTP old/new sul delta.
 L'[ADR 0147](./adr/0147-canonical-patient-profile-update-dispatch.md) definisce
 il comando canonico di aggiornamento e il dispatch unico verso il writer Node
 esistente: deduplicazione interna per esecuzione, senza idempotenza durevole
@@ -144,18 +126,6 @@ Il `prebuild` canonico applica l'ammissione metadata prima di caricare il
 verificatore delle dipendenze; gli ingressi diretti di build e packaging la
 ripetono prima di tracing/copia. La [guida nativa](./native-launch.md) descrive
 gli input ammessi e la DerivedData esterna, senza rimuovere dati dal checkout.
-La [verifica della tastiera GPUI](./analysis/2026-10-17-rust-gpui-keyboard-recovery.md)
-registra ricerca contestuale, lista filtrata, revisione, blocco e ridimensionamento
-con una nuova build Linux e immagini originali attribuite alla loro esecuzione.
-Il [confronto dei compilatori TypeScript](./analysis/2026-10-17-tsc-ts-migration-review.md)
-misura il typecheck di uno snapshot preciso con TypeScript 5.9, TypeScript 7
-e tsc-ts, includendo driver, ricevuta e limiti dell'eventuale adozione.
-La [consegna verificabile di PR #558, r08ef12a](./analysis/2026-10-18-pr558-soft-delete-delivery.md)
-documenta il guard dei tombstone attraverso route, porta e writer, le prove
-locali sul candidato e il passaggio di consegne per la successiva verticale.
-La [chiusura dei rilievi della review completa](./analysis/2026-10-18-pr558-full-review-repairs.md)
-documenta scope su ogni richiesta, data/ora dei controlli, recupero del focus,
-contratto compatibile e prove locali, distinguendoli dalla CI finale e dal merge.
 
 ## Percorsi di lettura
 
@@ -166,9 +136,6 @@ contratto compatibile e prove locali, distinguendoli dalla CI finale e dal merge
 - **Contribuzione:** [topologia della repository](./repository-topology.md),
   [architettura](../ARCHITECTURE.md), [guida ai contributi](../CONTRIBUTING.md)
   e contratto del componente.
-- **Presentazione pubblica:** [sito e linea editoriale](./getmediflow-editorial-proposal.md).
-- **Prove storiche:** [valutazione della candidata 0.8.5](./release-085-readiness.md)
-  e [confronto visuale 0.8.6](./design/2026-09-05-086-runtime-twin.md).
 
 ## Trasparenza sullo sviluppo
 
@@ -208,58 +175,21 @@ passati al retry automatico: l’assenza di retry su main non ne dimostra la
 causa risolta. L’harness ChatGPT conta 26 passati, compresi 10 casi di
 conformance, senza una nuova qualifica live consumer del candidato finale.
 
-La [Verifica di rilascio 0.8.6](./analysis/2026-09-07-086-release-verification.md) conserva SHA, ricevute, correzioni
-PIN/allegati, test e limiti delle candidature. Registrava assenza di finding
-reportabili residui nel perimetro sorgente, autorizzazione del pacchetto e
-attesa di CI e pubblicazione, insieme a una suite completa con un fallimento.
-Questa attesa è storica: non descrive più lo stato della release.
-
-Il [Verbale integrato](./analysis/2026-09-06-086-integrated-closeout.md) conserva prove e decisioni con le rispettive
-disposizioni. La [Review Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md) mantiene il report inglese storico e
-gli addenda sanitizzati: firma di produzione non attestata e RBAC per
-operatore fuori scope non vanno reinterpretati come capacità consegnate.
-
 La [Promozione della UI web](./adr/0123-official-web-ui-navigation-compositions.md) stabilisce B predefinita e A selezionabile,
-separando il confronto sintetico. La [Verifica della UI integrata](./analysis/2026-09-06-086-integrated-ui-verification.md)
-riporta build standalone e percorsi browser senza flag, distinguendo prove
-reali, simulate e limiti. La [Verifica della cartella Apple](./analysis/2026-09-06-086-apple-ui-verification.md) documenta
-build locali, bozze e navigazione su Mac e simulatori; la
-[Nuova proposta macOS](./design/2026-09-06-086-macos-redesign.md) riguarda il successivo redesign con barra delle
-aree, una lista laterale e cartella documentale. L’accettazione estetica
-resta un giudizio distinto.
+separando il confronto sintetico.
 
-Il [Candidato funzionale locale](./analysis/2026-09-06-086-functional-closeout.md) fotografa la base precedente alla
-promozione UI di ADR 0123, con prove e incidente conservati. Le integrazioni
-successive non riscrivono quella evidenza. [Stato funzioni](./adr/0121-function-status-projection.md) e
+[Stato funzioni](./adr/0121-function-status-projection.md) e
 [setup host Ollama](./adr/0122-local-provider-host-setup.md) distinguono configurazione, ammissione e singola
-esecuzione; [Inventario codice](./analysis/2026-09-06-086-code-inventory.md) e [matrice regolatoria](./analysis/2026-09-06-086-regulatory-evidence.md) raccolgono
+esecuzione; la [matrice regolatoria](./analysis/2026-09-06-086-regulatory-evidence.md) raccoglie
 copertura, controlli e gap, senza certificare conformità o adozione
 organizzativa.
 
 Per i documenti, [ADR 0119](./adr/0119-anydoc-apple-vision-current-source.md) separa AnyDoc e fallback PDF Apple Vision
 dal catalogo Fabric. [ADR 0128](./adr/0128-local-desktop-ocr.md) descrive il candidato Tesseract WASM e i
 profili renderer Windows/Linux; la qualifica dei target resta distinta.
-La [Prima verifica OCR](./analysis/2026-09-05-086-ocr-verification.md) conserva preview, matrice browser sintetica e
-gate allora aperti. Per WHO, la [Decisione WHO WUL-672](./analysis/2026-09-05-086-who-decision.md) registra la
-scelta del sidecar locale; [ADR 0115](./adr/0115-icd11-who-reference-data-adapter.md) e [setup](./icd-who-setup.md) governano Search
+Per WHO, [ADR 0115](./adr/0115-icd11-who-reference-data-adapter.md) e [setup](./icd-who-setup.md) governano Search
 locale opt-in, con provisioning e prova sul target non attestati dal solo
 contratto. Lookup e cross-check restano fuori dal candidato.
-
-La [Baseline operativa WUL-670](./analysis/2026-09-05-mediflow-086-baseline.md) conserva base, prove sintetiche, recuperi
-prioritari e ordine di sviluppo. Il
-[Piano operativo configurazione e parità desktop](./analysis/2026-09-07-086-guided-configuration-plan.md) articola in sei fasi
-la richiesta del 7 settembre e i contratti e gate da completare: è un piano,
-non una prova della consegna di ogni voce. La
-[Mini roadmap di consolidamento](./roadmap-086-consolidamento.md) raccoglie OCR, ICD-11, impostazioni,
-scheda paziente, onboarding assistito, deslop, GDPR/AI Act, recupero selettivo
-dei branch, design arena e collegamenti Linear. Non cambia i contratti del
-runtime o il design attivo.
-
-## Candidato Web 0.8.5: editor e analytics
-
-[Snapshot/CAS del modulo, recupero dei salvataggi parziali e conteggio Schede](./web-patient-edit-and-analytics-085.md)
-conserva il contratto `mf085-fix-a-web-20260904`, le regressioni e i limiti di
-quella candidatura sorgente. Non è una ricevuta di rilascio.
 
 ## Contratti per componente
 
@@ -285,8 +215,6 @@ il documento o la prova nominati, non l’intero prodotto.
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
 - Parity localhost/Apple: [docs/parity-matrix.md](./parity-matrix.md), [docs/apple-parity-matrix.json](./apple-parity-matrix.json) e [docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json)
 - Limiti noti della 0.8.5: [docs/known-limitations.md](./known-limitations.md)
-- Verbale finale locale 0.8.5: [docs/analysis/2026-09-01-mediflow-0.8.5-final-verification.md](./analysis/2026-09-01-mediflow-0.8.5-final-verification.md)
-- Ledger operativo del programma 0.8.5 riaperto: [docs/analysis/2026-09-01-mediflow-0.8.5-reopened-program-ledger.md](./analysis/2026-09-01-mediflow-0.8.5-reopened-program-ledger.md)
 - Run record recovery UI/parity 0.8: [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/analysis/2026-07-27-parity-0.8-recovery-run.md)
 - Contratto OpenAPI `/api/v1`: [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml), [docs/openapi/README.md](./openapi/README.md), [docs/adr/0010-openapi-spec-first-for-api-v1.md](./adr/0010-openapi-spec-first-for-api-v1.md), [docs/adr/0052-network-patient-profile-write-boundary.md](./adr/0052-network-patient-profile-write-boundary.md), [docs/adr/0053-network-diary-entry-write-boundary.md](./adr/0053-network-diary-entry-write-boundary.md), [docs/adr/0054-network-therapy-write-boundary.md](./adr/0054-network-therapy-write-boundary.md), [docs/adr/0055-network-checkup-write-boundary.md](./adr/0055-network-checkup-write-boundary.md), [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md)
 - Limiti JSON native/network e risposta 413: [ADR 0124](./adr/0124-bounded-native-network-json.md).
@@ -299,7 +227,6 @@ il documento o la prova nominati, non l’intero prodotto.
 - Astrazione provider AI e boundary egress: [ADR 0077](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
 - Matrice task, modelli e serving gate post-0.8: [docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md)
 - Contratto export FHIR R4 v0: [ADR 0081](./adr/0081-fhir-r4-export-v0-contract.md)
-- Correzione indipendente lifecycle nativo MF085-004: [candidato e test](./fhir-lifecycle-fix.md); non attiva FHIR v2.
 - Registro persistente delle attese v0: [ADR 0082](./adr/0082-persistent-expectations-register-v0.md)
 - Diagnosi da documento review-only: [ADR 0084](./adr/0084-document-diagnoses-review-only.md)
 - Scaffold intelligente e automazione graduata: [ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md)
@@ -332,8 +259,6 @@ il documento o la prova nominati, non l’intero prodotto.
 - Autorita della sorgente per Document Synthesis: [ADR 0102](./adr/0102-document-synthesis-source-authority.md)
 - Locator storico OCR e currentness della sorgente documentale: [ADR 0099](./adr/0099-ocr-document-locator-and-source-currentness.md)
 - Estrazione locale unica degli allegati con AnyDoc, prevalente sul runtime OCR: [ADR 0107](./adr/0107-anydoc-local-attachment-extraction.md)
-- Closeout secondario dello stack intelligente: [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md)
-- Triage audit esterno V2: [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md)
 
 ## 🧭 Ordine di lettura consigliato
 
@@ -387,7 +312,6 @@ installato, clinicamente qualificato o pubblicato.
 | Intended purpose e claims guard clinico | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | `CANONICAL` | Fissa `WUL-279`: claim consentiti/esclusi su AI, SISS/FSE, cloud, diagnosi, triage, prescrizione e automazione, con guard `check:claims`. |
 | Voice visit capture Fluid-style | [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | `CANONICAL / PROPOSED` | Conserva il boundary storico. Il percorso corrente è governato da ADR 0113 e integra Apple on-device review-first; microfono reale e validazione clinica restano fuori dal claim. |
 | Workflow di contribuzione | [CONTRIBUTING.md](../CONTRIBUTING.md) | `CANONICAL` | Definisce il lavoro contributivo, le verifiche richieste e la Definition of Done. |
-| Audit esterno V2: triage e residuo azionabile | [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md) | `SECONDARY / REVIEW TRIAGE` | Dossier di supporto collegato a `WUL-470` e figlie `WUL-471`..`WUL-475`: separa obiezioni misframed da residui reali su PIN, FHIR, MDR, sync futuro e drift ADR. Non prevale su `SECURITY.md`, `ARCHITECTURE.md`, ADR o issue Linear. |
 | Decisioni architetturali | [docs/adr/*.md](./adr/README.md) | `CANONICAL` | Ogni scelta non banale deve vivere qui. |
 | Contratto API locale `/api/v1` | [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml) | `CANONICAL` | Spec OpenAPI client-facing; processo/versioning governati da ADR 0010. |
 | Primo write paired profilo paziente | [docs/adr/0052-network-patient-profile-write-boundary.md](./adr/0052-network-patient-profile-write-boundary.md) | `CANONICAL` | Slice per `PUT /api/v1/network/patients/{id}` con paired client, sessione operatore, scope ambulatoriale e `version`; esclude delete remoto, child CRUD, sync e campi AI/documentali. |
@@ -484,7 +408,6 @@ installato, clinicamente qualificato o pubblicato.
 | ADR attese locali e collegamento prestazione-risultato | [docs/adr/0079-local-open-loops-and-result-link.md](./adr/0079-local-open-loops-and-result-link.md) | `CANONICAL` | Decisione accettata e prima slice web locale consegnata; il registro persistente resta una decisione distinta. |
 | ADR contratto export FHIR R4 v0 | [docs/adr/0081-fhir-r4-export-v0-contract.md](./adr/0081-fhir-r4-export-v0-contract.md) | `CANONICAL` | Decisione `Accepted`: fissa matrice di copertura, parità web/native e gate locale esterno per l'export-only v0. Non introduce claim FSE. |
 | ADR registro persistente delle attese v0 | [docs/adr/0082-persistent-expectations-register-v0.md](./adr/0082-persistent-expectations-register-v0.md) | `CANONICAL` | Decisione `Accepted`: definisce un registro host-only con provenienza univoca, matching fail-closed e chiusura confermata. Non dichiara runtime consegnato. |
-| Closeout evoluzione stack intelligente | [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md) | `SECONDARY` | Ricostruisce il consolidamento di scaffold, flusso di controllo, attese e roadmap rispetto a `main` alla data del verbale; non prevale sulle ADR o attesta revisioni successive. |
 | ADR ritiro preview profiles funzionali su `main` | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | `CANONICAL` | Fissa `WUL-199`: il workbench ufficiale non espone piu preview profiles runtime; AI e Smart Import restano live e il contesto paziente SISS diventa stabile nella scheda paziente. |
 | ADR architettura shared Apple client e runtime `home-base` packaged | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | `CANONICAL` | Governa `WUL-188`: core Apple condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come nodo `home-base` autorevole, client mobili paired senza accesso diretto a SQLite e parity non-AI estesa via `/api/v1/network/*`. |
 | ADR corpus documentale SISS/FSE locale | [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md) | `CANONICAL` | Fissa `WUL-176`: prima corpus locale/versionato e fetch/sync controllato, poi eventuale MCP solo sopra un corpus approvato, non scraping live come sorgente primaria. |
@@ -501,8 +424,7 @@ installato, clinicamente qualificato o pubblicato.
 
 ## 🗂️ File sovrapposti o secondari
 
-[docs/product_roadmap.md](./product_roadmap.md) è l’alias storico, **deprecato**, della roadmap;
-il riferimento attivo è [docs/ROADMAP.md](./ROADMAP.md). `docs/index.html` rimane una
+La roadmap è [docs/ROADMAP.md](./ROADMAP.md). `docs/index.html` rimane una
 pagina visuale legacy per consultazione rapida, non il documento su cui
 fondare decisioni architetturali.
 
@@ -561,8 +483,6 @@ Il telecomando di ADR 0159 conserva il suo confine.
 
 Il [contratto porte e lifecycle GPUI](./adr/0161-gpui-host-ports-lifecycle.md)
 prepara G-1a.1: discovery versionata, scope e cancellazione comune.
-Il [verbale](./analysis/2026-10-23-gpui-ports-contract.md) distingue le prove
-eseguite dalla decisione 2 e dalla chiusura SEC-2/3 in G-1a.2.
 
 Il recupero dell’autorità native dopo un nuovo login è circoscritto da
 [ADR 0164](adr/0164-native-inference-authority-retirement.md) e dal

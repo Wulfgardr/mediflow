@@ -94,7 +94,6 @@ non comporta alcuna promessa di anonimizzazione universale o assenza di errori.
 - [SECURITY](../SECURITY.md): policy di sicurezza e trattamento dei dati.
 - [Topologia dati](./topologia-dati-flussi.md): persistenza, accessi e flussi.
 - [Limiti noti](./known-limitations.md): limitazioni del sistema.
-- [Readiness 0.8.5](./release-085-readiness.md): evidenze e gate della candidatura.
 
 Questa pagina rende accessibile la lettura dei documenti tecnici. In caso di
 differenze, prevalgono policy, contratti e matrice dei runtime, ciascuno nel

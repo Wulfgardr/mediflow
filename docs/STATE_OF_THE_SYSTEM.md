@@ -70,7 +70,7 @@ scopi d'uso e ruoli; non attribuisce una classe regolatoria o una certificazione
 ## Prove storiche
 
 La 0.8.6 è stata pubblicata il 20 settembre 2026. Le sue prove e i limiti sono
-nella [verifica datata](./analysis/2026-09-07-086-release-verification.md), gli
+nella verifica datata, gli
 archivi e il commit nel tag, le versioni nel [CHANGELOG](../CHANGELOG.md).
 
 **Come leggere la ricostruzione seguente.** I due aggiornamenti datati
@@ -79,7 +79,7 @@ quelle prove. Le sezioni tematiche descrivono i contratti e il contenuto
 implementativo, segnalando le osservazioni della 0.8.5. Non sono un’attestazione
 di esecuzione di ogni funzione sul commit pubblicato.
 
-La [verifica notturna dell’8 settembre](./analysis/2026-09-07-086-release-verification.md#verifica-notturna-dell8-settembre-programma-ancora-aperto)
+La verifica notturna dell’8 settembre
 registrava build produzione 11b9, suite aggregata 4c99 senza fallimenti ma con
 esclusioni esplicite, Linux standalone e Windows preview. Restavano da
 verificare caricamento locale a freddo, nuovo percorso ChatGPT, installazione
@@ -96,14 +96,14 @@ precedenza di AnyDoc e Apple Vision nel percorso documentale 0.8.6: le prove
 
 Il 7 settembre la richiesta dell’utente riaprì lo sviluppo di impostazioni
 guidate, integrazione ChatGPT, scelta del modello per esperienza, cataloghi e
-parità desktop. Il [piano operativo](./analysis/2026-09-07-086-guided-configuration-plan.md)
+parità desktop. Il piano operativo
 ne definiva fasi e prove quando le capacità richieste non erano ancora tutte
 implementate. L’utente aveva nuovamente reso disponibili VM Windows/Linux e
 disco Xcode; prima di ogni test occorreva comunque verificare sorgenti e
 ambiente. Le indisponibilità registrate in altri passaggi descrivevano momenti
 diversi, non una proprietà permanente della repository.
 
-Il [verbale integrato 0.8.6](./analysis/2026-09-06-086-integrated-closeout.md)
+Il verbale integrato 0.8.6
 riunì le prove storiche e i controlli delle candidature successive. Risultavano
 integrati navigazione web e Apple, form progressivi e scelta web tra barra
 superiore e laterale. La decisione di sviluppo concluso su `c320694c3` rimase
@@ -112,7 +112,7 @@ un fatto storico. Gli addenda indipendenti chiusero il contratto PIN su
 integrati in `11a42f68`, senza finding reportabili residui nel perimetro
 sorgente revisionato.
 
-La [verifica di rilascio](./analysis/2026-09-07-086-release-verification.md)
+La verifica di rilascio
 distingueva la build `e7f8a555a`, lo smoke MCP, una suite completa con un
 fallimento e le prove focalizzate. Il pacchetto sorgente era autorizzato,
 mentre CI finale, PR, merge e tag non erano ancora attestati: questa attesa
@@ -173,7 +173,7 @@ unito a main o rilasciato. Non è lo stato corrente della 0.8.6.
 
 ## Aggiornamento di candidatura: 5 settembre 2026
 
-La [readiness 0.8.5](./release-085-readiness.md) raccoglie la revisione Pro e i
+La readiness 0.8.5 raccoglie la revisione Pro e i
 controlli locali riferiti al commit runtime `4f2aa312c`. Le ricevute precedenti
 non verificavano automaticamente questo candidato. AppleShared/XCTest e
 distribuzione restavano gate aperti: il codice sorgente e il canale binario
