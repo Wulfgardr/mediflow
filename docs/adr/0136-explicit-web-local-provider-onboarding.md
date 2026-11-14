@@ -220,3 +220,71 @@ La prova riguarda solo questo binario e questo modello. Non promuove
 `available_unqualified`, non attribuisce causalità al digest e non qualifica
 UI, latenza, qualità clinica o uso clinico. Le misure successive sul prodotto
 restano prove distinte.
+
+## Caricamento a freddo con tetto separato, WUL-840, 14 novembre 2026
+
+Le prove del 13 novembre sul Mac17,10 con 48 GB, Ollama.app 0.40.16 e
+`qwen3.5:35b-a3b` su disco esterno hanno osservato il caricamento in 31-33
+secondi. Il comando CLI di attivazione ha negato l'ammissione dopo 30,38
+secondi con `local_attestation_failed`. Il precaricamento tecnico successivo
+ha richiesto 32,33 secondi e lo stesso comando a modello residente 0,43
+secondi. Il precaricamento manuale non chiude il percorso utente a freddo.
+
+Il solo stadio di precaricamento senza prompt ha ora un tetto di **60
+secondi**, applicato nell'attestor condiviso. Il valore coincide con il
+budget host Web già esistente: il Web non si restringe. Il precedente
+candidato `f30ef1dfa`, con tetto di 45 secondi, negava anche dal Web un
+caricamento di 50 secondi che prima poteva completarsi entro il budget host.
+Il limite di 30 secondi che causava il difetto era soltanto nel comando CLI.
+
+Il margine rispetto ai 31-33 secondi osservati serve anche per dischi esterni
+più lenti, ma non garantisce il caricamento su ogni disco o macchina.
+Versione, tags, show e processi caricati conservano ciascuno il limite di
+**5 secondi**. Il comando CLI sostituisce il limite globale di 30 secondi
+con la somma dei cinque tetti, **80 secondi**. Un singolo stadio non può
+usare il tempo riservato agli altri.
+
+Il Web conserva il budget host di **60 secondi**, l'attesa pagina di **70
+secondi**, la lettura di 10 secondi e il corpo HTTP di 5 secondi. Prevale
+sempre la prima scadenza o cancellazione. Il tempo aggiunto non estende
+sessioni, resource-use o autorità. Riautenticazione, scadenza monotona,
+revoca, revisione del binding e CAS lifecycle rimangono obbligatori.
+Non si introduce un retry o un'ammissione dopo una risposta tardiva.
+
+Restano i cinque stadi, endpoint loopback, versione ammessa, assenza di
+marker remoti e confronto del digest caricato con quello installato.
+Il precaricamento invia solo modello e `keep_alive`, senza prompt,
+`messages`, download o generazione di testo. Il limite riguarda anche i
+consumer dell'attestor condiviso, mentre i loro budget più brevi conservano
+precedenza. Non cambia l'ammissione puntuale delle versioni né lo stato
+`available_unqualified`.
+
+I testi di attesa non cambiano. Il Web comunica «Verifica locale e possibile
+caricamento del modello in memoria in corso. La verifica home-base ha un
+limite di 60 secondi.», con pulsante «Verifica in corso…» e annullamento.
+La GPUI usa lo stesso endpoint Web, mostra «Verifica o rilettura in corso…»
+e permette di interrompere il collegamento. Non espone i singoli stadi.
+
+La regressione persistente usa HTTP loopback con ritardi e scadenze scalati
+nella stessa proporzione: un caricamento di 32 secondi simulati attraversa
+il comando CLI e tutti i cinque stadi. Sulla base il comando nega per il
+limite di 30 secondi. La regressione aggiuntiva nega sulla testa
+`f30ef1dfa` e ammette sulla correzione un precaricamento di 50 secondi
+simulati, sia attraverso il servizio Web con budget host sia dal CLI.
+I controesempi negano superamento dei 60 secondi,
+trasporto interrotto, cancellazione, digest cambiato e risposta remota,
+senza scrittura lifecycle. Un test fissa esattamente i quattro tetti da 5
+secondi. I test del servizio e della pagina fissano anche i limiti esatti
+di 60 e 70 secondi: il primo resta attivo fino a 59.999 ms e interrompe
+a 60.000 ms, la seconda fino a 69.999 ms e interrompe a 70.000 ms.
+Queste prove non attestano UI renderizzata, qualità o uso clinico.
+
+La build di produzione `25e07608a` ha completato tre attivazioni HTTP su
+archivi sintetici nuovi, senza modello residente prima di ogni prova,
+in **36,13 s, 31,69 s e 29,67 s**. Ollama è stato riavviato tra le prove,
+senza precaricamento manuale. Le corrispondenti ripetizioni a modello
+residente hanno richiesto **0,033 s, 0,026 s e 0,028 s**. Il digest caricato
+coincide in tutti i casi con quello sopra documentato per la 0.40.16.
+Le prime due prove esercitano anche l'intervallo oltre il vecchio limite
+CLI di 30 secondi. Sono prove HTTP del prodotto costruito, senza finestre,
+e non attestano l'interazione visiva Web o GPUI.
