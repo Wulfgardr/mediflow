@@ -399,3 +399,17 @@ for (const mutation of ['missing', 'altered', 'extra', 'node', 'abi', 'arch']) {
     }
   });
 }
+
+test('public CA asset is in the trusted roster; a wrong ledger hash refuses with a typed code', t => {
+  const f = fixture(t, 'standalone');
+  const ca = fs.readFileSync(new URL('../assets/chatgpt-execution/public-ca.pem', import.meta.url));
+  const target = path.join(f.payloadRoot, 'resources/chatgpt-execution/mac/codex-0.153.4/public-ca.pem');
+  fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, ca);
+  const ledger = generatePayloadLedger(f);
+  assert.equal(verifyPayloadLedger({ payloadRoot: f.payloadRoot, ledger }).status, 'TRUSTED_ROSTER_BYTES_MATCH');
+  const record = ledger.payload.roster.find(item => item.path.endsWith('/public-ca.pem'));
+  assert.ok(record); assert.equal(record.bytes, ca.length);
+  assert.equal(ledger.assets.find(item => item.path === record.path).kind, 'public-ca');
+  record.sha256 = '0'.repeat(64);
+  assert.throws(() => verifyPayloadLedger({ payloadRoot: f.payloadRoot, ledger }), { code: 'payload_ledger_mismatch' });
+});

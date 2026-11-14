@@ -19,7 +19,7 @@ import type { MacProductQualificationAuthority } from './execution-platform';
 type Phase = 'preparing' | 'ready' | 'borrowed' | 'draining' | 'sealed' | 'revoked';
 export type MacQualificationStage = 'platform' | 'sources' | 'build' | 'probe' | 'version' | 'protocol' | 'initialize' | 'readback' | 'custody';
 export type MacPreparationOptions = Readonly<{ binaryPath: string; nativeSourcePath: string; schemaDirectory: string;
-    c1ReceiptPath: string; lifetimeMs?: number; signal?: AbortSignal; diagnostic?: (event: ExecutionDiagnostic) => void }>;
+    publicCaPath: string; c1ReceiptPath: string; lifetimeMs?: number; signal?: AbortSignal; diagnostic?: (event: ExecutionDiagnostic) => void }>;
 export type MacQualificationAudit = Readonly<{ schema: 'mediflow.mac-custody-audit.v1'; run: string; phase: Phase;
     stage: MacQualificationStage; claim: 'candidate_boundary_only_not_live_or_clinical'; revision: string | null;
     baseContextSha256: string; sourceAvailable: true; fullSourceBuildBinding: 'unqualified';
@@ -31,7 +31,7 @@ export type MacQualificationAudit = Readonly<{ schema: 'mediflow.mac-custody-aud
 export class MacQualificationFailure extends ExecutionError {
     constructor(readonly stage: MacQualificationStage, readonly audit: MacQualificationAudit,
         /** Host-only diagnosis of our own retained directory, never a UI field. */
-        readonly retainedRoot: string | null) { super('unqualified_boundary'); }
+        readonly retainedRoot: string | null, reason: 'public_ca_mismatch' | null = null) { super('unqualified_boundary', null, reason); }
 }
 type Evidence = Readonly<{ revision: string; isCurrent(): boolean }>;
 type Entry = Readonly<{ binaryPath: string; current(): Evidence | null; take(signal: AbortSignal): Promise<QualifiedExecutionHost> }>;
@@ -241,7 +241,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
         const pins = verifyMacSourceSet(options.schemaDirectory, options.c1ReceiptPath, executionConfigFromToml(EXECUTION_CONFIG));
         binaryPath = verifyExecutionSubstrate(options.binaryPath);
         substrate = readMacOsSubstrate();
-        const ca = executionPublicCaBundle();
+        const ca = executionPublicCaBundle(options.publicCaPath);
         check();
         root = realpathSync(mkdtempSync('/private/tmp/mfmac-')); chmodSync(root, 0o700);
         const rootStat = lstatSync(root); rootIdentity = JSON.stringify([rootStat.dev, rootStat.ino, rootStat.uid]);
@@ -417,6 +417,6 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
     } catch (error) {
         if (error instanceof MacNativeBuildError && error.drainUnconfirmed) buildUnconfirmed = true;
         await close();
-        throw new MacQualificationFailure(stage, audit(), root && !cleaned ? root : null);
+        throw new MacQualificationFailure(stage, audit(), root && !cleaned ? root : null, error instanceof ExecutionError ? error.reason : null);
     }
 }
