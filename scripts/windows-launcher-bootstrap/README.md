@@ -123,9 +123,27 @@ compare every delivered binary byte, including timestamps, with no exclusions.
 The CI also records `toolchain.json` beside each manifest: native architecture,
 compiler and linker file versions, MSVC toolset directory version and Windows SDK
 version. `inspect-windows-bootstrap-toolchain.ps1` logs the installed toolsets and
-measures the selected tools before each comparison. The verifier requires every
-recorded version to match, and checks the compiler against both delivered and
-rebuilt manifests. Toolchain drift fails even if the binary bytes happen to match.
+measures the selected tools before each comparison. The verifier checks the
+compiler against both delivered and rebuilt manifests. For x64, every measured
+version must match `toolchain.json` and the rebuild must equal the delivered
+binary byte for byte.
+
+For ARM64, `arm64-rebuilds.json` records the complete rebuild SHA-256 for each
+accepted combination of compiler, linker, MSVC toolset and Windows SDK versions.
+Selection uses all measured version fields and the native architecture, never
+the runner image name. The single delivered binary remains the MSVC 14.52 build.
+The verifier checks its digest against its recorded toolchain, then checks the
+rebuild digest against the measured toolchain. Both digests cover every byte,
+including timestamps, with no normalization or exclusions. A rebuild using the
+delivered toolchain also retains the direct byte comparison. Unknown or incomplete
+versions fail with the measured and expected versions, even if bytes match.
+
+The MSVC 14.51 digest `35666d8b5e9aa882c66dd28300634ac23128f85c178d3b2beb69561b3cbffb3c`
+comes from [run 43388494696](https://github.com/Wulfgardr/mediflow/actions/runs/43388494696);
+[run 43517030662](https://github.com/Wulfgardr/mediflow/actions/runs/43517030662)
+measured the corresponding tool versions on image 20261101.203.1. The register
+also records the MSVC 14.52 rebuild and its source run. Image versions document
+provenance and do not authorize a toolchain.
 The record is CI provenance, not an additional runtime dependency.
 Manual regeneration compares two new builds; its artifacts require review and
 commit before the ordinary delivered-artifact comparison qualifies the checkout.
