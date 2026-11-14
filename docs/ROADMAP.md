@@ -91,7 +91,7 @@ prerequisiti del consolidamento. Le direzioni di ricerca accettate dall'utente
 restano soggette a prove e decisioni sul loro perimetro. Backlog, codice
 conservato e pianificazione non attestano implementazione o qualifica.
 
-La [preparazione operativa del 26 settembre](./analysis/2026-09-26-09x-preparation.md)
+La preparazione operativa del 26 settembre
 collega il consolidamento alle tappe successive: riuso delle prove 0.9.0,
 sequenza del pilota 0.9.1, casi sintetici e decisioni ancora da verificare.
 È materiale preparatorio; non anticipa l'accettazione delle issue o il rilascio.
@@ -121,7 +121,7 @@ comprensibili configurazione e scelte operative: impostazioni guidate,
 connessione ChatGPT ufficiale, scelta locale/online per funzione, WHO
 operativo, aggiornamento AIFA, import esenzioni/protesica e parità funzionale
 desktop, con Mini e headless entro i rispettivi confini. Il
-[piano operativo](./analysis/2026-09-07-086-guided-configuration-plan.md) organizza
+piano operativo organizza
 il lavoro in sei fasi, con dipendenze e prove di accettazione. iOS/iPadOS erano
 separati da quella tranche; la precedente dichiarazione di sviluppo concluso
 non copriva i nuovi requisiti.
@@ -137,7 +137,7 @@ spenti per impostazione predefinita e risultati da rivedere.
 
 ### Preparazione storica
 
-La [mini roadmap 0.8.6](./roadmap-086-consolidamento.md) conserva la preparazione
+La mini roadmap 0.8.6 conserva la preparazione
 del lavoro: OCR con ripiego locale funzionante, accesso a ICD-11 WHO,
 impostazioni più semplici, revisione della scheda paziente localhost,
 configurazione iniziale assistita, revisione complessiva della qualità dei

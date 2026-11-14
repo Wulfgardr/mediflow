@@ -19,7 +19,7 @@ correlazione, non una chiave generale di idempotenza.
 
 - [ADR 0015](./adr/0015-audit-taxonomy-minimum-catalog.md): contratti delle coorti
   paziente, diario, terapia, osservazione, checkup, prescrizioni e ambulatori.
-- [Prima tranche](./analysis/2026-09-26-090-first-tranche.md): storia delle consegne;
+- Prima tranche: storia delle consegne;
   non trasferire automaticamente i risultati alla revisione corrente.
 - [Matrice Apple](./apple-parity-matrix.json) e [parity](./parity-matrix.md): capacità
   ed esclusioni delle superfici; non dimostrano atomicità o uso reale corrente.
@@ -56,7 +56,7 @@ I percorsi PUT Web **P-01**, v1 **P-08** e paired **P-05** attraversano
 `updatePatientProfile` in `patient-profile-service`; il paired vi arriva
 tramite `updateNetworkScopedPatient` in `network-patient-write`. Il commit
 rimane in `patient-update-operation`. La porta resta un servizio Node
-in-process; la [mappa della porta profilo](analysis/2026-10-17-patient-profile-port.md)
+in-process; la mappa della porta profilo
 descrive questa estrazione e i limiti residui.
 
 Create: normalizzazione paziente, ID fornito o generato secondo adapter, versione iniziale host; associazione ambulatoriale nel commit. PUT: ID path, versione attesa e CAS; assente/null del primario distinti, associazioni conservate. DELETE: tombstone e versione; esaurimento della versione corrente restituisce 409 prima degli effetti. DELETE/restore paired mantengono la stessa guardia dopo scope/currentness. Paired: parent paziente nello scope e campi sigillati; restore rete distinto dal ripristino amministrativo. Create-context Web lega la creazione al contesto corrente, non crea il paziente.

@@ -417,7 +417,7 @@ Sono stati letti AGENTS, CONTRIBUTING, SECURITY, i confini pertinenti di
 ARCHITECTURE, la guida [privacy e AI](../privacy-and-ai-governance.md),
 [ADR 0065](../adr/0065-intended-purpose-and-claims-guard.md),
 [COMPLIANCE](../COMPLIANCE.md), la matrice dei runtime e la
-[roadmap 0.8.6, sezione 7](../roadmap-086-consolidamento.md#7-gdpr-e-ai-act--essenziale).
+roadmap 0.8.6, sezione 7.
 README e STATE_OF_THE_SYSTEM descrivono ancora una fotografia sorgente 0.8.5;
 le loro vecchie verifiche non sono prove sul candidato 0.8.6.
 

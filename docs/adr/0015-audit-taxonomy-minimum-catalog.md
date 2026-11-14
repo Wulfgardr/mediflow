@@ -757,10 +757,10 @@ Omissione, null esplicito e tombstone sono distinti.
 Riconciliazione documentale della sola coorte checkup: questa decisione Accepted,
 integrata in `34719db232801ae29bba72ed9aad2c0533041901` il 26 settembre 2026,
 supersedes l'esito race-specifico 409 con snapshot mancante descritto in
-`docs/web-patient-edit-and-analytics-085.md`, sezione «Seconda revisione combinata:
+[`docs/web-patient-edit-and-analytics-085.md`](https://github.com/Wulfgardr/mediflow/blob/4c7f140ff1becd9066ff45fabdf1862bcd14fd9c/docs/web-patient-edit-and-analytics-085.md), sezione «Seconda revisione combinata:
 disponibilità del genitore», integrata in
 `4f2aa312c9404a3f2b5118bde165851c379a28cc` il 5 settembre 2026. La spiegazione
-storica resta conservata in quel documento. Una cancellazione gia committata
+storica resta conservata in quel documento, nella storia Git. Una cancellazione gia committata
 al riesame transazionale del padre restituisce 404 senza effetti sul figlio o
 sul suo audit; una connessione concorrente non puo committare durante il writer
 lock IMMEDIATE. Il conflitto di versione del figlio disponibile rimane 409.

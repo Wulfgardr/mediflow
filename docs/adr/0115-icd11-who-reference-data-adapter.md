@@ -75,7 +75,7 @@ Questo contributo non chiude WUL-673 né dichiara parità delle altre piattaform
 ## Decisione vigente per il candidato 0.8.6: prima del codice
 
 L'utente ha scelto il **sidecar WHO locale** il 6 settembre, come registrato
-nel [packet WUL-672](../analysis/2026-09-05-086-who-decision.md#1-decisione-utente-catalogo-who-con-sidecar-locale).
+nel packet WUL-672.
 Questa revisione sostituisce il target online della decisione del 1 settembre
 per il production root del candidato. Le sezioni storiche sotto descrivono
 quel percorso precedente e i relativi packet, non autorizzano fallback online.
