@@ -290,3 +290,23 @@ for (const operation of ['status', 'settings'] as const) test(`ordinary ChatGPT 
   await expect(proposal).toContainText('Proposta sintetica dopo recupero annullato.');
   remote.assertCompleted(2);
 });
+
+test('ordinary ChatGPT CA refusal exposes only the closed reason in Dettagli before consent', async ({ page }) => {
+  const remote = await installOrdinaryChatGptTransport(page, 'patient_insight', () => { throw new Error('No generation allowed'); });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
+  const patientId = await createPatient(page, 'CaDenied');
+  await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'attenzione');
+  const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > div > [data-disclosure-control]').click();
+  const controls = await selectOrdinaryChatGpt(disclosure);
+  await page.route('**/api/ai/patient-insight/preview', route => route.fulfill({ status: 503, contentType: 'application/json',
+    body: JSON.stringify({ code: 'unqualified_boundary', boundary: { reason: 'public_ca_mismatch', path: '/private/never-display', exception: 'never-display' } }) }));
+  remote.arm(); await disclosure.getByRole('button', { name: 'Genera proposta' }).click();
+  await expect(controls.getByRole('alert')).toContainText('Le autorità di certificazione non corrispondono');
+  await controls.getByRole('button', { name: 'Dettagli', exact: true }).click();
+  await expect(controls.locator('code')).toHaveText('public_ca_mismatch');
+  await expect(controls).not.toContainText('never-display');
+  await expect(controls.getByRole('button', { name: 'Consenti invio a OpenAI per questo contesto' })).toHaveCount(0);
+  expect(remote.operations.filter(value => ['consent', 'login/start', 'models', 'generate'].includes(value))).toEqual([]);
+  expect(remote.clinicalWrites).toEqual([]);
+});
