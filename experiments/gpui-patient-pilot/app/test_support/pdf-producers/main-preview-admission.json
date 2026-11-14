@@ -1,0 +1,67 @@
+{
+  "baseCommit": "3dff5db0afbed481f466342ee95cc8736749febc",
+  "producers": {
+    "coregraphics-two-pages.pdf": {
+      "sha256": "f64362f5204bb4bedb082a2cc5c4eb80eecedbb0bd829561257b623a25b705c1",
+      "pages": [
+        {
+          "width": 300,
+          "height": 180,
+          "pages": 2,
+          "page": 1,
+          "nonwhite": true
+        },
+        {
+          "width": 300,
+          "height": 180,
+          "pages": 2,
+          "page": 2,
+          "nonwhite": true
+        }
+      ]
+    },
+    "ghostscript.pdf": {
+      "sha256": "f3945627337cdb82e12716a45fabad28d3f8fbaaf000a10bdf7abf79f6c44a3d",
+      "pages": [
+        {
+          "width": 300,
+          "height": 180,
+          "pages": 1,
+          "page": 1,
+          "nonwhite": true
+        }
+      ]
+    },
+    "reportlab.pdf": {
+      "sha256": "2540910a7d4d718da21762ed826da3d5a87e1b0ecbf45e659d921ca932c53468",
+      "pages": [
+        {
+          "width": 300,
+          "height": 180,
+          "pages": 1,
+          "page": 1,
+          "nonwhite": true
+        }
+      ]
+    },
+    "reportlab-bookmarks.pdf": {
+      "sha256": "8fe174647185a9c69ded409f130982f55cc73319a743f4e4aa6d35a2e1669f9e",
+      "pages": [
+        {
+          "width": 300,
+          "height": 180,
+          "pages": 2,
+          "page": 1,
+          "nonwhite": true
+        },
+        {
+          "width": 300,
+          "height": 180,
+          "pages": 2,
+          "page": 2,
+          "nonwhite": true
+        }
+      ]
+    }
+  }
+}
