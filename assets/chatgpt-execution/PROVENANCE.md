@@ -7,8 +7,7 @@
 Fonte: https://raw.githubusercontent.com/nodejs/node/v24.21.0/src/node_root_certs.h
 SHA-256 `3cc4e524e51a7bb85223de9239688de4b22e8d32fc04e7d0bfca785172cc6a74`.
 Copia e licenza del rilascio in `scripts/fixtures/node-public-ca/`.
-La licenza Node contiene le condizioni Mozilla per i certificati derivati
-(NSS, MPL 2.0) e le relative attribuzioni.
+La licenza del rilascio Node è conservata senza modifiche.
 
 Rigenerazione offline, con destinazione assente:
 
