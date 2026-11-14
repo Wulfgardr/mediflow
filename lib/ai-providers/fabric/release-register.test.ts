@@ -40,8 +40,16 @@ test('I-0 copre esattamente le sei celle del gate e separa API opzionali e Treat
     for (const cell of [...register.cells, ...register.conditionalCells]) {
         assert.equal(cell.conditional, register.conditionalCells.includes(cell));
         assert.equal(cell.qualification, 'not_qualified');
-        assert.equal(cell.modelIdentity, null);
-        assert.equal(cell.proof, null);
+        if (cell.provider === 'ollama') {
+            const evidence = JSON.parse(readFileSync(new URL(cell.proof.path, root), 'utf8'));
+            assert.deepEqual(cell.modelIdentity, evidence.modelIdentity);
+            assert.ok(['partial_http_execution', 'blocked_local_extraction'].includes(cell.proof.status));
+            assert.equal(evidence.qualification, false);
+            assert.equal(evidence.admission.status, 'passed');
+        } else {
+            assert.equal(cell.modelIdentity, null);
+            assert.equal(cell.proof, null);
+        }
         assert.equal(cell.dataClass, 'synthetic_only');
         assert.ok(cell.blockedBy.length > 0);
         assert.ok(cell.blockedBy.every((criterion: string) => !['I-3', 'I-3b', 'I-7'].includes(criterion)));
@@ -57,7 +65,10 @@ test('I-0 censisce ogni descriptor corrente senza cambiare ammissioni o maschera
     assert.throws(() => getFabricCapabilityDescriptor('unknown_release_capability'), /capability_unknown/);
     for (const row of register.capabilities) {
         assert.deepEqual(row.chatCriteria, row.descriptor.id === 'treatment_reasoning' ? [] : ['C-7', 'C-8']);
-        assert.equal(row.runtimeProof, null);
+        if (['patient_insight', 'smart_import', 'document_synthesis'].includes(row.descriptor.id)) {
+            assert.equal(row.runtimeProof.qualification, false);
+            assert.ok(existsSync(new URL(row.runtimeProof.path, root)));
+        } else assert.equal(row.runtimeProof, null);
         if (row.descriptor.entryPoint) assert.ok(existsSync(new URL(row.descriptor.entryPoint, root)), row.descriptor.id);
     }
     assert.deepEqual(register.additionalContractRequirements.map((row: { id: string }) => row.id), ['search', 'navigation']);

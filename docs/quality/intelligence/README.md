@@ -30,9 +30,19 @@ Le venue delle celle descrivono il percorso contrattuale, mentre `venues` nei
 descriptor fotografa il catalogo Fabric attuale: i due elenchi non attestano
 la stessa cosa e nessuno dei due abilita un provider.
 
-Il target resta Mac16,5 M4 Max/36 GB. Un carico singolo è il profilo del futuro
-banco, non una sostenibilità già dimostrata. Budget di memoria e tempi restano
-nulli fino a baseline e decisione; non si riciclano i limiti dei 16 GiB.
+Il profilo vigente è Mac17,10, Apple M5 Max, 48 GB, secondo l'emendamento
+del 9 novembre nel contratto. I profili Mac16,5 e i relativi risultati restano
+storia. Le prove del 13 novembre distinguono budget provvisori dei singoli
+casi, distribuzioni con errori e requisiti ancora non provati. I budget globali
+restano nulli finché manca una baseline completa. Il RSS dei processi non
+comprende tutta la memoria GPU unificata usata da MLX.
+
+## Misura del 13 novembre 2026
+
+La [nuova misura locale](2026-11-13-ollama/README.md) usa il Mac fissato e
+Ollama.app 0.40.16 ammesso puntualmente. Registra proposte PI/SI, dinieghi
+PDF, errori sul carico e verifiche oltre i budget provvisori. C-L e I-2 non
+sono chiuse. I dati numerici e i limiti sono distinti dalle prove storiche.
 
 ## Misura successiva del 30 ottobre 2026
 
