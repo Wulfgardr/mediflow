@@ -43,20 +43,44 @@ mod preview {
     }
 
     #[test]
-    fn fields_and_actions_in_the_catalog_are_refused() {
-        for entries in [
-            b"/AcroForm << /Fields [] >>".as_slice(),
-            b"/AcroForm << /Fields [<< /FT /Tx /T (Synthetic field) >>] >>",
-            b"/OpenAction << /S /URI /URI (https://example.invalid/) >>",
-            b"/AA << /WC << /S /JavaScript /JS (app.alert(1)) >> >>",
-            b"/Names << /JavaScript << /Names [(test) << /S /JavaScript /JS (app.alert(1)) >>] >> >>",
-            b"/Outlines << /First << /Title (Synthetic) /A << /Type /Action /S /URI /URI (https://example.invalid/) >> >> >>",
-        ] {
-            assert_refused(&super::fixture::catalog_with_extra_entries(entries));
-        }
-        assert_refused(include_bytes!(
-            "../test_support/pdf-producers/outline-action.pdf"
+    fn declared_form_fields_are_refused_but_an_empty_form_is_admitted() {
+        assert_refused(&super::fixture::catalog_with_extra_entries(
+            b"/AcroForm << /Fields [<< /FT /Tx /T (Synthetic field) /V (Hb 13.4) >>] >>",
         ));
+        let source = super::fixture::catalog_with_extra_entries(b"/AcroForm << /Fields [] >>");
+        let output = super::worker(&source, "1");
+        assert!(output.status.success());
+        assert!(parse_output(Arc::new(Zeroizing::new(source)), 1, &output.stdout).is_ok());
+    }
+
+    #[test]
+    fn catalog_actions_and_bookmarks_keep_the_admission_of_main() {
+        for entries in [
+            b"/OpenAction << /S /URI /URI (https://example.invalid/) >>".as_slice(),
+            b"/AA << /WC << /S /JavaScript /JS (void 0) >> >>",
+            b"/JS (void 0)",
+            b"/Names << /JavaScript << /Names [(test) << /S /JavaScript /JS (void 0) >>] >> >>",
+            b"/Outlines << /First << /Title (Synthetic) /A << /Type /Action /S /URI /URI (https://example.invalid/) >> >> >>",
+            b"/Outlines << /First << /Title (Synthetic) /A << /S /Launch /F (synthetic-missing.txt) >> >> >>",
+        ] {
+            let source = super::fixture::catalog_with_extra_entries(entries);
+            let output = super::worker(&source, "1");
+            assert!(output.status.success());
+            assert!(parse_output(Arc::new(Zeroizing::new(source)), 1, &output.stdout).is_ok(), "{entries:?}");
+        }
+        for source in [
+            include_bytes!("../test_support/pdf-producers/bookmark-goto.pdf").as_slice(),
+            include_bytes!("../test_support/pdf-producers/bookmark-uri.pdf").as_slice(),
+            include_bytes!("../test_support/pdf-producers/openaction-destination.pdf").as_slice(),
+            include_bytes!("../test_support/pdf-producers/openaction-goto.pdf").as_slice(),
+            include_bytes!("../test_support/pdf-producers/outline-action.pdf").as_slice(),
+        ] {
+            let output = super::worker(source, "1");
+            assert!(output.status.success());
+            assert!(
+                parse_output(Arc::new(Zeroizing::new(source.to_vec())), 1, &output.stdout).is_ok()
+            );
+        }
     }
 
     #[test]
@@ -78,7 +102,6 @@ mod preview {
             b"/Annots [<< /Subtype /Widget /Rect [0 0 10 10] >>]",
             b"/Annots [<< /Subtype /Link /Rect [0 0 10 10] /A << /S /URI /URI (https://example.invalid/) >> >>]",
             b"/Annots null", b"/Annots 0", b"/Annots << >>", b"/Annots [null]",
-            b"/AA << /O << /S /JavaScript /JS (app.alert(1)) >> >>",
         ] {
             assert_refused(&super::fixture::page_with_extra_entries(entries));
         }
@@ -101,35 +124,62 @@ mod preview {
             assert!(output.status.success());
             assert!(parse_output(Arc::new(Zeroizing::new(source)), 1, &output.stdout).is_ok());
         }
-        // An empty annotation array cannot hide a page action.
-        assert_refused(&super::fixture::page_with_extra_entries(
-            b"/Annots [] /AA << /O << /S /JavaScript /JS (app.alert(1)) >> >>",
-        ));
+        // Page action metadata is not an annotation and is not executed.
+        let source = super::fixture::page_with_extra_entries(
+            b"/Annots [] /AA << /O << /S /JavaScript /JS (void 0) >> >>",
+        );
+        let output = super::worker(&source, "1");
+        assert!(output.status.success());
+        assert!(parse_output(Arc::new(Zeroizing::new(source)), 1, &output.stdout).is_ok());
     }
 
     #[test]
-    fn other_pdf_producers_reach_the_same_parser_with_nonempty_rasters() {
+    fn pdfs_shown_by_main_stay_visible_through_the_preview_parser() {
+        use sha2::{Digest, Sha256};
+        let baseline: serde_json::Value = serde_json::from_slice(include_bytes!(
+            "../test_support/pdf-producers/main-preview-admission.json"
+        ))
+        .unwrap();
         for (producer, source, pages) in [
             (
-                "CoreGraphics",
+                "coregraphics-two-pages.pdf",
                 include_bytes!("../test_support/pdf-producers/coregraphics-two-pages.pdf")
                     .as_slice(),
                 2,
             ),
             (
-                "Ghostscript",
+                "ghostscript.pdf",
                 include_bytes!("../test_support/pdf-producers/ghostscript.pdf").as_slice(),
                 1,
             ),
             (
-                "ReportLab",
+                "reportlab.pdf",
                 include_bytes!("../test_support/pdf-producers/reportlab.pdf").as_slice(),
                 1,
             ),
+            (
+                "reportlab-bookmarks.pdf",
+                include_bytes!("../test_support/pdf-producers/reportlab-bookmarks.pdf").as_slice(),
+                2,
+            ),
         ] {
+            assert_eq!(
+                format!("{:x}", Sha256::digest(source)),
+                baseline["producers"][producer]["sha256"].as_str().unwrap()
+            );
             for page in 1..=pages {
                 let output = super::worker(source, &page.to_string());
                 assert!(output.status.success(), "{producer}, page {page}");
+                let at = output.stdout.iter().position(|b| *b == b'\n').unwrap();
+                let header: serde_json::Value =
+                    serde_json::from_slice(&output.stdout[..at]).unwrap();
+                for key in ["width", "height", "page", "pages"] {
+                    assert_eq!(
+                        header[key],
+                        baseline["producers"][producer]["pages"][page - 1][key],
+                        "{producer}, page {page}, {key}"
+                    );
+                }
                 let preview = parse_output(
                     Arc::new(Zeroizing::new(source.to_vec())),
                     page,
