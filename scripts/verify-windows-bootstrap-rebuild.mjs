@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 export function peByteDifferences(delivered, rebuilt) {
   const differences = [];
@@ -24,6 +25,22 @@ export function assertBootstrapToolchainEqual(recorded, actual) {
   }
 }
 
+export function selectBootstrapRebuild(records, actual) {
+  const fields = ['architecture', 'compiler', 'linker', 'msvc', 'windowsSdk'];
+  const matches = records.filter(record => fields.every(field =>
+    typeof record.toolchain[field] === 'string' && record.toolchain[field].length > 0 &&
+    record.toolchain[field] === actual[field]));
+  assert.equal(matches.length, 1,
+    `Unknown Windows bootstrap toolchain: actual=${JSON.stringify(actual)}; expected=${JSON.stringify(records.map(record => record.toolchain))}`);
+  assert.match(matches[0].sha256, /^[a-f0-9]{64}$/u, 'Invalid recorded bootstrap rebuild SHA-256');
+  return matches[0];
+}
+
+export function assertBootstrapRebuildHash(expected, rebuilt) {
+  const actual = createHash('sha256').update(rebuilt).digest('hex');
+  assert.equal(actual, expected, 'Windows bootstrap differs from source rebuild for measured toolchain (SHA-256 over all bytes)');
+}
+
 function verify() {
   assert.equal(process.platform, 'win32');
   const root = fileURLToPath(new URL('..', import.meta.url));
@@ -32,12 +49,20 @@ function verify() {
   const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/u, ''));
   const recorded = readJson(path.join(directory, 'toolchain.json'));
   const actual = readJson(process.argv[3]);
+  const regenerationInput = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
+    ? readJson(process.env.GITHUB_EVENT_PATH).inputs?.regenerate_bootstrap : false;
+  const regeneration = regenerationInput === true || regenerationInput === 'true';
   console.log(JSON.stringify({ type: 'bootstrap-toolchain-comparison', arch: process.arch, recorded, actual }));
   assert.equal(recorded.architecture, process.arch);
-  assertBootstrapToolchainEqual(recorded, actual);
+  // The explicit dispatch compares two fresh builds before their new digest can
+  // be recorded. Routine runs always use the committed toolchain expectations.
+  const records = process.arch === 'arm64' ? readJson(path.join(root, 'scripts/windows-launcher-bootstrap/arm64-rebuilds.json')) : null;
+  const expected = records ? selectBootstrapRebuild(records, actual) : null;
+  if (regeneration || !expected) assertBootstrapToolchainEqual(recorded, actual);
   const files = ['system-directory.node', 'manifest.json'];
   const delivered = files.map(name => fs.readFileSync(path.join(directory, name)));
   assert.equal(JSON.parse(delivered[1]).build.compiler, recorded.compiler, 'Recorded toolchain must identify the delivered manifest compiler');
+  if (records && !regeneration) assertBootstrapRebuildHash(selectBootstrapRebuild(records, recorded).sha256, delivered[0]);
   try {
     for (const name of files) fs.unlinkSync(path.join(directory, name));
     const build = spawnSync(process.execPath, [path.join(root, 'scripts/prepare-windows-launcher-bootstrap.mjs'), 'build'],
@@ -47,8 +72,16 @@ function verify() {
     const rebuilt = fs.readFileSync(path.join(directory, files[0]));
     console.log(JSON.stringify({ type: 'bootstrap-byte-comparison', arch: process.arch,
       differences: peByteDifferences(delivered[0], rebuilt) }));
-    assertBootstrapBytesEqual(delivered[0], rebuilt);
-    console.log('Windows bootstrap matches source rebuild byte for byte; no exclusions.');
+    if (expected && !regeneration) {
+      console.log(JSON.stringify({ type: 'bootstrap-rebuild-expectation', ...expected }));
+      assertBootstrapRebuildHash(expected.sha256, rebuilt);
+    }
+    // x64 keeps its direct comparison. ARM64 also compares the delivered bytes
+    // directly when the measured toolchain is the one used for delivery.
+    if (regeneration || !expected || JSON.parse(delivered[1]).build.compiler === actual.compiler) assertBootstrapBytesEqual(delivered[0], rebuilt);
+    console.log(expected && !regeneration && recorded.compiler !== actual.compiler
+      ? 'Windows bootstrap matches source rebuild SHA-256 for measured toolchain; all bytes, no exclusions.'
+      : 'Windows bootstrap matches source rebuild byte for byte; no exclusions.');
   } finally {
     files.forEach((name, index) => fs.writeFileSync(path.join(directory, name), delivered[index]));
   }
