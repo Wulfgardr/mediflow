@@ -49,15 +49,20 @@ function verify() {
   const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/u, ''));
   const recorded = readJson(path.join(directory, 'toolchain.json'));
   const actual = readJson(process.argv[3]);
+  const regenerationInput = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
+    ? readJson(process.env.GITHUB_EVENT_PATH).inputs?.regenerate_bootstrap : false;
+  const regeneration = regenerationInput === true || regenerationInput === 'true';
   console.log(JSON.stringify({ type: 'bootstrap-toolchain-comparison', arch: process.arch, recorded, actual }));
   assert.equal(recorded.architecture, process.arch);
+  // The explicit dispatch compares two fresh builds before their new digest can
+  // be recorded. Routine runs always use the committed toolchain expectations.
   const records = process.arch === 'arm64' ? readJson(path.join(root, 'scripts/windows-launcher-bootstrap/arm64-rebuilds.json')) : null;
   const expected = records ? selectBootstrapRebuild(records, actual) : null;
-  if (!expected) assertBootstrapToolchainEqual(recorded, actual);
+  if (regeneration || !expected) assertBootstrapToolchainEqual(recorded, actual);
   const files = ['system-directory.node', 'manifest.json'];
   const delivered = files.map(name => fs.readFileSync(path.join(directory, name)));
   assert.equal(JSON.parse(delivered[1]).build.compiler, recorded.compiler, 'Recorded toolchain must identify the delivered manifest compiler');
-  if (records) assertBootstrapRebuildHash(selectBootstrapRebuild(records, recorded).sha256, delivered[0]);
+  if (records && !regeneration) assertBootstrapRebuildHash(selectBootstrapRebuild(records, recorded).sha256, delivered[0]);
   try {
     for (const name of files) fs.unlinkSync(path.join(directory, name));
     const build = spawnSync(process.execPath, [path.join(root, 'scripts/prepare-windows-launcher-bootstrap.mjs'), 'build'],
@@ -67,14 +72,14 @@ function verify() {
     const rebuilt = fs.readFileSync(path.join(directory, files[0]));
     console.log(JSON.stringify({ type: 'bootstrap-byte-comparison', arch: process.arch,
       differences: peByteDifferences(delivered[0], rebuilt) }));
-    if (expected) {
+    if (expected && !regeneration) {
       console.log(JSON.stringify({ type: 'bootstrap-rebuild-expectation', ...expected }));
       assertBootstrapRebuildHash(expected.sha256, rebuilt);
     }
     // x64 keeps its direct comparison. ARM64 also compares the delivered bytes
     // directly when the measured toolchain is the one used for delivery.
-    if (!expected || JSON.parse(delivered[1]).build.compiler === actual.compiler) assertBootstrapBytesEqual(delivered[0], rebuilt);
-    console.log(expected && recorded.compiler !== actual.compiler
+    if (regeneration || !expected || JSON.parse(delivered[1]).build.compiler === actual.compiler) assertBootstrapBytesEqual(delivered[0], rebuilt);
+    console.log(expected && !regeneration && recorded.compiler !== actual.compiler
       ? 'Windows bootstrap matches source rebuild SHA-256 for measured toolchain; all bytes, no exclusions.'
       : 'Windows bootstrap matches source rebuild byte for byte; no exclusions.');
   } finally {

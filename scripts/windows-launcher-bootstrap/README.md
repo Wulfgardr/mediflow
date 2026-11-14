@@ -145,8 +145,14 @@ measured the corresponding tool versions on image 20261101.203.1. The register
 also records the MSVC 14.52 rebuild and its source run. Image versions document
 provenance and do not authorize a toolchain.
 The record is CI provenance, not an additional runtime dependency.
-Manual regeneration compares two new builds; its artifacts require review and
-commit before the ordinary delivered-artifact comparison qualifies the checkout.
+The verifier recognizes explicit regeneration from the GitHub `workflow_dispatch`
+event payload with `regenerate_bootstrap=true`. In that mode, the measured tools
+must still match an accepted version tuple, the newly recorded toolchain and both
+fresh manifests. It compares
+the two fresh binaries directly without requiring their new digest in the registry.
+An ordinary dispatch with a false input retains the committed digest checks.
+Regenerated artifacts require review and commit, including any new expected digest,
+before the ordinary comparison qualifies the checkout.
 It copies the measured toolchain into the artifact only for the explicit
 `regenerate_bootstrap` dispatch. A routine run cannot update that record.
 The ARM64 pair was regenerated from [CI run 43515447333](https://github.com/Wulfgardr/mediflow/actions/runs/43515447333)
