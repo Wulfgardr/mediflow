@@ -7,7 +7,10 @@ import { assertNodeRuntime, readNodeContract } from './node-runtime-contract.mjs
 
 const SCHEMA = 'mediflow.runtime-payload-ledger.v1';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-function fail(message) { throw new Error(`Payload ledger: ${message}`); }
+export class PayloadLedgerError extends Error {
+  constructor(message) { super(`Payload ledger: ${message}`); this.name = 'PayloadLedgerError'; this.code = 'payload_ledger_mismatch'; }
+}
+function fail(message) { throw new PayloadLedgerError(message); }
 function physical(file, directory = false) {
   const absolute = path.resolve(file);
   const stat = fs.lstatSync(absolute);
@@ -43,6 +46,7 @@ function licenseFiles(files, prefix = '') {
     .map(({ path: name, bytes, sha256 }) => ({ path: name, bytes, sha256 }));
 }
 function assetKind(name) {
+  if (name.endsWith('/public-ca.pem')) return 'public-ca';
   if (/\.(?:node|dylib|so(?:\.\d+)*|dll|exe)$/iu.test(name)) return 'native';
   if (/\.(?:woff2?|ttf|otf)$/iu.test(name)) return 'font';
   if (/\.(?:safetensors|gguf|onnx|pt|pth|tiktoken)$/iu.test(name)) return 'model-or-tokenizer';

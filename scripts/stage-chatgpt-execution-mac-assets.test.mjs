@@ -9,7 +9,7 @@ const deny = result => assert.notEqual(result.status, 0, `${result.stdout}\n${re
 const action = (input, mode, root) => runStage(input, { args: [`--${mode}`, '--installation-root', root] });
 
 for (const bundle of [false, true]) {
-  test(`${bundle ? 'app' : 'standalone'}: explicit staging validates seven pins and is idempotent`, t => {
+  test(`${bundle ? 'app' : 'standalone'}: explicit staging validates eight pins and is idempotent`, t => {
     const input = fixture(t), app = bundle ? appRoot(input.directory) : null;
     input.installationRoot = app?.web ?? input.installationRoot;
     pass(runStage(input));
@@ -18,7 +18,7 @@ for (const bundle of [false, true]) {
     assert.deepEqual(snapshot(input.directory), before);
     const assets = path.join(input.installationRoot, ...assetParts);
     assert.equal(fs.existsSync(path.join(assets, 'codex')), !bundle);
-    assert.deepEqual(fs.readdirSync(assets).sort(), bundle ? ['C1-RECEIPT.json', 'mac-owner.c', 'schema'] : ['C1-RECEIPT.json', 'codex', 'mac-owner.c', 'schema']);
+    assert.deepEqual(fs.readdirSync(assets).sort(), bundle ? ['C1-RECEIPT.json', 'mac-owner.c', 'public-ca.pem', 'schema'] : ['C1-RECEIPT.json', 'codex', 'mac-owner.c', 'public-ca.pem', 'schema']);
     assert.deepEqual(fs.readFileSync(app?.helper ?? path.join(assets, 'codex')), syntheticFiles.codex);
   });
 }

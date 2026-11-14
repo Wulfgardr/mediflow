@@ -134,5 +134,9 @@ function OrdinaryFunctionControls({ client, view, needsReprepare = false, canRep
             <button type="button" disabled={!canReprepare} onClick={() => void client.reprepareRemote()}>Nuova preparazione</button>
         </div>}
         {view.error && <p role="alert">{view.error}</p>}
+        {view.error && view.errorReason === 'public_ca_mismatch' && <Disclosure title="Dettagli">
+            <p>Autorità di certificazione non corrispondenti. Verifica gli asset dell’installazione MediFlow.</p>
+            <code>public_ca_mismatch</code>
+        </Disclosure>}
     </fieldset>;
 }

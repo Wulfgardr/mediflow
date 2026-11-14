@@ -27,7 +27,7 @@ const { resolve } = await import('../security/web-auth-lifecycle-owner-adapter.t
 const directory = join(dataDir, 'chatgpt-execution');
 const hold = join(directory, 'mac-preparation.hold');
 const blocked = { state: 'blocked', expiresAt: null };
-const assets = () => ({ binaryPath: '/synthetic/never-started', nativeSourcePath: '/synthetic/owner.c', schemaDirectory: '/synthetic/schema', c1ReceiptPath: '/synthetic/c1' });
+const assets = () => ({ binaryPath: '/synthetic/never-started', nativeSourcePath: '/synthetic/owner.c', schemaDirectory: '/synthetic/schema', c1ReceiptPath: '/synthetic/c1', publicCaPath: '/synthetic/public-ca.pem' });
 const cleanAudit: MacQualificationAudit = {
     schema: 'mediflow.mac-custody-audit.v1', run: 'synthetic', phase: 'revoked', stage: 'readback',
     claim: 'candidate_boundary_only_not_live_or_clinical', revision: null, baseContextSha256: '', sourceAvailable: true,

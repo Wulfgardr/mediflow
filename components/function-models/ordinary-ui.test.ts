@@ -137,3 +137,13 @@ test('switching off without changing the model preserves the local binding', () 
     (button.props.onClick as () => void)();
     assert.deepEqual(command, { action: 'set_activation', functionId: 'patient_insight', enabled: false });
 });
+
+test('CA refusal shows only the closed public reason in Dettagli', () => {
+    const render = loadComponent('./function-model-picker.tsx', 'OrdinaryFunctionControls');
+    const tree = render({ client: {}, view: { loading: false, error: 'Preparazione negata', errorReason: 'public_ca_mismatch', settings: null, state: null } });
+    assert.match(text(tree), /Autorità di certificazione non corrispondenti/);
+    assert.match(text(tree), /public_ca_mismatch/);
+    assert.ok(nodes(tree).some(node => text(node.props.children).includes('Dettagli')));
+    const unknown = render({ client: {}, view: { loading: false, error: 'Preparazione negata', errorReason: '/private/secret', settings: null, state: null } });
+    assert.doesNotMatch(text(unknown), /private|public_ca_mismatch|Autorità di certificazione/);
+});

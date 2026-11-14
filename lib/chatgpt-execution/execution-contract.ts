@@ -3,7 +3,7 @@ export type ExecutionCode = 'unqualified_boundary' | 'session_expired' | 'not_co
     | 'model_unavailable' | 'model_mismatch' | 'invalid_request' | 'invalid_output' | 'tool_use_denied'
     | 'timeout' | 'process_exited' | 'protocol_error' | 'upstream_error';
 export class ExecutionError extends Error {
-    constructor(readonly code: ExecutionCode, readonly denial: ExecutionDenial | null = null) { super(code); this.name = 'ExecutionError'; }
+    constructor(readonly code: ExecutionCode, readonly denial: ExecutionDenial | null = null, readonly reason: 'public_ca_mismatch' | null = null) { super(code); this.name = 'ExecutionError'; }
 }
 export type SupportedChatGptPlan = 'plus' | 'pro' | 'prolite';
 export function isSupportedChatGptPlan(value: unknown): value is SupportedChatGptPlan {

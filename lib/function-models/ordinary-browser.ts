@@ -10,7 +10,7 @@ const EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ul
 export type BrowserOrdinarySettings = Readonly<{ revision: string; enabled: boolean; retention: 'chatgpt_service_terms_apply';
     preferences: Readonly<Record<OrdinaryFunction, Readonly<{ use: 'local' | 'chatgpt_subscription'; model: string | null; effort: string | null }>>>;
     lanes: Readonly<Record<OrdinaryFunction, string | undefined>> }>;
-export type OrdinaryBrowserView = Readonly<{ loading: boolean; error: string | null; settings: BrowserOrdinarySettings | null;
+export type OrdinaryBrowserView = Readonly<{ loading: boolean; error: string | null; errorReason?: 'public_ca_mismatch' | null; settings: BrowserOrdinarySettings | null;
     state: OrdinaryFlowState | null; disclosure: OrdinaryContentDisclosure | null;
     challenge: Readonly<{ verificationUrl: string; userCode: string }> | null; catalog: SynthesisCatalog | null; choice: string; completed: boolean }>;
 const text = (v: unknown, n = 256): v is string => typeof v === 'string' && v.length > 0 && v.length <= n && !/[\x00-\x1f\x7f]/u.test(v);
@@ -79,11 +79,17 @@ const boundaryChecks: Readonly<Record<string, string>> = Object.freeze({
     proxy_connect: 'collegamento al servizio ufficiale', loopback_other: 'servizi locali', unix_socket: 'servizi locali',
     mach_lookup: 'servizi di sistema', external_network: 'rete fuori dalle destinazioni ufficiali',
 });
+export function publicCaPreparationReason(value: unknown): 'public_ca_mismatch' | null {
+    const boundary = value && typeof value === 'object' ? (value as Record<string, unknown>).boundary : null;
+    return boundary && typeof boundary === 'object' && (boundary as Record<string, unknown>).reason === 'public_ca_mismatch'
+        ? 'public_ca_mismatch' : null;
+}
 const NOTHING_SENT = 'Nessun dato è stato inviato a ChatGPT.';
 /** Honest refusal on the Mac: what is missing, and that nothing left the station. */
 export function boundaryPreparationError(value: unknown): string {
     const boundary = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>).boundary : null;
     const notice = boundary && typeof boundary === 'object' && !Array.isArray(boundary) ? boundary as Record<string, unknown> : null;
+    if (publicCaPreparationReason(value)) return `Le autorità di certificazione non corrispondono al fascio verificato. ${NOTHING_SENT}`;
     const build = typeof notice?.osBuild === 'string' && /^[0-9]{2}[A-Z][0-9]{1,5}[a-z]?$/u.test(notice.osBuild) ? ` ${notice.osBuild}` : '';
     const failed = Array.isArray(notice?.failed) ? [...new Set(notice.failed.filter((name): name is string => typeof name === 'string' && Object.hasOwn(boundaryChecks, name)).map(name => boundaryChecks[name]))] : [];
     if (notice?.stage === 'probe' && notice.probe === 'failed' && failed.length)
@@ -109,7 +115,7 @@ export function createOrdinaryBrowser(functionId: OrdinaryFunction, transport: t
     let view = empty(), generation = 0, pending: { resolve(value: Response): void; reject(error: Error): void } | undefined;
     let lifetime: ReturnType<typeof setTimeout> | undefined;
     let retirement: Promise<void> = Promise.resolve();
-    const emit = (patch: Partial<OrdinaryBrowserView>) => { view = Object.freeze({ ...view, ...patch }); changed(view); };
+    const emit = (patch: Partial<OrdinaryBrowserView>) => { view = Object.freeze({ ...view, ...(patch.error === null ? { errorReason: null } : {}), ...patch }); changed(view); };
     async function fetchValue(operation: string, value?: unknown, signal?: AbortSignal): Promise<unknown> {
         const response = await transport(PREFIX + operation, { method: value === undefined ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store',
             ...(value === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) }), signal });
@@ -166,7 +172,10 @@ export function createOrdinaryBrowser(functionId: OrdinaryFunction, transport: t
                 if (response.status !== 202) {
                     const error = response.ok ? null : await preparationError(response);
                     if (generation !== token || signal.aborted) throw failure('revoked');
-                    emit({ loading: false, error }); return response;
+                    let errorReason: 'public_ca_mismatch' | null = null;
+                    try { if (error) { const body = await response.clone().json(); if (body?.code === 'unqualified_boundary') errorReason = publicCaPreparationReason(body); } } catch { /* No diagnostic prose from responses. */ }
+                    if (generation !== token || signal.aborted) throw failure('revoked');
+                    emit({ loading: false, error, errorReason }); return response;
                 }
                 const value = await response.json(); const state = parseState(value, functionId); const disclosure = parseDisclosure(value.disclosure, state);
                 if (state.phase !== 'needs_consent') throw failure();

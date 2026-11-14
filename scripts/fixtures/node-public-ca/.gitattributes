@@ -1,0 +1,2 @@
+# Preserve the upstream release license byte for byte.
+LICENSE -whitespace
