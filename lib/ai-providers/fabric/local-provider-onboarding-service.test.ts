@@ -131,7 +131,15 @@ test('timeout is bounded even if an ordinary transport finishes late; no lifecyc
     const f = fixture(async () => { started(); return new Promise(resolve => { complete = resolve; }); });
     const operation = f.service.activate((await f.service.inspect()).revision);
     const rejected = assert.rejects(operation, /verification_interrupted/);
-    await waiting; context.mock.timers.tick(60_001); await rejected;
+    await waiting; context.mock.timers.tick(59_999);
+    await Promise.resolve();
+    assert.equal(f.lifecycle.service.read().status, 'denied');
+    assert.equal(f.calls(), 1);
+    let settled = false; void operation.catch(() => { settled = true; });
+    await Promise.resolve(); assert.equal(settled, false);
+    context.mock.timers.tick(1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(settled, true); await rejected;
     complete({} as Awaited<ReturnType<typeof attestLocalOllamaModel>>);
     await Promise.resolve();
     assert.equal(f.lifecycle.service.read().status, 'denied');
