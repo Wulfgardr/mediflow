@@ -172,3 +172,51 @@ scadenze o digest. Non promuove `available_unqualified`, non attribuisce una
 garanzia causale al digest e non qualifica UI, latenza, qualità delle funzioni
 generative o uso clinico. La prova riguarda soltanto questo binario e modello;
 una build Homebrew HEAD non è compresa.
+
+
+## Compatibilità locale Ollama 0.40.16, WUL-840, 13 novembre 2026
+
+Il candidato 8954e9c97 rifiuta Ollama.app 0.40.16 prima di inviare un prompt.
+La versione è ora ammessa puntualmente, conservando le precedenti. Restano
+negate 0.40.7, 0.40.15, 0.40.17, 0.40.160, anteprime e suffissi build della
+0.40.16. Non è ammesso un intervallo 0.40.x.
+
+Sono state lette le note ufficiali delle dieci release da
+[0.40.7](https://github.com/ollama/ollama/releases/tag/v0.40.7) a
+[0.40.16](https://github.com/ollama/ollama/releases/tag/v0.40.16) e il
+[delta completo da 0.40.6](https://github.com/ollama/ollama/compare/v0.40.6...v0.40.16).
+Il delta tocca anche i tipi usati dall'attestor: ShowResponse aggiunge
+`template_source` e `voices`; non rimuove i campi di località controllati.
+Cambiano i metadati safetensors e il context length dei modelli solo voce
+in `/api/ps`. Cambiano anche i percorsi cloud: cancellazione delle richieste
+remote al distacco del client, decodifica delle risposte web search su
+`/api/chat`, instradamento nei launcher e compatibilità Responses/Messages.
+Queste modifiche non sono qualificate da questa prova locale.
+
+Sul Mac17,10 con 48 GB, macOS 27.3 build 26C5035r, il binario installato
+ha SHA-256 `5c3cf935be8d896433a5caefefc8857bc2bb9e32c77c35e7c3d38b7c5919822f`.
+La verifica `codesign --verify --deep --strict` dell'app è riuscita.
+Il daemon sulla porta loopback 11434 ha cloud disabilitato, modelli
+protetti da scritture e rete limitata a localhost dalla sandbox di macOS.
+La sonda TCP verso 192.0.2.1:9, nello stesso contesto sandbox dell'osservatore,
+fallisce con EPERM. Nessun modello scaricato.
+
+Il modello già installato `qwen3.5:35b-a3b`, safetensors nvfp4, runner MLX,
+ha digest `26025611beeb3fe9e4850b1fdae686bebba7cdfa7f13ddb04955f19872ee022a`.
+L'attestazione canonica passa versione, tags, show, precaricamento senza
+prompt e processi caricati. La lettura dei tags prima e dopo ogni stadio
+mantiene quel digest; il digest nei processi caricati coincide. Show e
+precaricamento non espongono da soli un digest causale, restano legati
+al nome canonico e alle osservazioni ai confini.
+L'adapter di produzione ripete i cinque stadi per l'operazione e restituisce
+un testo sintetico non vuoto, con risposta HTTP 200 dal modello canonico.
+Nessun marker remoto nelle risposte osservate.
+
+I sei nuovi casi sono rossi sulla base e verdi sulla modifica. I test
+conservano le versioni già ammesse e negate, aggiungono i cinque stadi di
+località per la 0.40.16 e negano le versioni vicine e i suffissi.
+Endpoint loopback, località, digest, autorità e scadenze restano invariati.
+La prova riguarda solo questo binario e questo modello. Non promuove
+`available_unqualified`, non attribuisce causalità al digest e non qualifica
+UI, latenza, qualità clinica o uso clinico. Le misure successive sul prodotto
+restano prove distinte.
