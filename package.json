@@ -170,6 +170,7 @@
     "test:parity:smoke": "bash scripts/parity-smoke.sh",
     "test:anydoc-diagnostics": "node --test scripts/anydoc-http-diagnostic.test.mjs scripts/anydoc-consumer-diagnostic.test.mjs scripts/anydoc-diagnostic-correlation.test.mjs",
     "test:e2e": "playwright test --workers=1",
+    "e2e:gesti": "node scripts/measure-web-gestures.mjs",
     "e2e:web": "E2E_SPECS='e2e/web-smoke.spec.ts' bash scripts/e2e-smoke.sh",
     "e2e:ai-rollout-readiness": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts' bash scripts/e2e-smoke.sh",
     "e2e:ai-rollout-governance": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts e2e/patient-insight-kill-switch.spec.ts e2e/smart-import-kill-switch.spec.ts e2e/treatment-reasoning-kill-switch.spec.ts' bash scripts/e2e-smoke.sh",

@@ -241,7 +241,11 @@ for (const kind of ['read', 'post'] as const) {
         f.handle(() => new Promise(() => {}));
         const pending = kind === 'post' ? f.controller.activate() : f.controller.refresh();
         await until(() => f.calls.length === (kind === 'post' ? 2 : 1));
-        context.mock.timers.tick(kind === 'post' ? 70_001 : 10_001); await pending;
+        context.mock.timers.tick(kind === 'post' ? 69_999 : 9_999); await nextTurn();
+        assert.equal(f.calls.at(-1)?.init.signal?.aborted, false);
+        assert.equal(f.view().phase, kind === 'post' ? 'verifying' : 'reading_configuration');
+        context.mock.timers.tick(1);
+        assert.equal(f.calls.at(-1)?.init.signal?.aborted, true); await pending;
         assert.equal(f.view().messageCode, 'request_timed_out'); assert.equal(f.view().status, null);
         assert.equal(f.view().phase, 'interrupted'); assert.equal(f.calls.at(-1)?.init.signal?.aborted, true);
         const count = f.calls.length; context.mock.timers.tick(200_000); await nextTurn(); assert.equal(f.calls.length, count);
