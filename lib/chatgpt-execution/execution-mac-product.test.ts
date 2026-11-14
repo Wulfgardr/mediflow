@@ -8,7 +8,7 @@ import type { MacQualificationAudit } from './execution-mac-qualification';
 const { createMacProductPlatformManager } = await import('./execution-mac-product.ts');
 const { MacQualificationFailure } = await import('./execution-mac-qualification.ts');
 const { ExecutionError } = await import('./execution-contract.ts');
-const assets = () => ({ binaryPath: '/synthetic/codex', nativeSourcePath: '/synthetic/mac-owner.c', schemaDirectory: '/synthetic/schema', c1ReceiptPath: '/synthetic/c1' });
+const assets = () => ({ binaryPath: '/synthetic/codex', nativeSourcePath: '/synthetic/mac-owner.c', schemaDirectory: '/synthetic/schema', c1ReceiptPath: '/synthetic/c1', publicCaPath: '/synthetic/public-ca.pem' });
 const audit = (clean: boolean): MacQualificationAudit => ({
     schema: 'mediflow.mac-custody-audit.v1', run: 'synthetic', phase: 'revoked', stage: 'readback',
     claim: 'candidate_boundary_only_not_live_or_clinical', revision: null, baseContextSha256: '', sourceAvailable: true,

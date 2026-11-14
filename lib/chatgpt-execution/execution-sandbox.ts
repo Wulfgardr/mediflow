@@ -1,8 +1,7 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { readFileSync, realpathSync } from 'node:fs';
+import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
-import { rootCertificates } from 'node:tls';
 import { ExecutionError } from './execution-contract';
 
 // Binary, Apple sandbox support file and public CA bundle are pinned by digest.
@@ -16,11 +15,18 @@ export const EXECUTION_SUBSTRATE = Object.freeze({
 });
 export const DYLD_SUPPORT_PATH = '/System/Library/Sandbox/Profiles/dyld-support.sb';
 
-/** Only bundled public roots; never consult the user's keychain or environment. */
-export function executionPublicCaBundle(): string {
-    const pem = rootCertificates.join('\n');
-    if (createHash('sha256').update(pem).digest('hex') !== EXECUTION_SUBSTRATE.publicCaSha256) throw new ExecutionError('unqualified_boundary');
-    return pem;
+export const EXECUTION_PUBLIC_CA_PIN = Object.freeze({ bytes: 181304, sha256: EXECUTION_SUBSTRATE.publicCaSha256 });
+/** Read the qualified asset bytes, never the host runtime trust or keychain. */
+export function executionPublicCaBundle(path: string): string {
+    try {
+        const before = lstatSync(path);
+        if (!before.isFile() || before.isSymbolicLink() || before.size !== EXECUTION_PUBLIC_CA_PIN.bytes) throw new Error();
+        const bytes = readFileSync(path), after = lstatSync(path);
+        if (before.dev !== after.dev || before.ino !== after.ino || before.ctimeMs !== after.ctimeMs
+            || bytes.length !== EXECUTION_PUBLIC_CA_PIN.bytes
+            || createHash('sha256').update(bytes).digest('hex') !== EXECUTION_PUBLIC_CA_PIN.sha256) throw new Error();
+        return bytes.toString('utf8');
+    } catch { throw new ExecutionError('unqualified_boundary', null, 'public_ca_mismatch'); }
 }
 
 function literal(path: string): string {

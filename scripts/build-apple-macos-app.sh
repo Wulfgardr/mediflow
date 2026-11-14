@@ -238,7 +238,8 @@ if (( EXECUTION_MAC_STAGE_COUNT == ${#EXECUTION_MAC_STAGE_VARS[@]} )); then
     --binary "$MEDIFLOW_CHATGPT_EXECUTION_BINARY" \
     --native-source "$MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE" \
     --schema-directory "$MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY" \
-    --c1-receipt "$MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT"
+    --c1-receipt "$MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT" \
+    --public-ca "$ROOT_DIR/assets/chatgpt-execution/public-ca.pem"
 fi
 # absence is a packaging error, not a successful app with a HELD helper.
 node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \

@@ -1026,6 +1026,87 @@ mod tests {
             || route == "POST /api/v1/network/pairing/confirm"));
     }
 
+    fn conflict_with_initial_twelve(
+        cx: &mut gpui::TestAppContext,
+        draft: &str,
+        expected_after_conflict: &str,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, _| {
+            app.session = Some(host.session.clone());
+            app.patients = Load::Ready(Vec::new());
+            app.local_host.authority = Authority::Open(access);
+        });
+        let windows = |years| json!({"ambulatory_record":{"kind":"years","years":years}});
+        host.plan(&format!("GET {ROUTE}"))
+            .send((200, overview(1, windows(12))))
+            .unwrap();
+        plan_identities(&host, archived_patient());
+        view.update(cx, |app, cx| app.read_retention(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            app.local_host.retention.windows[0]
+                .update(cx, |input, cx| input.set_content(draft, cx));
+            assert_eq!(app.local_host.retention.windows[0].read(cx).value(), draft);
+            app.prepare_retention_windows(cx);
+        });
+        host.plan(&format!("PUT {ROUTE}"))
+            .send((409, json!({"code":"conflict"})))
+            .unwrap();
+        host.plan(&format!("GET {ROUTE}"))
+            .send((200, overview(2, windows(14))))
+            .unwrap();
+        plan_identities(&host, archived_patient());
+        view.update(cx, |app, cx| app.confirm_retention(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert_eq!(
+                app.local_host.retention.windows[0].read(cx).value(),
+                expected_after_conflict
+            );
+            assert_eq!(
+                app.local_host.retention.overview.as_ref().unwrap()["windowsRevision"],
+                2
+            );
+            assert!(app.local_host.retention.command.is_none());
+            assert!(app.local_host.retention.message.as_ref().unwrap().1);
+        });
+        assert_eq!(
+            host.bodies(&format!("PUT {ROUTE}")).len(),
+            1,
+            "no automatic retry"
+        );
+    }
+
+    #[gpui::test]
+    fn retention_conflict_equivalent_leading_zero_draft_follows_remote(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        conflict_with_initial_twelve(cx, "012", "14");
+    }
+
+    #[gpui::test]
+    fn retention_conflict_distinct_draft_preserves_thirteen(cx: &mut gpui::TestAppContext) {
+        conflict_with_initial_twelve(cx, "13", "13");
+    }
+
+    #[gpui::test]
+    fn retention_conflict_distinct_normalized_draft_preserves_leading_zero(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        conflict_with_initial_twelve(cx, "013", "013");
+    }
+
     #[gpui::test]
     fn retention_search_finds_a_patient_created_after_the_directory_was_read(
         cx: &mut gpui::TestAppContext,
@@ -1110,6 +1191,149 @@ mod tests {
             commands.iter().any(|id| id == "retention-hold-place-0"),
             "a newly created patient must be searchable without reopening Patients: {commands:?}"
         );
+        assert_eq!(
+            host.routes()
+                .iter()
+                .filter(|route| route.as_str() == "POST /api/v1/network/patients")
+                .count(),
+            1
+        );
+    }
+
+    #[gpui::test]
+    fn retention_revisit_after_patient_creation_refreshes_previously_open_page(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let mut first_overview = overview(0, json!({}));
+        first_overview["review"] = json!([]);
+        host.plan(&format!("GET {ROUTE}"))
+            .send((200, first_overview))
+            .unwrap();
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.patients = Load::Ready(vec![]);
+            app.area = Area::Settings;
+            app.settings_page = SettingsPage::Retention;
+            app.local_host.authority = Authority::Open(access.clone());
+            app.read_retention(cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, _| {
+            assert!(app.local_host.retention.overview.is_some());
+            app.area = Area::Patients;
+        });
+        host.plan("POST /api/v1/network/patients")
+            .send((201, json!({"id":"patient-a", "version":1})))
+            .unwrap();
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.patients = Load::Ready(vec![]);
+            app.local_host.authority = Authority::Open(access);
+            app.new_patient(cx);
+            for (index, value) in [
+                (0, "Amina"),
+                (1, "Sintetica"),
+                (2, "SYNTHETIC"),
+                (8, "other"),
+            ] {
+                app.form.as_mut().unwrap().fields[index]
+                    .editor
+                    .update(cx, |input, cx| input.set_content(value, cx));
+            }
+            app.form.as_mut().unwrap().state = FormState::Review;
+            app.confirm_form(cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, _| {
+            assert!(
+                app.form.is_none(),
+                "creation must be verified: {:?}",
+                app.message
+            );
+            assert_eq!(app.patient.detail.ready().unwrap().id, "patient-a");
+        });
+
+        let mut empty = overview(0, json!({}));
+        empty["review"] = json!([]);
+        host.plan(&format!("GET {ROUTE}"))
+            .send((200, empty))
+            .unwrap();
+        host.plan("GET /api/v1/network/patients")
+            .send((
+                200,
+                json!([
+                    {"id":"patient-a","firstName":"Amina","lastName":"Sintetica","birthDate":null,
+                     "taxCode":"SYNTHETIC","version":1}
+                ]),
+            ))
+            .unwrap();
+        host.plan("GET /api/v1/network/ai-runtime")
+            .send((503, json!({})))
+            .unwrap();
+        host.plan("GET /api/auth/profile")
+            .send((503, json!({})))
+            .unwrap();
+        view.update(cx, |app, cx| {
+            assert!(matches!(app.patients, Load::Idle));
+            assert_eq!(app.settings_page, SettingsPage::Retention);
+            app.navigate(Area::Settings, cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            app.local_host
+                .retention
+                .hold_patient
+                .update(cx, |input, cx| input.set_content("Sintetica", cx));
+            cx.notify();
+        });
+        let commands = rendered_command::button_ids(|| {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            })
+        });
+        assert!(
+            commands.iter().any(|id| id == "retention-hold-place-0"),
+            "returning to an already opened Retention page must refresh the invalidated directory: {commands:?}"
+        );
+        for (query, expected) in [
+            ("Amina", true),
+            ("Sintetica", true),
+            ("Sintetica Amina", true),
+            ("SYNTHETIC", false),
+        ] {
+            view.update(cx, |app, cx| {
+                app.local_host
+                    .retention
+                    .hold_patient
+                    .update(cx, |input, cx| input.set_content(query, cx));
+                cx.notify();
+            });
+            let commands = rendered_command::button_ids(|| {
+                cx.update(|window, cx| {
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                })
+            });
+            assert_eq!(
+                commands.iter().any(|id| id == "retention-hold-place-0"),
+                expected,
+                "retention searches surname and given name, not identifier: {query}"
+            );
+        }
         assert_eq!(
             host.routes()
                 .iter()

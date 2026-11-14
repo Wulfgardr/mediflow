@@ -1544,7 +1544,11 @@ impl ClinicalApp {
             } else if area == Area::Patients {
                 self.load_patients(cx);
             } else if area == Area::Settings {
-                self.load_ai_status(cx);
+                if self.settings_page == SettingsPage::Retention {
+                    self.read_retention(cx);
+                } else {
+                    self.load_ai_status(cx);
+                }
                 self.ensure_account_profile_loaded(cx);
             } else if area == Area::Scales {
                 self.load_scales(cx);

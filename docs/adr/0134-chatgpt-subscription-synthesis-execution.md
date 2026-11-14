@@ -821,3 +821,34 @@ minimizzata. Lo schema supplementare native-ordinary-v1 documenta gli stessi
 metadati additivi; richieste, grant, output clinico, parser e commit restano
 invariati. La decodifica nativa degli stati esistenti continua a ignorare i
 campi opzionali non presentati, senza attribuire loro autorità.
+
+## Fascio CA distribuito e indipendente dal Node dell'host (WUL-842)
+
+Data: 14 novembre 2026. Il pin introdotto dalla PR #540 qualifica i byte di
+`tls.rootCertificates.join('\n')` di Node 24.21.0. Ricostruirli dal Node
+corrente negava la preparazione dopo aggiornamenti ammessi da `>=24 <25`.
+Distribuiamo quei medesimi 181304 byte, con 121 CA e SHA-256
+`8403bc9ed3ae3e71b4af96a4d37c23999d7ba8c2fc9411fc6d6feb5e7ee8c4f7`,
+come ottavo asset macOS `public-ca.pem`. Non cambiamo il trust qualificato.
+
+La fonte conservata è `src/node_root_certs.h` del rilascio ufficiale Node
+24.21.0, con digest e licenza nel relativo file di provenienza.
+`scripts/regenerate-chatgpt-public-ca.mjs` verifica prima la fonte e poi
+ricostruisce i byte senza rete, eseguire C o consultare il runtime TLS.
+Il test confronta l'intero fascio con l'asset distribuito.
+
+Lo staging riceve un percorso esplicito `--public-ca`, verifica dimensione,
+digest e percorso fisico prima di scrivere e include il file nel layout
+esatto. Il ledger del payload registra e verifica anche questo file. Un
+asset assente, alterato, con CA aggiunte o non conforme al ledger nega
+l'avvio o la preparazione. Non esistono fallback al Node corrente, al
+portachiavi, a `NODE_EXTRA_CA_CERTS` o a percorsi scelti dall'ambiente.
+
+L'issuer rilegge i byte verificati, li scrive nel proprio file immutabile e
+li passa a Codex tramite `CODEX_CA_CERTIFICATE`. Il custode protegge il file;
+il proxy CONNECT resta inizialmente chiuso, con le due destinazioni già
+ammesse, e non termina TLS. Restano richiesti probe reale, readback,
+custodia corrente e consenso specifico prima di aprire il proxy.
+Il motivo pubblico `public_ca_mismatch` identifica solo il controllo CA:
+nessuna eccezione, percorso o impronta viene mostrata nel picker.
+Questa modifica non qualifica account, generazioni o uso clinico.
