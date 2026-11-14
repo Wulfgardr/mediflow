@@ -119,7 +119,7 @@ dati di pazienti o sessioni autenticate.
 ## Applicazione a MediFlow 0.8.6
 
 Alla prima applicazione descritta qui segue la
-[proposta strutturale macOS](./2026-09-06-086-macos-redesign.md), che introduce
+proposta strutturale macOS, che introduce
 una sola lista laterale e una cartella documentale. Il relativo verbale
 separa ciò che è implementato, ciò che è stato osservato e ciò che resta
 soggetto all'accettazione dell'utente.
@@ -152,6 +152,6 @@ Apple, nel candidato locale della lane
 Modalità demo e fixture di test verificano la presentazione, ma non
 sostituiscono pairing, scritture cliniche, condivisione esterna o installazione
 su dispositivi reali. Il
-[verbale Apple](../analysis/2026-09-06-086-apple-ui-verification.md) distingue
+verbale Apple distingue
 compilazione, test, osservazione UI e limiti; i log restano nella ricevuta
 locale della lane.

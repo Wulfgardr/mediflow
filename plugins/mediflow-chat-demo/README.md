@@ -63,7 +63,7 @@ dal monorepo upstream. Servono rete e porte locali 8080, 8081 e 3017 libere.
 Se una checkout contiene ancora la vecchia directory generata
 `tmp-chat-reference`, spostarla fuori dalla checkout prima dei test della guardia.
 Le due prove avviano e chiudono i propri server. Budget, metodo, compromessi
-e [misure prima/dopo](./evidence/2026-10-22-polish.md) sono riproducibili;
+e misure prima/dopo sono riproducibili;
 non attestano prestazioni di ogni desktop o provider.
 
 ## Due esiti diversi
@@ -164,7 +164,7 @@ sessioni e listener propri. Nessun archivio o plugin clinico va modificato.
 
 ## Prove e limiti
 
-[Esiti del 22 ottobre 2026](./evidence/2026-10-22.md). Le catture del reference
+Esiti del 22 ottobre 2026. Le catture del reference
 host documentano la superficie SDK, senza attribuirle gli esiti del desktop.
 La prova automatica usa un host simulato e il bridge SDK pubblicato. Verifica
 le sole notifiche tecniche, origine osservata, CORS, sessione, blocco, risposta

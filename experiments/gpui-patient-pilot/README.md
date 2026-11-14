@@ -9,9 +9,9 @@ prova con cinque pazienti inventati in memoria.
 Il lavoro è nella [PR 558](https://github.com/Wulfgardr/mediflow/pull/558),
 collegata a [WUL-706](https://linear.app/wulfgardr/issue/WUL-706) e
 [WUL-714](https://linear.app/wulfgardr/issue/WUL-714).
-Il [verbale del client collegato](../../docs/analysis/2026-10-17-rust-gpui-connected-client.md)
+Il verbale del client collegato
 riporta la copertura effettiva, il confronto old/new e le prove della finestra.
-Il [verbale del primo pilota](../../docs/analysis/2026-10-17-rust-gpui-patient-pilot.md)
+Il verbale del primo pilota
 e le immagini `linux-review.png` / `linux-saved-grafite.png` restano evidenza
 storica della demo; non documentano la nuova connessione.
 

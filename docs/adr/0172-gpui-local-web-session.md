@@ -156,5 +156,5 @@ consumer preesistenti o credenziali API.
 
 Questi consumer non concedono consenso né disponibilità per l'inferenza.
 Prova DEMO e consensi sul contenuto delle proposte restano distinti e ancora
-privi del nuovo consumer nativo. Il [rapporto G-2](../analysis/2026-10-30-gpui-g2-settings/models.md)
+privi del nuovo consumer nativo. Il rapporto G-2
 conserva limiti e alternative sui file dei modelli; il pull resta negato.

@@ -22,10 +22,6 @@ restano consultabili nell’[indice del tag v0.9.0](https://github.com/Wulfgardr
 Le voci storiche conservano date, conteggi, revisioni e limiti:
 la data di questo indice non rinnova le prove cui rimandano.
 
-Il [rapporto G-2 su accesso e modelli](analysis/2026-10-30-gpui-g2-settings/README.md)
-registra il delta nativo del 30 ottobre, le superfici di credenziali e i residui
-che richiedono una decisione esplicita.
-
 ## Preparazione indipendente delle future 0.9.x
 
 | File | Scopo | Quando consultarlo |
@@ -42,7 +38,6 @@ che richiedono una decisione esplicita.
 | [ADR 0187](./adr/0187-network-ingress-and-commit-authority.md) | Proposed: ingresso LAN paired, sessioni Web locali e autorità rivalidata al commit. | Per proxy TLS, writer network e conferma del pin nei client. |
 | [Nucleo CU-1a](./local-operation-core.md) | Protocollo chiuso, composizione host, autorità, journal e recupero con adapter simulato. | Per integrare CU-1b senza estendere il claim al client o ai servizi reali. |
 | [Censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) | Matrice di 66 funzioni, 36 route Web, 17 route Impostazioni e crosswalk CSV delle 205 righe della specifica; 40 unità PR proposte sotto G-1–9. | Per assegnare residui e prove, verificare writer e porte host, distinguere sorgente e pilota installato e chiudere i gate immediati. |
-| [Tranche indipendente 0.9.x](./analysis/2026-09-26-09x-independent-development.md) | Codice sintetico, demo, prove e prerequisiti delle patch successive. | Per riprodurre e riesaminare i candidati senza confonderli con il core 0.9.0. |
 | [Delta regolatorio futuro](./analysis/2026-09-26-09x-regulatory-delta.md) | Matrice candidata, fonti datate e responsabilità aperte WUL-738. | Prima di ampliare finalità, distribuzione o trattamento; non qualifica un deployment. |
 
 ## Ingresso progressivo e candidatura
@@ -53,19 +48,10 @@ versione o risalire alla provenienza di un’interfaccia.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [analysis/2026-09-26-rust-boundary-evaluation.md](./analysis/2026-09-26-rust-boundary-evaluation.md) | Preparazione WUL-706, prerequisiti, esperimento codec e confronto GPUI/Tauri/SwiftUI. | Prima della decisione Rust 0.9.2 o della valutazione shell 0.9.6. |
-| [analysis/2026-10-17-rust-gpui-patient-pilot.md](./analysis/2026-10-17-rust-gpui-patient-pilot.md) | Client Rust e UI GPUI della verticale paziente, prove locali e criteri ancora da qualificare. | Per riesaminare WUL-706/WUL-714 senza attribuire al pilota un'autorità clinica. |
-| [analysis/2026-10-17-rust-gpui-connected-client.md](./analysis/2026-10-17-rust-gpui-connected-client.md) | Client paired v3 collegato, copertura delle 17 schermate, confronto old/new, prove e limiti per piattaforma. | Per valutare la migrazione effettiva della shell e i criteri ancora aperti prima della sostituzione. |
-| [analysis/2026-10-17-rust-gpui-keyboard-recovery.md](./analysis/2026-10-17-rust-gpui-keyboard-recovery.md) | Parità della tastiera, resize compatto/desktop e nuove prove native attribuite alla build recuperata. | Per riesaminare focus, input, revisione e blocco distinguendo sequenza accettata, tentativo interrotto e disponibilità delle immagini. |
-| [analysis/2026-10-17-tsc-ts-migration-review.md](./analysis/2026-10-17-tsc-ts-migration-review.md) | Confronto misurato TypeScript 5.9 / TypeScript 7 / tsc-ts, compatibilità, driver e provenienza. | Per decidere sul typecheck sperimentale senza attribuire il risultato alla velocità del prodotto o alla migrazione del writer. |
 | [experiments/gpui-patient-pilot/README.md](../experiments/gpui-patient-pilot/README.md) | Avvio del client collegato e della demo distinta, percorsi, comandi, custodia e dipendenze. | Per compilare, provare o modificare il client Rust e la finestra GPUI. |
 | [experiments/gpui-patient-pilot/comparison/protocol.md](../experiments/gpui-patient-pilot/comparison/protocol.md) | Corpus, protocolli di confronto, scritture nominate, compatibilità della release, provenienza e misure. | Per riprodurre gli assert old/new senza confonderli con una qualifica completa del prodotto. |
 | [experiments/gpui-patient-pilot/evidence/connected-review.md](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected-review.md) | Review del trasporto, UI e delta host; regressioni, TLS e provenienza dell'issuer. | Per riesaminare protezioni, test osservati e limiti residui della connessione nativa. |
 | [experiments/gpui-patient-pilot/evidence/connected/release-v0.9.0-ui/README.md](https://github.com/Wulfgardr/mediflow/blob/ec4be829929f5c26e39a45676a9faf603931095e/experiments/gpui-patient-pilot/evidence/connected/release-v0.9.0-ui/README.md) | Schermate originali release, origine CI e equivalenza del tree Git. | Per confrontare geometrie e famiglia visuale senza attribuire al vecchio run prove della nuova UI. |
-| [analysis/2026-10-17-patient-notes-pilot.md](./analysis/2026-10-17-patient-notes-pilot.md) | Baseline cifrata continua di lettura/modifica note sui due ingressi HTTP correnti. | Per riprodurre le prove WUL-574 prima del collegamento al servizio condiviso. |
-| [analysis/2026-10-17-patient-profile-port.md](./analysis/2026-10-17-patient-profile-port.md) | Porta comune Web/API v1/paired, writer esistente e prove di conformità e HTTP old/new sul delta ricostruito. | Per valutare il confine condiviso senza dichiarare migrata l'autorità SQLite. |
-| [analysis/2026-10-18-pr558-soft-delete-delivery.md](./analysis/2026-10-18-pr558-soft-delete-delivery.md) | Guard tombstone attraverso route, porta e writer; prove e51 e sequenza WUL-582/573. | Per riprodurre la correzione iniziale senza confonderla con le successive modifiche di produzione. |
-| [analysis/2026-10-18-pr558-full-review-repairs.md](./analysis/2026-10-18-pr558-full-review-repairs.md) | Rilievi della review completa, scope per richiesta, controlli con ora locale, focus e ricevute del candidato. | Per riesaminare le correzioni e cercare nella PR il binding finale di review, CI e merge. |
 | [adr/0137-rust-boundary-pilot-proposal.md](./adr/0137-rust-boundary-pilot-proposal.md) | ADR Proposed: confine Rust condizionato, IPC/FFI, protocollo e rollback. | Per riesaminare la proposta, senza inferire accettazione o runtime. |
 | [adr/0145-rust-gpui-connected-client.md](./adr/0145-rust-gpui-connected-client.md) | Client Rust/GPUI paired v3, roster desktop, contratto visivo e confronto old/new. | Per riesaminare l'integrazione e distinguere shell, writer e qualifica mobile. |
 | [adr/0146-patient-profile-query-application-boundary.md](./adr/0146-patient-profile-query-application-boundary.md) | BT-01/S1: ammissione host, vista profilo scoped, handle revocabili e budget condiviso di 32 KiB. | Per verificare autorità Web/token locale/paired/FSE, grant headless esplicito, assenza di effetti della query e rollback. |
@@ -82,13 +68,7 @@ versione o risalire alla provenienza di un’interfaccia.
 | [adr/0158-territorial-packs.md](./adr/0158-territorial-packs.md) | WUL-785: nucleo internazionale e pacchetti territoriali governati dall’host. | Prima di separare capacità Italia/Lombardia o modificare migrazione e conservazione dello storico. |
 | [adr/0160-mediflow-in-desktop-chat.md](./adr/0160-mediflow-in-desktop-chat.md) | WUL-788: secondo round Proposed; canali per host, importazione, Fabric, viste, budget e pubblicazione. | Prima di implementare broker, accesso, scritture o distribuzione; non attesta ammissione clinica. |
 | [start-here.md](./start-here.md) | Esigenza ambulatoriale, uso senza AI e tre livelli di approfondimento. | Primo accesso al progetto. |
-| [release-085-readiness.md](./release-085-readiness.md) | Evidenze runtime, gate aperti, account Apple e promozione. | Prima di presentare o distribuire la 0.8.5. |
-| [getmediflow-editorial-proposal.md](./getmediflow-editorial-proposal.md) | Ragioni del racconto pubblico e rapporto tra sito, documentazione e runtime. | Revisione del racconto pubblico. |
-| [design/2026-09-05-086-runtime-twin.md](./design/2026-09-05-086-runtime-twin.md) | Gemello web sintetico 0.8.6, copertura, confronto visuale e launcher locale. | Esplorazione e verifica del candidato WUL-676. |
 | [design/2026-09-06-breccia-apple-reference.md](./design/2026-09-06-breccia-apple-reference.md) | Criteri ricavati da testo e fotogrammi Breccia, fonti e adattamenti Apple. | Prima di progettare o rifinire le app iPhone, iPad e Mac. |
-| [design/2026-09-06-086-macos-redesign.md](./design/2026-09-06-086-macos-redesign.md) | Proposta Mac con una sola lista laterale, gerarchia documentale e prove locali. | Revisione del redesign successivo alla prima rifinitura Apple 0.8.6. |
-| [analysis/2026-09-26-090-first-tranche.md](./analysis/2026-09-26-090-first-tranche.md) | Prima tranche locale 0.9.0: inventario, aggiornamento paziente atomico, audit pilota e riparazioni dei test. | Per distinguere candidati verificati, limiti e lavoro ancora aperto dalla release. |
-| [analysis/2026-10-15-c02-comparison.md](./analysis/2026-10-15-c02-comparison.md) | Confronto C02 delimitato: replay paziente senza AI, conteggi statici e contesto storico liste. | Per valutare il criterio 6 C20 distinguendo misure, limiti e dimensioni ND dalla release. |
 | [audit-writers.md](./audit-writers.md) | Classificazione dei writer audit correnti e residui clinici C05. | Prima di modificare un writer o verificare i criteri C04. |
 | [clinical-write-roster.md](./clinical-write-roster.md) | Operazioni cliniche per superficie, garanzie e residui C05. | Prima di modificare una scrittura, il suo parser o la sua prova. |
 | [authority-census.md](./authority-census.md) | Owner delle autorità e disposizioni correnti dei candidati C01, con limiti di provenienza. | Per verificare C01 o scegliere una semplificazione. |
@@ -116,7 +96,6 @@ distribuzione o sicurezza generale.
 | [security-audits/README.md](./security-audits/README.md) | Indice e regole editoriali dei rapporti pubblici di sicurezza. | Per trovare un audit, interpretarne lo stato o aggiungere un nuovo rapporto sanitizzato. |
 | [security-audits/2026-11-04-091-security-sweep.md](./security-audits/2026-11-04-091-security-sweep.md) | Ricognizione 0.9.1: correzioni S-01..S-04 con prove e rischi residui dichiarati. | Per le correzioni di sicurezza della 0.9.1 o per scegliere il prossimo lavoro di sicurezza. |
 | [security-audits/2026-10-01-network-patient-authority-fix.md](./security-audits/2026-10-01-network-patient-authority-fix.md) | Finding F-01/F-02, correzione, revisione esatta, prove, provenienza e limiti della candidata locale. | Prima della composizione con PR 372 o di qualunque claim di correzione distribuita. |
-| [analysis/2026-09-07-086-daybreak-security-review.md](./analysis/2026-09-07-086-daybreak-security-review.md) | Review Daybreak storica della 0.8.6 e addenda sanitizzati. | Solo per la revisione e il perimetro storici indicati nel rapporto. |
 
 <!-- @Codex -->
 ## Consegna 0.8.6
@@ -127,22 +106,6 @@ installer nativi firmati o notarizzati, non qualifica app complete per altri
 sistemi e non chiude l’ammissione al deployment clinico WUL-688. Il quadro
 corrente è nello [Stato del sistema](./STATE_OF_THE_SYSTEM.md); le voci qui
 raccolte consentono di ricostruire come si sia arrivati alla consegna.
-
-[Piano operativo configurazione e parità desktop](./analysis/2026-09-07-086-guided-configuration-plan.md) articola in sei fasi
-la richiesta del 7 settembre: impostazioni, ChatGPT, scelte per funzione,
-cataloghi e verifica dei target. Il piano non prova che ogni voce sia
-consegnata. La [Verifica di rilascio 0.8.6](./analysis/2026-09-07-086-release-verification.md) conserva SHA, ricevute,
-correzioni PIN/allegati, test e limiti: assenza di finding reportabili
-residui, autorizzazione del pacchetto, suite completa con un fallimento e
-attesa di CI/pubblicazione descrivono le candidature registrate, non lo
-stato corrente della release.
-
-Il [Verbale integrato](./analysis/2026-09-06-086-integrated-closeout.md) conserva prove e decisioni con la loro
-disposizione; la [Review Daybreak](./analysis/2026-09-07-086-daybreak-security-review.md) mantiene report inglese storico e
-addenda sanitizzati, senza attestare firma di produzione o RBAC per
-operatore, che resta fuori scope. La [Verifica della cartella Apple](./analysis/2026-09-06-086-apple-ui-verification.md)
-distingue sorgenti, toolchain, bozze e limiti del filone nativo, separato
-dalla consegna della 0.8.6.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
@@ -159,30 +122,14 @@ dalla consegna della 0.8.6.
 | [ADR 0125](./adr/0125-explicit-aifa-catalog-download.md) | Proposta di aggiornamento esplicito dalla fonte ufficiale AIFA. | Per implementare download limitato, conflitti e sostituzione atomica. |
 | [ADR 0127](./adr/0127-atomic-local-exemption-import.md) | Import esenzioni locale con anteprima, subset esplicito, CAS e commit atomico. | Per implementare o verificare WUL-690. |
 | [ADR 0133](./adr/0133-local-prosthetics-catalog-import.md) | Contratto candidato WUL-693: CSV protesica, import atomico, provenienza e backup. | Per importare un repertorio locale dichiarato. |
-| [Verifica UI integrata 0.8.6](./analysis/2026-09-06-086-integrated-ui-verification.md) | UI promossa senza flag: sorgenti, comandi e limiti. | Per distinguere la prova del candidato integrato dal confronto sintetico. |
-| [Chiusura funzionale locale 0.8.6](./analysis/2026-09-06-086-functional-closeout.md) | Candidate, controlli e limiti della tranche funzionale. | Prima della revisione finale e di ogni promozione. |
-| [Inventario first-party](./analysis/2026-09-06-086-code-inventory.md) | Copertura ripetibile e debito classificato. | Per scegliere tranche deslop motivate. |
 | [Matrice regolatoria 0.8.6](./analysis/2026-09-06-086-regulatory-evidence.md) | Fonti correnti, applicabilità condizionale, controlli e gap. | Revisione competente GDPR/AI Act; non certificazione. |
 | [ADR 0120](./adr/0120-local-work-profile-onboarding.md) | Raccomandazione locale e cambio reversibile del profilo. | Per onboarding, persistenza e rollback. |
-| [Verifica accesso](./analysis/2026-09-06-086-access-verification.md) | Matrice sintetica auth, lock, logout e recovery. | Per valutare copertura e limiti WUL-675. |
 | [ADR 0121](./adr/0121-function-status-projection.md) | Lettura autenticata dello stato delle funzioni. | Per modificare prerequisiti, errori e stati osservati. |
 | [ADR 0136](./adr/0136-explicit-web-local-provider-onboarding.md) | Verifica e attivazione Ollama con consenso Web esplicito e owner canonico. | Per onboarding locale, CAS, revoca e recupero. |
 | [ADR 0122](./adr/0122-local-provider-host-setup.md) | Ammissione esplicita Ollama nel processo host. | Per la CLI host; ADR 0136 governa il comando Web dedicato. |
 | [ADR 0129](./adr/0129-function-model-catalog-preferences.md) | Preferenze per esperienza e override da catalogo host sigillato. | Per CAS, preset e dispatch senza ammissione UI. |
 | [ADR 0130](./adr/0130-node-test-data-dir-preflight.md) | Data-dir esplicito per i test Node. | Per preflight, subprocess e cleanup delle fixture. |
 | [ADR 0138](./adr/0138-explicit-data-directory-bootstrap.md) | Nessuna adozione legacy implicita nella cartella dati scelta. | Per bootstrap, isolamento dei nuovi archivi e primo avvio nativo. |
-| [docs/analysis/2026-09-05-mediflow-086-baseline.md](./analysis/2026-09-05-mediflow-086-baseline.md) | Baseline WUL-670, prove sintetiche e recuperi selettivi. | Prima delle tranche 0.8.6; limiti runtime espliciti. |
-| [docs/analysis/2026-09-05-086-who-decision.md](./analysis/2026-09-05-086-who-decision.md) | Decisione utente per il sidecar WHO locale e analisi storica delle alternative. | Contesto WUL-672; implementazione corrente governata da ADR 0115 e setup, non prova live. |
-| [docs/roadmap-086-consolidamento.md](./roadmap-086-consolidamento.md) | Piano e issue Linear per OCR, WHO, UI/design arena, onboarding, deslop, GDPR/AI Act e recupero branch. | Prima di avviare le tranche 0.8.6; non è evidenza runtime o attestazione di conformità. |
-
-## Candidato Web 0.8.5
-
-Questa voce conserva un intervento della candidatura 0.8.5. Va letta con la
-sua revisione e non come attestazione della pubblicazione successiva.
-
-| File | Scopo | Quando consultarlo |
-| --- | --- | --- |
-| [docs/web-patient-edit-and-analytics-085.md](./web-patient-edit-and-analytics-085.md) | Snapshot del modulo, CAS iniziale, recupero parziale e metrica Schede per paziente. | Per ricostruire il contratto del candidato e verificare editor paziente/checkup o aggregazione diagnosi, senza dedurre lo stato d’integrazione dalla sola voce. |
 
 ## OCR locale 0.8.6
 
@@ -192,7 +139,6 @@ non autorizzano a dichiarare un OCR disponibile su ogni piattaforma.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [docs/analysis/2026-09-05-086-ocr-verification.md](./analysis/2026-09-05-086-ocr-verification.md) | Prove della prima tranche OCR e residui WUL-671. | Per riprendere errori/recupero e prova del pacchetto target. |
 | [docs/adr/0119-anydoc-apple-vision-current-source.md](./adr/0119-anydoc-apple-vision-current-source.md) | Precedenza AnyDoc e Apple Vision, matrice e preview OCR. | Per il percorso documentale; prevale sulle formulazioni incompatibili di ADR 0107/0111/0117. |
 
 ## ⚙️ Orchestrazione e governance (consultazione sempre)
@@ -232,7 +178,6 @@ sono certificati di equivalenza delle app o ricevute di distribuzione.
 | [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | Topologia dati, trust boundaries, cifratura e percorsi digitali, inclusi AnyDoc, proposte Fabric, artifact cifrati e boundary `network-home-base`. | Per analisi data flow e impatti sicurezza. |
 | [docs/repository-topology.md](./repository-topology.md) | Fonte canonica per repository operativa, confine Git/fuori-Git e aree top-level: runtime clinico, publication/site e tooling. | Quando devi scegliere repository, branch o collocazione di codice, asset e artefatti locali. |
 | [runtime-payload-ledger.md](./runtime-payload-ledger.md) | Inventario read-only del payload, confronto con roster fidato e gap di provenienza e qualifica. | Per censire un pacchetto locale o standalone senza eseguirlo, distinguendo lock input da byte distribuiti. |
-| [analysis/2026-10-08-c18-payload-inventory.md](./analysis/2026-10-08-c18-payload-inventory.md) | Prova C18 del pacchetto owner realmente installato, membri e digest, notice mancanti e advisory scope datato. | Per riesaminare WUL-733 senza inferire un SBOM completo o parità operativa Mac, Windows e Linux. |
 | [docs/parity-matrix.md](./parity-matrix.md) | Matrice localhost/Apple con 66 capability e conteggi 30/13/23; il gate P6 residuo è in `WUL-481` e le prove conservano la propria revisione. | Per steering parity, click-map P6 e release readiness Apple. |
 | [docs/known-limitations.md](./known-limitations.md) | Limiti noti della candidata sorgente 0.8, inclusi VoiceOver mobile, tooling di sviluppo e claim non autorizzati. | Per release readiness, note pubbliche, security posture e claim di accessibilità. |
 | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | Deep dive tecnico esteso dell'architettura MediFlow. | Per approfondimenti implementativi. |
@@ -270,8 +215,6 @@ contratti e nella valutazione competente del deployment.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/ROADMAP.md](./ROADMAP.md) | Roadmap prodotto canonica. | Per direzione prodotto/release narrative. |
-| [docs/analysis/2026-09-26-09x-preparation.md](./analysis/2026-09-26-09x-preparation.md) | Preparazione secondaria 0.9.1–0.9.7: raccordo con il consolidamento, sequenza del pilota e casi sintetici da verificare. | Per preparare le tappe successive senza duplicare la 0.9.0 o anticiparne i gate. |
-| [docs/product_roadmap.md](./product_roadmap.md) | Roadmap storica (deprecata). | Solo per contesto storico. |
 | [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: stato attuale del prodotto, boundary dichiarati e orientamento rapido. | Per onboarding rapido o lettura pubblica del progetto. |
 | [docs/COMPLIANCE.md](./COMPLIANCE.md) | Quadro compliance GDPR/FHIR e interoperabilità. | Per requisiti normativi e policy operative. |
 | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | Roadmap codifiche cliniche FSE/EDS. | Per sviluppo terminologie e export documentale. |
@@ -298,29 +241,15 @@ implementata perché è stata recuperata nell’inventario.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [docs/analysis/2026-07-17-baseline-performance.md](./analysis/2026-07-17-baseline-performance.md) | Baseline riproducibile delle route list principali su 200 e 2000 pazienti sintetici, con payload, tempi HTTP, costo di decifratura simulato e campioni grezzi JSON. | Quando si misura o confronta una modifica a query list, paginazione, allegati o decifratura client. |
-| [docs/analysis/2026-10-15-riflessione-prestazioni.md](./analysis/2026-10-15-riflessione-prestazioni.md) | Riflessione sulle prestazioni della 0.9.0: lanciatori in modalità sviluppo, richieste ripetute nella scheda, priorità stimate e protezioni da aggiungere in CI. | Quando si sceglie il prossimo intervento sulle prestazioni o si aggiunge una soglia di prestazione. |
-| [docs/analysis/2026-09-01-mediflow-0.8.5-final-verification.md](./analysis/2026-09-01-mediflow-0.8.5-final-verification.md) | Verbale finale locale 0.8.5 con matrice feature, percorsi verificati, evidenze ripetibili, prestazioni, esclusioni e gate nativi o tri-OS residui. | Quando si valuta il candidato sorgente locale 0.8.5 senza confonderlo con release, CI remota o certificazione. |
-| [docs/analysis/2026-09-01-mediflow-0.8.5-reopened-program-ledger.md](./analysis/2026-09-01-mediflow-0.8.5-reopened-program-ledger.md) | Ledger operativo della riapertura 0.8.5 con coda, ownership, routing card, worktree, gate ambientali e registro delle prove legate allo SHA. | Quando si coordina il rush finale senza confondere split del programma, implementazione, integrazione e release. |
-| [docs/analysis/2026-08-23-web-lume-recomposition-r0.md](./analysis/2026-08-23-web-lume-recomposition-r0.md) | Decision basis locale R0 per ancestry, equivalenza, collisioni e ordine depth-first della futura ricomposizione Web Lume. | Quando si riconciliano baseline Lume, Web #209 e tastiera #200 senza confondere candidato, integrazione e rilascio. |
-| [docs/analysis/2026-07-26-openminis-intelligent-scaffold-audit.md](./analysis/2026-07-26-openminis-intelligent-scaffold-audit.md) | Audit clean-room dei pattern OpenMinis per lo scaffold intelligente, con confini di riuso e divieti di importazione. | Quando si progetta lo scaffold provider o si valuta il riuso di pattern esterni senza importarne autorità o egress. |
-| [docs/analysis/2026-08-06-pk1-patient-insight-fabric-run.md](./analysis/2026-08-06-pk1-patient-insight-fabric-run.md) | Run record della wave PK-1: adozione Fabric su patient insight, quattro round writer/verifica, GO: VERIFIED, HOLD_REMOTE_PROMOTION invariato. | Quando si riprende o verifica l'adozione Fabric di patient insight o si prepara PK-2. |
 | [docs/capability-mapping/mediflow-0.8.5-crosswalk.md](./capability-mapping/mediflow-0.8.5-crosswalk.md) | Vista derivata del mapping WUL-522, con provenance congelata, copertura, conflitti residui e claim ceiling candidate-only. | Quando si verifica il mapping 0.8.5 senza trasformare inventari o gap in parity. |
-| [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md) | Triage secondario dell'audit esterno V2, collegato a `WUL-470` e figlie `WUL-471`..`WUL-475`, con separazione tra obiezioni misframed e residui azionabili su PIN, FHIR, MDR, sync futuro e drift ADR. | Quando si rivedono le issue nate dall'audit esterno V2 o serve recuperare il razionale completo dietro il tracker Linear. |
-| [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md) | Verbale secondario sul consolidamento di scaffold, flusso di controllo, attese e roadmap, riferito a `main` alla data della registrazione. | Quando si pianifica una nuova slice AI/euristica o si verifica cosa resta oltre le PR #39, #41, #42 e #43. |
-| [docs/analysis/2026-07-17-installabilita-v0-scope.md](./analysis/2026-07-17-installabilita-v0-scope.md) | Scope e proof macOS per WUL-455: confronto bundle Node, Tauri sidecar ed Electron, raccomandazione v0, build riproducibile e limiti non provati. | Quando si pianifica l'installabilita o si verifica la proof macOS avviabile senza Node installato sulla macchina di esecuzione. |
 | [docs/analysis/2026-07-26-apple-intelligence-dettatura-e-sintesi-on-device.md](./analysis/2026-07-26-apple-intelligence-dettatura-e-sintesi-on-device.md) | Mappa read-only delle API Apple on-device per dettatura e sintesi, senza decisione o funzione attivata. | Quando si valuta una futura capacità Apple Intelligence o il relativo confine privacy. |
 | [docs/analysis/2026-07-26-handover-interfaccia-apple.md](./analysis/2026-07-26-handover-interfaccia-apple.md) | Handover storico della prima armonizzazione UI Apple universale, con rettifiche e prove disponibili. | Quando si ricostruisce la provenienza del lavoro UI Apple precedente alla candidata 0.8. |
-| [docs/analysis/2026-07-27-parita-funzioni-quattro-superfici.md](./analysis/2026-07-27-parita-funzioni-quattro-superfici.md) | Inventario storico di 186 azioni e dei divari tra web, iPhone, iPad e macOS. | Quando si confronta la matrice canonica corrente con il rilevamento iniziale dei divari. |
 | [docs/markdown-index.md](./markdown-index.md) | Indice completo markdown con sintesi. | Per navigazione completa e controllo copertura doc. |
-| [docs/analysis/2026-10-24-measures/README.md](./analysis/2026-10-24-measures/README.md) | W-11 Misure: titolo e creazione stabili, lettura distinta dal vuoto, bozza e storico; prove per revisione e limiti residui. | Per verificare WUL-787, i consumer Quadro/Open Loops e la composizione Misure senza attribuire build o qualifica clinica. |
 | [docs/design/punto-inchiostro/02-addendum-composizione.md](./design/punto-inchiostro/02-addendum-composizione.md) | Regole compositive D1–D16, stati di form, vuoto, proposta e overflow, sequenza delle unità Web. | Per applicare l'addendum alla specifica Punto d'inchiostro senza cambiare flussi clinici o capacità dei servizi. |
 | [docs/openapi/README.md](./openapi/README.md) | Runbook operativo per manutenzione della spec OpenAPI `/api/v1`. | Quando si cambia il contratto client-facing o si fa review di drift. |
 | [docs/design/2026-07-26-agenda-clinica-e-scadenze.md](./design/2026-07-26-agenda-clinica-e-scadenze.md) | Intento di prodotto post-0.8 per un'agenda centrata su scadenze cliniche e terapeutiche. | Quando si pianifica l'evoluzione dell'agenda senza confonderla con lo stato consegnato. |
-| [docs/design/2026-07-26-cosa-mutuare-analisi-esterna.md](./design/2026-07-26-cosa-mutuare-analisi-esterna.md) | Confronto critico con studi e prodotti esterni per ridurre attrito senza impoverire l'informazione clinica. | Quando si valutano scelte di gerarchia, carico cognitivo o consolidamento dei flussi. |
 | [docs/design/2026-08-21-mini-headless-agent-cli.md](./design/2026-08-21-mini-headless-agent-cli.md) | Mini WUL-696: sessione Supervisor con parità dei comandi CLI, authority Web, revoca e prove sintetiche distinte dal DoD clinico. | Quando si usa o modifica Mini; contratto ADR 0117, punto di innesto UI e limiti delle prove sintetiche. |
 | [docs/design/2026-08-21-web-redesign-consolidamento.md](./design/2026-08-21-web-redesign-consolidamento.md) | Programma di consolidamento UI/UX web («un fuoco, una risposta») con baseline critique 23/40, interventi per vista e fasi P0-P2 verificate. | Prima di toccare navigazione, stati, tastiera o il dialetto CSS delle viste kree8. |
-| [docs/design/2026-08-21-identita-apple-proposte.md](./design/2026-08-21-identita-apple-proposte.md) | Tre direzioni d'identità Apple coerenti con Lume (Carta, Guardia, Strumento) con raccomandazione e piano di verifica; studio non target, verifica sbloccata dal volume Xcode del 2026-08-21. | Quando si sceglie l'identità visiva delle app Apple o si pianificano le prove runtime. |
 | [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md) | Ingresso della baseline storica e transitoria Vetro Clinico: glossario, ordine di lettura, regole redazionali e precedenza. | Quando serve riconciliare una superficie transitoria senza usarla come destinazione attiva. |
 | [docs/design/vetro-clinico/01-fondamenta.md](./design/vetro-clinico/01-fondamenta.md) | Principi, audit onesto della baseline Vetro Clinico e decisioni vincolanti di transizione. | Quando serve distinguere stato rilevato, debito e direzione di design separata. |
 | [docs/design/vetro-clinico/02-token.md](./design/vetro-clinico/02-token.md) | Architettura token a tre livelli, palette semantica, tipografia, geometria, motion e azioni di consolidamento. | Quando si valuta una modifica a colore, corpo testo, raggio, ombra, blur o durata. |
@@ -346,7 +275,6 @@ implementata perché è stata recuperata nell’inventario.
 | [docs/design/lume/09-icona.md](./design/lume/09-icona.md) | Specifica dell'icona MediFlow per macOS, iOS e web, con asset approvati e criteri di integrazione. | Quando si cablano o si verificano le icone dell'app e del web. |
 | [docs/design/lume/10-superficie-e-materiale.md](./design/lume/10-superficie-e-materiale.md) | Proposta misurata per la convergenza tra superfici Lume e materiali Apple. | Quando si valuta materiale, contrasto o gerarchia delle superfici; non trattarla come canone adottato. |
 | [docs/design/wul-271-kree8-visual-translation.md](./design/wul-271-kree8-visual-translation.md) | Traduzione visiva Kree8 → MediFlow per PIN gate, root entry live `/`, first real-patient cockpit slice e alias review `/mockups/kree8` (WUL-271/WUL-272/WUL-273/WUL-274). | Per ricostruire l’ingresso Kree8 e la migrazione delle superfici legacy; la voce non autorizza nuove prove con dati clinici reali. |
-| [docs/analysis/2026-07-30-smart-import-clinical-series-run.md](./analysis/2026-07-30-smart-import-clinical-series-run.md) | Run record sintetico del contratto provider-neutral, serie temporali e collegamento prescrizioni per Smart Import.  | Per ricostruire contratto, serie temporali e collegamento delle prescrizioni nelle prove sintetiche Smart Import. |
 
 ## 🧱 ADR (decisioni architetturali)
 
@@ -439,7 +367,6 @@ un’autorizzazione aggiuntiva né un’attestazione di runtime.
 | [docs/adr/0079-local-open-loops-and-result-link.md](./adr/0079-local-open-loops-and-result-link.md) | Accetta le attese locali deterministiche: prima slice web consegnata, salvataggio esplicito e nessuna estensione paired. |
 | [docs/adr/0080-serialize-sqlite-schema-guards-at-bootstrap.md](./adr/0080-serialize-sqlite-schema-guards-at-bootstrap.md) | Propone di serializzare le schema guard SQLite al bootstrap per rendere deterministici build e avvii multiprocesso. |
 | [docs/adr/0081-fhir-r4-export-v0-contract.md](./adr/0081-fhir-r4-export-v0-contract.md) | Decisione `Accepted`: fissa copertura, parità web/native, validazione locale e nessun claim FSE per l'export FHIR R4 v0. |
-| [docs/fhir-lifecycle-fix.md](./fhir-lifecycle-fix.md) | Candidato MF085-004: conserva archivio e setting nella proiezione FHIR nativa, con test e limiti v1 espliciti. |
 | [docs/adr/0082-persistent-expectations-register-v0.md](./adr/0082-persistent-expectations-register-v0.md) | Decisione `Accepted`: definisce un registro persistente host-only delle attese con provenienza univoca, matching fail-closed e conferma esplicita della chiusura. |
 | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | Fissa `WUL-199`: i preview profiles funzionali vengono ritirati da `main`, con AI e Smart Import gia live e il contesto paziente SISS promosso a parte stabile della scheda paziente. |
 | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | Formalizza `WUL-188`: family Apple ricostruita con core Swift condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come `home-base` autorevole e mobile paired senza accesso diretto a SQLite. |
@@ -470,7 +397,6 @@ un’autorizzazione aggiuntiva né un’attestazione di runtime.
 | [Plugin sintetico](../plugins/mediflow-synthetic/README.md) | Setup Node 24, dipendenze fissate, prove MCP/DOM/browser simulato e limiti di installazione. |
 | [Skill synthetic-review](../plugins/mediflow-synthetic/skills/synthetic-review/SKILL.md) | Workflow medico limitato a esempi inventati, senza accesso a cartelle cliniche o applicazione. |
 | [Lettore inline sintetico](../plugins/mediflow-chat-demo/README.md) | Pacchetto WUL-788, confini, prova R/L e configurazione locale reversibile. |
-| [Esiti del lettore inline sintetico, 22 ottobre 2026](../plugins/mediflow-chat-demo/evidence/2026-10-22.md) | Host di riferimento riuscito e client reale bloccato dalla quota; limiti e prove. |
 
 Il confronto con `rg --files -g '*.md' | sort` permette di verificare
 l’inventario. Ogni file deve comparire con una descrizione, la data «Ultimo
@@ -490,7 +416,6 @@ di ciascuna proposta e il limite di autorità dell’host.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [TREATMENT-PORTABLE-ADR.md](../proposals/TREATMENT-PORTABLE-ADR.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
 | [docs/adr/0076-macos-ordinary-proposal-only-addendum.md](./adr/0076-macos-ordinary-proposal-only-addendum.md) | Deroga candidata Mac per quattro proposte ordinarie, senza apply o persistenza document-derived. | Per verificare l’eccezione Mac circoscritta, senza estenderla ai client mobili o alle scritture cliniche. |
 
 ## Verifica formale circoscritta
