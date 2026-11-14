@@ -2,6 +2,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import reactHooks from "eslint-plugin-react-hooks";
+import { EFFECT_EXEMPT_PATTERNS, EFFECT_RESTRICTIONS } from "./scripts/use-effect-ratchet.mjs";
 
 // @Codex: apply the existing Next lint contract to the package CommonJS sources.
 const packageCommonJsConfig = {
@@ -41,6 +42,15 @@ const eslintConfig = defineConfig([
       "react-hooks/immutability": "warn",
       "react-hooks/purity": "warn",
     },
+  },
+  {
+    name: "mediflow/no-use-effect",
+    rules: { "no-restricted-syntax": ["error", ...EFFECT_RESTRICTIONS] },
+  },
+  {
+    name: "mediflow/use-effect-ratchet",
+    files: EFFECT_EXEMPT_PATTERNS,
+    rules: { "no-restricted-syntax": "off" },
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([
