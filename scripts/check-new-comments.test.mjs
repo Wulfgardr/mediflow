@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { GUIDANCE, findNewComments } from './check-new-comments.mjs';
+import { GUIDANCE, commentKind, findNewComments } from './check-new-comments.mjs';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'check-new-comments.mjs');
 
@@ -37,7 +37,8 @@ function fixtureRepo(t) {
         return findNewComments(repo, 'base').map(({ text }) => text);
     };
     const cli = () => spawnSync(process.execPath, [SCRIPT, '--base', 'base', '--repo', repo], { encoding: 'utf8' });
-    return { repo, write, commit, flagged, cli };
+    const moveBase = () => git(repo, 'branch', '-f', 'base');
+    return { repo, write, commit, flagged, cli, moveBase };
 }
 
 test('blocca commenti narrativi, ripieghi giustificati e codice commentato', (t) => {
@@ -117,4 +118,56 @@ test('la riga di comando esce 0 su un diff pulito e 1 con file, riga e indicazio
     assert.equal(result.status, 1);
     assert.match(result.stderr, /dirty\.ts:1: \/\/ racconto/);
     assert.ok(result.stderr.includes(GUIDANCE));
+});
+
+test('modificare una riga dentro un doc comment esistente resta ammesso, dentro un blocco normale no', (t) => {
+    const { write, commit, flagged, moveBase } = fixtureRepo(t);
+    write('api.ts', [
+        '/**',
+        ' * Documentazione originale della API pubblica.',
+        ' * Seconda riga.',
+        ' */',
+        'export function api() {}',
+        '/*',
+        ' * blocco narrativo',
+        ' */',
+        'export const x = 1;',
+        '',
+    ].join('\n'));
+    commit('api');
+    moveBase();
+    write('api.ts', [
+        '/**',
+        ' * Documentazione aggiornata della API pubblica.',
+        ' * Seconda riga.',
+        ' */',
+        'export function api() {}',
+        '/*',
+        ' * blocco narrativo riscritto',
+        ' */',
+        'export const x = 1;',
+        '',
+    ].join('\n'));
+    const got = flagged();
+    assert.ok(got.includes('* blocco narrativo riscritto'));
+    assert.ok(!got.some((line) => line.includes('Documentazione')));
+});
+
+test('un commento in coda dopo una stringa chiusa viene segnalato, un marcatore dentro una stringa no', () => {
+    assert.equal(commentKind('api.ts', 'const name = "patient"; // narrative'), 'trailing');
+    assert.equal(commentKind('api.ts', "const name = 'a'; // eslint-disable-line no-console"), 'trailing');
+    assert.equal(commentKind('api.ts', 'const s = `x ${y}`; // racconto'), 'trailing');
+    assert.equal(commentKind('api.ts', 'const s = "a // b";'), null);
+    assert.equal(commentKind('api.ts', "const s = 'it\\'s // ok';"), null);
+    assert.equal(commentKind('w.yml', 'key: "a # b"'), null);
+    assert.equal(commentKind('w.yml', 'key: "a" # spiega'), 'trailing');
+});
+
+test('aggiornare solo una riga di un doc comment esistente non viene segnalato', (t) => {
+    const { write, commit, flagged, moveBase } = fixtureRepo(t);
+    write('doc.ts', '/**\n * Documentazione originale della API pubblica.\n */\nexport function api() {}\n');
+    commit('doc');
+    moveBase();
+    write('doc.ts', '/**\n * Documentazione aggiornata della API pubblica.\n */\nexport function api() {}\n');
+    assert.deepEqual(flagged(), []);
 });
