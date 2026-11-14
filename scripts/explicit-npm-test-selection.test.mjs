@@ -235,7 +235,7 @@ console.log(JSON.stringify(result.files));`;
   assert.deepEqual(JSON.parse(result.stdout), [claimsFile]);
 });
 
-test('eight required npm script bodies and CI bindings select the actual independent expected paths', () => {
+test('ten required npm script bodies and CI bindings select the actual independent expected paths', () => {
   const actual = collectExplicitNpmSelections(sourceRoot);
   assert.deepEqual(Object.fromEntries(Object.entries(actual).map(([id, value]) => [id, value.files])), {
     'npm:test:launcher-helpers': ['scripts/launcher-helpers.test.mjs', 'scripts/windows-system-command.test.mjs'],
@@ -246,12 +246,16 @@ test('eight required npm script bodies and CI bindings select the actual indepen
     'npm:test:fabric-generative-runtime-crosswalk': ['scripts/check-fabric-generative-runtime-crosswalk.test.mjs'],
     'npm:test:anydoc-diagnostics': ['scripts/anydoc-http-diagnostic.test.mjs', 'scripts/anydoc-consumer-diagnostic.test.mjs', 'scripts/anydoc-diagnostic-correlation.test.mjs'],
     'npm:test:lume-tokens': ['scripts/check-lume-tokens.test.mjs'],
+    'npm:test:new-comments': ['scripts/check-new-comments.test.mjs'],
+    'npm:test:use-effect-ratchet': ['scripts/use-effect-ratchet.test.mjs'],
   });
   for (const suite of Object.values(actual)) assert.deepEqual(suite.errors, []);
   assert.equal(actual['npm:test:native-launcher'].binding.stepIf, "runner.os == 'macOS'");
   assert.deepEqual(actual[suiteId].binding.matrix.os, ['ubuntu-22.04', 'windows-latest', 'macos-latest']);
   assert.equal(actual[suiteId].binding.shell, null);
   assert.deepEqual(actual['npm:test:usage-dashboard'].binding.commands, ['test:usage-dashboard', 'check:usage-dashboard']);
+  assert.deepEqual(actual['npm:test:new-comments'].binding.commands, ['test:new-comments', 'check:new-comments']);
+  assert.deepEqual(actual['npm:test:use-effect-ratchet'].binding.commands, ['test:use-effect-ratchet', 'check:use-effect-ratchet']);
   assert.equal(collectUnitTestFiles(sourceRoot).filter(file => file === 'scripts/explicit-npm-test-selection.test.mjs').length, 1);
 });
 
