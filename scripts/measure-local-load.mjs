@@ -54,7 +54,7 @@ try{
    selectedAttachment=await db.attachments.add({id:crypto.randomUUID(),patientId,name,type:'application/pdf',size:file.length,data:'data:application/pdf;base64,'+file.toString('base64'),createdAt:new Date()},{attachmentCollection:view});
   }
   for(const mode of ['cold','warm']){
-   if(mode==='warm'){const attestation=await attestLocalOllamaModel('http://127.0.0.1:11434',model,AbortSignal.timeout(600000));if(attestation.digest!=='26025611beeb3fe9e4850b1fdae686bebba7cdfa7f13ddb04955f19872ee022a')throw new Error('warm_identity_mismatch');save('cl-warm-residency-'+scenario,{attestation,ps:await(await nativeFetch('http://127.0.0.1:11434/api/ps')).json()});}
+   if(mode==='warm'){const attestation=await(async()=>{globalThis.fetch=nativeFetch;try{return await attestLocalOllamaModel('http://127.0.0.1:11434',model,AbortSignal.timeout(600000));}finally{globalThis.fetch=request;}})();if(attestation.digest!=='26025611beeb3fe9e4850b1fdae686bebba7cdfa7f13ddb04955f19872ee022a')throw new Error('warm_identity_mismatch');save('cl-warm-residency-'+scenario,{attestation,ps:await(await nativeFetch('http://127.0.0.1:11434/api/ps')).json()});}
    for(let run=mode==='warm'?0:1;run<=30;run++){
     if(Date.now()-Number(process.env.CL_STARTED_MS)>5*60*60*1000){save('cl-cutoff',{at:new Date().toISOString(),scenario,mode,run});break;}
     currentCase=scenario+'/'+mode+'/'+run;aborter=null;
