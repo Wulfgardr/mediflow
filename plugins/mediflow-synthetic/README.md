@@ -107,7 +107,7 @@ Il protocollo è quello generato dal binario installato (`app-server
 generate-json-schema`); `plugin/read` è ancora indicato come in sviluppo
 nella [documentazione app-server](https://developers.openai.com/codex/app-server).
 Questo è un harness di qualifica locale, non un client production. Il seam
-[Proposed di disclosure](../../docs/analysis/2026-09-30-synthetic-mcp-disclosure-seam.md)
+Proposed di disclosure
 rimane separato, non collegato al plugin e con valutatore runtime chiuso.
 
 Nessun marketplace o installazione personale viene creato. L'artefatto sorgente

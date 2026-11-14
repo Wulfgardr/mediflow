@@ -201,5 +201,5 @@ repository and use only selected source/build artifacts, never clinical data.
 Advisory scanning, reachability, redistribution admission and clean-machine
 qualification remain explicit gaps. The generator always reports advisories
 as `NOT_CHECKED`; dated advisory findings and dispositions belong to the
-associated review. The [first scoped inventory](./analysis/2026-10-08-c18-payload-inventory.md)
+associated review. The first scoped inventory
 records one actual package exercise and its limits.

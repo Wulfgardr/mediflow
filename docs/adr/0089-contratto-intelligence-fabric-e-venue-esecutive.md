@@ -12,7 +12,7 @@ Related:
 [ADR 0077](./0077-ai-provider-abstraction-and-egress-anonymization-boundary.md),
 [ADR 0086](./0086-intelligent-scaffold-and-graded-automation-boundary.md),
 [ADR 0092](./0092-limite-digest-bound-readiness-ai-locale.md),
-[Audit OpenMinis](../analysis/2026-07-26-openminis-intelligent-scaffold-audit.md) e
+Audit OpenMinis e
 [Matrice serving](../ai-runtime-serving-matrix.md).
 
 ## Problema
