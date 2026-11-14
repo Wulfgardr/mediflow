@@ -105,7 +105,7 @@ docs/private/
 .next-visual-*/
 
 # Le catture PNG di docs/analysis pesavano 54 MB in ogni checkout e worktree.
-# Restano nella storia (docs/analysis/CATTURE.md); le nuove vanno nella PR.
+# Restano nella storia del repository (commit 5afa7f0f2); le nuove vanno nella PR.
 docs/analysis/**/*.png
 
 # Le prove dei giri GPUI restano nella storia (experiments/gpui-patient-pilot/evidence/README.md);

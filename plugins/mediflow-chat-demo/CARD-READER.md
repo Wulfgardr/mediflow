@@ -220,9 +220,7 @@ Su macOS il precedente `headless-shell` inizializzava sincronicamente
 WindowServer/TCC al primo ricalcolo dell’hover: la profilazione ha individuato
 una pausa di 51.6 ms nel renderer, con 1.9 ms di CPU. Non era lavoro HMAC,
 parsing o rendering della scheda. Il cambio di browser non cambia host,
-sandbox, osservatore o budget. Diagnosi e tre budget consecutivi sono in
-[`evidence/card-performance-profile.json`](evidence/card-performance-profile.json)
-e [`evidence/card-reference-summary.json`](evidence/card-reference-summary.json).
+sandbox, osservatore o budget. Diagnosi e tre budget consecutivi restano nella storia Git del repository.
 
 Il controllo negativo verifica 75 ms di lavoro sincrono al clic, che devono
 fallire il gate dei long task oltre 50 ms, oltre a 150 ms di blocco del clic e 2200 ms
