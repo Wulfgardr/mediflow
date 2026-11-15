@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { test, type TestContext } from 'node:test';
+import { test as nodeTest, type TestContext } from 'node:test';
 import { chromium } from '@playwright/test';
 import { secureLaunch } from '../../../e2e/fixtures/secure-browser.ts';
 import { createSyntheticSpecialistDemo as specialistFixture, SYNTHETIC_DECISION, SPECIALIST_SENTINELS } from './synthetic-demo.test-support.ts';
@@ -11,6 +11,8 @@ import { physicianSubmit } from './browser-adapter.ts';
 import { launchConfinedBrowser } from './browser-network.ts';
 import { portalAttributes, type ProcedureSnapshot } from '../contract.ts';
 import { recordSpecialistOutcome } from './outcome-service.ts';
+
+const test = (name: string, fn: (t: TestContext) => Promise<void>) => nodeTest(name, { timeout: 120_000 }, fn);
 
 type Fixture = Awaited<ReturnType<typeof specialistFixture>>;
 async function fixture(t: TestContext, mode: 'protected' | 'manual' = 'protected') {
