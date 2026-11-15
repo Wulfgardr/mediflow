@@ -843,6 +843,8 @@ impl ClinicalApp {
             this.voice_model.shutdown();
             let local_access = this.local_host.withdraw(cx);
             #[cfg(unix)]
+            this.chat_access.voice.retire_before_exit(cx);
+            #[cfg(unix)]
             this.chat_access.detach(cx);
             #[cfg(unix)]
             this.patient_document.detach(cx);
