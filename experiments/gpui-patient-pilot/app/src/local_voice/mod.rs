@@ -50,13 +50,13 @@ impl State {
 pub(crate) const LIMIT_REACHED: &str =
     "La registrazione si è fermata da sola: 60 minuti o 80.000 caratteri sono il massimo.";
 
-/// Testo massimo della revisione: la trascrizione più le etichette di medico e
-/// paziente e le correzioni. Resta sotto i 262.144 caratteri UTF-16 di una
-/// voce di diario.
 /// Attesa massima del rilascio del motore all'uscita dell'app: il thread
 /// finisce prima il passo in corso (verifica del modello, caricamento o una
 /// decodifica).
 pub(crate) const RELEASE_BEFORE_EXIT: std::time::Duration = std::time::Duration::from_secs(10);
+/// Testo massimo della revisione: la trascrizione più le etichette di medico e
+/// paziente e le correzioni. Resta sotto i 262.144 caratteri UTF-16 di una
+/// voce di diario.
 pub(crate) const MAX_REVIEW_CHARS: usize = 120_000;
 
 impl Fault {
