@@ -67,7 +67,9 @@ export async function createSyntheticSpecialistDemo(finalAct: 'protected' | 'man
         .run('demo-operation', 'demo-patient', now / 1000, cipher.seal('Prestazioni inventate'), cipher.seal(decision.clinicalQuestion), cipher.seal(JSON.stringify({ decision })));
     plan = resolvePlan(); portal.configure(plan);
     const browser = await createSyntheticSpecialistBrowser({ plan: () => plan, cookie: portal.cookie,
-        verifyReceipt: async (ctx, receipt) => { ctx.assertCurrent(); return portal.verifyReceipt(receipt); } });
+        verifyReceipt: async (ctx, receipt) => { ctx.assertCurrent(); return portal.verifyReceipt(receipt); } }).catch(async error => {
+        await portal.close(); db.close(); rmSync(directory, { recursive: true, force: true }); throw error;
+    });
     browser.context.setDefaultTimeout(2500); browser.context.setDefaultNavigationTimeout(2500);
     const listeners = new Set<() => void>(), reviews: LocalOperationPlan[] = [];
     let confirm: (plan: Readonly<LocalOperationPlan>) => Promise<boolean> = async plan => { reviews.push(structuredClone(plan)); return native ? native.confirm(plan) : true; };

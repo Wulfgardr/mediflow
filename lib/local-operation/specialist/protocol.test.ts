@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test as nodeTest, type TestContext } from 'node:test';
 import { fork } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { createSyntheticSpecialistDemo as specialistFixture, SPECIALIST_SENTINELS } from './synthetic-demo.test-support.ts';
 import { LOCAL_OPERATION_RPC_MODE, LOCAL_OPERATION_TOOL_DESCRIPTOR, localOperationResultSchema } from '../../../packages/mcp/src/local-operation-contract.ts';
+
+const test = (name: string, fn: (t: TestContext) => Promise<void>) => nodeTest(name, { timeout: 120_000 }, fn);
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 test('CU-1 verticale: cattura reale MCP content, structuredContent, _meta, errori, stderr, IPC e log contro allowlist', async t => {

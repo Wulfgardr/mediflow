@@ -81,7 +81,21 @@ jobs:
             printf 'MEDIFLOW_DATA_DIR=%s\n' "${DATA_DIR}"
             printf 'MEDIFLOW_WEB_CORE_DATA_DIR=%s\n' "${DATA_DIR}"
           } >> "${GITHUB_ENV}"
-      - run: npm run test:unit
+      - name: Enable the Chromium renderer sandbox
+        timeout-minutes: 3
+        run: |
+          probe() {
+            node --input-type=module -e "import { chromium } from '@playwright/test';
+            const browser = await chromium.launch({ chromiumSandbox: true, timeout: 30000 });
+            const page = await browser.newPage(); await page.setContent('<p>sandbox</p>'); await browser.close();"
+          }
+          sysctl kernel.apparmor_restrict_unprivileged_userns || true
+          if probe; then echo 'sandboxed Chromium starts with the runner defaults'; else echo 'sandboxed Chromium does not start with the runner defaults'; fi
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          probe
+      - name: Unit tests
+        timeout-minutes: 40
+        run: npm run test:unit
       - name: Historical schema origins converge to the fresh schema
         run: |
           node scripts/probe-historical-sql-baselines.mjs > "$RUNNER_TEMP/schema-convergence.json" \

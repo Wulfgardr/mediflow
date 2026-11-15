@@ -13,7 +13,7 @@ export async function createSyntheticSpecialistBrowser(input: {
     if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) deny();
     let runtime = await launchConfinedBrowser();
     let context = runtime.context;
-    let page = await context.newPage();
+    let page = await context.newPage().catch(async error => { await runtime.close(); throw error; });
     let stopping: Promise<void> = Promise.resolve();
     const transports = new Set<APIRequestContext>();
     let authority: { ctx: AdapterContext; phase: Destination['purpose']; blocked: boolean; census?: CensusDispatch } | null = null;
@@ -59,7 +59,7 @@ export async function createSyntheticSpecialistBrowser(input: {
         surface.on('download', download => { if (authority) authority.blocked = true; void download.cancel(); });
         surface.on('worker', () => { if (authority) authority.blocked = true; });
     }
-    await configure();
+    await configure().catch(async error => { await runtime.close(); throw error; });
     async function during<T>(ctx: AdapterContext, phase: Destination['purpose'], action: () => Promise<T>): Promise<T> {
         await stopping;
         ctx.assertCurrent();
