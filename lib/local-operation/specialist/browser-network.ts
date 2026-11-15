@@ -13,7 +13,7 @@ export async function launchConfinedBrowser() {
     await new Promise<void>(resolve => { proxy.listen(0, '127.0.0.1', resolve); });
     const address = proxy.address(); if (!address || typeof address === 'string') deny();
     const proxySwitch = `--proxy-server=http://127.0.0.1:${address.port}`;
-    const browser = await chromium.launch({ headless: true, args: [proxySwitch, ...switches] }).catch(async error => {
+    const browser = await chromium.launch({ headless: true, chromiumSandbox: true, args: [proxySwitch, ...switches] }).catch(async error => {
         await closeProxy(); throw error;
     });
     async function closeProxy() {
@@ -23,7 +23,7 @@ export async function launchConfinedBrowser() {
     try {
         const cdp = await browser.newBrowserCDPSession();
         const { arguments: actual } = await cdp.send('Browser.getBrowserCommandLine');
-        if (![proxySwitch, ...switches].every(value => actual.includes(value))) deny();
+        if (actual.includes('--no-sandbox') || ![proxySwitch, ...switches].every(value => actual.includes(value))) deny();
         await cdp.detach();
         const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: false });
         context.setDefaultTimeout(2500); context.setDefaultNavigationTimeout(2500);

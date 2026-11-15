@@ -28,7 +28,10 @@ function run(label, file, expected, pattern) {
 function mutateFiles(label, edits, pattern, testFile = suite) {
     if (!selected.test(label)) return;
     const directory = path.join(owned, label); fs.mkdirSync(directory);
-    for (const subtree of ['lib', 'packages']) fs.cpSync(path.join(root, subtree), path.join(directory, subtree), { recursive: true });
+    for (const subtree of ['lib', 'packages', 'e2e/fixtures/secure-browser.ts']) {
+        fs.mkdirSync(path.dirname(path.join(directory, subtree)), { recursive: true });
+        fs.cpSync(path.join(root, subtree), path.join(directory, subtree), { recursive: true });
+    }
     fs.symlinkSync(path.join(root, 'node_modules'), path.join(directory, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
     for (const [relative, before, after] of edits) {
         const file = path.join(directory, relative), original = fs.readFileSync(file, 'utf8');
@@ -59,6 +62,8 @@ try {
         "const switches = ['--proxy-bypass-list=<-loopback>', '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',\n    '--disable-quic', '--host-resolver-rules=MAP * ~NOTFOUND'];",
         "const switches = ['--proxy-bypass-list=*', '--force-webrtc-ip-handling-policy=disable_non_proxied_udp', '--disable-quic'];",
         'canale non mediato sconosciuto');
+    mutate('renderer-sandbox', 'lib/local-operation/specialist/browser-network.ts',
+        "chromiumSandbox: true, ", '', 'sandbox del renderer');
     mutate('close-on-revoke', 'lib/local-operation/specialist/browser-adapter.ts', 'runtime.close(), ', '', 'revoca chiude un canale');
     mutate('resource-channel', 'lib/local-operation/specialist/browser-adapter.ts', "request.resourceType() !== 'document' || ", '', 'risorsa con URL');
     mutateFiles('control-inventory', [
