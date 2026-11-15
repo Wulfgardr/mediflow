@@ -233,6 +233,8 @@ pub(crate) struct WhisperSession {
     shared: Arc<Mutex<Shared>>,
     commands: Sender<Event>,
     worker: Option<JoinHandle<()>>,
+    /// Si chiude quando il thread di lavoro è uscito e ha rilasciato tutto.
+    done: Option<Receiver<()>>,
 }
 
 impl WhisperSession {
@@ -240,15 +242,33 @@ impl WhisperSession {
         let shared = Arc::new(Mutex::new(Shared::default()));
         let (commands, receiver) = mpsc::channel();
         let worker_shared = shared.clone();
+        let (alive, done) = mpsc::channel::<()>();
         let worker = std::thread::Builder::new()
             .name("mediflow-voce-locale".into())
-            .spawn(move || run(engine, source, receiver, worker_shared))
+            .spawn(move || {
+                let _alive = alive;
+                run(engine, source, receiver, worker_shared);
+            })
             .ok();
         Self {
             shared,
             commands,
             worker,
+            done: Some(done),
         }
+    }
+    /// Ritiro che aspetta il rilascio del motore, al massimo `limit`. Serve
+    /// prima di `exit()`: la distruzione statica del dispositivo Metal di
+    /// ggml abortisce se trova ancora buffer di un contesto whisper.
+    pub(crate) fn close(mut self, limit: Duration) -> bool {
+        let done = self.done.take();
+        drop(self);
+        done.is_none_or(|done| {
+            matches!(
+                done.recv_timeout(limit),
+                Err(RecvTimeoutError::Disconnected)
+            )
+        })
     }
     /// Comando del medico: il thread lo esegue solo se la macchina lo
     /// ammette nello stato in cui lo trova.
@@ -359,7 +379,9 @@ impl WhisperSession {
         let shared = Arc::new(Mutex::new(Shared::default()));
         let (commands, receiver) = mpsc::channel();
         let worker_shared = shared.clone();
+        let (alive, done) = mpsc::channel::<()>();
         let worker = std::thread::spawn(move || {
+            let _alive = alive;
             let mut source = source;
             if !wait_for_start(&receiver, &worker_shared) {
                 return;
@@ -370,6 +392,7 @@ impl WhisperSession {
             shared,
             commands,
             worker: Some(worker),
+            done: Some(done),
         }
     }
     #[cfg(test)]
@@ -686,6 +709,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
             let segments = dictation.segments().to_vec();
             let speakers = attribute(shared, &dictation);
             dictation.wipe();
+            drop(dictation);
             publish(shared, |s| {
                 s.stable.zeroize();
                 s.provisional.zeroize();
@@ -728,6 +752,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
     #[cfg(test)]
     let windows = dictation.windows.clone();
     dictation.wipe();
+    drop(dictation);
     publish(shared, |s| {
         s.finals = finals;
         s.segments = segments;
@@ -1616,7 +1641,7 @@ pub(crate) mod tests {
                 "{word:?} missing: {lower}"
             );
         }
-        drop(session);
+        assert!(session.close(Duration::from_secs(30)), "engine released");
         std::fs::remove_dir_all(directory).unwrap();
     }
 
@@ -1741,10 +1766,7 @@ pub(crate) mod tests {
             "audio {seconds:.0} s, calcolo {wall:.0} s, RSS massimo {max_rss} MB, {} caratteri",
             text.chars().count()
         );
-        // Il thread di lavoro libera il contesto Metal prima dell'uscita del
-        // processo di prova.
-        drop(session);
-        std::thread::sleep(Duration::from_secs(2));
+        assert!(session.close(Duration::from_secs(30)), "engine released");
         assert!(max_retained <= RETAINED_BOUND);
     }
 
@@ -1842,6 +1864,7 @@ pub(crate) mod tests {
                 })
             )
             .unwrap();
+            assert!(session.close(Duration::from_secs(30)), "engine released");
         }
     }
 }
