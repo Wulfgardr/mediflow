@@ -62,7 +62,7 @@ impl LocalVoice {
         Self { work: None, editor }
     }
     pub(super) fn retire(&mut self, cx: &mut App) {
-        drop(self.withdraw(cx));
+        self.withdraw(cx);
     }
     /// All'uscita dell'app: come il ritiro, ma aspetta il rilascio del motore.
     pub(super) fn retire_before_exit(&mut self, cx: &mut App) {
