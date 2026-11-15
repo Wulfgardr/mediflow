@@ -53,6 +53,10 @@ pub(crate) const LIMIT_REACHED: &str =
 /// Testo massimo della revisione: la trascrizione più le etichette di medico e
 /// paziente e le correzioni. Resta sotto i 262.144 caratteri UTF-16 di una
 /// voce di diario.
+/// Attesa massima del rilascio del motore all'uscita dell'app: il thread
+/// finisce prima il passo in corso (verifica del modello, caricamento o una
+/// decodifica).
+pub(crate) const RELEASE_BEFORE_EXIT: std::time::Duration = std::time::Duration::from_secs(10);
 pub(crate) const MAX_REVIEW_CHARS: usize = 120_000;
 
 impl Fault {
@@ -347,6 +351,18 @@ impl Session {
                 .and_then(|text| reviewed_text(whisper.state(), &text));
         }
         None
+    }
+    /// Ritira la sessione e aspetta, al massimo `limit`, che il motore sia
+    /// rilasciato. Solo per l'uscita del processo.
+    pub(crate) fn close(self, limit: std::time::Duration) -> bool {
+        match self.backend {
+            #[cfg(target_os = "macos")]
+            Backend::Whisper(whisper) => whisper.close(limit),
+            _ => {
+                let _ = limit;
+                true
+            }
+        }
     }
 }
 

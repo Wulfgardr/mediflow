@@ -62,12 +62,23 @@ impl LocalVoice {
         Self { work: None, editor }
     }
     pub(super) fn retire(&mut self, cx: &mut App) {
-        if let Some(work) = self.work.take()
+        drop(self.withdraw(cx));
+    }
+    /// All'uscita dell'app: come il ritiro, ma aspetta il rilascio del motore.
+    pub(super) fn retire_before_exit(&mut self, cx: &mut App) {
+        if let Some(session) = self.withdraw(cx) {
+            session.close(crate::local_voice::RELEASE_BEFORE_EXIT);
+        }
+    }
+    fn withdraw(&mut self, cx: &mut App) -> Option<Session> {
+        let work = self.work.take();
+        if let Some(work) = &work
             && let Ok(mut pending) = work.pending.lock()
         {
             pending.withdraw();
         }
         self.editor.update(cx, |input, cx| input.retire(cx));
+        work.map(|work| work.session)
     }
 }
 impl ClinicalApp {
@@ -1836,5 +1847,105 @@ mod tests {
             ids,
             ["chat-voice-pause", "chat-voice-stop", "chat-voice-discard"]
         );
+    }
+
+    /// Decodificatore finto il cui rilascio dura come quello del contesto
+    /// whisper con Metal: il processo può uscire solo dopo.
+    struct SlowRelease {
+        inner: crate::local_voice::listening::tests::CountingDecoder,
+        released: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    }
+    impl crate::local_voice::listening::Decoder for SlowRelease {
+        fn decode(
+            &mut self,
+            audio: &[f32],
+        ) -> Result<zeroize::Zeroizing<String>, crate::local_voice::listening::EngineFailure>
+        {
+            self.inner.decode(audio)
+        }
+    }
+    impl Drop for SlowRelease {
+        fn drop(&mut self) {
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            self.released
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    /// Cmd-Q dopo una dettatura, con il testo ancora da rivedere: quando il
+    /// gestore di uscita della shell torna, il motore è già rilasciato. Dopo
+    /// viene `exit()`, che distrugge il dispositivo Metal di ggml e abortisce
+    /// se trova ancora buffer vivi.
+    #[gpui::test]
+    fn quitting_after_a_dictation_releases_the_engine_before_exit(cx: &mut gpui::TestAppContext) {
+        use crate::local_voice::listening::tests::{LoudnessDetector, tone};
+        use crate::local_voice::whisper::{WhisperSession, tests::InjectedSource};
+        let host = Host::new();
+        let released = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let whisper = WhisperSession::with_parts(
+            LoudnessDetector,
+            SlowRelease {
+                inner: Default::default(),
+                released: released.clone(),
+            },
+            Box::new(InjectedSource::new(tone(3.0))),
+        );
+        let (view, cx, _remote) = recording_app(cx, &host, Session::with_whisper(whisper));
+        cx.update_window_entity(&view, |app, _, _| {
+            app.chat_access.voice.work.as_ref().unwrap().session.start();
+        });
+        let mut filled = false;
+        for _ in 0..2_000 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            filled = cx.update_window_entity(&view, |app, _, cx| {
+                app.poll_chat_voice(cx);
+                app.chat_access.voice.work.as_ref().unwrap().filled
+            });
+            if filled {
+                break;
+            }
+        }
+        assert!(filled, "no review text");
+        cx.cx.update(|cx| cx.shutdown());
+        assert!(
+            released.load(std::sync::atomic::Ordering::SeqCst),
+            "engine still alive when the app exits"
+        );
+    }
+
+    /// Cmd-Q durante l'ascolto, con una decodifica in corso: l'uscita aspetta
+    /// che il thread la finisca e rilasci il motore.
+    #[gpui::test]
+    fn quitting_during_a_decode_waits_for_the_engine_release(cx: &mut gpui::TestAppContext) {
+        use crate::local_voice::listening::tests::{LoudnessDetector, tone};
+        use crate::local_voice::whisper::{
+            WhisperSession,
+            tests::{BlockingDecoder, InjectedSource},
+        };
+        let host = Host::new();
+        let (decoder, gate) = BlockingDecoder::new();
+        let whisper = WhisperSession::with_parts(
+            LoudnessDetector,
+            decoder,
+            Box::new(InjectedSource::new(tone(30.0))),
+        );
+        let (view, cx, _remote) = recording_app(cx, &host, Session::with_whisper(whisper));
+        cx.update_window_entity(&view, |app, _, _| {
+            app.chat_access.voice.work.as_ref().unwrap().session.start();
+        });
+        gate.entered
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("decode started");
+        let release = gate.release.clone();
+        let opener = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            BlockingDecoder::open(&release);
+        });
+        cx.cx.update(|cx| cx.shutdown());
+        assert!(
+            gate.finished.try_recv().is_ok(),
+            "engine still alive when the app exits"
+        );
+        opener.join().unwrap();
     }
 }
