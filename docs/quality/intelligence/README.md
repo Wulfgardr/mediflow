@@ -137,3 +137,14 @@ a route fredde e li risolve preparando le route prima della selezione. Document
 Synthesis richiede inoltre un formato supportato: stesso testo sintetico in PDF.
 Le tre funzioni restituiscono HTTP 200 con una inferenza ciascuna; la copertura
 RSS resta incompleta, senza qualifica o accettazione semantica.
+
+
+## Misure Ollama del 14 novembre 2026
+
+Il registro corrente usa [le distribuzioni numeriche](2026-11-14-ollama/measurements.json) della seconda tornata: cinque scenari, trenta esiti freddi e trenta caldi ciascuno. Errori compresi nei percentili; warmup distinti. [Metodo](2026-11-14-ollama/metodo-v3.md) e [ripresa dopo interruzione esterna](2026-11-14-ollama/resume-method.md) legano sorgente, build e parti conservate. La revisione misurata e bfddf87a5334fd7d86d7c184deac77630a332042; gli aggiornamenti successivi di main introducono documentazione e ratchet, senza cambiare il prodotto misurato.
+
+Il [replay degli scarti](2026-11-14-ollama/rejections.json) distingue tentativi respinti da operazioni definitivamente fallite e concorda con ogni esito registrato. I [24 scarti storici e il warmup](2026-11-14-ollama/historical-rejections.json) restano senza contenuto recuperabile: non vengono attribuite loro le regole della nuova tornata.
+
+Sintesi riesce con ricevuta locale e zero scritture. La [revoca](2026-11-14-ollama/i2-interventions.json) nega la pubblicazione, ma la richiesta Ollama termina dopo il lock. Solo Import produce un budget C-L numerico senza errori; gli altri budget restano nulli con motivo. Le tre celle ChatGPT hanno una disposizione esplicita di mancata esecuzione per I-4. Nessuna cella e qualificata. RSS e memoria GPU non sono misure fisiche disgiunte; GPU non misurata separatamente, superfici e accettazione clinica non verificate. Il [redattore](2026-11-14-ollama/component.json) copre il solo componente su diecimila caratteri. [Chiusura dei processi](2026-11-14-ollama/cleanup.json).
+
+Il [registro del 13 novembre](2026-11-13-ollama/registro-storico.json) conserva byte per byte la fotografia precedente e tutti i suoi controlli. I nuovi test verificano il registro attivo, i budget fissi e controesempi reali dei rifiuti; non modificano soglie, prompt o controllori.

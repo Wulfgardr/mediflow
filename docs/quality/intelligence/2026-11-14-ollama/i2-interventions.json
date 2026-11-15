@@ -1,0 +1,209 @@
+{
+  "schema": "mediflow.local-intervention-observation.v1",
+  "sourceRevision": "bfddf87a5334fd7d86d7c184deac77630a332042",
+  "sourceCaptureSha256": "5ff535048d1eb2dd2c1abc3c0e2e6fb8e9c609791428f9a033c5e2892048495a",
+  "limits": [
+    "HTTP_abort_does_not_prove_physical_stop",
+    "observed_response_completion_does_not_timestamp_individual_tokens"
+  ],
+  "observations": [
+    {
+      "functionId": "patient_insight",
+      "scenario": "cancel",
+      "elapsedMs": 1556.3563340000037,
+      "interventionKind": "abort_transport",
+      "interventionAt": "2026-11-14T21:01:38.636Z",
+      "physicallyObserved": [
+        {
+          "id": "55748-3",
+          "endedAt": "2026-11-14T21:01:38.637Z",
+          "event": "error",
+          "httpStatus": null,
+          "afterInterventionMs": 1.0,
+          "doneReason": null,
+          "done": null,
+          "evalCount": null,
+          "evalDuration": null
+        }
+      ],
+      "error": {
+        "name": "AbortError",
+        "code": 20,
+        "message": "This operation was aborted"
+      },
+      "physicalStopProved": false,
+      "continuedReplyObserved": false,
+      "applicationLockReceipt": null,
+      "publicationHttpOutcomes": []
+    },
+    {
+      "functionId": "patient_insight",
+      "scenario": "revoke",
+      "elapsedMs": 2223.468249999998,
+      "interventionKind": "authenticated_application_lock",
+      "interventionAt": "2026-11-14T21:01:41.809Z",
+      "physicallyObserved": [
+        {
+          "id": "55748-4",
+          "endedAt": "2026-11-14T21:01:42.476Z",
+          "event": "end",
+          "httpStatus": 200,
+          "afterInterventionMs": 667.0,
+          "doneReason": "stop",
+          "done": true,
+          "evalCount": 261,
+          "evalDuration": 2159380959
+        }
+      ],
+      "error": {
+        "name": "Error",
+        "code": "stale",
+        "message": "stale"
+      },
+      "physicalStopProved": false,
+      "continuedReplyObserved": true,
+      "applicationLockReceipt": {
+        "schemaVersion": "mediflow.application-lock-receipt.v1",
+        "state": "server_invalidation_confirmed"
+      },
+      "publicationHttpOutcomes": [
+        {
+          "httpStatus": 401,
+          "code": "session_stale"
+        }
+      ]
+    },
+    {
+      "functionId": "smart_import",
+      "scenario": "cancel",
+      "elapsedMs": 1557.1843329999974,
+      "interventionKind": "abort_transport",
+      "interventionAt": "2026-11-14T21:01:52.733Z",
+      "physicallyObserved": [
+        {
+          "id": "55748-6",
+          "endedAt": "2026-11-14T21:01:52.734Z",
+          "event": "error",
+          "httpStatus": null,
+          "afterInterventionMs": 1.0,
+          "doneReason": null,
+          "done": null,
+          "evalCount": null,
+          "evalDuration": null
+        }
+      ],
+      "error": {
+        "name": "SmartImportReviewBrowserControllerError",
+        "code": "operation_superseded",
+        "message": "Smart Import review operation rejected."
+      },
+      "physicalStopProved": false,
+      "continuedReplyObserved": false,
+      "applicationLockReceipt": null,
+      "publicationHttpOutcomes": []
+    },
+    {
+      "functionId": "smart_import",
+      "scenario": "revoke",
+      "elapsedMs": 1586.8185840000006,
+      "interventionKind": "authenticated_application_lock",
+      "interventionAt": "2026-11-14T21:01:55.902Z",
+      "physicallyObserved": [
+        {
+          "id": "55748-7",
+          "endedAt": "2026-11-14T21:01:55.932Z",
+          "event": "end",
+          "httpStatus": 200,
+          "afterInterventionMs": 30.0,
+          "doneReason": "stop",
+          "done": true,
+          "evalCount": 181,
+          "evalDuration": 1512056125
+        }
+      ],
+      "error": {
+        "name": "SmartImportBrowserOrchestratorError",
+        "code": "preview_outcome_unknown",
+        "message": "Smart Import browser operation unavailable."
+      },
+      "physicalStopProved": false,
+      "continuedReplyObserved": true,
+      "applicationLockReceipt": {
+        "schemaVersion": "mediflow.application-lock-receipt.v1",
+        "state": "server_invalidation_confirmed"
+      },
+      "publicationHttpOutcomes": [
+        {
+          "httpStatus": 401,
+          "code": "session_stale"
+        }
+      ]
+    },
+    {
+      "functionId": "document_synthesis",
+      "scenario": "cancel",
+      "elapsedMs": 1611.8271670000104,
+      "interventionKind": "abort_transport",
+      "interventionAt": "2026-11-14T21:02:06.877Z",
+      "physicallyObserved": [
+        {
+          "id": "55748-9",
+          "endedAt": "2026-11-14T21:02:10.040Z",
+          "event": "end",
+          "httpStatus": 200,
+          "afterInterventionMs": 3163.0,
+          "doneReason": "stop",
+          "done": true,
+          "evalCount": 561,
+          "evalDuration": 4636694750
+        }
+      ],
+      "error": {
+        "name": "DocumentSynthesisReviewBrowserControllerError",
+        "code": "operation_superseded",
+        "message": "Sintesi documentale non disponibile."
+      },
+      "physicalStopProved": false,
+      "continuedReplyObserved": true,
+      "applicationLockReceipt": null,
+      "publicationHttpOutcomes": []
+    },
+    {
+      "functionId": "document_synthesis",
+      "scenario": "revoke",
+      "elapsedMs": 4395.918917000003,
+      "interventionKind": "authenticated_application_lock",
+      "interventionAt": "2026-11-14T21:02:13.247Z",
+      "physicallyObserved": [
+        {
+          "id": "55748-10",
+          "endedAt": "2026-11-14T21:02:16.007Z",
+          "event": "end",
+          "httpStatus": 200,
+          "afterInterventionMs": 2760.0,
+          "doneReason": "stop",
+          "done": true,
+          "evalCount": 517,
+          "evalDuration": 4263923875
+        }
+      ],
+      "error": {
+        "name": "DocumentSynthesisBrowserOrchestratorError",
+        "code": "preview_outcome_unknown",
+        "message": "Document Synthesis preview non disponibile."
+      },
+      "physicalStopProved": false,
+      "continuedReplyObserved": true,
+      "applicationLockReceipt": {
+        "schemaVersion": "mediflow.application-lock-receipt.v1",
+        "state": "server_invalidation_confirmed"
+      },
+      "publicationHttpOutcomes": [
+        {
+          "httpStatus": 401,
+          "code": "session_stale"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,259 @@
+{
+  "sha256": "622f73f8804b6d5f0c04e80e91e9b8c9a608b212db1921e8748757525a758b32",
+  "measuredCount": 24,
+  "warmupCount": 1,
+  "rawResponsesRecordedByOllama": false,
+  "rows": [
+    {
+      "case": "load-100-30-10/cold/2",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:34:34.906Z",
+      "endedAt": "2026-11-13T20:35:11.257Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/cold/3",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:35:11.395Z",
+      "endedAt": "2026-11-13T20:35:47.023Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/cold/4",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:35:47.178Z",
+      "endedAt": "2026-11-13T20:36:30.670Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/cold/5",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:36:30.868Z",
+      "endedAt": "2026-11-13T20:37:16.602Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/cold/7",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:38:18.958Z",
+      "endedAt": "2026-11-13T20:39:25.059Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/cold/8",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:39:25.266Z",
+      "endedAt": "2026-11-13T20:40:20.699Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/cold/14",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:43:45.872Z",
+      "endedAt": "2026-11-13T20:44:31.006Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/cold/19",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:47:24.773Z",
+      "endedAt": "2026-11-13T20:48:13.196Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/cold/20",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:48:13.387Z",
+      "endedAt": "2026-11-13T20:48:56.755Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/cold/25",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:52:09.944Z",
+      "endedAt": "2026-11-13T20:53:09.894Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/cold/30",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:55:56.916Z",
+      "endedAt": "2026-11-13T20:56:45.279Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/0",
+      "phase": "warmup",
+      "beganAt": "2026-11-13T20:56:45.280Z",
+      "endedAt": "2026-11-13T20:57:10.249Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/3",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:57:26.007Z",
+      "endedAt": "2026-11-13T20:57:43.111Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/5",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:57:47.476Z",
+      "endedAt": "2026-11-13T20:58:01.825Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/8",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:58:19.760Z",
+      "endedAt": "2026-11-13T20:58:32.736Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/9",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:58:32.736Z",
+      "endedAt": "2026-11-13T20:58:45.797Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/10",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:58:45.797Z",
+      "endedAt": "2026-11-13T20:59:01.741Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/11",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:59:01.742Z",
+      "endedAt": "2026-11-13T20:59:16.124Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/13",
+      "phase": "measured",
+      "beganAt": "2026-11-13T20:59:20.001Z",
+      "endedAt": "2026-11-13T20:59:31.668Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/18",
+      "phase": "measured",
+      "beganAt": "2026-11-13T21:00:14.384Z",
+      "endedAt": "2026-11-13T21:00:38.662Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/20",
+      "phase": "measured",
+      "beganAt": "2026-11-13T21:00:42.802Z",
+      "endedAt": "2026-11-13T21:00:57.939Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/25",
+      "phase": "measured",
+      "beganAt": "2026-11-13T21:01:23.566Z",
+      "endedAt": "2026-11-13T21:01:49.098Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/26",
+      "phase": "measured",
+      "beganAt": "2026-11-13T21:01:49.099Z",
+      "endedAt": "2026-11-13T21:02:11.218Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/27",
+      "phase": "measured",
+      "beganAt": "2026-11-13T21:02:11.218Z",
+      "endedAt": "2026-11-13T21:02:26.721Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    },
+    {
+      "case": "load-100-30-10/warm/28",
+      "phase": "measured",
+      "beganAt": "2026-11-13T21:02:26.722Z",
+      "endedAt": "2026-11-13T21:02:40.798Z",
+      "code": "proposal_invalid",
+      "proposal": null,
+      "attempts": 2,
+      "specificRule": "not_recoverable_without_raw_reply"
+    }
+  ],
+  "source": "external first-round cl-outcomes.json, SHA-256 above; raw replies were not captured"
+}

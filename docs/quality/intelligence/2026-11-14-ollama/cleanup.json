@@ -1,0 +1,22 @@
+{
+  "at": "2026-11-14T23:31:33.848872+00:00",
+  "interruptedSessionAllOwnedIdentitiesAbsent": true,
+  "completedSessions": [
+    {
+      "stage": "continuation",
+      "sampledIdentitiesAbsent": 713,
+      "ownSupervisorsAbsent": true,
+      "modelsUnloaded": true,
+      "daemonListenerAbsent": true
+    },
+    {
+      "stage": "component-run",
+      "sampledIdentitiesAbsent": 34,
+      "ownSupervisorsAbsent": true,
+      "modelsUnloaded": true,
+      "daemonListenerAbsent": true
+    }
+  ],
+  "listener11434Absent": true,
+  "measurementMarkerAbsent": true
+}

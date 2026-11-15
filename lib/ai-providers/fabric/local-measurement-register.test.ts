@@ -7,7 +7,7 @@ const root = new URL('../../../', import.meta.url);
 const directory = 'docs/quality/intelligence/2026-11-13-ollama/';
 const read = (name: string) => JSON.parse(fs.readFileSync(new URL(name, root), 'utf8'));
 const measurement = read(directory + 'measurements.json');
-const register = JSON.parse(fs.readFileSync(process.env.MEDIFLOW_WUL840_REGISTER ?? new URL('docs/quality/intelligence/registro-0.9.1.json', root), 'utf8'));
+const register = JSON.parse(fs.readFileSync(process.env.MEDIFLOW_WUL840_REGISTER ?? new URL(directory + 'registro-storico.json', root), 'utf8'));
 const functions = ['patient_insight', 'smart_import', 'document_synthesis'];
 
 function validate(value: typeof register) {
