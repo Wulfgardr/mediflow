@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { test, type TestContext } from 'node:test';
+import { test as nodeTest, type TestContext } from 'node:test';
 import { chromium } from '@playwright/test';
+import { secureLaunch } from '../../../e2e/fixtures/secure-browser.ts';
 import { createSyntheticSpecialistDemo as specialistFixture, SYNTHETIC_DECISION, SPECIALIST_SENTINELS } from './synthetic-demo.test-support.ts';
 import { BrowserInput } from './browser-input.ts';
 import { unique } from './unique.ts';
 import { physicianSubmit } from './browser-adapter.ts';
+import { launchConfinedBrowser } from './browser-network.ts';
 import { portalAttributes, type ProcedureSnapshot } from '../contract.ts';
 import { recordSpecialistOutcome } from './outcome-service.ts';
+
+const test = (name: string, fn: (t: TestContext) => Promise<void>) => nodeTest(name, { timeout: 120_000 }, fn);
 
 type Fixture = Awaited<ReturnType<typeof specialistFixture>>;
 async function fixture(t: TestContext, mode: 'protected' | 'manual' = 'protected') {
@@ -97,7 +101,7 @@ test('CU-1 verticale: salvataggio, sospensione e riapertura conservano la stessa
     if (process.env.MEDIFLOW_CU_CAPTURE_DIR) {
         const directory = process.env.MEDIFLOW_CU_CAPTURE_DIR;
         assert.ok(path.isAbsolute(directory)); mkdirSync(directory, { recursive: true });
-        const observer = await chromium.launch({ headless: true }); t.after(() => observer.close());
+        const observer = await chromium.launch(secureLaunch({ headless: true })); t.after(() => observer.close());
         const context = await observer.newContext({ viewport: { width: 1000, height: 1000 } }); await context.addCookies([f.portal.cookie]);
         const page = await context.newPage();
         capture = async phase => {
@@ -133,7 +137,7 @@ test('CU-1 verticale: atto manuale nel browser del medico, ricevuta assente e ri
     await assert.rejects(f.service.approve(cap)); await assert.rejects(f.service.execute(cap));
     await assert.rejects(f.service.reconcile(cap)); assert.equal(f.service.inspect(f.plan.operationId).state, 'uncertain');
     assert.equal(sends(f), 0);
-    const doctor = await chromium.launch({ headless: true }); t.after(() => doctor.close());
+    const doctor = await chromium.launch(secureLaunch({ headless: true })); t.after(() => doctor.close());
     const context = await doctor.newContext(); const page = await context.newPage();
     await physicianSubmit(page, context, { origin: f.portal.origin, cookie: f.portal.cookie });
     assert.equal(f.portal.state.kind, 'submitted');
@@ -394,6 +398,12 @@ test('CU-1 strutturale: alias WebRTC non raggiunge UDP fuori manifest', async t 
         } finally { peer.close(); }
     }, udp.address().port);
     assert.equal(packets, 0, 'nessun pacchetto UDP fuori manifest');
+});
+
+test('CU-1 strutturale: il Chromium del simulatore parte con il sandbox del renderer', async () => {
+    let runtime: Awaited<ReturnType<typeof launchConfinedBrowser>> | undefined;
+    await assert.doesNotReject(async () => { runtime = await launchConfinedBrowser(); });
+    await runtime?.close();
 });
 
 test('CU-1 strutturale: canale non mediato sconosciuto negato dal confine di rete', async t => {
