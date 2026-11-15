@@ -122,8 +122,7 @@ test('actual Swift client logs in and unwraps v3 over pinned HTTPS, then retires
     const der = spawnSync('openssl', ['x509', '-in', path.join(directory, 'cert.pem'), '-outform', 'der']);
     assert.equal(der.status, 0);
     const child = spawn('/usr/bin/xcrun', ['xctest', '-XCTest', 'MediFlowAppleSharedTests.HomeBasePatientsClientTests/testRealV3HTTPSLoginAndLogout', bundle], {
-        env: { ...process.env, DEVELOPER_DIR: '/Applications/Xcode.app/Contents/Developer',
-            MEDIFLOW_NATIVE_AUTH_SMOKE_URL: origin, MEDIFLOW_NATIVE_AUTH_SMOKE_TLS_PIN: createHash('sha256').update(der.stdout).digest('hex') },
+        env: { ...process.env, MEDIFLOW_NATIVE_AUTH_SMOKE_URL: origin, MEDIFLOW_NATIVE_AUTH_SMOKE_TLS_PIN: createHash('sha256').update(der.stdout).digest('hex') },
         stdio: ['ignore', 'pipe', 'pipe'] });
     let output = ''; for (const stream of [child.stdout, child.stderr]) stream.on('data', value => { output += value; });
     const exit = await new Promise<number | null>((resolve, reject) => { child.once('error', reject); child.once('exit', resolve); });
