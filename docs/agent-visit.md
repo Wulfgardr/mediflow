@@ -60,15 +60,9 @@ risposta persa o un’interruzione, `riprendi` riusa le buste cifrate già salva
 Cambiare file o identità richiede una nuova visita, anziché riusare il suo UUID.
 Il client rifiuta file SQLite, link simbolici e PDF con hash diversi.
 
-La ricevuta `closed` conferma che la cassetta è chiusa. Finché MediFlow non
-è sbloccato, i contenuti restano cifrati in attesa. Con una scheda sbloccata,
-il controllo viene ripetuto ogni cinque secondi. CF discordanti, mancanti o
-ambigui bloccano l’applicazione automatica. La creazione di una scheda assente
-resta nel percorso del medico con PIN.
-
-In «In arrivo» il medico confronta dati presenti, proposte e citazioni, apre
-i PDF originali ed applica la singola visita oppure tutte quelle senza dubbi.
-Il deposito non costituisce conferma delle proposte cliniche.
+La ricevuta `closed` conferma che la visita è stata depositata nella cassetta
+cifrata. Per rileggerla, sblocca MediFlow, apri «In arrivo» e scegli «Aggiorna».
+L’applicazione al dossier seguirà il flusso previsto dall’ADR 0190.
 
 ## Trasporto MCP
 
