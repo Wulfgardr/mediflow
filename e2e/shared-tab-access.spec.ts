@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/isolated-runtime';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { agentVisitPassphrase, agentVisitPin } from './agent-visit-utils';
 
 test('renewing tab B preserves tab A authority and transfers the key without another passphrase', async ({ page, context, isolatedRuntime }, testInfo) => {
@@ -35,11 +35,33 @@ test('renewing tab B preserves tab A authority and transfers the key without ano
         expect(locks).toEqual([]);
         await expect(second.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
         await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+        const patientId = await page.evaluate(async () => {
+            const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ firstName: 'Persona', lastName: 'SinteticaSchede', taxCode: 'RSSMRA80A01F205X', birthDate: '1980-01-01T00:00:00.000Z', address: '', phone: '', diagnoses: [] }) });
+            if (!response.ok) throw new Error('SYNTHETIC_PATIENT_FAILED');
+            return (await response.json()).id as string;
+        });
+        await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Pazienti', exact: true }).click();
+        await page.getByRole('option', { name: /SinteticaSchede/ }).click();
+        await page.keyboard.press('n');
+        await expect(page).toHaveURL(new RegExp('/patients/' + patientId + '/entries/new$'));
+        await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill('SYNTHETIC_SHARED_TAB_CLINICAL_NOTE');
+        const saved = page.waitForResponse(response => response.url().endsWith('/api/entries') && response.request().method() === 'POST');
+        await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
+        expect((await saved).status()).toBe(201);
+        await second.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Pazienti', exact: true }).click();
+        await second.getByRole('option', { name: /SinteticaSchede/ }).click();
+        await second.getByRole('link', { name: 'Apri scheda paziente', exact: true }).click();
+        await openPatientSection(second, 'diario');
+        await expect(second.getByText('SYNTHETIC_SHARED_TAB_CLINICAL_NOTE', { exact: true })).toBeVisible();
+        await second.screenshot({ path: testInfo.outputPath('voce-aperta-con-la-chiave-condivisa.png'), fullPage: true });
+        await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
         await page.getByRole('link', { name: 'Agenti', exact: true }).click();
         await page.getByLabel('PIN di conferma', { exact: true }).fill(agentVisitPin);
         const creation = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
         await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
         expect((await creation).status()).toBe(201);
+        await second.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
         await second.getByRole('link', { name: 'Agenti', exact: true }).click();
         await second.getByLabel('PIN di conferma', { exact: true }).fill(agentVisitPin);
         const secondCreation = second.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');

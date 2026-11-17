@@ -119,6 +119,9 @@ export async function completeOnboardingIfNeeded(page: Page, pin: string): Promi
       encryptedMasterKey, salt: Buffer.from(salt).toString('base64') },
   });
   expect(response.status()).toBe(200);
+  const closed = await page.request.post('/api/auth/lock', { headers: { ...trustedWebRequestHeaders(page.url()),
+    'If-Match': response.headers()['etag'], 'Idempotency-Key': crypto.randomUUID() } });
+  expect(closed.status()).toBe(200);
   await page.reload();
 }
 
@@ -134,6 +137,7 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
     try { await renew.click({ timeout: 1000 }); }
     catch (error) { if (await renew.isVisible()) throw error; }
   }
+  if (await hasStableUnlockedShell(page)) return;
   await expect(pinInput).toBeEnabled();
   await pinInput.fill(pin);
   await expect(pinInput).toHaveValue(pin);
