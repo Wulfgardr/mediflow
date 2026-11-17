@@ -77,8 +77,6 @@ export async function PUT(request: Request,
         const { id, observationId } = await params;
         const parsed = await readObservationJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
-        const sealedError = rejectUnsealedV1Write('observations', parsed.body);
-        if (sealedError) return sealedError;
         const expectedVersion = safeObservationExpectedVersion(parsed.body.version);
         if (expectedVersion === null) return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         // preserve scoped 404-before-domain-validation; the operation rechecks under IMMEDIATE.
@@ -89,7 +87,7 @@ export async function PUT(request: Request,
         if (shape) return NextResponse.json({ error: shape.error }, { status: shape.status });
         const normalized = normalizeObservationUpdateInput(parsed.body);
         if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
-        const persistedSealedError = rejectUnsealedV1Write('observations', normalized.values);
+        const persistedSealedError = rejectUnsealedV1Write('observations', parsed.body);
         if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = updateObservationOperation({
@@ -117,13 +115,11 @@ export async function DELETE(request: Request,
         const { id, observationId } = await params;
         const parsed = await readObservationJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
-        const sealedError = rejectUnsealedV1Write('observations', parsed.body);
-        if (sealedError) return sealedError;
         const deletion = parseObservationDeleteInput(parsed.body, 'api-v1-delete');
         if (!deletion.ok) return NextResponse.json({ error: deletion.error }, { status: deletion.status });
         const normalized = normalizeObservationUpdateInput(deletion.body);
         if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
-        const persistedSealedError = rejectUnsealedV1Write('observations', normalized.values);
+        const persistedSealedError = rejectUnsealedV1Write('observations', parsed.body);
         if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = updateObservationOperation({

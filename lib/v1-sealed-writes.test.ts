@@ -61,6 +61,26 @@ for (const family of families) {
             assert.equal(success.status, method === 'POST' ? 201 : 200, await success.text());
         });
     }
+    test(`${family.table} DELETE accepts the server default and rejects plaintext without effects`, async () => {
+        const id = `synthetic-sealed-${++serial}`;
+        dbServer.$client.prepare('INSERT INTO patients (id,first_name,last_name,tax_code,identifier_type) VALUES (?,?,?,?,?)')
+            .run(id, 'Persona', 'Sintetica', '', 'none');
+        const itemId = family.path ? `${id}-item` : id;
+        if (family.path) {
+            const created = await collection.POST(request('POST', { ...family.body, id: itemId, [family.field]: sealed }), { params: Promise.resolve({ id }) });
+            assert.equal(created.status, 201, await created.text());
+        }
+        const params = Promise.resolve({ id, [family.item.slice(1, -1)]: itemId });
+        const before = snapshot();
+        const rejected = await item.DELETE(request('DELETE', { version: 1, deletionReason: 'Solo testo sintetico' }), { params });
+        assert.equal(rejected.status, 422, await rejected.text());
+        assert.equal(snapshot(), before);
+        const accepted = await item.DELETE(request('DELETE', { version: 1 }), { params });
+        assert.equal(accepted.status, 200, await accepted.text());
+        const row = dbServer.$client.prepare(`SELECT deletion_reason, version FROM ${family.table} WHERE id=?`).get(itemId) as { deletion_reason: string; version: number };
+        assert.equal(row.deletion_reason, 'api-v1-delete');
+        assert.equal(row.version, 2);
+    });
     test(`${family.table} POST accepts sealed input`, async () => {
         const id = `synthetic-sealed-${++serial}`;
         dbServer.$client.prepare('INSERT INTO patients (id,first_name,last_name,tax_code,identifier_type) VALUES (?,?,?,?,?)')

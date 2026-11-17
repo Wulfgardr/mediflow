@@ -6,7 +6,7 @@ import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import { parseExpectedVersion } from '@/lib/patient-concurrency';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
-import { readPatientProfile, updatePatientProfile } from '@/lib/patient-profile-service';
+import { readPatientProfile, updatePatientProfile, validateLocalPatientProfileUpdate } from '@/lib/patient-profile-service';
 import { deletePatientOperation } from '@/lib/patient-delete-operation';
 import { auditContextFromRequest, requestIdFromRequest } from '@/lib/security/audit';
 
@@ -45,12 +45,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
-        const sealedError = rejectUnsealedV1Write('patients', body);
-        if (sealedError) return sealedError;
         const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
+
+        const invalidInput = await validateLocalPatientProfileUpdate(id, body, expectedVersion);
+        if (invalidInput) return NextResponse.json(invalidInput.value, { status: invalidInput.status });
+        const sealedError = rejectUnsealedV1Write('patients', body);
+        if (sealedError) return sealedError;
 
         const commit = await updatePatientProfile({
             patientId: id, expectedVersion,
@@ -84,8 +87,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
-        const sealedError = rejectUnsealedV1Write('patients', body);
-        if (sealedError) return sealedError;
         const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
@@ -95,7 +96,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
             return NextResponse.json({ error: 'Invalid deletionReason' }, { status: 400 });
         }
 
-        const deletionSealedError = rejectUnsealedV1Write('patients', { deletionReason });
+        const deletionSealedError = rejectUnsealedV1Write('patients', body);
         if (deletionSealedError) return deletionSealedError;
         /* resolve the API actor before the synchronous tombstone/audit commit. */
         const auditContext = auditContextFromRequest(request, archiveActorSession);

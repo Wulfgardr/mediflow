@@ -77,8 +77,6 @@ export async function PUT(
         const envelope = await readCheckupJsonObject(request);
         if (!envelope.ok) return envelope.response;
         const body = envelope.body;
-        const sealedError = rejectUnsealedV1Write('checkups', body);
-        if (sealedError) return sealedError;
         // WUL-308: child PUTs require optimistic concurrency like the patient PUT.
         const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
@@ -98,7 +96,7 @@ export async function PUT(
         }
 
         // host audit context is resolved before the synchronous IMMEDIATE mutation.
-        const persistedSealedError = rejectUnsealedV1Write('checkups', normalized.values);
+        const persistedSealedError = rejectUnsealedV1Write('checkups', body);
         if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = updateCheckupOperation({
@@ -152,7 +150,7 @@ export async function DELETE(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        const persistedSealedError = rejectUnsealedV1Write('checkups', normalized.values);
+        const persistedSealedError = rejectUnsealedV1Write('checkups', parsedBody.clientValues);
         if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = updateCheckupOperation({

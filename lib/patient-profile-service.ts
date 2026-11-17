@@ -680,3 +680,11 @@ export async function updatePatientProfile(
     if (outcome.kind === 'uncertain') throw outcome.error;
     return outcome.result;
 }
+
+export async function validateLocalPatientProfileUpdate(patientId: string, body: Record<string, unknown>, expectedVersion: number) {
+    const existing = await dbServer.select({ id: patients.id }).from(patients)
+        .where(and(eq(patients.id, patientId), activePatients())).get();
+    if (!existing) return { status: 404, value: { error: 'Not found' } };
+    const normalized = normalizePatientUpdateInput(body, { expectedVersion });
+    return normalized.ok ? null : { status: 400, value: { error: normalized.error } };
+}
