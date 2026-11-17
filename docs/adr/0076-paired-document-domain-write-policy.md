@@ -56,7 +56,7 @@ Fatti verificati sul tip della lane (Wave 4):
 - Il contenuto delle voci di diario e HTML sigillato `ENC:`: il server non
   puo sanitizzarlo. La sanitizzazione avviene solo nei client, con allowlist
   condivisa in `lib/clinical-rich-text.ts`.
-- [ADR 0073](./0073-treatment-reasoning-athena-boundary.md) definisce la
+- [ADR 0073](https://github.com/Wulfgardr/mediflow/blob/28c17d07f937ac663638c90070490a88927d6d9b/docs/adr/0073-treatment-reasoning-athena-boundary.md) definisce la
   tassonomia `review_only` / `form_prefill_only` / `no_write` per le
   proposte AI: nessuna promozione implicita a scrittura.
 
@@ -80,7 +80,7 @@ Fatti verificati sul tip della lane (Wave 4):
   tabella che non li ha.
 - Opzione 3: parita reale dove il contenuto e responsabilita diretta del
   medico, nessuna apertura del piano AI, costo contenuto in guardie nuove e
-  validazione dei riferimenti. E la linea coerente con ADR 0073 e con la
+  validazione dei riferimenti. E la linea coerente con [ADR 0073](https://github.com/Wulfgardr/mediflow/blob/28c17d07f937ac663638c90070490a88927d6d9b/docs/adr/0073-treatment-reasoning-athena-boundary.md) e con la
   distinzione gia operante tra contenuto manuale e derivato.
 
 ## Decisione
@@ -132,7 +132,7 @@ generatore di bozza visita (deterministico, nessuna scrittura) diventa
 esponibile al boundary come endpoint compute-only. Il risultato entra nel
 diario esclusivamente attraverso la revisione dell'utente e le capability
 di scrittura manuale esistenti, con semantica `form_prefill_only` di
-ADR 0073. Lo stesso vale per i prefill da insight gia persistiti (per
+[ADR 0073](https://github.com/Wulfgardr/mediflow/blob/28c17d07f937ac663638c90070490a88927d6d9b/docs/adr/0073-treatment-reasoning-athena-boundary.md). Lo stesso vale per i prefill da insight gia persistiti (per
 esempio suggerimento follow-up che precompila il form controlli): il record
 risultante e una scrittura manuale con provenance nel campo cifrato, come
 sul web.
@@ -167,7 +167,7 @@ Fermarsi e aprire ADR o issue separata se una proposta:
 - scrive dal client paired un campo di Classe C, incluso il replay OCR;
 - introduce DELETE o PUT paired sugli allegati;
 - applica bozze o candidati senza revisione esplicita dell'utente
-  (auto-write), in violazione della tassonomia ADR 0073;
+  (auto-write), in violazione della tassonomia [ADR 0073](https://github.com/Wulfgardr/mediflow/blob/28c17d07f937ac663638c90070490a88927d6d9b/docs/adr/0073-treatment-reasoning-athena-boundary.md);
 - trasforma il generatore di bozza visita da deterministico a model-powered
   senza rivedere questo ADR;
 - rimuove la validazione client-side di ownership dei riferimenti di
