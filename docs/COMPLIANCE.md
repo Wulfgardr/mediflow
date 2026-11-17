@@ -6,7 +6,7 @@ Riferimenti correlati:
 
 - [SECURITY.md](../SECURITY.md) (sicurezza e oscuramento dei dati identificativi)
 - [ARCHITECTURE.md](../ARCHITECTURE.md) (confini architetturali stabili)
-- [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) (roadmap terminologie/FSE)
+- [docs/FSE2-terminology-roadmap.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/FSE2-terminology-roadmap.md) (roadmap terminologie/FSE)
 - [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md) (mappa documentale)
 
 ---

@@ -10,7 +10,7 @@ I documenti originali permettono di consultare le fonti; checkup,
 appuntamenti e attività aperte aiutano a organizzare i controlli successivi.
 
 Il [README](../README.md) presenta le funzioni e l'avvio dai sorgenti.
-Il [manuale](./MANUALE.md) descrive l'uso; il
+Il [manuale](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/MANUALE.md) descrive l'uso; il
 [contratto di prodotto](../PRODUCT.md) ne precisa finalità e limiti.
 
 ## La versione disponibile
@@ -48,5 +48,5 @@ Per contribuire, consulta [architettura](../ARCHITECTURE.md),
 [sicurezza](../SECURITY.md), [guida ai contributi](../CONTRIBUTING.md) e
 contratto del componente. La [mappa della documentazione](./README.md)
 indica il riferimento per ogni tema; le topologie dei
-[dati](./topologia-dati-flussi.md) e della [repository](./repository-topology.md)
+[dati](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md) e della [repository](./repository-topology.md)
 descrivono flussi e organizzazione del codice.

@@ -6,8 +6,8 @@ Status: Accepted
 
 Related:
 [docs/adr/0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md),
-[docs/NATIVE.md](../NATIVE.md),
-[ARCHITETTURA.md](../ARCHITETTURA.md),
+[docs/NATIVE.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/NATIVE.md),
+[ARCHITETTURA.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ARCHITETTURA.md),
 [lib/icd-codes.ts](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/lib/icd-codes.ts),
 [lib/scale-definitions.ts](../../lib/scale-definitions.ts)
 
