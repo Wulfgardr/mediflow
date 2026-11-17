@@ -28,7 +28,7 @@ La CI di avvio su macOS, Windows e Linux usa il lanciatore condiviso con
 `--scelta web --senza-browser`, archivio sintetico e verifica del fingerprint.
 Questa descrizione non trasferisce alle nuove modifiche le prove storiche
 di release riportate nelle sezioni successive.
-Vedi [README](../README.md), [manuale](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/MANUALE.md) e
+Vedi [README](../README.md), [manuale](MANUALE.md) e
 [ADR 0068](adr/0068-cross-platform-runtime-windows-linux.md).
 
 ## Supporto, capacità e protezione correnti

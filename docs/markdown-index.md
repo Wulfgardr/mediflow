@@ -188,6 +188,7 @@ contratti e nella valutazione competente del deployment.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/COMPLIANCE.md](./COMPLIANCE.md) | Quadro compliance GDPR/FHIR e interoperabilità. | Per requisiti normativi e policy operative. |
+| [docs/MANUALE.md](./MANUALE.md) | Manuale utente medico. | Per supporto operativo lato clinico. |
 
 ## 🧑‍💻 Evidenze tecniche e documentazione
 

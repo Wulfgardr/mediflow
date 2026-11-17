@@ -9,7 +9,7 @@ const roots = [
   'README.md', 'ARCHITECTURE.md', 'SECURITY.md', 'CONTRIBUTING.md',
   'docs/releases/0.9.1-contract.md',
   'docs/design',
-  'docs/README.md', 'docs/COMPLIANCE.md', 'docs/STATE_OF_THE_SYSTEM.md', 'docs/markdown-index.md',
+  'docs/README.md', 'docs/COMPLIANCE.md', 'docs/MANUALE.md', 'docs/STATE_OF_THE_SYSTEM.md', 'docs/markdown-index.md',
   'docs/adr/0006-terminology-plugin-and-fse-profiles.md',
   'docs/adr/0065-intended-purpose-and-claims-guard.md',
   'app', 'components', 'native', 'oss-assets',

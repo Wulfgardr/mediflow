@@ -147,13 +147,13 @@ distinta dalla MIT. [Guida ICD-11](./docs/icd-who-setup.md).
 Il catalogo AIFA si importa da file o con **Aggiorna ora**. Con il consenso
 Internet AIFA, l'apertura di Repertori controlla gli aggiornamenti al massimo
 una volta al giorno; l'installazione resta esplicita.
-[Guida AIFA](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/MANUALE.md#catalogo-farmaci-aifa).
+[Guida AIFA](./docs/MANUALE.md#catalogo-farmaci-aifa).
 
 La protesica supporta fonti personali, documenti originali e provenienza
 nelle nuove prescrizioni scelte dal catalogo. Importa file CSV; per XLSX
 serve prima l'esportazione in CSV. Catalogo, originali e copie della
 provenienza sono in chiaro nel database locale.
-[Guida protesica](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/MANUALE.md#fonti-personali-della-protesica).
+[Guida protesica](./docs/MANUALE.md#fonti-personali-della-protesica).
 
 I percorsi SISS/FSE accompagnano l'utente verso i canali ufficiali e non sono
 integrazioni regionali. L'esportazione FHIR segue il
