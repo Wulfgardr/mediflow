@@ -518,7 +518,9 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
         let cursor = 0;
         for (const line of lines) { offsets.push(cursor); cursor += line.length + 1; }
         for (const result of parseItalianLabReport(plain)) {
-            const start = offsets[result.lineNumber - 1] ?? 0;
+            const start = offsets[result.lineNumber - 1];
+            const line = lines[result.lineNumber - 1];
+            const end = start + line.replace(/\r$/u, '').length;
             // Codice e unità solo da corrispondenza esatta col catalogo locale; altrimenti restano da inserire.
             const coded = catalogObservationCode(result.analyte, result.unit);
             const fromParagraph = rebuilt.has(start);
@@ -530,8 +532,7 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
                 observedAt: date,
             };
             facts.push({ factId: dossierFactId('observation', unit.index, start, values), kind: 'observation', origin: 'parser:lab',
-                evidence: { unit: unit.index, start, end: start + (lines[result.lineNumber - 1] ?? '').length,
-                    excerpt: text.slice(start, start + (lines[result.lineNumber - 1] ?? '').length).trim() },
+                evidence: { unit: unit.index, start, end, excerpt: text.slice(start, end).trim() },
                 negated: false, values, decision: 'pending' });
         }
         const legacySections = segmentDossierSections(text);
@@ -568,10 +569,11 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
                 for (const token of line.matchAll(CODE_TOKEN)) {
                     const code = token[0].toUpperCase();
                     if (!input.exemptionCodes.has(code)) continue;
-                    const start = lineStart + (token.index ?? 0);
+                    const start = lineStart + token.index;
+                    const end = start + token[0].length;
                     const values: DossierFactValues = { code };
                     facts.push({ factId: dossierFactId('exemption', unit.index, start, values), kind: 'exemption', origin: 'parser:exemption',
-                        evidence: { unit: unit.index, start, end: start + code.length, excerpt: line.trim() },
+                        evidence: { unit: unit.index, start, end, excerpt: text.slice(start, end) },
                         negated: negatedBefore(text, start), values, decision: 'pending' });
                 }
             }

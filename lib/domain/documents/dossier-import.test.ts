@@ -110,6 +110,24 @@ function fact(kind: DossierFact['kind'], values: Record<string, string>, factId 
     return { factId, kind, origin: 'manual', evidence: null, negated: false, values, decision: 'pending' };
 }
 
+for (const { label, line, origin, field, expected } of [
+    { label: 'Laboratorio CRLF', line: 'Glucosio 110 mg/dL 70-99 H', origin: 'parser:lab', field: 'display', expected: 'Glucosio 110 mg/dL 70-99 H' },
+    { label: 'Esenzione CRLF', line: 'Esenzioni 013 048', origin: 'parser:exemption', field: 'code', expected: '048' },
+    { label: 'Esenzione CRLF con spazi multipli', line: 'Esenzione    048', origin: 'parser:exemption', field: 'code', expected: '048' },
+]) {
+    test(label, () => {
+        const text = ['## Pagina 1', 'Copertina', '## Pagina 2', 'Città 🧪', 'Riga α', 'Riga β', line, 'Note'].join('\r\n');
+        const { units } = splitDossierUnits(text, 2);
+        const { facts } = extractDossierCandidates({ fileName: 'referto.pdf', text, units, documentDate: null, exemptionCodes: new Set(['013', '048']) });
+        const fact = facts.find((item) => item.origin === origin && item.values[field] === (field === 'display' ? 'Glucosio' : expected));
+        assert.ok(fact?.evidence);
+        assert.equal(fact.evidence.unit, 2);
+        const page = units[1];
+        assert.equal(text.slice(page.start + fact.evidence.start, page.start + fact.evidence.end), expected);
+        assert.equal(fact.evidence.excerpt, expected);
+    });
+}
+
 test('lab rows rendered by AnyDoc as markdown headings keep exact evidence offsets', () => {
     const text = '## Referto di laboratorio\n\n## Glucosio 110 mg/dL 70-99 H\n\n- Creatinina 0,9 mg/dL 0,6-1,2';
     const { facts } = extractDossierCandidates({ fileName: 'x.pdf', text, units: splitDossierUnits(text, null).units, documentDate: '2025-01-10', exemptionCodes: empty });
