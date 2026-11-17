@@ -147,13 +147,13 @@ distinta dalla MIT. [Guida ICD-11](./docs/icd-who-setup.md).
 Il catalogo AIFA si importa da file o con **Aggiorna ora**. Con il consenso
 Internet AIFA, l'apertura di Repertori controlla gli aggiornamenti al massimo
 una volta al giorno; l'installazione resta esplicita.
-[Guida AIFA](./docs/MANUALE.md#catalogo-farmaci-aifa).
+[Guida AIFA](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/MANUALE.md#catalogo-farmaci-aifa).
 
 La protesica supporta fonti personali, documenti originali e provenienza
 nelle nuove prescrizioni scelte dal catalogo. Importa file CSV; per XLSX
 serve prima l'esportazione in CSV. Catalogo, originali e copie della
 provenienza sono in chiaro nel database locale.
-[Guida protesica](./docs/MANUALE.md#fonti-personali-della-protesica).
+[Guida protesica](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/MANUALE.md#fonti-personali-della-protesica).
 
 I percorsi SISS/FSE accompagnano l'utente verso i canali ufficiali e non sono
 integrazioni regionali. L'esportazione FHIR segue il
@@ -229,7 +229,7 @@ verifica o dell'installazione del sistema di oscuramento impedisce l'invio.
 La configurazione di un servizio non ne dimostra il funzionamento. Le prove
 con trasporto simulato non attestano l'esecuzione su account o servizi reali.
 
-[Matrice delle funzioni AI](./docs/ai-runtime-serving-matrix.md) ·
+[Matrice delle funzioni AI](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/ai-runtime-serving-matrix.md) ·
 [Modelli ammessi e preferenze](./docs/adr/0129-function-model-catalog-preferences.md) ·
 [Controlli sull'invio dei dati](./docs/adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
 
@@ -240,7 +240,7 @@ con trasporto simulato non attestano l'esecuzione su account o servizi reali.
 L'uso con dati sanitari richiede una valutazione di finalità, ruoli, base
 giuridica, sicurezza e obblighi applicabili. Il funzionamento locale e la
 revisione umana non costituiscono una certificazione di conformità.
-[Privacy, GDPR e governance AI](./docs/privacy-and-ai-governance.md).
+[Privacy, GDPR e governance AI](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/privacy-and-ai-governance.md).
 
 ## Dove stanno i dati
 
@@ -258,7 +258,7 @@ recupera originali esterni già mancanti. Verifica e ripristino Web non hanno
 il limite previsto per un singolo caricamento; elaborano il JSON in memoria,
 quindi la dimensione gestibile dipende dalle risorse del computer.
 
-[Topologia dei dati](./docs/topologia-dati-flussi.md) ·
+[Topologia dei dati](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md) ·
 [Sicurezza](./SECURITY.md) · [Limiti noti](./docs/known-limitations.md)
 
 ## Provalo
@@ -335,7 +335,7 @@ per il primo avvio dell'archivio sono nell'[ADR 0138](./docs/adr/0138-explicit-d
 Per compilare le app Apple serve Xcode completo. Un Apple Account gratuito
 consente prove personali nei limiti del Personal Team; Developer ID e
 notarizzazione Mac richiedono l'Apple Developer Program.
-[Guida nativa](./docs/NATIVE.md) ·
+[Guida nativa](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/NATIVE.md) ·
 [Confronto degli account Apple](https://developer.apple.com/support/compare-memberships/).
 
 </details>
@@ -380,7 +380,7 @@ di lavoro e una coda di revisione senza scrivere nella cartella.
 
 </details>
 
-Il [plugin `mediflow-synthetic`](./plugins/mediflow-synthetic/README.md) per Codex
+Il [plugin `mediflow-synthetic`](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/plugins/mediflow-synthetic/README.md) per Codex
 mostra due esempi fissi inventati e non accede all'archivio clinico. È distinto
 dal canale ChatGPT usato dalle funzioni AI di MediFlow.
 
@@ -391,7 +391,7 @@ dal canale ChatGPT usato dalle funzioni AI di MediFlow.
 | Conoscere il prodotto | [Get MediFlow](https://getmediflow.dev) e [Inizia qui](./docs/start-here.md) |
 | Consultare prove e limiti | [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) e [release 0.9.0](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0) |
 | Trovare il riferimento di un tema | [Mappa della documentazione](./docs/README.md) |
-| Confrontare le piattaforme | [Guida nativa](./docs/NATIVE.md) e [matrice di parità](./docs/parity-matrix.md) |
+| Confrontare le piattaforme | [Guida nativa](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/NATIVE.md) e [matrice di parità](./docs/parity-matrix.md) |
 | Ricostruire una decisione tecnica | [ADR](./docs/adr/README.md) |
 | Trovare un documento preciso | [Indice completo](./docs/markdown-index.md) |
 
