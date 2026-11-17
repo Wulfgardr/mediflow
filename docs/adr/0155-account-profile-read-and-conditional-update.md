@@ -1,5 +1,7 @@
 # ADR 0155 — Profilo dell'account: lettura e aggiornamento condizionale
 
+Stato: Accepted, deliberato da Leonardo il 17/11/2026
+
 Data: 2026-10-20. Stato: Proposed; approvato per l'implementazione,
 accettazione finale dopo review e integrazione protetta.
 Riferimenti: WUL-771, ADR 0143, ADR 0153, ADR 0154.

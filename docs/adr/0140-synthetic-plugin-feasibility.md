@@ -7,6 +7,8 @@ read_when:
 
 # ADR 0140 — fattibilità del plugin con esempi inventati
 
+Stato: Accepted, deliberato da Leonardo il 17/11/2026
+
 Data: 2026-09-30. Stato: proposta implementata per riesame, perimetro WUL-756.
 Base verificata: `bf7cd61bd8c779e0b3f28906af8a7923ae7c98fb`.
 

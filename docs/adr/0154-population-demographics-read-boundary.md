@@ -1,5 +1,7 @@
 # ADR 0154 — Analisi demografica della popolazione e calendario del client
 
+Stato: Accepted, deliberato da Leonardo il 17/11/2026
+
 Data: 2026-10-19. Stato: Proposed; documento e dipendenza approvati per
 implementazione, accettazione finale dopo review e integrazione protetta.
 Riferimenti: WUL-771, ADR 0145, ADR 0146, ADR 0151, ADR 0152.
