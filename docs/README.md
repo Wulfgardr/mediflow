@@ -35,8 +35,8 @@ limiti originari; non attestano lo stato delle versioni successive.
 
 ## Pianificazione corrente
 
-La [roadmap prodotto](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ROADMAP.md#roadmap-vigente--21-settembre-2026) riporta
-le tappe 0.9.0–1.0 definite nel
+La rotta del prodotto è descritta nell’[ADR 0185](./adr/0185-rotta-di-mediflow.md).
+Le tappe 0.9.0–1.0 sono nel
 [registro incrementale Linear](https://linear.app/wulfgardr/document/mediflow-incremental-release-ledger-090-to-10-ee0392f27b72).
 Il [contratto U0 approvato della 0.9.1](./releases/0.9.1-contract.md) registra
 le decisioni di Leonardo del 23 ottobre 2026: W=36, G=10, C/P/I/Q, soglia
@@ -130,7 +130,7 @@ gli input ammessi e la DerivedData esterna, senza rimuovere dati dal checkout.
 ## Percorsi di lettura
 
 - **Prodotto e uso:** [Inizia qui](./start-here.md),
-  [README](../README.md) e [manuale](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/MANUALE.md).
+  [README](../README.md) e [manuale](./MANUALE.md).
 - **Dati e responsabilità:** [privacy, GDPR e governance AI](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/privacy-and-ai-governance.md),
   [sicurezza](../SECURITY.md) e contratti richiamati.
 - **Contribuzione:** [topologia della repository](./repository-topology.md),
@@ -211,8 +211,6 @@ il documento o la prova nominati, non l’intero prodotto.
 - Vetro Clinico, baseline storica e transitoria di design: [docs/design/vetro-clinico/README.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/design/vetro-clinico/README.md)
 - Lume, lingua di design attiva con token DTCG nella release sorgente v0.8; i gate di parity restano separati: [docs/design/lume/README.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/design/lume/README.md)
 - Lettura completa dello stato corrente: [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
-- FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/FAQ.md)
-- Walkthrough operativo end-to-end: [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md)
 - Parity localhost/Apple: [docs/parity-matrix.md](./parity-matrix.md), [docs/apple-parity-matrix.json](./apple-parity-matrix.json) e [docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json)
 - Limiti noti della 0.8.5: [docs/known-limitations.md](./known-limitations.md)
 - Run record recovery UI/parity 0.8: [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/analysis/2026-07-27-parity-0.8-recovery-run.md)
@@ -273,7 +271,7 @@ restano sufficienti i contratti pertinenti e [CONTRIBUTING.md](../CONTRIBUTING.m
 5. [CONTRIBUTING.md](../CONTRIBUTING.md)
 6. [docs/repository-topology.md](./repository-topology.md)
 7. [docs/adr/](./adr/README.md) (pertinenti al tema, con i successivi emendamenti)
-8. [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md)
+8. [Manuale utente medico](./MANUALE.md)
 9. [docs/markdown-index.md](./markdown-index.md)
 
 ## 🧱 Convenzione stato documenti
@@ -352,8 +350,6 @@ installato, clinicamente qualificato o pubblicato.
 | Autorita della sorgente per Document Synthesis | [docs/adr/0102-document-synthesis-source-authority.md](./adr/0102-document-synthesis-source-authority.md) | `CANONICAL / ACCEPTED` | Fissa source-set host-owned, citazioni con locator validato e receipt finale review-only; non autorizza runtime o persistenza. |
 | Locator OCR e currentness della sorgente documentale | [docs/adr/0099-ocr-document-locator-and-source-currentness.md](./adr/0099-ocr-document-locator-and-source-currentness.md) | `CANONICAL / ACCEPTED` | Accetta `documentSourceRef`, revision ed epoch monotoni e il contratto di currentness riusato dalla nuova estrazione; non autorizza runtime OCR o apply. |
 | Estrazione locale unica degli allegati con AnyDoc | [docs/adr/0107-anydoc-local-attachment-extraction.md](./adr/0107-anydoc-local-attachment-extraction.md) | `CANONICAL / ACCEPTED` | Governa il primo passaggio deterministico locale. La 0.8.5 continua soltanto le pagine PDF `needsOcr` con Apple Vision locale, provenienza e fail-closed; `ocr=unavailable` resta lo stato della capability Fabric separata. |
-| FAQ pubbliche | [docs/FAQ.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/FAQ.md) | `SECONDARY` | Risponde alle domande iniziali su prodotto, AI facoltativa, distribuzione e limiti senza sostituire i contratti. |
-| Roadmap terminologie/FSE | [docs/FSE2-terminology-roadmap.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/FSE2-terminology-roadmap.md) | `CANONICAL` | Evoluzione codifiche cliniche e compliance documentale (coerente con ADR 0006). |
 | Matrice baseline ufficiale GTW/FSE | [docs/fse-gtw-baseline-alignment.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/fse-gtw-baseline-alignment.md) | `CANONICAL` | Gap analysis versionata tra artifact ministeriali `it-fse-support` e stato reale MediFlow. |
 | Baseline SISS | [docs/siss-baseline.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/siss-baseline.md) | `CANONICAL` | Stato attuale, fonti ufficiali, matrice del prototipo contestuale e sequenza `WUL-43` -> `WUL-45` -> `WUL-44` -> `WUL-178` -> `WUL-180` per l'integrazione SISS. |
 | Fattibilita SSI/A2A SISS oltre `portal-handoff` | [docs/siss-ssi-a2a-feasibility.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/siss-ssi-a2a-feasibility.md) | `CANONICAL` | Boundary ufficiale del filone `WUL-180`: cosa e integrabile davvero con `SSI`, `A2A`, `webapp` e onboarding regionale, e cosa non e ancora dimostrabile con sole fonti pubbliche. |
@@ -366,17 +362,13 @@ installato, clinicamente qualificato o pubblicato.
 | Integrazione ATHENA-style Treatment Reasoning | [docs/treatment-reasoning-athena-integration.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/treatment-reasoning-athena-integration.md) | `SECONDARY / HISTORICAL` | Conserva il percorso storico rimosso in attuazione dell’ADR 0180; le istruzioni di provisioning non sono più operative. |
 | Parity operativa MLX benchmark-visible | [docs/mlx-operational-parity.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/mlx-operational-parity.md) | `SECONDARY / HISTORICAL` | Conserva la baseline `WUL-165` per MLX generico. Il codice MLX e la precedente eccezione Treatment Reasoning sono rimossi dal prodotto con ADR 0180. |
 | Limitazioni note 0.8.5 | [docs/known-limitations.md](./known-limitations.md) | `CANONICAL` | Registra claim ceiling e residui: rete cloud live, host MCP esterni, microfono reale o validazione clinica. Distingue il fallback AnyDoc dal Fabric `ocr=unavailable` e le evidenze sorgente da quelle di pubblicazione. |
-| Walkthrough end-to-end | [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md) | `CANONICAL` | Segue web, native e servizi locali dal dato alla proposta: `home-base` read-only-first con scritture versionate circoscritte, artefatti documentali e guard di revisione shell. |
-| Topologia dati e flussi | [docs/topologia-dati-flussi.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md) | `CANONICAL` | Percorsi dati digitali end-to-end (cifratura, API, storage, trust boundaries), inclusi artifact documentali cifrati e boundary `network-home-base`. |
 | Indice completo Markdown repo | [docs/markdown-index.md](./markdown-index.md) | `CANONICAL` | Permette di trovare i `.md` tracciati per argomento e capire quando consultarli; non certifica il runtime. |
 | Testing app macOS | [docs/native-testing.md](./native-testing.md) | `CANONICAL` | Strategia e workflow ufficiale test native (XCTest/Xcode). |
 | Contratto design Lume macOS | [docs/design/lume/06-macos-apple-contract.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/design/lume/06-macos-apple-contract.md) | `CANONICAL` | Contratto Lume per l'app macOS reale e la sua evoluzione in superficie nativa primaria: oggi la card clinica opaca e consegnata, mentre componenti interni e gate visuali restano parziali. La feature parity resta governata dai documenti dedicati. |
 | Verify loop e smoke paired mobile home-base | [docs/mobile-home-base-smoke.md](./mobile-home-base-smoke.md) | `SECONDARY` | Runbook operativo: gate headless sintetici obbligatori sul boundary di rete e smoke iPhone/iPad opzionale contro `home-base` reale. |
-| Deep dive tecnico architettura | [docs/ARCHITETTURA.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ARCHITETTURA.md) | `SECONDARY` | Approfondisce componenti, dipendenze e percorsi tecnici, senza prevalere sui contratti canonici. |
-| Sintesi operativa architettura | [docs/system_architecture.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/system_architecture.md) | `SECONDARY` | Offre una sintesi di Clinical Workbench, home-base, documenti, SISS/FSE e presidi locali, separando fotografia 0.8.5 e quadro di pubblicazione 0.8.6. |
-| Setup client macOS, TLS locale e click-map | [docs/NATIVE.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/NATIVE.md), [docs/native-testing.md](./native-testing.md), [docs/parity-click-map-macos.md](./parity-click-map-macos.md), [docs/native-setup.md](./native-setup.md), [docs/native-launch.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md), [docs/local-api-tls.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/local-api-tls.md) | `CANONICAL + RUNBOOK` | Materiale operativo nativo. PR #21/`WUL-401` hanno consegnato il tooling P6 di base; prerequisiti operativi e verbale manuale restano in `WUL-481`. |
+| Setup client macOS, TLS locale e click-map | [docs/native-testing.md](./native-testing.md), [docs/parity-click-map-macos.md](./parity-click-map-macos.md), [docs/native-setup.md](./native-setup.md), [docs/native-launch.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md), [docs/local-api-tls.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/local-api-tls.md) | `CANONICAL + RUNBOOK` | Materiale operativo nativo. PR #21/`WUL-401` hanno consegnato il tooling P6 di base. I prerequisiti operativi e il verbale manuale restano in `WUL-481`. |
 | Compliance/GDPR/FHIR | [docs/COMPLIANCE.md](./COMPLIANCE.md) | `CANONICAL` | Quadro documentale dei requisiti GDPR/FHIR e delle condizioni di scambio. |
-| Manuale utente medico | [docs/MANUALE.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/MANUALE.md) | `CANONICAL` | Descrive l’uso dal punto di vista del medico, entro le condizioni di impiego del prodotto. |
+| Manuale utente medico | [docs/MANUALE.md](./MANUALE.md) | `CANONICAL` | Descrive l’uso dal punto di vista del medico, entro le condizioni di impiego del prodotto. |
 | ADR native token bootstrap secure-first | [docs/adr/0014-native-token-bootstrap-secure-first.md](./adr/0014-native-token-bootstrap-secure-first.md) | `CANONICAL` | Precedenza secure-first del token native (`Keychain -> config -> legacy`) e failure mode espliciti. |
 | ADR audit taxonomy minima | [docs/adr/0015-audit-taxonomy-minimum-catalog.md](./adr/0015-audit-taxonomy-minimum-catalog.md) | `CANONICAL` | Catalogo audit `audit.v1`, schema evento minimo e confini PHI-safe per log e audit record. |
 | ADR backup artifact v1 manifest/preflight | [docs/adr/0016-backup-artifact-v1-manifest-preflight.md](./adr/0016-backup-artifact-v1-manifest-preflight.md) | `CANONICAL` | Artifact backup JSON v1 con manifest, checksum e restore preflight server-side. |
@@ -424,14 +416,14 @@ installato, clinicamente qualificato o pubblicato.
 
 ## 🗂️ File sovrapposti o secondari
 
-La roadmap è [docs/ROADMAP.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ROADMAP.md). `docs/index.html` rimane una
+`docs/index.html` rimane una
 pagina visuale legacy per consultazione rapida, non il documento su cui
 fondare decisioni architetturali.
 
 ## ⚙️ Regole rapide di mantenimento
 
-Le decisioni durature appartengono alle ADR e i cambi di direzione prodotto
-alla [docs/ROADMAP.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ROADMAP.md). Quando un `.md` viene aggiunto, rimosso o
+Registra le decisioni durature nelle ADR. Per la direzione del prodotto, consulta
+l’[ADR 0185](./adr/0185-rotta-di-mediflow.md). Quando un `.md` viene aggiunto, rimosso o
 rinominato, va aggiornato l’[docs/markdown-index.md](./markdown-index.md); se cambia il
 riferimento autorevole di un tema, va aggiornata questa mappa. In caso di
 contrasto prevale il documento canonico indicato, nel proprio ambito.

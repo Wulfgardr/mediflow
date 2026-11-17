@@ -10,7 +10,7 @@ I documenti originali permettono di consultare le fonti; checkup,
 appuntamenti e attività aperte aiutano a organizzare i controlli successivi.
 
 Il [README](../README.md) presenta le funzioni e l'avvio dai sorgenti.
-Il [manuale](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/MANUALE.md) descrive l'uso; il
+Il [manuale](./MANUALE.md) descrive l'uso; il
 [contratto di prodotto](../PRODUCT.md) ne precisa finalità e limiti.
 
 ## La versione disponibile
