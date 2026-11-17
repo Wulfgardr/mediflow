@@ -84,3 +84,12 @@ test('every encrypted field rejects malformed envelopes and structured plaintext
         }
     }
 });
+
+test('local diary creation requires a client-sealed title instead of a plaintext server default', async () => {
+    const collection = load('../app/api/v1/patients/[id]/entries/route.ts');
+    const before = snapshot();
+    const response = await collection.POST(request('POST', { type: 'note', content: sealed, date: '2026-01-01' }),
+        { params: Promise.resolve({ id: 'synthetic-missing-title' }) });
+    assert.equal(response.status, 422);
+    assert.equal(snapshot(), before);
+});
