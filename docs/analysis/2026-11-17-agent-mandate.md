@@ -39,3 +39,21 @@ nei test di ammissione è una fixture sintetica. Il canale di deposito A3,
 il token A2 e l'applicazione A5 restano lavori distinti: questi test non
 provano ancora un deposito agente completo né autorizzano scritture cliniche.
 La condivisione della chiave fra schede resta WUL-877.
+
+## Percorso del medico
+
+`e2e/agent-mandate.spec.ts` passa sulla build sintetica del commit
+`b289e6aac`. Parte da un archivio isolato, passa alla passphrase con il
+kit di recupero, sblocca la scheda e crea il mandato dalla pagina Agenti.
+Verifica prima il rifiuto del PIN errato, poi la creazione, la revoca
+esplicita ed un nuovo mandato. Avanza l'orologio del browser per attivare
+il blocco per inattività, controlla nel DB sintetico che il mandato resti
+attivo, ricarica e sblocca. Il blocco manuale successivo revoca il mandato.
+Le catture mostrano il mandato creato ed il blocco per inattività.
+
+Sulla base A6 `c9f2d2661`, il medesimo percorso si ferma con un'asserzione
+sull'assenza della voce Agenti, dopo un vero sblocco con passphrase.
+La prova non usa cookie o chiavi preconfezionati. La lettura diretta del
+DB è limitata alla directory sintetica posseduta dal fixture. Il comando
+E2E imposta `E2E_ISOLATED_STANDALONE_DIR` al payload fisico della build e
+`E2E_BROWSER_CHANNEL=chrome`, mantenendo sandbox e rete limitata al loopback.

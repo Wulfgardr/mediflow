@@ -42,7 +42,7 @@ test('doctor creates, reloads and revokes a mandate; inactivity preserves it and
     const createdId = response.request().postDataJSON().mandate.id;
     const listing = await page.request.get('/api/agent-mandates');
     expect(listing.status()).toBe(200);
-    const mandate = (await listing.json()).find((value: { id: string }) => value.id === createdId);
+    let mandate = (await listing.json()).find((value: { id: string }) => value.id === createdId);
     expect(mandate).toBeTruthy();
     expect(mandate.expiresAt - mandate.createdAt).toBe(43200000);
     expect(mandate.wrappedPrivateKey).toMatch(/^ENC:/u);
@@ -55,6 +55,20 @@ test('doctor creates, reloads and revokes a mandate; inactivity preserves it and
         finally { database.close(); }
     };
     expect(read()).toEqual({ revoked_at: null, wrapped_private_key: mandate.wrappedPrivateKey });
+    const revocation = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'DELETE');
+    await page.getByRole('button', { name: 'Revoca', exact: true }).click();
+    expect((await revocation).status()).toBe(200);
+    await expect(page.getByText('openai · Revocato', { exact: true })).toBeVisible();
+    expect(read().revoked_at).not.toBeNull();
+    await page.getByLabel('PIN di conferma', { exact: true }).fill(pin);
+    const nextCreation = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
+    const nextResponse = await nextCreation; expect(nextResponse.status()).toBe(201);
+    const nextId = nextResponse.request().postDataJSON().mandate.id;
+    const nextListing = await page.request.get('/api/agent-mandates'); expect(nextListing.status()).toBe(200);
+    mandate = (await nextListing.json()).find((value: { id: string }) => value.id === nextId);
+    await expect(page.getByRole('button', { name: 'Revoca', exact: true })).toBeVisible();
+    expect(read().revoked_at).toBeNull();
     const idleLock = page.waitForResponse(response => response.url().endsWith('/api/auth/lock') && response.request().method() === 'POST');
     await page.clock.fastForward('15:01');
     expect((await idleLock).request().headers()['x-mediflow-lock-reason']).toBe('inactivity');
