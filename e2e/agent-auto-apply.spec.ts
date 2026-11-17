@@ -19,8 +19,16 @@ for (const reviewed of [false, true]) test(reviewed ? 'the physician explicitly 
     const credentials = info.outputPath('private-agent');
     mkdirSync(credentials, { mode: 0o700 });
     const cli = async (...args: string[]) => {
-        const result = await execute(process.execPath, ['scripts/run-strip-types.mjs', 'packages/agent-client/src/cli.ts', ...args, '--credenziali', credentials],
+        const cfIndex = args.indexOf('--cf');
+        const cfInput = cfIndex >= 0 ? args[cfIndex + 1] : undefined;
+        if (cfInput !== undefined) args[cfIndex + 1] = '-';
+        const pending = execute(process.execPath, ['scripts/run-strip-types.mjs', 'packages/agent-client/src/cli.ts', ...args, '--credenziali', credentials],
             { cwd: repository, timeout: 30000, maxBuffer: 1024 * 1024 });
+        if (cfInput !== undefined) {
+            expect(pending.child.spawnargs).not.toContain(fiscalCode);
+            pending.child.stdin?.end(cfInput + '\n');
+        }
+        const result = await pending;
         expect(result.stdout).not.toContain(sentinel);
         expect(result.stderr).not.toContain(sentinel);
         return JSON.parse(result.stdout);

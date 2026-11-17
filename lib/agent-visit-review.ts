@@ -14,6 +14,7 @@ import { agentVisitPdfText } from './agent-visit-pdf-text';
 export type IncomingAgentCassette = AgentCassette & { appliedItemIds: string[] };
 export type AgentVisitReview = { visit: OpenedAgentVisit; patient: Patient | null; appliedItemIds: string[];
     documents: Map<string, { text: string; name: string }>; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[] };
+const proposalLabels: Record<string, string> = { therapy: 'la terapia', service: 'la prestazione', diagnosis: 'la diagnosi', exemption: 'l’esenzione', observation: 'l’osservazione' };
 const hex = (value: ArrayBuffer) => [...new Uint8Array(value)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
 const normalized = (value: string) => value.replace(/\s+/gu, ' ').trim().toLocaleLowerCase('it-IT');
@@ -61,7 +62,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
         const source = documents.get(sourceHash(item));
         const quote = text(item.value.quote);
         if (!source || quote.length < 12 || !normalized(source.text).includes(normalized(quote))) {
-            proposalBlockers.push('Fonte da verificare per la proposta ' + item.kind + '.'); continue;
+            proposalBlockers.push('Fonte da verificare per ' + (proposalLabels[item.kind] ?? 'questa proposta') + '.'); continue;
         }
         const fields = values(item);
         const kind = item.kind === 'service' ? 'service_prescription' : item.kind;
@@ -82,12 +83,12 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             visit.items.some(item => item.kind === 'service') ? db.servicePrescriptions.query({ patientId: patient.id }).toArray({ signal, rejectAuthUnavailable: true }) : [],
             visit.items.some(item => item.kind === 'observation') ? db.observations.query({ patientId: patient.id }).toArray({ signal, rejectAuthUnavailable: true }) : [],
         ]);
-        const status = (value: string) => ({ active: 'in corso', suspended: 'sospesa', completed: 'conclusa' }[value] ?? value);
+        const status = (value: string) => ({ active: 'in corso', suspended: 'sospesa', completed: 'conclusa', prescribed: 'prescritta', booked: 'prenotata', performed: 'eseguita', report_received: 'referto ricevuto', cancelled: 'annullata' }[value] ?? value);
         for (const item of visit.items.filter(item => !automaticAgentKind(item.kind))) {
             const value = values(item);
             let before: string[] = [];
             if (item.kind === 'therapy') before = therapies.filter(stored => !stored.deletedAt && normalized(stored.drugName) === normalized(value.drugName ?? '')).map(stored => stored.drugName + ': ' + stored.dosage + ' (' + status(stored.status) + ')');
-            if (item.kind === 'service') before = services.filter(stored => normalized(stored.serviceName) === normalized(value.serviceName ?? '')).map(stored => stored.serviceName + ' (' + stored.status + ')');
+            if (item.kind === 'service') before = services.filter(stored => normalized(stored.serviceName) === normalized(value.serviceName ?? '')).map(stored => stored.serviceName + ' (' + status(stored.status) + ')');
             if (item.kind === 'observation') before = observations.filter(stored => !stored.deletedAt && stored.code === value.code).map(stored => stored.display + ': ' + stored.value + ' ' + stored.unitCode);
             if (item.kind === 'diagnosis') before = (patient.diagnoses ?? []).filter(stored => stored.code === value.code && stored.system === value.system).map(stored => stored.code + ' ' + stored.description);
             if (item.kind === 'exemption') before = (patient.exemptions ?? []).filter(code => code === value.code);
