@@ -411,8 +411,8 @@ test('application lock bypasses a pending authority barrier and cancels a queued
 test('security provider clears stale persisted authority and fences stale auth paths', () => {
     const source = readFileSync(new URL('../../components/security-provider.tsx', import.meta.url), 'utf8');
     const authApiSource = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
-    const lockStart = source.indexOf('const lock = () => {');
-    const requestStart = source.indexOf('void requestApplicationLockConfirmation()', lockStart);
+    const lockStart = source.search(/const lock = \([^)]*\) => \{/u);
+    const requestStart = source.indexOf('void requestApplicationLockConfirmation(', lockStart);
     assert.ok(lockStart >= 0 && source.indexOf('clearClientAuthority();', lockStart) < requestStart);
     for (const pattern of [
         /authorityAttemptGenerationRef\.current === attemptGeneration/,

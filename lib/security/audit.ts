@@ -85,6 +85,8 @@ export const AUDIT_EVENT_TYPES = [
     /* terminal PHI-safe outcome for the fixed synthetic cloud-provider probe. */
     'ai.provider_probe.executed',
     /* terminal PHI-safe audit for the bounded semantic-query operation. */
+    'agent.mandate.created',
+    'agent.mandate.revoked',
     'agent.semantic_query.executed',
     /* non-terminal PHI-safe attempt emitted by generic AIP ports. */
     'agent.operation.attempted',
