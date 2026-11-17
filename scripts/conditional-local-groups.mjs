@@ -10,7 +10,6 @@ import { cargoTestCommand } from './native-tool-test-selection.mjs';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const conditionalLocalGroups = JSON.parse(fs.readFileSync(new URL('./conditional-local-groups.json', import.meta.url), 'utf8'));
 
-// Local and CI consume the same registry command; only owned paths/provisioning differ.
 export function conditionalGroupPlan(root, groupId, ownedRoot, platform = process.platform) {
   const group = conditionalLocalGroups.groups[groupId];
   if (!group) throw new Error(`Unknown conditional group: ${groupId}`);
@@ -39,8 +38,6 @@ export function conditionalGroupPlan(root, groupId, ownedRoot, platform = proces
       path.join(outputs, 'codec-results.json'),
     ] : [];
     const args = localInvocationArguments(recipe, values);
-    // These two existing component scripts accept a positional output root, although
-    // their local registry recipe needs no arguments. Never use their fixed defaults.
     if (group.outputArguments?.includes(recipeId)) args.push(path.join(outputs, path.basename(path.dirname(recipeId))));
     commands.push({ label: recipeId, executable: recipe.executable, args, env: {
       ...env, ...recipe.env, ...(groupId === 'apple-native' ? { MEDIFLOW_NATIVE_TEST_RUNNER: 'swift' } : {}),
@@ -65,8 +62,6 @@ export function copyTrackedWorkspace(root, target) {
   const tracked = execFileSync('git', ['ls-files', '-t', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
   for (const entry of tracked) {
     if (entry.length < 3 || entry[1] !== ' ') throw new Error('Malformed tracked workspace entry');
-    // Only Git's exact skip-worktree tag denotes intentionally unmaterialized
-    // input. Ordinary missing files and materialized symlinks still fail below.
     if (entry[0] === 'S') continue;
     const file = entry.slice(2);
     const source = path.join(root, file), destination = path.join(target, file);
@@ -87,7 +82,6 @@ export function runConditionalGroup(root, groupId, { keepOutput = false } = {}) 
   assertNodeRuntime(readNodeContract(root));
   const ownedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-conditional-local-'));
   try {
-    // Validate selection and platform before copying or launching any command.
     const plan = conditionalGroupPlan(root, groupId, ownedRoot);
     const workspace = path.join(ownedRoot, 'workspace');
     fs.mkdirSync(workspace);

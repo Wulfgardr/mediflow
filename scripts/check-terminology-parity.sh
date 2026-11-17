@@ -23,6 +23,4 @@ if ! swift test --package-path "$ROOT_DIR/native/MediFlowMac" --filter Terminolo
 fi
 cat "$APPLE_TEST_LOG"
 
-# L'elenco dei quattro test vive in un solo posto: la CI riusa lo stesso script
-# sull'output della run completa, invece di rieseguire `swift test --filter`.
 bash "$ROOT_DIR/scripts/assert-apple-terminology-tests.sh" "$APPLE_TEST_LOG"

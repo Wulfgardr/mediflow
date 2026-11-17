@@ -33,7 +33,6 @@ export default class QuarantineReporter {
     mkdirSync(directory, { recursive: true });
     writeFileSync(join(directory, 'quarantine-playwright.json'), JSON.stringify({ originalStatus: result.status,
       gateStatus: admitted ? 'passed-with-quarantine' : result.status, globalErrors: this.globalErrors, tests: decisions }, null, 2));
-    // The list/HTML reporters retain the real failures. Only the gate changes.
     if (admitted) return { status: 'passed' };
   }
 }

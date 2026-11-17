@@ -43,7 +43,6 @@ try:
         if run.returncode != 101 or not failures or 'error[E' in run.stdout:
             print(run.stdout, flush=True)
             raise SystemExit(f'{name}: non dimostrata una failure di asserzione nei test selezionati')
-        # Ogni test elencato deve cadere: un filtro che resta verde non prova nulla.
         silent = [test for test in tests if not any(test in failure for failure in failures)]
         if silent:
             print(run.stdout, flush=True)
