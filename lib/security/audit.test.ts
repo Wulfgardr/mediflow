@@ -20,7 +20,7 @@ function buildAuditRecord(overrides: Partial<AuditRecord>): AuditRecord {
     return {
         origin: 'local',
         schemaVersion: 1,
-        eventId: 'evt-1',
+        eventId: 'evt-1', proposerRef: null, mandateRef: null, modelProvider: null,
         eventType: 'patient.updated',
         occurredAt: '2026-03-18T10:00:00.000Z',
         outcome: 'success',
@@ -354,6 +354,7 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
         native: 0,
         api: 1,
         job: 0,
+        agent: 0,
     });
     assert.deepEqual(summary.subjectTypes, {
         backup: 0,

@@ -424,6 +424,9 @@ export const auditEvents = sqliteTable('audit_events', {
     requestId: text('request_id'),
     redactedMetadata: text('redacted_metadata'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    proposerRef: text('proposer_ref'),
+    mandateRef: text('mandate_ref'),
+    modelProvider: text('model_provider'),
 });
 
 // --- Attachments ---

@@ -39,6 +39,7 @@ import {
     withAuditContextMetadata,
     writeAuditEventInTransaction,
     type AuditEventType,
+    type AgentAuditProvenance,
     type AuditRedactedMetadata,
 } from './security/audit';
 import type { ServerSession } from './security/server-session';
@@ -52,6 +53,7 @@ type MutationResponse =
     | { status: 400 | 401 | 403 | 404 | 409; value: Record<string, unknown> };
 
 type HostContext = {
+    agentProvenance?: AgentAuditProvenance;
     request: Request;
     session: ServerSession;
 };
@@ -343,7 +345,8 @@ function serviceAuditInput(
         actorType: surface === 'network' ? 'user' as const : actor.actorType,
         actorRef: surface === 'network' ? context.session.userId : actor.actorRef,
         subjectType, subjectRef,
-        sourceSurface: surface === 'network' ? 'native' as const : actor.sourceSurface,
+        sourceSurface: surface === 'network' ? 'native' as const : (context as HostContext).agentProvenance ? 'agent' as const : actor.sourceSurface,
+        agentProvenance: surface === 'host' ? (context as HostContext).agentProvenance : undefined,
         requestId: requestIdFromRequest(context.request),
         redactedMetadata: surface === 'network'
             ? { ...(metadata ?? {}), flags }

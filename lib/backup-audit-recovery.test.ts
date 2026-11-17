@@ -63,7 +63,7 @@ function prepare(dataDir: string): void {
 }
 
 function seedAudit(db: Database.Database, row: typeof originalAudit): void {
-    db.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    db.prepare('INSERT INTO audit_events (event_id,schema_version,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,request_id,redacted_metadata,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         .run(...Object.values(row));
 }
 
@@ -351,7 +351,7 @@ test('manual and scheduled producers keep one SQLite snapshot across a concurren
                 "import {serializeBackupArtifact} from './lib/backup-artifact.ts';",
                 "const originalPrepare = Database.prototype.prepare; let fired = false;",
                 "Database.prototype.prepare = function(statement) { const prepared = originalPrepare.call(this, statement); if (!fired && /from\\s+[\"']?patients[\"']?(?:\\s|$)/i.test(statement)) { fired = true; const other = new Database(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));",
-                "other.transaction(() => { other.prepare(\"UPDATE patients SET last_name='After', version=2 WHERE id='snapshot-patient'\").run(); other.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_AUDIT_ROW))); other.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_COMMAND_AUDIT_ROW))); })(); other.close(); } return prepared; };",
+                "other.transaction(() => { other.prepare(\"UPDATE patients SET last_name='After', version=2 WHERE id='snapshot-patient'\").run(); other.prepare('INSERT INTO audit_events (event_id,schema_version,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,request_id,redacted_metadata,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_AUDIT_ROW))); other.prepare('INSERT INTO audit_events (event_id,schema_version,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,request_id,redacted_metadata,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_COMMAND_AUDIT_ROW))); })(); other.close(); } return prepared; };",
                 "if (process.env.SNAPSHOT_PRODUCER === 'scheduled') { process.argv[1] = path.resolve('scripts/run-scheduled-backup.mjs'); await import('./scripts/run-scheduled-backup.mjs'); } else {",
                 webBackupDatasetScript,
                 "console.log(await serializeBackupArtifact(buildWebBackupDataset())); }",

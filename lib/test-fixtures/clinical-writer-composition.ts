@@ -8,6 +8,7 @@ import { createWebAttachmentInTransaction } from '../attachment-web-create';
 import { updatePatientOperationInTransaction } from '../patient-update-operation';
 import { PATIENT_PROFILE_UPDATE_OPERATION } from '../patient-profile-update-contract';
 import { bindSyntheticArchiveSessions } from '../security/web-auth-lifecycle-owner-test-fixture';
+import type { AgentAuditProvenance } from '../security/audit';
 import { patients, users } from '../schema';
 import { activePatients } from '../patient-lifecycle';
 
@@ -62,36 +63,37 @@ export function composeOriginalThree(prefix: string): Promise<unknown>[] {
 
 export const compositionSteps = ['note', 'transcript', 'attachment', 'therapy', 'service', 'diagnoses', 'exemptions', 'observation'] as const;
 
-function steps(tx: Tx, prefix: string) {
+function steps(tx: Tx, prefix: string, agentProvenance?: AgentAuditProvenance) {
+    const context = { ...audit, sourceSurface: agentProvenance ? 'agent' as const : 'web' as const, agentProvenance };
     const entry = (kind: string) => entryWriter.createEntryOperationInTransaction(tx, { patientId, id: `${prefix}-${kind}`,
         values: { id: `${prefix}-${kind}`, patientId, type: 'visit', title: `ENC:synthetic:${kind}`, content: `ENC:synthetic:${kind}`, date },
-        mode: 'web', audit, changedFields: ['content'] });
+        mode: 'web', audit: context, changedFields: ['content'] });
     const profile = (values: { diagnoses?: string; exemptions?: string }, expectedVersion: number) => updatePatientOperationInTransaction(tx, {
         operationId: PATIENT_PROFILE_UPDATE_OPERATION.id, contractVersion: PATIENT_PROFILE_UPDATE_OPERATION.version,
-        patientId, expectedVersion, values, setPrimaryAmbulatory: false, audit });
+        patientId, expectedVersion, values, setPrimaryAmbulatory: false, audit: context });
     return [
         () => entry('note'),
         () => entry('transcript'),
         () => createWebAttachmentInTransaction(tx, request, session, { id: `${prefix}-attachment`, patientId,
-            name: 'ENC:synthetic:pdf', type: 'application/pdf', size: 1, data: 'ENC:YQ==:Yg==' }),
+            name: 'ENC:synthetic:pdf', type: 'application/pdf', size: 1, data: 'ENC:YQ==:Yg==' }, agentProvenance),
         () => therapyWriter.createTherapyOperationInTransaction(tx, { patientId, therapyId: `${prefix}-therapy`,
             values: { id: `${prefix}-therapy`, patientId, drugName: 'ENC:synthetic:drug', dosage: 'ENC:synthetic:dose', status: 'active', startDate: date },
-            mode: 'web', audit, changedFields: ['drugName'] }),
-        () => serviceWriter.createHostServicePrescriptionInTransaction(tx, { request, session }, { id: `${prefix}-service`, patientId,
+            mode: 'web', audit: context, changedFields: ['drugName'] }),
+        () => serviceWriter.createHostServicePrescriptionInTransaction(tx, { request, session, agentProvenance }, { id: `${prefix}-service`, patientId,
             prescribedAt: '2026-11-17', serviceName: 'ENC:synthetic:service' }),
         () => profile({ diagnoses: 'ENC:synthetic:diagnoses' }, 1),
         () => profile({ exemptions: 'ENC:synthetic:exemptions' }, 2),
         () => createObservationOperationInTransaction(tx, { patientId, observationId: `${prefix}-observation`,
             values: { id: `${prefix}-observation`, patientId, codeSystem: 'synthetic', code: 'synthetic', display: 'ENC:synthetic:observation', unitSystem: 'synthetic', unitCode: '1', value: 'ENC:synthetic:value', observedAt: date },
-            mode: 'web', audit, changedFields: ['content'] }),
+            mode: 'web', audit: context, changedFields: ['content'] }),
     ];
 }
 
-export function composeAll(prefix: string, options: { failAfter?: number; expectedRevision?: number; denyAt?: number } = {}): void {
+export function composeAll(prefix: string, options: { failAfter?: number; expectedRevision?: number; denyAt?: number; agentProvenance?: AgentAuditProvenance } = {}): void {
     dbServer.transaction(tx => {
         const patient = tx.select().from(patients).where(and(eq(patients.id, patientId), activePatients())).get();
         if (patient?.version !== (options.expectedRevision ?? 1)) throw new Error('SYNTHETIC_REVISION_CHANGED');
-        for (const [index, apply] of steps(tx, prefix).entries()) {
+        for (const [index, apply] of steps(tx, prefix, options.agentProvenance).entries()) {
             if (options.denyAt === index) throw new Error('SYNTHETIC_COMMIT_REVOKED');
             const result = apply();
             if (result.status !== 200 && result.status !== 201) throw new Error(`SYNTHETIC_ELEMENT_DENIED:${result.status}`);

@@ -8,7 +8,23 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 11 ed i predecessori canonici 3, 4, 5, 6, 9 e 10; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 12 ed i predecessori canonici 3, 4, 5, 6, 9, 10 e 11; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+
+## Raccordo schema 12 del 17 novembre 2026
+
+Le tre colonne di provenienza dell'audit si aggiungono solo nella migrazione
+versionata. La ricostruzione dei predecessori le rimuove prima del confronto;
+le impronte precedenti restano invariate e la nuova impronta v11 è verificata
+sul bootstrap originale della revisione `0dd19cf33`. Il recupero cifrato v11
+conserva account, dati clinici, ledger e audit storico senza attribuirgli
+agenti. Il nucleo terapia inoltra la provenienza fidata all'audit, senza
+cambiare transizioni, CAS, autorità o ricevute del comando di stato.
+
+Le prove su schema, recupero cifrato, backup e otto writer agenti passano;
+i due test di nuova attribuzione e versione falliscono sulla base precedente.
+Il modello legacy non copre questa attribuzione o la migrazione: proprietà,
+limiti e mutanti TLA restano quelli qualificati. Il gate completo viene
+rieseguito dopo il raccordo dei digest della revisione di implementazione.
 
 ## Raccordo del 17 novembre 2026: nucleo di creazione componibile
 

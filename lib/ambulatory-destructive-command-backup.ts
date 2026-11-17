@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import { AMBULATORY_MARKER_FIELDS, commandObject, commandOpaqueId, parseAmbulatoryCommandReceipt,
     type AmbulatoryCommandReceipt, type AmbulatoryCommandMarker } from './ambulatory-destructive-command-contract.ts';
-import { backupAuditsEqual, canonicalizeBackupAuditRows, type BackupAuditRow } from './backup-audit.ts';
+import { backupAuditsEqual, canonicalizeBackupAuditRows, readBackupAuditRows, type BackupAuditRow } from './backup-audit.ts';
 
 export const AMBULATORY_COMMAND_FIELDS = [...AMBULATORY_MARKER_FIELDS, 'actorRef', 'deviceId', 'devicePlatform', 'deviceTokenHash',
     'outcome', 'reason', 'committedAt', 'resultJson', 'auditSnapshots'] as const;
@@ -73,10 +73,7 @@ export function readAmbulatoryCommandRows(db: Database.Database): AmbulatoryComm
     return db.prepare(`SELECT ${AMBULATORY_COMMAND_FIELDS.map(key => `${snake(key)} AS ${key}`).join(',')} FROM ambulatory_destructive_commands ORDER BY command_id`).all() as AmbulatoryCommandRow[];
 }
 export function readAmbulatoryCommandAudits(db: Database.Database): BackupAuditRow[] {
-    return canonicalizeBackupAuditRows(db.prepare(`SELECT event_id AS eventId, schema_version AS schemaVersion, event_type AS eventType,
-        occurred_at AS occurredAt, outcome, actor_type AS actorType, actor_ref AS actorRef, subject_type AS subjectType,
-        subject_ref AS subjectRef, source_surface AS sourceSurface, request_id AS requestId, redacted_metadata AS redactedMetadata,
-        created_at AS createdAt FROM audit_events`).all());
+    return readBackupAuditRows(db);
 }
 export function planAmbulatoryCommandUnion(db: Database.Database, values: unknown, audits: unknown): AmbulatoryCommandRow[] {
     const localAudits = readAmbulatoryCommandAudits(db);
