@@ -58,7 +58,8 @@ export default function SettingsProfilePage() {
     const [workProfileOpen, setWorkProfileOpen] = useState(false);
     useRuntimeTwinPendingForm(state.current !== null
         && (profile.doctorName !== (state.current.displayName ?? '')
-            || profile.clinicName !== (state.current.ambulatoryName ?? '')), async () => {
+            || profile.clinicName !== (state.current.ambulatoryName ?? '')
+            || (profile.doctorTaxCode ?? '') !== (state.current.doctorTaxCode ?? '')), async () => {
             discarded.current = true;
             pendingProfile.discard();
         });
@@ -106,6 +107,15 @@ export default function SettingsProfilePage() {
                             autoComplete="organization"
                             className={SETTINGS_INPUT_CLASS}
                         />
+                    </div>
+
+                    <div>
+                        <label htmlFor="doctor-tax-code" className={SETTINGS_LABEL_CLASS}>Codice fiscale</label>
+                        <input id="doctor-tax-code" name="doctorTaxCode" type="text"
+                            value={profile.doctorTaxCode ?? ''}
+                            onChange={(event) => editor.current?.edit({ ...profile, doctorTaxCode: event.target.value.toUpperCase() })}
+                            disabled={state.busy || !state.current} maxLength={16} autoComplete="off"
+                            className={SETTINGS_INPUT_CLASS} />
                     </div>
 
                     {state.busy && !state.current && <p role="status" className={styles.feedback}>Caricamento del profilo…</p>}

@@ -399,12 +399,12 @@ test('scale dates do not become scores and explicit scores after dates retain th
     for (const text of ['MMSE 03/2021', 'MMSE 01/03/2021', 'MMSE 2019: 24/30']) assert.deepEqual(findScaleMentions(text), [], text);
 });
 
-test('professional identity labels cannot cross lines or be taken from narrative prose', () => {
+test('incomplete professional labels and narrative prose do not exclude patient codes', () => {
     const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
     for (const prefix of [
         'Assistito Medico\nC.F.', 'Sig. Bianchi Luca, inviato dal medico\nC.F.:',
         "Paziente Bianchi Luca, preso in carico dall'operatore\nCF",
-        'CF medico:\n', 'CF\nmedico:', 'Codice fiscale del\nmedico:',
+        'CF\nmedico:', 'Codice fiscale del\nmedico:',
         'Medico\r\nCF:', 'Medico\u2028CF:',
         'Sig. Bianchi Luca, inviato dal medico C.F.:', 'Assistito Medico C.F.:',
     ]) {
@@ -466,4 +466,14 @@ test('patient names are read only from a labelled line, as capitalised words', a
     assert.equal(evaluateDossierGroupIdentity([{ taxCodes: [], patientNames: twoBoxes }, { taxCodes: [], patientNames: [['mario', 'rossi']] }], linked, 'p').status, 'discordant_name');
     // Un'anagrafica senza nome completo non permette il confronto: resta la conferma.
     assert.equal(evaluateDossierGroupIdentity([{ taxCodes: [], patientNames: [['mario', 'rossi']] }], [{ id: 'p', taxCode: '', lastName: 'D’Amico' }], 'p').blocking, false);
+});
+
+test('WUL-878 labeled prescriber blocks exclude only professional occurrences', () => {
+    const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
+    for (const block of [`Medico prescrittore\n${CF_B}`, `Medico prescrittore\nPersona Sintetica\nCF: ${CF_B}`, `Codice fiscale del medico\n${CF_B}`, `Medico prescrittore\nCognome e nome del medico: Persona Sintetica\nCodice fiscale\n${CF_B}`]) {
+        const codes = collectDossierTaxCodes(`Paziente CF ${CF_A}\n\n${block}`);
+        assert.equal(evaluateDossierGroupIdentity([{ taxCodes: codes }], patients, 'pa').status, 'matched');
+        const repeated = collectDossierTaxCodes(`${block}\n\nPaziente CF ${CF_B}\nPaziente CF ${CF_A}`);
+        assert.equal(evaluateDossierGroupIdentity([{ taxCodes: repeated }], patients).status, 'mixed');
+    }
 });

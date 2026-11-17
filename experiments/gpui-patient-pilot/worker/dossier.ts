@@ -48,6 +48,7 @@ const ports: DossierPorts = {
     sessionSignal: () => controller.signal,
     extract: async value => remote('extract', Buffer.from(value).toString('base64')) as Awaited<ReturnType<DossierPorts['extract']>>,
     sha256: async value => createHash('sha256').update(value).digest('hex'),
+    physicianTaxCode: async () => remote('physicianTaxCode') as string | null,
     listPatients: async () => remote('patients') as Awaited<ReturnType<DossierPorts['listPatients']>>,
     getPatient: async id => remote('patient', id) as Awaited<ReturnType<DossierPorts['getPatient']>>,
     updatePatientCodes: async (id, change) => { remote('patientCodes', id, change); },

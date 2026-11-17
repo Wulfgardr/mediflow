@@ -797,3 +797,24 @@ test('a document already in the dossier receives prepared proposals and section 
     assert.equal(result.residualAcknowledged, 0, 'copertura dichiarata parziale: il residuo resta al medico');
     assert.equal([...records.keys()].filter((key) => key.startsWith('entries:')).length, 1, 'una sola voce di diario: la sintesi');
 });
+
+test('WUL-878 profile physician code is excluded without labels and cannot receive the dossier', async () => {
+    const text = `%PDF-1.4 sintetico\nRicetta\nPaziente CF ${CF_A}\n${CF_B}`;
+    const { ports, files } = setup([['ricetta.pdf', text]]);
+    const [withoutProfile] = await buildDossierInventory(ports, files, live);
+    assert.equal(evaluateDraftGroupIdentity(withoutProfile, patientsFixture(), 'pa').status, 'mixed');
+    Object.assign(ports, { physicianTaxCode: async () => CF_B });
+    const [group] = await buildDossierInventory(ports, files, live);
+    assert.equal(evaluateDraftGroupIdentity(group, patientsFixture(), 'pa').status, 'matched');
+    assert.equal(evaluateDraftGroupIdentity(group, patientsFixture(), 'pb').blocking, true);
+    assert.equal((await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live }))[0].status, 'stored');
+    const only = setup([['solo-medico.pdf', `%PDF-1.4 sintetico\nRicetta\n${CF_B}`]]);
+    Object.assign(only.ports, { physicianTaxCode: async () => CF_B });
+    const [physician] = await buildDossierInventory(only.ports, only.files, live);
+    assert.deepEqual(evaluateDraftGroupIdentity(physician, patientsFixture(), null).candidatePatientIds, []);
+    assert.equal(evaluateDraftGroupIdentity(physician, patientsFixture(), 'pb').blocking, true);
+    const other = setup([['altro.pdf', `${text}\nRSSMRA80A01H501U`]]);
+    Object.assign(other.ports, { physicianTaxCode: async () => CF_B });
+    const [mixed] = await buildDossierInventory(other.ports, other.files, live);
+    assert.equal(evaluateDraftGroupIdentity(mixed, patientsFixture(), 'pa').status, 'mixed');
+});

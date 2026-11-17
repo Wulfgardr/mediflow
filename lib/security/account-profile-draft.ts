@@ -7,6 +7,7 @@ export class AccountProfileDraftMemory {
     retain(profile: AccountProfile | null, draft: ProfileDraft) {
         if (!profile) return;
         this.pending = draft.doctorName !== (profile.displayName ?? '') || draft.clinicName !== (profile.ambulatoryName ?? '')
+            || (draft.doctorTaxCode ?? '') !== (profile.doctorTaxCode ?? '')
             ? { userId: profile.userId, archiveGeneration: profile.archiveGeneration, draft: { ...draft } } : null;
     }
     resume(profile: AccountProfile): ProfileDraft | null {

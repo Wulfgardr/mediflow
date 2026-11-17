@@ -1,3 +1,4 @@
+import { identifierError } from '../patient-identity';
 import { z } from 'zod';
 import { optionalTextSchema, requiredTextSchema } from './common';
 import { validatePassphraseSetupCredentials } from '@/lib/security/passphrase-adoption-validation';
@@ -18,8 +19,6 @@ export const authSetupSchema = z.object({
     }
 });
 
-/* ADR 0155. The subject is always the session user, so only these three keys
-   exist and both names are mandatory (string or null). */
 const conditionalProfileNameSchema = z.string().trim().max(200).nullable()
     .transform((value) => value === null || value.length === 0 ? null : value);
 
@@ -27,6 +26,8 @@ export const authProfileConditionalUpdateSchema = z.object({
     expectedVersion: z.string().min(1),
     displayName: conditionalProfileNameSchema,
     ambulatoryName: conditionalProfileNameSchema,
+    doctorTaxCode: z.string().trim().transform(value => value.toUpperCase())
+        .refine(value => !value || identifierError('cf', value) === null).nullable().optional(),
 }).strict();
 
 export type AuthSetupPayload = z.infer<typeof authSetupSchema>;

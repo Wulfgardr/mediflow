@@ -337,6 +337,11 @@ impl DossierImport {
                         .map_err(|_| RuntimeError::InvalidResponse)
                 }
             }
+            "physicianTaxCode" => {
+                let profile = self.host.native.read_account_profile()?;
+                self.live()?;
+                Ok(json!(profile.doctor_tax_code))
+            }
             "patients" => {
                 let mut patients = vec![];
                 for row in self.host.native.list_patients(&self.scope, false)? {
