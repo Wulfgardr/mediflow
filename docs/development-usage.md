@@ -175,7 +175,7 @@ Dal 28 settembre lo snapshot viene esteso dai record locali con
 `npm run collect:development-usage`, poi si rigenerano tabelle e SVG con
 `npm run build:usage-dashboard`. La base pubblicata del 27 settembre resta
 conservata separatamente. La copertura successiva dipende dai log disponibili.
-La [procedura di release](./releases/development-usage.md) descrive fonti,
+La [procedura di release](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/releases/development-usage.md) descrive fonti,
 esclusioni, controlli ed ordine dei commit prima del tag. La raccolta include
 le sessioni T3 Code registrate dai rispettivi harness con cwd attribuibile.
 

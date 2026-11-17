@@ -33,8 +33,8 @@ e il modello, quando usato, non acquisisce autorità sulla cartella.
 | Chi può leggere o modificare? | API, fonti canoniche e invarianti, sezioni 5–7. |
 
 Per lo stato dei provider esterni e dell'oscuramento dei dati identificativi,
-il riferimento corrente è la [matrice AI](./ai-runtime-serving-matrix.md).
-La guida a [privacy e governance](./privacy-and-ai-governance.md) ne spiega
+il riferimento corrente è la [matrice AI](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/ai-runtime-serving-matrix.md).
+La guida a [privacy e governance](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/privacy-and-ai-governance.md) ne spiega
 responsabilità e limiti. I diagrammi sottostanti conservano i contratti e le
 sequenze del perimetro sorgente 0.8.5; dove una fase storica differisce dalla
 composizione documentale successiva, il testo ne precisa la portata.

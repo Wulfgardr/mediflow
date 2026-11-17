@@ -98,7 +98,7 @@ Negativo:
 ## First Thin Slice
 
 1. Documentare il boundary scenario-specific in
-   [docs/siss-modulo-prescrittivo-regionale.md](../siss-modulo-prescrittivo-regionale.md).
+   [docs/siss-modulo-prescrittivo-regionale.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/siss-modulo-prescrittivo-regionale.md).
 2. Selezionare il richiamo ufficiale del modulo come target della prima issue
    runtime futura.
 3. Bloccare esplicitamente:

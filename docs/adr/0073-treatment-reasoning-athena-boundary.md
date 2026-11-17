@@ -17,7 +17,7 @@ Il rischio e introdurre troppo presto un agente terapeutico come se fosse un
 prescrittore, un motore di decisione clinica autonoma o una dipendenza cloud.
 Questo violerebbe ADR 0033 (private),
 [ADR 0054](./0054-network-therapy-write-boundary.md),
-[ADR 0057](./0057-local-evidence-absorption-layer.md),
+[ADR 0057](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0057-local-evidence-absorption-layer.md),
 [ADR 0065](./0065-intended-purpose-and-claims-guard.md) e
 [SECURITY.md](../../SECURITY.md).
 
@@ -102,7 +102,7 @@ intenzionale: impedisce promozioni implicite di un agente terapeutico.
 
 La prima slice ha introdotto contratto e benchmark senza runtime clinico:
 
-1. documento di integrazione `docs/treatment-reasoning-athena-integration.md`;
+1. documento di integrazione [docs/treatment-reasoning-athena-integration.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/treatment-reasoning-athena-integration.md);
 2. contratto puro `lib/treatment-reasoning-contract.ts`;
 3. test di contratto `lib/treatment-reasoning-contract.test.ts`;
 4. corpus sintetico `scripts/fixtures/treatment-reasoning-corpus.json`;
@@ -198,7 +198,7 @@ Decisione accettata per l'implementazione candidata richiesta: un secondo motore
 locale esplicito `athena_transformers` per Windows e Linux, con runtime Python
 e pesi originali inventariati offline. MLX resta il percorso macOS; nessuna
 sostituzione automatica, chiamata cloud o dipendenza da un Mac remoto. La
-[proposta tecnica](../../proposals/TREATMENT-PORTABLE-ADR.md) conserva il
+[proposta tecnica](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/proposals/TREATMENT-PORTABLE-ADR.md) conserva il
 contesto e i dettagli del candidato; questa estensione ne adotta i contratti
 indicati sotto, senza promuovere le dichiarazioni di disponibilità.
 

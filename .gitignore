@@ -108,10 +108,7 @@ docs/private/
 # Restano nella storia del repository (commit 5afa7f0f2); le nuove vanno nella PR.
 docs/analysis/**/*.png
 
-# Le prove dei giri GPUI restano nella storia (experiments/gpui-patient-pilot/evidence/README.md);
-# quelle nuove vanno nella PR. Restano versionati solo i due ingressi del confronto con la 0.9.0.
 experiments/gpui-patient-pilot/evidence/**
-!experiments/gpui-patient-pilot/evidence/README.md
 !experiments/gpui-patient-pilot/evidence/connected/
 experiments/gpui-patient-pilot/evidence/connected/**
 !experiments/gpui-patient-pilot/evidence/connected/release-v0.9.0-web-readonly.json

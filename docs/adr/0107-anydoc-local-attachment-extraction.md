@@ -11,10 +11,10 @@ Issue: WUL-522
 Program line: candidato `0.8.5`
 
 Supersedes, per il percorso di estrazione documentale:
-[ADR 0011](./0011-ocr-first-qwen-clinical-and-prudent-icd-autofill.md),
-[ADR 0059](./0059-macos-apple-vision-ocr-fallback.md),
+[ADR 0011](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0011-ocr-first-qwen-clinical-and-prudent-icd-autofill.md),
+[ADR 0059](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0059-macos-apple-vision-ocr-fallback.md),
 [ADR 0077](./0077-ai-provider-abstraction-and-egress-anonymization-boundary.md) e
-[ADR 0088](./0088-deterministic-pdf-page-router.md).
+[ADR 0088](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0088-deterministic-pdf-page-router.md).
 
 Related: [ADR 0084](./0084-document-diagnoses-review-only.md),
 [ADR 0086](./0086-intelligent-scaffold-and-graded-automation-boundary.md),

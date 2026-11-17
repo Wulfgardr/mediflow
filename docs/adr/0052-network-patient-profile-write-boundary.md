@@ -64,8 +64,8 @@ Restano esplicitamente fuori:
 
 ## Riferimenti
 
-- [ADR 0034](./0034-local-only-default-and-network-home-base-opt-in.md)
-- [ADR 0036](./0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md)
-- [ADR 0038](./0038-network-readonly-data-plane-auth-boundary.md)
+- [ADR 0034](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0034-local-only-default-and-network-home-base-opt-in.md)
+- [ADR 0036](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md)
+- [ADR 0038](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0038-network-readonly-data-plane-auth-boundary.md)
 - [ADR 0048](./0048-apple-shared-client-architecture-and-home-base-runtime.md)
 - [OpenAPI v1](../openapi/mediflow-v1.yaml)

@@ -10,7 +10,7 @@ riceve un issue e un worktree dedicati prima del runtime.
 Program line: candidata `0.8.5`
 
 Related: [ADR 0065](./0065-intended-purpose-and-claims-guard.md),
-[ADR 0072](./0072-voice-visit-capture-fluid-boundary.md),
+[ADR 0072](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0072-voice-visit-capture-fluid-boundary.md),
 [ADR 0077](./0077-ai-provider-abstraction-and-egress-anonymization-boundary.md),
 [ADR 0094](./0094-intelligence-fabric-headless-contract-085.md),
 [ADR 0095](./0095-broker-projection-e-servizi-host-per-capability.md),

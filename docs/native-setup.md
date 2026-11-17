@@ -4,8 +4,8 @@ Il client macOS richiede un certificato locale, un proxy TLS e la propria config
 
 Riferimenti correlati:
 - [docs/NATIVE.md](./NATIVE.md)
-- [docs/local-api-tls.md](./local-api-tls.md)
-- [docs/native-launch.md](./native-launch.md)
+- [docs/local-api-tls.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/local-api-tls.md)
+- [docs/native-launch.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md)
 - [docs/native-testing.md](./native-testing.md)
 
 ## Uso

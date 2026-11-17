@@ -69,7 +69,7 @@ Il manifest `.codex-plugin/plugin.json` e il companion `.mcp.json` conservano
 la rappresentazione legacy richiesta; test schema-aware impediscono divergenze
 di identità, presentazione e comando server. Non sono presenti apps mappings,
 hook, marketplace o impostazioni personali. La skill limita l'uso a esempi
-inventati. I dettagli e le prove sono nel [README del pacchetto](../../plugins/mediflow-synthetic/README.md).
+inventati. I dettagli e le prove sono nel [README del pacchetto](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/plugins/mediflow-synthetic/README.md).
 
 Questa slice è sorgente di sviluppo, richiede build e dipendenze esplicite e
 non dichiara un installer. Nessun install è stato eseguito sull'account.
