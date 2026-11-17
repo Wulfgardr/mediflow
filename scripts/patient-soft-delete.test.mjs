@@ -1,6 +1,3 @@
-// WUL-306 (ADR 0066): static guards for the patient soft-delete lifecycle.
-// Behavioral tombstone coverage lives in lib/patient-lifecycle.test.ts (bash wrapper:
-// scripts/patient-soft-delete-test.sh); these checks pin the route wiring instead.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -70,8 +67,6 @@ function assertImportedProfileRead(file, declaration) {
         'GET must resolve to the imported profile reader, not an identically named local binding');
 }
 
-// Token comparison ignores formatting/comments/quote style, not executable syntax
-// or string values. It pins the small response/delegation boundary, not whole files.
 function syntaxTokens(source) {
     const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, source);
     const tokens = [];
@@ -206,8 +201,6 @@ function assertPatientProfileTombstones({ route, routeSource, profileSource, dis
     assert.equal(updates.length, 1);
     assert.ok(patientReadIsFiltered(updates[0]), 'the final patient UPDATE must itself exclude tombstones');
 
-    // Reuse the existing audit contract for real import bindings, reachability,
-    // same-patient delegation and the one synchronous transaction/audit writer.
     assert.deepEqual(validateRequiredPatientUpdateAudit({
         spec: { handler: 'PUT', serviceModule: '@/lib/patient-profile-service', serviceExport: 'updatePatientProfile',
             profileFile: 'lib/patient-profile-service.ts', auditContextExport: route.auditContextExport,
@@ -308,9 +301,6 @@ test('primary patient list reads exclude soft-deleted patients', () => {
     }
 });
 
-// WUL-322 (ADR 0066 Slice 3): the test-container clear must select victims via the
-// M2M membership and tombstone them, never via the stale legacy patients.ambulatoryId
-// column (WUL-300 constraint), never as a hard delete.
 test('ambulatories/clear is membership-based, soft-deletes and stays test-only', () => {
     const routeSource = read('app/api/ambulatories/clear/route.ts');
     const writeFile = checkedSource(read('lib/ambulatory-write.ts'));
@@ -328,11 +318,9 @@ test('ambulatories/clear is membership-based, soft-deletes and stays test-only',
     assert.match(clearServiceSource, /clearTestContainerByMembership\(/, 'clear service must go through the membership-based helper');
     assert.match(clearServiceSource, /dbServer\.transaction\(/, 'clear service must run in one synchronous transaction');
 
-    // (e) the non-test safety check stays: clearing a LIVE ambulatory is rejected.
     assert.match(clearServiceSource, /type !== 'test'/, 'clear must keep the test-only safety check');
     assert.match(clearServiceSource, /status: 403/, 'clearing a non-test ambulatory must stay rejected');
 
-    // (d) one patient.deleted audit event per cleared patient, PHI-safe metadata only.
     assert.match(clearServiceSource, /const result = clearTestContainerByMembership\(tx, ambulatoryId\)/, 'clear must retain the transactional membership result');
     assert.match(clearServiceSource, /for \(const patient of result\.clearedPatients\)/, 'clear must audit each cleared patient');
     assert.match(clearServiceSource, /resourceVersion: patient\.version/, 'each patient audit must retain the resulting version');
@@ -348,34 +336,23 @@ test('the membership-clear helper tombstones with the dedicated reason', () => {
     assert.doesNotMatch(source, /patients\.ambulatoryId/, 'helper must not read the stale legacy column (WUL-300)');
 });
 
-// ADR 0066 allowlist guard (WUL-316 style): unfiltered reads are intentional only
-// at these stable AST fingerprints. The number is the expected multiplicity.
 const UNFILTERED_PATIENTS_READ_ALLOWLIST = [
-    // Create identity checks intentionally include tombstones after admission: IDs may not be reused.
-    // Two Web branches, one local-v1 branch, and the paired branch each have one exact lookup.
     ['app/api/patients/route.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, values.id)).get()', 1],
     ['app/api/patients/route.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
     ['app/api/v1/patients/route.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
     ['lib/network-patient-lifecycle.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
-    // SISS create checks deletedAt immediately after lookup and returns 404 before insert/audit.
-    // The SISS family SQLite oracle retains its tombstoned-parent denial case.
     ['app/api/siss-handoffs/route.ts', 'tx.select({ deletedAt: patients.deletedAt }).from(patients) .where(eq(patients.id, patientId)).get()', 1],
     ['app/api/system/backup-restore/route.ts', 'tx.select().from(patients).all()', 1],
-    // ADR0066: admin orphan inspection and transactional repair deliberately include tombstones.
     ['app/api/system/fix-orphans/route.ts', 'tx.select({ id: patients.id }).from(patients)', 1],
     ['app/api/system/fix-orphans/route.ts', 'tx.select({ id: patients.id, version: patients.version }).from(patients).all()', 1],
     ['app/api/system/migrate/route.ts', 'dbServer.select().from(patients).where(isNull(patients.ambulatoryId))', 1],
     ['app/api/system/migrate-m2m/route.ts', 'tx.select({ id: patients.id, version: patients.version, ambulatoryId: patients.ambulatoryId }) .from(patients).where(isNotNull(patients.ambulatoryId)).all()', 1],
-    // Admin purge previews tombstone/version in a read transaction and rereads them before cascade in the write transaction.
     ['app/api/system/purge-patient/route.ts', 'tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt }) .from(patients).where(eq(patients.id, patientId)).get()', 2],
     ['app/api/system/restore-patient/route.ts', 'dbServer .select({ id: patients.id, firstName: patients.firstName, lastName: patients.lastName, deletedAt: patients.deletedAt, deletionReason: patients.deletionReason, version: patients.version, }) .from(patients) .where(isNotNull(patients.deletedAt)) .orderBy(desc(patients.deletedAt))', 1],
-    // admin restore reads this tombstone inside its IMMEDIATE transaction.
     ['app/api/system/restore-patient/route.ts', 'tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt }) .from(patients).where(eq(patients.id, patientId)).get()', 1],
     ['lib/network-patient-lifecycle.ts', 'tx .select({ id: patients.id, version: patients.version, updatedAt: patients.updatedAt, isArchived: patients.isArchived, }) .from(patients) .where(and(eq(patients.id, patientId), isNotNull(patients.deletedAt))) .get()', 1],
     ['lib/network-patient-lifecycle.ts', 'tx .select({ patient: patients }) .from(patients) .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId)) .where(and(eq(patients.id, context.patientId), eq(patientsToAmbulatories.ambulatoryId, context.scopeAmbulatoryId), isNotNull(patients.deletedAt))) .get()', 1],
     ['lib/network-patient-read.ts', 'dbServer .select({ patient: patients }) .from(patients) .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId)) .where(and(...filters)) .orderBy(desc(patients.updatedAt))', 1],
-    // Clear's remaining selected members include existing tombstones: bump membership authority
-    // without rewriting lifecycle fields (test-container-clear's tombstoned-member oracle).
     ['lib/test-container-clear.ts', 'runner .select({ id: patients.id, version: patients.version }).from(patients) .where(inArray(patients.id, remainingIds)).all()', 1],
     ['lib/ambulatory-destructive-command-plan.ts', 'tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt, deletionReason: patients.deletionReason }).from(patients) .where(inArray(patients.id, clear.memberIds)).all()', 1],
     ['lib/patient-cascade.ts', 'runner.select({ id: patients.id }).from(patients)', 2],
@@ -432,8 +409,6 @@ function isActivePatientsPredicate(node) {
     return isAndCall(node) && node.arguments.some(isActivePatientsPredicate);
 }
 
-/* Follow a local const only through AND arguments into the owning patient WHERE.
- * Every use must satisfy that path: one safe query cannot hide a later escape. */
 function isLocalConstantActivePredicate(node) {
     if (!ts.isIdentifier(node)) return false;
     let block = node.parent;

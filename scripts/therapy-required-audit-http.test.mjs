@@ -1,4 +1,3 @@
-/* synthetic real-HTTP Web-cookie and local-v1-token therapy audit/budget proof. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
@@ -31,7 +30,7 @@ async function request(method, pathname, { headers = {}, body, rawBody } = {}) {
     });
     const raw = await response.text();
     let json = null;
-    try { json = raw ? JSON.parse(raw) : null; } catch { /* preserve status and raw below */ }
+    try { json = raw ? JSON.parse(raw) : null; } catch {  }
     return { status: response.status, json, raw };
 }
 
@@ -116,7 +115,6 @@ test('real Web cookie and local v1 token admit therapy writes, enforce 4 MiB and
     }
 });
 
-/* real paired capability plus Web session, with required-audit failure readback. */
 test('real paired therapy create and PUT rollback audit FAIL and IGNORE', async () => {
     const ready = await request('GET', '/api/v1/ambulatories', { headers: { authorization: `Bearer ${token}` } });
     assert.equal(ready.status, 200);

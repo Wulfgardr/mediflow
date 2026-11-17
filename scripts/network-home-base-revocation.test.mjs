@@ -48,7 +48,6 @@ test('revocation during a slow HTTP body leaves clinical rows and success audit 
         const route = ['service-prescriptions', 'prosthetic-prescriptions'].includes(resource)
             ? `/api/v1/network/${resource}?patientId=${patientId}` : `/api/v1/network/patients/${patientId}/${resource}`;
         const body = { ...payload, ...(['service-prescriptions', 'prosthetic-prescriptions'].includes(resource) ? { patientId } : {}) };
-        // A successful control warms the route and proves the exact payload and authority work.
         const control = await call('POST', route, body, headers);
         assert.equal(control.status, 201, JSON.stringify(control.body));
         const tables = [resource.replaceAll('-', '_'), 'audit_events'];

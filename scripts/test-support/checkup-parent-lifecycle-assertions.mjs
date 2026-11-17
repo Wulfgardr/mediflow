@@ -1,4 +1,3 @@
-/* shared behavioral oracle for real routes and negative fixture controls. */
 import assert from 'node:assert/strict';
 
 function independentWalConnections(h) {
@@ -15,8 +14,6 @@ export async function assertDeletionFirst(h, method, payload) {
     let reached = false;
     h.beforeTransaction(() => {
         reached = true;
-        // This hook is after the route's successful preflight but before the
-        // real operation opens IMMEDIATE. B commits through its own connection.
         assert.equal(h.sqlite.inTransaction, false);
         assert.ok(h.statements.some(sql => /^select .*"checkups".*exists\s*\(/i.test(sql)));
         assert.equal(h.deleteParent(h.contender).changes, 1);
@@ -65,7 +62,6 @@ export async function assertChildFirst(h, method, payload) {
     assert.ok(h.statements.some(sql => /^begin immediate$/i.test(sql)));
     assert.deepEqual({ ...h.contender.prepare("SELECT * FROM checkups WHERE id = 'synthetic-checkup'").get() }, h.row());
 
-    // The formerly blocked writer may commit only after the child transaction.
     assert.equal(h.deleteParent(h.contender).changes, 1);
     assert.equal(h.parent().deleted_at, 1893456001);
     const committed = h.row(), auditCommitted = h.audit.slice();

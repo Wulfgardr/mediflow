@@ -6,7 +6,6 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { assertNodeRuntime, readNodeContract } from './node-runtime-contract.mjs';
 
-// Closed inventory: local and CI use exactly these real HTTP harnesses, in order.
 export const CLINICAL_HTTP_TEST_FILES = Object.freeze([
     'scripts/checkup-local-bounded-json.test.mjs',
     'scripts/entry-required-audit-http.test.mjs',
@@ -83,8 +82,6 @@ async function main() {
     } finally {
         process.off('SIGINT', stop);
         process.off('SIGTERM', stop);
-        // The wrapper owns server teardown and removes each copied Next workspace.
-        // Keep failed synthetic fixtures/logs for diagnosis; successful runs leave none.
         if (passed) await rm(suiteDir, { recursive: true, force: true });
         else console.error(`[clinical-http] Synthetic failure artifacts: ${suiteDir}`);
     }
