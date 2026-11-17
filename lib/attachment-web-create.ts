@@ -18,6 +18,7 @@ import { isDocumentOcrQueueReason, isDocumentOcrQueueState } from './domain/docu
 import { activePatients } from './patient-lifecycle';
 import { attachments, patients } from './schema';
 import { unauthorizedResponse } from './security/server-auth';
+import type { AgentAuditProvenance } from './security/audit';
 import type { ServerSession } from './security/server-session';
 
 const mintHostAttachmentCurrentness = createHostAttachmentCurrentness;
@@ -26,7 +27,7 @@ type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 type AttachmentCreateResult = { status: 201 | 400 | 404 | 409 | 413; value: Record<string, unknown> };
 
 export function createWebAttachmentInTransaction(
-    tx: Tx, request: Request, session: ServerSession, body: AttachmentCreatePayload,
+    tx: Tx, request: Request, session: ServerSession, body: AttachmentCreatePayload, agentProvenance?: AgentAuditProvenance,
 ): AttachmentCreateResult {
     if (typeof body.patientId !== 'string' || body.patientId.trim().length === 0) {
         return { status: 400, value: { error: 'patientId required' } };
@@ -62,7 +63,7 @@ export function createWebAttachmentInTransaction(
         documentFreshnessEpoch: currentness.freshnessEpoch,
     }).run();
     if (inserted.changes !== 1) throw new Error('Attachment insert did not affect exactly one row');
-    writeAttachmentWebAudit(tx, request, session, 'attachment.created', id);
+    writeAttachmentWebAudit(tx, request, session, 'attachment.created', id, undefined, agentProvenance);
     return { status: 201, value: { id, currentness } };
 }
 

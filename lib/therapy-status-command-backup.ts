@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { parseTherapyStatusCommand } from './therapy-status-command-contract.ts';
-import { backupAuditsEqual, canonicalizeBackupAuditRows, type BackupAuditRow } from './backup-audit.ts';
+import { backupAuditsEqual, canonicalizeBackupAuditRows, readBackupAuditRows, type BackupAuditRow } from './backup-audit.ts';
 
 export const THERAPY_COMMAND_FIELDS = ['commandId', 'protocol', 'archiveGeneration', 'actorRef', 'patientId', 'therapyId', 'expectedVersion', 'target', 'outcome', 'reason', 'committedAt', 'resultVersion', 'resultEndDate', 'auditEventId', 'auditSnapshot'] as const;
 export type TherapyCommandRow = Record<typeof THERAPY_COMMAND_FIELDS[number], unknown>;
@@ -48,10 +48,7 @@ export function readTherapyStatusCommandRows(db: Database.Database): TherapyComm
     return db.prepare(`SELECT ${projection} FROM therapy_status_commands ORDER BY command_id`).all() as TherapyCommandRow[];
 }
 export function readTherapyCommandAudits(db: Database.Database): BackupAuditRow[] {
-    return canonicalizeBackupAuditRows(db.prepare(`SELECT event_id AS eventId, schema_version AS schemaVersion, event_type AS eventType,
-        occurred_at AS occurredAt, outcome, actor_type AS actorType, actor_ref AS actorRef, subject_type AS subjectType,
-        subject_ref AS subjectRef, source_surface AS sourceSurface, request_id AS requestId, redacted_metadata AS redactedMetadata,
-        created_at AS createdAt FROM audit_events`).all());
+    return readBackupAuditRows(db);
 }
 export function planTherapyStatusCommandUnion(db: Database.Database, incoming: unknown, audits: unknown): TherapyCommandRow[] {
     const local = validateTherapyStatusCommandRows(readTherapyStatusCommandRows(db), readTherapyCommandAudits(db));

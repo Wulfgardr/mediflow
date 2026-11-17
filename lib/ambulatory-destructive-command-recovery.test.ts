@@ -19,6 +19,7 @@ const canonical = new Map([
 for (const version of [4, 5, 6, 9, 10]) {
     function predecessor() {
         const db = new Database(':memory:'); initializeSqliteSchema(db);
+        for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) db.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) db.exec(sql);
         if (version < 9) db.exec('DROP TABLE portable_import_origins');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) if (version < 9) db.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
@@ -69,6 +70,7 @@ test('failure after the new v6 DDL rolls back the predecessor ledger, account by
     for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) original.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
     original.exec('ALTER TABLE entries DROP COLUMN recorded_by');
     original.exec('DROP TABLE portable_import_origins; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
+    for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) original.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
     for (const sql of RETIRED_FEATURE_TABLES_SQL) original.exec(sql);
     original.prepare("INSERT INTO users(id,username,role,password_hash,encrypted_master_key,salt) VALUES ('synthetic-v5','synthetic-v5','admin','synthetic-hash','v3:synthetic-wrapped-key','synthetic-salt')").run();
     const user = original.prepare("SELECT * FROM users WHERE id='synthetic-v5'").get(); original.close();

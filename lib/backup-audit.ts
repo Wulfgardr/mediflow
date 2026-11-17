@@ -1,3 +1,4 @@
+import type Database from 'better-sqlite3';
 import { types } from 'node:util';
 
 export const BACKUP_AUDIT_FIELDS = [
@@ -5,7 +6,10 @@ export const BACKUP_AUDIT_FIELDS = [
     'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata', 'createdAt',
 ] as const;
 
+export const BACKUP_AGENT_AUDIT_FIELDS = ['proposerRef', 'mandateRef', 'modelProvider'] as const;
+
 export type BackupAuditRow = {
+    proposerRef?: string | null; mandateRef?: string | null; modelProvider?: string | null;
     eventId: string; schemaVersion: number; eventType: string; occurredAt: number;
     outcome: string; actorType: string; actorRef: string; subjectType: string;
     subjectRef: string | null; sourceSurface: string; requestId: string | null;
@@ -31,8 +35,10 @@ export function canonicalizeBackupAuditRows(value: unknown): BackupAuditRow[] {
         if (!row || typeof row !== 'object' || types.isProxy(row) || Array.isArray(row)
             || Object.getPrototypeOf(row) !== Object.prototype) throw new Error('Backup audit row is invalid.');
         const descriptors = Object.getOwnPropertyDescriptors(row);
-        if (Reflect.ownKeys(row).length !== BACKUP_AUDIT_FIELDS.length
-            || BACKUP_AUDIT_FIELDS.some(key => !descriptors[key]?.enumerable || !Object.hasOwn(descriptors[key], 'value'))) {
+        const hasProvenance = BACKUP_AGENT_AUDIT_FIELDS.every(key => Object.hasOwn(descriptors, key));
+        const fields = hasProvenance ? [...BACKUP_AUDIT_FIELDS, ...BACKUP_AGENT_AUDIT_FIELDS] : BACKUP_AUDIT_FIELDS;
+        if (Reflect.ownKeys(row).length !== fields.length
+            || fields.some(key => !descriptors[key]?.enumerable || !Object.hasOwn(descriptors[key], 'value'))) {
             throw new Error('Backup audit row fields are invalid.');
         }
         const audit = row as BackupAuditRow;
@@ -47,8 +53,13 @@ export function canonicalizeBackupAuditRows(value: unknown): BackupAuditRow[] {
                     && typeof (row as Record<string, unknown>)[key] !== 'string')) {
             throw new Error('Backup audit row or duplicate event identity is invalid.');
         }
+        const agent = audit.sourceSurface === 'agent';
+        if (agent ? !hasProvenance || audit.actorType !== 'user'
+            || ![audit.proposerRef, audit.mandateRef].every(ref => typeof ref === 'string' && /^[A-Za-z0-9_-]{1,128}$/u.test(ref))
+            || !['openai', 'anthropic', 'local'].includes(audit.modelProvider ?? '')
+            : hasProvenance && BACKUP_AGENT_AUDIT_FIELDS.some(key => audit[key] !== null)) throw new Error('Backup agent audit provenance is invalid.');
         identities.add(audit.eventId);
-        return Object.fromEntries(BACKUP_AUDIT_FIELDS.map(key => [key, audit[key]])) as BackupAuditRow;
+        return Object.fromEntries((agent ? fields : BACKUP_AUDIT_FIELDS).map(key => [key, audit[key]])) as BackupAuditRow;
     });
     return rows.sort((left, right) => left.eventId < right.eventId ? -1 : left.eventId > right.eventId ? 1 : 0);
 }
@@ -68,6 +79,13 @@ export function snapshotBackupAudit(row: Record<string, unknown>): BackupAuditRo
 }
 
 export function backupAuditsEqual(left: BackupAuditRow, right: BackupAuditRow): boolean {
-    return BACKUP_AUDIT_FIELDS.every(key => Object.is(left[key], right[key]));
+    return [...BACKUP_AUDIT_FIELDS, ...BACKUP_AGENT_AUDIT_FIELDS].every(key => Object.is(left[key] ?? null, right[key] ?? null));
 }
 
+
+export function readBackupAuditRows(db: Database.Database): BackupAuditRow[] {
+    const columns = new Set((db.pragma('table_info(audit_events)') as { name: string }[]).map(column => column.name));
+    const snake = (key: string) => key.replace(/[A-Z]/gu, value => `_${value.toLowerCase()}`);
+    const fields = [...BACKUP_AUDIT_FIELDS, ...BACKUP_AGENT_AUDIT_FIELDS.filter(key => columns.has(snake(key)))];
+    return canonicalizeBackupAuditRows(db.prepare(`SELECT ${fields.map(key => `${snake(key)} AS ${key}`).join(',')} FROM audit_events`).all());
+}

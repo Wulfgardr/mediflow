@@ -96,7 +96,7 @@ l'import e dell'ammissione di qualsiasi database vuoto.
 | Storia e dichiarazioni ORM | `drizzle/*.sql` resta immutato e non viene replayato dal runtime; `lib/schema.ts` descrive l'ORM e viene confrontato con il bootstrap reale. |
 | Riparazione e swap | Il protocollo esistente riconcilia i propri artefatti prima dell'apertura; il reopen usa la stessa ammissione versionata. Il lifecycle della sostituzione appartiene a C15 e ADR0142. |
 
-La versione SQLite corrente è `user_version=11` (vedi [Versioni dello schema](#versioni-dello-schema)). La prima installazione ammette
+La versione SQLite corrente è `user_version=12` (vedi [Versioni dello schema](#versioni-dello-schema)). La prima installazione ammette
 un file creato esclusivamente dal processo in una directory senza residui di
 un database precedente (sidecar, originali conservati, artefatti di swap),
 oppure la prenotazione nativa riconoscibile. Un file preesistente di zero byte o un
@@ -141,6 +141,7 @@ lock persistente o schema non riconosciuto impediscono l'apertura operativa.
 | 9 | 7 novembre 2026 | Elenco allergie cifrato sul paziente, ADR 0182. |
 | 10 | 7 novembre 2026 | `entries.recorded_by`: autore autenticato della voce di diario, assegnato dal server, [ADR 0183](0183-autore-delle-voci-di-diario.md). Colonna nullable, nessun backfill delle voci storiche. |
 | 11 | 8 novembre 2026 | Escono sette tabelle mai scritte dal prodotto (`durable_review_*` e `headless_soap_*`), [ADR 0103](0103-headless-clinician-authorized-soap-entry-write.md). La copia originale dell'aggiornamento le conserva. |
+| 12 | 17 novembre 2026 | Audit del canale agenti: proponente, mandato e fornitore distinti dall'autore, con originale v11 verificato e recuperabile. [ADR 0190](0190-mandato-agenti-e-cassetta-della-visita.md). |
 
 Poiché la versione corrente è validata senza DDL, **ogni modifica allo schema
 canonico richiede un numero nuovo**: altrimenti gli archivi già marcati con il

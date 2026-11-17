@@ -10,6 +10,7 @@ const PREDECESSORS = new Map([
     [6, '4becef1521ec507b3da31047e01ab3e25562197c8a518472bb4cdef93ed3867b'],
     [9, '85259ea3bdcbdfa286a0d8a206a04bfc5621c106a604488c0e17d8c7c37d3ba1'],
     [10, '459c212cd2d9a65e4df72df63923c64551ec530c3efe07459235af8b362d6452'],
+    [11, '0702a61e6f2a1feaca7df3350ec6597dcd5213c48339fdce723cf4531e33e8ee'],
 ]);
 /* Every predecessor still carries the durable review and headless SOAP tables,
  * removed from the canonical schema in version 11: their exact historical DDL. */
@@ -35,7 +36,8 @@ export function assertAmbulatoryCommandPredecessorRecoverySchema(probe: Database
     const canonical = new Database(':memory:');
     try {
         initializeSqliteSchema(canonical);
-        for (const sql of RETIRED_FEATURE_TABLES_SQL) canonical.exec(sql);
+        for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) canonical.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
+        if (version < 11) for (const sql of RETIRED_FEATURE_TABLES_SQL) canonical.exec(sql);
         if (version < 9) {
             canonical.exec('DROP TABLE portable_import_origins');
             for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) canonical.exec(`ALTER TABLE patients DROP COLUMN ${column}`);

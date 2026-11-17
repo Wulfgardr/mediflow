@@ -23,6 +23,11 @@ export function ensureAuditSqliteSchema(sqlite: Database.Database): void {
         )
     `).run();
 
+    const columns = new Set((sqlite.pragma('table_info(audit_events)') as { name: string }[]).map(column => column.name));
+    for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) {
+        if (!columns.has(column)) sqlite.prepare(`ALTER TABLE audit_events ADD COLUMN ${column} TEXT`).run();
+    }
+
     sqlite.prepare('CREATE INDEX IF NOT EXISTS audit_events_occurred_idx ON audit_events(occurred_at DESC)').run();
     sqlite.prepare('CREATE INDEX IF NOT EXISTS audit_events_type_idx ON audit_events(event_type)').run();
     sqlite.prepare('CREATE INDEX IF NOT EXISTS audit_events_subject_idx ON audit_events(subject_type, subject_ref)').run();
