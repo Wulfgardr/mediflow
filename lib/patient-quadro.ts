@@ -2,7 +2,7 @@ import type { Observation } from './db';
 import { classifyObservationRange, toNumericValue } from './observation-range';
 import { formatMeasureValue, formatUnitForDisplay, resolveStaticTerminology } from './terminology';
 
-export function projectQuadroMeasures(observations: Observation[]) {
+export function projectQuadroMeasures(observations: Observation[], { onlyOutOfRange = false } = {}) {
     const parameters = new Map<string, { latest: Observation; previous?: Observation }>();
     for (const item of observations) {
         if (item.deletedAt) continue;
@@ -23,17 +23,19 @@ export function projectQuadroMeasures(observations: Observation[]) {
     }
     return [...parameters.values()].toSorted((left, right) =>
         new Date(right.latest.observedAt).getTime() - new Date(left.latest.observedAt).getTime())
-        .map(({ latest: item, previous }) => {
+        .flatMap(({ latest: item, previous }) => {
+            const outOfRange = classifyObservationRange(item.value, item.refLow, item.refHigh);
+            if (onlyOutOfRange && !outOfRange) return [];
             const value = toNumericValue(item.value);
             const previousValue = previous ? toNumericValue(previous.value) : null;
             const difference = value !== null && previousValue !== null ? Math.round((value - previousValue) * 100) / 100 : null;
-            return {
+            return [{
                 id: item.id,
                 display: resolveStaticTerminology('LOINC', item.code)?.displayIt ?? item.display,
                 valueLabel: formatMeasureValue(item.value, item.unitCode),
                 date: item.observedAt,
                 delta: difference !== null && previous ? `${difference > 0 ? '+' : ''}${String(difference).replace('.', ',')} ${formatUnitForDisplay(item.unitCode)} dal ${new Date(previous.observedAt).toLocaleDateString('it-IT')}`.trim() : undefined,
-                outOfRange: classifyObservationRange(item.value, item.refLow, item.refHigh),
-            };
+                outOfRange,
+            }];
         });
 }

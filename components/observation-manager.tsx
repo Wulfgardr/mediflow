@@ -16,6 +16,7 @@ import { ApiConflictError, db } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
 import { formatMeasureValue, formatUnitForDisplay, searchStaticTerminology } from '@/lib/terminology';
 import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
+import { projectQuadroMeasures } from '@/lib/patient-quadro';
 import {
     applyObservationPrefill,
     type ObservationPrefill,
@@ -128,6 +129,7 @@ export default function ObservationManager({
        onesta di UI (label "Misure del giorno", non "Referto"): senza panelId nello
        schema non si afferma che sia lo stesso referto. */
     const [viewMode, setViewMode] = useState<'parametro' | 'data'>('parametro');
+    const [onlyOutOfRange, setOnlyOutOfRange] = useState(false);
     const loincOptions = useMemo(() => searchStaticTerminology('LOINC', '', 500), []);
     const ucumOptions = useMemo(() => searchStaticTerminology('UCUM', '', 500), []);
 
@@ -260,6 +262,15 @@ export default function ObservationManager({
             }))
             .sort((a, b) => b.date.getTime() - a.date.getTime());
     }, [observations]);
+
+    const outOfRangeRows = useMemo(() => onlyOutOfRange && observations
+        ? projectQuadroMeasures(observations, { onlyOutOfRange })
+        : [], [observations, onlyOutOfRange]);
+
+    function selectView(mode: typeof viewMode) {
+        setViewMode(mode);
+        setOnlyOutOfRange(false);
+    }
 
     const selectedLoinc = loincOptions.find((item) => item.code === code);
 
@@ -470,8 +481,9 @@ export default function ObservationManager({
             </div>
             {readable && groups && groups.length > 0 && <div className={styles.toolbar}>
                 <div role="group" aria-label="Vista parametri" className={styles.controls}>
-                    <button type="button" aria-pressed={viewMode === 'parametro'} onClick={() => setViewMode('parametro')}>Per parametro</button>
-                    <button type="button" aria-pressed={viewMode === 'data'} onClick={() => setViewMode('data')}>Per data</button>
+                    <button type="button" aria-pressed={!onlyOutOfRange && viewMode === 'parametro'} onClick={() => selectView('parametro')}>Per parametro</button>
+                    <button type="button" aria-pressed={!onlyOutOfRange && viewMode === 'data'} onClick={() => selectView('data')}>Per data</button>
+                    <button type="button" aria-pressed={onlyOutOfRange} onClick={() => setOnlyOutOfRange(active => !active)}>Solo fuori intervallo</button>
                 </div>
             </div>}
             {failed ? <ViewState state={unavailable ? 'unavailable' : 'error'}
@@ -480,6 +492,18 @@ export default function ObservationManager({
             : observationsLoading ? <ViewState state="loading" title="Lettura delle misure in corso…" />
             : groups === undefined ? <ViewState state="unavailable" title="La lettura delle misure non è disponibile." />
             : groups.length === 0 ? <ViewState state="empty" title="Nessuna misura registrata." />
+            : onlyOutOfRange ? (
+                outOfRangeRows.length === 0 ? <ViewState state="empty" title="Nessuna misura fuori intervallo." /> :
+                    <table className={`${styles.table} ${styles.observationDayTable}`}>
+                        <thead><tr><th scope="col">Misura</th><th scope="col">Valore</th><th scope="col">Data</th><th scope="col">Variazione</th></tr></thead>
+                        <tbody>{outOfRangeRows.map(row => <tr key={row.id}>
+                            <td>{row.display}</td>
+                            <td className={styles.critical}>{row.valueLabel}<small>{row.outOfRange === 'alto' ? '▲ Alto' : '▼ Basso'}</small></td>
+                            <td className={styles.muted}><time>{new Date(row.date).toLocaleDateString('it-IT')}</time></td>
+                            <td>{row.delta ?? '–'}</td>
+                        </tr>)}</tbody>
+                    </table>
+            )
             : viewMode === 'data' ? (byDay ?? []).map(day => <section key={day.key}>
                 <header className={styles.sectionHead}><h3>Misure del {day.date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}</h3><span>{day.items.length} misure</span></header>
                 <table className={`${styles.table} ${styles.observationDayTable}`}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Riferimento</th></tr></thead><tbody>
