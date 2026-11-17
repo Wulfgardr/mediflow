@@ -2,8 +2,6 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, unlockIfNeeded } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
-// Real authenticated routes and synthetic SQLite records. Only the named
-// transport failures are injected; writes forwarded by route.fetch still commit.
 test.beforeEach(({ baseURL }) => {
   if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw new Error('Owned synthetic archive and non-3000 loopback required');
 });
@@ -100,14 +98,12 @@ for (const width of [1440, 390]) {
     const acceptedResponse = await accepted;
     expect(acceptedResponse.status()).toBe(200);
     expect(writes.map(write => write.version)).toEqual([1, 2]);
-    // The API stores the client's encrypted note; plaintext is verified in the UI.
     const savedMotivation: unknown = acceptedResponse.request().postDataJSON().motivation;
     expect(savedMotivation).toMatch(/^ENC:.+/);
     const stored = (await records(page, data.patientId)).find(item => item.id === data.therapyId);
     expect(stored).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', motivation: savedMotivation, status: 'suspended' });
     await expect(save(page)).toBeHidden();
 
-    // Read the saved dosage and note from the suspended card after a fresh load.
     await page.reload();
     await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openPatientSection(page, 'terapie');
@@ -444,14 +440,7 @@ test('unreadable therapy note blocks renewed deletion after a conflict', async (
   expect(writes).toBe(1);
 });
 
-// A deterministic response barrier, not a claim about a real transport race.
-// Fetch first so the server outcome is known, then hold delivery across a real
-// React context transition. Session lock may abort the browser request instead.
 async function holdTherapyResponse(page: Page, patientId: string, therapyId: string, method: 'GET' | 'DELETE') {
-  // Passive observers return the native promises and preserve receivers/results.
-  // Observe both reread branches; the parent may finish after the held list.
-  // Crypto tracking conservatively includes work in the replacement context.
-  // Fixture therapy fields are plaintext; no decryption delay is injected.
   await page.evaluate(({ patientId, therapyId, method }) => {
     const nativeFetch = window.fetch;
     const nativeDecrypt = crypto.subtle.decrypt;
@@ -485,8 +474,6 @@ async function holdTherapyResponse(page: Page, patientId: string, therapyId: str
         const request = requests[name];
         request.seen = true;
         state.activity++;
-        // Register before the caller's await continuation, while returning its
-        // original fetch promise. Wrap json only on this observed Response.
         void promise.then(response => {
           request.settled = true;
           state.activity++;
@@ -543,7 +530,6 @@ async function holdTherapyResponse(page: Page, patientId: string, therapyId: str
       await gate;
       if (!route.request().failure()) await route.fulfill({ response });
     } catch (error) {
-      // Only a browser-observed cancellation is allowed to retire delivery.
       if (!route.request().failure()) errors.push(error);
     } finally {
       settled = true;
@@ -572,8 +558,6 @@ async function holdTherapyResponse(page: Page, patientId: string, therapyId: str
               request.seen && request.settled && request.jsonCalls === request.jsonSettled && (!requireJson || request.jsonCalls > 0));
             if (!complete()) return false;
             const activity = state.activity;
-            // A task drains preceding promise continuations, including chained
-            // field decrypts; the frame lets resulting React work reach the DOM.
             await new Promise<void>(resolve => {
               const channel = new MessageChannel();
               channel.port1.onmessage = () => { channel.port1.close(); channel.port2.close(); resolve(); };
@@ -611,15 +595,12 @@ for (const transition of ['patient', 'session', 'unmount'] as const) {
     test(`${transition} retires delete ${phase} without contaminating the next therapy context`, async ({ page }) => {
       const original = await fixture(page);
       const other = await fixture(page);
-      // Register both record tabs through ordinary SPA navigation. A second
-      // page.goto would reset the frame's in-memory list of opened records.
       await openTherapies(page, original);
       await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
         .getByRole('link', { name: 'Pazienti', exact: true }).click();
       await expect(page).toHaveURL(/area=incarico/);
       await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true })
         .fill(other.therapyId.replace(/^therapy-/, 'SYN'));
-      // Search includes raw synthetic taxCode; the visible row masks that code.
       const otherRow = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true }).getByRole('option');
       await expect(otherRow).toHaveCount(1);
       await otherRow.click();
@@ -631,8 +612,6 @@ for (const transition of ['patient', 'session', 'unmount'] as const) {
       await expect(openRecords.locator(`a[href="/patients/${other.patientId}/modules"]`)).toBeVisible();
       await openPatientSection(page, 'terapie');
       await expect(page.locator('#terapie').getByText('Farmaco sintetico principale', { exact: true })).toBeVisible();
-      // The lifecycle transition must retain this document; a reload would
-      // destroy callbacks and could falsely appear to prove controller fencing.
       const documentMarker = await page.evaluate(() => {
         const marker = crypto.randomUUID();
         Object.defineProperty(window, '__therapyLifecycleDocument', { value: marker });
@@ -655,7 +634,6 @@ for (const transition of ['patient', 'session', 'unmount'] as const) {
           await held.wait();
           await expect(deleteRecovery(page)).toContainText('Invio dell’eliminazione in corso');
         } else {
-          // Explicit injected rejection before commit; no production failure assumed.
           const endpoint = `**/api/therapies/${original.therapyId}`;
           const reject = (route: Route) => route.request().method() === 'DELETE'
             ? route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"Synthetic lifecycle rejection before commit"}' })
@@ -686,8 +664,6 @@ for (const transition of ['patient', 'session', 'unmount'] as const) {
         } else {
           await leaveTherapyContext(page, transition, other);
         }
-        // Release only after the old component/context has retired. The new
-        // context exists before delivery; late state must not replace its state.
         if (transition === 'unmount') {
           await page.getByRole('navigation', { name: 'Cartelle aperte', exact: true })
             .locator(`a[href="/patients/${original.patientId}/modules"]`).click();
@@ -696,8 +672,6 @@ for (const transition of ['patient', 'session', 'unmount'] as const) {
         await openPatientSection(page, 'terapie');
         await expect(page.locator('#terapie').getByText('Farmaco sintetico secondario', { exact: true })).toBeVisible();
         await expect(deleteRecovery(page)).toHaveCount(0);
-        // Establish a fresh prompt before releasing the old result. It must
-        // retain an empty reason and remain cancellable without another DELETE.
         await (await deletionAction(page, 'Farmaco sintetico secondario')).click();
         const freshPrompt = page.getByRole('dialog', { name: 'Eliminare la terapia «Farmaco sintetico secondario»?', exact: true });
         await expect(freshPrompt.getByRole('textbox', { name: "Motivazione dell'eliminazione" })).toHaveValue('');
@@ -707,8 +681,6 @@ for (const transition of ['patient', 'session', 'unmount'] as const) {
           await pending.finish(transition === 'session');
         }
         expect(await page.evaluate(() => Reflect.get(window, '__therapyLifecycleDocument'))).toBe(documentMarker);
-        // Authoritative reads after request completion also precede the final
-        // UI observations, rather than asserting immediate absence at release.
         const afterOriginal = await records(page, original.patientId);
         const expectedOriginal = phase === 'pending committed response'
           ? beforeOriginal.filter(item => item.id !== original.therapyId) : beforeOriginal;

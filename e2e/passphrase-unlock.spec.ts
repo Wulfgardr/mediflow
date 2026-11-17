@@ -1,6 +1,3 @@
-/* ADR 0143: real UI on an isolated server. An account moved to a passphrase is unlocked by it in
-   the browser, and what the person types never reaches the network. The account is provisioned
-   as an explicitly legacy PIN fixture; adoption uses the real access settings. */
 import { createCipheriv, createDecipheriv, hkdfSync, pbkdf2Sync, randomBytes } from 'node:crypto';
 import type { Page, Request } from '@playwright/test';
 import { expect, test } from './fixtures/isolated-runtime';
@@ -17,8 +14,6 @@ test.describe.configure({ retries: 0 });
 
 const isPost = (request: Request, pathname: string) => request.method() === 'POST' && new URL(request.url()).pathname === pathname;
 
-// The documented construction, written apart from the product code: AES-256-GCM as base64 of
-// IV, ciphertext and tag; version 3 is PBKDF2-HMAC-SHA256 then HKDF-SHA256 into two values.
 function wrap(masterKey: Buffer, kek: Buffer): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', kek, iv);
@@ -61,33 +56,26 @@ async function expectUnlocked(page: Page): Promise<void> {
 
 test('an account moved to a passphrase is unlocked by it, and the passphrase never reaches the network', async ({ page, browser, baseURL, browserName }) => {
   expect(browserName, 'The held answer needs Chromium: it must not be skipped silently').toBe('chromium');
-  // Compatibility setup uses the real legacy API; the browser opens it through ordinary PIN login.
   const login = page.waitForResponse(response => isPost(response.request(), '/api/auth/login'));
   await bootstrapUnlockedSession(page, PIN);
   const pinWrapping = await (await login).json() as { encryptedMasterKey: string; salt: string };
   let credential = passphraseCredential(openPinWrapping(pinWrapping.encryptedMasterKey, pinWrapping.salt));
 
-  // Asked by another site with this browser's cookie, the move is refused.
   const foreign = await page.request.post('/api/auth/passphrase', {
     headers: { Origin: 'http://attacker.invalid', 'Sec-Fetch-Site': 'cross-site' }, data: { currentPin: PIN, ...credential },
   });
   expect(foreign.status()).toBe(403);
   expect((await page.request.get('/api/patients')).status()).toBe(200);
 
-  // Another browser reaches the lock screen while the account still unlocks with its PIN, and stays there.
   const stale = await browser.newContext({ baseURL });
   const stalePage = await stale.newPage();
   const staleLogins: string[] = [];
   stalePage.on('request', request => { if (isPost(request, '/api/auth/login')) staleLogins.push(request.postData() ?? ''); });
   await stalePage.goto('/');
-  // The person starts typing while the field still says PIN; what they type is the passphrase they are about to set.
   const staleInput = stalePage.locator('#mediflow-lock-pin');
   await expect(stalePage.getByLabel('PIN operatore', { exact: true })).toBeEnabled();
   await staleInput.fill(PASSPHRASE);
 
-  // The person submits there at the very moment of the move. The answer to "what unlocks this
-  // account" is produced while it still says PIN, and is held here until the move is done: it is
-  // the oldest answer the browser can act on. Chromium only: the response is paused, not replaced.
   const cdp = await stale.newCDPSession(stalePage);
   let heldCheck: string | undefined;
   cdp.on('Fetch.requestPaused', event => { heldCheck = event.requestId; });
@@ -106,7 +94,6 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   const download = page.waitForEvent('download');
   await kitPanel.getByRole('button', { name: 'Scarica kit di recupero' }).click(); await download;
   await kitPanel.getByRole('checkbox').check();
-  // The server can commit credentials while cleanup remains pending; the UI must keep that distinction.
   await page.route('**/api/auth/passphrase', async route => {
     const result = await fetchInterceptedRequest(route);
     await route.fulfill({ response: result, json: { ...await result.json(), earlierCopiesCleared: false } });
@@ -121,26 +108,21 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   credential = payload;
   const root = pbkdf2Sync(Buffer.from(PASSPHRASE.normalize('NFKC'), 'utf8'), Buffer.from(credential.salt, 'base64'), 2_000_000, 32, 'sha256');
   expect(credential.verifier).toBe(Buffer.from(hkdfSync('sha256', root, Buffer.alloc(0), 'mediflow.unlock.verifier.v3', 32)).toString('base64'));
-  // The move retires the session of the page that asked.
   expect((await page.request.get('/api/patients')).status()).toBe(401);
 
   try {
     await cdp.send('Fetch.continueRequest', { requestId: heldCheck! });
     await cdp.send('Fetch.disable');
-    // The answer said PIN, the field said PIN, and the account now has a passphrase. A text the
-    // policy accepts as a passphrase is not sent as a PIN on the first gesture: it stays in the field.
     const notice = stalePage.locator('#mediflow-lock-confirm');
     const refusal = stalePage.locator('#mediflow-lock-error');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     await expect(staleInput).toHaveValue(PASSPHRASE);
     expect(staleLogins).toEqual([]);
-    // Confirmed on the control shown with the notice, the browser asks again, learns of the move and still sends nothing.
     await stalePage.getByRole('button', { name: LONG_PIN_CONFIRM, exact: true }).click();
     await expect(refusal).toHaveText('Questo archivio ora si sblocca con la passphrase. Inseriscila.');
     await expect(notice).toHaveCount(0);
     await expect(stalePage.getByLabel('Passphrase', { exact: true })).toHaveValue('');
     expect(staleLogins).toEqual([]);
-    // Typed into a field that says passphrase, it unlocks, and only its verifier travels.
     await staleInput.fill(PASSPHRASE);
     await staleInput.press('Enter');
     await expectUnlocked(stalePage);
@@ -160,7 +142,6 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await expect(field).toHaveAttribute('type', 'password');
   await expect(page.getByLabel('PIN operatore', { exact: true })).toHaveCount(0);
 
-  // The PIN is shorter than any passphrase: it cannot even be submitted.
   await field.fill(PIN);
   await expect(submit).toBeDisabled();
 
@@ -181,18 +162,15 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   const response = await accepted;
   expect(response.status()).toBe(200);
   expect(await response.json()).toMatchObject({ success: true, encryptedMasterKey: credential.encryptedMasterKey, salt: credential.salt });
-  // The shell is rendered only after the provider has opened the returned wrapping with the key it derived.
   await expectUnlocked(page);
   await expect(page.getByTestId('pin-residue-notice')).toBeVisible(); // Pending remains visible in the unlocked shell.
 
-  // The access settings describe the account as it is now, and no longer offer the PIN rotation the server refuses.
   await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
   await page.getByRole('link', { name: 'Accesso', exact: true }).click();
   await expect(page.getByTestId('settings-access-passphrase')).toContainText('Questo archivio si sblocca con la passphrase.');
   await expect(page.getByRole('button', { name: 'Aggiorna PIN', exact: true })).toHaveCount(0);
   await expect(page.getByText('Il blocco richiede la passphrase al prossimo accesso.')).toBeVisible();
 
-  // Both attempts sent a verifier and nothing else; the accepted one is the value node:crypto derived.
   expect(logins).toHaveLength(2);
   for (const body of logins) {
     expect(Object.keys(JSON.parse(body))).toEqual(['verifier']);
@@ -208,7 +186,6 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await expectUnlocked(page);
   await expect(page.getByTestId('pin-residue-notice')).toHaveCount(0); // Only canonical true clears the warning.
 
-  // A browser with no cookie, storage or key of the first one unlocks the same way.
   const reopened = await browser.newContext({ baseURL });
   try {
     const second = await reopened.newPage();
@@ -224,7 +201,6 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
 });
 
 test('a PIN as long as a passphrase opens its archive only when it is confirmed on the control shown with the notice', async ({ page, browser, baseURL }) => {
-  // First setup accepts a PIN of any length: this account has one the policy would accept as a passphrase.
   await bootstrapUnlockedSession(page, LONG_PIN);
 
   const locked = await browser.newContext({ baseURL });
@@ -233,7 +209,6 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     const logins: string[] = [];
     lockPage.on('request', request => { if (isPost(request, '/api/auth/login')) logins.push(request.postData() ?? ''); });
     const sent = () => logins.map(body => JSON.parse(body));
-    // Every gesture below that must send nothing is followed by this: whatever it started has ended.
     const settled = async () => {
       await lockPage.waitForLoadState('networkidle');
       await expect(lockPage.locator('form')).toHaveAttribute('aria-busy', 'false');
@@ -249,13 +224,10 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     await expect(input).toHaveValue(LONG_PIN);
-    // The text can be changed at once: focus is back on the field.
     await expect(input).toBeFocused();
     await settled();
     expect(sent()).toEqual([]);
 
-    // Submitting the form again is never the confirmation, however it is done: Enter again,
-    // Enter held down, the button, a double click on the button, two submits in the same instant.
     await lockPage.keyboard.press('Enter');
     await settled();
     await lockPage.keyboard.down('Enter');
@@ -272,8 +244,6 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     expect(sent()).toEqual([]);
 
-    // Nor is a press that began elsewhere. Enter held down in the field stays one gesture when
-    // focus moves to the confirmation: its repetitions activate nothing.
     await input.focus();
     await lockPage.keyboard.down('Enter');
     await settled();
@@ -283,7 +253,6 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     await lockPage.keyboard.down('Enter');
     await lockPage.keyboard.up('Enter');
     await settled();
-    // The second click of a double click that began on another control lands where the confirmation now is.
     const target = await confirm.boundingBox();
     await lockPage.mouse.move(target!.x + target!.width / 2, target!.y + target!.height / 2);
     await lockPage.mouse.down({ clickCount: 2 });
@@ -292,8 +261,6 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     expect(sent()).toEqual([]);
 
-    // Another message takes the place of the notice, as when an old request of this page comes
-    // back unauthorized. The confirmation goes with the notice.
     await lockPage.evaluate(() => window.dispatchEvent(new Event('mediflow:api-auth-unavailable')));
     await expect(lockPage.locator('#mediflow-lock-error')).toHaveText('Sessione scaduta.');
     await expect(notice).toHaveCount(0);
@@ -301,7 +268,6 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
 
-    // A text that changes is another text, also when it is typed back before any submit.
     await input.fill(`${LONG_PIN}!`);
     await expect(confirm).toHaveCount(0);
     await input.fill(LONG_PIN);
@@ -310,8 +276,6 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     await settled();
     expect(sent()).toEqual([]);
 
-    // A changed text is held in its turn. Confirmed from the keyboard alone, with one distinct
-    // press, it leaves as the PIN it claims to be, once, and the server refuses it.
     await input.fill(`${LONG_PIN}!`);
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
@@ -323,7 +287,6 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     await settled();
     expect(sent()).toEqual([{ password: `${LONG_PIN}!` }]);
 
-    // The right PIN, confirmed twice in the same instant, leaves once and opens the archive.
     await input.fill(LONG_PIN);
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);

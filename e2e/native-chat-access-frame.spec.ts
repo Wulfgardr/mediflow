@@ -243,8 +243,6 @@ for (const width of [390, 1440]) test(`local voice opens native review without r
     await page.screenshot({ path: info.outputPath('voice-frame.png'), fullPage: true });
 });
 
-// Uno stato per test, su una pagina nuova: ricaricare il frame dentro lo stesso test mescola il
-// revoke della carta uscente e il collegamento della nuova con lo stato della finta host.
 for (const width of [390, 1440]) for (const [status, text] of [
     ['insight-opened', 'Quadro paziente aperto nella finestra MediFlow'],
     ['insight-unavailable', 'Quadro paziente non disponibile'],
@@ -259,11 +257,9 @@ for (const width of [390, 1440]) for (const [status, text] of [
     await expect(frame.locator('#card')).toBeHidden();
     await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeDisabled();
     await expect(frame.getByRole('button', { name: 'Apri il Quadro paziente in MediFlow' })).toBeDisabled();
-    // La chat possiede la richiesta solo finché la finestra attende il consenso o genera.
     if (status === 'insight-opened') await expect(frame.getByRole('button', { name: 'Revoca' })).toBeEnabled();
     else await expect(frame.getByRole('button', { name: 'Revoca' })).toBeDisabled();
     const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: unknown }[] } }).accessFixture.calls);
-    // Solo comando e rinnovi di stato, mai altri argomenti.
     expect(calls.map(call => call.arguments).slice(0, 2)).toEqual([{ command: 'attach' }, { command: 'patient-insight' }]);
     expect(calls.slice(2).every(call => JSON.stringify(call.arguments) === '{"command":"status"}')).toBe(true);
     expect(await frame.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);

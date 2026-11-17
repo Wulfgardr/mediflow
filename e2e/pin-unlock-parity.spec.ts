@@ -1,11 +1,9 @@
-/* WUL-675: real UI + isolated server; no auth mocks or credential overrides. */
 import { randomUUID } from 'node:crypto';
 import type { Page, Response } from '@playwright/test';
 import { expect, test } from './fixtures/isolated-runtime';
 import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 import { bootstrapUnlockedSession } from './utils';
 
-// This is the original Linux reproduction, not process.env.E2E_PIN.
 const ALPHANUMERIC_PIN = 'demo086086';
 const NUMERIC_PIN = '086086';
 const CONTROL_ETAG = /^"[A-Za-z0-9_-]{32,256}"$/u;
@@ -20,7 +18,6 @@ function isPost(response: Response, pathname: string): boolean {
 async function expectUnlocked(page: Page): Promise<void> {
   await expect(page.getByLabel('MediFlow lock screen', { exact: true })).toHaveCount(0);
   const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
-  // Use the ordinary manual-entry link, when the authenticated work-profile step is shown.
   const manualEntry = page.getByRole('link', { name: 'Apri la cartella manualmente', exact: true });
   await expect(navigation.or(manualEntry).first()).toBeVisible();
   if (await manualEntry.isVisible()) await manualEntry.click();
@@ -28,8 +25,6 @@ async function expectUnlocked(page: Page): Promise<void> {
   expect((await page.request.get('/api/patients')).status()).toBe(200);
 }
 
-// First use is v3 now. Provision only this compatibility account through the real legacy
-// API, then open it with the ordinary PIN form; the dedicated onboarding spec owns the v3 wizard.
 async function openLegacyPinArchive(page: Page, pin: string): Promise<WrappedKey> {
   const responsePromise = page.waitForResponse(response => isPost(response, '/api/auth/login'));
   await bootstrapUnlockedSession(page, pin);
@@ -39,7 +34,6 @@ async function openLegacyPinArchive(page: Page, pin: string): Promise<WrappedKey
   const wrapping = await response.json() as WrappedKey;
   expect(wrapping.encryptedMasterKey).toMatch(/^v2:/u);
   expect(wrapping.salt.length).toBeGreaterThan(0);
-  // The shared fixture has already clicked manual entry; wait for that navigation, not a second click.
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
   expect((await page.request.get('/api/patients')).status()).toBe(200);
   return { encryptedMasterKey: wrapping.encryptedMasterKey, salt: wrapping.salt };
@@ -71,9 +65,7 @@ async function unlock(page: Page, pin: string, key: WrappedKey, gesture: 'click'
   expect(response.request().postDataJSON().password).toBe(pin);
   expect(response.status()).toBe(200);
   expect(response.headers().etag).toMatch(CONTROL_ETAG);
-  // The same key wrapping must survive lock/reopen, not a reset, migration or new PIN.
   expect(await response.json()).toMatchObject({ success: true, ...key });
-  // Navigation is rendered only after the actual provider unwraps the returned master key.
   await expectUnlocked(page);
 }
 
@@ -87,8 +79,6 @@ for (const { name, pin } of [
     try {
       const page = await initial.newPage();
       key = await openLegacyPinArchive(page, pin);
-      // Use the real application-lock endpoint from the supplied lifecycle test.
-      // Its UI toolbar is outside this capsule; no selector or owner is invented.
       const check = await page.request.get('/api/auth/check', { headers: { 'Cache-Control': 'no-store' } });
       expect(check.status()).toBe(200);
       expect(check.headers().etag).toMatch(CONTROL_ETAG);
@@ -106,7 +96,6 @@ for (const { name, pin } of [
     } finally {
       await initial.close();
     }
-    // No storageState, sessionStorage, cookies or local key copied into the reopened browser.
     const reopened = await browser.newContext({ baseURL });
     try {
       const page = await reopened.newPage();
@@ -118,10 +107,6 @@ for (const { name, pin } of [
   });
 }
 
-/* Chromium test-only response gate. The real server has already responded.
-   CDP pauses delivery, then continues the UNMODIFIED response. No route(), fulfill(),
-   Fetch.fulfillRequest, API replacement, cookie injection or successful-login stub.
-   This makes pending/loading checks deterministic without sleeps or timeout changes. */
 async function holdRealResponse(
   page: Page, pathname: string, status: number,
   trigger: () => Promise<void>, inspectPending: () => Promise<void>,
@@ -141,7 +126,6 @@ async function holdRealResponse(
       urlPattern: new URL(pathname, page.url()).href, requestStage: 'Response',
     }] });
     const responsePromise = page.waitForResponse(response => isPost(response, pathname));
-    // Observe rejection too when an earlier assertion fails; the original promise is still awaited.
     void responsePromise.catch(() => undefined);
     await trigger();
     await expect.poll(() => held?.status, 'A real server response must reach the response gate').toBe(status);
@@ -160,7 +144,6 @@ test('real renewal: required/pending, short and wrong PIN, loading and focus rec
   expect(browserName, 'Response-gated negative case requires Chromium/CDP; it must not silently skip').toBe('chromium');
   const key = await openLegacyPinArchive(page, ALPHANUMERIC_PIN);
   const context = page.context();
-  // New page with the real shared cookie, but no opener and no copied tab-local key.
   await page.close();
   const reopened = await context.newPage();
   const loginRequests: string[] = [];
@@ -180,7 +163,6 @@ test('real renewal: required/pending, short and wrong PIN, loading and focus rec
     await expect(input).toBeDisabled();
     await expect(submit).toBeDisabled();
     await expect(renew).toBeEnabled();
-    // requestSubmit still performs native validation and also exercises the existing handler guard.
     await form.evaluate((element: HTMLFormElement) => element.requestSubmit());
     expect(loginRequests).toEqual([]);
 

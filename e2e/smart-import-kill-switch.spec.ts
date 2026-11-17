@@ -12,16 +12,10 @@ test('[E2E fixture] smart import kill switch disables analysis on patient detail
   await bootstrapUnlockedSession(page, pin);
 
   const disableSmartImport = async () => {
-    // The lane is fail-closed when the setting row is absent (fresh e2e DB): pin it to
-    // 'enabled' so the toggle below always starts from the ON state.
     await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
 
-    // WUL-297: kill switches now live on the dedicated AI sub-route. The helper waits
-    // for the async settings load, whose completion resets the switches to the stored
-    // values and would otherwise undo a click that landed too early.
     await openAiFunzioniSettings(page);
 
-    // ordinary preferences require preview and a separate apply gesture.
     const preferences = page.getByTestId('function-preferences');
     const card = preferences.locator('article').filter({
       has: page.getByRole('heading', { name: 'Importazione assistita', exact: true }),
@@ -75,9 +69,6 @@ test('[E2E fixture] smart import kill switch disables analysis on patient detail
   try {
     await disableSmartImport();
 
-    // WUL-274/Kree8: create via API and open the primary Scheda route (/modules), where the
-    // Fabric preview mounts. The legacy new-patient submit ("Crea Nuova Scheda") and the
-    // cockpit patient-search navigation no longer expose a patients-search-input testid.
     const patientId = await page.evaluate(async (body) => {
       const response = await fetch('/api/patients', {
         method: 'POST',
@@ -93,8 +84,6 @@ test('[E2E fixture] smart import kill switch disables analysis on patient detail
 
     await page.goto(`/patients/${patientId}/modules`);
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
-    // the blocked reason is disclosed in Riepilogo; the disabled
-    // generation control remains in the assisted summary disclosure.
     const summaryLink = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true })
       .getByRole('link', { name: 'Riepilogo', exact: true });
     await summaryLink.click();

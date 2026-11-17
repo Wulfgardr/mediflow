@@ -6,7 +6,6 @@ test('standalone cookie admission rejects hostile logout before retiring the Web
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
   const request = page.context().request;
-  // Keep the authenticated cookie jar, without UI polling or recovery during logout.
   await page.close();
 
   expect((await request.get('/api/patients')).status()).toBe(200);
@@ -16,8 +15,6 @@ test('standalone cookie admission rejects hostile logout before retiring the Web
     { name: 'unsupported media type', headers: { ...trusted, 'Content-Type': 'text/plain' } },
   ];
 
-  // Logout has no duplicate transport guard. Without the packaged proxy these
-  // requests retire the session, so both the denial and absence of effects matter.
   for (const { name, headers } of deniedTransports) {
     const denied = await request.post('/api/auth/logout', { headers, data: '{}' });
     expect(denied.status(), name).toBe(403);
@@ -51,9 +48,6 @@ test('a page mutation is admitted on the browser own Origin and Fetch Metadata',
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
 
-  // The browser context carries no forged headers: no-cors GETs (stylesheets,
-  // images) go out without Origin, and Chrome 156+ fails every subresource with
-  // ERR_INVALID_ARGUMENT when a context forges Sec-Fetch-Site.
   expect(failed.filter((entry) => entry.includes('ERR_INVALID_ARGUMENT'))).toEqual([]);
   const noCors = (await Promise.all(subresources)).filter((headers) => headers['sec-fetch-mode'] === 'no-cors');
   expect(noCors.length).toBeGreaterThan(0);

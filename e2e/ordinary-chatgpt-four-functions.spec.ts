@@ -1,4 +1,3 @@
-/* four real clinical UI journeys with an entirely synthetic HTTP peer. */
 import { createHash } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { openDocumentActions, bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
