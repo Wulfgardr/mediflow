@@ -60,9 +60,6 @@ const SOURCE_EXTENSIONS = new Set([
 
 const CONFIG_EXTENSIONS = new Set(['.json', '.yaml', '.yml']);
 
-// These are versioned or locally present inputs which are intentionally outside
-// a first-party source/debt inventory. The filter is path based so a source file
-// whose name merely contains "evidence" remains eligible.
 const EXCLUDED_SEGMENTS = new Set([
   '.build',
   '.next',
@@ -105,8 +102,6 @@ function git(args) {
   return gitBytes(args).toString('utf8').trim();
 }
 
-// --ref <commit-ish> pins both path selection and bytes to Git objects. Without
-// it, retain the legacy index/checkout census and its worktree status metadata.
 function requestedRef(args) {
   const indexes = args.flatMap((arg, index) => arg === '--ref' || arg.startsWith('--ref=') ? [index] : []);
   if (indexes.length === 0) return null;
@@ -119,18 +114,14 @@ function requestedRef(args) {
 }
 
 function revisionSource(ref) {
-  // Replacement refs are mutable local overlays, not the pinned Git objects.
   const objectBytes = (args) => gitBytes(args, true);
   const objectText = (args) => objectBytes(args).toString('utf8').trim();
   const commit = objectText(['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`]);
   const tree = objectText(['rev-parse', `${commit}^{tree}`]);
   const treeBytes = objectBytes(['ls-tree', '-r', '-z', '--full-tree', tree]);
   let treeText;
-  // JSON paths must be lossless UTF-8. Reject raw names rather than silently
-  // merging different byte sequences into a fabricated replacement-character path.
   try { treeText = new TextDecoder('utf-8', { fatal: true }).decode(treeBytes); }
   catch { throw new Error('Git revision paths are not valid UTF-8; refusing lossy census'); }
-  // NUL framing preserves tabs/newlines in paths; never trim paths or blob bytes.
   const entries = treeText.split('\0').filter(Boolean).map((entry) => {
       const separator = entry.indexOf('\t');
       const [, type, oid] = entry.slice(0, separator).split(' ');
