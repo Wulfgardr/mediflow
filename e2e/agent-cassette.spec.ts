@@ -19,6 +19,7 @@ test('a cookie-free agent deposits encrypted text while the doctor is idle-locke
         const context = { mandateRef: mandate.id, visitId };
         const anchor = sealAgentItemNode(mandate.publicKey, { ...context, itemId: visitId, kind: 'anchor' }, new TextEncoder().encode(JSON.stringify({ fiscalCode: 'SYNTHETIC_CF_6742' })));
         const headers = { Authorization: 'Bearer ' + token };
+        expect((await agent.get('/api/agent/v1/context', { headers })).status()).toBe(200);
         const open = await agent.post('/api/agent/v1/visits', { headers, data: { operation: 'visita.apri', visitId, anchor } });
         expect(open.status()).toBe(201);
         const bytes = new TextEncoder().encode(JSON.stringify({ text: sentinel }));
