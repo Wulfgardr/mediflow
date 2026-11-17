@@ -4,6 +4,7 @@
     "noEmit": false,
     "allowImportingTsExtensions": false,
     "outDir": "./tmp-patient-ambulatory-membership-test",
+    "rootDir": ".",
     "module": "commonjs",
     "moduleResolution": "node",
     "target": "ES2020",

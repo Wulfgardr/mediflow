@@ -97,3 +97,16 @@ route restano respinti, compresa la variante OR nel nucleo. La fixture di
 composizione legge soltanto il paziente attivo; non richiede nuove eccezioni
 all'elenco dei lettori ammessi. Passano gli11 controlli statici e le27 prove
 di composizione, compresi rollback ed esecutori concorrenti.
+
+## Percorso del test compilato
+
+Dopo l'import del normalizzatore da `scripts/`, TypeScript inferiva come
+radice comune la repository anziché `lib/`. Il launcher cercava ancora
+`tmp-patient-ambulatory-membership-test/patient-ambulatory-membership.test.js`
+e falliva prima delle asserzioni, come nel job web-core 44040342056.
+La configurazione fissa ora `rootDir` alla repository e il launcher usa
+il percorso `lib/` corrispondente. Lo stesso comando
+`npm run test:patient-ambulatory-membership` fallisce sulla head c98fa4b9d
+e passa con la correzione: otto test, inclusi i mutanti del passaggio
+al nucleo e le asserzioni sulla transazione e sull'audit, senza modifiche
+alle asserzioni. Prova locale su Node 24.22.3 e SQLite in memoria.
