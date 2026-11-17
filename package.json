@@ -205,7 +205,10 @@
     "collect:development-usage": "node scripts/collect-development-usage.mjs",
     "check:release-usage": "node scripts/check-release-usage.mjs",
     "test:release-usage": "node --test scripts/check-release-usage.test.mjs",
-    "prove:a-mano": "node scripts/prove-a-mano.mjs"
+    "prove:a-mano": "node scripts/prove-a-mano.mjs",
+    "agent:visita": "node scripts/run-strip-types.mjs packages/agent-client/src/cli.ts",
+    "agent:mcp": "node scripts/run-strip-types.mjs scripts/agent-visit-mcp-stdio.mjs",
+    "test:agent-visita": "node scripts/run-strip-types.mjs --test packages/agent-client/src/credentials.test.ts packages/agent-client/src/visit-client.test.ts"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",
