@@ -1097,3 +1097,12 @@ pairing, del socket loopback e del file privato sono esterne a TLC.
 La prova TLS non loopback sul Mac si ferma prima di HTTP e non viene
 qualificata da un aggiornamento dei digest. Il gate completo terapia
 viene rieseguito sul raccordo, mantenendo questo limite distinto.
+
+
+### Cassette cifrate e recupero, WUL-870
+
+La sincronizzazione include la nuova raccolta cifrata nel bootstrap e nei
+controlli di recupero. I cinque file aggiornati non cambiano gli eventi o
+le transizioni del controller delle terapie. Il modello resta invariato;
+le proprietà delle cassette, della cifratura e della loro futura
+applicazione richiedono prove separate e non sono attribuite a TLC.
