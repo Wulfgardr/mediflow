@@ -54,8 +54,6 @@ test('patient insight renders stored markdown as read-only history without fallb
 
   await bootstrapUnlockedSession(page, pin);
 
-  // Other specs share this DB and may leave Patient Insight disabled; ensure it is on
-  // so the saved historical summary renders instead of the disabled card.
   await page.evaluate(async () => {
     await fetch('/api/settings', {
       method: 'POST',
@@ -73,8 +71,6 @@ test('patient insight renders stored markdown as read-only history without fallb
     phone: '3330001122',
   });
 
-  // The insight parser (lib/ai-summary-service extractSection) recognises section
-  // markers as **Titolo**: (colon outside the bold markers), not **Titolo:**.
   await updatePatient(page, patientId, {
     aiSummary: [
       '**Quadro attuale**: Follow-up post-dimissione ortopedica con programma riabilitativo domiciliare in corso. [S1]',
@@ -88,8 +84,6 @@ test('patient insight renders stored markdown as read-only history without fallb
     ].join('\n'),
   });
 
-  // WUL-274/Kree8: the full AI insight lives on the primary Scheda route (/modules);
-  // /patients/:id lands on the cockpit "Quadro" which does not host the insight card.
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
   await openPatientSection(page, 'quadro');
@@ -99,8 +93,6 @@ test('patient insight renders stored markdown as read-only history without fallb
   await insightDisclosure.locator(':scope > div > [data-disclosure-control]').click();
   await expect(insightDisclosure.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'true');
 
-  // Saved summaries are historical Markdown in read-only mode. New structured
-  // proposals have their own review-only surface and are covered separately.
   await expect(page.getByRole('heading', { name: 'Quadro paziente' })).toBeVisible();
   const historicalSummary = page.getByTestId('patient-insight-historical-summary');
   await expect(historicalSummary.getByRole('heading', { name: 'Riepilogo storico salvato', exact: true })).toBeVisible();

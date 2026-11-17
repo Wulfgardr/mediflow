@@ -68,7 +68,6 @@ test('conservazione: profilo, finestre, blocchi, scarto e autorizzazione su runt
     expect((await overview()).windows).toEqual(saved.windows);
     await page.reload(); await expect(input).toHaveValue('12');
 
-    // R-4: la finestra salvata sopravvive a un riavvio del server, non solo alla ricarica della pagina.
     db.close();
     await isolatedRuntime.restart();
     db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
@@ -213,7 +212,6 @@ test('blocco su documento dal browser: il documento resta finché il blocco non 
   } finally { db.close(); }
 });
 
-// R-1: il contratto 0.9.1 fissa la corrispondenza fra assetto e profilo; minimi e fonti si leggono dalla tabella del prodotto.
 const PROFILE_FOR_PRESET: Record<TerritorialPreset, RetentionProfileId> = { core: 'none', 'core+it': 'it-national', 'core+it+lom': 'it-lom-rev04' };
 const termText = (term: RetentionTerm | EffectiveTerm) => term.kind === 'years' ? `${term.years} anni` : term.kind === 'unlimited' ? 'Illimitata' : 'Da fissare';
 
@@ -258,7 +256,6 @@ test('R-1: profilo di conservazione per nucleo, Italia e Lombardia con minimi e 
     await page.screenshot({ path: join(evidence, `profilo-${profileId}.png`), fullPage: true });
 
     if (preset === 'core+it+lom') { observed.push({ preset, profileId }); continue; }
-    // Finestre: sotto il minimo del profilo il salvataggio è respinto, sopra resta dopo la ricarica.
     const bounded = RETENTION_CATEGORIES.find(category => profile.terms[category].term.kind === 'years');
     if (bounded) {
       const minimum = profile.terms[bounded].term as { kind: 'years'; years: number };
@@ -267,7 +264,6 @@ test('R-1: profilo di conservazione per nucleo, Italia e Lombardia con minimi e 
       expect((await overview()).windows, `R-1 finestra sotto il minimo respinta per ${profileId}`).toEqual(state.windows);
       await page.reload();
     } else {
-      // Senza minimi in anni (nessun profilo) il titolare fissa il termine: nessun fascicolo scade prima.
       expect(RETENTION_CATEGORIES.filter(category => profile.terms[category].term.kind === 'owner')).toHaveLength(RETENTION_CATEGORIES.length - 1);
     }
     const category = bounded ?? 'ambulatory_record';

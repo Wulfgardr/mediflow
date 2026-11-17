@@ -60,7 +60,6 @@ async function measureText(page: Page) {
     while (walker.nextNode()) {
       const node = walker.currentNode;
       const element = node.parentElement;
-      // Framework dev chrome is a separate shadow tree; scripts and SVG icons are not product text.
       if (!element || element.closest('script, style, noscript, nextjs-portal, svg:not(:has(text))')) continue;
       const range = document.createRange(); range.selectNodeContents(node);
       if ([...range.getClientRects()].some(rect => rect.width > 0 && rect.height > 0)) record(element, node.textContent || '');
@@ -73,7 +72,6 @@ async function measureText(page: Page) {
       if (element.closest('script, style, svg, nextjs-portal')) continue;
       for (const pseudo of ['::before', '::after']) {
         const content = getComputedStyle(element, pseudo).content;
-        // Pure dots, arrows and clinical glyphs are decorative shapes, not type samples.
         if (/^['"].*[\p{L}\p{N}].*['"]$/u.test(content)) record(element, content.slice(1, -1), pseudo);
       }
     }
@@ -174,8 +172,6 @@ const typographyTest = test.extend<{ patientFixture: { id: string; name: string 
   },
 });
 
-// Una sessione e un paziente di prova per tema: ripeterli per ogni pagina
-// portava il job E2E oltre il suo limite. Ogni pagina resta un passo del rapporto.
 for (const theme of ['light', 'dark'] as const) {
   typographyTest.describe(`Punto: testo renderizzato, ${theme}`, () => {
     typographyTest.setTimeout(ROUTES.length * 20_000 + 120_000);

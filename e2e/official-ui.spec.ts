@@ -1,4 +1,3 @@
-/* ADR 0123: production UI acceptance on an explicitly marked synthetic node. */
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -63,8 +62,6 @@ test.beforeAll(async ({ browser, baseURL }) => {
   await expect(nav().or(page.getByRole('heading', { name: 'Sblocca MediFlow' })).first()).toBeVisible();
   await unlockIfNeeded(page, pin);
   await expect(nav()).toBeVisible();
-  // Fixture creation uses the browser's ordinary authenticated API after PIN;
-  // no copied session material, seed hook, or auth override is used.
   const statuses = await page.evaluate(async fixtures => {
     const result = [];
     for (const fixture of fixtures) {
@@ -105,7 +102,6 @@ test('ordinary PIN and manual onboarding preserve default B without comparison c
   const profile = page.getByTestId('work-profile-onboarding');
   await expect(profile).toBeVisible();
   await profile.getByRole('link', { name: 'Apri la cartella manualmente' }).click();
-  // The manual entry opens the patient records, not the Agenda.
   await expect(page).toHaveURL(/[?&]area=incarico/);
   await expect(nav().getByRole('link', { name: 'Pazienti', exact: true })).toHaveAttribute('aria-current', 'page');
 });
@@ -152,7 +148,6 @@ test('patient preview opens the correct record and all thirteen progressive sect
 });
 
 test('diagnosis-only edit guards navigation and retains the draft after cancellation', async () => {
-  // Synthetic persisted association only; no WHO service is enabled or contacted.
   const originalDiagnosis = {
     code: '1A00', description: 'Diagnosi sintetica iniziale', system: 'ICD-11',
     date: '2026-09-06T00:00:00.000Z',
@@ -184,7 +179,6 @@ test('diagnosis-only edit guards navigation and retains the draft after cancella
     await expect(diagnosis).toHaveValue(`${originalDiagnosis.code} - ${originalDiagnosis.description}`);
     await expect(code).toHaveAttribute('readonly', '');
     await expect(reference).toBeVisible();
-    // Loading defaults alone must not mark the editor dirty.
     await nav().getByRole('link', { name: 'Pazienti', exact: true }).click();
     await expect(page).toHaveURL(/[?&]area=incarico/);
     await expect(leave).toHaveCount(0);
@@ -207,7 +201,6 @@ test('diagnosis-only edit guards navigation and retains the draft after cancella
     await expect(reference).toHaveCount(0);
     expect(patientWrites).toBe(0);
     await page.screenshot({ path: test.info().outputPath('diagnosis-draft-retained.png') });
-    // Explicit discard restores navigation and leaves the saved association intact.
     await nav().getByRole('link', { name: 'Pazienti', exact: true }).click();
     await leave.getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
     await expect(page).toHaveURL(/[?&]area=incarico/);
@@ -219,8 +212,6 @@ test('diagnosis-only edit guards navigation and retains the draft after cancella
   } finally {
     page.off('request', observeWrite);
     await page.unroute('**/api/icd/proxy*');
-    // Keep only this test's deliberately injected transport failure out of the
-    // suite-wide console check; retain every unexpected diagnostic.
     const diagnostics = consoleErrors.splice(diagnosticStart);
     const isExpected = ({ text, url }: { text: string; url: string }) =>
       url.startsWith(new URL('/api/icd/proxy?', page.url()).href) && text.includes('503 (Service Unavailable)');
@@ -252,7 +243,6 @@ test('entry survives disclosure, cross-tab layout change and cancelled navigatio
       await test.info().attach('sibling-access-state.txt', { body: await sibling.locator('body').innerText(), contentType: 'text/plain' });
       const renew = sibling.getByRole('button', { name: 'Rinnova accesso', exact: true });
       if (!await renew.isVisible()) throw error;
-      // Exercise the existing explicit recovery gesture; the PIN remains required.
       await renew.click();
       await unlockIfNeeded(sibling, pin);
     }
@@ -308,7 +298,6 @@ test('both layouts reload and reflow at desktop, phone, narrow and short viewpor
 test('unavailable preference storage is transient and ordinary lock clears open records', async () => {
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto('/settings/aspetto');
-  // Only the presentation key rejects writes. Auth storage remains untouched.
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
     Storage.prototype.setItem = function(key: string, value: string) {
@@ -362,6 +351,5 @@ test('unavailable preference storage is transient and ordinary lock clears open 
   }
   await unlockIfNeeded(page, pin);
   await expect(nav()).toBeVisible();
-  // Preserve known auth conflict diagnostics; any other console error fails.
   expect(consoleErrors.filter(({ text, url }) => !(url.endsWith('/api/auth/lock') && text.includes('409 (Conflict)')))).toEqual([]);
 });

@@ -1,4 +1,3 @@
-/* C-6 Web: real UI, real server, local extraction and ENC2 attachment on an empty isolated archive. */
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
@@ -29,7 +28,6 @@ async function stage(page: Page, lastName: string) {
     await panel.locator('input[type="file"]').setInputFiles({ name: `referto-${lastName}.pdf`, mimeType: 'application/pdf', buffer: await syntheticPdf(lastName) });
     await expect(panel.getByRole('heading', { name: 'Revisione dei dati' })).toBeVisible({ timeout: 60_000 });
     await expect(panel.getByText(`Paziente: ${lastName} Lucia`)).toBeVisible();
-    // The document never fills the identity: every field starts empty.
     for (const label of ['Nome', 'Cognome', 'Codice fiscale']) await expect(panel.getByLabel(label, { exact: true })).toHaveValue('');
     return panel;
 }
@@ -71,7 +69,6 @@ test('risposta persa dopo la conferma: l’esito si rilegge, nessuna seconda sch
     await bootstrapUnlockedSession(page, PIN);
     const before = await patientCount(page), lastName = `Persa${randomUUID().slice(0, 6)}`;
     await stage(page, lastName);
-    // The server executes; the browser never receives the answer.
     await page.route('**/api/patients/document-create', async (route) => {
         if ((route.request().postDataJSON() as { operation?: string }).operation !== 'execute') return route.continue();
         await fetchInterceptedRequest(route);

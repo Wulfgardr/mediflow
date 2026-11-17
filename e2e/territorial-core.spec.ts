@@ -1,4 +1,3 @@
-/* J-2 e J-4 (ADR 0177): il nucleo senza Lombardia, provato nel browser su un runtime isolato. */
 import { test, expect } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
@@ -24,7 +23,6 @@ test('J-2: con il solo nucleo SISS, portali e PRREG spariscono dalla scheda e i 
   test.setTimeout(240_000);
   const evidence = process.env.TERRITORIAL_EVIDENCE_DIR || info.outputPath('territoriale');
   mkdirSync(evidence, { recursive: true });
-  // Lo stato della sessione SISS legge la cronologia del browser dell'host: qui resta sintetico.
   await page.route('**/api/siss/session-status', route => route.fulfill({ json: SYNTHETIC_SISS_SESSION }));
   await bootstrapUnlockedSession(page, '314159');
   await switchPreset(page, 'core+it+lom');
@@ -51,11 +49,9 @@ test('J-2: con il solo nucleo SISS, portali e PRREG spariscono dalla scheda e i 
     await scheda();
     await openPatientSection(page, 'siss');
     await expect(pane).toContainText('SISS e FSE');
-    // Superfici lombarde presenti: le stesse che con il solo nucleo devono sparire.
     await expect(pane.getByRole('region', { name: 'Passaggio al portale regionale', exact: true }), 'J-2 portali presenti con Lombardia').toBeVisible();
     await expect(pane.getByRole('button', { name: 'Apri Prescrittivo Regionale (PRREG), fuori da MediFlow', exact: true }), 'J-2 PRREG presente con Lombardia').toBeVisible();
 
-    // Un passaggio registrato dalla UI con il modulo lombardo attivo.
     await openDiary();
     await pane.getByRole('button', { name: 'Registra passaggio', exact: true }).first().click();
     const form = pane.getByRole('form', { name: 'Registra passaggio locale', exact: true });
@@ -83,7 +79,6 @@ test('J-2: con il solo nucleo SISS, portali e PRREG spariscono dalla scheda e i 
     await expect(page.getByText(/Prescrittivo Regionale \(PRREG\)/u), 'J-2 PRREG assente con il solo nucleo').toHaveCount(0);
     await expect(page.locator(`[data-siss-handoff-id="${handoffId}"]`)).toHaveCount(0);
 
-    // Lo storico resta nell'archivio: rilettura via API e nel database del runtime isolato.
     expect((await archived()).map(row => row.id), 'J-2 storico conservato con il solo nucleo (API)').toEqual([handoffId]);
     expect(db.prepare('SELECT id FROM siss_handoff_events WHERE patient_id=?').pluck().all(patientId), 'J-2 storico conservato con il solo nucleo (database)').toEqual([handoffId]);
 

@@ -1,4 +1,3 @@
-/* LUME-104/68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
@@ -58,9 +57,6 @@ async function prepareStableInsightHydration(page: Page): Promise<{ loaded: Prom
     }
   });
 
-  /* Riproduce deterministicamente la gara osservata nella suite completa: la
-     sintesi documentale risponde prima di Patient Insight. Il prodotto deve
-     attendere entrambe prima di decidere se aprire Archivio documenti. */
   await page.route('**/api/settings/aiPatientInsightKillSwitch', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1_000));
     await route.continue();
@@ -71,8 +67,6 @@ async function prepareStableInsightHydration(page: Page): Promise<{ loaded: Prom
   return { loaded: patientInsightLoaded.then(() => undefined) };
 }
 
-/* ADR 0123: the canonical folder owns thirteen destinations. The
-   record tab preserves identity while the reading pane scrolls. */
 async function expectInViewport(locator: Locator): Promise<void> {
   await expect(locator).toBeVisible();
   expect(await locator.evaluate(element => {
@@ -124,8 +118,6 @@ async function expectPatientIdentityPrivate(header: Locator, patient: { name: st
 }
 
 async function expectPatientHeaderCommands(page: Page, header: Locator, patientId: string): Promise<void> {
-  // Il colore a riposo si misura con il puntatore lontano: un clic precedente può lasciarlo
-  // sopra «Nuova voce», che allora mostra il colore di :hover.
   await page.mouse.move(0, 0);
   const primary = header.getByRole('link', { name: 'Nuova voce', exact: true });
   const actions = header.getByRole('button', { name: 'Azioni', exact: true });
@@ -237,7 +229,6 @@ test('le quindici sezioni restano raggiungibili con una sola destinazione corren
   await expectCurrentSection(page, 'follow-up');
 });
 
-/* WUL-678: prove the folder action reaches the existing planner. */
 test('il follow-up apre il pianificatore canonico dalla cartella', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -253,7 +244,6 @@ test('il follow-up apre il pianificatore canonico dalla cartella', async ({ page
     const box = element.getBoundingClientRect();
     return { width: box.width, height: box.height, radius: style.borderRadius };
   });
-  // DOM geometry can round a 44 px target to 43.99997 px.
   const geometryTolerance = 0.5;
   expect(geometry.width).toBeGreaterThanOrEqual(44 - geometryTolerance);
   expect(geometry.height).toBeGreaterThanOrEqual(44 - geometryTolerance);
@@ -287,7 +277,6 @@ for (const schedaCase of CASES) {
     const surface = page.getByTestId('lume-scheda-surface');
     await expect(header.getByRole('heading', { name: patient.name, level: 1 })).toBeVisible();
     await expect(page.getByRole('heading', { name: patient.name, level: 1 })).toHaveCount(1);
-    // Late settings must not steal the active folder section or reveal documents.
     await expectCurrentSection(page, 'quadro');
     await expect(page.locator('#documenti')).toBeHidden();
     await expectSurfaceHierarchyAndNeutralChrome(page, header, schedaCase.viewport === 'narrow' ? 44 : 28);
@@ -295,7 +284,6 @@ for (const schedaCase of CASES) {
     await expectPatientHeaderCommands(page, header, patient.id);
 
     await page.getByRole('navigation', { name: 'Sezioni della vista' }).getByRole('link', { name: 'Riepilogo', exact: true }).click();
-    // the hash precedes the asynchronous folder visibility update.
     await expect(page).toHaveURL(new URL(`/patients/${patient.id}/modules#quadro`, page.url()).href);
     await expectCurrentSection(page, 'quadro');
     const note = page.getByRole('button', { name: 'Leggi la nota completa', exact: true });
@@ -304,7 +292,6 @@ for (const schedaCase of CASES) {
     await expect(note).toBeFocused();
     await note.press('Space');
     await expect(note).toHaveAttribute('aria-expanded', 'true');
-    // Scroll the actual overflowing ancestor, not the former inert Scheda wrapper.
     const scrollEvidence = await surface.evaluate(element => {
       let owner = element.parentElement;
       while (owner && !(owner.scrollHeight > owner.clientHeight && /auto|scroll/.test(getComputedStyle(owner).overflowY))) owner = owner.parentElement;
