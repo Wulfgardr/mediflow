@@ -183,3 +183,20 @@ Il guard OpenAPI resta invariato: la sua normalizzazione attuale non confronta
 ed è verificata da parser e SQLite reale, oltre alla review indipendente.
 Questo limite del guard non dimostra retrocompatibilità. C05 complessivo e i
 residui lifecycle/move/restore restano aperti.
+
+## Emendamento 17 novembre 2026, WUL-876
+
+Le scritture locali con token su `/api/v1/patients` e discendenti rifiutano con
+422 i campi cifrati privi di envelope ENC valido, prima di dati e audit di successo.
+Il roster è `lib/backup-encrypted-fields.json`; il validatore è quello della rete.
+Il rifiuto vale su POST, PUT e DELETE delle cinque famiglie: pazienti, diario,
+terapie, osservazioni e checkup. Null svuota solo i campi opzionali.
+
+Per creare una voce del diario locale il client deve fornire sia `title` sia
+`content` cifrati. Non è più ammesso generare il titolo in chiaro sul server.
+Anche il motivo delle cancellazioni deve arrivare cifrato: manca al server la
+chiave per cifrare un testo predefinito. Queste route locali del diario restano
+nel perimetro implementation-only della contract-policy; `EntryCreateRequest`
+descrive invece il writer paired-network, che non cambia in questa correzione.
+L'incompatibilità per i vecchi client che inviano testo in chiaro ripristina il
+confine di cifratura richiesto dal modello dati. Non introduce un nuovo formato.

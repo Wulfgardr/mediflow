@@ -83,7 +83,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const { id } = await params;
         const parsed = await readEntryJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
-        const sealedError = rejectUnsealedV1Write('entries', parsed.body);
+        const sealedError = rejectUnsealedV1Write('entries', { ...parsed.body, title: parsed.body.title ?? '' });
         if (sealedError) return sealedError;
         const prepared = prepareEntryCreate(parsed.body, 'v1', id);
         if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: prepared.status });
