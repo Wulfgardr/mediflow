@@ -57,3 +57,14 @@ La prova non usa cookie o chiavi preconfezionati. La lettura diretta del
 DB è limitata alla directory sintetica posseduta dal fixture. Il comando
 E2E imposta `E2E_ISOLATED_STANDALONE_DIR` al payload fisico della build e
 `E2E_BROWSER_CHANNEL=chrome`, mantenendo sandbox e rete limitata al loopback.
+
+## Raccordo dei controlli della nuova pagina e tabella
+
+La CI ha rilevato tre omissioni di registrazione: percorso statico della
+pagina, ruolo tipografico del titolo e classificazione della tabella locale
+nei controlli di archivio e backup. Il titolo usa ora il ruolo della scala
+Lume, la lista dei percorsi comprende Agenti e la tabella dei mandati è
+classificata in ogni controllo. Il portabile clinico resta distinto dal
+recupero cifrato completo dell'archivio. Le regressioni di backup, matrice,
+archivio 0.9.0 e percorsi statici passano con 13 test, senza modificare i
+criteri sulle tabelle cliniche o sui campi storici.
