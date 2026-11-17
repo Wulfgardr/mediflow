@@ -106,7 +106,7 @@ test('D05: TXT is refused at selection through the real import producer; RTF sti
         name, type, size: bytes.byteLength, relativePath: `Sintetico/${name}`, lastModified: 0,
         read: async () => new Uint8Array(bytes),
     });
-    const ports = { ...createDossierPorts(), exemptionCodes: async () => new Set<string>(),
+    const ports = { ...createDossierPorts(), exemptionCodes: async () => new Set<string>(), physicianTaxCode: async () => null,
         listPatients: async () => [{ id: 'synthetic-patient', firstName: 'Ada', lastName: 'Sintetica', taxCode: '', diagnoses: [], exemptions: [] }] };
     const live = { signal: new AbortController().signal, isCurrent: () => true };
     try {
