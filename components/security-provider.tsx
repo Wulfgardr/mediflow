@@ -227,7 +227,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         };
         // The revocation fence must overtake any in-flight or queued login/setup request.
         // Only a later, explicit PIN gesture may start after this receipt settles.
-        void requestApplicationLockConfirmation(reason)
+        void requestApplicationLockConfirmation(reason === 'inactivity' ? 'inactivity' : 'manual')
             .then(completeRecovery)
             .catch(() => completeRecovery(false));
     };
