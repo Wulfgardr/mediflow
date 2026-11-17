@@ -48,9 +48,12 @@ Prima del primo tentativo, il chiamante assegna alla visita un UUID e lo salva
 nel proprio stato. Lo stesso UUID identifica ogni ripresa della stessa visita.
 
 ```sh
-npm run agent:visita -- deposita --agente UUID-AGENTE --estrazione /visita/dossier/estrazione-preparata.json --cf CODICEFISCALE --visita UUID-VISITA
+npm run agent:visita -- deposita --agente UUID-AGENTE --estrazione /visita/dossier/estrazione-preparata.json --cf - --visita UUID-VISITA
 npm run agent:visita -- riprendi --agente UUID-AGENTE --visita UUID-VISITA
 ```
+
+Con `--cf -` il client legge il CF da stdin fino alla chiusura dello stream,
+senza inserirlo negli argomenti del processo.
 
 Aggiungere `--trascrizione /visita/trascrizione.txt` se presente. Dopo una
 risposta persa o un’interruzione, `riprendi` riusa le buste cifrate già salvate.

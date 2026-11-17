@@ -69,10 +69,12 @@ async function fixture() {
     return { ...f, root, files, credentials, file, transcription, extraction, bodies, events, origin, afterNote: (action: () => void) => { afterNote = action; }, drop: () => { drop = true; }, deny: () => { denied = true; }, scope: () => { operations = ['visita.apri', 'visita.nota', 'visita.chiudi']; },
         async cleanup() { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); f.database.close(); fs.rmSync(root, { recursive: true, force: true }); } };
 }
-async function cli(args: string[], data: string, environment: Partial<NodeJS.ProcessEnv> = {}) {
+async function cli(args: string[], data: string, environment: Partial<NodeJS.ProcessEnv> = {}, input?: string) {
     const child = spawn(process.execPath, ['scripts/run-strip-types.mjs', 'packages/agent-client/src/cli.ts', ...args], {
-        env: { ...process.env, ...environment, MEDIFLOW_DATA_DIR: path.join(data, 'unused-clinical') }, stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, ...environment, MEDIFLOW_DATA_DIR: path.join(data, 'unused-clinical') }, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
     });
+    if (input !== undefined) { assert.ok(child.stdin); child.stdin.end(input); }
+    assert.ok(child.stdout); assert.ok(child.stderr);
     let stdout = '', stderr = ''; child.stdout.on('data', bytes => { stdout += bytes; }); child.stderr.on('data', bytes => { stderr += bytes; });
     const timeout = setTimeout(() => child.kill('SIGTERM'), 15000);
     const code = await new Promise<number | null>(resolve => child.once('close', resolve)); clearTimeout(timeout);
@@ -289,4 +291,30 @@ test('a database-shaped input is rejected before opening its file descriptor', a
         assert.throws(() => prepareAgentVisit(f.mandate.publicKey, f.principal.agentRef, f.mandate.id, file, cf), /AGENT_INPUT_INVALID/);
         assert.equal(opened, 0);
     } finally { fs.openSync = open; await f.cleanup(); }
+});
+
+
+test('the real CLI reads a bounded fiscal code from stdin without putting it in process arguments', async () => {
+    const f = await fixture();
+    try {
+        const result = await cli(['deposita', '--credenziali', f.credentials, '--agente', f.principal.agentRef, '--estrazione', f.file, '--cf', '-', '--visita', randomUUID()], f.root, {}, cf + '\n');
+        assert.equal(result.code, 0, result.stderr);
+        assert.equal(JSON.parse(result.stdout).status, 'closed');
+        assert.ok(!JSON.stringify(result).includes(cf));
+        assert.ok(f.bodies.every(body => !body.includes(cf)));
+    } finally { await f.cleanup(); }
+});
+
+test('oversized or empty stdin is refused without depositing or echoing its content', async () => {
+    const f = await fixture();
+    try {
+        for (const input of ['', cf.repeat(16)]) {
+            const result = await cli(['deposita', '--credenziali', f.credentials, '--agente', f.principal.agentRef, '--estrazione', f.file, '--cf', '-', '--visita', randomUUID()], f.root, {}, input);
+            assert.equal(result.code, 1);
+            assert.deepEqual(JSON.parse(result.stderr), { error: 'AGENT_INPUT_INVALID' });
+            assert.ok(!JSON.stringify(result).includes(cf));
+        }
+        assert.equal(f.rows().length, 0);
+        assert.deepEqual(f.events, []);
+    } finally { await f.cleanup(); }
 });
