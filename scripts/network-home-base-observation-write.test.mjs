@@ -472,7 +472,7 @@ test('web clinical lifecycle rejects stale writes, preserves observation tombsto
         assert.equal(patientDelete.response.status, 200);
 
         const webCreates = [
-            ['/api/entries', { patientId, type: 'note', date: '2026-05-02T09:00:00.000Z', content: 'blocked' }],
+            ['/api/entries', { patientId, type: 'note', date: '2026-05-02T09:00:00.000Z', content: 'ENC:c3ludGhldGlj:YmxvY2tlZA==' }],
             ['/api/therapies', { patientId, drugName: 'Blocked therapy', dosage: '1 compressa', startDate: '2026-05-02T09:00:00.000Z' }],
             ['/api/checkups', { patientId, title: 'Blocked checkup', date: '2026-05-02T09:00:00.000Z' }],
             ['/api/observations', { patientId, codeSystem: 'LOINC', code: '8480-6', display: 'Systolic blood pressure', unitSystem: 'UCUM', unitCode: 'mm[Hg]', value: 128, observedAt: '2026-05-02T09:00:00.000Z', source: 'manual' }],
@@ -483,7 +483,7 @@ test('web clinical lifecycle rejects stale writes, preserves observation tombsto
         }
 
         const v1Creates = [
-            [`/api/v1/patients/${patientId}/entries`, { type: 'note', date: '2026-05-02T09:00:00.000Z', content: 'blocked' }],
+            [`/api/v1/patients/${patientId}/entries`, { type: 'note', date: '2026-05-02T09:00:00.000Z', content: 'ENC:c3ludGhldGlj:YmxvY2tlZA==' }],
             [`/api/v1/patients/${patientId}/therapies`, { drugName: 'Blocked therapy', dosage: '1 compressa', startDate: '2026-05-02T09:00:00.000Z' }],
             [`/api/v1/patients/${patientId}/checkups`, { title: 'Blocked checkup', date: '2026-05-02T09:00:00.000Z' }],
             [`/api/v1/patients/${patientId}/observations`, { codeSystem: 'LOINC', code: '8480-6', display: 'Systolic blood pressure', unitSystem: 'UCUM', unitCode: 'mm[Hg]', value: 128, observedAt: '2026-05-02T09:00:00.000Z', source: 'manual' }],
