@@ -8,6 +8,9 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
+import { randomUUID } from 'node:crypto';
+import { agentBase64, agentBytes, openAgentItem } from './agent-cassette-crypto';
+import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto';
 import { commitExemptionImport, previewExemptionImport } from './exemption-catalog-import';
 import { EXEMPTION_COLUMNS } from './exemption-import-contract';
 import { createProstheticsCatalog } from './reference-data/prosthetics-catalog-service';
@@ -28,6 +31,7 @@ const NON_BACKUP_TABLES = new Set(['settings', 'users', 'patient_duplicate_inten
 const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['agent_pairing_requests', 'agent_clients', 'agent_mandates', 'headless_checkup_active_role_attestations', 'archive_generation', 'archive_session_generations', 'portable_import_origins']);
 /* Command replay remains empty until append-only audit restore has a separate contract. */
 const BACKUP_TABLES = {
+    agentCassettes: 'agent_cassettes',
     auditEvents: 'audit_events',
     ambulatories: 'ambulatories',
     attachments: 'attachments',
@@ -130,6 +134,20 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         await Promise.all(columns.map(async (column) => [column, await seal(`${table}.${column}`)])),
     );
     const now = 1_783_000_000;
+    const keys = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+    const privateBytes = new Uint8Array(await crypto.subtle.exportKey('pkcs8', keys.privateKey));
+    const wrapped = await encryptData(agentBase64(privateBytes), masterKey); privateBytes.fill(0);
+    const publicKey = agentBase64(new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey)));
+    const mandateRef = randomUUID(), visitId = randomUUID(), itemId = randomUUID();
+    const anchor = sealAgentItemNode(publicKey, { mandateRef, visitId, itemId: visitId, kind: 'anchor' }, new TextEncoder().encode(JSON.stringify({ fiscalCode: 'SYNTHETIC_BACKUP_ONLY' })));
+    const note = new TextEncoder().encode(JSON.stringify({ text: 'SYNTHETIC_CASSETTE_ROUNDTRIP_6742' }));
+    const item = { id: itemId, kind: 'note', byteLength: note.length, documentHash: null,
+        envelope: sealAgentItemNode(publicKey, { mandateRef, visitId, itemId, kind: 'note' }, note) };
+    insertRow(db, 'agent_cassettes', { id: visitId, mandate_ref: mandateRef, agent_ref: randomUUID(), actor_ref: actorRef,
+        archive_generation: randomUUID(), public_key: publicKey, wrapped_private_key: `ENC:${wrapped.iv}:${wrapped.data}`,
+        model_provider: 'local', allows_clinical_egress: 0, anchor_ciphertext: JSON.stringify(anchor), items_ciphertext: JSON.stringify([item]),
+        status: 'closed', revision: 3, deposited_at: now * 1000, modified_at: now * 1000 });
+
     insertRow(db, 'ambulatory_destructive_commands', { command_id: '61111111-1111-4111-8111-111111111111', protocol: 'ambulatory.destructive.v1',
         operation: 'ambulatory.delete.v1', original_archive_generation: (db.prepare('SELECT generation FROM archive_generation WHERE id=1').get() as {generation:string}).generation,
         original_scope_id: 'synthetic-original-scope', ambulatory_id: 'synthetic-unreceived-ambulatory', expected_version: 1, plan_digest: 'a'.repeat(64),
@@ -243,6 +261,7 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
     const preview = previewExemptionImport(db, bytes, 'inventato-backup.txt', 'synthetic-backup-operator');
     assert.ok(preview.proof);
     commitExemptionImport(db, { bytes, sourceName: 'inventato-backup.txt', proof: preview.proof, acceptSubset: true }, 'synthetic-backup-operator');
+    return masterKey;
 }
 
 function primaryKeyColumns(db: Database.Database, table: string): string[] {
@@ -477,7 +496,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             clearBackupTables(sourceDb, clinicalTables);
             clearBackupTables(targetDb, clinicalTables);
             const targetInitialAudits = readOrderedRows(targetDb, 'audit_events');
-            await populateSyntheticClinicalFixture(sourceDb, sourceActorRef);
+            const cassetteMasterKey = await populateSyntheticClinicalFixture(sourceDb, sourceActorRef);
             /* Include nonempty synthetic repertory and receipt in the total round-trip gate. */
             const prosthetics = createProstheticsCatalog(sourceDb), catalogBytes = Buffer.from(PROSTHETICS_TEMPLATE);
             const catalogPreview = prosthetics.preview(catalogBytes, 'synthetic-roundtrip.csv', 'synthetic-backup');
@@ -560,6 +579,16 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             })) as { ok: boolean; artifactPath?: string; message?: string };
             assert.equal(reexport.ok, true, reexport.message); assert.ok(reexport.artifactPath);
             const restoredArtifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(reexport.artifactPath, 'utf8')));
+            const restoredCassette = restoredArtifact.payload.agentCassettes![0];
+            const [, wrappedIv, wrappedCipher] = String(restoredCassette.wrappedPrivateKey).split(':');
+            const privateBytes = agentBytes(await decryptData(wrappedCipher, wrappedIv, cassetteMasterKey) as string);
+            try {
+                const privateKey = await crypto.subtle.importKey('pkcs8', privateBytes, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+                const item = JSON.parse(String(restoredCassette.itemsCiphertext))[0];
+                const opened = await openAgentItem(privateKey, { mandateRef: String(restoredCassette.mandateRef), visitId: String(restoredCassette.id), itemId: item.id, kind: item.kind }, item.envelope);
+                assert.equal(JSON.parse(new TextDecoder().decode(opened)).text, 'SYNTHETIC_CASSETTE_ROUNDTRIP_6742');
+                opened.fill(0);
+            } finally { privateBytes.fill(0); }
             const fileKey = await crypto.subtle.importKey('raw', Buffer.from(fileGolden.masterKey, 'base64'), 'AES-GCM', false, ['decrypt']);
             const restoredFile = restoredArtifact.payload.attachments.find(row => row.id === 'w7-attachment')!;
             assert.equal(restoredFile.data, fileGolden.data);

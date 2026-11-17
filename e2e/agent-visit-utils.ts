@@ -1,0 +1,48 @@
+import type { Page, APIRequestContext } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { bootstrapUnlockedSession } from './utils';
+import { AGENT_OPERATIONS } from '../lib/agent-mandate-contract';
+
+export const agentVisitPin = '24682468';
+export const agentVisitPassphrase = 'mandato sintetico visita novembre';
+export async function pairSyntheticVisitAgent(page: Page, agent: APIRequestContext) {
+    const pin = agentVisitPin, passphrase = agentVisitPassphrase;
+    await bootstrapUnlockedSession(page, pin);
+    await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
+    await page.getByRole('link', { name: 'Accesso', exact: true }).click();
+    await page.getByLabel('PIN attuale', { exact: true }).first().fill(pin);
+    await page.getByLabel('Nuova passphrase', { exact: true }).fill(passphrase);
+    await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(passphrase);
+    await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
+    const kit = page.getByTestId('recovery-kit');
+    const download = page.waitForEvent('download');
+    await kit.getByRole('button', { name: 'Scarica kit di recupero' }).click(); await download;
+    await kit.getByRole('checkbox').check();
+    await kit.getByRole('button', { name: 'Attiva la nuova passphrase' }).click();
+    await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+    await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+    await page.getByLabel('Passphrase', { exact: true }).fill(passphrase);
+    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+    await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agenti', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: 'Agenti', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Nuovo mandato', exact: true })).toBeVisible();
+    await page.getByLabel('PIN di conferma', { exact: true }).fill(pin);
+    const creation = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
+    const created = await creation; expect(created.status()).toBe(201);
+    const mandate = created.request().postDataJSON().mandate;
+    expect(mandate.durationMs).toBe(43200000);
+    const request = await agent.post('/api/agent/v1/pairings', { data: { name: 'Synthetic cassette client', operations: AGENT_OPERATIONS } });
+    expect(request.status()).toBe(201);
+    const requested = await request.json();
+    const pollPath = '/api/agent/v1/pairings?requestId=' + requested.receipt.id;
+    const polling = { Authorization: 'Pairing ' + requested.pairingCredential.claim };
+    expect((await agent.get(pollPath, { headers: polling })).status()).toBe(202);
+    await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
+    await page.getByRole('button', { name: 'Approva ' + requested.receipt.code, exact: true }).click();
+    const issued = await agent.get(pollPath, { headers: polling }); expect(issued.status()).toBe(200);
+    const result = await issued.json();
+    expect((await agent.storageState()).cookies).toEqual([]);
+    return { mandate, token: result.credential.token as string, agentRef: result.receipt.agentRef as string };
+}
