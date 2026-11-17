@@ -52,3 +52,18 @@ sul Mac si ferma prima di HTTP: il server registra `ENOTCONN`, il client
 o firewall. Il test resta attivo nella CI e non viene saltato per
 qualificare il 404. Finché non raggiunge HTTP, il risultato del proxy
 resta non provato.
+
+## Percorso del medico e contratti
+
+Il percorso sintetico usa una sessione browser reale per creare il mandato
+e approvare il codice. Il client agente ha un contenitore cookie separato
+e vuoto. Sulla base A1 la richiesta di pairing fallisce con 404; dopo A2
+il percorso passa, persiste la credenziale privata, rilegge il contesto
+e riceve un diniego dopo il blocco manuale. La cattura mostra il codice
+da confrontare. Nessun token viene stampato o allegato alla ricevuta.
+
+Quaranta test mirati passano sul raccordo finale: store, credenziale,
+HTTP, matrice a riposo, archivio storico e backup completo. Il catalogo
+operativo segue ora le funzioni di autenticazione effettive. Le nuove
+tabelle sono classificate come autorità locale esclusa dal portabile;
+questo pezzo non conserva ancora documenti o visite cliniche.

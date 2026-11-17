@@ -93,6 +93,20 @@ locali salvano ciò che ricevono.
 - La privata viene cifrata nel browser con la master key tramite `sealLocalDraft`. Non è un campo del contratto generico `ENCRYPTED_FIELDS`. Pubblica, perimetro e stato sono metadati del mandato.
 - Autorità locale esclusa dal backup portabile. Il recupero completo cifrato conserva l'archivio fisico, mentre la nuova generazione impedisce di riattivare il deposito con il vecchio mandato. Il deposito clinico A3 non è ancora parte di questo pezzo.
 
+### `agent_pairing_requests`: richieste di abbinamento
+
+- Altra protezione: `claim_hash`
+- In chiaro: `id`, `code`, `name`, `operations`, `created_at`, `expires_at`, `status`, `mandate_ref`
+- Il segreto di polling è rappresentato da un hash SHA-256 con separazione di dominio. Codice, nome dell'agente e perimetro sono metadati in chiaro. La richiesta scade dopo cinque minuti e non concede accesso prima dell'approvazione UI.
+- Autorità locale esclusa dal portabile, inclusa soltanto nel recupero completo cifrato.
+
+### `agent_clients`: credenziali degli agenti
+
+- Altra protezione: `token_hash`
+- In chiaro: `id`, `mandate_ref`, `name`, `operations`, `expires_at`, `revoked_at`
+- Il DB conserva l'hash del bearer. Il token aperto resta nel file privato del client, fuori dalle cartelle sincronizzate, con permessi `0600` su POSIX. Il file non contiene PIN, cookie o master key. Le ACL Windows non sono qualificate da questa prova.
+- Autorità locale esclusa dal portabile. La generazione corrente e lo stato del mandato restano necessari anche dopo un recupero completo.
+
 ### `attachments`: documenti allegati e loro estratti
 
 - Cifrate: `name`, `path`, `data`, `summary_snapshot`, `parse_evidence_artifact_snapshot`
