@@ -10,6 +10,21 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 11 ed i predecessori canonici 3, 4, 5, 6, 9 e 10; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## Raccordo del 17 novembre 2026: nucleo di creazione componibile
+
+La creazione della terapia espone `createTherapyOperationInTransaction` e il
+wrapper restituisce il risultato del nucleo nella propria transazione
+IMMEDIATE. La logica di ammissione, stato iniziale, data di conclusione e
+audit resta identica. Il nucleo di aggiornamento usato dal comando di stato
+non cambia. Il diff non introduce attese nel commit o nuove transizioni.
+
+La matrice di composizione prova rollback con errori clinici e audit fallito,
+retry e due applicatori su SQLite. I 239 test mirati includono quelli già
+esistenti su transizioni, audit terapia e revisione concorrente. Il modello
+legacy, gli invarianti, i testimoni e i mutanti restano quelli qualificati;
+il gate completo viene rieseguito sulla revisione sincronizzata. Queste
+prove non attestano l'applicatore della cassetta, ancora da implementare.
+
 ## Raccordo del 9 novembre 2026: backup della 0.9.0 pubblicata
 
 Lo schema 3, scritto dalla 0.9.0, entra fra i predecessori ammessi da

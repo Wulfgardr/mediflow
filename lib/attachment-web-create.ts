@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
-import { attachmentCreateSchema } from './api-schemas/attachments';
+import { attachmentCreateSchema, type AttachmentCreatePayload } from './api-schemas/attachments';
 import { parseApiBody } from './api-schemas/parse';
 import { readBoundedJsonBody } from './bounded-request-body';
 import { writeAttachmentWebAudit } from './attachment-web-audit';
@@ -21,6 +21,50 @@ import { unauthorizedResponse } from './security/server-auth';
 import type { ServerSession } from './security/server-session';
 
 const mintHostAttachmentCurrentness = createHostAttachmentCurrentness;
+
+type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
+type AttachmentCreateResult = { status: 201 | 400 | 404 | 409 | 413; value: Record<string, unknown> };
+
+export function createWebAttachmentInTransaction(
+    tx: Tx, request: Request, session: ServerSession, body: AttachmentCreatePayload,
+): AttachmentCreateResult {
+    if (typeof body.patientId !== 'string' || body.patientId.trim().length === 0) {
+        return { status: 400, value: { error: 'patientId required' } };
+    }
+    const dataSize = getAttachmentPayloadByteSize(body.data);
+    if (!dataSize.ok) return { status: 400, value: { error: dataSize.error } };
+    if (dataSize.size > resolveMaxAttachmentBytes()) {
+        return { status: 413, value: { error: 'Attachment payload too large' } };
+    }
+    const id = body.id ?? uuidv4();
+    const patient = tx.select({ id: patients.id }).from(patients)
+        .where(and(eq(patients.id, body.patientId), activePatients())).get();
+    if (!patient) return { status: 404, value: { error: 'Patient not found' } };
+    if (!attachmentCollectionMatches(tx, body.patientId, body.expectedCollection)) return { status: 409, value: { error: ATTACHMENT_COLLECTION_CHANGED_ERROR, code: ATTACHMENT_COLLECTION_CHANGED } };
+    if (tx.select({ id: attachments.id }).from(attachments).where(eq(attachments.id, id)).get()) return { status: 409, value: { error: 'Attachment already exists' } };
+    const currentness = mintHostAttachmentCurrentness();
+    const inserted = tx.insert(attachments).values({
+        id,
+        patientId: body.patientId,
+        name: body.name,
+        type: body.type,
+        size: body.size,
+        path: buildAttachmentPath(body.path, body.name, id),
+        data: body.data ?? null,
+        summarySnapshot: body.summarySnapshot ?? null,
+        parseEvidenceArtifactSnapshot: body.parseEvidenceArtifactSnapshot ?? null,
+        ocrQueueState: isDocumentOcrQueueState(body.ocrQueueState) ? body.ocrQueueState : null,
+        ocrQueueReason: isDocumentOcrQueueReason(body.ocrQueueReason) ? body.ocrQueueReason : null,
+        ocrQueueUpdatedAt: isDocumentOcrQueueState(body.ocrQueueState) ? new Date() : null,
+        createdAt: new Date(),
+        documentSourceRef: currentness.sourceRef,
+        documentRevision: currentness.revision,
+        documentFreshnessEpoch: currentness.freshnessEpoch,
+    }).run();
+    if (inserted.changes !== 1) throw new Error('Attachment insert did not affect exactly one row');
+    writeAttachmentWebAudit(tx, request, session, 'attachment.created', id);
+    return { status: 201, value: { id, currentness } };
+}
 
 /** Creates one web attachment with active-patient validation and initial currentness in one transaction. */
 export async function createWebAttachment(
@@ -43,52 +87,8 @@ export async function createWebAttachment(
         const parsedBody = parseApiBody(attachmentCreateSchema, json.value);
         if (!parsedBody.ok) return parsedBody.response;
         const body = parsedBody.data;
-        if (typeof body.patientId !== 'string' || body.patientId.trim().length === 0) {
-            return NextResponse.json({ error: 'patientId required' }, { status: 400 });
-        }
-        const dataSize = getAttachmentPayloadByteSize(body.data);
-        if (!dataSize.ok) return NextResponse.json({ error: dataSize.error }, { status: 400 });
-        if (dataSize.size > resolveMaxAttachmentBytes()) {
-            return NextResponse.json({ error: 'Attachment payload too large' }, { status: 413 });
-        }
-
-        const id = body.id ?? uuidv4();
-        let committed: ReturnType<typeof mintHostAttachmentCurrentness> | null = null;
-        const created = dbServer.transaction((tx): 'created' | 'missing' | 'duplicate' | 'stale' => {
-            const patient = tx.select({ id: patients.id }).from(patients)
-                .where(and(eq(patients.id, body.patientId), activePatients())).get();
-            if (!patient) return 'missing';
-            if (!attachmentCollectionMatches(tx, body.patientId, body.expectedCollection)) return 'stale';
-            if (tx.select({ id: attachments.id }).from(attachments).where(eq(attachments.id, id)).get()) return 'duplicate';
-            const currentness = mintHostAttachmentCurrentness();
-            const inserted = tx.insert(attachments).values({
-                id,
-                patientId: body.patientId,
-                name: body.name,
-                type: body.type,
-                size: body.size,
-                path: buildAttachmentPath(body.path, body.name, id),
-                data: body.data ?? null,
-                summarySnapshot: body.summarySnapshot ?? null,
-                parseEvidenceArtifactSnapshot: body.parseEvidenceArtifactSnapshot ?? null,
-                ocrQueueState: isDocumentOcrQueueState(body.ocrQueueState) ? body.ocrQueueState : null,
-                ocrQueueReason: isDocumentOcrQueueReason(body.ocrQueueReason) ? body.ocrQueueReason : null,
-                ocrQueueUpdatedAt: isDocumentOcrQueueState(body.ocrQueueState) ? new Date() : null,
-                createdAt: new Date(),
-                documentSourceRef: currentness.sourceRef,
-                documentRevision: currentness.revision,
-                documentFreshnessEpoch: currentness.freshnessEpoch,
-            }).run();
-            if (inserted.changes !== 1) throw new Error('Attachment insert did not affect exactly one row');
-            writeAttachmentWebAudit(tx, request, session, 'attachment.created', id);
-            committed = currentness;
-            return 'created';
-        }, { behavior: 'immediate' });
-        if (created === 'stale') return NextResponse.json({ error: ATTACHMENT_COLLECTION_CHANGED_ERROR, code: ATTACHMENT_COLLECTION_CHANGED }, { status: 409 });
-        if (created === 'duplicate') return NextResponse.json({ error: 'Attachment already exists' }, { status: 409 });
-        if (created === 'missing') return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        // The committed currentness lets the browser extend its reviewed view for the next file of the same batch.
-        return NextResponse.json({ id, currentness: committed }, { status: 201 });
+        const result = dbServer.transaction(tx => createWebAttachmentInTransaction(tx, request, session, body), { behavior: 'immediate' });
+        return NextResponse.json(result.value, { status: result.status });
     } catch {
         return NextResponse.json({ error: 'Create Failed' }, { status: 500 });
     }

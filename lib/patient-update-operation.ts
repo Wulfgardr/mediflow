@@ -37,11 +37,22 @@ export type PatientUpdateOperationResult =
     | { status: 400 | 404 | 409; value: Record<string, unknown> }
     | NetworkPatientCommitDenial;
 
-export function updatePatientOperation(input: PatientUpdateOperationInput): PatientUpdateOperationResult {
+type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
+
+function assertPatientUpdateContract(input: PatientUpdateOperationInput): void {
     if (input.operationId !== PATIENT_PROFILE_UPDATE_OPERATION.id
         || input.contractVersion !== PATIENT_PROFILE_UPDATE_OPERATION.version) {
         throw new Error('Unsupported patient profile update operation');
     }
+}
+
+export function updatePatientOperation(input: PatientUpdateOperationInput): PatientUpdateOperationResult {
+    assertPatientUpdateContract(input);
+    return dbServer.transaction((tx) => updatePatientOperationInTransaction(tx, input), { behavior: 'immediate' });
+}
+
+export function updatePatientOperationInTransaction(tx: Tx, input: PatientUpdateOperationInput): PatientUpdateOperationResult {
+    assertPatientUpdateContract(input);
     const reviewed = input.reviewedNotes;
     const key = reviewed ? profileNotesCommitKey(reviewed.command, reviewed.permit, input.audit) : null;
     if (reviewed && (input.patientId !== reviewed.command.target.patientId || input.expectedVersion !== reviewed.command.target.expectedVersion
@@ -54,105 +65,101 @@ export function updatePatientOperation(input: PatientUpdateOperationInput): Pati
     const replay = key && reviewed ? { reference: key.reference, digest: key.digest, commandDigest: key.commandDigest,
         actorRef: input.audit.actorRef, patientId: input.patientId, ambulatoryId: reviewed.permit.ambulatoryId,
         archiveGeneration: input.audit.archiveGeneration } : null;
-    // better-sqlite3/Drizzle callback stays synchronous. Patient, membership and
-    // required audit either commit together or all roll back; no second writer.
-    return dbServer.transaction((tx): PatientUpdateOperationResult => {
-        const denied = input.authorizeCommit?.(tx);
-        if (denied) return denied;
-        if (reviewed && reviewed.permit.authorizeCommit(tx) !== true) throw new ProfileNotesCommitError('commit_denied');
-        const condition = and(
-            eq(patients.id, input.patientId),
-            activePatients(),
-            ...(scopeAmbulatoryId === undefined ? [] : [
-                eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId),
-            ]),
-        );
-        const existing = scopeAmbulatoryId === undefined
-            ? tx.select().from(patients).where(condition).get()
-            : tx.select({ patient: patients }).from(patients)
-                .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
-                .where(condition).get()?.patient;
+    const denied = input.authorizeCommit?.(tx);
+    if (denied) return denied;
+    if (reviewed && reviewed.permit.authorizeCommit(tx) !== true) throw new ProfileNotesCommitError('commit_denied');
+    const condition = and(
+        eq(patients.id, input.patientId),
+        activePatients(),
+        ...(scopeAmbulatoryId === undefined ? [] : [
+            eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId),
+        ]),
+    );
+    const existing = scopeAmbulatoryId === undefined
+        ? tx.select().from(patients).where(condition).get()
+        : tx.select({ patient: patients }).from(patients)
+            .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
+            .where(condition).get()?.patient;
 
-        if (!existing) return { status: 404, value: { error: 'Not found' } };
+    if (!existing) return { status: 404, value: { error: 'Not found' } };
 
-        const prior = replay ? readProfileNotesCommitReceipt(tx, replay) : null;
-        if (prior) return { status: 200, value: { success: true }, existing, receipt: prior };
+    const prior = replay ? readProfileNotesCommitReceipt(tx, replay) : null;
+    if (prior) return { status: 200, value: { success: true }, existing, receipt: prior };
 
-        if (existing.version !== input.expectedVersion) return { status: 409,
-            value: buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, existing) };
-        if (existing.version >= Number.MAX_SAFE_INTEGER) return { status: 409,
-            value: buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, existing) };
+    if (existing.version !== input.expectedVersion) return { status: 409,
+        value: buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, existing) };
+    if (existing.version >= Number.MAX_SAFE_INTEGER) return { status: 409,
+        value: buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, existing) };
 
-        const values = { ...input.values };
-        const hasIdentityWrite = values.taxCode !== undefined || values.identifierType !== undefined;
-        const hasBirthChange = ['birthDate', 'birthYear', 'birthDatePrecision'].some(key => Reflect.get(values, key) !== undefined);
-        const effective = { ...existing, ...Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) };
-        if (values.identifierType === undefined && values.taxCode !== undefined && values.taxCode !== existing.taxCode) {
-            effective.identifierType = values.identifierType = inferLegacyIdentifierType(values.taxCode);
-        }
-        const hasIdentityChange = effective.taxCode !== existing.taxCode || effective.identifierType !== existing.identifierType;
-        if (hasIdentityChange && input.values.identifierType !== undefined) {
-            const error = identifierError(effective.identifierType, effective.taxCode);
-            if (error) return { status: 400, value: { error } };
-            values.taxCode = normalizeIdentifierValue(effective.identifierType, effective.taxCode);
-            effective.taxCode = values.taxCode;
-        }
-        if (hasBirthChange && values.birthDatePrecision === undefined) {
-            effective.birthDatePrecision = values.birthDate ? 'exact' : values.birthYear != null ? 'estimated' : 'unknown';
-            values.birthDatePrecision = effective.birthDatePrecision;
-        }
-        if (hasBirthChange || hasIdentityChange) {
-            const error = birthError(effective);
-            if (error) return { status: 400, value: { error } };
-        }
-        if ((hasIdentityWrite || input.setPrimaryAmbulatory || values.isArchived === false) && hasPatientIdentifierConflict(tx, effective)) return { status: 409, value: PATIENT_IDENTIFIER_DUPLICATE };
-        const identityChanged = effective.identifierType !== existing.identifierType || effective.taxCode !== existing.taxCode;
-        if (identityChanged) values.identifierHistory = JSON.stringify([...JSON.parse(existing.identifierHistory), {
-            version: input.expectedVersion + 1, occurredAt: (values.updatedAt ?? new Date()).toISOString(), actorRef: input.audit.actorRef,
-            previous: { type: existing.identifierType, value: existing.taxCode },
-            next: { type: effective.identifierType, value: effective.taxCode },
-        }]);
-        const updated = tx.update(patients).set({ ...values, version: input.expectedVersion + 1 })
-            .where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))
-            .run();
-        if (updated.changes === 0) {
-            const current = tx.select({
-                id: patients.id, version: patients.version,
-                updatedAt: patients.updatedAt, isArchived: patients.isArchived,
-            }).from(patients)
-                .where(and(eq(patients.id, input.patientId), activePatients()))
-                .get();
-            return {
-                status: 409,
-                value: buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, current ?? null),
-            };
-        }
+    const values = { ...input.values };
+    const hasIdentityWrite = values.taxCode !== undefined || values.identifierType !== undefined;
+    const hasBirthChange = ['birthDate', 'birthYear', 'birthDatePrecision'].some(key => Reflect.get(values, key) !== undefined);
+    const effective = { ...existing, ...Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) };
+    if (values.identifierType === undefined && values.taxCode !== undefined && values.taxCode !== existing.taxCode) {
+        effective.identifierType = values.identifierType = inferLegacyIdentifierType(values.taxCode);
+    }
+    const hasIdentityChange = effective.taxCode !== existing.taxCode || effective.identifierType !== existing.identifierType;
+    if (hasIdentityChange && input.values.identifierType !== undefined) {
+        const error = identifierError(effective.identifierType, effective.taxCode);
+        if (error) return { status: 400, value: { error } };
+        values.taxCode = normalizeIdentifierValue(effective.identifierType, effective.taxCode);
+        effective.taxCode = values.taxCode;
+    }
+    if (hasBirthChange && values.birthDatePrecision === undefined) {
+        effective.birthDatePrecision = values.birthDate ? 'exact' : values.birthYear != null ? 'estimated' : 'unknown';
+        values.birthDatePrecision = effective.birthDatePrecision;
+    }
+    if (hasBirthChange || hasIdentityChange) {
+        const error = birthError(effective);
+        if (error) return { status: 400, value: { error } };
+    }
+    if ((hasIdentityWrite || input.setPrimaryAmbulatory || values.isArchived === false) && hasPatientIdentifierConflict(tx, effective)) return { status: 409, value: PATIENT_IDENTIFIER_DUPLICATE };
+    const identityChanged = effective.identifierType !== existing.identifierType || effective.taxCode !== existing.taxCode;
+    if (identityChanged) values.identifierHistory = JSON.stringify([...JSON.parse(existing.identifierHistory), {
+        version: input.expectedVersion + 1, occurredAt: (values.updatedAt ?? new Date()).toISOString(), actorRef: input.audit.actorRef,
+        previous: { type: existing.identifierType, value: existing.taxCode },
+        next: { type: effective.identifierType, value: effective.taxCode },
+    }]);
+    const updated = tx.update(patients).set({ ...values, version: input.expectedVersion + 1 })
+        .where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))
+        .run();
+    if (updated.changes === 0) {
+        const current = tx.select({
+            id: patients.id, version: patients.version,
+            updatedAt: patients.updatedAt, isArchived: patients.isArchived,
+        }).from(patients)
+            .where(and(eq(patients.id, input.patientId), activePatients()))
+            .get();
+        return {
+            status: 409,
+            value: buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, current ?? null),
+        };
+    }
 
-        if (input.setPrimaryAmbulatory) {
-            upsertPrimaryAmbulatoryMembership(tx, input.patientId, input.values.ambulatoryId);
-        }
-        const journal = key ? createProfileNotesCommitJournal(key, Date.now()) : undefined;
-        writeAuditEventInTransaction(tx, {
-            eventType: classifyPatientMutationEvent(existing.isArchived ?? null, input.values.isArchived as boolean | undefined),
-            outcome: 'success',
-            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType,
-            actorRef: input.audit.actorRef,
-            subjectType: 'patient',
-            subjectRef: input.patientId,
-            sourceSurface: input.audit.sourceSurface,
-            requestId: input.audit.requestId,
-            occurredAt: journal ? new Date(journal.receipt.committedAt) : undefined,
-            redactedMetadata: {
-                profileNotesCommit: journal,
-                changedFields: Object.entries(input.values)
-                    .filter(([key, value]) => key !== 'version' && key !== 'updatedAt' && value !== undefined)
-                    .map(([key]) => key),
-                resourceVersion: input.expectedVersion + 1,
-                flags: [...(input.audit.flags ?? []), ...(identityChanged ? [`identifier-history:${input.expectedVersion + 1}`] : [])],
-            },
-        });
-        const receipt = replay ? readProfileNotesCommitReceipt(tx, replay) : null;
-        if (replay && !receipt) throw new ProfileNotesCommitError('receipt_unavailable');
-        return { status: 200, value: { success: true }, existing, ...(receipt ? { receipt } : {}) };
-    }, { behavior: 'immediate' });
+    if (input.setPrimaryAmbulatory) {
+        upsertPrimaryAmbulatoryMembership(tx, input.patientId, input.values.ambulatoryId);
+    }
+    const journal = key ? createProfileNotesCommitJournal(key, Date.now()) : undefined;
+    writeAuditEventInTransaction(tx, {
+        eventType: classifyPatientMutationEvent(existing.isArchived ?? null, input.values.isArchived as boolean | undefined),
+        outcome: 'success',
+        archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType,
+        actorRef: input.audit.actorRef,
+        subjectType: 'patient',
+        subjectRef: input.patientId,
+        sourceSurface: input.audit.sourceSurface,
+        requestId: input.audit.requestId,
+        occurredAt: journal ? new Date(journal.receipt.committedAt) : undefined,
+        redactedMetadata: {
+            profileNotesCommit: journal,
+            changedFields: Object.entries(input.values)
+                .filter(([key, value]) => key !== 'version' && key !== 'updatedAt' && value !== undefined)
+                .map(([key]) => key),
+            resourceVersion: input.expectedVersion + 1,
+            flags: [...(input.audit.flags ?? []), ...(identityChanged ? [`identifier-history:${input.expectedVersion + 1}`] : [])],
+        },
+    });
+    const receipt = replay ? readProfileNotesCommitReceipt(tx, replay) : null;
+    if (replay && !receipt) throw new ProfileNotesCommitError('receipt_unavailable');
+    return { status: 200, value: { success: true }, existing, ...(receipt ? { receipt } : {}) };
 }

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { validateRequiredPatientDeleteAudit, validateRequiredPatientUpdateAudit } from './audit-quality-gate.mjs';
+import { normalizeSynchronousTransactionCore, validateRequiredPatientDeleteAudit, validateRequiredPatientUpdateAudit } from './audit-quality-gate.mjs';
 
 const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -183,7 +183,7 @@ function assertPatientProfileTombstones({ route, routeSource, profileSource, dis
     assertIfReturn(admission.thenStatement.statements[1], '!existing',
         '{ status: 404, value: { error: "Not found" } }', 'preflight absence must precede validation and audit');
 
-    const core = checkedSource(coreSource);
+    const core = checkedSource(normalizeSynchronousTransactionCore(coreSource, 'updatePatientOperation'));
     assertNamedImports(core, 'drizzle-orm', ['and', 'eq']);
     assertNamedImports(core, './patient-lifecycle', ['activePatients']);
     const owner = exportedFunction(core, 'updatePatientOperation');
@@ -280,8 +280,8 @@ test('profile tombstone guard rejects broken imports, delegation, filters, 404s 
         ['writer loses 404', 'coreSource',
             "if (!existing) return { status: 404, value: { error: 'Not found' } };",
             "if (!existing) return { status: 200, value: { error: 'Not found' } };"],
-        ['writer lookup weakens AND with OR', 'coreSource', '            activePatients(),',
-            '            or(activePatients(), eq(patients.id, input.patientId)),'],
+        ['writer lookup weakens AND with OR', 'coreSource', '        activePatients(),',
+            '        or(activePatients(), eq(patients.id, input.patientId)),'],
         ['final UPDATE loses the active predicate', 'coreSource',
             '.where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))',
             '.where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion)))'],
