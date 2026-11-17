@@ -10,7 +10,7 @@ const { installLoopbackIngress } = await import('./loopback-ingress.mjs');
 const f = await agentCassetteFixture();
 f.run(() => f.store.open(f.principal, f.visitId, f.anchor));
 const own = f.rows()[0], other = { ...own, id: randomUUID(), actorRef: 'another-synthetic-doctor' };
-const context = issueSyntheticWebSessionContext({ id: f.actorRef, username: 'synthetic-incoming', role: 'admin' }, 'agent-incoming-reader');
+const context = issueSyntheticWebSessionContext({ id: f.actorRef, username: f.actorRef, role: 'admin' }, 'agent-incoming-reader');
 let session: typeof context.session | null = context.session;
 let reads = 0;
 const handler = createAgentIncomingReader({ session: async () => session, cassettes: () => { reads++; return [own, other]; } });
