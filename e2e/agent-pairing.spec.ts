@@ -51,6 +51,7 @@ test('agent obtains its scoped credential only after the doctor compares and app
     expect((await pending.json()).credential).toBeNull();
     await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Synthetic Codex agent ' + requested.receipt.code, exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Approva ' + requested.receipt.code, exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath('codice-da-confrontare.png'), fullPage: true });
     const approval = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates/pairings') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Approva ' + requested.receipt.code, exact: true }).click();
