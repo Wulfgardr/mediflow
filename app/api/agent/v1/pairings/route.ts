@@ -1,14 +1,14 @@
 import { openDbServer } from '@/lib/db-server';
 import { AgentMandateDenied } from '@/lib/agent-mandate-store';
 import { createAgentPairingStore } from '@/lib/agent-pairing-store';
-import { agentChannelFailure, requireAgentLoopback } from '@/lib/security/agent-channel';
+import { agentChannelFailure, requireAgentLoopbackContext } from '@/lib/security/agent-channel';
 import { readNativeNetworkJson } from '@/lib/native-network-json-body';
 
 export const runtime = 'nodejs';
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 export async function POST(request: Request): Promise<Response> {
     try {
-        requireAgentLoopback(request);
+        requireAgentLoopbackContext(request);
         const body = await readNativeNetworkJson(request, 2048, { signal: request.signal, deadline: performance.now() + 2000 }) as Record<string, unknown>;
         if (!body || Object.keys(body).sort().join(',') !== 'name,operations') return reply({ code: 'INVALID_INPUT' }, 400);
         const result = createAgentPairingStore(openDbServer()).request(body.name, body.operations);
@@ -17,7 +17,7 @@ export async function POST(request: Request): Promise<Response> {
 }
 export async function GET(request: Request): Promise<Response> {
     try {
-        requireAgentLoopback(request);
+        requireAgentLoopbackContext(request);
         const url = new URL(request.url), id = url.searchParams.get('requestId');
         const claim = /^Pairing ([A-Za-z0-9_-]{43})$/u.exec(request.headers.get('authorization') ?? '')?.[1];
         if (!id || !claim || [...url.searchParams.keys()].join(',') !== 'requestId') return reply({ code: 'PAIRING_DENIED' }, 401);

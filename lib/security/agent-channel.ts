@@ -7,12 +7,12 @@ import type { AgentOperation } from '../agent-mandate-contract';
 export class AgentChannelDenied extends Error {
     constructor(readonly status: 401 | 403 | 404) { super('AGENT_CHANNEL_DENIED'); }
 }
-export function requireAgentLoopback(request: Request): void {
+export function requireAgentLoopbackContext(request: Request): void {
     if (!hasAttestedLoopbackIngress(request)) throw new AgentChannelDenied(404);
 }
-export function withAgentTransaction<T>(database: Database.Database, request: Request, operation: AgentOperation | null,
+export function withAuthenticatedAgentTransaction<T>(database: Database.Database, request: Request, operation: AgentOperation | null,
     consume: (principal: AgentPrincipal) => T): T {
-    requireAgentLoopback(request);
+    requireAgentLoopbackContext(request);
     const match = /^Bearer (mfa_[A-Za-z0-9_-]{43})$/u.exec(request.headers.get('authorization') ?? '');
     if (!match) throw new AgentChannelDenied(401);
     return database.transaction(() => {

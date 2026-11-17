@@ -9,7 +9,7 @@ import { createAgentMandateStore } from '../agent-mandate-store';
 import { createAgentPairingStore } from '../agent-pairing-store';
 import { readSqliteArchiveGeneration } from '../archive-generation';
 import { installLoopbackIngress } from './loopback-ingress.mjs';
-import { agentChannelFailure, withAgentTransaction } from './agent-channel';
+import { agentChannelFailure, withAuthenticatedAgentTransaction } from './agent-channel';
 import { allowsNetworkIngress } from './network-ingress-policy.mjs';
 
 const directory = mkdtempSync(join(tmpdir(), 'mediflow-agent-channel-'));
@@ -36,7 +36,7 @@ const server = createServer(async (incoming, outgoing) => {
         if (url.pathname === '/api/agent/v1/pairings') response = await (incoming.method === 'POST' ? pair(request) : poll(request));
         else if (url.pathname === '/api/agent/v1/context') response = await context(request);
         else {
-            try { response = withAgentTransaction(database, request, 'visita.proponi.terapia', () => {
+            try { response = withAuthenticatedAgentTransaction(database, request, 'visita.proponi.terapia', () => {
                 database.prepare("INSERT INTO settings(key,value) VALUES ('synthetic-agent-scope-write','ciphertext')").run(); return Response.json({ status: 'accepted' });
             }); } catch (error) { response = agentChannelFailure(error); }
         }
