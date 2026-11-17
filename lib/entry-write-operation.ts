@@ -60,88 +60,92 @@ function sameEntryCreate(existing: typeof entries.$inferSelect, values: typeof e
 
 /* IMMEDIATE acquires the writer lock before parent/scope and duplicate reads. */
 export function createEntryOperation(input: CreateInput): Result {
-    return dbServer.transaction((tx): Result => {
-        const denial = input.authorizeCommit?.(tx);
-        if (denial) return denial;
-        if (input.values.type === 'scale' && (input.values.patientId !== input.patientId || input.values.id !== input.id)) {
-            return { status: 409, value: { code: 'SCALE_IDEMPOTENCY_CONFLICT', error: 'Identificativo o paziente incoerente con la richiesta.' } };
-        }
-        if (input.mode === 'network' && !networkScopeContains(tx, input.patientId, input.scopeAmbulatoryId!)) {
-            return { status: 404, value: { error: 'Not found',
-                ...(input.values.type === 'scale' ? { code: 'SCALE_PATIENT_INACTIVE' } : {}) } };
-        }
-        if (input.values.type === 'scale' && !activeScaleParentExists(tx, input.patientId)) {
-            return { status: 409, value: { code: 'SCALE_PATIENT_INACTIVE',
-                error: 'Paziente archiviato o rimosso. Punteggio non registrato.' } };
-        }
-        if (!activeParentExists(tx, input.patientId)) {
-            return { status: 404, value: { error: input.mode === 'network' ? 'Not found' : 'Patient not found' } };
-        }
+    return dbServer.transaction((tx) => createEntryOperationInTransaction(tx, input), { behavior: 'immediate' });
+}
 
-        const existing = tx.select().from(entries).where(eq(entries.id, input.id)).get();
-        if (existing) {
-            if ((input.mode === 'network' || input.values.type === 'scale') && sameEntryCreate(existing, input.values)) {
-                return { status: 200, value: { id: existing.id, version: existing.version, idempotent: true } };
-            }
-            return { status: 409, value: { ...(input.values.type === 'scale' ? { code: 'SCALE_IDEMPOTENCY_CONFLICT' } : {}), error: input.mode === 'network'
-                ? 'Network diary create id already exists with different content' : 'Conflict' } };
-        }
+export function createEntryOperationInTransaction(tx: Tx, input: CreateInput): Result {
+    const denial = input.authorizeCommit?.(tx);
+    if (denial) return denial;
+    if (input.values.type === 'scale' && (input.values.patientId !== input.patientId || input.values.id !== input.id)) {
+        return { status: 409, value: { code: 'SCALE_IDEMPOTENCY_CONFLICT', error: 'Identificativo o paziente incoerente con la richiesta.' } };
+    }
+    if (input.mode === 'network' && !networkScopeContains(tx, input.patientId, input.scopeAmbulatoryId!)) {
+        return { status: 404, value: { error: 'Not found',
+            ...(input.values.type === 'scale' ? { code: 'SCALE_PATIENT_INACTIVE' } : {}) } };
+    }
+    if (input.values.type === 'scale' && !activeScaleParentExists(tx, input.patientId)) {
+        return { status: 409, value: { code: 'SCALE_PATIENT_INACTIVE',
+            error: 'Paziente archiviato o rimosso. Punteggio non registrato.' } };
+    }
+    if (!activeParentExists(tx, input.patientId)) {
+        return { status: 404, value: { error: input.mode === 'network' ? 'Not found' : 'Patient not found' } };
+    }
 
-        const operator = input.audit.actorType === 'user'
-            ? tx.select({ displayName: users.displayName, username: users.username }).from(users)
-                .where(eq(users.id, input.audit.actorRef)).get() : undefined;
-        const recordedBy = operator?.displayName?.trim() || operator?.username || null;
-        const inserted = tx.insert(entries).values({ ...input.values, recordedBy }).run();
-        if (inserted.changes !== 1) throw new Error('Entry create did not write exactly one row');
-        writeAuditEventInTransaction(tx, {
-            eventType: 'entry.created', outcome: 'success',
-            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
-            subjectType: 'entry', subjectRef: input.id,
-            sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
-            redactedMetadata: { changedFields: input.changedFields, resourceVersion: 1, flags: input.audit.flags },
-        });
-        return { status: 201, value: input.mode === 'web' ? { id: input.id, version: 1 }
-            : input.mode === 'v1' ? { id: input.id } : { id: input.id, version: 1 } };
-    }, { behavior: 'immediate' });
+    const existing = tx.select().from(entries).where(eq(entries.id, input.id)).get();
+    if (existing) {
+        if ((input.mode === 'network' || input.values.type === 'scale') && sameEntryCreate(existing, input.values)) {
+            return { status: 200, value: { id: existing.id, version: existing.version, idempotent: true } };
+        }
+        return { status: 409, value: { ...(input.values.type === 'scale' ? { code: 'SCALE_IDEMPOTENCY_CONFLICT' } : {}), error: input.mode === 'network'
+            ? 'Network diary create id already exists with different content' : 'Conflict' } };
+    }
+
+    const operator = input.audit.actorType === 'user'
+        ? tx.select({ displayName: users.displayName, username: users.username }).from(users)
+            .where(eq(users.id, input.audit.actorRef)).get() : undefined;
+    const recordedBy = operator?.displayName?.trim() || operator?.username || null;
+    const inserted = tx.insert(entries).values({ ...input.values, recordedBy }).run();
+    if (inserted.changes !== 1) throw new Error('Entry create did not write exactly one row');
+    writeAuditEventInTransaction(tx, {
+        eventType: 'entry.created', outcome: 'success',
+        archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+        subjectType: 'entry', subjectRef: input.id,
+        sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+        redactedMetadata: { changedFields: input.changedFields, resourceVersion: 1, flags: input.audit.flags },
+    });
+    return { status: 201, value: input.mode === 'web' ? { id: input.id, version: 1 }
+        : input.mode === 'v1' ? { id: input.id } : { id: input.id, version: 1 } };
 }
 
 /* matched UPDATE IGNORE is an integrity fault, not an optimistic conflict. */
 export function updateEntryOperation(input: UpdateInput): Result {
-    return dbServer.transaction((tx): Result => {
-        const denial = input.authorizeCommit?.(tx);
-        if (denial) return denial;
-        const existing = input.mode === 'network'
-            ? tx.select({ entry: entries }).from(entries)
-                .innerJoin(patientsToAmbulatories, eq(entries.patientId, patientsToAmbulatories.patientId))
-                .where(and(eq(entries.id, input.entryId), eq(entries.patientId, input.patientId!),
-                    eq(patientsToAmbulatories.ambulatoryId, input.scopeAmbulatoryId!))).get()?.entry
-            : tx.select().from(entries)
-                .where(input.mode === 'v1'
-                    ? and(eq(entries.id, input.entryId), eq(entries.patientId, input.patientId!))
-                    : eq(entries.id, input.entryId)).get();
-        if (!existing) return { status: 404, value: { error: 'Not found' } };
-        if ((existing.type === 'scale' || input.values.type === 'scale')
-            && !activeScaleParentExists(tx, existing.patientId)) {
-            return { status: 409, value: { code: 'SCALE_PATIENT_INACTIVE',
-                error: 'Paziente archiviato o rimosso. Nessuna nuova registrazione.' } };
-        }
-        if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
-        if (existing.version !== input.expectedVersion) {
-            return { status: 409, value: buildVersionConflictPayload(
-                'entry', input.expectedVersion, input.entryId, existing) as unknown as Record<string, unknown> };
-        }
-        const changed = tx.update(entries).set({ ...input.values, version: input.expectedVersion + 1 })
-            .where(and(eq(entries.id, input.entryId), eq(entries.patientId, existing.patientId),
-                eq(entries.version, input.expectedVersion))).run();
-        if (changed.changes !== 1) throw new Error('Entry update did not write exactly one row');
-        writeAuditEventInTransaction(tx, {
-            eventType: input.values.deletedAt ? 'entry.deleted' : 'entry.updated', outcome: 'success',
-            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
-            subjectType: 'entry', subjectRef: input.entryId,
-            sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
-            redactedMetadata: { changedFields: input.changedFields,
-                resourceVersion: input.expectedVersion + 1, flags: input.audit.flags },
-        });
-        return { status: 200, value: { success: true } };
-    }, { behavior: 'immediate' });
+    return dbServer.transaction((tx) => updateEntryOperationInTransaction(tx, input), { behavior: 'immediate' });
+}
+
+export function updateEntryOperationInTransaction(tx: Tx, input: UpdateInput): Result {
+    const denial = input.authorizeCommit?.(tx);
+    if (denial) return denial;
+    const existing = input.mode === 'network'
+        ? tx.select({ entry: entries }).from(entries)
+            .innerJoin(patientsToAmbulatories, eq(entries.patientId, patientsToAmbulatories.patientId))
+            .where(and(eq(entries.id, input.entryId), eq(entries.patientId, input.patientId!),
+                eq(patientsToAmbulatories.ambulatoryId, input.scopeAmbulatoryId!))).get()?.entry
+        : tx.select().from(entries)
+            .where(input.mode === 'v1'
+                ? and(eq(entries.id, input.entryId), eq(entries.patientId, input.patientId!))
+                : eq(entries.id, input.entryId)).get();
+    if (!existing) return { status: 404, value: { error: 'Not found' } };
+    if ((existing.type === 'scale' || input.values.type === 'scale')
+        && !activeScaleParentExists(tx, existing.patientId)) {
+        return { status: 409, value: { code: 'SCALE_PATIENT_INACTIVE',
+            error: 'Paziente archiviato o rimosso. Nessuna nuova registrazione.' } };
+    }
+    if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
+    if (existing.version !== input.expectedVersion) {
+        return { status: 409, value: buildVersionConflictPayload(
+            'entry', input.expectedVersion, input.entryId, existing) as unknown as Record<string, unknown> };
+    }
+    const changed = tx.update(entries).set({ ...input.values, version: input.expectedVersion + 1 })
+        .where(and(eq(entries.id, input.entryId), eq(entries.patientId, existing.patientId),
+            eq(entries.version, input.expectedVersion))).run();
+    if (changed.changes !== 1) throw new Error('Entry update did not write exactly one row');
+    writeAuditEventInTransaction(tx, {
+        eventType: input.values.deletedAt ? 'entry.deleted' : 'entry.updated', outcome: 'success',
+        archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+        subjectType: 'entry', subjectRef: input.entryId,
+        sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+        redactedMetadata: { changedFields: input.changedFields,
+            resourceVersion: input.expectedVersion + 1, flags: input.audit.flags },
+    });
+    return { status: 200, value: { success: true } };
 }

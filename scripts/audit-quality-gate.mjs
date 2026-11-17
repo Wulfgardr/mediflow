@@ -742,7 +742,30 @@ export function serviceAuditContract(handler, mode, operation, resource) {
 }
 
 /* structural wiring and DML/audit order; SQLite tests establish behavior. */
+function normalizeSynchronousTransactionCore(coreSource, ownerName) {
+    const source = checkedSource('transaction-core.ts', coreSource);
+    const functions = source.sourceFile.statements.filter(ts.isFunctionDeclaration);
+    const cores = functions.filter(node => node.name?.text === `${ownerName}InTransaction`);
+    if (cores.length === 0) return coreSource;
+    const wrappers = functions.filter(node => node.name?.text === ownerName);
+    const core = cores[0], wrapper = wrappers[0];
+    const names = wrapper?.parameters.map(parameter => parameter.name.getText(source.sourceFile));
+    const prefix = ownerName === 'updatePatientOperation' ? 'assertPatientUpdateContract(input);' : '';
+    const expected = `{ ${prefix} return dbServer.transaction((tx) => ${ownerName}InTransaction(tx, ${names?.join(', ')}), { behavior: 'immediate' }); }`;
+    if (cores.length !== 1 || wrappers.length !== 1 || !core.body || !wrapper.body
+        || core.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+        || !core.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)
+        || !names?.every(name => /^[A-Za-z_][A-Za-z_0-9]*$/u.test(name))
+        || sourceTokens(wrapper.body.getText(source.sourceFile)) !== sourceTokens(expected)
+        || core.parameters.map(parameter => parameter.name.getText(source.sourceFile)).join(',') !== ['tx', ...names].join(',')
+        || bindingIsWritten(source.sourceFile, source.checker, source.checker.getSymbolAtLocation(core.name))) return coreSource;
+    return coreSource.slice(0, wrapper.body.getStart(source.sourceFile))
+        + `{ ${prefix} return dbServer.transaction((tx) => ${core.body.getText(source.sourceFile)}, { behavior: 'immediate' }); }`
+        + coreSource.slice(wrapper.body.end);
+}
+
 export function validateRequiredServiceAudit({ spec, routeSource, coreSource }) {
+    coreSource = normalizeSynchronousTransactionCore(coreSource, spec.ownerName);
     const problems = validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
     const core = checkedSource(spec.ownerFile, coreSource);
     const owner = namedFunction(core.sourceFile, spec.ownerName);
@@ -1178,6 +1201,7 @@ export function validateRequiredCheckupAudit(input) {
 }
 
 function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridgeSource = null }, resource) {
+    coreSource = normalizeSynchronousTransactionCore(coreSource, spec.ownerName);
     const problems = [];
     const core = checkedSource(spec.ownerFile, coreSource);
     const owner = namedFunction(core.sourceFile, spec.ownerName, true);
@@ -1657,6 +1681,7 @@ function validateReviewedNotesProfileAuditPort({ spec, routeSource, profileSourc
 
 /* bounded C04 patient-update contract; this source guard complements the real transaction tests. */
 export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSource, auditSource, profileSource = null, dispatchSource = null }) {
+    coreSource = normalizeSynchronousTransactionCore(coreSource, spec.ownerName);
     const problems = spec.reviewedNotesCommit
         ? validateReviewedNotesProfileAuditPort({ spec, routeSource, profileSource, dispatchSource })
         : spec.profileFile
