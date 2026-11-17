@@ -67,7 +67,7 @@ Riferimenti correlati:
 - [docs/native-testing.md](./native-testing.md)
 - [docs/native-setup.md](./native-setup.md)
 - [docs/local-api-tls.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/local-api-tls.md)
-- [docs/walkthrough.md](./walkthrough.md)
+- [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md)
 
 ---
 
