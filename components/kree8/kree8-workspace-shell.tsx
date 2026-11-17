@@ -154,6 +154,10 @@ export function Kree8WorkspaceShell({
           if (!target.isConnected) return;
           // A later keyboard/pointer choice wins over this deferred focus pass.
           const active = document.activeElement;
+          if (active instanceof HTMLElement && (
+            active.matches('input, textarea, select, [role="textbox"], [role="combobox"]')
+            || active.isContentEditable
+          )) return;
           if (active !== initiatingFocus && active !== document.body) return;
           // a routed record has already placed its heading as the
           // destination. Keep that one-time transfer while still revealing the
