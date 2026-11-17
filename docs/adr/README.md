@@ -14,6 +14,8 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- [0190-mandato-agenti-e-cassetta-della-visita.md](./0190-mandato-agenti-e-cassetta-della-visita.md): mandato fino a 12 ore, deposito cifrato e applicazione condizionata della visita. Il runtime resta subordinato alla composizione atomica dei writer.
+
 - [0183-autore-delle-voci-di-diario.md](./0183-autore-delle-voci-di-diario.md): autore assegnato dal server, schema 10 e contratto di lettura additivo.
 - [0184-prove-sul-comportamento-e-vincoli-sul-testo.md](./0184-prove-sul-comportamento-e-vincoli-sul-testo.md): prove sul comportamento e vincoli sul testo dei sorgenti ammessi solo per confini, contratti immutabili e verifica formale.
 - [0185-rotta-di-mediflow.md](./0185-rotta-di-mediflow.md): un centro (la cartella dei pazienti che il sistema non vede) e un laboratorio intelligente; giri di due settimane, quaderno delle idee in Linear, orizzonte senza numeri; 0.9.1 a contratto intero.
