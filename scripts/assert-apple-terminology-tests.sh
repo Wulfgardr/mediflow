@@ -1,19 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Asserisce che i quattro test Apple di parità terminologica risultino 'passed'
-# per NOME nell'output di `swift test`, invece di fidarsi del suo exit code.
-#
-# È l'unica parte del gate di parità che una run full-suite non fa: un verde
-# complessivo dice che nessun test è fallito, non che questi quattro siano
-# girati. Se uno viene rinominato o cancellato, `swift test` resta verde e solo
-# questa asserzione se ne accorge.
-#
-# Uso: assert-apple-terminology-tests.sh <file-con-l-output-di-swift-test>
-#
-# Estratto da check-terminology-parity.sh perché la CI ha già l'output di una
-# run completa (apple-native.yml) e rieseguire `swift test --filter` su un
-# runner macOS fatturato 10x sarebbe una duplicazione da due minuti.
 
 if [[ $# -ne 1 ]]; then
   printf 'uso: %s <file-con-l-output-di-swift-test>\n' "${0##*/}" >&2

@@ -113,8 +113,6 @@ export function buildOperationalCatalog(sources: Map<string, string>, descriptor
                     if (!guards.has(origin)) guards.set(origin, new Set());
                     guards.get(origin)!.add(name);
                 }
-                // Un nome da controllo conta come prova ma non chiude il percorso: la sua
-                // implementazione può essere proprio quella che raggiunge il servizio.
                 follow(ts.isPropertyAccessExpression(expression) ? expression.name : expression, true);
             }
             if (ts.isIdentifier(node) && !(ts.isVariableDeclaration(node.parent) && node.parent.name === node)) follow(node);

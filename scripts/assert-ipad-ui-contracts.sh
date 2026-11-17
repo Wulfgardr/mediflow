@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# xcodebuild prints a final `passed` line even when XCTest recorded XCTSkip.
-# Require that each iPad-only contract appears as passed and never as skipped.
 
 if [[ $# -ne 1 ]]; then
   printf 'uso: %s <file-con-l-output-di-xcodebuild-test>\n' "${0##*/}" >&2

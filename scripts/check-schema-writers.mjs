@@ -1,24 +1,5 @@
 #!/usr/bin/env node
 
-// Ogni tabella dichiarata in lib/schema.ts deve avere almeno un writer specifico:
-// un modulo non-infrastrutturale che esegue .insert/.update/.delete su quel simbolo.
-//
-// Una tabella senza writer è, salvo decisione contraria e documentata, un'affermazione
-// di architettura non verificata: lo schema dichiara una struttura dati che nessun
-// codice popola. Il caso che ha motivato questo gate è `document_diagnosis_proposals`,
-// presente nello schema e inclusa in backup/restore/cascade ma mai scritta — dove però
-// l'assenza del writer è **deliberata** e messa a verbale da ADR 0087.
-//
-// È esattamente la distinzione che il gate serve a rendere visibile: un'assenza decisa
-// e un'assenza dimenticata hanno lo stesso aspetto nello schema, e si distinguono solo
-// leggendo un ADR. L'allowlist è il posto dove la decisione diventa leggibile in CI.
-//
-// I moduli infrastrutturali che enumerano *tutte* le tabelle (backup, restore, cascade,
-// scheduler) non contano come writer: farebbero risultare popolata qualunque tabella.
-//
-// L'allowlist è stale-sensitive nelle due direzioni: un'eccezione non più necessaria
-// fa fallire il gate tanto quanto una tabella orfana non dichiarata. È il meccanismo
-// che costringe a rivedere l'eccezione nel momento in cui il writer viene integrato.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,8 +12,6 @@ const extensions = new Set(['.ts', '.tsx', '.mjs', '.js']);
 const skipped = ['.git', '.next', 'node_modules', 'coverage', 'dist', 'out']
   .map((item) => `${path.sep}${item}${path.sep}`);
 
-// Moduli che operano su ogni tabella per costruzione: non provano l'esistenza di un
-// percorso di scrittura reale per una tabella specifica.
 const infrastructure = new Set([
   'lib/backup-artifact.ts',
   'lib/backup-restore-executor.ts',
@@ -44,9 +23,6 @@ const infrastructure = new Set([
   'scripts/run-scheduled-backup.mjs',
 ]);
 
-// Tabelle senza writer, accettate consapevolmente. Ogni voce richiede un motivo e un
-// riferimento a una decisione scritta. Una voce che non serve più fa fallire il gate:
-// va rimossa.
 const allowlist = [
   {
     table: 'document_diagnosis_proposals',

@@ -103,7 +103,6 @@ async function waitForServer(server) {
     try {
       if ((await fetch(`${BASE_URL}/api/system/revision`, { cache: 'no-store' })).ok) return;
     } catch {
-      // Compilation is still in progress.
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -148,8 +147,6 @@ async function seed(page) {
       diagnoses: [{ code, description, system: 'ICD-10' }],
       notes: 'Caso dimostrativo sintetico. Monitoraggio territoriale programmato.', isAdi: index === 0,
     });
-    // SQLite persiste updatedAt con precisione al secondo: separare gli insert
-    // di oltre un secondo evita tie, mentre l'ordine inverso preserva la fixture.
     await new Promise((resolve) => setTimeout(resolve, 1_100));
     await write(page, 'POST', '/api/therapies', {
       id: `${id}-therapy`, patientId: id, drugName, activePrinciple: drugName,

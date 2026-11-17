@@ -73,7 +73,6 @@ test('canonical URI data exception is confined to the exact native codec fixture
         uri, `let uri = "${uri}"`), false);
 });
 
-/* pin each new exception to its exact source line and file. */
 const pairedWhoUrlSeams = [
   [
     "lib/reference-data/icd11-who-network-route.test.ts",

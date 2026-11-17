@@ -1,4 +1,3 @@
-/* route and owner mutations for all eight ordinary ambulatory writes. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';

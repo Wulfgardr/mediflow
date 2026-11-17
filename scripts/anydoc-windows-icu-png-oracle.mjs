@@ -1,4 +1,3 @@
-// Pure parent-side oracle for the single synthetic text probe; no renderer imports.
 import {inflateSync} from 'node:zlib';
 
 const demand=(condition,message)=>{if(!condition)throw Error(message);};
