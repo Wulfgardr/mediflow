@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.58.0
+  version: 1.59.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -556,6 +556,7 @@ paths:
         Updates a patient using optimistic concurrency. Clients MUST send the last
         observed `version`. The server atomically compares it and returns `409`
         with PHI-safe metadata when the record changed or disappeared.
+      x-mediflow-encrypted-write: Fields listed in lib/backup-encrypted-fields.json require a valid ENC envelope. Null clears an optional field. Deletion reasons must be supplied sealed.
       security:
         - bearerAuth: []
       parameters:
@@ -584,6 +585,8 @@ paths:
                   lastName: Rossi
                   phone: "+39 333 1234567"
       responses:
+        '422':
+          description: A field requiring encryption is not a valid ENC envelope. No data or success audit is written.
         '200':
           description: Patient updated.
           content:
@@ -615,6 +618,7 @@ paths:
         clinical rows stay preserved for an explicit, audited admin purge. The
         server returns `409` with PHI-safe metadata when the record changed or
         disappeared before the delete could commit.
+      x-mediflow-encrypted-write: Fields listed in lib/backup-encrypted-fields.json require a valid ENC envelope. Null clears an optional field. Deletion reasons must be supplied sealed.
       security:
         - bearerAuth: []
       parameters:
@@ -636,6 +640,8 @@ paths:
                   version: 7
                   deletionReason: ENC:opaque-deletion-reason
       responses:
+        '422':
+          description: A field requiring encryption is not a valid ENC envelope. No data or success audit is written.
         '200':
           description: Patient deleted.
           content:

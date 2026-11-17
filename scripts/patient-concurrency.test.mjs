@@ -45,7 +45,7 @@ class LaneClient {
     }
 
     async deletePatient(id, version) {
-        return this.request('DELETE', `/${id}`, { version });
+        return this.request('DELETE', `/${id}`, { version, deletionReason: 'ENC:c3ludGhldGlj:cmVhc29u' });
     }
 
     async request(method, suffix, body) {
@@ -270,7 +270,7 @@ async function runConflictScenario({ name, winnerLane, loserLane, loserOperation
 
         const winnerResult = await winner.updatePatient(patientId, {
             version: winnerSnapshot.version,
-            notes: `winner:${winner.label}:${name}`
+            notes: 'ENC:c3ludGhldGlj:d2lubmVy'
         });
         assert.equal(winnerResult.response.status, 200, `${winner.label} update should succeed`);
         assert.deepEqual(winnerResult.json, { success: true }, `${winner.label} update should return success payload`);
@@ -278,7 +278,7 @@ async function runConflictScenario({ name, winnerLane, loserLane, loserOperation
         const loserResult = loserOperation === 'update'
             ? await loser.updatePatient(patientId, {
                 version: loserSnapshot.version,
-                notes: `loser:${loser.label}:${name}`
+                notes: 'ENC:c3ludGhldGlj:bG9zZXI='
             })
             : await loser.deletePatient(patientId, loserSnapshot.version);
 

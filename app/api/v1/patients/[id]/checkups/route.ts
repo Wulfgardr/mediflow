@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { checkupCreateIdSchema } from '@/lib/api-schemas/clinical-writes';
 import { readCheckupJsonObject } from '@/lib/checkup-json-body';
@@ -89,6 +90,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const envelope = await readCheckupJsonObject(request);
         if (!envelope.ok) return envelope.response;
         const body = envelope.body;
+        const sealedError = rejectUnsealedV1Write('checkups', body);
+        if (sealedError) return sealedError;
         const auditBody = body;
         const parsedId = checkupCreateIdSchema.safeParse(body.id);
         if (!parsedId.success) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
@@ -102,6 +105,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
 
         // preserve local-token actor selection outside the synchronous transaction.
+        const persistedSealedError = rejectUnsealedV1Write('checkups', normalized.values);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = createCheckupOperation({
             patientId: id, checkupId: normalized.values.id, values: normalized.values, mode: 'v1',

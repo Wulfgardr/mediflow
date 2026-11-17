@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
@@ -92,11 +93,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const { id } = await params;
         const parsed = await readTherapyJsonObject(request, 'v1', 'create');
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const sealedError = rejectUnsealedV1Write('therapies', parsed.body);
+        if (sealedError) return sealedError;
         const shape = validateTherapyInput(parsed.body, 'v1', 'create');
         if (shape) return NextResponse.json({ error: shape.error }, { status: shape.status });
         const newId = therapyCreateId(parsed.body);
         const normalized = normalizeTherapyCreateInput(parsed.body, { id: newId, patientId: id });
         if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const persistedSealedError = rejectUnsealedV1Write('therapies', normalized.values);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromSession(auditSession);
         const result = createTherapyOperation({
             patientId: id, therapyId: newId, values: normalized.values,
