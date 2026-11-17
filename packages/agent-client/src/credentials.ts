@@ -20,7 +20,7 @@ function credential(value: unknown): value is AgentCredential {
         return origin.origin === item.origin && origin.protocol === 'http:' && ['127.0.0.1', '[::1]'].includes(origin.hostname);
     } catch { return false; }
 }
-function directoryFor(value: string): string {
+export function agentPrivateDirectory(value: string): string {
     const blocked = ['Documents', 'Desktop', 'Downloads', 'Library/Mobile Documents', 'Library/CloudStorage'].map(relative => path.join(os.homedir(), relative));
     if (blocked.some(root => inside(root, path.resolve(value)))) throw unavailable();
     let existing = path.resolve(value);
@@ -40,7 +40,7 @@ function privateFile(stat: fs.Stats): boolean {
 }
 export function saveAgentCredential(directory: string, value: AgentCredential): void {
     if (!credential(value)) throw unavailable();
-    const root = directoryFor(directory), destination = path.join(root, `${value.agentRef}.json`);
+    const root = agentPrivateDirectory(directory), destination = path.join(root, `${value.agentRef}.json`);
     try {
         const stat = fs.lstatSync(destination);
         if (stat.isSymbolicLink() || !privateFile(stat)) throw unavailable();
@@ -58,7 +58,7 @@ export function saveAgentCredential(directory: string, value: AgentCredential): 
 }
 export function readAgentCredential(directory: string, agentRef: string, now = Date.now()): AgentCredential | null {
     if (!/^[a-f0-9-]{36}$/u.test(agentRef)) throw unavailable();
-    const file = path.join(directoryFor(directory), `${agentRef}.json`);
+    const file = path.join(agentPrivateDirectory(directory), `${agentRef}.json`);
     let descriptor: number;
     try { descriptor = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW); }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw unavailable(); }
