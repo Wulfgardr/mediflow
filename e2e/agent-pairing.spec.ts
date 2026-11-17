@@ -1,0 +1,80 @@
+import { expect, test } from './fixtures/isolated-runtime';
+import { bootstrapUnlockedSession } from './utils';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { saveAgentCredential, readAgentCredential } from '../packages/agent-client/src/credentials';
+
+const pin = '24682468';
+const passphrase = 'mandato sintetico visita novembre';
+test.describe.configure({ retries: 0 });
+
+test('agent obtains its scoped credential only after the doctor compares and approves the pairing code', async ({ page, isolatedRuntime, playwright }, testInfo) => {
+    test.setTimeout(120000);
+    const agent = await playwright.request.newContext({ baseURL: isolatedRuntime.url });
+    try {
+    await bootstrapUnlockedSession(page, pin);
+    await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
+    await page.getByRole('link', { name: 'Accesso', exact: true }).click();
+    await page.getByLabel('PIN attuale', { exact: true }).first().fill(pin);
+    await page.getByLabel('Nuova passphrase', { exact: true }).fill(passphrase);
+    await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(passphrase);
+    await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
+    const kit = page.getByTestId('recovery-kit');
+    const download = page.waitForEvent('download');
+    await kit.getByRole('button', { name: 'Scarica kit di recupero' }).click(); await download;
+    await kit.getByRole('checkbox').check();
+    await kit.getByRole('button', { name: 'Attiva la nuova passphrase' }).click();
+    await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+    await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+    await page.getByLabel('Passphrase', { exact: true }).fill(passphrase);
+    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+    await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agenti', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: 'Agenti', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Nuovo mandato', exact: true })).toBeVisible();
+    await page.getByLabel('Proporre terapie', { exact: true }).uncheck();
+    await page.getByLabel('PIN di conferma', { exact: true }).fill(pin);
+    const creation = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
+    const created = await creation; expect(created.status()).toBe(201);
+    const mandateRef = created.request().postDataJSON().mandate.id;
+    await expect(page.getByRole('button', { name: 'Revoca', exact: true })).toBeVisible();
+    const request = await agent.post('/api/agent/v1/pairings', { data: { name: 'Synthetic Codex agent', operations: ['visita.apri', 'visita.nota'] } });
+    expect(request.status()).toBe(201);
+    const requested = await request.json();
+    expect((await agent.storageState()).cookies).toEqual([]);
+    expect(requested.receipt.code).toMatch(/^[A-F0-9]{8}$/u);
+    const pollPath = '/api/agent/v1/pairings?requestId=' + requested.receipt.id;
+    const polling = { Authorization: 'Pairing ' + requested.pairingCredential.claim };
+    const pending = await agent.get(pollPath, { headers: polling }); expect(pending.status()).toBe(202);
+    expect((await pending.json()).credential).toBeNull();
+    await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Synthetic Codex agent ' + requested.receipt.code, exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Approva ' + requested.receipt.code, exact: true }).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('codice-da-confrontare.png'), fullPage: true });
+    const approval = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates/pairings') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Approva ' + requested.receipt.code, exact: true }).click();
+    expect((await approval).status()).toBe(200);
+    const issued = await agent.get(pollPath, { headers: polling }); expect(issued.status()).toBe(200);
+    const result = await issued.json(), token = result.credential.token;
+    expect(result.receipt.mandateRef).toBe(mandateRef);
+    expect(JSON.stringify(result.receipt).includes(token)).toBe(false);
+    const directory = mkdtempSync(path.join(tmpdir(), 'mediflow-paired-e2e-'));
+    try {
+        saveAgentCredential(directory, { agentRef: result.receipt.agentRef, mandateRef, token, expiresAt: result.credential.expiresAt, origin: isolatedRuntime.url });
+        expect(readAgentCredential(directory, result.receipt.agentRef)?.token === token).toBe(true);
+        if (process.platform !== 'win32') expect(statSync(path.join(directory, result.receipt.agentRef + '.json')).mode & 0o777).toBe(0o600);
+        const bearer = { Authorization: 'Bearer ' + token };
+        const context = await agent.get('/api/agent/v1/context', { headers: bearer }); expect(context.status()).toBe(200);
+        const projection = await context.json(); expect(projection.operations).not.toContain('visita.proponi.terapia');
+        expect(projection.mandateRef).toBe(mandateRef);
+        expect(projection).not.toHaveProperty('wrappedPrivateKey'); expect(projection).not.toHaveProperty('actorRef');
+        expect(readFileSync(path.join(isolatedRuntime.dataDirectory, '..', 'server.log'), 'utf8').includes(token)).toBe(false);
+        const lock = page.waitForResponse(response => response.url().endsWith('/api/auth/lock') && response.request().method() === 'POST');
+        await page.getByRole('button', { name: 'Blocca', exact: true }).first().click(); await lock;
+        expect((await agent.get('/api/agent/v1/context', { headers: bearer })).status()).toBe(401);
+        expect((await agent.get(pollPath, { headers: polling })).status()).toBe(401);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+    } finally { await agent.dispose(); }
+});

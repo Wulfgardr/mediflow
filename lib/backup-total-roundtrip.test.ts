@@ -25,7 +25,7 @@ const MEMBERSHIP_TABLE = 'patients_to_ambulatories';
 // Their historical audit backfill does not qualify export/restore continuity (C15).
 const NON_BACKUP_TABLES = new Set(['settings', 'users', 'patient_duplicate_intents', 'patient_retired_ids']);
 /* Checkup enrollment is host-local authorization state and is not exported by the v1 clinical backup. */
-const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['agent_mandates', 'headless_checkup_active_role_attestations', 'archive_generation', 'archive_session_generations', 'portable_import_origins']);
+const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['agent_pairing_requests', 'agent_clients', 'agent_mandates', 'headless_checkup_active_role_attestations', 'archive_generation', 'archive_session_generations', 'portable_import_origins']);
 /* Command replay remains empty until append-only audit restore has a separate contract. */
 const BACKUP_TABLES = {
     auditEvents: 'audit_events',

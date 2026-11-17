@@ -37,7 +37,8 @@
     "chat-checkup-booking": "C-9b: paired native checkup booking preview/authorization/receipt boundary. Admission, CAS and receipt run as the commit guard of the shared createCheckupOperation IMMEDIATE transaction; the receipt is its required audit row. No independent SQLite connection, schema or clinical writer.",
     "native-patient-document": "ADR0042: named native document intake composition injects the existing Node handle into the common patient creation command and its readback. No driver, new connection, generic writer or agent source locator.",
     "web-patient-document": "ADR0042: local Web document intake composition injects the existing Node handle into the same patient creation command, intake and readback used by the native route, and reads the selected or default ambulatory as the existing create flow does. No driver, new connection or writer.",
-    "agent-mandate-host": "ADR0190: trusted Web mandate creation and manual-lock revocation. Existing SQL authority, no agent clinical commit or key disclosure."
+    "agent-mandate-host": "ADR0190: trusted Web mandate creation and manual-lock revocation. Existing SQL authority, no agent clinical commit or key disclosure.",
+    "agent-pairing-host": "ADR0190: loopback pairing transport and trusted Web approval use the existing admitted SQL handle. Opaque scoped credentials, no clinical cleartext or external SQLite access."
   },
   "semantics": {
     "edge": "Exact source path, resolved target, capability, import form, imported symbols and occurrence count. Value imports are conservatively treated as runtime dependencies; explicit type-only imports are not authority.",
@@ -1905,6 +1906,39 @@
       ],
       "count": 1,
       "classification": "agent-mandate-host"
+    },
+    {
+      "file": "app/api/agent/v1/pairings/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "agent-pairing-host"
+    },
+    {
+      "file": "app/api/agent/v1/context/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "agent-pairing-host"
+    },
+    {
+      "file": "app/api/agent-mandates/pairings/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "agent-pairing-host"
     }
   ],
   "opaqueLoaders": [
