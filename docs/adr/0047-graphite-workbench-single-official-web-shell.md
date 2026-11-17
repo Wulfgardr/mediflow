@@ -3,6 +3,8 @@
 Date: 2026-04-22  
 Status: Accepted
 
+Nota del 17/11/2026: la parte sull’ingresso `/` è superata da ADR 0060. La regola «nessun selettore» resta valida.
+
 > Aggiornamento 0.8.6: [ADR 0123](./0123-official-web-ui-navigation-compositions.md)
 > ammette due disposizioni della stessa UI ufficiale, con B predefinita e A
 > selezionabile. Non reintroduce shell estetiche concorrenti.

@@ -66,7 +66,7 @@ Riferimenti correlati:
 - [docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json)
 - [docs/native-testing.md](./native-testing.md)
 - [docs/native-setup.md](./native-setup.md)
-- [docs/local-api-tls.md](./local-api-tls.md)
+- [docs/local-api-tls.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/local-api-tls.md)
 - [docs/walkthrough.md](./walkthrough.md)
 
 ---

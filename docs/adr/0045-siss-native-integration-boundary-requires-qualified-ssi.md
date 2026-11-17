@@ -100,7 +100,7 @@ Negativo:
 ## First Thin Slice
 
 1. Formalizzare il boundary nel documento
-   [docs/siss-ssi-a2a-feasibility.md](../siss-ssi-a2a-feasibility.md).
+   [docs/siss-ssi-a2a-feasibility.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/siss-ssi-a2a-feasibility.md).
 2. Riallineare la baseline SISS e il piano attivo per evitare ambiguita.
 3. Usare il corpus documentale sincronizzato per scegliere una sola capability
    da perseguire davvero oltre l'handoff:

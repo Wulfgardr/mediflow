@@ -1,5 +1,7 @@
 # ADR 0172 — Sessione Web locale del client GPUI
 
+Stato: Accepted, deliberato da Leonardo il 17/11/2026
+
 Stato: Proposed. Review indipendente richiesta prima del merge.
 
 ## Contesto

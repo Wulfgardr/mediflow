@@ -97,7 +97,7 @@ nessun HTTP 200 o ritorno al gestionale prova da solo l'emissione.
 
 Percorso verso il nazionale: il prescrittivo regionale resta il confine del
 medico; il rapporto ricetta elettronica/NRE/MEF è descritto nella
-[ricognizione PRREG](../siss-modulo-prescrittivo-regionale.md).
+[ricognizione PRREG](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/siss-modulo-prescrittivo-regionale.md).
 Endpoint SAC, deleghe e accessi direttamente riusabili da MediFlow sono
 non documentati nel contratto selezionato. Non si deduce accesso nazionale
 dal possesso di un contesto SISS.
@@ -188,7 +188,7 @@ SIAP è candidato terzo servizio per pertinenza all'assistenza primaria,
 non una nuova priorità esecutiva approvata: mantenere valutazione/scheletro
 sintetico, nessun invio. SGDT/PREG/protesica restano successivi alle due
 priorità. Non si sceglie una veste istituzionale per accelerare la simulazione.
-La [bozza di lettera](aria-letter-draft.md) raccoglie le domande; i dubbi già
+La [bozza di lettera](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/territorial/aria-letter-draft.md) raccoglie le domande; i dubbi già
 chiusi su OAuth e nomi dell'ambiente non vengono riaperti.
 
 ## Registro delle fonti regionali citate

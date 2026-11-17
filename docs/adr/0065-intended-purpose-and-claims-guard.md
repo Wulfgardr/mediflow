@@ -10,7 +10,7 @@ ADR 0039 (private),
 [ADR 0045](./0045-siss-native-integration-boundary-requires-qualified-ssi.md),
 [ADR 0046](./0046-modulo-prescrittivo-regionale-first-slice-webapp-assisted.md),
 [ADR 0051](./0051-patient-import-decision-contract-between-review-and-persistence.md),
-[ADR 0057](./0057-local-evidence-absorption-layer.md)
+[ADR 0057](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0057-local-evidence-absorption-layer.md)
 
 ## Problema
 

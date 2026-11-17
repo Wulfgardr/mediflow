@@ -52,7 +52,7 @@ un profilo di avvio qualificato.
 | Ambito | Contenuto e confine dei sorgenti correnti | Stato di consegna e fonte |
 | --- | --- | --- |
 | Profili 0.9.0 | Sorgente, browser localhost e headless con Node 24: macOS ARM, Windows 11 ARM con Node x64 emulato, Omarchy/Arch ARM su Parallels. | Le prove tecniche sui profili conservano revisione e ambiente; i runner CI non sostituiscono le macchine dichiarate. L'accettazione delle prove delegate sostitutive in [C20](https://linear.app/wulfgardr/issue/WUL-735) è una decisione distinta e non attesta una prova personale. |
-| App e installer nativi | Percorso separato dalla release sorgente. Il builder Mac può usare il client Debug ARM64 della CI, con sorgenti della stessa revisione, senza Xcode completo. | Distribuzione prevista nella 0.9.6. L'artefatto CI è un componente, non un installer pubblico; firma e notarizzazione restano distinte. [Guida al confezionamento](./native-launch.md#compilazione-su-github), [PR #537](https://github.com/Wulfgardr/mediflow/pull/537). |
+| App e installer nativi | Percorso separato dalla release sorgente. Il builder Mac può usare il client Debug ARM64 della CI, con sorgenti della stessa revisione, senza Xcode completo. | Distribuzione prevista nella 0.9.6. L'artefatto CI è un componente, non un installer pubblico; firma e notarizzazione restano distinte. [Guida al confezionamento](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md#compilazione-su-github), [PR #537](https://github.com/Wulfgardr/mediflow/pull/537). |
 | Accesso e flussi Apple | Protocollo v3 integrato con [PR #539](https://github.com/Wulfgardr/mediflow/pull/539); il preflight corrente ammette account v3 solo negli archivi a utente unico. Integrati anche CSV, documenti multipli, allegati del diario e comandi di rientro. | L'accesso v3 resta subordinato alla qualifica nativa prevista dalla [policy](../SECURITY.md#chiavi-passphrase-e-recupero) e dall'[ADR 0143](./adr/0143-strong-unlock-credential.md#client-apple-v3--16-ottobre-2026-wul-777). La [matrice di parità](./parity-matrix.md#riconciliazione-corrente--wul-694-16-ottobre-2026) distingue prove Mac, simulatori e hardware fisico. La correzione dell'arresto del Diario iPad [#553](https://github.com/Wulfgardr/mediflow/pull/553) resta aperta, con prova UI pendente. |
 | Cartella ordinaria | Ricerca, revisione e scritture nominate, con conflitti, validazione e audit. AI facoltativa, provider esterni spenti per impostazione predefinita. | [Roster clinico](./clinical-write-roster.md); flussi integrati e usabilità finale in C20, non dedotti dalla compilazione. |
 | Protezione locale | Cifratura applicativa dei soli campi dichiarati; passphrase v3 e kit separato. Identificativi, metadati e alcune copie restano in chiaro. | [Matrice dati a riposo](./data-at-rest-matrix.md) e [policy](../SECURITY.md#chiavi-passphrase-e-recupero); volume cifrato e recupero completo restano verifiche distinte. |
@@ -64,7 +64,7 @@ un profilo di avvio qualificato.
 **Uso clinico quotidiano: ammissione separata dalla consegna sorgente 0.9.0.** Leonardo e il
 referente competente decidono l'ammissione dell'installazione e dei flussi
 concreti; una consegna sorgente o una prova sintetica non prende tale decisione.
-La [guida alle responsabilità](./privacy-and-ai-governance.md) prepara funzioni,
+La [guida alle responsabilità](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/privacy-and-ai-governance.md) prepara funzioni,
 scopi d'uso e ruoli; non attribuisce una classe regolatoria o una certificazione.
 
 ## Prove storiche
@@ -338,8 +338,8 @@ generale al client remoto.
 
 Documenti/ADR principali:
 
-- [ADR 0034](./adr/0034-local-only-default-and-network-home-base-opt-in.md)
-- [ADR 0038](./adr/0038-network-readonly-data-plane-auth-boundary.md)
+- [ADR 0034](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0034-local-only-default-and-network-home-base-opt-in.md)
+- [ADR 0038](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0038-network-readonly-data-plane-auth-boundary.md)
 - [ADR 0048](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md)
 - [docs/mobile-home-base-smoke.md](./mobile-home-base-smoke.md)
 
@@ -389,10 +389,10 @@ da Git.
 
 Documenti/ADR principali:
 
-- [docs/siss-baseline.md](./siss-baseline.md)
-- [docs/siss-ssi-a2a-feasibility.md](./siss-ssi-a2a-feasibility.md)
-- [docs/siss-modulo-prescrittivo-regionale.md](./siss-modulo-prescrittivo-regionale.md)
-- [docs/siss-fse-docs-corpus.md](./siss-fse-docs-corpus.md)
+- [docs/siss-baseline.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/siss-baseline.md)
+- [docs/siss-ssi-a2a-feasibility.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/siss-ssi-a2a-feasibility.md)
+- [docs/siss-modulo-prescrittivo-regionale.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/siss-modulo-prescrittivo-regionale.md)
+- [docs/siss-fse-docs-corpus.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/siss-fse-docs-corpus.md)
 - [ADR 0045](./adr/0045-siss-native-integration-boundary-requires-qualified-ssi.md)
 - [ADR 0046](./adr/0046-modulo-prescrittivo-regionale-first-slice-webapp-assisted.md)
 - [ADR 0049](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md)
@@ -630,7 +630,7 @@ assenza di prove live non autorizzano esecuzione o egress.
 La promozione richiede corpus sintetico o case pack governato, benchmark
 ripetibile, stop-rules, modalità shadow quando applicabile, rollback e
 fallback espliciti e aggiornamento di documentazione/ADR se cambia un limite
-architetturale. La [matrice di runtime](./ai-runtime-serving-matrix.md)
+architetturale. La [matrice di runtime](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/ai-runtime-serving-matrix.md)
 distingue `runtime`, `shadow`, `benchmark_only` e `hold`: installare un
 modello non significa averlo ammesso all’esecuzione.
 

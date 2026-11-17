@@ -13,7 +13,7 @@ Related:
 [ADR 0086](./0086-intelligent-scaffold-and-graded-automation-boundary.md),
 [ADR 0092](./0092-limite-digest-bound-readiness-ai-locale.md),
 Audit OpenMinis e
-[Matrice serving](../ai-runtime-serving-matrix.md).
+[Matrice serving](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/ai-runtime-serving-matrix.md).
 
 ## Problema
 
