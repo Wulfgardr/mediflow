@@ -1,3 +1,4 @@
+import { normalizeSynchronousTransactionCore } from '../scripts/audit-quality-gate.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -258,12 +259,23 @@ test('all patient PUT adapters wire one transactional set-primary operation with
     assert.match(operation, /import\s*\{\s*upsertPrimaryAmbulatoryMembership\s*\}\s*from\s*'\.\/patient-ambulatory-membership'/);
     assert.equal(operation.match(/\bupsertPrimaryAmbulatoryMembership\s*\(/g)?.length, 1);
     const assertTransactionWiring = (source: string) => {
-        const transaction = source.match(/return dbServer\.transaction\(\(tx\)[^{]*\{([\s\S]*?)\},\s*\{ behavior:\s*'immediate'\s*\}\);/)?.[1];
+        const normalized = normalizeSynchronousTransactionCore(source, 'updatePatientOperation');
+        const transaction = normalized.match(/return dbServer\.transaction\(\(tx\)[^{]*\{([\s\S]*?)\},\s*\{ behavior:\s*'immediate'\s*\}\);/)?.[1];
         assert.ok(transaction, 'membership and required audit must share the immediate transaction');
         assert.match(transaction, /if\s*\(input\.setPrimaryAmbulatory\)\s*\{\s*upsertPrimaryAmbulatoryMembership\(tx, input\.patientId, input\.values\.ambulatoryId\);\s*\}/);
         assert.match(transaction, /writeAuditEventInTransaction\(tx,/);
     };
     assertTransactionWiring(operation);
+    for (const [before, after] of [
+        ['updatePatientOperationInTransaction(tx, input),', 'updatePatientOperationInTransaction(dbServer, input),'],
+        ['updatePatientOperationInTransaction(tx, input),', 'updatePatientOperationInTransaction(tx, { ...input }),'],
+        ['return dbServer.transaction', 'dbServer.transaction'],
+        ['export function updatePatientOperationInTransaction', 'export async function updatePatientOperationInTransaction'],
+    ]) {
+        const changed = operation.replace(before!, after!);
+        assert.notEqual(changed, operation);
+        assert.throws(() => assertTransactionWiring(changed));
+    }
     for (const call of ['upsertPrimaryAmbulatoryMembership(tx,', 'writeAuditEventInTransaction(tx,']) {
         const changed = operation.replace(call, call.replace('(tx,', '(dbServer,'));
         assert.notEqual(changed, operation);

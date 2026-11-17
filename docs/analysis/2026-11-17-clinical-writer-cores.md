@@ -76,3 +76,14 @@ questa sola modifica.
 Non sono provati schema 12, mandato, abbinamento, ECIES, deposito,
 In arrivo, CLI/MCP, identità della cassetta, condivisione delle chiavi,
 percorso del medico o end-to-end delle dieci visite di ADR 0190.
+
+## Raccordo del controllo membership
+
+La CI del primo rebase ha rilevato un controllo statico ancora legato al
+corpo del wrapper di aggiornamento paziente. Il test membership ora usa
+lo stesso normalizzatore del gate audit: il nucleo viene seguito soltanto
+se il wrapper restituisce la transazione IMMEDIATE, inoltra gli stessi
+argomenti ed il nucleo è sincrono. Restano i controlli che membership ed
+audit usino il medesimo `tx`. Mutanti aggiuntivi fanno fallire il test se
+cambiano handle o input, manca il return o il nucleo diventa async.
+La suite mirata di membership, composizione e gate audit passa con 57 test.

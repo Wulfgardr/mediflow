@@ -742,7 +742,7 @@ export function serviceAuditContract(handler, mode, operation, resource) {
 }
 
 /* structural wiring and DML/audit order; SQLite tests establish behavior. */
-function normalizeSynchronousTransactionCore(coreSource, ownerName) {
+export function normalizeSynchronousTransactionCore(coreSource, ownerName) {
     const source = checkedSource('transaction-core.ts', coreSource);
     const functions = source.sourceFile.statements.filter(ts.isFunctionDeclaration);
     const cores = functions.filter(node => node.name?.text === `${ownerName}InTransaction`);
