@@ -67,6 +67,9 @@ receipt storiche dopo restore (ADR0168); non concede scrittura dalla chat.
 La [matrice dei dati a riposo](./data-at-rest-matrix.md) dice colonna per colonna e
 file per file che cosa si legge senza la chiave, e quali esposizioni restano da decidere in C06.
 
+Il [deposito della visita da un client agente](./agent-visit.md) descrive
+collegamento, CLI, ripresa e trasporto MCP secondo ADR 0190.
+
 La [selezione dei test](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/test-selection.md) descrive il controllo che impedisce
 a un file di test di restare fuori da ogni suite; non attesta l’esecuzione delle
 prove sulle piattaforme installate.
