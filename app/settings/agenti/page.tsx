@@ -28,7 +28,7 @@ export default function AgentSettingsPage() {
         setReadAt(Date.now());
     }
     return <main className="mx-auto max-w-3xl space-y-8 p-6">
-        <h1 className="text-2xl font-semibold">Agenti</h1>
+        <h1 className="type-page-title">Agenti</h1>
         <form className="space-y-4" onSubmit={event => { event.preventDefault(); void run(async () => {
             const keys = await generateMandateKeys();
             const response = await fetch('/api/agent-mandates', { method: 'POST', headers: { 'Content-Type': 'application/json' },

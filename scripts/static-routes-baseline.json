@@ -1,6 +1,6 @@
 {
-  "revision": "26ca8e66fb782ef9eb1966904fb7557359961c50",
-  "source": "Local production build of https://github.com/Wulfgardr/mediflow/tree/26ca8e66fb782ef9eb1966904fb7557359961c50",
+  "revision": "b289e6aac0bca5f142a42e8d6b6b5e29c7507dfa",
+  "source": "Production build of https://github.com/Wulfgardr/mediflow/tree/b289e6aac0bca5f142a42e8d6b6b5e29c7507dfa",
   "staticRoutes": [
     "/",
     "/_not-found",
@@ -17,6 +17,7 @@
     "/scales",
     "/settings",
     "/settings/accesso",
+    "/settings/agenti",
     "/settings/ai",
     "/settings/ai/chatgpt",
     "/settings/ai/fabric",
