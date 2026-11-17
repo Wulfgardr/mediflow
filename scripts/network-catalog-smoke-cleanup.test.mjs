@@ -12,15 +12,12 @@ test('catalog smoke waits for the server writer before removing its workspace', 
   const bin = join(root, 'bin');
   const scripts = join(root, 'scripts');
   const cli = join(root, 'node_modules/next/dist/bin');
-  // Satisfy the wrapper's dependency-directory preflight without installing or
-  // running packages: the synthetic Next CLI below owns the real child writer.
   const dependencyDirectories = ['typescript', '@types/react', '@types/node']
     .map(name => join(root, 'node_modules', name));
   for (const path of [bin, scripts, cli, data, ...dependencyDirectories]) mkdirSync(path, { recursive: true });
   const stopped = join(data, 'writer-stopped.json');
   const pidFile = join(data, 'controller.pid');
   t.after(async () => {
-    // Also reap the synthetic controller when the old npx launcher is under test.
     if (existsSync(pidFile) && !existsSync(stopped)) {
       try { process.kill(Number(readFileSync(pidFile, 'utf8')), 'SIGTERM'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
       for (let i = 0; i < 100 && !existsSync(stopped); i++) await delay(20);
@@ -29,8 +26,6 @@ test('catalog smoke waits for the server writer before removing its workspace', 
     rmSync(root, { recursive: true, force: true });
   });
   copyFileSync(new URL('./network-home-base-catalog-read-smoke.sh', import.meta.url), join(scripts, 'network-home-base-catalog-read-smoke.sh'));
-  // Only external preparation/HTTP/test commands are synthetic. Run the actual
-  // smoke script, including its real background launch, EXIT trap, wait and rm.
   writeFileSync(join(bin, 'node'), `#!/bin/bash\ncase "$1" in\n  */prepare-e2e-db.mjs|--test) exit 0 ;;\n  *) exec "$TEST_NODE" "$@" ;;\nesac\n`, { mode: 0o755 });
   writeFileSync(join(bin, 'curl'), '#!/bin/bash\ntest -f "$MEDIFLOW_DATA_DIR/writer-ready"\n', { mode: 0o755 });
   writeFileSync(join(bin, 'npx'), `#!/bin/bash\n"$TEST_NODE" "$TEST_ROOT/node_modules/next/dist/bin/next" "$@" &\nchild=$!\ntrap 'exit 0' TERM\nwait "$child"\n`, { mode: 0o755 });

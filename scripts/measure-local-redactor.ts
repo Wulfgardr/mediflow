@@ -13,7 +13,6 @@ const value = (name: string) => args[args.indexOf(name) + 1];
 for (const name of ['--python', '--model', '--fixture', '--out', '--permit']) {
     if (!args.includes(name) || !path.isAbsolute(value(name))) throw new Error(`absolute_path_required:${name}`);
 }
-// The owner issues this only after the shared machine is free to measure.
 if (!fs.existsSync(value('--permit'))) throw new Error('measurement_permit_missing');
 const fixtureBytes = fs.readFileSync(value('--fixture'));
 const fixture = JSON.parse(fixtureBytes.toString());
@@ -33,7 +32,6 @@ for (const mode of ['cold', 'warm']) {
         for (let run = 1; run <= 30; run++) {
             const current = runner ?? createGlinerRedactionRunner(configuration);
             try {
-                // One preliminary extraction for the warm distribution, never hidden.
                 for (const phase of mode === 'warm' && run === 1 ? ['warmup', 'measured'] : ['measured']) {
                     const started = performance.now();
                     let outcome = 'ok', error: string | null = null;

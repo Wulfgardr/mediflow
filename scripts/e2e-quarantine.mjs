@@ -32,8 +32,6 @@ export function loadQuarantine(path = manifestPath) {
   return entries;
 }
 
-// node:test wraps the actual failure in ERR_TEST_FAILURE. Keep every aggregate
-// member: a known browser abort must not swallow a separate cleanup/assertion error.
 export function errorMessages(error) {
   if (Array.isArray(error?.errors)) return error.errors.flatMap(errorMessages);
   if (error?.code === 'ERR_TEST_FAILURE' && error.cause) return errorMessages(error.cause);

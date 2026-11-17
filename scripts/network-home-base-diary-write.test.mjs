@@ -135,7 +135,6 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.deepEqual(visitDraft.json?.safety?.writesPerformed, []);
         assert.deepEqual(await listAuditEvents(sessionHeaders), auditBeforeVisitDraft);
 
-        // ADR0153: exercise compiled HTTP routes and the existing profile owner together.
         const scaleHeaders = { ...pairedHeaders(diaryWriter), ...sessionHeaders,
             'x-mediflow-expected-ambulatory-id': encodeURIComponent(ambulatoryId) };
         const noCatalogGrant = await request('GET', '/api/v1/network/scales', {
@@ -596,7 +595,6 @@ async function cleanupPatient(patientId) {
             if (!entry?.id || entry.deletedAt) continue;
             const deletion = await request('DELETE', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
                 headers: localApiHeaders(),
-                // WUL-308: child DELETEs require optimistic concurrency.
                 body: { version: entry.version, deletionReason: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2UtZGlhcnktd3JpdGUtY2xlYW51cA==' },
             });
             assert.equal(deletion.response.status, 200);

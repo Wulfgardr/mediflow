@@ -35,8 +35,6 @@ export function collectAppleInstallabilityBinding(root) {
   const filters = yaml.jobs?.changes?.steps?.filter(step => typeof step.run === 'string' && step.run.includes('done < changed.txt'));
   if (filters?.length !== 1) throw new Error('Apple change filter missing or duplicated');
   const run = filters[0].run;
-  // Match the first unconditional case before the existing event-specific branch.
-  // No shell execution or general shell parser is used for inventory discovery.
   const unconditional = run.split('if [ "$EVENT" != push ]; then')[0];
   const expected = 'scripts/installability-v0-macos.test.mjs | scripts/build-installability-v0-macos.sh | scripts/installability-v0-macos-launcher.sh) apple=true; continue ;;';
   const cases = [...unconditional.matchAll(/case "\$f" in([\s\S]*?)esac/gu)];
@@ -44,7 +42,6 @@ export function collectAppleInstallabilityBinding(root) {
   return binding;
 }
 export function collectCiDispositionSelections(root) {
-  // Small synthetic inventory fixtures do not contain the shared registry.
   if (!fs.existsSync(path.join(root, 'scripts/conditional-local-groups.json'))) return {};
   const out = {};
   for (const [group, script, workflow, job] of hooks) {

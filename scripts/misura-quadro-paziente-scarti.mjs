@@ -64,7 +64,6 @@ function proiezione(context) {
         recentClinicalEvents: Object.freeze(dopo('Evento clinico recente: ')) });
 }
 
-// --- Ollama finto per la prova a secco -------------------------------------------------
 const valida = JSON.stringify({ schemaVersion: 'mediflow.ai.extract.v1', task: 'patient_insight', summary: 'Condizione cronica sintetica in follow-up [S2]',
     data: { currentState: ['Follow-up clinico attuale della condizione sintetica [S1, S2]'], alerts: [], nextSteps: ['Rivalutare al prossimo controllo [S3]'], gaps: [] } });
 const troppoLunga = fixture.rejected.find((item) => item.cause === 'overlong').content;
@@ -98,7 +97,6 @@ function avviaFinto(porta, modello) {
     return new Promise((resolve) => server.listen(porta, '127.0.0.1', () => resolve(server)));
 }
 
-// --- Classificazione della singola risposta grezza (solo diagnostica) --------------------
 function classifica(moduli, contenuto, doneReason, fonti) {
     if (doneReason === 'length') return 'troncata';
     let json; try { json = JSON.parse(contenuto); } catch { return 'json_non_valido'; }
@@ -126,7 +124,6 @@ async function main() {
     const opzioni = argomenti(process.argv.slice(2));
     const importa = (relativo) => import(pathToFileURL(path.join(opzioni.repo, relativo)).href);
 
-    // Il loader in uso deve essere quello di --repo, altrimenti gli alias @/ mescolano due codici.
     const aliasDiProva = fileURLToPath(import.meta.resolve('@/lib/ai-providers/provider'));
     if (!aliasDiProva.startsWith(opzioni.repo + path.sep)) {
         throw new Error(`il loader risolve @/ in ${path.dirname(path.dirname(path.dirname(aliasDiProva)))}: lancia lo script con ${opzioni.repo}/scripts/run-strip-types.mjs`);
@@ -150,7 +147,6 @@ async function main() {
         importa('lib/ai-providers/generative-json-validation.ts'), importa('lib/ai-task-contracts.ts')]);
     const moduli = { validateGenerativeJson, parsePatientInsightExtractionResponse: contracts.parsePatientInsightExtractionResponse, isEnvelopeUsable: contracts.isEnvelopeUsable };
 
-    // Registra ogni /api/chat della richiesta in corso, senza cambiare cio' che il prodotto riceve.
     let tentativi = [];
     const fetchOriginale = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
@@ -182,7 +178,7 @@ async function main() {
     const projection = proiezione(fixture.context);
     const fonti = 1 + projection.activeConditions.length + projection.currentTherapies.length + projection.recentClinicalEvents.length;
 
-    let codice = null; try { codice = execFileSync('git', ['-C', opzioni.repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(); } catch { /* fuori da git */ }
+    let codice = null; try { codice = execFileSync('git', ['-C', opzioni.repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(); } catch {  }
     fs.mkdirSync(path.dirname(opzioni.out), { recursive: true });
     const scrittore = fs.createWriteStream(opzioni.out, { flags: 'w' });
     const righe = [];
