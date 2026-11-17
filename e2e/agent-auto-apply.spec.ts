@@ -101,8 +101,11 @@ for (const reviewed of [false, true]) test(reviewed ? 'the physician explicitly 
     await page.getByRole('button', { name: 'nota-visita.pdf', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'nota-visita.pdf', exact: true })).toBeVisible();
     await expect(page.getByTestId('document-preview-pdf-page')).toBeVisible();
+    await page.screenshot({ path: info.outputPath('originale-pdf-della-visita.png'), fullPage: true });
     await page.getByRole('dialog').getByRole('button', { name: 'Chiudi', exact: true }).click();
     await page.screenshot({ path: info.outputPath('nota-pdf-applicati-proposte-in-attesa.png'), fullPage: true });
+    await page.getByRole('heading', { name: 'Esenzione proposta', exact: true }).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath('diagnosi-esenzione-in-attesa.png'), fullPage: true });
     const incoming = await (await page.request.get('/api/agent-mandates/incoming')).json();
     expect(incoming.find((row: { id: string }) => row.id === visitId).appliedItemIds).toHaveLength(2);
     const replay = await cli('riprendi', '--agente', access.agentRef, '--visita', visitId);
