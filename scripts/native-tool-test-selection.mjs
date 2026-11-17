@@ -28,8 +28,6 @@ function yaml(root, file) {
   check(value); return value;
 }
 
-// Closed explicit-target contract, not a general TOML parser. Cargo consumes
-// these same path/name fields. The original command retains doctests as well.
 export function cargoTestCommand(root) {
   const source = read(root, cargoManifest);
   if (/"""|'''/u.test(source)) throw new Error('Unsupported multiline Cargo values');
@@ -74,8 +72,6 @@ const gpuiPaths = [`${gpuiDirectory}/**`, 'app/fonts/**', 'native/MediFlowMac/So
   'scripts/web-auth-control-test-client.mjs', 'scripts/chat-card-*.mjs', 'scripts/*chat-therapy*', 'scripts/fixtures/chat-card-owned-tree.mjs',
   'scripts/native-tool-test-selection.mjs', 'scripts/probe-patient-document-key-erasure.mjs', 'scripts/check-test-selection.test.mjs', gpuiWorkflow];
 const gpuiTriggers = { pull_request: { paths: gpuiPaths }, push: { branches: ['main'], paths: gpuiPaths }, workflow_dispatch: null };
-// Closed, single-line TOML tables for this pilot's explicit Cargo targets. A new
-// target/feature/overlay needs a modeled binding before it can select tests.
 function gpuiTables(root, file, allowed) {
   const tables = Object.create(null);
   let table;
@@ -109,7 +105,6 @@ export function cargoGpuiPilotTestCommand(root) {
   const client = gpuiTables(root, `${gpuiDirectory}/client/Cargo.toml`, ['[package]', '[lib]', '[dependencies]', '[dev-dependencies]', '[[test]]']);
   const transport = gpuiTables(root, `${gpuiDirectory}/transport/Cargo.toml`, ['[package]', '[lib]', '[[bin]]', '[dependencies]', "[target.'cfg(windows)'.dependencies]"]);
   const app = gpuiTables(root, `${gpuiDirectory}/app/Cargo.toml`, ['[package]', '[[bin]]', "[target.'cfg(windows)'.dependencies]", '[dependencies]', '[dev-dependencies]', "[target.'cfg(target_os = \"macos\")'.dependencies]", "[target.'cfg(target_os = \"macos\")'.dev-dependencies]"]);
-  // Local voice engine: whisper.cpp only on macOS; Windows and Linux never resolve it.
   exactFields(app["[target.'cfg(target_os = \"macos\")'.dependencies]"], {
     'whisper-rs': '{ version = "=0.16.0", default-features = false, features = ["metal"] }',
   }, 'macOS local voice engine');
@@ -126,8 +121,6 @@ export function cargoGpuiPilotTestCommand(root) {
   exactFields(state["[target.'cfg(windows)'.dependencies]"], {
     'windows-sys': '{ version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading", "Win32_Storage_FileSystem"] }',
   }, 'state Windows dependencies');
-  // Model the actual test-support feature and timezone fixture dependency;
-  // accepting this table must not silently accept an optional/disabled harness.
   exactFields(app['[dev-dependencies]'], {
     gpui: '{ workspace = true, features = ["test-support"] }', gpui_platform: '{ workspace = true, features = ["test-support"] }', 'chrono-tz': '"0.10"',
   }, 'app test-support dependencies');
@@ -144,7 +137,6 @@ export function cargoGpuiPilotTestCommand(root) {
   exactFields(transport['[[bin]]'], { name: '"mediflow-runtime-probe"', path: '"src/bin/mediflow-runtime-probe.rs"' }, 'transport probe target');
   exactFields(app['[[bin]]'], { name: '"mediflow-gpui-patient-pilot"', path: '"src/main.rs"' }, 'binary test target');
   const main = read(root, `${gpuiDirectory}/app/src/main.rs`).replace(/^(?:\s|\/\/[^\n]*(?:\n|$))*/u, '');
-  // These first items cannot be hidden inside a comment, string, cfg or function.
   if (!/^mod appointments;\s*#\[cfg\(unix\)\]\s*mod chat_access;\s*mod clinical_text;\s*mod clinical_units;\s*mod components;\s*mod demo;\s*mod demo_app;\s*mod documents;\s*mod editing;\s*mod icons;\s*#\[cfg\(unix\)\]\s*mod local_voice;\s*mod native_lock;\s*mod navigation;\s*mod patient_forms;\s*mod patient_text;\s*mod platform_integration;\s*mod references;\s*mod shell;\s*mod text_input;\s*mod theme;\s*mod title;/u.test(main)) throw new Error('Pilot binary module binding changed');
   const shell = read(root, `${gpuiDirectory}/app/src/shell.rs`).replace(/^(?:\s|\/\/[^\n]*(?:\n|$))*/u, '');
   if (!/^mod account_profile;\s*mod agenda_flow;\s*mod ai_preferences;\s*mod ai_status;\s*mod ambulatories;\s*mod ambulatory_commands;\s*mod analytics;\s*#\[cfg\(unix\)\]\s*mod chat_access;\s*mod clinical_forms;\s*mod document_curation;\s*mod document_details;\s*mod document_library;\s*mod document_synthesis;\s*mod dossier_import;\s*#\[cfg\(unix\)\]\s*mod evidence_queue;\s*mod generation;\s*mod local_host;\s*pub\(crate\) mod local_preferences;\s*mod local_settings;\s*#\[cfg\(unix\)\]\s*mod local_voice;\s*#\[cfg\(test\)\]\s*mod notes_recovery_tests;\s*mod open_loops;\s*#\[cfg\(unix\)\]\s*mod patient_document;\s*mod patient_insight;\s*#\[cfg\(test\)\]\s*pub\(crate\) mod rendered_command;\s*mod scales;\s*#\[cfg\(unix\)\]\s*mod service_matching;\s*mod settings;\s*mod smart_import;\s*mod therapy_picker;\s*mod threshold_actions;\s*mod view_state;\s*#\[cfg\(target_os = "macos"\)\]\s*mod voice_model;\s*mod who_lookup;/u.test(shell)) throw new Error('Pilot shell module binding changed');
@@ -234,8 +226,6 @@ export function collectGpuiComparisonSelection(root) {
   const governance = collectLiteralCiBinding(root, { ...suite, ciCall: `node --import ./scripts/register-strip-types-loader.mjs ${gpuiDirectory}/comparison/governance.mjs --check` });
   if (governance.jobIf !== null || governance.stepIf !== null) throw new Error('Governance fixture CI binding changed');
   const source = read(root, `${gpuiDirectory}/comparison/run.mjs`);
-  // These exact children are executed/imported by the versioned orchestrator.
-  // An additional test file still fails the repository's discovery inventory.
   const files = ['prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs', 'governance.mjs', 'audit.mjs'].map(file => `${gpuiDirectory}/comparison/${file}`);
   for (const file of files) read(root, file);
   for (const required of [

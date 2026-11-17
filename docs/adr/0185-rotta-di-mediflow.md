@@ -1,7 +1,7 @@
 # ADR 0185: Rotta di MediFlow, un centro e un laboratorio
 
 Data: 2026-11-08. Stato: **Accepted** (decisioni di Leonardo dell'8 novembre 2026).
-Supera la sequenza di release 0.9.2-1.0 della [roadmap del 21 settembre](../ROADMAP.md) come
+Supera la sequenza di release 0.9.2-1.0 della [roadmap del 21 settembre](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ROADMAP.md) come
 piano di consegna. Non tocca il contratto `/api/v1` né il
 [contratto 0.9.1](../releases/0.9.1-contract.md), che resta intero.
 Integra [ADR 0180](./0180-athena-fuori-dal-nucleo-modelli-per-dominio.md) e

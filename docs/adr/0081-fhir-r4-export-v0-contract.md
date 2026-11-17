@@ -227,7 +227,7 @@ Il workflow `FHIR R4 Web Gate` esegue `npm run check:fhir-r4 -- --falsify`
 su 18 Bundle sintetici serializzati dal mapper Web corrente, più tre
 mutazioni semantiche nella stessa JVM. Non è il golden condiviso v2 e non
 attesta parità Apple. Implementazione, preflight, baseline, report e limiti
-sono descritti nel [README del runner](../../scripts/README-fhir-r4.md).
+sono descritti nel [README del runner](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/scripts/README-fhir-r4.md).
 
 La prima esecuzione sul mapper di `034aad5b9` rilevava un errore preesistente:
 la scala frazionaria produceva `valueInteger: 1.5`; il gate partiva con

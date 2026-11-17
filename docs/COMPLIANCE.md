@@ -6,7 +6,7 @@ Riferimenti correlati:
 
 - [SECURITY.md](../SECURITY.md) (sicurezza e oscuramento dei dati identificativi)
 - [ARCHITECTURE.md](../ARCHITECTURE.md) (confini architetturali stabili)
-- [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) (roadmap terminologie/FSE)
+- [docs/FSE2-terminology-roadmap.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/FSE2-terminology-roadmap.md) (roadmap terminologie/FSE)
 - [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md) (mappa documentale)
 
 ---
@@ -122,7 +122,7 @@ sistemi riconosciuti restano quelli legacy, compreso `icd-9`: l'URI
 Questa slice WUL-457 non modifica il mapper Swift, che conserva ancora il
 fallback ICD-11, né dimostra parità per sistemi sconosciuti. DTO v2, warning
 con identificatori canonici, golden condiviso e parità Apple
-restano aperti. Il [gate ufficiale offline Web](../scripts/README-fhir-r4.md)
+restano aperti. Il [gate ufficiale offline Web](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/scripts/README-fhir-r4.md)
 esegue il validatore fissato su 18 Bundle sintetici del mapper reale.
 Il mapper Web blocca i punteggi scala vuoti, non numerici, non finiti,
 frazionari o fuori dall'intervallo signed 32-bit prima di rilasciare il Bundle.

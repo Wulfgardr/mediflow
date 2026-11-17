@@ -9,11 +9,11 @@ altre.
 
 Questo documento conserva i **confini stabili ad alto livello** e deve cambiare
 raramente. I dettagli e le prove appartengono ai riferimenti pertinenti:
-[walkthrough](./docs/walkthrough.md) per i flussi web e nativi,
+[walkthrough](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md) per i flussi web e nativi,
 [stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) per implementazione e verifiche,
-[topologia dei dati](./docs/topologia-dati-flussi.md) per il percorso delle
-informazioni. Gli approfondimenti sono in [docs/ARCHITETTURA.md](./docs/ARCHITETTURA.md)
-e [docs/system_architecture.md](./docs/system_architecture.md); le decisioni
+[topologia dei dati](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md) per il percorso delle
+informazioni. Gli approfondimenti sono in [docs/ARCHITETTURA.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ARCHITETTURA.md)
+e [docs/system_architecture.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/system_architecture.md); le decisioni
 negli [ADR](./docs/adr/README.md), la mappa in [docs/README.md](./docs/README.md)
 e l’inventario in [docs/markdown-index.md](./docs/markdown-index.md).
 
@@ -400,8 +400,8 @@ separate, non si deducono da questo contratto.
 Per ogni modifica non banale, scrivi un ADR in `docs/adr/`, breve e concreto:
 problema, opzioni, compromessi, decisione e primo intervento circoscritto.
 Aggiorna [ARCHITECTURE.md](./ARCHITECTURE.md) solo quando cambino la visione
-stabile o i confini; il [walkthrough](./docs/walkthrough.md) quando cambi il
-flusso reale end-to-end; la [topologia dei dati](./docs/topologia-dati-flussi.md)
+stabile o i confini; il [walkthrough](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md) quando cambi il
+flusso reale end-to-end; la [topologia dei dati](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md)
 quando cambino percorsi, confini di fiducia o superfici API.
 
 Se cambia chi governa un tema o dove trovarne il contratto, riallinea

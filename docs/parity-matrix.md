@@ -276,7 +276,7 @@ Due tool chiamati da Codex reale con argomenti `{}` hanno restituito i due
 esempi fissi inventati previsti. Il plugin non legge cartelle cliniche e non
 modifica l'archivio. Questa prova non attesta riconoscimento automatico,
 interfaccia nativa dell'host o funzionamento in ChatGPT classico. Vedi la
-[prova del prototipo](../plugins/mediflow-synthetic/README.md#prova-opzionale-dellagente-codex-reale).
+[prova del prototipo](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/plugins/mediflow-synthetic/README.md#prova-opzionale-dellagente-codex-reale).
 
 ### Headless, MCP e Mini correnti
 

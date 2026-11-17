@@ -86,7 +86,6 @@ test('one reservation covers awaited service and rejects concurrent request befo
     const first = h.route.POST(request().req, ctx);
     await entered.promise;
     const second = request();
-    // Allow baseline to settle without hanging when it lacks admission control.
     const competing = h.route.POST(second.req, ctx);
     await tick();
     finish.resolve();
@@ -266,7 +265,6 @@ test('attachment wrapper rejects malformed and non-object JSON before consuming 
     assert.equal((await h.helper.withNetworkAttachmentJson(request().req, consume)).status, 200);
     assert.equal(calls, 1);
 
-    // Actual POST wiring, with only admission and downstream service isolated.
     const response = await h.route.POST(request({ text: 'null' }).req, ctx);
     assert.equal(response.status, 400);
     assert.deepEqual(h.events.filter(event => event === 'auth' || event === 'service'), ['auth']);

@@ -25,11 +25,9 @@ export function attribution(primary) {
       if (!cache.has(cwd)) {
         let ok = false;
         try {
-          // The nearest repository owns the directory: a foreign checkout nested
-          // inside a MediFlow worktree is judged by its own identity.
           const top = fs.realpathSync(git(fs.realpathSync(cwd), ['rev-parse', '--show-toplevel']));
           ok = roots.some(root => fs.existsSync(root) && fs.realpathSync(root) === top) || repositoryMatches(git(top, ['remote', 'get-url', 'origin']));
-        } catch { /* A directory without Git provenance is excluded. */ }
+        } catch {  }
         cache.set(cwd, ok);
       }
       return cache.get(cwd);
@@ -49,8 +47,6 @@ const day = timestamp => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Ro
 const count = n => Number.isSafeInteger(n) && n >= 0 ? n : 0;
 export async function collectRecords(roots, accepts) {
   const records = new Map();
-  // Codex counters are cumulative per session. Observations from every file of
-  // a session are reconciled first, so partial copies cannot add a delta twice.
   const sessions = new Map();
   let malformed = 0;
   for (const [environment, directories] of Object.entries(roots)) for (const directory of directories) for await (const file of files(directory)) {

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// Lume motion budget guard. Dependency-free and fail-closed.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -10,8 +9,6 @@ const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const SOURCE_DIRS = ['app', 'components'];
 const SOURCE_EXTENSIONS = new Set(['.css', '.tsx']);
 
-// An exception is deliberately narrower than a file: exact path, rule and
-// declaration are all required. Add one only for a transient operation spinner.
 export const ALLOWLIST = [
   {
     path: 'components/kree8/kree8-lock-screen.module.css',
@@ -231,7 +228,6 @@ function resolveBaseRef(rootDir) {
         return before;
       }
     } catch {
-      // Gli eventi pull_request non hanno `before`; prosegue la risoluzione del branch base.
     }
   }
 
@@ -246,7 +242,6 @@ function resolveBaseRef(rootDir) {
       { cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
     ).trim());
   } catch {
-    // Il remote locale puo non dichiarare il branch predefinito.
   }
   candidates.push('origin/main', 'main', 'origin/master', 'master');
 
@@ -264,7 +259,6 @@ function resolveBaseRef(rootDir) {
       }).trim();
       if (mergeBase && mergeBase !== head) return mergeBase;
     } catch {
-      // Prova il prossimo branch base noto.
     }
   }
 

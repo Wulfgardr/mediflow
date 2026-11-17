@@ -37,7 +37,6 @@ prepare_workspace() {
     fi
   done
 
-  # reuse the clean install pinned by the checkout; Next must not install into this copy.
   if [[ ! -d "$ROOT_DIR/node_modules/next" || ! -d "$ROOT_DIR/node_modules/typescript" || ! -d "$ROOT_DIR/node_modules/@types/react" || ! -d "$ROOT_DIR/node_modules/@types/node" ]]; then
     echo "Install the checkout dependencies with npm ci before the network smoke." >&2
     exit 1
@@ -82,8 +81,6 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Starting Next.js dev server for network home-base catalog smoke..."
-# Own the Next CLI itself: it forwards SIGTERM and waits for its server child.
-# Waiting for an npx wrapper can leave that child writing during workspace removal.
 node "$ROOT_DIR/node_modules/next/dist/bin/next" dev "$WORKSPACE_DIR" --webpack --hostname "$HOST" --port "$PORT" >"$DEV_LOG" 2>&1 &
 DEV_PID=$!
 

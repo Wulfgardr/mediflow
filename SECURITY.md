@@ -16,10 +16,10 @@ requisiti minimi debba rispettare chi contribuisce.
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) (confini architetturali stabili)
 - [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (stato del sistema e limiti operativi, con le rispettive date)
-- [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) (percorsi dei dati e confini di fiducia)
-- [docs/walkthrough.md](./docs/walkthrough.md) (flussi operativi end-to-end)
+- [docs/topologia-dati-flussi.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md) (percorsi dei dati e confini di fiducia)
+- [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md) (flussi operativi end-to-end)
 - [docs/adr/](./docs/adr/README.md) (decisioni con impatto sicurezza)
-- [docs/security-audits/](./docs/security-audits/README.md) (rapporti pubblici sanitizzati, legati a revisioni esatte; non sostituiscono questa policy)
+- [docs/security-audits/](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/security-audits/README.md) (rapporti pubblici sanitizzati, legati a revisioni esatte; non sostituiscono questa policy)
 - [docs/README.md](./docs/README.md) e [docs/markdown-index.md](./docs/markdown-index.md) (mappa e indice completo documentazione)
 
 ---
@@ -158,7 +158,7 @@ Regole minime:
 
 La UI web usa HTTP su localhost. Il client nativo usa invece il proxy HTTPS
 locale (`:3443`) e verifica il certificato atteso mediante certificate pinning
-(vedi [docs/local-api-tls.md](./docs/local-api-tls.md)).
+(vedi [docs/local-api-tls.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/local-api-tls.md)).
 
 <a id="modalita-network-home-base"></a>
 
@@ -536,7 +536,7 @@ La segnalazione deve sempre indicare versione o commit interessato, scenario
 d’attacco e differenza tra comportamento atteso e osservato.
 
 I rapporti pubblici sanitizzati già coordinati sono elencati in
-[docs/security-audits/](./docs/security-audits/README.md). L’archivio non deve
+[docs/security-audits/](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/security-audits/README.md). L’archivio non deve
 contenere materiale di riproduzione sensibile né anticipare la pubblicazione di
 una correzione non ancora distribuita.
 

@@ -18,7 +18,7 @@ Issue: [GitHub #280](https://github.com/Wulfgardr/mediflow/issues/280)
 Program line: candidata `0.8.5`
 
 Related: [ADR 0065](./0065-intended-purpose-and-claims-guard.md),
-[ADR 0072](./0072-voice-visit-capture-fluid-boundary.md),
+[ADR 0072](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0072-voice-visit-capture-fluid-boundary.md),
 [ADR 0110](./0110-riapertura-governata-programma-intelligente-085.md),
 [ARCHITECTURE.md](../../ARCHITECTURE.md) e
 [SECURITY.md](../../SECURITY.md).

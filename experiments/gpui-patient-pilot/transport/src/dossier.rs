@@ -448,7 +448,8 @@ pub fn prepared_facts(input: &Value) -> Value {
     }
     let mut facts = array(&input["parserFacts"]).to_vec();
     let mut ids = BTreeSet::new();
-    let mut uncoded = 0;
+    let mut uncoded = Vec::new();
+    let mut uncoded_names = BTreeSet::new();
     for item in array(&source["facts"]) {
         let kind = string(&item["kind"]);
         let mut raw = item["values"].clone();
@@ -506,9 +507,18 @@ pub fn prepared_facts(input: &Value) -> Value {
                 set_default(&mut v, "observedAt", day);
                 v.as_object_mut().unwrap().remove("code");
                 v.as_object_mut().unwrap().remove("unitCode");
-                let coded = catalog(string(&v["display"]), string(&v["unit"]));
+                let display = string(&item["values"]["display"]);
+                let coded = catalog(display, string(&v["unit"]));
                 if coded.is_null() {
-                    uncoded += 1;
+                    let name = display.trim_matches(crate::js_whitespace);
+                    let name = if name.is_empty() {
+                        "Esame senza nome"
+                    } else {
+                        name
+                    };
+                    if uncoded_names.insert(name) {
+                        uncoded.push(name);
+                    }
                     continue;
                 }
                 v["code"] = coded["code"].clone();
@@ -680,14 +690,10 @@ pub fn prepared_facts(input: &Value) -> Value {
         }
         facts.push(json!({"factId":id,"kind":kind,"origin":"prepared","evidence":evidence,"negated":negated,"values":v,"decision":"pending"}));
     }
-    if uncoded > 0 {
+    if !uncoded.is_empty() {
         notes.push(json!(format!(
-            "{uncoded} {} nella sintesi e nel testo conservato.",
-            if uncoded == 1 {
-                "valore di laboratorio senza codice LOINC verificato resta"
-            } else {
-                "valori di laboratorio senza codice LOINC verificato restano"
-            }
+            "Esami senza codice LOINC: {}.",
+            uncoded.join(", ")
         )));
     }
     if source["summary"].is_object() {
@@ -1364,6 +1370,26 @@ pub fn verify_call(call: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn prepared_facts_list_uncoded_exams_in_source_order() {
+        let result = prepared_facts(&json!({
+            "source": {
+                "sha256": "a".repeat(64),
+                "facts": [
+                    {"kind": "observation", "values": {"display": "Marcatore Beta", "value": "2"}},
+                    {"kind": "observation", "values": {"display": "Marcatore Alfa", "value": "1"}},
+                    {"kind": "observation", "values": {"display": "\u{feff}Marcatore Beta ", "value": "3"}},
+                    {"kind": "observation", "values": {"display": " \u{feff}", "value": "4"}}
+                ],
+                "summary": {"title": "Referto sintetico", "text": "Risultati di laboratorio"}
+            },
+            "now": "2026-10-20T12:00:00Z"
+        }));
+        let note = "Esami senza codice LOINC: Marcatore Beta, Marcatore Alfa, Esame senza nome.";
+        assert_eq!(result["notes"], json!([note]));
+        assert_eq!(result["facts"][0]["values"]["preparedNotes"], note);
+    }
+
     #[test]
     fn physician_code_is_never_a_patient_candidate() {
         let patients = vec![

@@ -3,7 +3,7 @@
 Date: 2026-07-12
 Status: Accepted
 
-Related: [ADR 0057](./0057-local-evidence-absorption-layer.md), [ADR 0062](./0062-service-prescriptions-domain.md), [ADR 0064](./0064-service-prescription-itemization-and-catalog-matching.md), [ADR 0056](./0056-network-observation-write-boundary.md)
+Related: [ADR 0057](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0057-local-evidence-absorption-layer.md), [ADR 0062](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0062-service-prescriptions-domain.md), [ADR 0064](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0064-service-prescription-itemization-and-catalog-matching.md), [ADR 0056](./0056-network-observation-write-boundary.md)
 
 ## Stato di implementazione
 

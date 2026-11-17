@@ -34,8 +34,8 @@ senza modificare automaticamente la cartella. Si usano solo modelli ammessi
 dal sistema locale. I servizi esterni sono spenti per impostazione predefinita
 e richiedono configurazione, consenso e controlli sui dati da inviare.
 
-La [matrice AI](./ai-runtime-serving-matrix.md) riporta funzioni, prove e
-limiti; [privacy e governance AI](./privacy-and-ai-governance.md) descrivono
+La [matrice AI](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/ai-runtime-serving-matrix.md) riporta funzioni, prove e
+limiti; [privacy e governance AI](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/privacy-and-ai-governance.md) descrivono
 le responsabilità d'uso.
 
 ## Per chi sviluppa
@@ -48,5 +48,5 @@ Per contribuire, consulta [architettura](../ARCHITECTURE.md),
 [sicurezza](../SECURITY.md), [guida ai contributi](../CONTRIBUTING.md) e
 contratto del componente. La [mappa della documentazione](./README.md)
 indica il riferimento per ogni tema; le topologie dei
-[dati](./topologia-dati-flussi.md) e della [repository](./repository-topology.md)
+[dati](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md) e della [repository](./repository-topology.md)
 descrivono flussi e organizzazione del codice.

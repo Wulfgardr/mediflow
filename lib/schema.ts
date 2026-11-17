@@ -39,6 +39,40 @@ export const users = sqliteTable('users', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
+export const agentCassettes = sqliteTable('agent_cassettes', {
+    id: text('id').primaryKey().notNull(), mandateRef: text('mandate_ref').notNull(), agentRef: text('agent_ref').notNull(), actorRef: text('actor_ref').notNull(),
+    archiveGeneration: text('archive_generation').notNull(), publicKey: text('public_key').notNull(), wrappedPrivateKey: text('wrapped_private_key').notNull(),
+    modelProvider: text('model_provider').notNull(), allowsClinicalEgress: integer('allows_clinical_egress').notNull(),
+    anchorCiphertext: text('anchor_ciphertext').notNull(), itemsCiphertext: text('items_ciphertext').notNull().default('[]'), status: text('status').notNull(),
+    revision: integer('revision').notNull(), depositedAt: integer('deposited_at').notNull(), modifiedAt: integer('modified_at').notNull(),
+});
+
+export const agentMandates = sqliteTable('agent_mandates', {
+    id: text('id').primaryKey().notNull(),
+    actorRef: text('actor_ref').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    archiveGeneration: text('archive_generation').notNull(),
+    operations: text('operations').notNull(),
+    provider: text('provider').notNull(),
+    allowsClinicalEgress: integer('allows_clinical_egress').notNull(),
+    publicKey: text('public_key').notNull(),
+    wrappedPrivateKey: text('wrapped_private_key').notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    revokedAt: integer('revoked_at'),
+});
+
+export const agentPairingRequests = sqliteTable('agent_pairing_requests', {
+    id: text('id').primaryKey().notNull(), code: text('code').notNull().unique(), name: text('name').notNull(), operations: text('operations').notNull(),
+    claimHash: text('claim_hash').notNull(), createdAt: integer('created_at').notNull(), expiresAt: integer('expires_at').notNull(),
+    status: text('status').notNull(), mandateRef: text('mandate_ref').references(() => agentMandates.id, { onDelete: 'cascade' }),
+});
+export const agentClients = sqliteTable('agent_clients', {
+    id: text('id').primaryKey().notNull().references(() => agentPairingRequests.id, { onDelete: 'cascade' }),
+    mandateRef: text('mandate_ref').notNull().references(() => agentMandates.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(), operations: text('operations').notNull(), tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: integer('expires_at').notNull(), revokedAt: integer('revoked_at'),
+});
+
 export const physicianReviewAttestations = sqliteTable('physician_review_attestations', {
     actorRef: text('actor_ref').primaryKey().references(() => users.id).notNull(),
     schemaVersion: text('schema_version').notNull(),

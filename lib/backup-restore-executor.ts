@@ -11,6 +11,7 @@ import { dbServer, openDbServer, runDbServerImmediateTransaction } from './db-se
 import { ArchiveReplacedError, rotateSqliteArchiveGeneration } from './archive-generation';
 import { clearAllSessions } from './security/server-session';
 import {
+    agentCassettes,
     ambulatories,
     auditEvents,
     therapyStatusCommands,
@@ -49,6 +50,7 @@ import { DATE_FIELDS } from '../scripts/scheduled-backup-date-fields.mjs';
 export { DATE_FIELDS };
 
 const CLEAR_ORDER: BackupCollectionName[] = [
+    'agentCassettes',
     'messages',
     'attachments',
     'documentDiagnosisProposals',
@@ -75,6 +77,7 @@ const CLEAR_ORDER: BackupCollectionName[] = [
 ];
 
 const INSERT_ORDER: BackupCollectionName[] = [
+    'agentCassettes',
     'ambulatories',
     'drugs',
     'exemptions',
@@ -104,6 +107,7 @@ const TABLE_LOOKUP = {
     auditEvents,
     therapyStatusCommands,
     ambulatoryDestructiveCommands,
+    agentCassettes,
     ambulatories,
     attachments,
     checkups,

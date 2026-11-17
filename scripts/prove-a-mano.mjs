@@ -67,7 +67,7 @@ export function catalog(output) {
     { id: 'visuale-091', command: [node, 'scripts/qualify-visual-091.mjs'], unavailable: () => !existsSync('node_modules/next/dist/bin/next') ? 'mancano dipendenze Next' : undefined },
     { id: 'identita-ui', command: [node, 'scripts/ui-identita/prova.mjs'], unavailable: () => !existsSync('node_modules/next/dist/bin/next') ? 'mancano dipendenze Next' : !process.version.startsWith('v24.') ? 'richiede Node 24' : undefined },
     { id: 'ascolto-visita-modello', command: [node, 'scripts/prove-ascolto-visita.mjs', ...voiceModel()], unavailable: listeningUnavailable },
-    { id: 'ascolto-visita-microfono', unavailable: () => 'WUL-828: microfono vero e voce di Leonardo, da provare a mano nella seconda seduta (elenco in docs/quality/prove-a-mano.md)' },
+    { id: 'ascolto-visita-microfono', unavailable: () => 'WUL-828: microfono vero e voce di Leonardo, da provare a mano nella seconda seduta (contratto in docs/releases/0.9.1-contract.md)' },
   ];
 }
 export function writeReport(output, results) {

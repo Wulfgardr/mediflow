@@ -23,6 +23,7 @@ const PATIENT_AMBULATORY_TABLE = 'patients_to_ambulatories';
 
 /* @Codex */
 const BACKUP_TABLES = {
+  agentCassettes: 'agent_cassettes',
   ambulatories: 'ambulatories',
   attachments: 'attachments',
   conversations: 'conversations',

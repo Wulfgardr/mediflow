@@ -8,7 +8,7 @@ import { assertTherapyCommandPredecessorRecoverySchema } from './therapy-status-
 import { RETIRED_FEATURE_TABLES_SQL } from './ambulatory-destructive-command-recovery-schema';
 
 function predecessor() {
-    const db = new Database(':memory:'); initializeSqliteSchema(db);
+    const db = new Database(':memory:'); initializeSqliteSchema(db); db.exec('DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
     for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) db.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
     for (const sql of RETIRED_FEATURE_TABLES_SQL) db.exec(sql);
     for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) db.exec(`ALTER TABLE patients DROP COLUMN ${column}`);

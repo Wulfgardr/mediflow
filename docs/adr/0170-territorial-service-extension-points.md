@@ -160,9 +160,9 @@ anche per riconciliare, né writer territoriali; restano evidenze locali.
 
 La [mappa lombarda](../territorial/lombardia-services-and-prerequisites.md)
 colloca le dodici schede e registra le lacune. La
-[prova Italia generico](../territorial/italia-generico-paper-test.md)
+[prova Italia generico](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/territorial/italia-generico-paper-test.md)
 usa gli stessi punti senza PRREG, Carta SISS o ruoli regionali nel nucleo.
-La [lettera](../territorial/aria-letter-draft.md) resta bozza non inviata.
+La [lettera](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/territorial/aria-letter-draft.md) resta bozza non inviata.
 Accettazione dell'ADR, ammissione istituzionale e chiusura delle due issue
 restano decisioni distinte. Questo documento non chiude il gate Moduli e SISS
 né la release 0.9.1.

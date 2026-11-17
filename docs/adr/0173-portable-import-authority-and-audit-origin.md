@@ -1,5 +1,7 @@
 # ADR 0173: Autorità e provenienza del ripristino portabile
 
+Stato: Accepted, deliberato da Leonardo il 17/11/2026
+
 Stato: Proposed. Review indipendente richiesta prima del merge.
 
 Il checksum del formato portabile verifica l'integrità, senza autenticare la

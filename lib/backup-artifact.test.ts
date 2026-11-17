@@ -13,6 +13,7 @@ import {
 } from './backup-artifact';
 
 const basePayload = {
+    agentCassettes: [],
     ambulatories: [
         {
             id: 'amb-1',
@@ -346,6 +347,7 @@ test('preserves patient assigned ambulatory ids inside the backup payload', asyn
 
 
 const OPTIONAL_GROUPS = [
+    ['agentCassettes'],
     ['ambulatoryDestructiveCommands'],
     ['documentDiagnosisProposals'],
     ['exemptionImportReceipts'],

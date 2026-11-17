@@ -36,8 +36,6 @@ const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.Modu
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const target = '/api/attachments/SYNTHETIC_EXCLUDED_SOURCE/local-extraction';
 
-// Exercise the real consumer/browser/server collectors together with ordinary
-// in-memory Request/Response fixtures, not a browser or native protocol probe.
 async function fixture({ sinkFailure = false, enabled = true, marker = true, delayBrowser = false } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'anydoc-correlation-'));
   if (marker) fs.writeFileSync(path.join(directory, 'SYNTHETIC_ONLY'), 'Synthetic fixture');
@@ -104,7 +102,7 @@ async function fixture({ sinkFailure = false, enabled = true, marker = true, del
       const response = await promise;
       if (method === 'POST') {
         const reader = response.body.getReader();
-        while (!(await reader.read()).done) { /* Consume only the original body. */ }
+        while (!(await reader.read()).done) {  }
         reader.releaseLock();
       }
       if (!delayBrowser) page.emit(terminal, call.browserRequest);
@@ -139,7 +137,6 @@ test('one-to-one join keeps attempts distinct and does not turn a negative termi
     [2, 'project', 'requestfailed', true], [2, 'release', 'release_requestfailed', true],
   ]);
   assert.doesNotMatch(JSON.stringify({ attachment, records, joined }), /SYNTHETIC_EXCLUDED|synthetic\.invalid|attachments|"(?:cookie|grant|headers|url)"/i);
-  // Equal or unrelated timestamps must not affect join/completeness.
   for (const r of records) r.at = 100;
   for (const r of attachment.browser.events) r.at = 0;
   assert.deepEqual(contract.auditJoin(attachment, records), joined);

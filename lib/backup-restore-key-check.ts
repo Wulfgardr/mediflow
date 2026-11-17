@@ -35,7 +35,7 @@ export async function assertBackupReadableWithKey(
 ): Promise<void> {
     let payload: Record<string, unknown>;
     try { payload = (JSON.parse(artifactJson) as { payload?: Record<string, unknown> })?.payload ?? {}; } catch { return; }
-    for (const [table, fields] of Object.entries(encryptedFields)) {
+    for (const [table, fields] of Object.entries({ ...encryptedFields, agent_cassettes: ['wrappedPrivateKey'] })) {
         const rows = payload[COLLECTION_OF[table] ?? camel(table)];
         if (!Array.isArray(rows)) continue;
         for (const row of rows) {

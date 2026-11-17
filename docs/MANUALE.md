@@ -12,7 +12,7 @@ sono distinti dalla disponibilità di queste impostazioni.
 Per orientarti prima dell'avvio o approfondire una scelta:
 - [README.md](../README.md) presenta il progetto e il primo accesso;
 - [docs/COMPLIANCE.md](./COMPLIANCE.md) raccoglie il quadro privacy/GDPR/FHIR;
-- [docs/ROADMAP.md](./ROADMAP.md) descrive la direzione del prodotto.
+- [docs/ROADMAP.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ROADMAP.md) descrive la direzione del prodotto.
 
 ---
 
@@ -171,7 +171,7 @@ il runtime locale attraverso il browser.
 * **Vantaggi**: avvio rapido, integrazione macOS e schermata di blocco con PIN.
 * **Come si usa**: scegli **App per Mac** in Avvio. La voce è disponibile
   solo su Mac con il bundle già costruito per questa revisione. Per costruirlo
-  serve Xcode completo, seguendo [la guida nativa](native-launch.md).
+  serve Xcode completo, seguendo [la guida nativa](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md).
 * **Nota**: la vecchia shell macOS resta una fotografia alpha, mentre il
   lavoro attivo prosegue sul backend/API `home-base`. In caso di problemi
   usa l'interfaccia web, che resta la superficie operativa primaria.
