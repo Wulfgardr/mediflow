@@ -1,6 +1,7 @@
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
+import { getEventListeners } from 'node:events';
 import { agentCassetteFixture } from './test-fixtures/agent-cassette';
 import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto';
 import { db, type Patient } from './db';
@@ -8,11 +9,12 @@ import { inspectAgentVisit, prepareAgentApplication } from './agent-visit-review
 import type { AgentItemKind } from './agent-cassette-crypto';
 import { AGENT_ITEM_OPERATION } from './agent-cassette-contract';
 import { readPatientDiaryMetadata } from './patient-diary-metadata';
+import { agentVisitPdfText } from './agent-visit-pdf-text';
 
 const cfA = 'RSSMRA80A01F205X', cfB = 'RSSMRA85T10A562S';
 function patient(cf: string): Patient { return { id: 'synthetic-' + cf, taxCode: cf, firstName: 'Persona', lastName: 'Sintetica',
     address: '', phone: '', updatedAt: new Date(), createdAt: new Date(), version: 1 }; }
-async function fixture(cf = cfA, wrongHash = false, proposal?: { kind: 'service' | 'observation'; values: Record<string, string>; quote: string }) {
+async function fixture(cf = cfA, wrongHash = false, proposal?: { kind: 'service' | 'observation' | 'therapy'; values: Record<string, string>; quote: string }) {
     const f = await agentCassetteFixture();
     db.setKey(f.masterKey);
     const visitId = randomUUID();
@@ -99,6 +101,32 @@ test('locking during local PDF inspection discards the result', async () => {
         await assert.rejects(inspectAgentVisit(f.row, [patient(cfA)], null, controller.signal, async () => { controller.abort(); return 'Paziente CF ' + cfA; }));
     } finally { f.close(); }
 });
+
+test('an already cancelled cassette PDF removes the preview listener', async ({ mock: mocks }) => {
+    mocks.timers.enable({ apis: ['setTimeout'] });
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(agentVisitPdfText(new Uint8Array([1]), controller.signal));
+    assert.deepEqual(getEventListeners(controller.signal, 'abort'), []);
+});
+
+for (const [prefix, suffix, blocked] of [
+    ['Non assume ', '', true], ['La madre assume ', '', true], ['', ', sospeso.', true], ['Visita odierna. ', '', false],
+] as const) {
+    test(`a therapy quote keeps the qualifiers from the source (${(prefix || suffix).trim()})`, async () => {
+        const quote = 'Farmaco Sintetico 1 compressa al giorno dal 2026-11-17';
+        const f = await fixture(cfA, false, { kind: 'therapy', quote, values: {
+            drugName: 'Farmaco Sintetico', dosage: '1 compressa al giorno', status: 'active', startDate: '2026-11-17',
+        } });
+        const query = mock.method(db.therapies, 'query', () => ({ toArray: async () => [] }));
+        try {
+            const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal,
+                async () => 'Paziente CF ' + cfA + '\n' + prefix + quote + suffix);
+            assert.deepEqual(review.blockers, []);
+            assert.equal(review.proposalBlockers.length > 0, blocked);
+        } finally { query.mock.restore(); f.close(); }
+    });
+}
 
 
 test('a patient revision changed after the displayed review cannot be silently adopted', async () => {
