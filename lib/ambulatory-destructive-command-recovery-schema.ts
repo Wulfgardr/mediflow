@@ -10,6 +10,7 @@ const PREDECESSORS = new Map([
     [6, '4becef1521ec507b3da31047e01ab3e25562197c8a518472bb4cdef93ed3867b'],
     [9, '85259ea3bdcbdfa286a0d8a206a04bfc5621c106a604488c0e17d8c7c37d3ba1'],
     [10, '459c212cd2d9a65e4df72df63923c64551ec530c3efe07459235af8b362d6452'],
+    [13, 'd7f4022529da290e4aa2128fba5b8a6dee38f3fdc662fa1b36ce735b16eb6789'],
     [12, '0839efe53ea413c80beeff2653fe1b61e29b18e889e78c30d7bc226ab31a67c1'],
     [11, '0702a61e6f2a1feaca7df3350ec6597dcd5213c48339fdce723cf4531e33e8ee'],
 ]);
@@ -37,7 +38,8 @@ export function assertAmbulatoryCommandPredecessorRecoverySchema(probe: Database
     const canonical = new Database(':memory:');
     try {
         initializeSqliteSchema(canonical);
-        canonical.exec('DROP TABLE agent_mandates');
+        canonical.exec('DROP TABLE agent_clients; DROP TABLE agent_pairing_requests');
+        if (version < 13) canonical.exec('DROP TABLE agent_mandates');
         if (version < 12) for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) canonical.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         if (version < 11) for (const sql of RETIRED_FEATURE_TABLES_SQL) canonical.exec(sql);
         if (version < 9) {

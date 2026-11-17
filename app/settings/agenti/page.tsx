@@ -1,12 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import type { AgentPairingRequest } from '@/lib/agent-pairing-store';
 import { AGENT_OPERATIONS, type AgentMandate, type AgentMandateInput } from '@/lib/agent-mandate-contract';
 import { generateMandateKeys } from '@/lib/agent-mandate-client';
 import { SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 
 export default function AgentSettingsPage() {
     const [mandates, setMandates] = useState<AgentMandate[]>([]);
+    const [pairings, setPairings] = useState<AgentPairingRequest[]>([]);
+    const [selectedMandates, setSelectedMandates] = useState<Record<string, string>>({});
     const [readAt, setReadAt] = useState(0);
     const [pin, setPin] = useState('');
     const [hours, setHours] = useState('12');
@@ -22,13 +25,15 @@ export default function AgentSettingsPage() {
         finally { setBusy(false); setPin(''); }
     }
     async function refresh() {
-        const response = await fetch('/api/agent-mandates', { cache: 'no-store' });
-        if (!response.ok) throw new Error('denied');
+        const [response, requests] = await Promise.all([fetch('/api/agent-mandates', { cache: 'no-store' }), fetch('/api/agent-mandates/pairings', { cache: 'no-store' })]);
+        if (!response.ok || !requests.ok) throw new Error('denied');
         setMandates(await response.json());
+        setPairings(await requests.json());
         setReadAt(Date.now());
     }
     return <main className="mx-auto max-w-3xl space-y-8 p-6">
         <h1 className="type-page-title">Agenti</h1>
+        <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh); }}>Aggiorna</button>
         <form className="space-y-4" onSubmit={event => { event.preventDefault(); void run(async () => {
             const keys = await generateMandateKeys();
             const response = await fetch('/api/agent-mandates', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -51,8 +56,29 @@ export default function AgentSettingsPage() {
             <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !operations.length}>Crea mandato</button>
         </form>
         {error && <p role="alert">{error}</p>}
+        <section className="space-y-3"><h2 className="text-lg font-semibold">Richieste di abbinamento</h2>
+            <p>Confronta il codice con quello mostrato dall’agente prima di approvare.</p>
+            <ul>{pairings.map(pairing => {
+                const compatible = mandates.filter(mandate => mandate.revokedAt === null && mandate.expiresAt > readAt
+                    && pairing.operations.every(operation => mandate.operations.includes(operation)));
+                const selected = selectedMandates[pairing.id] ?? compatible[0]?.id ?? '';
+                return <li className="space-y-3 border-b py-4" key={pairing.id}>
+                    <h3>{pairing.name} <strong>{pairing.code}</strong></h3>
+                    <p>{pairing.operations.map(operation => operationLabels[AGENT_OPERATIONS.indexOf(operation)]).join(', ')}</p>
+                    <label className="block">Mandato per {pairing.name}<select className={SETTINGS_INPUT_CLASS} value={selected}
+                        onChange={event => setSelectedMandates(current => ({ ...current, [pairing.id]: event.target.value }))}>
+                        {!compatible.length && <option value="">Crea un mandato con queste operazioni</option>}
+                        {compatible.map(mandate => <option key={mandate.id} value={mandate.id}>{mandate.provider} · {new Date(mandate.expiresAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</option>)}
+                    </select></label>
+                    <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !selected} onClick={() => { void run(async () => {
+                        const response = await fetch('/api/agent-mandates/pairings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ requestId: pairing.id, code: pairing.code, mandateRef: selected }) });
+                        if (!response.ok) throw new Error('denied'); await refresh();
+                    }); }}>Approva {pairing.code}</button>
+                </li>;
+            })}</ul>
+        </section>
         <section className="space-y-3"><h2 className="text-lg font-semibold">Mandati</h2>
-            <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh); }}>Aggiorna</button>
             <ul>{mandates.map(mandate => <li key={mandate.id} className="flex items-center justify-between gap-4 py-2">
                 <span>{mandate.provider} · {mandate.revokedAt !== null ? 'Revocato' : mandate.expiresAt <= readAt ? 'Scaduto' : `Fino alle ${new Date(mandate.expiresAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`}</span>
                 {mandate.revokedAt === null && <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(async () => {

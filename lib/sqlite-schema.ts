@@ -1,3 +1,4 @@
+import { ensureAgentPairingSchema } from './agent-pairing-schema';
 import { ensureAgentMandateSchema } from './agent-mandate-schema';
 import { ensurePortableImportOriginsSchema } from './backup-import-provenance';
 import { ensureAmbulatoryDestructiveCommandSchema } from './ambulatory-destructive-command-schema';
@@ -783,6 +784,7 @@ export function initializeSqliteSchema(sqlite: Database.Database): void {
         applySchemaGuards(sqlite);
         ensureTherapyStatusCommandSchema(sqlite);
         ensureAgentMandateSchema(sqlite);
+        ensureAgentPairingSchema(sqlite);
         ensurePortableImportOriginsSchema(sqlite);
         ensureAmbulatoryDestructiveCommandSchema(sqlite);
         upgradeLegacyAttachmentCurrentness(sqlite);
