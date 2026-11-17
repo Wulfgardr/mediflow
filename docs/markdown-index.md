@@ -59,7 +59,6 @@ versione o risalire alla provenienza di un’interfaccia.
 | [adr/0158-territorial-packs.md](./adr/0158-territorial-packs.md) | WUL-785: nucleo internazionale e pacchetti territoriali governati dall’host. | Prima di separare capacità Italia/Lombardia o modificare migrazione e conservazione dello storico. |
 | [adr/0160-mediflow-in-desktop-chat.md](./adr/0160-mediflow-in-desktop-chat.md) | WUL-788: secondo round Proposed; canali per host, importazione, Fabric, viste, budget e pubblicazione. | Prima di implementare broker, accesso, scritture o distribuzione; non attesta ammissione clinica. |
 | [start-here.md](./start-here.md) | Esigenza ambulatoriale, uso senza AI e tre livelli di approfondimento. | Primo accesso al progetto. |
-| [design/2026-09-06-breccia-apple-reference.md](./design/2026-09-06-breccia-apple-reference.md) | Criteri ricavati da testo e fotogrammi Breccia, fonti e adattamenti Apple. | Prima di progettare o rifinire le app iPhone, iPad e Mac. |
 | [clinical-write-roster.md](./clinical-write-roster.md) | Operazioni cliniche per superficie, garanzie e residui C05. | Prima di modificare una scrittura, il suo parser o la sua prova. |
 | [data-at-rest-matrix.md](./data-at-rest-matrix.md) | Matrice versionata di ciò che resta in chiaro o cifrato a riposo, custodia delle chiavi ed esposizioni aperte C06. | Prima di cambiare schema, contratto dei campi cifrati, backup, export o un testo sulla protezione dei dati. |
 | [backup-restore-drill.md](./backup-restore-drill.md) | Istruzioni per eseguire la prova sintetica di ripristino e leggerne l'esito. | Prima di affidarsi a un backup, o dopo aver cambiato backup e ripristino. |
@@ -156,14 +155,10 @@ sono certificati di equivalenza delle app o ricevute di distribuzione.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [docs/walkthrough.md](./walkthrough.md) | Walkthrough canonico end-to-end per web, native, AnyDoc e quattro percorsi Intelligence Fabric review-only. | Per capire flussi completi e integrazione moduli. |
 | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | Quadro corrente della release sorgente, contenuto implementativo e ricostruzione storica con date, SHA e limiti distinti. | Per distinguere disponibilità, intenzione progettuale e prove, prima di pianificare o dichiarare una capacità. |
-| [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | Topologia dati, trust boundaries, cifratura e percorsi digitali, inclusi AnyDoc, proposte Fabric, artifact cifrati e boundary `network-home-base`. | Per analisi data flow e impatti sicurezza. |
 | [docs/repository-topology.md](./repository-topology.md) | Fonte canonica per repository operativa, confine Git/fuori-Git e aree top-level: runtime clinico, publication/site e tooling. | Quando devi scegliere repository, branch o collocazione di codice, asset e artefatti locali. |
 | [docs/parity-matrix.md](./parity-matrix.md) | Matrice localhost/Apple con 66 capability e conteggi 30/13/23; il gate P6 residuo è in `WUL-481` e le prove conservano la propria revisione. | Per steering parity, click-map P6 e release readiness Apple. |
 | [docs/known-limitations.md](./known-limitations.md) | Limiti noti della candidata sorgente 0.8, inclusi VoiceOver mobile, tooling di sviluppo e claim non autorizzati. | Per release readiness, note pubbliche, security posture e claim di accessibilità. |
-| [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | Deep dive tecnico esteso dell'architettura MediFlow. | Per approfondimenti implementativi. |
-| [docs/system_architecture.md](./system_architecture.md) | Sintesi di componenti e responsabilità, con distinzione tra fotografia 0.8.5 e pubblicazione 0.8.6; AnyDoc e Apple Vision seguono la precedenza di ADR 0119. | Per overview veloce in onboarding/review, verificando gli ADR successivi per i confini aggiornati. |
 
 ## 🍎 Native, setup e testing
 
@@ -174,7 +169,6 @@ dalla release sorgente 0.8.6.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [docs/NATIVE.md](./NATIVE.md) | Guida canonica della family Apple attiva: bundle macOS packaged/home-base, client iPhone/iPad paired e core Swift condiviso. | Per struttura, build, boundary di sicurezza/parity e verifiche native correnti. |
 | [native/README.md](../native/README.md) | Layout, toolchain e comandi della universal app Apple e del package Swift condiviso. | Per build, test e orientamento nel subtree `native/`. |
 | [native/contracts/README.md](../native/contracts/README.md) | Oracoli byte-exact del core cross-platform, inclusi i vettori crittografici congelati. | Quando si modifica crittografia, portabilità del core o test golden. |
 | [native/MediFlowMac/Sources/MediFlowSQLiteC/README.md](../native/MediFlowMac/Sources/MediFlowSQLiteC/README.md) | Provenienza e regole di aggiornamento della SQLite amalgamation inclusa nel package nativo. | Quando si aggiorna SQLite vendorizzata o la build C multipiattaforma. |
@@ -193,11 +187,7 @@ contratti e nella valutazione competente del deployment.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [docs/ROADMAP.md](./ROADMAP.md) | Roadmap prodotto canonica. | Per direzione prodotto/release narrative. |
-| [docs/FAQ.md](./FAQ.md) | FAQ sintetiche pubbliche: stato attuale del prodotto, boundary dichiarati e orientamento rapido. | Per onboarding rapido o lettura pubblica del progetto. |
 | [docs/COMPLIANCE.md](./COMPLIANCE.md) | Quadro compliance GDPR/FHIR e interoperabilità. | Per requisiti normativi e policy operative. |
-| [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | Roadmap codifiche cliniche FSE/EDS. | Per sviluppo terminologie e export documentale. |
-| [docs/MANUALE.md](./MANUALE.md) | Manuale utente medico. | Per supporto operativo lato clinico. |
 
 ## 🧑‍💻 Evidenze tecniche e documentazione
 
@@ -211,34 +201,6 @@ implementata perché è stata recuperata nell’inventario.
 | [docs/capability-mapping/mediflow-0.8.5-crosswalk.md](./capability-mapping/mediflow-0.8.5-crosswalk.md) | Vista derivata del mapping WUL-522, con provenance congelata, copertura, conflitti residui e claim ceiling candidate-only. | Quando si verifica il mapping 0.8.5 senza trasformare inventari o gap in parity. |
 | [docs/markdown-index.md](./markdown-index.md) | Indice completo markdown con sintesi. | Per navigazione completa e controllo copertura doc. |
 | [docs/design/punto-inchiostro/02-addendum-composizione.md](./design/punto-inchiostro/02-addendum-composizione.md) | Regole compositive D1–D16, stati di form, vuoto, proposta e overflow, sequenza delle unità Web. | Per applicare l'addendum alla specifica Punto d'inchiostro senza cambiare flussi clinici o capacità dei servizi. |
-| [docs/design/2026-07-26-agenda-clinica-e-scadenze.md](./design/2026-07-26-agenda-clinica-e-scadenze.md) | Intento di prodotto post-0.8 per un'agenda centrata su scadenze cliniche e terapeutiche. | Quando si pianifica l'evoluzione dell'agenda senza confonderla con lo stato consegnato. |
-| [docs/design/2026-08-21-mini-headless-agent-cli.md](./design/2026-08-21-mini-headless-agent-cli.md) | Mini WUL-696: sessione Supervisor con parità dei comandi CLI, authority Web, revoca e prove sintetiche distinte dal DoD clinico. | Quando si usa o modifica Mini; contratto ADR 0117, punto di innesto UI e limiti delle prove sintetiche. |
-| [docs/design/2026-08-21-web-redesign-consolidamento.md](./design/2026-08-21-web-redesign-consolidamento.md) | Programma di consolidamento UI/UX web («un fuoco, una risposta») con baseline critique 23/40, interventi per vista e fasi P0-P2 verificate. | Prima di toccare navigazione, stati, tastiera o il dialetto CSS delle viste kree8. |
-| [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md) | Ingresso della baseline storica e transitoria Vetro Clinico: glossario, ordine di lettura, regole redazionali e precedenza. | Quando serve riconciliare una superficie transitoria senza usarla come destinazione attiva. |
-| [docs/design/vetro-clinico/01-fondamenta.md](./design/vetro-clinico/01-fondamenta.md) | Principi, audit onesto della baseline Vetro Clinico e decisioni vincolanti di transizione. | Quando serve distinguere stato rilevato, debito e direzione di design separata. |
-| [docs/design/vetro-clinico/02-token.md](./design/vetro-clinico/02-token.md) | Architettura token a tre livelli, palette semantica, tipografia, geometria, motion e azioni di consolidamento. | Quando si valuta una modifica a colore, corpo testo, raggio, ombra, blur o durata. |
-| [docs/design/vetro-clinico/03-materiali.md](./design/vetro-clinico/03-materiali.md) | Baseline dei materiali: vetro strutturale, carta clinica, vetro transitorio, leggibilità e degrado controllato. | Quando si classifica una regione UI o un materiale. |
-| [docs/design/vetro-clinico/04-interazione.md](./design/vetro-clinico/04-interazione.md) | Grammatica di feedback, motion, tastiera, form clinici e stati onesti. | Quando si rivede un comportamento interattivo. |
-| [docs/design/vetro-clinico/05-responsivita.md](./design/vetro-clinico/05-responsivita.md) | Ruoli dei breakpoint, modello a due densità, touch, puntatore e finestre. | Quando si valuta un layout tra dimensioni o densità. |
-| [docs/design/vetro-clinico/06-accessibilita.md](./design/vetro-clinico/06-accessibilita.md) | Contratto WCAG 2.2 AA e gap di accessibilità per piattaforma. | Quando si rivede accessibilità, traslucenza o motion. |
-| [docs/design/vetro-clinico/07-piattaforme/web.md](./design/vetro-clinico/07-piattaforme/web.md) | Guida web della baseline Vetro Clinico: mappa superficie-materiale e budget visivo. | Quando si valuta UI in `app/` o `components/`. |
-| [docs/design/vetro-clinico/07-piattaforme/apple.md](./design/vetro-clinico/07-piattaforme/apple.md) | Guida Apple transitoria: mappa HIG/Liquid Glass, limiti e gap nativi. | Quando si valuta UI nativa Apple o parity di design. |
-| [docs/design/vetro-clinico/07-piattaforme/windows.md](./design/vetro-clinico/07-piattaforme/windows.md) | Guida Windows previsionale: mapping Fluent 2 e confine shell nativa/canvas web. | Quando si pianifica il client Windows. |
-| [docs/design/vetro-clinico/07-piattaforme/linux.md](./design/vetro-clinico/07-piattaforme/linux.md) | Guida Linux previsionale: adattamento GNOME/libadwaita e degrado piatto. | Quando si pianifica il client Linux. |
-| [docs/design/vetro-clinico/08-esplorazioni.md](./design/vetro-clinico/08-esplorazioni.md) | Quattro esplorazioni con ricetta, costo e verdetto. | Quando si consulta l'evoluzione storica della baseline. |
-| [docs/design/vetro-clinico/09-roadmap.md](./design/vetro-clinico/09-roadmap.md) | Corsie DS della baseline Vetro Clinico, con gate e debito da consolidare. | Quando si consulta la sequenza storica di consolidamento. |
-| [docs/design/lume/README.md](./design/lume/README.md) | Lume, lingua di design attiva adottata da ADR 0078: manifesto, token DTCG, canone e limiti della candidata locale v0.8. | Quando si implementa Lume o si verifica un claim di design della candidata. |
-| [docs/design/lume/01-lingua.md](./design/lume/01-lingua.md) | Specifica Lume: modello focale (fuoco/penombra/buio operativo), materia e registri di luce, il filo, due voci tipografiche, profondità semantica, grammatica dell'attenzione, motion. | Quando si prototipa o implementa una superficie Lume. |
-| [docs/design/lume/02-derivazione.md](./design/lume/02-derivazione.md) | La ricerca di mercato dietro Lume (tre ambiti di ricerca con fonti: premium 2026, frontiera clinica, frontiera estetica), le opzioni scartate e la motivazione di ogni scelta. | Quando si mette in dubbio una scelta di Lume o si rifà la ricerca. |
-| [docs/design/lume/03-migrazione.md](./design/lume/03-migrazione.md) | Percorso di migrazione da Vetro Clinico a Lume: mappa dei token, fasi L0-L6 con gate, rischi, cosa sopravvive. | Quando si pianifica o verifica l'adozione progressiva di Lume. |
-| [docs/design/lume/04-perlustrazione.md](./design/lume/04-perlustrazione.md) | Perlustrazione EHR/provider dietro la grammatica dell'attenzione: tre ambiti di ricerca (applicativi USA, gestionali GP, design system sanitari aperti), 12 integrazioni normative, rifiuti, spazio bianco competitivo. | Quando si raffina worklist, provenienza, sicurezza o si studia il mercato dei gestionali. |
-| [docs/design/lume/05-app-native.md](./design/lume/05-app-native.md) | Lume nelle app native: mappa SwiftUI, grammatica compatta iPhone e note tri-OS prospettiche, con macOS come priorita operativa. | Quando si implementa Lume sui client Apple; non apre una lane Windows/Linux. |
-| [docs/design/lume/06-macos-apple-contract.md](./design/lume/06-macos-apple-contract.md) | Contratto Lume per l'app macOS reale e la futura superficie nativa primaria: card clinica opaca consegnata, componenti interni e gate ancora parziali. | Prima di progettare o implementare una superficie Lume su macOS. |
-| [docs/design/lume/07-gesto-e-movimento.md](./design/lume/07-gesto-e-movimento.md) | Grammatica Lume per gesto, movimento, focus, stato e continuità, con reduced motion per costruzione. | Quando si implementano o verificano animazioni, transizioni e feedback di interazione. |
-| [docs/design/lume/08-matrice-viste.md](./design/lume/08-matrice-viste.md) | Matrice vista-per-vista, criteri golden e ordine di migrazione delle superfici Lume. | Quando si pianifica una slice Lume o si definiscono screenshot e contratti AX. |
-| [docs/design/lume/09-icona.md](./design/lume/09-icona.md) | Specifica dell'icona MediFlow per macOS, iOS e web, con asset approvati e criteri di integrazione. | Quando si cablano o si verificano le icone dell'app e del web. |
-| [docs/design/lume/10-superficie-e-materiale.md](./design/lume/10-superficie-e-materiale.md) | Proposta misurata per la convergenza tra superfici Lume e materiali Apple. | Quando si valuta materiale, contrasto o gerarchia delle superfici; non trattarla come canone adottato. |
-| [docs/design/wul-271-kree8-visual-translation.md](./design/wul-271-kree8-visual-translation.md) | Traduzione visiva Kree8 → MediFlow per PIN gate, root entry live `/`, first real-patient cockpit slice e alias review `/mockups/kree8` (WUL-271/WUL-272/WUL-273/WUL-274). | Per ricostruire l’ingresso Kree8 e la migrazione delle superfici legacy; la voce non autorizza nuove prove con dati clinici reali. |
 
 ## 🧱 ADR (decisioni architetturali)
 

@@ -10,7 +10,7 @@ Related:
 [docs/adr/0065-intended-purpose-and-claims-guard.md](./0065-intended-purpose-and-claims-guard.md),
 [docs/adr/0066-patient-soft-delete-lifecycle.md](./0066-patient-soft-delete-lifecycle.md),
 ARCHITETTURA.md (private),
-[docs/NATIVE.md](../NATIVE.md),
+[docs/NATIVE.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/NATIVE.md),
 lib/security.ts (private),
 [lib/db.ts](../../lib/db.ts),
 native/MediFlowMac/Sources/MediFlowAppleShared/CryptoService.swift (private)

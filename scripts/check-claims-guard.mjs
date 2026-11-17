@@ -7,12 +7,9 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const roots = [
   'README.md', 'ARCHITECTURE.md', 'SECURITY.md', 'CONTRIBUTING.md',
-  'docs/README.md', 'docs/markdown-index.md', 'docs/FAQ.md', 'docs/ROADMAP.md',
-  'docs/STATE_OF_THE_SYSTEM.md', 'docs/walkthrough.md', 'docs/system_architecture.md',
-  'docs/ARCHITETTURA.md', 'docs/COMPLIANCE.md', 'docs/MANUALE.md', 'docs/NATIVE.md',
   'docs/releases/0.9.1-contract.md',
-  'docs/FSE2-terminology-roadmap.md',
-  'docs/topologia-dati-flussi.md', 'docs/design',
+  'docs/design',
+  'docs/README.md', 'docs/COMPLIANCE.md', 'docs/STATE_OF_THE_SYSTEM.md', 'docs/markdown-index.md',
   'docs/adr/0006-terminology-plugin-and-fse-profiles.md',
   'docs/adr/0065-intended-purpose-and-claims-guard.md',
   'app', 'components', 'native', 'oss-assets',
@@ -78,7 +75,8 @@ const allowlist = [
   rationale: 'This ADR enumerates banned claims as policy text.',
 }));
 
-if (process.argv.includes('--self-test')) runSelfTest();
+if (process.argv.includes('--list-files')) console.log(roots.flatMap(collectFiles).sort().join('\n'));
+else if (process.argv.includes('--self-test')) runSelfTest();
 else runRepositoryScan();
 
 function runRepositoryScan() {
