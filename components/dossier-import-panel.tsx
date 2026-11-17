@@ -8,7 +8,9 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 
+import { DossierEvidenceText, splitDossierPassage } from '@/components/dossier-evidence';
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useSecurity } from '@/components/security-provider';
@@ -24,7 +26,7 @@ import {
 } from '@/lib/document-dossier-session';
 import {
     DOSSIER_FACT_KIND_LABELS, DOSSIER_GAP_LABELS, buildDossierReceipt, createManualDossierFact, dossierFactBlockers, dossierFactRef,
-    latestAppliedOutcome, unitText,
+    extractDossierCandidates, latestAppliedOutcome, unitText,
     type DossierFact, type DossierFactKind, type DossierRecord,
 } from '@/lib/domain/documents/dossier-import';
 import {
@@ -517,6 +519,9 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
     const ids = useId();
     const [draft, setDraft] = useState<DossierRecord>(document.record);
     const [newKind, setNewKind] = useState<DossierFactKind>('diagnosis');
+    const [selectedFact, setSelectedFact] = useState<DossierFact | null>(null);
+    const fullTextRef = useRef<HTMLDetailsElement>(null);
+    const passageRef = useRef<HTMLElement>(null);
     const dirty = JSON.stringify(draft) !== JSON.stringify(document.record);
     const record = document.record;
     const written = (fact: DossierFact) => { const outcome = latestAppliedOutcome(record, fact.factId)?.outcome; return outcome === 'applied' || outcome === 'already_present'; };
@@ -524,6 +529,41 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
         setDraft((current) => ({ ...current, facts: current.facts.map((fact) => fact.factId === factId ? change(fact) : fact) }));
     const acceptedReady = record.facts.filter((fact) => fact.decision === 'accepted' && !written(fact) && !dossierFactBlockers(fact, { exemptionCodes: view.exemptionCodes }).length).length;
     const units = record.extraction.state === 'extracted' ? record.extraction.units : [];
+    const textUnits = units.map((unit) => ({ unit, text: unitText(document.text ?? '', unit) }));
+    const unitTexts = new Map<number, string | null>();
+    for (const { unit, text } of textUnits) {
+        unitTexts.set(unit.index, unitTexts.has(unit.index) ? null : text);
+    }
+    const reparsedLabEvidence = useMemo(() => {
+        const text = document.text;
+        if (!document.textVerified || !text?.includes('\r') || record.extraction.state !== 'extracted'
+            || !record.facts.some((fact) => fact.origin === 'parser:lab')) return null;
+        const { facts } = extractDossierCandidates({
+            text, units: record.extraction.units, fileName: record.source.fileName,
+            documentDate: record.documentDate?.value ?? null, exemptionCodes: view.exemptionCodes,
+        });
+        return new Map(facts.filter((fact) => fact.origin === 'parser:lab').map((fact) => [fact.factId, fact.evidence]));
+    }, [document.text, document.textVerified, record, view.exemptionCodes]);
+    const verifiedPassage = (fact: DossierFact) => {
+        const { evidence } = fact;
+        if (!document.textVerified || typeof evidence?.excerpt !== 'string') return null;
+        if (fact.origin === 'parser:lab' && reparsedLabEvidence) {
+            const reparsed = reparsedLabEvidence.get(fact.factId);
+            if (!reparsed || reparsed.unit !== evidence.unit || reparsed.start !== evidence.start || reparsed.end !== evidence.end) return null;
+        }
+        const passage = splitDossierPassage(unitTexts, evidence);
+        const excerpt = evidence.excerpt.replace(/\s+/gu, ' ').trim();
+        return passage && excerpt && passage.passage.replace(/\s+/gu, ' ').trim() === excerpt ? passage : null;
+    };
+    const selection = selectedFact ? verifiedPassage(selectedFact) : null;
+    const showEvidence = (fact: DossierFact) => {
+        const fullText = fullTextRef.current;
+        if (!fullText) return;
+        flushSync(() => setSelectedFact(fact));
+        fullText.open = true;
+        passageRef.current?.focus({ preventScroll: true });
+        passageRef.current?.scrollIntoView({ block: 'center' });
+    };
     return (
         <article className={styles.section} data-testid="dossier-document" data-complete={document.coverage.complete ? 'true' : 'false'}>
             <h3><PrivacyBlur>{record.source.fileName}</PrivacyBlur> · {record.documentDate ? record.documentDate.value : 'data non indicata'}</h3>
@@ -539,10 +579,11 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                 <span>{record.extractionAttempts?.length ? formatCountLabel(record.extractionAttempts.length, 'tentativo registrato', 'tentativi registrati') : ''}</span>
                 <button type="button" className={styles.secondary} disabled={busy || dirty} onClick={() => { void onRetry(); }}>Riprova l’estrazione dall’originale</button>
             </div> : null}
-            {document.text !== null ? <details className={styles.disclosure}>
+            {document.text !== null ? <details className={styles.disclosure} ref={fullTextRef} id={`${ids}-full-text`}>
                 <summary>Testo completo{document.textVerified ? '' : ' (non verificato)'}</summary>
-                <dl>{units.map((unit) => <div key={unit.index}><dt>{unit.kind === 'page' ? `Pagina ${unit.index}` : 'Documento'}</dt>
-                    <dd><PrivacyBlur>{unitText(document.text!, unit)}</PrivacyBlur></dd></div>)}</dl>
+                <dl>{textUnits.map(({ unit, text }, position) => <div key={`${unit.index}:${position}`}><dt>{unit.kind === 'page' ? `Pagina ${unit.index}` : 'Documento'}</dt>
+                    <dd><DossierEvidenceText text={text}
+                        selection={selectedFact?.evidence?.unit === unit.index ? selection : null} passageRef={passageRef} /></dd></div>)}</dl>
             </details> : <p className={styles.muted}>Nessun testo conservato: consulta l’originale nella sezione Documenti della scheda e aggiungi qui ciò che serve.</p>}
             <table className={styles.table} role="table">
                 <caption>Proposte e informazioni aggiunte. Il medico decide ciascuna.</caption>
@@ -552,10 +593,14 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                     const blockers = dossierFactBlockers(fact, { exemptionCodes: view.exemptionCodes });
                     const applied = latestAppliedOutcome(record, fact.factId);
                     const locked = written(fact) || busy || Boolean(record.pendingWrites?.some((claim) => claim.factId === fact.factId));
+                    const evidence = fact.evidence;
+                    const canShowEvidence = verifiedPassage(fact);
                     return <tr key={fact.factId} role="row" data-testid="dossier-fact" data-kind={fact.kind} data-origin={fact.origin} data-decision={fact.decision}>
                         <td role="cell" data-label="Tipo">{DOSSIER_FACT_KIND_LABELS[fact.kind]}<small className={styles.muted}>{ORIGIN_LABEL[fact.origin] ?? fact.origin}</small></td>
                         <td role="cell" data-label="Contenuto">
-                            {fact.evidence ? <small>Evidenza, unità {fact.evidence.unit}: <PrivacyBlur>{fact.evidence.excerpt}</PrivacyBlur></small> : null}
+                            {evidence ? <small>Evidenza, unità {evidence.unit}: <PrivacyBlur>{evidence.excerpt}</PrivacyBlur></small> : null}
+                            {canShowEvidence && <button type="button" className={styles.secondary} aria-controls={`${ids}-full-text`}
+                                onClick={() => showEvidence(fact)}>Mostra nel testo</button>}
                             {fact.values.textSource === 'document' ? <small>Testo: il testo completo del documento, conservato sopra.</small> : null}
                             {qualifierNotes(fact).map((note) => <small key={note} data-testid="dossier-qualifier">{note}</small>)}
                             {FIELDS[fact.kind].filter((field) => !(field.name === 'text' && fact.values.textSource === 'document')).map((field) => <FactField key={field.name} spec={field} value={fact.values[field.name] ?? ''} disabled={locked}
