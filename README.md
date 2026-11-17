@@ -1,7 +1,5 @@
 # MediFlow
 
-
-
 <img src="./docs/design/punto-inchiostro/icona/punto-giorno.svg" width="100" alt="Icona di MediFlow">
 
 MediFlow è una cartella clinica gratuita e a codice aperto per l'ambulatorio e la medicina territoriale. Tiene l'archivio sul tuo computer e funziona anche senza intelligenza artificiale.
@@ -33,7 +31,7 @@ Nasce dal mio lavoro di medico di distretto. Inizialmente per me. Poi, se viene 
 
 MediFlow non sostituisce il tuo giudizio. Non diagnostica, prescrive o esegue triage da solo. Le funzioni intelligenti preparano proposte, senza scrivere autonomamente nella cartella.
 
-Le tre funzioni intelligenti locali non sono qualificate e, nelle prove su dati sintetici, solo l’import assistito è rimasto entro i tempi e la memoria misurata previsti per la prova: [LINK NOTA DI RILASCIO].
+Le tre funzioni intelligenti locali non sono qualificate e, nelle prove su dati sintetici, solo l’import assistito è rimasto nei tempi e nella memoria previsti. Le misure sono nel [registro della 0.9.1](./docs/quality/intelligence/registro-0.9.1.json).
 
 La versione Web è prevista per Mac, Windows e Linux. Il client per Mac è stato installato e controllato su un MacBook Pro M5 Max. L’uso dell’interfaccia resta da collaudare e la compatibilità con gli altri Mac non è provata.
 
@@ -61,7 +59,7 @@ Per la 0.9.0 pubblicata segui il [README del tag](https://github.com/Wulfgardr/m
 
 ## Per chi sviluppa
 
-[Contribuire](./CONTRIBUTING.md) · [Architettura](./ARCHITECTURE.md)
+[Contribuire](./CONTRIBUTING.md) · [Architettura](./ARCHITECTURE.md) · [Documentazione](./docs/README.md)
 
 ## Sviluppo assistito
 
