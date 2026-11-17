@@ -4,9 +4,8 @@ import { clientArchiveGeneration } from './security/client-auth-api';
 import { db } from './db';
 import { notifyDbChange } from './live-query';
 import { openAgentVisit } from './agent-cassette-client';
-import type { AgentCassetteIndexPage, IncomingAgentCassette } from './agent-cassette-contract';
 import { inspectAgentVisit, prepareAgentApplication, type AgentVisitReview } from './agent-visit-review';
-import type { AgentApplicationReceipt } from './agent-visit-application-contract';
+import type { AgentApplicationReceipt, AgentCassetteIndexPage, IncomingAgentCassette } from './agent-visit-application-contract';
 
 const empty = { visits: [] as AgentVisitReview[], busy: false, error: null as string | null };
 let snapshot = empty;

@@ -2,6 +2,11 @@ import { z } from 'zod';
 import { dateInputSchema } from './api-schemas/common';
 import { therapyCreateSchema } from './api-schemas/clinical-writes';
 import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';
+import type { AgentCassette } from './agent-cassette-contract';
+
+export type AgentCassetteIndexEntry = Pick<AgentCassette, 'id' | 'archiveGeneration' | 'status' | 'revision' | 'depositedAt'>;
+export type AgentCassetteIndexPage = { visits: AgentCassetteIndexEntry[]; next: string | null };
+export type IncomingAgentCassette = AgentCassette & { appliedItemIds: string[] };
 
 const sealed = z.string().regex(/^ENC:[A-Za-z0-9+/]+=*:[A-Za-z0-9+/]+=*$/u);
 const noteValues = z.object({ title: sealed, content: sealed, date: dateInputSchema, metadata: sealed }).strict();
