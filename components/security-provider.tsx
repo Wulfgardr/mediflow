@@ -28,9 +28,11 @@ import {
     persistSecuritySession,
     restoreSecuritySession,
 } from '@/lib/security/client-security-session';
+import { createTabKeyShare } from '@/lib/security/tab-key-share';
 import { notifyDbChange } from '@/lib/live-query';
 import {
     checkAuthHealthRequest,
+    clientTabAuthorityBinding,
     changePinRequest,
     createClientAuthorityNetworkBarrier,
     loginWithPinRequest,
@@ -85,6 +87,7 @@ interface SecurityContextType {
     preparePassphraseRecovery: (secret: string, passphrase: string, kit?: RecoveryKit) => Promise<AccessResult>;
     changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
     lock: () => void;
+    renewAccess: () => Promise<void>;
     updateUser: (data: Pick<User, 'id' | 'displayName' | 'ambulatoryName'>, isCurrent: () => boolean) => void;
 }
 
@@ -162,6 +165,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setUnlockCredential(unlock.credential);
     };
     const masterKeyRef = useRef<CryptoKey | null>(null);
+    const tabKeyShareRef = useRef<ReturnType<typeof createTabKeyShare<User>> | null>(null);
     const wrappingRef = useRef<{ encryptedMasterKey: string; salt: string } | null>(null);
     const preparedAccessRef = useRef<{ generation: number; commit: () => Promise<AccessResult> } | null>(null);
     const [preparedKit, setPreparedKit] = useState<PreparedRecoveryKit | null>(null);
@@ -179,6 +183,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [flowError, setFlowError] = useState<string | null>(null);
 
     const setActiveMasterKey = (key: CryptoKey | null) => {
+        if (key === null) tabKeyShareRef.current?.clear();
         masterKeyRef.current = key;
         db.setKey(key);
         notifyDbChange();
@@ -197,12 +202,18 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const uninstall = installArchiveGenerationTransport();
+        const shared = typeof BroadcastChannel === 'undefined' ? null : createTabKeyShare<User>(new BroadcastChannel('mediflow.tab-key.v1'), async () => {
+            const result = await checkAuthHealthRequest({ fresh: true });
+            return result.response.ok && result.controlState === 'accepted' && result.payload?.status === 'ok' && result.payload.hasSession === true
+                ? clientTabAuthorityBinding() : null;
+        }, clientTabAuthorityBinding);
+        tabKeyShareRef.current = shared;
         const replaced = () => {
             ++authorityAttemptGenerationRef.current;
             clearClientAuthority();
         };
         window.addEventListener(ARCHIVE_REPLACED_EVENT, replaced);
-        return () => { window.removeEventListener(ARCHIVE_REPLACED_EVENT, replaced); uninstall(); };
+        return () => { window.removeEventListener(ARCHIVE_REPLACED_EVENT, replaced); shared?.dispose(); tabKeyShareRef.current = null; uninstall(); };
     }, []);
 
     const runAuthorityNetworkRequest = <T,>(request: () => Promise<T>): Promise<T> => {
@@ -332,6 +343,31 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const renewAccess = async () => {
+        const attempt = ++authorityAttemptGenerationRef.current;
+        updateAuthRecoveryState('pending');
+        setAuthErrorMessage(null);
+        let health;
+        try { health = await checkAuthHealthRequest({ fresh: true }); } catch { updateAuthRecoveryState('failed'); return; }
+        if (authorityAttemptGenerationRef.current !== attempt) return;
+        if (!health.response.ok || health.controlState !== 'accepted' || health.payload?.status !== 'ok') { updateAuthRecoveryState('failed'); return; }
+        if (health.payload.hasSession === false) { updateAuthRecoveryState('ready'); return; }
+        const shared = await tabKeyShareRef.current?.request();
+        if (authorityAttemptGenerationRef.current !== attempt) return;
+        if (!shared || typeof shared.user?.id !== 'string' || typeof shared.user.username !== 'string' || typeof shared.user.role !== 'string') {
+            updateAuthRecoveryState('required');
+            setAuthErrorMessage('Apri una scheda già sbloccata oppure blocca tutte le schede per accedere di nuovo.');
+            return;
+        }
+        setActiveMasterKey(shared.key);
+        wrappingRef.current = shared.wrapping;
+        setUser(shared.user);
+        setIsAuthenticated(true);
+        setIsLocked(false);
+        updateAuthRecoveryState('ready');
+        void tabKeyShareRef.current?.publish(shared);
+    };
+
     const repairFromLegacy = async () => {
         if (isRepairing) return;
         setIsRepairing(true);
@@ -380,6 +416,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
             setActiveMasterKey(session.key);
             setUser(session.userData);
+            void tabKeyShareRef.current?.publish({ key: session.key, user: session.userData, wrapping: null });
             setIsAuthenticated(true);
             setIsLocked(false);
             updateAuthRecoveryState('ready');
@@ -538,6 +575,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             setActiveMasterKey(material ? await residentKey(masterKey) : masterKey);
             if (authorityAttemptGenerationRef.current !== attemptGeneration) { clearClientAuthority(); return false; }
             setUser(userData);
+            if (masterKeyRef.current) void tabKeyShareRef.current?.publish({ key: masterKeyRef.current, user: userData, wrapping: wrappingRef.current });
             setIsAuthenticated(true);
             setIsLocked(false);
             setAuthErrorMessage(null);
@@ -831,6 +869,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 preparePassphraseRecovery,
                 changePin,
                 lock,
+                renewAccess,
                 updateUser: (data, isCurrent) => setUser(prev => isCurrent() && prev?.id === data.id ? { ...prev, ...data } : prev)
             }}>
                 {pinResidueNotice}
@@ -856,6 +895,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             preparePassphraseRecovery,
             changePin,
             lock,
+            renewAccess,
             updateUser: (data, isCurrent) => setUser(prev => isCurrent() && prev?.id === data.id ? { ...prev, ...data } : prev)
         }}>
             <div className="relative min-h-screen">
