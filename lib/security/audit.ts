@@ -394,7 +394,7 @@ function buildAuditEventRow(input: AuditWriteInput): typeof auditEvents.$inferIn
     const provenance = input.agentProvenance;
     if (input.sourceSurface === 'agent') {
         if (input.actorType !== 'user' || !provenance
-            || ![provenance.proposerRef, provenance.mandateRef].every(ref => /^[A-Za-z0-9_-]{1,128}$/u.test(ref))
+            || ![provenance.proposerRef, provenance.mandateRef].every(ref => typeof ref === 'string' && /^[A-Za-z0-9_-]{1,128}$/u.test(ref))
             || !['openai', 'anthropic', 'local'].includes(provenance.modelProvider)) throw new Error('Invalid agent audit provenance');
     } else if (provenance !== undefined) throw new Error('Agent audit requires agent surface');
     const occurredAt = input.occurredAt ?? new Date();
