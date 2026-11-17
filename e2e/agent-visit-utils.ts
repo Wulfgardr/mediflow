@@ -1,11 +1,11 @@
 import type { Page, APIRequestContext } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
-import { AGENT_OPERATIONS } from '../lib/agent-mandate-contract';
+import { AGENT_OPERATIONS, type AgentOperation } from '../lib/agent-mandate-contract';
 
 export const agentVisitPin = '24682468';
 export const agentVisitPassphrase = 'mandato sintetico visita novembre';
-export async function pairSyntheticVisitAgent(page: Page, agent: APIRequestContext) {
+export async function pairSyntheticVisitAgent(page: Page, agent: APIRequestContext, operations: AgentOperation[] = [...AGENT_OPERATIONS]) {
     const pin = agentVisitPin, passphrase = agentVisitPassphrase;
     await bootstrapUnlockedSession(page, pin);
     await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
@@ -33,7 +33,7 @@ export async function pairSyntheticVisitAgent(page: Page, agent: APIRequestConte
     const created = await creation; expect(created.status()).toBe(201);
     const mandate = created.request().postDataJSON().mandate;
     expect(mandate.durationMs).toBe(43200000);
-    const request = await agent.post('/api/agent/v1/pairings', { data: { name: 'Synthetic cassette client', operations: AGENT_OPERATIONS } });
+    const request = await agent.post('/api/agent/v1/pairings', { data: { name: 'Synthetic cassette client', operations } });
     expect(request.status()).toBe(201);
     const requested = await request.json();
     const pollPath = '/api/agent/v1/pairings?requestId=' + requested.receipt.id;

@@ -11,7 +11,7 @@ test('a cookie-free agent deposits encrypted text while the doctor is idle-locke
     const agent = await playwright.request.newContext({ baseURL: isolatedRuntime.url });
     try {
         await page.clock.install();
-        const { mandate, token } = await pairSyntheticVisitAgent(page, agent);
+        const { mandate, token } = await pairSyntheticVisitAgent(page, agent, ['visita.apri', 'visita.nota', 'visita.chiudi']);
         await page.clock.fastForward(16 * 60 * 1000);
         await expect(page.getByLabel('Passphrase', { exact: true })).toBeVisible();
         const visitId = randomUUID(), itemId = randomUUID();
@@ -25,9 +25,15 @@ test('a cookie-free agent deposits encrypted text while the doctor is idle-locke
         const item = { id: itemId, kind: 'note', envelope: sealAgentItemNode(mandate.publicKey, { ...context, itemId, kind: 'note' }, bytes), byteLength: bytes.length, documentHash: null };
         const add = await agent.post('/api/agent/v1/visits', { headers, data: { operation: 'visita.nota', visitId, expectedRevision: 1, item } });
         expect(add.status()).toBe(201);
+        const therapyId = randomUUID();
+        const therapy = { id: therapyId, kind: 'therapy', envelope: sealAgentItemNode(mandate.publicKey, { ...context, itemId: therapyId, kind: 'therapy' }, bytes), byteLength: bytes.length, documentHash: null };
+        const denied = await agent.post('/api/agent/v1/visits', { headers, data: { operation: 'visita.proponi.terapia', visitId, expectedRevision: 2, item: therapy } });
+        expect(denied.status()).toBe(403);
         const close = await agent.post('/api/agent/v1/visits', { headers, data: { operation: 'visita.chiudi', visitId, expectedRevision: 2 } });
         expect(close.status()).toBe(201);
-        expect(JSON.stringify(await close.json())).not.toContain(token);
+        const closed = await close.json();
+        expect(closed.receipt.itemCount).toBe(1);
+        expect(JSON.stringify(closed)).not.toContain(token);
         for (const file of ['medical.db', 'medical.db-wal']) {
             try { expect(readFileSync(path.join(isolatedRuntime.dataDirectory, file)).includes(Buffer.from(sentinel))).toBe(false); }
             catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
