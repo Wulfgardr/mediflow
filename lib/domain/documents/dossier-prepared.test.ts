@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import type { Observation } from '../../db';
+import { projectQuadroMeasures } from '../../patient-quadro';
 
 import {
     DOSSIER_PREPARED_SCHEMA, anchorPreparedQuote, parsePreparedExtraction, preparedBulkDecisions, preparedDossierFacts, preparedFactEligible, preparedPatientKey, verifyPreparedFields,
@@ -34,6 +36,67 @@ function prepared(facts: PreparedFactInput[], extra: Partial<PreparedSource> = {
         .facts.filter((fact) => fact.origin === 'prepared' && fact.values.preparedCheck !== 'summary');
 }
 const checkOf = (facts: PreparedFactInput[]) => prepared(facts).map((fact) => fact.values.preparedCheck);
+
+test('referto sintetico con venti risultati, tre fuori intervallo e due senza codice', async (t) => {
+    const panel = [
+        ['Emoglobina', '10', 'g/dL', '12', '16'],
+        ['Potassio', '6,5', 'mmol/L', '3,5', '5'],
+        ['Creatinina', '2,5', 'mg/dL', '0,6', '1,2'],
+        ['Ematocrito', '42', '%', '36', '48'],
+        ['Globuli rossi', '4,5', '10*6/uL', '4', '5,5'],
+        ['Globuli bianchi', '7', '10*3/uL', '4', '10'],
+        ['Piastrine', '250', '10*3/uL', '150', '400'],
+        ['MCV', '88', 'fL', '80', '100'],
+        ['MCH', '30', 'pg', '27', '33'],
+        ['MCHC', '33', 'g/dL', '32', '36'],
+        ['RDW', '13', '%', '11', '15'],
+        ['Sodio', '140', 'mmol/L', '135', '145'],
+        ['Cloro', '103', 'mmol/L', '98', '107'],
+        ['ALT', '25', 'U/L', '8', '40'],
+        ['AST', '22', 'U/L', '8', '40'],
+        ['Fosfatasi alcalina', '80', 'U/L', '40', '120'],
+        ['Bilirubina totale', '0,8', 'mg/dL', '0,2', '1,2'],
+        ['Albumina', '4', 'g/dL', '3,5', '5'],
+        ['Marcatore Alfa', '7', 'U/L'],
+        ['Marcatore Beta', '9', 'U/L'],
+    ] as const;
+    const proposals = panel.map(([display, value, unit, refLow, refHigh]): PreparedFactInput => ({
+        kind: 'observation',
+        quote: [display, value, unit, refLow && refHigh ? `intervallo di riferimento ${refLow}–${refHigh}` : null].filter(Boolean).join(' '),
+        values: { display, value, unit, ...(refLow && refHigh ? { refLow, refHigh } : {}) },
+    }));
+    const text = proposals.map(({ quote }) => quote).join('\n');
+    const { units } = splitDossierUnits(text, null);
+    const result = preparedDossierFacts({ source: source(proposals), text, units, documentDate: '2026-10-20', parserFacts: [], now });
+    const observations = result.facts.filter(fact => fact.kind === 'observation' && preparedFactEligible(fact, new Set()))
+        .map(({ factId, values }): Observation => ({
+            id: factId, patientId: 'synthetic', codeSystem: 'LOINC', unitSystem: 'UCUM',
+            code: values.code, display: values.display, unitCode: values.unitCode, value: values.value,
+            refLow: values.refLow, refHigh: values.refHigh, observedAt: new Date(values.observedAt), createdAt: now,
+        }));
+    assert.equal(panel.length, 20);
+    assert.deepEqual(observations.map(({ display }) => display), panel.slice(0, 18).map(([display]) => display));
+
+    await t.test('compaiono solo i tre risultati fuori intervallo con la variazione', () => {
+        const previousDate = new Date('2026-09-20');
+        const history = ['13', '4,5', '1'].map((value, index) => ({
+            ...observations[index], id: `previous-${index}`, value, observedAt: previousDate,
+        }));
+        const date = previousDate.toLocaleDateString('it-IT');
+        assert.deepEqual(projectQuadroMeasures([...observations, ...history], { onlyOutOfRange: true }).map(row =>
+            [row.display, row.outOfRange, row.delta]), [
+            ['Emoglobina (Hb)', 'basso', `-3 g/dL dal ${date}`],
+            ['Potassio (K)', 'alto', `+2 mmol/L dal ${date}`],
+            ['Creatinina', 'alto', `+1,5 mg/dL dal ${date}`],
+        ]);
+    });
+
+    await t.test('la nota d’importazione e la sintesi riportano entrambi i nomi', () => {
+        const note = 'Esami senza codice LOINC: Marcatore Alfa, Marcatore Beta.';
+        assert.deepEqual(result.notes, [note]);
+        assert.equal(result.facts.find(fact => fact.kind === 'document_entry')?.values.preparedNotes, note);
+    });
+});
 
 test('parse rejects a foreign schema, prototype kinds and malformed sources with a warning', () => {
     assert.equal(parsePreparedExtraction('{').ok, false);
