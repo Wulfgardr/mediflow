@@ -120,3 +120,25 @@ test('same-account login in another tab preserves draft and requires an explicit
         expect(writes).toBe(1);
     } finally { await other.close(); }
 });
+
+test('physician tax code is validated, saved and reread from the profile', async ({ page }, testInfo) => {
+    await bootstrapUnlockedSession(page, '1234');
+    await page.goto('/settings/profilo');
+    const code = page.getByLabel('Codice fiscale', { exact: true });
+    const save = page.getByRole('button', { name: 'Salva profilo', exact: true });
+    await expect(save).toBeEnabled();
+    await code.fill('RSSMRA85T10A562X');
+    await save.click();
+    await expect(page.getByRole('status').filter({ hasText: 'Codice fiscale non valido.' })).toBeVisible();
+    await code.fill('rssmra85t10a562s');
+    await save.click();
+    await expect(page.getByRole('status').filter({ hasText: 'Profilo aggiornato.' })).toBeVisible();
+    await page.reload();
+    await expect(code).toHaveValue('RSSMRA85T10A562S');
+    await testInfo.attach('physician-tax-code', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+    await code.fill('');
+    await save.click();
+    await expect(page.getByRole('status').filter({ hasText: 'Profilo aggiornato.' })).toBeVisible();
+    await page.reload();
+    await expect(code).toHaveValue('');
+});

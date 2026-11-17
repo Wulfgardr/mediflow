@@ -126,6 +126,9 @@ export function evaluateSettingsWrite(
     if (typeof key === 'string' && key.startsWith(RESTORE_RECEIPT_PREFIX)) {
         return { allowed: false, status: 403, reason: 'Le ricevute di ripristino appartengono al servizio di recupero.' };
     }
+    if (typeof key === 'string' && key.startsWith('accountProfile.doctorTaxCode:')) {
+        return { allowed: false, status: 403, reason: 'Modifica il codice fiscale dalla pagina Profilo.' };
+    }
     const channel = settingsWriteChannelForSession(session);
     const policy = SETTINGS_WRITE_REGISTRY[key];
 

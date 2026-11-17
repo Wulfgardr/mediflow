@@ -14,6 +14,7 @@ pub struct AccountProfileSnapshot {
     pub username: String,
     pub display_name: Option<String>,
     pub ambulatory_name: Option<String>,
+    pub doctor_tax_code: Option<String>,
     pub profile_version: String,
     pub archive_generation: String,
 }
@@ -46,6 +47,7 @@ pub struct AccountProfileRead {
     pub username: String,
     pub display_name: Option<String>,
     pub ambulatory_name: Option<String>,
+    pub doctor_tax_code: Option<String>,
     pub profile_version: String,
     pub archive_generation: String,
 }
@@ -57,6 +59,7 @@ impl AccountProfileRead {
             username: self.username.clone(),
             display_name: self.display_name.clone(),
             ambulatory_name: self.ambulatory_name.clone(),
+            doctor_tax_code: self.doctor_tax_code.clone(),
             profile_version: self.profile_version.clone(),
             archive_generation: self.archive_generation.clone(),
         }
@@ -115,6 +118,7 @@ struct ReadWire {
     username: String,
     display_name: Option<String>,
     ambulatory_name: Option<String>,
+    doctor_tax_code: Option<String>,
     profile_version: String,
     archive_generation: String,
 }
@@ -126,6 +130,7 @@ struct SnapshotWire {
     username: String,
     display_name: Option<String>,
     ambulatory_name: Option<String>,
+    doctor_tax_code: Option<String>,
     profile_version: String,
     archive_generation: String,
 }
@@ -141,6 +146,7 @@ impl SnapshotWire {
             username: self.username,
             display_name: self.display_name,
             ambulatory_name: self.ambulatory_name,
+            doctor_tax_code: self.doctor_tax_code.clone(),
             profile_version: self.profile_version,
             archive_generation: self.archive_generation,
         };
@@ -157,6 +163,7 @@ struct UpdateWire {
     username: String,
     display_name: Option<String>,
     ambulatory_name: Option<String>,
+    doctor_tax_code: Option<String>,
     profile_version: String,
     archive_generation: String,
 }
@@ -168,6 +175,7 @@ struct ConflictWire {
     username: String,
     display_name: Option<String>,
     ambulatory_name: Option<String>,
+    doctor_tax_code: Option<String>,
     profile_version: String,
     archive_generation: String,
     code: String,
@@ -190,6 +198,7 @@ pub(crate) fn parse_read(
         username: wire.username,
         display_name: wire.display_name,
         ambulatory_name: wire.ambulatory_name,
+        doctor_tax_code: wire.doctor_tax_code,
         profile_version: wire.profile_version,
         archive_generation: wire.archive_generation,
     }
@@ -199,6 +208,7 @@ pub(crate) fn parse_read(
         username: snapshot.username,
         display_name: snapshot.display_name,
         ambulatory_name: snapshot.ambulatory_name,
+        doctor_tax_code: snapshot.doctor_tax_code,
         profile_version: snapshot.profile_version,
         archive_generation: snapshot.archive_generation,
     })
@@ -216,6 +226,7 @@ pub(crate) fn parse_update(
         username: wire.username,
         display_name: wire.display_name,
         ambulatory_name: wire.ambulatory_name,
+        doctor_tax_code: wire.doctor_tax_code,
         profile_version: wire.profile_version,
         archive_generation: wire.archive_generation,
     }
@@ -241,6 +252,7 @@ pub(crate) fn parse_conflict(
         username: wire.username,
         display_name: wire.display_name,
         ambulatory_name: wire.ambulatory_name,
+        doctor_tax_code: wire.doctor_tax_code,
         profile_version: wire.profile_version,
         archive_generation: wire.archive_generation,
     }

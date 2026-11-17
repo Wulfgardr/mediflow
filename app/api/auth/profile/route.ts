@@ -78,6 +78,7 @@ export async function PUT(request: Request) {
             expectedVersion: parsedBody.data.expectedVersion,
             displayName: parsedBody.data.displayName,
             ambulatoryName: parsedBody.data.ambulatoryName,
+            doctorTaxCode: parsedBody.data.doctorTaxCode,
             nativeBinding,
         });
 
