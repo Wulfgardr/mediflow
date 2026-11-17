@@ -13,7 +13,7 @@ const fiscalCode = 'RSSMRA80A01F205X';
 const sentinel = 'SYNTHETIC_AUTO_VISIT_20261117';
 test.describe.configure({ retries: 0 });
 
-test('a CLI paired for twelve hours deposits a visit and the unlocked tab automatically accepts only note and PDF', async ({ page, isolatedRuntime }, info) => {
+for (const reviewed of [false, true]) test(reviewed ? 'the physician explicitly applies the verified clinical proposals after reading the original PDF' : 'a CLI paired for twelve hours deposits a visit and the unlocked tab automatically accepts only note and PDF', async ({ page, isolatedRuntime }, info) => {
     test.setTimeout(150000);
     await createSyntheticAgentMandate(page);
     const credentials = info.outputPath('private-agent');
@@ -112,5 +112,23 @@ test('a CLI paired for twelve hours deposits a visit and the unlocked tab automa
     for (const name of ['medical.db', 'medical.db-wal']) {
         try { expect(readFileSync(path.join(isolatedRuntime.dataDirectory, name)).includes(Buffer.from(sentinel))).toBe(false); }
         catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+    }
+    if (reviewed) {
+        const catalog = await page.evaluate(async () => {
+            const response = await fetch('/api/exemptions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: '013', description: 'Esenzione sintetica per prova isolata', source: 'synthetic' }) });
+            return { status: response.status, body: await response.json() };
+        });
+        expect(catalog.status).toBe(200);
+        expect(catalog.body.count).toBe(1);
+        await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
+        await expect(page.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
+        expect(await counts()).toEqual([1, 1, 0, 0]);
+        await page.getByRole('button', { name: 'Applica la visita', exact: true }).click();
+        await expect.poll(counts).toEqual([1, 1, 1, 1]);
+        await expect(page.getByText('Nessuna visita in attesa.', { exact: true })).toBeVisible();
+        const applied = await (await page.request.get('/api/agent-mandates/incoming')).json();
+        expect(applied.find((row: { id: string }) => row.id === visitId).appliedItemIds).toHaveLength(6);
+        await page.screenshot({ path: info.outputPath('proposte-applicate-dopo-conferma.png'), fullPage: true });
     }
 });
