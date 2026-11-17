@@ -16,8 +16,8 @@ requisiti minimi debba rispettare chi contribuisce.
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) (confini architetturali stabili)
 - [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (stato del sistema e limiti operativi, con le rispettive date)
-- [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) (percorsi dei dati e confini di fiducia)
-- [docs/walkthrough.md](./docs/walkthrough.md) (flussi operativi end-to-end)
+- [docs/topologia-dati-flussi.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md) (percorsi dei dati e confini di fiducia)
+- [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md) (flussi operativi end-to-end)
 - [docs/adr/](./docs/adr/README.md) (decisioni con impatto sicurezza)
 - [docs/security-audits/](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/security-audits/README.md) (rapporti pubblici sanitizzati, legati a revisioni esatte; non sostituiscono questa policy)
 - [docs/README.md](./docs/README.md) e [docs/markdown-index.md](./docs/markdown-index.md) (mappa e indice completo documentazione)

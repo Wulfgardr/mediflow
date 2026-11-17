@@ -12,7 +12,7 @@ sono distinti dalla disponibilità di queste impostazioni.
 Per orientarti prima dell'avvio o approfondire una scelta:
 - [README.md](../README.md) presenta il progetto e il primo accesso;
 - [docs/COMPLIANCE.md](./COMPLIANCE.md) raccoglie il quadro privacy/GDPR/FHIR;
-- [docs/ROADMAP.md](./ROADMAP.md) descrive la direzione del prodotto.
+- [docs/ROADMAP.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ROADMAP.md) descrive la direzione del prodotto.
 
 ---
 

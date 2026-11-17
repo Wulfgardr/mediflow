@@ -12,7 +12,7 @@ read_when:
 > Questa pagina distingue il prodotto disponibile, il contenuto dei sorgenti e
 > le prove che ne documentano lo sviluppo. Per i principi stabili prevalgono
 > [ARCHITECTURE.md](../ARCHITECTURE.md) e [SECURITY.md](../SECURITY.md); per i
-> flussi operativi, [docs/walkthrough.md](./walkthrough.md). La governance della
+> flussi operativi, [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md). La governance della
 > repository è definita da [CONTRIBUTING.md](../CONTRIBUTING.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
@@ -316,7 +316,7 @@ Documenti/ADR principali:
 - [ADR 0060](./adr/0060-kree8-cockpit-live-root-entry.md)
 - [ADR 0047](./adr/0047-graphite-workbench-single-official-web-shell.md)
 - [ADR 0050](./adr/0050-functional-preview-profiles-retired-on-mainline.md)
-- [docs/walkthrough.md](./walkthrough.md)
+- [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md)
 
 ### 2.3 Il Mac resta il nodo autorevole
 
@@ -657,8 +657,8 @@ sintesi o una prova storica per una nuova decisione.
    delle prove storiche.
 4. [ARCHITECTURE.md](../ARCHITECTURE.md): principi stabili.
 5. [SECURITY.md](../SECURITY.md): minacce considerate, privacy, registrazione degli eventi e oscuramento dei dati identificativi.
-6. [docs/walkthrough.md](./walkthrough.md): flusso end-to-end.
-7. [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md): percorsi dati
+6. [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md): flusso end-to-end.
+7. [docs/topologia-dati-flussi.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md): percorsi dati
    e trust boundaries.
 8. [docs/repository-topology.md](./repository-topology.md): governance della
    repository e confine Git/fuori-Git.
@@ -818,9 +818,9 @@ non introduce nuovi percorsi remoti o cloud.
 ## ⚙️ 8. Regole di manutenzione
 
 Una funzione che cambia richiede l’aggiornamento del proprio documento
-canonico e, se cambia il percorso reale, del [walkthrough](./walkthrough.md).
+canonico e, se cambia il percorso reale, del [walkthrough](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md).
 Modifiche a trust boundary, API o dati riguardano anche la
-[topologia dei flussi](./topologia-dati-flussi.md); modifiche alla precedenza
+[topologia dei flussi](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md); modifiche alla precedenza
 delle fonti vanno nell’[indice canonico](./README.md). Aggiunte, rimozioni o
 rinomine Markdown richiedono l’aggiornamento dell’[inventario](./markdown-index.md).
 Issue e roadmap pubbliche devono riflettere i cambi di priorità operativa.
