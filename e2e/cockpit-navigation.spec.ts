@@ -1,4 +1,3 @@
-/* delay real successful reads; no replacement patient or route payload. */
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 import { trustedArchiveWebRequestHeaders, fetchInterceptedRequest } from './fixtures/trusted-web-request';
@@ -59,7 +58,6 @@ test('a patient read completing during navigation cannot restore the previous ar
     await navigation.getByRole('link', { name: 'Pazienti', exact: true }).click();
     await navigationReceived.promise;
     releasePatients.release();
-    // This text is published only after the real patient list has been rendered.
     await expect(page.getByText(/(?:scheda pronta|schede pronte) nell’archivio locale\.$/u)).toBeVisible();
     releaseNavigation.release();
     delayNavigation = false;
@@ -85,8 +83,6 @@ test('deferred row focus yields to a newer focus outside the list', async ({ pag
   const rows = page.getByTestId('lume-patient-row');
   await expect(rows).toHaveCount(2);
   await rows.first().focus();
-  // Hold browser animation callbacks to exercise a newer focus before the
-  // pending virtual-row focus runs. Keyboard and application handlers are real.
   await page.evaluate(() => {
     const originalRequest = window.requestAnimationFrame.bind(window);
     const originalCancel = window.cancelAnimationFrame.bind(window);
@@ -130,8 +126,6 @@ test('deferred row focus yields to a newer focus outside the list', async ({ pag
   }
 });
 
-/* hold the real folder response while the loaded cockpit can still
-   render its child. Both the summary intent and the return destination matter. */
 test('Apri quadro has one destination while folder navigation is pending', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const archiveHeaders = await trustedArchiveWebRequestHeaders(page);

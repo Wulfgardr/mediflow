@@ -1,7 +1,3 @@
-/* test-only, passive observation of one real keyboard activation.
- * No synthetic events, focus repair, input activation or application hooks.
- * The returned object remains in the page; snapshots contain passive state and bounded counts only.
- */
 export type ChooserBrowserState = Readonly<{
   documentHasFocus: boolean | null; visibilityState: DocumentVisibilityState | null;
   userActivationIsActive: boolean | null; userActivationHasBeenActive: boolean | null;
@@ -19,13 +15,10 @@ export type KeyboardChooserSnapshot = Readonly<{
   click: null | Readonly<{ afterEnter: boolean; state: ChooserState; defaultPrevented: boolean }>;
 }>;
 
-// Self-contained: Playwright serializes this function, not its module scope.
 export function installKeyboardChooserObservation(element: Element) {
   const root = element as HTMLElement;
   const document = root.ownerDocument;
   const input = root.querySelector<HTMLInputElement>('input[type="file"]');
-  // Passive browser context at each phase; absent APIs stay unknown. These
-  // diagnostics do not replace the native event/original-input oracle.
   const browserState = (): ChooserBrowserState => {
     const activation = document.defaultView?.navigator.userActivation;
     return {
@@ -63,8 +56,6 @@ export function installKeyboardChooserObservation(element: Element) {
     inputClicks = Math.min(2, inputClicks + 1);
     click ??= { event, afterEnter: enters === 1, state: state() };
   };
-  // Capture sees the input click even when dropzone stops its propagation.
-  // Keeping the original Event also exposes cancellation AFTER our listener.
   document.addEventListener('keydown', onKeyDown, true);
   document.addEventListener('click', onClick, true);
   return {
@@ -94,8 +85,6 @@ export function chooserReady(state: ChooserState): boolean {
     && state.inputEnabled && state.inputNotTabbable;
 }
 
-// A completed DOM chain is NOT a browser PASS: the caller must still await
-// the actual native filechooser, verify its input identity and cancel it.
 export function keyboardChooserDecision(snapshot: KeyboardChooserSnapshot): string {
   if (!chooserReady(snapshot.initial)) return 'PRECONDITION_NOT_READY';
   if (!snapshot.initial.rootFocused) return 'PRECONDITION_FOCUS_MISSING';

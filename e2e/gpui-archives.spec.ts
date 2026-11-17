@@ -66,7 +66,6 @@ test('GPUI local authority restores with confirmation, atomic snapshot and durab
     const keys = db.prepare('SELECT * FROM users ORDER BY id').all();
     const history = db.prepare('SELECT * FROM audit_events ORDER BY event_id').all();
     try {
-        // Cancel means no mutation request; both data and receipt are checked independently.
         expect((await request.get(`/api/system/backup-restore/receipts/${id}`)).status()).toBe(404);
         expect(db.prepare('SELECT * FROM patients ORDER BY id').all()).toEqual(before);
         for (const missing of ['x-mediflow-restore-confirmation', 'x-mediflow-restore-snapshot', 'x-mediflow-restore-id']) {

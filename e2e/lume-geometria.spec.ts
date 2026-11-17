@@ -1,9 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
-// Scala web dei raggi di Punto d'inchiostro (docs/design/punto-inchiostro/01-specifica.md):
-// righe e record 0, controlli 10, voce in scrittura 12, piano 16. Cerchi e
-// pillole (raggio pari almeno a metà del lato corto) sono misurati a parte.
 const WEB_RADIUS_SCALE = [0, 10, 12, 16];
 
 const VIEWPORTS = [
@@ -111,8 +108,6 @@ test('nuova scheda: è segnata solo la sezione corrente', async ({ page }) => {
     return { background: style.backgroundColor, border: style.borderTopWidth, shadow: style.boxShadow };
   });
   const [currentLook, otherLook] = await Promise.all([look(current), look(other)]);
-  // La sezione non corrente resta testo: nessun fondo pieno, nessuna cornice.
   expect(otherLook).toEqual({ background: 'rgba(0, 0, 0, 0)', border: '0px', shadow: 'none' });
-  // La sezione corrente porta il filetto d'inchiostro sotto, come le linguette della Scheda.
   expect(currentLook.shadow).toMatch(/0px -2px 0px 0px inset/);
 });

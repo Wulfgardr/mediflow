@@ -1,9 +1,3 @@
-/* WUL-536. Falsificatore di contrasto sui due registri attivi.
-   Nasce da un difetto reale: `--lume-signal-critical` e' register-independent e,
-   usato grezzo come colore di testo, su grafite scendeva a 2.81:1 sull'etichetta
-   «Zona Pericolo» di ogni pagina di impostazioni. Il rapporto e' calcolato sui
-   valori COMPUTATI, non sul sorgente, perche' e' l'unico modo di intercettare un
-   token che cambia significato al cambio di registro. */
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
@@ -21,9 +15,6 @@ async function setRegistro(page: Page, registro: (typeof REGISTRI)[number]): Pro
   }, registro);
 }
 
-/* Il calcolo gira nella pagina: serve lo sfondo EFFETTIVO, cioe' il primo
-   antenato con un colore opaco, perche' le superfici Lume sono spesso
-   trasparenti e il contrasto non si legge sul nodo di testo. */
 async function repertiSottoSoglia(page: Page): Promise<Reperto[]> {
   return page.evaluate(() => {
     const sfondoEffettivo = (element: Element): string => {
@@ -105,8 +96,6 @@ for (const registro of REGISTRI) {
       await setRegistro(page, registro);
       await page.waitForTimeout(250);
 
-      /* Ancora del difetto originale: se l'etichetta sparisce, il test smette di
-         sorvegliare cio' per cui e' nato e va aggiornato invece di restare verde. */
       expect(
         await page.getByText('Zona Pericolo').count(),
         `${superficie}: l'etichetta «Zona Pericolo» deve essere presente`,

@@ -1,12 +1,6 @@
-/* Issue 109, riferimento 68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
-/*
- * Questo spec verifica la composizione della slice 5: una superficie editor
- * unica e i flussi caso di review/handoff. lume-new-entry.spec.ts resta la
- * prova comportamentale di form, ARIA, errori, salvataggio e opacità.
- */
 test.describe.configure({ retries: 0 });
 
 type ViewCase = {

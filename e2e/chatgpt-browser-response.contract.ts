@@ -1,6 +1,3 @@
-/* Synthetic oracle conformance, inside the EXISTING browser acceptance command.
- * This tiny HTTP server is not a replacement for the real Card/root scenarios.
- */
 import assert from 'node:assert/strict';
 import type { TestContext } from 'node:test';
 import { createServer } from 'node:http';
@@ -33,10 +30,7 @@ export async function checkBrowserResponseContract(browser: Browser, t: TestCont
                     ...(mode === 'missing-no-store' ? {} : { 'Cache-Control': 'no-store' }),
                     'Content-Length': body.byteLength + (['truncated-valid-json', 'abort', 'cancel-before-eof'].includes(mode) ? 8 : 0), 'Connection': 'close',
                 });
-                // Even syntactically valid JSON must fail when HTTP framing is incomplete.
                 if (mode === 'abort' || mode === 'cancel-before-eof') {
-                    // Keep the real body open until the explicit client fault.
-                    // No timer/sleep creates the ordering; context cleanup owns the socket.
                     output.flushHeaders(); output.write(body);
                 } else output.end(body);
             });
@@ -56,7 +50,6 @@ export async function checkBrowserResponseContract(browser: Browser, t: TestCont
         await page.goto(base);
         const operation = mode === 'pending-409' ? 'login/complete' : 'consent';
         const ticket = await oracle.arm(operation);
-        // An explicit synthetic consumer, not a mocked response or native method.
         const consumer = page.evaluate(async ({ mode, path }) => {
             const controller = new AbortController();
             try {

@@ -1,4 +1,3 @@
-/* full application and authenticated routes, isolated synthetic data only. */
 import { expect, test } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, unlockIfNeeded } from './utils';
 import type { Page } from '@playwright/test';
@@ -29,9 +28,6 @@ test('Documenti: upload, persistenza, consultazione e cancellazione senza genera
 });
 
 
-// These fixtures use the same real upload, encryption and isolated runtime as
-// the positive acceptance flow. Only the response under examination is delayed
-// or changed; the app and its effects are never substituted.
 async function originalFixture(page: Page) {
     test.skip(process.env.E2E_DOCUMENTS_SYNTHETIC_ONLY !== '1', 'Requires explicit isolated synthetic data');
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -88,8 +84,6 @@ async function delayOriginal(page: Page, id: string) {
         const response = await fetchInterceptedRequest(route);
         expect(response.status()).toBe(200);
         ready.resolve(); await release.promise;
-        // Cancellation makes delivery impossible; its observed requestfailed is
-        // asserted by the test, rather than hiding a still-current read error.
         await route.fulfill({ response }).catch(() => undefined);
         delivered.resolve();
     });
@@ -191,7 +185,6 @@ test('Originale: una rilettura fallita nasconde la fonte e pagehide ritira la le
             && url.searchParams.get('patientId') === patientId) return route.fulfill({ status: 503, json: { error: 'Synthetic list unavailable' } });
         return route.continue();
     });
-    // A successful real write causes the app's ordinary scoped invalidation.
     await docs.locator('input[type="file"]').setInputFiles({ name: 'originale-sintetico-C.txt', mimeType: 'text/plain', buffer: Buffer.from('Testo sintetico C.') });
     await expect(docs.getByRole('status').filter({ hasText: '1 allegato salvato' })).toBeVisible();
     await expect(docs.getByRole('button', { name: 'Riprova elenco', exact: true })).toBeVisible();

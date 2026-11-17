@@ -75,7 +75,6 @@ test('server binds GPUI authority to its socket ingress across login, both write
         expect((await call(`/api/attachments/${id}`, 'GET', session)).status).toBe(200);
         expect((await call(`/api/attachments/${id}`, 'DELETE', session, deletion)).status).toBe(200);
         expect((await call(`/api/attachments/${id}`, 'GET', session)).status).toBe(404);
-        // Restore the synthetic setting before retiring this authority.
         expect((await call(setting, 'PUT', session, {value: before.value ?? 'disabled'})).status).toBe(200);
         const fence = await call('/api/auth/check', 'GET', session);
         const logout = { ...session, 'If-Match': String(fence.headers.etag), 'Idempotency-Key': randomUUID() };

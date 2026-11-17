@@ -1,4 +1,3 @@
-/* issue 105, riferimento 68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   assertKeyboardFocusProgresses,
@@ -47,8 +46,6 @@ async function createPatient(page: Page): Promise<string> {
   return patientId;
 }
 
-/* The global diary lists non-deleted entries independently from the
-   patient list. Delete only this spec's entries before their patients; unrelated diary rows stay intact. */
 async function cleanupCreatedPatients(page: Page): Promise<void> {
   for (const patientId of createdPatientIds.splice(0).reverse()) {
     const entriesResponse = await page.evaluate(async (id) => {
@@ -111,9 +108,6 @@ async function createEntry(
   }, { patientId, fixture });
 }
 
-/* a full collector can already contain other patients/scales.
-   Capture the ordinary global window and keep every row still within its
-   50-entry limit. New fixture dates follow that window, without changing clocks. */
 type DiaryBaseline = { signatures: string[]; nextDate: number };
 
 async function readGlobalWindow(page: Page): Promise<Array<{ date: string }>> {
@@ -268,8 +262,6 @@ async function assertContrastAndFocus(
         alpha,
       ];
     };
-    // a transparent entry inherits the first painted ancestor; evaluating
-    // its own computed background as black would measure a non-existent surface.
     const paintedBackground = (element: HTMLElement): Rgba => {
       const ancestors: HTMLElement[] = [];
       for (let current: HTMLElement | null = element; current; current = current.parentElement) ancestors.push(current);
@@ -308,8 +300,6 @@ async function assertContrastAndFocus(
 
   await expect(entries.filter({ hasText: `${FIXTURE_PREFIX} 3` })).toHaveAttribute('data-active', 'true');
   await expect(page.locator('[data-testid="lume-diario-entry"][data-active="true"]')).toHaveCount(1);
-  // The focused diary row stays in the flat register: active state is the
-  // deliberate ink-tint background, while a shadow remains reserved for focus.
   const backgrounds = await entries.evaluateAll((elements) => elements.map((element) => getComputedStyle(element).backgroundColor));
   expect(backgrounds[0]).not.toBe(backgrounds[1]);
   expect(backgrounds.slice(1).every((background) => background === backgrounds[1])).toBe(true);
@@ -329,7 +319,6 @@ async function assertReflowStack(diary: Locator): Promise<void> {
   for (let index = 1; index < geometry.length; index += 1) {
     expect(geometry[index].top).toBeGreaterThanOrEqual(geometry[index - 1].bottom - 1);
   }
-  // Date and provenance may share a row or stack; their text must stay separate.
   expect(geometry.every((entry) => entry.dateRight <= entry.provenanceLeft
     || entry.dateBottom <= entry.provenanceTop)).toBe(true);
 }
@@ -410,8 +399,6 @@ test.describe.serial('Diario globale Lume', () => {
 
 
     const registerFamily = await resolvedRegisterFamily(page);
-    // dates orient chronology in the ordinary text face; provenance
-    // remains Registro. Both retain their distinct, observable presentation.
     const metaFamilies = await diary.locator('[data-lume-entry-part="provenance"]').evaluateAll(
       (elements) => elements.map((element) => getComputedStyle(element).fontFamily),
     );
