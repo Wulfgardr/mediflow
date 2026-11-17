@@ -58,3 +58,14 @@ completo: mandato, credenziali, deposito, applicatore, ricevute, In arrivo,
 CLI e prove del percorso medico sono nei pezzi successivi. La provenienza
 è predisposta per quel chiamante fidato; la sola presenza dei campi non
 prova la sua futura ammissione. Nessuna prova autorizza l'uso clinico.
+
+## Raccordo del payload di backup
+
+La prima CI A6 ha fermato build e avvio prima degli E2E: il roster del
+runtime di backup conservava i digest precedenti dei due lettori di ledger
+e di `backup-audit.ts`. I tre pin ora identificano i moduli qualificati
+qui sopra. Il gate conserva confronti sui byte e ammissione senza database.
+La suite `lib/scheduled-backup-runtime-contract.test.ts` passa con 45 casi,
+inclusi payload alterati, dipendenze mancanti, symlink e import senza accesso
+in scrittura o a SQLite. Il difetto osservato è conservato nella CI del
+primo head A6, `c43d028917df9899d13b51c505b0d6c5cd05a947`.
