@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { dbServer } from '../db-server';
 import * as entryWriter from '../entry-write-operation';
 import * as therapyWriter from '../therapy-write-operation';
@@ -9,6 +9,7 @@ import { updatePatientOperationInTransaction } from '../patient-update-operation
 import { PATIENT_PROFILE_UPDATE_OPERATION } from '../patient-profile-update-contract';
 import { bindSyntheticArchiveSessions } from '../security/web-auth-lifecycle-owner-test-fixture';
 import { patients, users } from '../schema';
+import { activePatients } from '../patient-lifecycle';
 
 export const patientId = 'synthetic-composition-patient';
 export const session = { id: `synthetic-composition-session-${process.pid}`, userId: 'synthetic-composition-doctor',
@@ -30,7 +31,7 @@ export function seedComposition(): void {
 export function compositionSnapshot() {
     return { counts: Object.fromEntries(['entries', 'therapies', 'service_prescriptions', 'attachments', 'observations', 'audit_events']
         .map(table => [table, (dbServer.$client.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n])),
-        patient: dbServer.select().from(patients).where(eq(patients.id, patientId)).get() };
+        patient: dbServer.select().from(patients).where(and(eq(patients.id, patientId), activePatients())).get() };
 }
 
 export function composeOriginalThree(prefix: string): Promise<unknown>[] {
@@ -88,7 +89,7 @@ function steps(tx: Tx, prefix: string) {
 
 export function composeAll(prefix: string, options: { failAfter?: number; expectedRevision?: number; denyAt?: number } = {}): void {
     dbServer.transaction(tx => {
-        const patient = tx.select().from(patients).where(eq(patients.id, patientId)).get();
+        const patient = tx.select().from(patients).where(and(eq(patients.id, patientId), activePatients())).get();
         if (patient?.version !== (options.expectedRevision ?? 1)) throw new Error('SYNTHETIC_REVISION_CHANGED');
         for (const [index, apply] of steps(tx, prefix).entries()) {
             if (options.denyAt === index) throw new Error('SYNTHETIC_COMMIT_REVOKED');
