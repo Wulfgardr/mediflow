@@ -1,4 +1,3 @@
-/* real settings recovery and currentness with isolated synthetic SQLite. */
 import { expect, test, type Page } from '@playwright/test';
 import Database from 'better-sqlite3';
 import { isAbsolute, join } from 'node:path';
@@ -63,8 +62,6 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         for (const lastName of ['SoloProva', 'Condiviso']) {
             const patientId = randomUUID();
             patientIds.push(patientId);
-            // create through the authenticated Web route; its destination is
-            // the active/default ambulatory, then scope these synthetic IDs below.
             const response = await page.request.post('/api/patients', { headers: archiveHeaders, data: {
                 id: patientId, firstName: 'Sintetico', lastName,
                 taxCode: `AMB${patientId.replaceAll('-', '').slice(0, 13).toUpperCase()}`,
@@ -81,8 +78,6 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
             expect((await response.json() as { id: string }).id).toBe(patientId);
             expect((await page.request.get(`/api/patients/${patientId}`)).status()).toBe(200);
         }
-        // fixture-only alignment; the Web legacy route selected the
-        // default/active destination. Keep versions at their create value.
         sql.transaction(() => {
             for (const patientId of patientIds) {
                 sql.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id=?').run(patientId);
@@ -172,8 +167,6 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         throw error;
     } finally {
         try {
-            // Restore only this test's two synthetic patients, including
-            // original membership timestamps. Keep their tested versions and audit.
             const cleanupSql = cleanupConnection ?? new Database(join(dir, 'medical.db'), { fileMustExist: true });
             try {
                 cleanupSql.exec('DROP TRIGGER IF EXISTS synthetic_ambulatory_ui_audit');

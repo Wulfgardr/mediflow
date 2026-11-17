@@ -72,8 +72,6 @@ async function seedSyntheticInsights(page: Page, patientId: string, insights: Sy
     const current = await currentResponse.json() as { version?: number };
     if (typeof current.version !== 'number') throw new Error('Versione fixture Evidence Stack assente');
 
-    // La route esercitata dalla curation cifra il payload client-side. Il seed usa
-    // invece solo testo sintetico e l'API locale per predisporre lo stato iniziale.
     const updateResponse = await fetch(`/api/patients/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -195,7 +193,6 @@ test('le sintesi archiviate chiuse non montano markdown e testo sorgente', async
   await expect(archive.locator('article')).toHaveCount(insights.length);
 
   async function assertMounted(selected: number | null) {
-    // Count DOM nodes, including hidden ones: visibility alone misses eager mounting.
     await expect(archive.locator('h2')).toHaveCount(selected === null ? 0 : 1);
     await expect(archive.locator('pre')).toHaveCount(selected === null ? 0 : 1);
     for (const [index, insight] of insights.entries()) {

@@ -40,12 +40,8 @@ export async function createBrowserResponseOracle(page: Page, base: string) {
         const response = new Promise<BrowserResponse>(resolve => { settleResponse = resolve; });
         const finished = new Promise<void>(resolve => { settleFinished = resolve; });
         const failure = new Promise<never>((_, fail) => { reject = fail; });
-        // The same rejection is raced by response/json. Mark it handled during the
-        // user's click without converting it into a success or changing its cause.
         void failure.catch(() => {});
         const fail = (code: string) => {
-            // Snapshot Node observations at this failure, not a reader phase or
-            // an abort initiator. The plain message also survives CI reporting.
             const context = Object.freeze({ operation, requestSelected: request !== undefined,
                 responseStatus: responseValue?.status() ?? null, networkTerminal });
             const error = new Error(`${code} [operation=${context.operation}; responseStatus=${context.responseStatus ?? 'not-observed'}; requestSelected=${context.requestSelected}; networkTerminal=${context.networkTerminal}]`);

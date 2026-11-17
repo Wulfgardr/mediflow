@@ -1,5 +1,4 @@
 import { scopedNotesOpenInput, syntheticScopedNotesView } from './fixtures/scoped-profile-notes-query';
-/* WUL-457: exact-string legacy systems only, not malformed-record normalization. */
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
@@ -62,7 +61,6 @@ async function fixture(page: Page, entry: EntryPoint) {
       .getByRole('menuitem', { name: 'Condividi FHIR', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Azioni', exact: true }).click();
   }
-  // Install after the modules capability probe, so unrelated startup File creation is excluded.
   await page.evaluate(() => {
     const effects: Effects = { blobs: 0, files: 0, objectUrls: 0, downloads: [], shares: [], payloads: [] };
     (window as Window & { __fhirEffects?: Effects }).__fhirEffects = effects;
@@ -157,7 +155,6 @@ for (const entry of ['edit-download', 'modules-download', 'modules-share'] as co
         await expect(page.getByRole('dialog', { name: 'Esporta FHIR con controllo FSE', exact: true })).toBeHidden();
       }
       if (!accept) {
-        // Let the async consumer settle; then reopening above also proves cancellation is repeatable.
         await page.waitForTimeout(200);
         expect(await effects(page)).toEqual(before);
         expect(downloads).toBe(previousDownloads);

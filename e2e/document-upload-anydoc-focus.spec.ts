@@ -61,7 +61,6 @@ async function createExtractableRtf(page: Page, patientId: string): Promise<Read
   expect(uploaded.patientId).toBe(patientId);
   expect(uploaded.data).toMatch(/^ENC:/u);
   // Cold webpack compilation of the detail route reloads the in-memory grant broker.
-  // Compile it before acquisition; the browser still performs its own authenticated read.
   const detail = await page.request.get(`/api/attachments/${uploaded.id}`);
   expect(detail.status()).toBe(200);
   expect((await detail.json() as { data: string }).data).toBe(uploaded.data);
@@ -105,8 +104,6 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   await page.setViewportSize({ width: 1440, height: 900 });
   await establishSyntheticSession(page);
 
-  // The deterministic login helper deliberately probes an already-locked state
-  // and receives one expected 409. Observe only the AnyDoc surface under test.
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
     if (['warning', 'error'].includes(message.type()) && browserMessages.length < 20) {
@@ -123,7 +120,6 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   await openDocumentArchive(page, patientId);
   await initialList.blocked;
 
-  // one accessible chooser opens the native picker and Tab visits the viewer before local extraction.
   const chooser = page.getByRole('button', { name: 'Carica documenti', exact: true });
   await expect(chooser).toHaveCount(1);
   await expect(chooser).toBeVisible();
@@ -138,8 +134,6 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   await chooser.focus();
   await expect(chooser).toBeFocused();
 
-  // No locator.press/refocus: a later focus loss must remain a failure. Observe
-  // the original root/input through the real Enter and the real native picker.
   const observation = await chooser.evaluateHandle(installKeyboardChooserObservation);
   const chooserProtocol = await page.context().newCDPSession(page);
   let keyboardSnapshot: KeyboardChooserSnapshot | null = null;
@@ -157,13 +151,11 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
     expect(initialSnapshot.initial.rootFocused, 'focus changed before Enter').toBe(true);
     const nativeWaiter = page.waitForEvent('filechooser').then((value) => { nativeEvent = true; return value; });
     gesture = (async () => {
-      // Playwright 1.58.2 subscribes without awaiting Chromium's interception acknowledgement.
       await chooserProtocol.send('Page.setInterceptFileChooserDialog', { enabled: true });
       await page.keyboard.press('Enter');
       const afterEnter: KeyboardChooserSnapshot = await observation.evaluate((probe) => probe.snapshot());
       keyboardSnapshot = afterEnter;
       decision = keyboardChooserDecision(afterEnter);
-      // Commit the discriminator before a native-event timeout can close the page.
       await testInfo.attach('anydoc-keyboard-activation', {
         body: Buffer.from(JSON.stringify({ decision, keyboardSnapshot, browserMessages })), contentType: 'application/json',
       });
@@ -176,12 +168,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
     await nativeChooser.setFiles([]);
     decision = 'NATIVE_CHOOSER_VERIFIED';
   } catch (error) { failures.push(error); }
-  // Join the SAME gesture promise before removing its observation, including
-  // when the native waiter failed first. This never sends another key.
   try { await gesture; } catch (error) { if (!failures.includes(error)) failures.push(error); }
-  // The test fixture owns the page. On a stage failure Promise.all observes
-  // both rejections; Playwright removes it on timeout/page teardown.
-  // Never replace a primary keyboard/chooser error with a cleanup/report error.
   try {
     if (!page.isClosed()) await observation.evaluate((probe) => probe.stop());
   } catch (error) { failures.push(error); }
@@ -270,8 +257,6 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   ]);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  // resize the same open document pane, as the user does; reloading
-  // would replace the UI whose responsive focus controls are being verified.
   await openPatientSection(page, 'documenti');
   await openDocumentActions(page, SYNTHETIC_ATTACHMENT_NAME);
   extractButton = page.getByRole('menuitem', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
@@ -403,9 +388,6 @@ test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima lo
 
   const preview = page.getByTestId('anydoc-local-extraction-preview');
   await expect(preview).toBeVisible();
-  // the receipt is reachable only after the client strictly validates the acquired grant,
-  // current canonical source, response provenance/digest and review-only contract (client lines 233-247).
-  // CDP response-body retrieval is unavailable in both CI and the packaged runtime.
   await preview.getByRole('button', { name: /Testo .*localmente/ }).click();
   await expect(preview.getByRole('button', { name: /Testo .*localmente/ })).toHaveText('Testo estratto localmente · da rivedere');
   await expect(preview.locator('pre')).toBeVisible();
@@ -420,7 +402,6 @@ test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima lo
   });
 });
 
-// native options must conceal filenames while preserving source identity.
 test('Documenti: privacy nasconde i nomi nel selettore prima e dopo la scelta', async ({ page }) => {
   await establishSyntheticSession(page);
   const patientId = await createSyntheticFixture(page);

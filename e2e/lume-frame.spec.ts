@@ -52,7 +52,6 @@ for (const frameCase of FRAME_CASES) {
     await page.setViewportSize({ width: frameCase.width, height: frameCase.height });
     await openSyntheticFrame(page, frameCase.register);
 
-    // ADR 0123: ordinary navigation owns links; the review mockup has no app rail.
     const navigation = page.getByRole('navigation', { name: 'Navigazione principale' });
     const patientsNav = navigation.getByRole('link', { name: 'Pazienti', exact: true });
     await patientsNav.focus();
@@ -72,8 +71,6 @@ for (const frameCase of FRAME_CASES) {
 
     await expect(rail).toHaveCSS('background-color', expected.chrome);
     await expect(canvas).toHaveCSS('background-color', expected.focal);
-    // The selected redesign removes decorative nested sheets at every width.
-    // Keep the depth check on the rendered surfaces, including the outer rail.
     for (const layer of [panel, focus]) {
       await expect(layer).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(layer).toHaveCSS('border-top-width', '0px');

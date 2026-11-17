@@ -57,7 +57,6 @@ async function openSyntheticAttachment(page: Page, scenario: Scenario, bytes: Bu
   await page.goto(`/patients/${patientId}/modules`);
   await openPatientSection(page, 'documenti');
   await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
-  // The ordinary facade encrypts the upload. Plaintext API seeds do NOT qualify this test.
   const saved = page.waitForResponse(response => response.request().method() === 'POST'
     && new URL(response.url()).pathname === '/api/attachments');
   await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
@@ -102,8 +101,6 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
       await openDocumentActions(page, attachment.name);
       await page.getByRole('menuitem', { name: `Estrai testo localmente da ${attachment.name}` }).click();
       const acquired = await acquirePromise;
-      // acquire status stays direct; the unchanged client validates its grant.
-      // Observe project bytes passively, without relying on the inspector body cache.
       expect(acquired.status()).toBe(200);
       const response = await responsePromise;
       expect(response.status()).toBe(200);
@@ -124,7 +121,6 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
       });
       const preview = page.getByTestId('anydoc-local-extraction-preview');
       if (scenario === 'image') {
-        // Single images have no PDF page routing in the current application contract.
         expect(result.status).toBe('review_required');
         expect(result.receipt.ocrProvenance).toBeUndefined();
         await expect(preview).toHaveCount(0);
@@ -135,7 +131,6 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
         await expect(preview).toBeVisible();
         await preview.getByRole('button', { name: /Testo (?:estratto localmente|OCR locale)/ }).click();
         await expect(preview.locator('pre')).toHaveText(result.markdown);
-        // AnyDoc normalizes whitespace around punctuation; preserve words and order.
         if (scenario !== 'scan') await expect(preview).toContainText(/PRIMA PAGINA TESTUALE\s*-\s*DOCUMENTO SINTETICO/);
         if (scenario === 'text') {
           expect(result.receipt.ocrProvenance).toBeUndefined();
@@ -162,7 +157,6 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
   });
 }
 
-/* a completed response held by the browser must never reappear after cancellation. */
 test('Upload cifrato: annullamento, risposta tardiva, replay e nuovo tentativo', async ({ page }) => {
   test.setTimeout(90_000);
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -182,7 +176,7 @@ test('Upload cifrato: annullamento, risposta tardiva, replay e nuovo tentativo',
       const response = await fetchInterceptedRequest(route);
       expect(response.status()).toBe(200); reached.resolve();
       await release.promise;
-      try { await route.fulfill({ response }); } catch { /* Browser cancellation may close the request first. */ }
+      try { await route.fulfill({ response }); } catch {  }
       finally { delivered.resolve(); }
     } else await route.continue();
   });

@@ -4,9 +4,6 @@ import path from 'node:path';
 import ts from 'typescript';
 import * as webpackRuntime from 'next/dist/compiled/webpack/webpack.js';
 
-/* Exercise the actual hooks with React DOM, without a clinical server,
-   database or mocked React effects. The installed Next compiler bundles only
-   these two modules and the tiny synthetic reader below. */
 let bundle: string;
 test.beforeAll(async ({}, info) => {
   const directory = info.outputPath('hook-fixture');
@@ -49,8 +46,6 @@ test.beforeAll(async ({}, info) => {
     }
     createRoot(document.getElementById('root')).render(h(App));
   `);
-  // Next's bundled declaration exposes types only; its installed CommonJS
-  // runtime exports the compiler. Keep that one dependency statically visible.
   const { webpack } = webpackRuntime as unknown as {
     webpack(options: unknown): {
       run(callback: (error: Error | null, stats: { hasErrors(): boolean; toString(): string }) => void): void;
@@ -95,9 +90,6 @@ async function mountReader(page: Page) {
 
 const settle = (reads: Route[], body: string) => Promise.all(reads.map(route => route.fulfill({ body })));
 const fail = (reads: Route[]) => Promise.all(reads.map(route => route.abort('failed')));
-/* An intentional network fault also emits one browser resource error
-   per fetch. Assert the complete console, including those expected failures;
-   an additional hook error or any unrelated error must fail the test. */
 const expectedNetworkFailures = () => [
   'Failed to load resource: net::ERR_FAILED',
   'Failed to load resource: net::ERR_FAILED',
@@ -152,7 +144,6 @@ test('superseded reads cannot report errors or overwrite current results', async
 test('restored documents requery and never revive a previous generation', async ({ page }) => {
   const { errors, reads } = await mountReader(page);
   await transition(page, 'pagehide');
-  // A scoped invalidation while suspended must not start another read.
   await page.getByRole('button', { name: 'Refresh patients' }).click();
   expect(reads).toHaveLength(2);
   await transition(page, 'pageshow');

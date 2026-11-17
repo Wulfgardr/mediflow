@@ -125,7 +125,6 @@ test('i comandi dichiarano solo form montati e mantengono lo stato di apertura c
 
 for (const theme of ['giorno', 'grafite']) for (const width of [1440, 768, 390, 720]) {
   test(`cattura disclosure ${theme} ${width === 720 ? 'zoom-200' : width}`, async ({ page }) => {
-    // CSS zoom exercises doubled controls and 720 CSS px reflow in a 1440 px viewport.
     await page.setViewportSize({ width: width === 720 ? 1440 : width, height: 960 });
     await fixture(page);
     await page.evaluate(value => {
