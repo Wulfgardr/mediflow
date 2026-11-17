@@ -1,7 +1,7 @@
 import { readAuthenticatedWebSession } from '@/lib/security/server-auth';
 import { createAgentIncomingReader } from '@/lib/security/agent-incoming-reader';
 import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
-import { readAgentCassettes } from '@/lib/agent-cassette-store';
+import { readAgentCassette, readAgentCassetteIndex } from '@/lib/agent-cassette-store';
 import { applyAgentVisit, agentAppliedItemIds, AgentApplicationDenied } from '@/lib/agent-visit-application';
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
@@ -9,8 +9,14 @@ import { readNativeNetworkJson } from '@/lib/native-network-json-body';
 import { openDbServer } from '@/lib/db-server';
 
 export const runtime = 'nodejs';
-export const GET = createAgentIncomingReader({ session: readAuthenticatedWebSession,
-    cassettes: () => readAgentCassettes(openDbServer()).map(row => ({ ...row, appliedItemIds: agentAppliedItemIds(row.id) })) });
+export const GET = createAgentIncomingReader({
+    session: readAuthenticatedWebSession,
+    index: (actorRef, after) => readAgentCassetteIndex(openDbServer(), actorRef, after),
+    cassette: (actorRef, id) => {
+        const row = readAgentCassette(openDbServer(), id, actorRef);
+        return row && { ...row, appliedItemIds: agentAppliedItemIds(id) };
+    },
+});
 
 export async function POST(request: Request): Promise<Response> {
     const denied = (status: number) => Response.json({ status: 'not_applied', code: 'INCOMING_DENIED' }, { status, headers: { 'Cache-Control': 'no-store' } });

@@ -5,6 +5,10 @@ export type AgentCassetteItem = { id: string; kind: Exclude<AgentItemKind, 'anch
 export type AgentCassette = { id: string; mandateRef: string; agentRef: string; actorRef: string; archiveGeneration: string;
     publicKey: string; wrappedPrivateKey: string; modelProvider: 'openai' | 'anthropic' | 'local'; allowsClinicalEgress: number;
     anchorCiphertext: string; itemsCiphertext: string; status: 'open' | 'closed'; revision: number; depositedAt: number; modifiedAt: number };
+export type AgentCassetteIndexEntry = Pick<AgentCassette, 'id' | 'archiveGeneration' | 'status' | 'revision' | 'depositedAt'>;
+export type AgentCassetteIndexPage = { visits: AgentCassetteIndexEntry[]; next: string | null };
+export type IncomingAgentCassette = AgentCassette & { appliedItemIds: string[] };
+export const AGENT_CASSETTE_COMPLETE = 'cassette_complete';
 export const AGENT_ITEM_OPERATION: Record<AgentCassetteItem['kind'], AgentOperation> = {
     note: 'visita.nota', transcription: 'visita.trascrizione', pdf: 'visita.allega', therapy: 'visita.proponi.terapia',
     service: 'visita.proponi.prestazione', diagnosis: 'visita.proponi.diagnosi', exemption: 'visita.proponi.esenzione', observation: 'visita.proponi.osservazione',

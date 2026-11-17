@@ -20,7 +20,7 @@ const fixture = await import('./test-fixtures/clinical-writer-composition.ts');
 fixture.seedComposition();
 const { createAgentMandateStore } = await import('./agent-mandate-store.ts');
 const { createAgentPairingStore } = await import('./agent-pairing-store.ts');
-const { createAgentCassetteStore } = await import('./agent-cassette-store.ts');
+const { createAgentCassetteStore, readAgentCassette, readAgentCassetteIndex } = await import('./agent-cassette-store.ts');
 const { applyAgentVisit, agentAppliedItemIds } = await import('./agent-visit-application.ts');
 const { archiveGenerationForSession } = await import('./security/archive-session-generation.ts');
 const { readBackupAuditRows, canonicalizeBackupAuditRows } = await import('./backup-audit.ts');
@@ -90,11 +90,14 @@ test('automatic application consumes only note and PDF, leaves all clinical prop
 test('one explicit review commits all structured proposals, service lines and proposer audit atomically', async () => {
     const f = await visit();
     applyAgentVisit(request, fixture.session, f.input('automatic'));
+    assert.ok(readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id));
     const before = snapshot(), input = f.input('review');
     const receipt = applyAgentVisit(request, fixture.session, input);
     const after = snapshot();
     assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [0, 0, 1, 1, 2, 1]);
     assert.equal(agentAppliedItemIds(f.id).length, 7);
+    assert.ok(!readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id));
+    assert.equal(readAgentCassette(database, f.id, fixture.session.userId)?.id, f.id);
     const audit = database.prepare("SELECT * FROM audit_events WHERE event_id=?").get(receipt.eventId) as Record<string, unknown>;
     assert.equal(audit.actor_ref, fixture.session.userId);
     assert.equal(audit.proposer_ref, f.principal.agentRef);

@@ -114,8 +114,11 @@ for (const reviewed of [false, true]) test(reviewed ? 'the physician explicitly 
     await page.screenshot({ path: info.outputPath('nota-pdf-applicati-proposte-in-attesa.png'), fullPage: true });
     await page.getByRole('heading', { name: 'Esenzione proposta', exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath('diagnosi-esenzione-in-attesa.png'), fullPage: true });
-    const incoming = await (await page.request.get('/api/agent-mandates/incoming')).json();
-    expect(incoming.find((row: { id: string }) => row.id === visitId).appliedItemIds).toHaveLength(2);
+    const index = await (await page.request.get('/api/agent-mandates/incoming')).json();
+    expect(index.visits).toContainEqual(expect.objectContaining({ id: visitId }));
+    expect(JSON.stringify(index)).not.toContain('itemsCiphertext');
+    const incoming = await (await page.request.get('/api/agent-mandates/incoming?visit=' + visitId)).json();
+    expect(incoming.appliedItemIds).toHaveLength(2);
     const replay = await cli('riprendi', '--agente', access.agentRef, '--visita', visitId);
     expect(replay.visitId).toBe(visitId);
     await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
@@ -125,6 +128,12 @@ for (const reviewed of [false, true]) test(reviewed ? 'the physician explicitly 
         catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
     }
     if (reviewed) {
+        const doubtfulId = randomUUID(), doubtfulCf = 'RSSMRA85T10A562S';
+        const doubtfulFile = path.join(source, 'estrazione-dubbia.json');
+        writeFileSync(doubtfulFile, JSON.stringify({ ...extraction, sources: extraction.sources.map(document =>
+            ({ ...document, patient: { taxCode: doubtfulCf } })) }), { mode: 0o600 });
+        const doubtful = await cli('deposita', '--agente', access.agentRef, '--estrazione', doubtfulFile, '--cf', doubtfulCf, '--visita', doubtfulId);
+        expect(doubtful.status).toBe('closed');
         const catalog = await page.evaluate(async () => {
             const response = await fetch('/api/exemptions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code: '013', description: 'Esenzione sintetica per prova isolata', source: 'synthetic' }) });
@@ -133,13 +142,23 @@ for (const reviewed of [false, true]) test(reviewed ? 'the physician explicitly 
         expect(catalog.status).toBe(200);
         expect(catalog.body.count).toBe(1);
         await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
-        await expect(page.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
+        const validVisit = page.getByRole('region', { name: 'Visita ' + visitId });
+        const doubtfulVisit = page.getByRole('region', { name: 'Visita ' + doubtfulId });
+        await expect(validVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
+        await expect(doubtfulVisit.getByText('Codice fiscale non confermato in una scheda esistente.', { exact: true })).toBeVisible();
+        await expect(doubtfulVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeDisabled();
         expect(await counts()).toEqual([1, 1, 0, 0]);
-        await page.getByRole('button', { name: 'Applica la visita', exact: true }).click();
+        await page.getByRole('button', { name: 'Applica tutte le visite senza dubbi', exact: true }).click();
         await expect.poll(counts).toEqual([1, 1, 1, 1]);
-        await expect(page.getByText('Nessuna visita in attesa.', { exact: true })).toBeVisible();
-        const applied = await (await page.request.get('/api/agent-mandates/incoming')).json();
-        expect(applied.find((row: { id: string }) => row.id === visitId).appliedItemIds).toHaveLength(6);
+        await expect(validVisit).toHaveCount(0);
+        await expect(doubtfulVisit).toBeVisible();
+        const pendingIndex = await (await page.request.get('/api/agent-mandates/incoming')).json();
+        expect(pendingIndex.visits).not.toContainEqual(expect.objectContaining({ id: visitId }));
+        expect(pendingIndex.visits).toContainEqual(expect.objectContaining({ id: doubtfulId }));
+        const applied = await (await page.request.get('/api/agent-mandates/incoming?visit=' + visitId)).json();
+        expect(applied.appliedItemIds).toHaveLength(6);
+        const notApplied = await (await page.request.get('/api/agent-mandates/incoming?visit=' + doubtfulId)).json();
+        expect(notApplied.appliedItemIds).toEqual([]);
         await page.screenshot({ path: info.outputPath('proposte-applicate-dopo-conferma.png'), fullPage: true });
     }
 });

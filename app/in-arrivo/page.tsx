@@ -2,7 +2,7 @@
 
 import { useState, useSyncExternalStore } from 'react';
 import { useSecurity } from '@/components/security-provider';
-import { agentIncomingSnapshot, agentIncomingServerSnapshot, subscribeAgentIncoming, refreshAgentIncoming, applyReviewedAgentVisits } from '@/lib/agent-incoming';
+import { agentIncomingSnapshot, agentIncomingServerSnapshot, subscribeAgentIncoming, refreshAgentIncoming, applyReviewedAgentVisits, readIncomingAgentPdf } from '@/lib/agent-incoming';
 import { automaticAgentKind } from '@/lib/agent-visit-application-contract';
 import { SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import DocumentViewer from '@/components/document-viewer';
@@ -18,6 +18,16 @@ const fieldValues: Record<string, Record<string, string>> = {
 function UnlockedIncoming() {
     const { visits, busy, error } = useSyncExternalStore(subscribeAgentIncoming, agentIncomingSnapshot, agentIncomingServerSnapshot);
     const [pdf, setPdf] = useState<{ base64: string; name: string } | null>(null);
+    const [openingPdf, setOpeningPdf] = useState(false);
+    const [pdfError, setPdfError] = useState<string | null>(null);
+    const showPdf = async (visitId: string, revision: number, itemId: string) => {
+        setOpeningPdf(true);
+        setPdfError(null);
+        try { setPdf(await readIncomingAgentPdf(visitId, revision, itemId)); }
+        catch (error) {
+            if (!(error instanceof DOMException && error.name === 'AbortError')) setPdfError(error instanceof Error ? error.message : 'PDF non disponibile.');
+        } finally { setOpeningPdf(false); }
+    };
     const applicable = visits.filter(review => review.visit.cassette.status === 'closed' && !review.blockers.length && !review.proposalBlockers.length
         && review.visit.items.filter(item => automaticAgentKind(item.kind)).every(item => review.appliedItemIds.includes(item.id))
         && review.visit.items.some(item => !automaticAgentKind(item.kind) && !review.appliedItemIds.includes(item.id)));
@@ -28,6 +38,7 @@ function UnlockedIncoming() {
             <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !applicable.length} onClick={() => { void applyReviewedAgentVisits(applicable.map(value => value.visit.cassette.id)); }}>Applica tutte le visite senza dubbi</button>
         </div>
         {error && <p role="alert">{error}</p>}
+        {pdfError && <p role="alert">{pdfError}</p>}
         {!visits.length && !busy && !error && <p>Nessuna visita in attesa.</p>}
         {visits.map(review => {
             const { visit } = review;
@@ -38,8 +49,8 @@ function UnlockedIncoming() {
                 <p>{visit.cassette.status === 'closed' ? 'Visita chiusa' : 'Deposito in corso'}</p>
                 {[...review.blockers, ...review.proposalBlockers].map((message, index) => <p role="alert" key={index}>{message}</p>)}
                 <div className="flex flex-wrap gap-3">{visit.items.filter(item => item.kind === 'pdf').map(item =>
-                    typeof item.value.name === 'string' && typeof item.value.base64 === 'string' && <button key={item.id} className={SETTINGS_SECONDARY_BUTTON_CLASS}
-                        onClick={() => setPdf({ name: String(item.value.name), base64: String(item.value.base64) })}>{item.value.name}</button>)}</div>
+                    typeof item.value.name === 'string' && <button key={item.id} className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={openingPdf}
+                        onClick={() => { void showPdf(visit.cassette.id, visit.cassette.revision, item.id); }}>{item.value.name}</button>)}</div>
                 {pending.map(item => <article key={item.id} className="space-y-2 whitespace-pre-wrap border-t pt-3">
                     <h3 className="font-semibold">{{ note: 'Nota', transcription: 'Trascrizione', pdf: 'PDF', therapy: 'Terapia proposta', service: 'Prestazione proposta', diagnosis: 'Diagnosi proposta', exemption: 'Esenzione proposta', observation: 'Osservazione proposta' }[item.kind]}</h3>
                     {typeof item.value.text === 'string' && <p>{item.value.text}</p>}
