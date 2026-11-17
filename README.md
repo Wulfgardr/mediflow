@@ -57,6 +57,8 @@ Avvia il programma con `node scripts/mediflow.mjs --scegli`. `nvm use` vale se u
 
 Per la 0.9.0 pubblicata segui il [README del tag](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/README.md). Prima di aggiornare, prepara backup, kit e chiave di recupero.
 
+Il manuale spiega come [aggiornare il catalogo farmaci AIFA](./docs/MANUALE.md#catalogo-farmaci-aifa) e [gestire le fonti personali della protesica](./docs/MANUALE.md#fonti-personali-della-protesica).
+
 ## Per chi sviluppa
 
 [Contribuire](./CONTRIBUTING.md) · [Architettura](./ARCHITECTURE.md) · [Documentazione](./docs/README.md)
