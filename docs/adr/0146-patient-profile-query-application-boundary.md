@@ -1,5 +1,7 @@
 # ADR 0146 / BT-01: ammissione host e query del profilo paziente
 
+Stato: Accepted, deliberato da Leonardo il 17/11/2026
+
 Data: 2026-10-18. Stato: Proposed; accettazione con il merge della PR.
 Riferimenti: WUL-582, WUL-575, ADR 0071, ADR 0145.
 
