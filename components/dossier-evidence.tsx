@@ -5,10 +5,10 @@ import type { DossierEvidence } from '@/lib/domain/documents/dossier-import';
 
 type DossierPassage = { before: string; passage: string; after: string };
 
-export function splitDossierPassage(unitTexts: ReadonlyMap<number, string>, evidence: DossierEvidence): DossierPassage | null {
+export function splitDossierPassage(unitTexts: ReadonlyMap<number, string | null>, evidence: DossierEvidence): DossierPassage | null {
     const text = unitTexts.get(evidence.unit);
     const { start, end } = evidence;
-    if (text === undefined || !Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > text.length) {
+    if (typeof text !== 'string' || !Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > text.length) {
         return null;
     }
     return { before: text.slice(0, start), passage: text.slice(start, end), after: text.slice(end) };
