@@ -1,0 +1,53 @@
+import { expect, test } from './fixtures/isolated-runtime';
+import { bootstrapUnlockedSession } from './utils';
+import { agentVisitPassphrase, agentVisitPin } from './agent-visit-utils';
+
+test('renewing tab B preserves tab A authority and transfers the key without another passphrase', async ({ page, context, isolatedRuntime }, testInfo) => {
+    test.setTimeout(120000);
+    await bootstrapUnlockedSession(page, agentVisitPin);
+    await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
+    await page.getByRole('link', { name: 'Accesso', exact: true }).click();
+    await page.getByLabel('PIN attuale', { exact: true }).first().fill(agentVisitPin);
+    await page.getByLabel('Nuova passphrase', { exact: true }).fill(agentVisitPassphrase);
+    await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(agentVisitPassphrase);
+    await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
+    const kit = page.getByTestId('recovery-kit');
+    const download = page.waitForEvent('download');
+    await kit.getByRole('button', { name: 'Scarica kit di recupero' }).click();
+    await download;
+    await kit.getByRole('checkbox').check();
+    await kit.getByRole('button', { name: 'Attiva la nuova passphrase' }).click();
+    await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+    await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+    await page.getByLabel('Passphrase', { exact: true }).fill(agentVisitPassphrase);
+    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+    await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+    const second = await context.newPage();
+    try {
+        await second.goto(isolatedRuntime.url);
+        await expect(second.getByRole('button', { name: 'Rinnova accesso', exact: true })).toBeVisible();
+        const locks: string[] = [];
+        context.on('request', request => { if (request.url().endsWith('/api/auth/lock')) locks.push(request.url()); });
+        await second.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+        await page.waitForTimeout(20000);
+        const authority = await page.request.get('/api/auth/check');
+        expect((await authority.json()).hasSession).toBe(true);
+        expect(locks).toEqual([]);
+        await expect(second.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+        await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+        await page.getByRole('link', { name: 'Agenti', exact: true }).click();
+        await page.getByLabel('PIN di conferma', { exact: true }).fill(agentVisitPin);
+        const creation = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
+        await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
+        expect((await creation).status()).toBe(201);
+        await second.getByRole('link', { name: 'Agenti', exact: true }).click();
+        await second.getByLabel('PIN di conferma', { exact: true }).fill(agentVisitPin);
+        const secondCreation = second.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
+        await second.getByRole('button', { name: 'Crea mandato', exact: true }).click();
+        expect((await secondCreation).status()).toBe(201);
+        await second.screenshot({ path: testInfo.outputPath('seconda-scheda-sbloccata.png'), fullPage: true });
+        await page.getByRole('button', { name: /Blocca/ }).first().click();
+        await expect.poll(async () => (await (await second.request.get('/api/auth/check')).json()).hasSession).toBe(false);
+        await expect(second.getByLabel('Passphrase', { exact: true })).toBeVisible({ timeout: 20000 });
+    } finally { await second.close(); }
+});

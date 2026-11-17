@@ -427,6 +427,10 @@ export function clientArchiveGeneration(): string {
 }
 
 /** Captures the current browser session and archive without exposing credentials. */
+export function clientTabAuthorityBinding(): string | null {
+    return currentAuthControlEtag && documentGeneration ? JSON.stringify([currentAuthControlEtag, documentGeneration]) : null;
+}
+
 export function captureClientAccountAuthority(): () => boolean {
     const etag = currentAuthControlEtag;
     const generation = documentGeneration;
