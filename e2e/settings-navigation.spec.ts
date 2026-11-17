@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
 const destinations = [
-    '/settings/profilo', '/settings/aspetto', '/settings/ambulatories', '/settings/accesso',
+    '/settings/profilo', '/settings/aspetto', '/settings/ambulatories', '/settings/accesso', '/settings/agenti',
     '/settings/backup', '/settings/conservazione', '/settings/compliance', '/settings/repertori', '/settings/ai/fabric',
     '/settings/ai/modelli', '/settings/ai/chatgpt', '/settings/ai/funzioni', '/settings/ai/governance',
     '/settings/diagnostica', '/settings/sviluppo', '/settings/zona-pericolo',

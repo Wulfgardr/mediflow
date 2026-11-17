@@ -39,6 +39,20 @@ export const users = sqliteTable('users', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
+export const agentMandates = sqliteTable('agent_mandates', {
+    id: text('id').primaryKey().notNull(),
+    actorRef: text('actor_ref').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    archiveGeneration: text('archive_generation').notNull(),
+    operations: text('operations').notNull(),
+    provider: text('provider').notNull(),
+    allowsClinicalEgress: integer('allows_clinical_egress').notNull(),
+    publicKey: text('public_key').notNull(),
+    wrappedPrivateKey: text('wrapped_private_key').notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    revokedAt: integer('revoked_at'),
+});
+
 export const physicianReviewAttestations = sqliteTable('physician_review_attestations', {
     actorRef: text('actor_ref').primaryKey().references(() => users.id).notNull(),
     schemaVersion: text('schema_version').notNull(),

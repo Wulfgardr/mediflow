@@ -86,6 +86,13 @@ locali salvano ciò che ricevono.
 - In chiaro: `session_ref`, `generation`, `expires_at`
 - Leggibile senza chiave: hash SHA-256 dell'identificatore casuale di sessione, generazione e scadenza. Non contiene cookie né chiavi e non autentica una sessione.
 
+### `agent_mandates`: mandato locale e chiave avvolta
+
+- Altra protezione: `wrapped_private_key`
+- In chiaro: `id`, `actor_ref`, `archive_generation`, `operations`, `provider`, `allows_clinical_egress`, `public_key`, `created_at`, `expires_at`, `revoked_at`
+- La privata viene cifrata nel browser con la master key tramite `sealLocalDraft`. Non è un campo del contratto generico `ENCRYPTED_FIELDS`. Pubblica, perimetro e stato sono metadati del mandato.
+- Autorità locale esclusa dal backup portabile. Il recupero completo cifrato conserva l'archivio fisico, mentre la nuova generazione impedisce di riattivare il deposito con il vecchio mandato. Il deposito clinico A3 non è ancora parte di questo pezzo.
+
 ### `attachments`: documenti allegati e loro estratti
 
 - Cifrate: `name`, `path`, `data`, `summary_snapshot`, `parse_evidence_artifact_snapshot`
