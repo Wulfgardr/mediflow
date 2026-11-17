@@ -12,13 +12,14 @@
  * leggere il formato v1 senza cambiamenti.
  */
 
+import { clinicalFactContext, contextHeading, contextReview, isHistoricalTherapy, legacyIcdPattern, legacySectionNegation, negationCues, structuredContextApplies, suspensionHeadings } from './clinical-context-lexicon';
 import { routeDocumentClass, parseFileNameHints } from './document-class-router';
 import type { DocumentDecisionClassification } from './document-decision';
 import { isValidItalianTaxCodeChecksum, resolveDocumentTaxCodeRoles } from './document-identity-resolution';
 import { parseItalianLabReport } from './lab-report-parser';
 import {
     catalogObservationCode, findInvalidityMentions, findIsoCode, findPrescriptionReference, findPriority, findScaleMentions, invalidityDetails,
-    parseMedicationItem, prostheticStatusOf, qualifiersOf, segmentDossierSections, splitSectionItems, type DossierSection,
+    legacyQualifiersOf, parseMedicationItem, prostheticStatusOf, qualifiersOf, segmentDossierSections, splitSectionItems, type DossierSection,
 } from './dossier-sections';
 import { clinicalDay, identityName, sameClinicalText, sameClinicalValue, sameDay, sameDosage, sameOptional, sameUnit } from './dossier-clinical-equality';
 import {
@@ -381,7 +382,6 @@ export interface DossierFact {
     recordId?: string;
 }
 
-const NEGATION = /\b(?:non|nega|negano|negativ[oaie]|assenza\s+di|assente|esclus[oaie]|escludere|no)\b/iu;
 
 function hashText(value: string): string {
     let hash = 0x811c9dc5;
@@ -403,12 +403,33 @@ function lineAround(text: string, start: number, end: number): { lineStart: numb
     return { lineStart, line: text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd) };
 }
 
-/** Negazione nella stessa frase, dopo l'eventuale fatto precedente (`boundary`). */
 function negatedBefore(text: string, start: number, boundary = 0): boolean {
     const { lineStart } = lineAround(text, start, start);
     const prefix = text.slice(Math.max(lineStart, boundary), start);
     const sentence = prefix.slice(Math.max(prefix.lastIndexOf('.'), prefix.lastIndexOf(';')) + 1);
-    return NEGATION.test(sentence);
+    return legacySectionNegation.test(sentence);
+}
+
+function icdContextText(text: string, matches: readonly RegExpMatchArray[], sections: readonly DossierSection[]): string {
+    const breaks = new Set<number>();
+    for (let index = 1; index < sections.length; index += 1) {
+        const { labelStart } = sections[index];
+        if (sections[index - 1].end === labelStart && /[ \t]/u.test(text[labelStart - 1] ?? '')
+            && !/[\r\n]/u.test(text.slice(sections[index - 1].labelStart, labelStart))) {
+            breaks.add(labelStart - 1);
+        }
+    }
+    for (let index = 1; index < matches.length; index += 1) {
+        const previous = matches[index - 1];
+        const cueStart = previous.index! + previous[0].length;
+        const lead = text.slice(cueStart, matches[index].index);
+        if (/[\p{L}\p{N}][ \t]+$/u.test(previous[3])
+            && /^\p{Lu}[^.!?;:\r\n]*[ \t]$/u.test(lead)
+            && negationCues(lead).next().value?.index === 0) {
+            breaks.add(cueStart - 1);
+        }
+    }
+    return breaks.size ? text.replace(/[ \t]/gu, (space, offset: number) => breaks.has(offset) ? '\n' : space) : text;
 }
 
 const DAY_MONTH_YEAR = String.raw`(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})`;
@@ -437,7 +458,6 @@ export function findExplicitDocumentDate(text: string, fileName: string): { date
 const LAB_RANGE = /-?\d+(?:[.,]\d+)?\s*[-–]\s*-?\d+(?:[.,]\d+)?/gu;
 const LAB_ROW_BREAK = /-?\d+(?:[.,]\d+)?\s*[-–]\s*-?\d+(?:[.,]\d+)?(?:\s+(?:H|L|ALTO|BASSO|\*{1,2}|↑|↓))?\s(?=\p{Lu})/gu;
 
-const ICD_EXPLICIT = /\bICD[-\s]?(9|10)(?:[-\s]?CM)?\s*[:.]?\s*([A-Z]?\d{2,3}(?:\.\d{1,2})?)\b\s*[-–:]?\s*((?:(?!\bICD\b|\bICD[-\s]?\d|\b(?:nega|non|esclus)\w*\b)[^\n.;]){0,160})/giu;
 const EXEMPTION_LINE = /\besen(?:zione|zioni|te)\b/iu;
 const CODE_TOKEN = /\b[A-Z0-9]{1,6}(?:\.[A-Z0-9]{1,4})?\b/giu;
 
@@ -476,6 +496,7 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
     const date = input.documentDate ?? '';
     for (const unit of input.units) {
         const text = unitText(input.text, unit);
+        const unitFactStart = facts.length;
         // Marcatura markdown di AnyDoc (titoli, elenchi, citazioni) sostituita da spazi
         // della stessa lunghezza: gli offset delle evidenze restano quelli del testo conservato.
         const unmarked = text.replace(/^([ \t]*)(#{1,6}|[-*+>])(?=[ \t])/gmu, (_match, lead: string, mark: string) => lead + ' '.repeat(mark.length));
@@ -492,7 +513,7 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
             });
         }).join('\n');
         // Laboratorio: parser esistente, riga per riga.
-        const lines = plain.replace(/\r/gu, '').split('\n');
+        const lines = plain.split('\n');
         const offsets: number[] = [];
         let cursor = 0;
         for (const line of lines) { offsets.push(cursor); cursor += line.length + 1; }
@@ -513,20 +534,20 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
                     excerpt: text.slice(start, start + (lines[result.lineNumber - 1] ?? '').length).trim() },
                 negated: false, values, decision: 'pending' });
         }
+        const legacySections = segmentDossierSections(text);
+        const icdMatches = [...text.matchAll(legacyIcdPattern)];
+        const icdContext = icdContextText(text, icdMatches, legacySections);
         let previousEnd = 0;
-        for (const match of text.matchAll(ICD_EXPLICIT)) {
-            const start = match.index ?? 0;
+        for (const match of icdMatches) {
+            const start = match.index;
             const boundary = previousEnd;
             previousEnd = start + match[0].length;
-            const section = segmentDossierSections(text).find((item) => item.start <= start && item.end >= start);
+            const section = legacySections.find((item) => item.start <= start && item.end >= start);
             const line = lineAround(text, start, start + match[0].length);
-            // Un punto (abbreviativo o meno) o un altro ICD non provano un cambio
-            // di soggetto. Nella stessa riga il familiare resta nel contesto fino
-            // a una nuova sezione esplicita, ad esempio «Diagnosi:».
             const contextStart = Math.max(line.lineStart, section?.start ?? 0);
             const contextEnd = Math.min(start + match[0].length, section?.end ?? text.length);
             const context = text.slice(contextStart, contextEnd).trim();
-            const qualifiers = qualifiersOf(context, section?.kind ?? 'diagnosis', section?.label ?? '');
+            const qualifiers = legacyQualifiersOf(context, section?.kind ?? 'diagnosis', section?.label ?? '');
             if (qualifiers.subject === 'familiare') {
                 facts.push({ factId: dossierFactId('anamnesis', unit.index, start, { text: context }), kind: 'anamnesis', origin: 'parser:icd',
                     evidence: { unit: unit.index, start: contextStart, end: contextEnd, excerpt: context }, negated: false,
@@ -543,7 +564,7 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
         }
         let lineStart = 0;
         for (const line of lines) {
-            if (EXEMPTION_LINE.test(line)) {
+            if (EXEMPTION_LINE.test(line) || EXEMPTION_LINE.test(contextHeading(text, lineStart))) {
                 for (const token of line.matchAll(CODE_TOKEN)) {
                     const code = token[0].toUpperCase();
                     if (!input.exemptionCodes.has(code)) continue;
@@ -557,6 +578,18 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
             lineStart += line.length + 1;
         }
         facts.push(...sectionCandidates(text, unit.index, date, routed.classification));
+        for (const fact of facts.slice(unitFactStart)) {
+            if (!fact.evidence || !structuredContextApplies(fact.kind)) continue;
+            const { start, end } = fact.evidence;
+            const context = fact.origin === 'parser:icd'
+                ? clinicalFactContext(fact.kind, fact.values, icdContext, start, start + 1)
+                : clinicalFactContext(fact.kind, fact.values, text, start, end);
+            const declaredSuspension = fact.kind === 'therapy' && fact.values.status === 'suspended';
+            if (context.suspended && declaredSuspension) fact.values.documentedSuspension = 'true';
+            const review = contextReview(context, declaredSuspension);
+            if (review) fact.values.contextReview = review;
+            fact.negated ||= context.negated;
+        }
     }
     // Il documento intero come voce di diario: conserva tutto ciò che non è strutturabile.
     const entry = entryKindForClass(routed.classification);
@@ -595,31 +628,19 @@ function sectionCandidates(text: string, unit: number, date: string, classificat
         switch (section.kind) {
             case 'diagnosis':
                 for (const item of splitSectionItems(text, section.start, section.end)) {
-                    if (/\bICD[-\s]?\d/iu.test(item.text)) continue; // coperto dal parser ICD esplicito
-                    const q = qualifiersOf(item.text, section.kind, section.label);
+                    if (/\bICD[-\s]?\d/iu.test(item.text)) continue;
+                    const q = legacyQualifiersOf(item.text, section.kind, section.label);
                     if (q.subject === 'familiare') {
                         add('anamnesis', 'parser:section', item, { title: 'Anamnesi familiare', date, text: item.text, subject: q.subject, temporality: q.temporality, certainty: q.certainty }, q.negated);
-                    } else {
-                        add('diagnosis', 'parser:section', item, { description: item.text, code: '', system: '', date, certainty: q.certainty, temporality: q.temporality, sectionLabel: section.label }, q.negated);
                     }
                 }
                 break;
             case 'anamnesis': case 'anamnesis_family': {
-                const q = qualifiersOf(content(section), section.kind, section.label);
+                const q = legacyQualifiersOf(content(section), section.kind, section.label);
                 add('anamnesis', 'parser:section', whole(section), { title: capitalized(section.label), date, text: content(section), subject: q.subject,
                     temporality: q.temporality || (section.kind === 'anamnesis' ? 'storica' : ''), certainty: q.certainty }, false);
                 break;
             }
-            case 'medication':
-                for (const item of splitSectionItems(text, section.start, section.end)) {
-                    const q = qualifiersOf(item.text, section.kind, section.label);
-                    const parsed = parseMedicationItem(item.text);
-                    // Una terapia letta da documento resta storica finché il medico non sceglie altrimenti.
-                    const status = /\bsospes|sospend|interrott/iu.test(`${label} ${item.text}`) ? 'suspended' : 'completed';
-                    add('therapy', 'parser:section', item, { drugName: parsed.drugName, dosage: parsed.dosage, status, startDate: '', endDate: '',
-                        temporality: q.temporality, sectionLabel: section.label, certainty: q.certainty }, q.negated);
-                }
-                break;
             case 'services': {
                 const items = splitSectionItems(text, section.start, section.end);
                 if (!items.length) break;
@@ -632,7 +653,7 @@ function sectionCandidates(text: string, unit: number, date: string, classificat
                 for (const item of splitSectionItems(text, section.start, section.end)) {
                     const isoCode = findIsoCode(item.text);
                     add('prosthetic', 'parser:section', item, { description: item.text.replace(/\b(?:cod(?:ice)?\.?\s*)?ISO\s*[:.]?\s*[\d.\s]+/iu, '').trim() || item.text,
-                        isoCode, category: '', status: prostheticStatusOf(`${section.label} ${item.text}`), prescribedAt: date }, qualifiersOf(item.text, section.kind, section.label).negated);
+                        isoCode, category: '', status: prostheticStatusOf(`${section.label} ${item.text}`), prescribedAt: date }, legacyQualifiersOf(item.text, section.kind, section.label).negated);
                 }
                 break;
             case 'invalidity': {
@@ -641,7 +662,7 @@ function sectionCandidates(text: string, unit: number, date: string, classificat
                 break;
             }
             case 'assessment': case 'followup': {
-                const q = qualifiersOf(content(section), section.kind, section.label);
+                const q = legacyQualifiersOf(content(section), section.kind, section.label);
                 add(classification === 'imaging_report' && /conclusion/u.test(label) ? 'imaging_report' : 'assessment', 'parser:section', whole(section),
                     { title: capitalized(section.label), date, text: content(section), temporality: q.temporality, certainty: q.certainty }, false);
                 break;
@@ -659,16 +680,33 @@ function sectionCandidates(text: string, unit: number, date: string, classificat
             requestReference: reference.value, clinicalQuestion: question ? content(question) : '', prescribedAt: date }, false);
     }
     for (const mention of findScaleMentions(text)) {
-        // La frase della menzione, non la riga: un paragrafo unito non estende la negazione ad altre scale.
         const from = Math.max(text.lastIndexOf('.', mention.start - 1), text.lastIndexOf(';', mention.start - 1), text.lastIndexOf('\n', mention.start - 1)) + 1;
         const stops = ['.', ';', '\n'].map((mark) => text.indexOf(mark, mention.end)).filter((index) => index >= 0);
         const sentence = text.slice(from, stops.length ? Math.min(...stops) : text.length);
         add('reported_scale', 'parser:scale', mention, { scaleName: mention.scaleName, scaleTotal: mention.total, scaleMax: mention.max, date, text: sentence.trim() },
-            NEGATION.test(sentence.slice(0, mention.start - from)) || /non\s+(?:eseguit|somministrat|valutabil)/iu.test(sentence));
+            legacySectionNegation.test(sentence.slice(0, mention.start - from)) || /non\s+(?:eseguit|somministrat|valutabil)/iu.test(sentence));
     }
     if (!sections.some((section) => section.kind === 'invalidity')) {
         for (const mention of findInvalidityMentions(text)) {
             add('invalidity', 'parser:section', mention, { title: 'Invalidità', date, text: mention.text, ...invalidityDetails(mention.text) }, false);
+        }
+    }
+    const legacyFamilyStarts = new Set(facts.filter((fact) => fact.kind === 'anamnesis' && fact.values.subject === 'familiare'
+        && fact.values.title === 'Anamnesi familiare').map((fact) => fact.evidence?.start));
+    for (const section of segmentDossierSections(text, true)) {
+        if (section.kind !== 'diagnosis' && section.kind !== 'medication') continue;
+        for (const item of splitSectionItems(text, section.start, section.end)) {
+            const context = clinicalFactContext(section.kind === 'medication' ? 'therapy' : 'diagnosis', {}, text, item.start, item.end);
+            const q = qualifiersOf(item.text, section.kind, section.label, context);
+            if (section.kind === 'diagnosis') {
+                if (/\bICD[-\s]?\d/iu.test(item.text) || legacyFamilyStarts.has(item.start)) continue;
+                add('diagnosis', 'parser:section', item, { description: item.text, code: '', system: '', date, certainty: q.certainty, temporality: q.temporality, sectionLabel: section.label }, q.negated);
+            } else {
+                const parsed = parseMedicationItem(item.text);
+                const status = suspensionHeadings.some((heading) => heading.toLowerCase() === section.label.toLowerCase()) ? 'suspended' : 'completed';
+                add('therapy', 'parser:section', item, { ...parsed, status, startDate: '', endDate: '', temporality: q.temporality,
+                    ...(q.subject === 'familiare' ? { subject: q.subject } : {}), sectionLabel: section.label, certainty: q.certainty }, q.negated);
+            }
         }
     }
     return facts;
@@ -686,7 +724,7 @@ export function dossierResidualSegments(text: string, units: readonly DossierUni
         const body = unitText(text, unit);
         // Coperti: le evidenze delle proposte e le etichette di sezione già interpretate.
         const covered = [...facts.filter((fact) => fact.evidence?.unit === unit.index).map((fact) => [fact.evidence!.start, fact.evidence!.end] as const),
-            ...segmentDossierSections(body).map((section) => [section.labelStart, section.start] as const)].sort((a, b) => a[0] - b[0]);
+            ...segmentDossierSections(body, true).map((section) => [section.labelStart, section.start] as const)].sort((a, b) => a[0] - b[0]);
         let cursor = 0;
         const push = (from: number, to: number) => {
             const raw = body.slice(from, to).replace(/^## Pagina \d+$/gmu, '').replace(/^-{3,}$/gmu, '');
@@ -738,6 +776,11 @@ const DATE_FIELDS = new Set(['date', 'startDate', 'endDate', 'observedAt', 'pres
 /** Motivi che impediscono di applicare un fatto accettato. Vuoto = applicabile. */
 export function dossierFactBlockers(fact: DossierFact, context: { exemptionCodes?: ReadonlySet<string> } = {}): string[] {
     const blockers: string[] = [];
+    if (structuredContextApplies(fact.kind) && fact.values.subject === 'familiare') {
+        blockers.push('Il dato riguarda un familiare.');
+    }
+    if (structuredContextApplies(fact.kind) && (fact.values.contextReview
+        || (fact.kind === 'therapy' && fact.values.documentedSuspension && !isHistoricalTherapy(fact.values.status)))) blockers.push('Rileggi il passaggio e aggiungi il dato a mano se pertinente.');
     if (fact.negated) blockers.push('Il testo nega questa informazione: correggi il fatto o rifiutalo.');
     for (const field of DOSSIER_REQUIRED_FIELDS[fact.kind]) {
         if (field === 'text' && fact.values.textSource === 'document') continue;

@@ -5,11 +5,12 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const directory = 'native/contracts/dossier-conformance';
+const testNames = ['dossier-prepared', 'dossier-import', 'clinical-context-lexicon'];
 const captured = ['preparedDossierFacts', 'anchorPreparedQuote', 'verifyPreparedFields', 'preparedTokens', 'preparedPatientKey', 'parsePreparedExtraction', 'evaluateDossierGroupIdentity', 'collectDossierPatientNames', 'preparedBulkDecisions', 'preparedFactEligible', 'dossierFactBlockers'];
 await mkdir(directory, { recursive: true });
 const scratch = await mkdtemp(path.join(tmpdir(), 'mediflow-dossier-corpus-'));
 try {
-  for (const name of ['dossier-prepared', 'dossier-import']) {
+  for (const name of testNames) {
     const output = path.join(scratch, `${name}.cjs`);
     await build({ entryPoints: [`lib/domain/documents/${name}.test.ts`], outfile: output, bundle: true, platform: 'node', format: 'cjs', plugins: [{ name: 'capture-verifier-inputs', setup(build) {
       build.onLoad({ filter: /\/dossier-(?:prepared|import)\.ts$/ }, async ({ path: sourcePath }) => {
@@ -25,7 +26,7 @@ try {
     const run = spawnSync(process.execPath, [output], { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
     if (run.status !== 0) throw new Error(run.stdout + run.stderr);
   }
-  const calls = (await Promise.all(['dossier-prepared', 'dossier-import'].map(async n => JSON.parse(await readFile(path.join(scratch, `${n}.json`), 'utf8'))))).flat();
+  const calls = (await Promise.all(testNames.map(async n => JSON.parse(await readFile(path.join(scratch, `${n}.json`), 'utf8'))))).flat();
   const unique = [...new Map(calls.map(c => [JSON.stringify(c), c])).values()];
   await writeFile(`${directory}/ts-cases.json`, JSON.stringify(unique));
   console.log(`Casi TS del verificatore: ${unique.length}`);

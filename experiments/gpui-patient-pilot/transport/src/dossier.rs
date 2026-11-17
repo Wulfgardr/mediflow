@@ -3,8 +3,15 @@ use chrono::{DateTime, NaiveDate};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, ops::Range, sync::LazyLock};
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
+
+mod clinical_context;
+
+use clinical_context::{
+    ClinicalContext, clinical_fact_context, historical_therapy, legacy_family, legacy_negation,
+    sentence_after, structured,
+};
 
 fn re(pattern: &str) -> Regex {
     Regex::new(pattern).expect("static dossier expression")
@@ -41,9 +48,9 @@ pub struct Token {
     end: usize,
     numeric: bool,
 }
+static WORD: LazyLock<Regex> = LazyLock::new(|| re(r"[0-9]+(?:[.,][0-9]+)*|[\p{L}\p{M}]+"));
 pub fn tokens(text: &str) -> Vec<Token> {
-    re(r"[0-9]+(?:[.,][0-9]+)*|[\p{L}\p{M}]+")
-        .find_iter(text)
+    WORD.find_iter(text)
         .map(|m| Token {
             text: normalized(m.as_str()),
             start: utf16_len(&text[..m.start()]),
@@ -201,16 +208,6 @@ pub fn anchor(text: &str, units: &[Value], quote: &str) -> Value {
     }
     best.map(|(_, v)| v).unwrap_or(Value::Null)
 }
-fn family(word: &str) -> bool {
-    re(r"^(?:padre|madre|fratell|sorell|figli|nonn|zi[oaie]$|familiar|genitor|mamma|papa$|coniug|moglie$|marito$|consorte$|nipot|cugin|suocer|cognat)").is_match(word)
-}
-fn negation(word: &str) -> bool {
-    [
-        "non", "nega", "negano", "negato", "negata", "assenza", "assente", "esclusa", "escluso",
-        "escluse", "esclusi", "no", "senza",
-    ]
-    .contains(&word)
-}
 fn name_words_present(passage: &[String], wanted: &[String]) -> bool {
     let long: Vec<_> = wanted
         .iter()
@@ -223,6 +220,15 @@ fn name_words_present(passage: &[String], wanted: &[String]) -> bool {
     }
 }
 pub fn verify_fields(kind: &str, values: &Value, passage: &[String]) -> Value {
+    verify_quoted_fields(kind, values, passage, None)
+}
+
+fn verify_quoted_fields(
+    kind: &str,
+    values: &Value,
+    passage: &[String],
+    source: Option<(&str, Range<usize>, &ClinicalContext)>,
+) -> Value {
     let mut out = json!({"check":"ok","negated":false,"notes":[],"drop":[]});
     let fail = |mut out: Value, check: &str| {
         out["check"] = json!(check);
@@ -234,7 +240,7 @@ pub fn verify_fields(kind: &str, values: &Value, passage: &[String]) -> Value {
     {
         return fail(out, "value_missing");
     }
-    let mut subject_at = 0;
+    let mut therapy_span = None;
     match kind {
         "therapy" => {
             let drug = words(string(&values["drugName"]));
@@ -243,19 +249,10 @@ pub fn verify_fields(kind: &str, values: &Value, passage: &[String]) -> Value {
                 return fail(out, "value_missing");
             }
             let end = end.unwrap();
-            subject_at = end - drug.len();
+            let subject_at = end - drug.len();
+            therapy_span = Some(subject_at..end);
             if first_numbers(passage, end, &numbers(string(&values["dosage"]))).is_none() {
                 return fail(out, "value_missing");
-            }
-            if values["status"] == "active"
-                && passage.iter().any(|w| {
-                    re(r"^(?:sospes|sospend|interrott|interromp|sospensione|stop)").is_match(w)
-                })
-            {
-                return fail(out, "status_conflict");
-            }
-            if values["subject"] != "familiare" && passage.iter().any(|w| family(w)) {
-                return fail(out, "subject_conflict");
             }
             let principle = words(string(&values["activePrinciple"]));
             if !principle.is_empty()
@@ -281,7 +278,6 @@ pub fn verify_fields(kind: &str, values: &Value, passage: &[String]) -> Value {
                 return fail(out, "value_missing");
             }
             let end = end.unwrap();
-            subject_at = end - display.len();
             let value = words(string(&values["value"]));
             let numeric = value.iter().any(|w| num(w));
             let value_end = if numeric {
@@ -309,36 +305,26 @@ pub fn verify_fields(kind: &str, values: &Value, passage: &[String]) -> Value {
             }
         }
         "reported_scale" => {
-            let Some(end) = in_order(passage, &words(string(&values["scaleName"]))) else {
+            let Some(scale) = in_order(passage, &words(string(&values["scaleName"]))) else {
                 return fail(out, "value_missing");
             };
             let mut n = numbers(string(&values["scaleTotal"]));
             n.extend(numbers(string(&values["scaleMax"])));
-            if first_numbers(passage, end, &n).is_none() {
+            if first_numbers(passage, scale, &n).is_none() {
                 return fail(out, "value_missing");
             }
         }
         "diagnosis" => {
-            if !string(&values["code"]).is_empty()
-                && contiguous(passage, &words(string(&values["code"])), 0).is_none()
+            if contiguous(passage, &words(string(&values["code"])), 0).is_none()
+                || in_order(passage, &words(string(&values["description"]))).is_none()
             {
                 return fail(out, "value_missing");
             }
-            let description = words(string(&values["description"]));
-            let Some(end) = in_order(passage, &description) else {
-                return fail(out, "value_missing");
-            };
-            subject_at = end.saturating_sub(description.len() * 3);
-            if values["subject"] != "familiare" && passage.iter().any(|w| family(w)) {
-                return fail(out, "subject_conflict");
-            }
         }
         "exemption" => {
-            let code = words(string(&values["code"]));
-            let Some(end) = contiguous(passage, &code, 0) else {
+            if contiguous(passage, &words(string(&values["code"])), 0).is_none() {
                 return fail(out, "value_missing");
-            };
-            subject_at = end - code.len();
+            }
         }
         "service_prescription" | "prosthetic" => {
             let field = if kind == "prosthetic" {
@@ -360,7 +346,43 @@ pub fn verify_fields(kind: &str, values: &Value, passage: &[String]) -> Value {
         }
         _ => {}
     }
-    out["negated"] = json!(subject_at > 0 && passage[..subject_at].iter().any(|w| negation(w)));
+    if !structured(kind) {
+        return out;
+    }
+    let joined;
+    let inferred;
+    let (body, quote, context) = if let Some(source) = source {
+        source
+    } else {
+        joined = passage.join(" ");
+        let quote = 0..joined.len();
+        inferred = clinical_fact_context(kind, values, &joined, quote.clone());
+        (joined.as_str(), quote, &inferred)
+    };
+    if let Some(therapy) = therapy_span {
+        let offsets: Vec<_> = WORD.find_iter(&body[quote.clone()]).collect();
+        let start = quote.start + offsets[therapy.start].start();
+        let end = quote.start + offsets[therapy.end - 1].end();
+        if first_numbers(
+            &words(sentence_after(body, start, end)),
+            0,
+            &numbers(string(&values["dosage"])),
+        )
+        .is_none()
+        {
+            return fail(out, "value_missing");
+        }
+    }
+    if kind == "therapy" && values["status"] == "active" && context.suspended {
+        return fail(out, "status_conflict");
+    }
+    if ["therapy", "diagnosis"].contains(&kind)
+        && values["subject"] != "familiare"
+        && context.family
+    {
+        return fail(out, "subject_conflict");
+    }
+    out["negated"] = json!(context.negated);
     out
 }
 fn date(value: &str) -> Option<NaiveDate> {
@@ -460,6 +482,10 @@ pub fn prepared_facts(input: &Value) -> Value {
             continue;
         }
         let mut v = item["values"].clone();
+        if structured(kind) {
+            v.as_object_mut().unwrap().remove("contextReview");
+            v.as_object_mut().unwrap().remove("documentedSuspension");
+        }
         let mut fact_notes = vec![];
         v.as_object_mut().unwrap().retain(|k, v| {
             ![
@@ -595,7 +621,9 @@ pub fn prepared_facts(input: &Value) -> Value {
                 if !passage.is_null()
                     && kind == "anamnesis"
                     && v["subject"] != "familiare"
-                    && array(&passage["words"]).iter().any(|w| family(string(w)))
+                    && array(&passage["words"])
+                        .iter()
+                        .any(|w| legacy_family(string(w)))
                 {
                     check = "subject_conflict".into();
                 }
@@ -613,41 +641,49 @@ pub fn prepared_facts(input: &Value) -> Value {
                         .iter()
                         .map(|w| string(w).to_owned())
                         .collect();
-                    let mut fields = verify_fields(kind, &v, &passage);
-                    negated = fields["negated"] == true;
-                    let unit = units.iter().find(|u| u["index"] == evidence["unit"]);
-                    let before = unit
-                        .map(|u| {
-                            let head = slice(
-                                &unit_text(text, u),
-                                0,
-                                evidence["start"].as_u64().unwrap_or(0) as usize,
-                            );
-                            let boundary = head
-                                .char_indices()
-                                .filter(|(at, c)| {
-                                    *c == '\n'
-                                        || (".;!?".contains(*c)
-                                            && head[at + c.len_utf8()..]
-                                                .chars()
-                                                .next()
-                                                .is_some_and(char::is_whitespace))
-                                })
-                                .map(|(at, c)| at + c.len_utf8())
-                                .max()
-                                .unwrap_or(0);
-                            words(&head[boundary..])
-                        })
-                        .unwrap_or_default();
-                    if before.iter().any(|w| negation(w)) {
-                        negated = true;
-                    }
-                    if fields["check"] == "ok"
-                        && ["therapy", "diagnosis"].contains(&kind)
-                        && v["subject"] != "familiare"
-                        && before.iter().any(|w| family(w))
-                    {
-                        fields["check"] = json!("subject_conflict");
+                    let unit = units
+                        .iter()
+                        .find(|u| u["index"] == evidence["unit"])
+                        .unwrap();
+                    let body = unit_text(text, unit);
+                    let start = evidence["start"].as_u64().unwrap_or(0) as usize;
+                    let end = evidence["end"].as_u64().unwrap_or(0) as usize;
+                    let quote = slice(&body, 0, start).len()..slice(&body, 0, end).len();
+                    let context = structured(kind)
+                        .then(|| clinical_fact_context(kind, &v, &body, quote.clone()));
+                    let fields = verify_quoted_fields(
+                        kind,
+                        &v,
+                        &passage,
+                        context.as_ref().map(|c| (&*body, quote.clone(), c)),
+                    );
+                    if let Some(context) = context {
+                        negated = context.negated;
+                        let declared_suspension =
+                            kind == "therapy" && historical_therapy(&item["values"]["status"]);
+                        if context.suspended && declared_suspension {
+                            v["documentedSuspension"] = json!("true");
+                        }
+                        let review = context.review(declared_suspension);
+                        if !review.is_empty() {
+                            v["contextReview"] = json!(review);
+                        }
+                    } else {
+                        let head = &body[..quote.start];
+                        let boundary = head
+                            .char_indices()
+                            .filter(|(at, c)| {
+                                '\n' == *c
+                                    || (".;!?".contains(*c)
+                                        && head[at + c.len_utf8()..]
+                                            .chars()
+                                            .next()
+                                            .is_some_and(char::is_whitespace))
+                            })
+                            .map(|(at, c)| at + c.len_utf8())
+                            .max()
+                            .unwrap_or(0);
+                        negated = words(&head[boundary..]).iter().any(legacy_negation);
                     }
                     for field in array(&fields["drop"]) {
                         v.as_object_mut().unwrap().remove(string(field));
@@ -942,6 +978,17 @@ pub fn blockers(fact: &Value, exemptions: Option<&[Value]>) -> Value {
     let mut out = vec![];
     let kind = string(&fact["kind"]);
     let v = &fact["values"];
+    if structured(kind) && v["subject"] == "familiare" {
+        out.push("Il dato riguarda un familiare.".to_owned());
+    }
+    if structured(kind)
+        && (!string(&v["contextReview"]).is_empty()
+            || (kind == "therapy"
+                && !string(&v["documentedSuspension"]).is_empty()
+                && !historical_therapy(&v["status"])))
+    {
+        out.push("Rileggi il passaggio e aggiungi il dato a mano se pertinente.".into());
+    }
     if fact["negated"] == true {
         out.push("Il testo nega questa informazione: correggi il fatto o rifiutalo.".to_owned());
     }
