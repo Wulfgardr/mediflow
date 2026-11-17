@@ -59,7 +59,7 @@ Per gli approfondimenti:
 - [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md)
 - [docs/system_architecture.md](./system_architecture.md)
 - [docs/native-setup.md](./native-setup.md)
-- [docs/native-launch.md](./native-launch.md)
+- [docs/native-launch.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md)
 - [docs/README.md](./README.md) e [docs/markdown-index.md](./markdown-index.md)
 
 ---

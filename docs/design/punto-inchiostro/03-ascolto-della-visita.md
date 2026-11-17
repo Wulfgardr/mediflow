@@ -12,7 +12,7 @@ read_when:
 Il modello per trascrivere la visita non è da scegliere adesso: è deciso da
 [ADR 0113](../../adr/0113-recording-visita-trascrizione-locale-085.md),
 accettato il 1 settembre 2026, sul confine fissato da
-[ADR 0072](../../adr/0072-voice-visit-capture-fluid-boundary.md).
+[ADR 0072](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0072-voice-visit-capture-fluid-boundary.md).
 
 - Solo l'app Mac, da macOS 26, con la trascrizione di sistema in italiano
   eseguita sul computer.

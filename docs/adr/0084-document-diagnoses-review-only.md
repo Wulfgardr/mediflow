@@ -3,7 +3,7 @@
 Date: 2026-07-24
 Status: Accepted
 
-Supersedes: [ADR 0011](./0011-ocr-first-qwen-clinical-and-prudent-icd-autofill.md) solo per l'autofill di diagnosi da documento.
+Supersedes: [ADR 0011](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0011-ocr-first-qwen-clinical-and-prudent-icd-autofill.md) solo per l'autofill di diagnosi da documento.
 
 ---
 

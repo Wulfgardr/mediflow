@@ -25,7 +25,7 @@ Riferimenti correlati:
 - [docs/README.md](./README.md) (mappa canonica documentazione)
 - [docs/markdown-index.md](./markdown-index.md) (indice completo markdown)
 - [docs/walkthrough.md](./walkthrough.md) (flusso end-to-end)
-- [docs/local-api-tls.md](./local-api-tls.md) (trasporto TLS locale)
+- [docs/local-api-tls.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/local-api-tls.md) (trasporto TLS locale)
 - [docs/native-testing.md](./native-testing.md) (strategia test ufficiale)
 - [docs/parity-matrix.md](./parity-matrix.md) (stato verificato delle capability)
 - [docs/design/lume/README.md](./design/lume/README.md) (lingua di design attiva)
@@ -326,8 +326,8 @@ La shell SwiftUI espone lista e dettaglio paziente, diario rich text, terapie,
 checkup, osservazioni, prestazioni, protesica, documenti e report entro le
 capability concesse dall'home-base. Le superfici AI, OCR e document-derived
 restano host-only o review-only secondo
-[ADR 0073](./adr/0073-treatment-reasoning-athena-boundary.md) e
-[ADR 0076](./adr/0076-paired-document-domain-write-policy.md).
+[ADR 0076](./adr/0076-paired-document-domain-write-policy.md). Treatment Reasoning
+è indisponibile secondo [ADR 0180](./adr/0180-athena-fuori-dal-nucleo-modelli-per-dominio.md).
 
 <a id="3-design-e-accessibilita"></a>
 

@@ -57,7 +57,7 @@ Restano fuori:
 
 ## Riferimenti
 
-- [ADR 0038](./0038-network-readonly-data-plane-auth-boundary.md)
+- [ADR 0038](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0038-network-readonly-data-plane-auth-boundary.md)
 - [ADR 0048](./0048-apple-shared-client-architecture-and-home-base-runtime.md)
 - [ADR 0052](./0052-network-patient-profile-write-boundary.md)
 - [OpenAPI v1](../openapi/mediflow-v1.yaml)
@@ -81,7 +81,7 @@ cifrati e vincoli paired restano invariati; nessun nuovo writer headless.
 
 ## Emendamento WUL-793 del 25 ottobre 2026 (Proposed)
 
-[ADR 0163](./0163-mobile-visit-dossier.md) ammette appunti mobili durevoli,
+[ADR 0163](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0163-mobile-visit-dossier.md) ammette appunti mobili durevoli,
 protetti come dati sanitari. Sono distinti dalle entries: nessuna scrittura o
 coda offline. Nuovo login, rivalidazione online e revisione esplicita precedono
 la precompilazione del compositore ordinario. Writer, audit e rilettura restano

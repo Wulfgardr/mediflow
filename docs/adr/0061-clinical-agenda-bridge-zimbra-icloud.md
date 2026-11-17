@@ -4,7 +4,7 @@ Date: 2026-05-16
 Status: Accepted
 
 Related: [ADR 0060](./0060-kree8-cockpit-live-root-entry.md),
-[ADR 0057](./0057-local-evidence-absorption-layer.md)
+[ADR 0057](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0057-local-evidence-absorption-layer.md)
 
 ## Problema
 

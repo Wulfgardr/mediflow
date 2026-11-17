@@ -196,7 +196,7 @@ fresco. Il completamento del pilota non equivale al completamento di C04:
 la classificazione di tutti i sink e chiamanti e la lista di migrazione C05
 devono restare esplicite, con gli elementi non risolti ancora aperti.
 
-La [classificazione corrente dei writer](../audit-writers.md) elenca i punti
+La [classificazione corrente dei writer](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/audit-writers.md) elenca i punti
 di scrittura, il motivo dell’obbligo e i residui da migrare in C05. Sostituisce
 i conteggi iniziali come riferimento operativo, senza modificare i contratti
 di sicurezza e delle ricevute headless.

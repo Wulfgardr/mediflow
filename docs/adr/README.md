@@ -36,8 +36,6 @@ verifica dello stato successivo.
 - [0151-profile-contract-package-topology.md](./0151-profile-contract-package-topology.md): BT-07; pacchetto puro dei contratti profilo già provati, owner Node e conformità condivisa senza nuovi writer o trasformazioni dei dati.
 - [0150-patient-profile-pilot-recovery.md](./0150-patient-profile-pilot-recovery.md): BT-06; recupero C15 prima/dopo il pilota, ricevuta storica conservata e autorizzazione corrente verificata senza riattivare sessioni o prove precedenti.
 - [0145-rust-gpui-connected-client.md](./0145-rust-gpui-connected-client.md): client Rust/GPUI paired, Windows/Linux espliciti, sblocco v3 e prove old/new; writer e integrazioni mobile restano distinti.
-- [0141-local-checkup-json-body-bound.md](./0141-local-checkup-json-body-bound.md): Proposed; nuovo cap locale 4 MiB e involucro oggetto per i quattro POST/PUT checkup, con DELETE e paired esclusi.
-- [0137-rust-boundary-pilot-proposal.md](./0137-rust-boundary-pilot-proposal.md): proposta WUL-706 subordinata al pilota 0.9.1; confronto IPC/FFI, codec isolato e rollback, senza adozione runtime o cambio UI.
 
 - [0125-explicit-aifa-catalog-download.md](./0125-explicit-aifa-catalog-download.md): propone un aggiornamento AIFA richiesto esplicitamente e basato sulla fonte ufficiale.
 
@@ -50,7 +48,6 @@ verifica dello stato successivo.
 - [0119-anydoc-apple-vision-current-source.md](./0119-anydoc-apple-vision-current-source.md): fissa la precedenza del ripiego PDF AnyDoc + Apple Vision, separato da Fabric, con matrice e provenienza dell’anteprima.
 
 <!-- @Codex MF085-002/003: bounded source-bound scale contract. -->
-- [0118-tinetti-poma28-source-bound-submission.md](./0118-tinetti-poma28-source-bound-submission.md): propone POMA-28 versionata e vincolata alla fonte, con storico separato, validazione completa e controlli dei writer Web/Swift; non dichiara validazione clinica né nuove soglie.
 
 - [0117-headless-portable-agent-first-and-capability-first-fabric.md](./0117-headless-portable-agent-first-and-capability-first-fabric.md): rende Headless/CLI/MCP, progettati per gli agenti e indipendenti dal sistema operativo, un requisito della 0.8.5; definisce un insieme minimo utile attraverso Application Services e riclassifica OCR come funzione indipendente dal modello, con DeepSeek facoltativo.
 - [0116-agentic-checkup-status-transition.md](./0116-agentic-checkup-status-transition.md): accetta la prima scrittura agentica non-SOAP soltanto come transizione `pending -> completed|cancelled` di un checkup esistente: servono proposta AIP, conferma UI specifica per l’operazione, CAS, idempotenza e ricevuta PHI-safe; il pacchetto iniziale resta solo documentale.
@@ -71,7 +68,6 @@ verifica dello stato successivo.
 - [0097-active-role-session-and-step-up-authorization.md](./0097-active-role-session-and-step-up-authorization.md): accetta il prerequisito host-owned, inattivo per default, physician-only e operation-scoped per la sola SOAP; non consegna runtime, proof o write.
 - [0100-fabric-vs-headless-semantic-plane.md](./0100-fabric-vs-headless-semantic-plane.md): propone di separare i piani Fabric e Headless, con inventari e controlli SHA distinti; non abilita runtime, cloud o applicazione dei risultati.
 - [0099-ocr-document-locator-and-source-currentness.md](./0099-ocr-document-locator-and-source-currentness.md): accetta il contratto fail-closed per locator OCR monouso e currentness della sorgente documentale, con DAG O1a-O5, senza autorizzare runtime o apply.
-- [0098-physician-terminal-review-authority.md](./0098-physician-terminal-review-authority.md): propone una funzionalità locale circoscritta per accettare o rifiutare una revisione, con gesto monouso e route assente fino al superamento dei controlli.
 - [0096-owner-sessione-selezione-e-lifetime-broker.md](./0096-owner-sessione-selezione-e-lifetime-broker.md): fissa responsabilità legate alla sessione, selezione canonica e broker dei lease.
 - [0095-broker-projection-e-servizi-host-per-capability.md](./0095-broker-projection-e-servizi-host-per-capability.md): fissa il ciclo di vita successivo alla configurazione iniziale, la proiezione del broker e servizi host distinti per funzione.
 - [0094-intelligence-fabric-headless-contract-085.md](./0094-intelligence-fabric-headless-contract-085.md): definisce l'Application Service Layer condiviso, separa Fabric e AIP e fissa completezza architetturale e operativa.
@@ -151,24 +147,18 @@ prima porzione di lavoro verificabile:
 
 - [0161 — Porte host e lifecycle GPUI](./0161-gpui-host-ports-lifecycle.md) — Accepted; contratto G-1a.1 e decisione 2 approvata da Leonardo.
 
-- [0163 — Dossier visita mobile](./0163-mobile-visit-dossier.md) — Proposed; WUL-793, copia esplicita e appunti cifrati, nessun writer offline.
 
-- [ADR 0164 — Ricevuta di ritiro dell’autorità native](0164-native-inference-authority-retirement.md): recupero circoscritto oltre la sessione; chiusura fisica distinta.
 
 - [ADR 0165 — Canale di accesso della chat alla sessione GPUI](0165-native-chat-access-channel.md): confine peer, conferma nativa e concessione monouso C4a.
 
-- [ADR 0167 — Prima sede da GPUI](0167-first-ambulatory-host-bootstrap.md): Web P3 amministrativa dedicata, operatore coincidente e creazione atomica senza scope paired.
 
 - [ADR0168 — Comando durevole stato terapia](0168-durable-therapy-status-command.md): C-5a/G-6, receipt/tombstone, tempo host e conservazione attraverso restore; consumer chat escluso.
 
 - [ADR0169 — Clear/delete ambulatori nominati](0169-gpui-ambulatory-destructive-commands.md): piano host congelato, doppia autorità e terminali durevoli; consumer GPUI collegato; qualifica aggregata ancora aperta.
 
 - [ADR 0170: Punti di innesto territoriali](0170-territorial-service-extension-points.md): Proposed; estende 0158 con contratti dei servizi e raccordo WUL-587.
-- [ADR 0171: Proprietà del runtime locale e lease dei client](0171-local-runtime-ownership-and-client-leases.md): proposto; ognuno ferma solo ciò che ha avviato, un server per archivio, recupero senza segnali a PID su disco.
-- [ADR 0172: Sessione Web locale del client GPUI](0172-gpui-local-web-session.md): proposta; route Web esistenti per interruttori e cancellazione con precondizioni, sessione separata e ritiro locale esatto senza Supervisor.
-- [ADR 0173: Autorità e provenienza del ripristino portabile](0173-portable-import-authority-and-audit-origin.md): proposto; credenziale fresca, attestazioni inattive e storico importato identificato con eventi locali.
-- [ADR 0175: Dossier clinico da cartella](0175-dossier-import-da-cartella.md): proposto; estrazione locale in sola lettura, identità prima dell'archiviazione, nuova scheda dal comando documentale, proposte da sezioni esplicite con evidenza e residuo, claim CAS per fatto, rilettura su tutti i campi, riprova OCR.
-- [ADR 0176: Estrazione preparata per il dossier](0176-estrazione-preparata-per-il-dossier.md): proposto; file esterno abbinato per sha256, citazioni verificate sul testo di MediFlow, raggruppamento per paziente, accettazione in blocco del solo verificato con i writer di 0175.
+- [ADR 0172: Sessione Web locale del client GPUI](0172-gpui-local-web-session.md): Accepted (17/11/2026); route Web esistenti per interruttori e cancellazione con precondizioni, sessione separata e ritiro locale esatto senza Supervisor.
+- [ADR 0173: Autorità e provenienza del ripristino portabile](0173-portable-import-authority-and-audit-origin.md): Accepted (17/11/2026); credenziale fresca, attestazioni inattive e storico importato identificato con eventi locali.
 - [ADR 0177: MediFlow utilizzabile ovunque, la Lombardia come modulo](0177-moduli-di-giurisdizione.md): proposto; i pacchetti territoriali di ADR 0158 governano anche le superfici Web di SISS e portali, catalogo farmaci di qualunque agenzia con fonte dichiarata, protesica senza modulo lombardo come seconda consegna.
 - [ADR 0178: Conservazione dei dati sanitari](0178-conservazione-dati-sanitari.md): proposto; profilo dal pacchetto territoriale (nessuno, Italia, Lombardia rev04), classificazione unica, scarto del fascicolo solo su conferma con audit, blocchi per contenzioso, finestre che non scendono sotto il minimo.
 - [ADR 0180: ATHENA fuori dal nucleo, modelli locali scelti per dominio](0180-athena-fuori-dal-nucleo-modelli-per-dominio.md): accettato; nessun requisito ATHENA o MLX nel nucleo, Treatment Reasoning non disponibile, modelli portabili GGUF scelti per dominio dopo prove proprie, Fabric operativo anche senza modello.

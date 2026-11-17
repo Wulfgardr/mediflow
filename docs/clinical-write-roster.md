@@ -26,9 +26,9 @@ correlazione, non una chiave generale di idempotenza.
 - [Route della capability map](./capability-mapping/sources/web-http-routes.v1.json)
   e [code explorer](../tools/code-explorer/curated-map.json): indici di sorgenti
   su baseline precedenti. L'explorer copre due esempi, non tutti i writer.
-- [Selezione dei test](./test-selection.md):
+- [Selezione dei test](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/test-selection.md):
   distingue presenza e selezione dall'esecuzione. Le prove sotto sono riferimenti,
-  non nuovi PASS. La classificazione degli obblighi è nell’[elenco audit C04](./audit-writers.md).
+  non nuovi PASS. La classificazione degli obblighi è nell’[elenco audit C04](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/audit-writers.md).
 
 **Superfici.** Web usa la sessione ammessa dall'adapter; v1 usa l'autorità locale
 prevista dalla route; paired richiede capability e contesto rete, con scope
@@ -225,7 +225,7 @@ ID e profili delle precedenti righe HTTP, aggiunge gli owner non ordinari e sepa
 Autorizzazione, versione/currentness, transazione e audit sono campi distinti;
 `no` indica assenza osservata, non un permesso a omettere la garanzia.
 Le differenze cliniche e le prove di riferimento restano nei profili sopra.
-La [mappa delle altre autorità e disposizioni C01](./authority-census.md) classifica
+La [mappa delle altre autorità e disposizioni C01](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/authority-census.md) classifica
 restore, schema, processi, rete e custodia, senza confonderli con CRUD clinico.
 
 ## Identificativi: regola trasversale da conservare nel roster
@@ -312,4 +312,4 @@ roundtrip/recovery e `verify:therapy-status` con confini legacy/nuovo separati.
 
 ## G-2c/G-3d: clear/delete host nominati
 
-`ambulatory.clear-test.v1` e `ambulatory.delete.v1` richiedono la doppia autorità corrente e un piano host immutabile, non un grant paired generico. Core legacy condivisi sincroni, piano/CAS/audit/receipt nella stessa IMMEDIATE; close/read non ricercano la sede corrente e recovery non esegue. Ledger append-only dedicato preservato da restore, receipt pubblica senza pazienti/snapshot audit. [Contratto](ambulatory-destructive-commands.md), ADR0169; consumer GPUI ancora da collegare.
+`ambulatory.clear-test.v1` e `ambulatory.delete.v1` richiedono la doppia autorità corrente e un piano host immutabile, non un grant paired generico. Core legacy condivisi sincroni, piano/CAS/audit/receipt nella stessa IMMEDIATE; close/read non ricercano la sede corrente e recovery non esegue. Ledger append-only dedicato preservato da restore, receipt pubblica senza pazienti/snapshot audit. [Contratto](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/ambulatory-destructive-commands.md), ADR0169; consumer GPUI ancora da collegare.

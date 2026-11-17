@@ -90,5 +90,5 @@ su `users`.
 ## Riferimenti
 
 - [ADR 0026](./0026-pin-rotation-via-client-side-rewrap.md)
-- [ADR 0038](./0038-network-readonly-data-plane-auth-boundary.md)
+- [ADR 0038](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0038-network-readonly-data-plane-auth-boundary.md)
 - [ADR 0048](./0048-apple-shared-client-architecture-and-home-base-runtime.md)

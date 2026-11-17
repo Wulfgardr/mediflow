@@ -132,7 +132,7 @@ node scripts/mediflow.mjs --scelta sviluppo --senza-browser
 solo i figli posseduti dal lanciatore. `scripts/Launch_MediFlowMac.command`
 resta uno strumento interno di preparazione del bundle: il punto di ingresso
 utente per Mac è la voce **App per Mac**, disponibile solo con bundle costruito
-e identità coerente. Consulta [la guida nativa](docs/native-launch.md).
+e identità coerente. Consulta [la guida nativa](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md).
 
 ### Lint / Build
 

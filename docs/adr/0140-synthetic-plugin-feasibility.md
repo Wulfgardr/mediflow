@@ -7,6 +7,8 @@ read_when:
 
 # ADR 0140 — fattibilità del plugin con esempi inventati
 
+Stato: Accepted, deliberato da Leonardo il 17/11/2026
+
 Data: 2026-09-30. Stato: proposta implementata per riesame, perimetro WUL-756.
 Base verificata: `bf7cd61bd8c779e0b3f28906af8a7923ae7c98fb`.
 
@@ -69,7 +71,7 @@ Il manifest `.codex-plugin/plugin.json` e il companion `.mcp.json` conservano
 la rappresentazione legacy richiesta; test schema-aware impediscono divergenze
 di identità, presentazione e comando server. Non sono presenti apps mappings,
 hook, marketplace o impostazioni personali. La skill limita l'uso a esempi
-inventati. I dettagli e le prove sono nel [README del pacchetto](../../plugins/mediflow-synthetic/README.md).
+inventati. I dettagli e le prove sono nel [README del pacchetto](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/plugins/mediflow-synthetic/README.md).
 
 Questa slice è sorgente di sviluppo, richiede build e dipendenze esplicite e
 non dichiara un installer. Nessun install è stato eseguito sull'account.

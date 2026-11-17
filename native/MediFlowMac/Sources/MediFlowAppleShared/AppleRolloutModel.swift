@@ -238,7 +238,7 @@ public extension AppleFoundationSnapshot {
                 id: "clinical-modules",
                 title: "Moduli clinici core",
                 summary: "Pazienti, diario, terapie, controlli, osservazioni, farmaci ed esenzioni devono migrare modulo-per-modulo senza fork logici.",
-                sourceOfTruth: "PLANS sezione 5, docs/parity-matrix.md",
+                sourceOfTruth: "docs/apple-parity-matrix.json",
                 macOS: ApplePlatformStatus(phase: .next, detail: "Rebuild del shell clinico nel nuovo assetto"),
                 iPhone: ApplePlatformStatus(phase: .blocked, detail: "Read/write non-IA dipendono da boundary paired"),
                 iPad: ApplePlatformStatus(phase: .blocked, detail: "Parita ampia dopo write boundary e cache"),
