@@ -6,7 +6,6 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 import ts from 'typescript';
 
-// Evaluate the helper and optional real browser transport in an isolated realm; no DB imports.
 const source = fs.readFileSync(new URL('../e2e/anydoc-consumer-diagnostic.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
 function fixture({ correlated = false, archiveTransport = false } = {}) {
@@ -249,7 +248,6 @@ test('stream rejection precedes cleanup cancellation and is not reported as done
   const failure = new TypeError('PRIVATE-TRANSPORT-DETAIL');
   f.controller.error(failure);
   await assert.rejects(pending, error => error === failure);
-  // Match boundedResponseText cleanup after an unsuccessful read.
   await reader.cancel().catch(() => {});
   reader.releaseLock();
   assert.deepEqual(f.eventNames(), ['armed', 'fetch_start', 'fetch_response', 'reader_acquired',

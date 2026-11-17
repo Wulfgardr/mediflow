@@ -15,8 +15,6 @@ test('Windows ICU identity is pinned; other target profiles acquire no data asse
  for(const p of profiles.filter(p=>p.platform!=='win32'))assert.equal(p.icuData,undefined);
 });
 
-// These are physical, deliberately synthetic package bytes. The Windows native
-// binary is never loaded; import hooks mark and stop entry after the real worker guard.
 for(const scenario of ['valid','missing','same-size-corrupt','truncated','symlink','directory','missing-profile-asset','unsafe-profile-name']){
  test(`real worker Windows guard: ${scenario} ICU ${scenario==='valid'?'reaches guarded import':'rejects before native import'}`,()=>{
   const root=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'mediflow-icu-worker-'));

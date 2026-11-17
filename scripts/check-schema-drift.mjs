@@ -1,20 +1,5 @@
 #!/usr/bin/env node
 
-// WUL-268 (STREAM A): schema drift check.
-//
-// The runtime initializer in lib/sqlite-schema.ts are the operative
-// migration mechanism: drizzle/*.sql files are historical artifacts and are
-// never applied at runtime (there is no migrator import and no db:migrate
-// script). This check makes that contract enforceable: it bootstraps a FRESH
-// temp SQLite database through the REAL db-server bootstrap path (by pointing
-// MEDIFLOW_DATA_DIR at a throwaway directory and explicitly calling openDbServer), introspects sqlite_master,
-// and compares the live tables / columns / indices against the drizzle
-// declarations in lib/schema.ts. It exits 1 with a readable diff on drift.
-//
-// Because lib/db-server.ts and lib/schema.ts use the "@/*" path alias and
-// "server-only", this script registers a tiny resolve hook that maps "@/*" to
-// the project root and stubs "server-only" before importing them. That keeps a
-// SINGLE source of truth: the check runs the actual guards rather than a copy.
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -27,10 +12,6 @@ const LOADER_PATH = path.join(ROOT_DIR, 'scripts', 'register-strip-types-loader.
 const DRIFT_HOOK_PATH = path.join(ROOT_DIR, 'scripts', 'schema-drift-resolve-hook.mjs');
 const WORKER_PATH = path.join(ROOT_DIR, 'scripts', 'check-schema-drift-worker.mjs');
 
-// The heavy lifting (importing the aliased, server-only modules and running the
-// real guards) happens in a worker process launched with the strip-types loader
-// and the "@/" resolve hook. This wrapper just resolves a compatible node
-// runtime the same way run-strip-types.mjs does, then relays the worker output.
 
 function resolveCommand(command) {
     if (!command) return null;
@@ -100,7 +81,6 @@ const result = spawnSync(
 try {
     fs.rmSync(tempDataDir, { recursive: true, force: true });
 } catch {
-    // best-effort cleanup of the throwaway bootstrap directory
 }
 
 process.exit(result.status === null ? 1 : result.status);
