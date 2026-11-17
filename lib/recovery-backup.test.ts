@@ -272,6 +272,7 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
         const oldFile = path.join(path.dirname(f.source), 'v4-snapshot.db');
         fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
+        old.exec('DROP TABLE agent_mandates');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
@@ -313,6 +314,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
     try {
         const oldFile = path.join(f.root, 'canonical5.db'); fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
+        old.exec('DROP TABLE agent_mandates');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
@@ -354,6 +356,7 @@ for (const alteration of ['none', 'column', 'index', 'view', 'authority-table'])
     try {
         const file = path.join(f.root, 'canonical6.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
+        old.exec('DROP TABLE agent_mandates');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE synthetic_extension');
@@ -444,6 +447,7 @@ test('encrypted v10 predecessor recovers without the tables of the removed featu
     try {
         const file = path.join(f.root, 'canonical10.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
+        old.exec('DROP TABLE agent_mandates');
         old.exec('DROP TABLE synthetic_extension; PRAGMA user_version=10;');
         for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
@@ -466,6 +470,7 @@ test('encrypted v9 predecessor resta recuperabile dopo l’aggiunta dell’autor
     try {
         const file = path.join(f.root, 'canonical9.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
+        old.exec('DROP TABLE agent_mandates');
         old.exec('DROP TABLE synthetic_extension; ALTER TABLE entries DROP COLUMN recorded_by; PRAGMA user_version=9;');
         for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
@@ -487,6 +492,7 @@ test(`encrypted 0.9.0 predecessor (schema 3) ${alteration}: the published releas
     try {
         const file = path.join(f.root, 'canonical3.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
+        old.exec('DROP TABLE agent_mandates');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec(`ALTER TABLE entries DROP COLUMN recorded_by; DROP TABLE synthetic_extension; DROP TABLE portable_import_origins;
             DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands;
@@ -519,21 +525,22 @@ test(`encrypted 0.9.0 predecessor (schema 3) ${alteration}: the published releas
     } finally { f.cleanup(); }
 });
 
-test('encrypted v11 predecessor restores historical audit into schema 12 without fabricating agent provenance', async () => {
+for (const version of [11, 12]) test(`encrypted v${version} predecessor restores historical audit into current schema without fabricating agent provenance`, async () => {
     const f = await fixture();
     try {
-        const file = path.join(f.root, 'canonical11.db');
+        const file = path.join(f.root, `canonical${version}.db`);
         fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
-        old.exec('DROP TABLE synthetic_extension; PRAGMA user_version=11;');
-        for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
+        old.exec('DROP TABLE agent_mandates');
+        old.exec(`DROP TABLE synthetic_extension; PRAGMA user_version=${version};`);
+        if (version < 12) for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE');
         const expected = contents(old); old.close();
         const bytes = fs.readFileSync(file), artifact = await encryptRecoveryBackup(bytes, f.key);
         await f.restore({ artifact });
         const restored = openVersionedSqliteDatabase(f.destination);
         try {
-            assert.equal(restored.pragma('user_version', { simple: true }), 12);
+            assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             for (const table of ['users', 'patients', 'entries', 'therapy_status_commands', 'ambulatory_destructive_commands']) assert.deepEqual(contents(restored)[table], expected[table]);
             assertPredecessorAuditHistory(contents(restored).audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
         } finally { restored.close(); }

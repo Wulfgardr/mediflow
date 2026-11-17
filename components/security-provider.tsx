@@ -210,7 +210,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         return barrier ? barrier.run(request) : request();
     };
 
-    const lock = () => {
+    const lock = (reason: 'manual' | 'inactivity' = 'manual') => {
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
         const receiptGeneration = ++lockReceiptGenerationRef.current;
         updateAuthRecoveryState('pending');
@@ -227,14 +227,14 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         };
         // The revocation fence must overtake any in-flight or queued login/setup request.
         // Only a later, explicit PIN gesture may start after this receipt settles.
-        void requestApplicationLockConfirmation()
+        void requestApplicationLockConfirmation(reason)
             .then(completeRecovery)
             .catch(() => completeRecovery(false));
     };
 
     useInactivityLock({
         enabled: isAuthenticated && !isLocked,
-        onTimeout: lock,
+        onTimeout: () => lock('inactivity'),
     });
 
     useEffect(() => {

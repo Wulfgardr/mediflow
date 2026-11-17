@@ -72,6 +72,10 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
         label: 'Dati',
         items: [
             {
+                id: 'agenti', href: '/settings/agenti', label: 'Agenti',
+                description: 'Mandati e richieste di abbinamento', keywords: ['agenti', 'mandato', 'visite'],
+            },
+            {
                 id: 'accesso',
                 href: '/settings/accesso',
                 label: 'Accesso',
