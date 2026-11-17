@@ -8,20 +8,17 @@ MediFlow è una cartella clinica gratuita e a codice aperto per l'ambulatorio e 
 
 ## Stato della versione
 
-**Oggi**
-> Oggi trovi la 0.9.0. La 0.9.1 è in preparazione e questa pagina la descrive.
-> Pubblicare il codice non significa che sia ammesso all’uso clinico. Il professionista o l’organizzazione responsabile deve valutare l’installazione e i suoi flussi.
+Sto preparando la 0.9.1. È lei che racconto qui. Oggi la versione pubblicata è la 0.9.0.
+
+Pubblicare il codice è un inizio. Per l’uso clinico, il professionista o l’organizzazione responsabile deve valutare l’installazione e i flussi. Il pulsante «pubblica» non fa quella valutazione.
 
 ## Cosa fa
 
-- Tieni nella scheda identità, allergie e diario, con autore e storico delle voci.
-- Segui terapie, controlli e prescrizioni, con i loro stati e la traccia delle modifiche.
-- Importi una cartella di documenti, ne controlli la copertura e rivedi l’identità.
-- Usi l’agenda e i moduli territoriali. Per SISS, portali e PRREG ti serve il modulo Lombardia.
-- Detti con whisper sul tuo computer. Puoi installare il modello dalle Impostazioni.
-- Se vuoi, chiedi un quadro del paziente, una sintesi dei documenti o un import assistito. Con il tuo consenso ricevi proposte con fonti e ricevuta.
-- Puoi aprire funzioni MediFlow da Claude e Codex. Puoi anche scegliere ChatGPT, con consenso e controlli sui dati.
-- Salvi una copia completa con documenti incorporati ed allegati. La copia non recupera originali esterni già mancanti.
+Faccio partire il lavoro dalla scheda. Ci trovi identità ed allergie, oltre al diario con autore e storico delle voci. Da lì segui terapie, controlli e prescrizioni, con i loro stati e le modifiche. Puoi importare una cartella di documenti, controllare la copertura e rivedere l’identità. Anche i documenti contano.
+
+Ho previsto agenda e moduli territoriali per organizzare l’attività. Il modulo Lombardia serve per SISS, portali e PRREG. La dettatura usa whisper sul computer, con modello installabile dalle Impostazioni. Le mani possono riposare.
+
+Per leggere la cartella puoi chiedere un quadro del paziente oppure una sintesi dei documenti. C’è anche l’import assistito. Tutte e tre preparano proposte con fonti e ricevuta, previo consenso. Puoi aprire funzioni MediFlow da Claude e Codex. Oppure scegliere ChatGPT, con consenso e controlli sui dati. Le copie complete comprendono documenti incorporati ed allegati. Se manca già un originale conservato fuori, la copia non lo recupera. Una copia non fa magie.
 
 ### Perché esiste MediFlow
 
@@ -29,21 +26,21 @@ Nasce dal mio lavoro di medico di distretto. Inizialmente per me. Poi, se viene 
 
 ## Cosa non fa
 
-MediFlow non sostituisce il tuo giudizio. Non diagnostica, prescrive o esegue triage da solo. Le funzioni intelligenti preparano proposte, senza scrivere autonomamente nella cartella.
+Il medico sei tu. Diagnosi, prescrizione e triage non sono attività autonome di MediFlow. Le funzioni intelligenti preparano proposte e non scrivono da sole nella cartella.
 
-Le tre funzioni intelligenti locali non sono qualificate e, nelle prove su dati sintetici, solo l’import assistito è rimasto nei tempi e nella memoria previsti. Le misure sono nel [registro della 0.9.1](./docs/quality/intelligence/registro-0.9.1.json).
+Ho misurato le tre funzioni intelligenti locali su dati sintetici. Non sono qualificate. Fra le tre, l’import assistito è l’unica ad essere rientrata nei limiti previsti di tempo e memoria. Il [registro della 0.9.1](./docs/quality/intelligence/registro-0.9.1.json) racconta le misure.
 
-La versione Web è prevista per Mac, Windows e Linux. Il client per Mac è stato installato e controllato su un MacBook Pro M5 Max. L’uso dell’interfaccia resta da collaudare e la compatibilità con gli altri Mac non è provata.
+Per il Web ho previsto Mac, Windows e Linux. Sul MacBook Pro M5 Max ho installato il client e ne ho controllato l’host. L’interfaccia non è stata ancora collaudata. Sugli altri Mac non ho prove di compatibilità.
 
 ## Dove stanno i dati
 
-Il tuo archivio è sul computer che ospita MediFlow. Prima della scrittura, i campi sensibili vengono cifrati lato client. MediFlow cifra alcuni campi, non il database.
+Ho scelto il computer che ospita MediFlow come sede dell’archivio. Prima della scrittura, i campi sensibili vengono cifrati lato client. MediFlow cifra alcuni campi, non il database.
 
-L’uso parte dal tuo computer. Un invio al cloud è previsto solo se la funzione che lo consente è stata sviluppata e documentata in modo esplicito. [Sicurezza e dati](./SECURITY.md)
+L’uso parte dal computer. Un invio al cloud è previsto solo per una funzione sviluppata e documentata esplicitamente. I dettagli sono in [Sicurezza e dati](./SECURITY.md). Vale la pena leggerli.
 
 ## Provalo
 
-Per avviare il codice servono Git e Node.js 24.x.
+Per partire servono Git e Node.js 24.x. Prima gli strumenti.
 
 ```sh
 git clone https://github.com/Wulfgardr/mediflow
@@ -53,9 +50,9 @@ npm ci
 npm run prepare:dependencies
 ```
 
-Avvia il programma con `node scripts/mediflow.mjs --scegli`. `nvm use` vale se usi nvm. Con altri gestori seleziona Node 24.
+Il comando di avvio è `node scripts/mediflow.mjs --scegli`. Se usi nvm, `nvm use` seleziona la versione prevista. Altrimenti seleziona Node 24 con il tuo gestore.
 
-Per la 0.9.0 pubblicata segui il [README del tag](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/README.md). Prima di aggiornare, prepara backup, kit e chiave di recupero.
+Per la versione pubblicata, la 0.9.0, segui il [README del tag](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/README.md). Se decidi di aggiornare, tieni pronti backup, kit e chiave di recupero. Meglio averli prima.
 
 Il manuale spiega come [aggiornare il catalogo farmaci AIFA](./docs/MANUALE.md#catalogo-farmaci-aifa) e [gestire le fonti personali della protesica](./docs/MANUALE.md#fonti-personali-della-protesica).
 
@@ -65,10 +62,10 @@ Il manuale spiega come [aggiornare il catalogo farmaci AIFA](./docs/MANUALE.md#c
 
 ## Sviluppo assistito
 
-MediFlow è progettato e diretto da Leonardo Pegollo. Gran parte del codice è scritta dagli agenti Codex e Claude Code su sue istruzioni. Intento, pianificazione, architettura, prove richieste e merge sono suoi. Le fonti esterne sono riconosciute nei [crediti](./CREDITS.md).
+Progetto MediFlow e ne seguo la direzione personalmente. Gran parte del codice la scrivono gli agenti Codex e Claude Code, su mie istruzioni. Intento, pianificazione, architettura, prove richieste e merge sono miei. Ho riconosciuto nei [crediti](./CREDITS.md) le fonti esterne.
 
-La [dashboard dei consumi](./docs/development-usage.md) è parziale. I token non misurano costo o qualità.
+Ho pubblicato una [dashboard dei consumi](./docs/development-usage.md), ma copre solo una parte del lavoro. Contare token non dice quanto sia costato il lavoro o quanto sia riuscito. Niente pagelle in token.
 
 ## Licenza
 
-MediFlow è gratuito ed è distribuito con [licenza MIT](./LICENSE). Hardware, modelli e servizi di terzi possono avere costi propri. Le fonti esterne sono in [CREDITS](./CREDITS.md).
+MediFlow è gratuito e distribuito con [licenza MIT](./LICENSE). Hardware, modelli e servizi di terzi possono costare. Le fonti utilizzate sono riconosciute in [CREDITS](./CREDITS.md). Anche questo va considerato.
