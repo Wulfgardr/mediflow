@@ -10,8 +10,8 @@ soltanto la pubblica e la privata cifrata dalla master key residente.
 
 La route UI richiede sessione Web corrente, trasporto same-origin,
 attestazione del socket loopback e generazione corrente dell'archivio.
-Il token locale e il futuro token agente non sostituiscono questi controlli.
-Il PIN passa dal verificatore esistente con lockout; non viene conservato
+Il token locale ed il futuro token agente non sostituiscono questi controlli.
+Il PIN passa dal verificatore esistente con lockout. Non viene conservato
 nel mandato o nelle ricevute. Un ritiro della sessione durante la verifica
 nega la creazione.
 
@@ -20,7 +20,7 @@ IMMEDIATE. Il lettore di ammissione richiede una transazione chiamante e
 rilegge scadenza, revoca, perimetro, autore e generazione. Non conserva
 un'autorizzazione in cache. Revocare più mandati è un'unica transazione;
 un errore audit annulla tutte le revoche. Il blocco manuale revoca prima
-di ritirare la sessione; il blocco per inattività ritira la sessione e
+di ritirare la sessione. Il blocco per inattività ritira la sessione e
 conserva il mandato. Un errore di revoca impedisce una ricevuta di blocco
 confermato.
 
