@@ -19,6 +19,7 @@
  *   d'identità, che resta sui codici letti da MediFlow.
  */
 
+import { clinicalFactContext, clinicalSentence, clinicalTokens, contextReview, isHistoricalTherapy, legacyPreparedFamily, legacyPreparedNegation, structuredContextApplies, type ClinicalContext } from './clinical-context-lexicon';
 import { isValidItalianTaxCodeChecksum } from './document-identity-resolution';
 import { catalogObservationCode } from './dossier-sections';
 import {
@@ -184,21 +185,10 @@ export function preparedPatientLabel(patient: PreparedPatient | null): string {
 // Citazioni: confronto per parole, sugli offset del testo conservato
 // ---------------------------------------------------------------------------
 
-interface Token { text: string; start: number; end: number; numeric: boolean }
-
-/**
- * Parole: sequenze di lettere (con diacritici), oppure numeri con i loro separatori («1,25»,
- * «12.06.06»). Cifre e lettere attaccate si separano: «5mg» vale «5» e «mg».
- */
-const WORD = /[0-9]+(?:[.,][0-9]+)*|[\p{L}\p{M}]+/gu;
+type Token = ReturnType<typeof clinicalTokens>[number];
 
 export function preparedTokens(text: string): Token[] {
-    const tokens: Token[] = [];
-    for (const match of text.matchAll(WORD)) {
-        const normalized = match[0].normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('it-IT');
-        tokens.push({ text: normalized, start: match.index!, end: match.index! + match[0].length, numeric: /[0-9]/u.test(normalized) });
-    }
-    return tokens;
+    return clinicalTokens(text);
 }
 
 function withinOneEdit(a: string, b: string): boolean {
@@ -273,7 +263,6 @@ function contiguous(passage: readonly string[], wanted: readonly string[], from 
     return -1;
 }
 
-/** Le parole lunghe di `wanted`, in ordine, entro una finestra stretta; restituisce l'indice dopo l'ultima, -1 se assenti. */
 function inOrder(passage: readonly string[], wanted: readonly string[]): number {
     const long = wanted.filter((word) => isNumber(word) || word.length >= 4);
     if (!long.length) return contiguous(passage, wanted);
@@ -304,10 +293,6 @@ function firstNumbersAfter(passage: readonly string[], from: number, wanted: rea
     return at;
 }
 
-const NEGATION_WORDS = new Set(['non', 'nega', 'negano', 'negato', 'negata', 'assenza', 'assente', 'esclusa', 'escluso', 'escluse', 'esclusi', 'no', 'senza']);
-const SUSPENSION = /^(?:sospes|sospend|interrott|interromp|sospensione|stop)/u;
-const FAMILY_WORDS = /^(?:padre|madre|fratell|sorell|figli|nonn|zi[oaie]$|familiar|genitor|mamma|papa$|coniug|moglie$|marito$|consorte$|nipot|cugin|suocer|cognat)/u;
-
 export interface PreparedFieldCheck { check: 'ok' | 'value_missing' | 'status_conflict' | 'subject_conflict'; negated: boolean; notes: string[]; drop: string[] }
 
 /**
@@ -316,20 +301,24 @@ export interface PreparedFieldCheck { check: 'ok' | 'value_missing' | 'status_co
  * in cui il documento li scrive. Un valore preso da una riga vicina non passa.
  */
 export function verifyPreparedFields(kind: DossierFactKind, values: Readonly<Record<string, string>>, passage: readonly string[]): PreparedFieldCheck {
+    return verifyFields(kind, values, passage);
+}
+
+function verifyFields(kind: DossierFactKind, values: Readonly<Record<string, string>>, passage: readonly string[], source?: { body: string; start: number; end: number; context: ClinicalContext }): PreparedFieldCheck {
     const out: PreparedFieldCheck = { check: 'ok', negated: false, notes: [], drop: [] };
     const fail = (check: PreparedFieldCheck['check']) => ({ ...out, check });
     const foreign = Object.entries(values).some(([field, value]) => ['dosage', 'value', 'scaleTotal', 'scaleMax', 'percentage'].includes(field) && FOREIGN_DIGITS.test(value));
     if (foreign) return fail('value_missing');
     let subjectAt = -1;
+    let drugEnd = 0;
     switch (kind) {
         case 'therapy': {
             const drug = words(values.drugName);
             const end = contiguous(passage, drug);
             if (!drug.length || end < 0) return fail('value_missing');
             subjectAt = end - drug.length;
+            drugEnd = end;
             if (firstNumbersAfter(passage, end, words(values.dosage).filter(isNumber)) < 0) return fail('value_missing');
-            if (values.status === 'active' && passage.some((word) => SUSPENSION.test(word))) return fail('status_conflict');
-            if (values.subject !== 'familiare' && passage.some((word) => FAMILY_WORDS.test(word))) return fail('subject_conflict');
             const principle = words(values.activePrinciple);
             if (principle.length && contiguous(drug, principle) < 0) {
                 const near = contiguous(passage.slice(Math.max(0, subjectAt - 6), end + 6), principle) >= 0;
@@ -341,7 +330,6 @@ export function verifyPreparedFields(kind: DossierFactKind, values: Readonly<Rec
             const display = words(values.display);
             const end = contiguous(passage, display);
             if (!display.length || end < 0) return fail('value_missing');
-            subjectAt = end - display.length;
             const value = words(values.value);
             const valueEnd = value.some(isNumber) ? firstNumbersAfter(passage, end, value.filter(isNumber)) : contiguous(passage.slice(0, end + 4), value, end);
             if (valueEnd < 0 || (value.some(isNumber) && passage.slice(end, valueEnd).filter(isNumber).length !== value.filter(isNumber).length)) return fail('value_missing');
@@ -350,24 +338,21 @@ export function verifyPreparedFields(kind: DossierFactKind, values: Readonly<Rec
             break;
         }
         case 'reported_scale': {
-            const end = inOrder(passage, words(values.scaleName));
-            if (end < 0) return fail('value_missing');
+            const scale = inOrder(passage, words(values.scaleName));
+            if (scale < 0) return fail('value_missing');
             const numbers = [...words(values.scaleTotal).filter(isNumber), ...words(values.scaleMax).filter(isNumber)];
-            if (firstNumbersAfter(passage, end, numbers) < 0) return fail('value_missing');
-            subjectAt = 0;
+            if (firstNumbersAfter(passage, scale, numbers) < 0) return fail('value_missing');
             break;
         }
         case 'diagnosis': {
-            if (values.code && contiguous(passage, words(values.code)) < 0) return fail('value_missing');
-            const end = inOrder(passage, words(values.description));
-            if (end < 0) return fail('value_missing');
-            subjectAt = Math.max(0, end - words(values.description).length * 3);
-            if (values.subject !== 'familiare' && passage.some((word) => FAMILY_WORDS.test(word))) return fail('subject_conflict');
+            const code = words(values.code);
+            const codeEnd = contiguous(passage, code);
+            const description = inOrder(passage, words(values.description));
+            if (codeEnd < 0 || description < 0) return fail('value_missing');
             break;
         }
         case 'exemption':
             if (contiguous(passage, words(values.code)) < 0) return fail('value_missing');
-            subjectAt = contiguous(passage, words(values.code)) - words(values.code).length;
             break;
         case 'service_prescription':
             // Nomi di prestazioni e ausili: si controllano le parole; quantità e frequenze non sono valori verificati.
@@ -381,12 +366,24 @@ export function verifyPreparedFields(kind: DossierFactKind, values: Readonly<Rec
         default:
             break;
     }
-    // Una negazione scritta prima del soggetto, nello stesso passo, nega il fatto.
-    if (subjectAt > 0 && passage.slice(0, subjectAt).some((word) => NEGATION_WORDS.has(word))) out.negated = true;
+    if (!structuredContextApplies(kind)) return out;
+    const body = source?.body ?? passage.join(' ');
+    const quoteStart = source?.start ?? 0;
+    const quoteEnd = source?.end ?? body.length;
+    const context = source?.context ?? clinicalFactContext(kind, values, body, quoteStart, quoteEnd);
+    if (kind === 'therapy') {
+        const tokens = clinicalTokens(body.slice(quoteStart, quoteEnd));
+        const start = quoteStart + tokens[subjectAt].start;
+        const end = quoteStart + tokens[drugEnd - 1].end;
+        const { after } = clinicalSentence(body, start, end);
+        if (firstNumbersAfter(words(after), 0, words(values.dosage).filter(isNumber)) < 0) return fail('value_missing');
+        if (values.status === 'active' && context.suspended) return fail('status_conflict');
+    }
+    if ((kind === 'therapy' || kind === 'diagnosis') && values.subject !== 'familiare' && context.family) return fail('subject_conflict');
+    out.negated = context.negated;
     return out;
 }
 
-/** Parole della frase che precede la citazione nella sua unità, fino a un segno di fine frase o a capo. */
 function sentenceBefore(text: string, units: readonly DossierUnit[], evidence: DossierEvidence): string[] {
     const unit = units.find((candidate) => candidate.index === evidence.unit);
     if (!unit) return [];
@@ -460,6 +457,10 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
         if (ids.has(factId)) continue;
         ids.add(factId);
         const values: Record<string, string> = { ...item.values };
+        if (structuredContextApplies(item.kind)) {
+            delete values.contextReview;
+            delete values.documentedSuspension;
+        }
         const factNotes: string[] = [];
         for (const field of Object.keys(values)) if (DATE_FIELDS.has(field) && !notFuture(values[field], now)) delete values[field];
         switch (item.kind) {
@@ -504,7 +505,8 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
             evidence = passage?.evidence ?? quoted?.evidence ?? null;
             check = passage ? (passage.match === 'exact' ? 'verified' : 'approximate') : 'paraphrase';
             if (passage && item.kind === 'invalidity' && values.percentage && !percentageWritten(values.percentage, passage.evidence.excerpt)) check = 'value_missing';
-            if (passage && item.kind === 'anamnesis' && values.subject !== 'familiare' && passage.words.some((word) => FAMILY_WORDS.test(word))) check = 'subject_conflict';
+            if (passage && item.kind === 'anamnesis' && values.subject !== 'familiare'
+                && passage.words.some((word) => legacyPreparedFamily.test(word))) check = 'subject_conflict';
         } else if (!item.quote) check = 'no_quote';
         else if (!quoteLongEnough(item.quote)) check = 'short_quote';
         else {
@@ -513,13 +515,19 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
             else {
                 evidence = anchor.evidence;
                 // I valori si confrontano con le parole del documento senza tolleranza, anche in lettura approssimata.
-                const fields = verifyPreparedFields(item.kind, values, anchor.words);
-                negated = fields.negated;
-                // Le parole della stessa frase prima della citazione contano: una negazione o un familiare tagliati fuori restano.
-                const before = sentenceBefore(text, units, anchor.evidence);
-                if (before.some((word) => NEGATION_WORDS.has(word))) negated = true;
-                if (fields.check === 'ok' && (item.kind === 'therapy' || item.kind === 'diagnosis') && values.subject !== 'familiare'
-                    && before.some((word) => FAMILY_WORDS.test(word))) fields.check = 'subject_conflict';
+                const { start, end, unit: unitIndex } = anchor.evidence;
+                const unit = units.find((candidate) => candidate.index === unitIndex)!;
+                const body = unitText(text, unit);
+                const structured = structuredContextApplies(item.kind);
+                const context = structured ? clinicalFactContext(item.kind, values, body, start, end) : undefined;
+                const fields = verifyFields(item.kind, values, anchor.words, context && { body, start, end, context });
+                negated = context?.negated ?? sentenceBefore(text, units, evidence).some((word) => legacyPreparedNegation.has(word));
+                if (context) {
+                    const declaredSuspension = item.kind === 'therapy' && isHistoricalTherapy(item.values.status);
+                    if (context.suspended && declaredSuspension) values.documentedSuspension = 'true';
+                    const review = contextReview(context, declaredSuspension);
+                    if (review) values.contextReview = review;
+                }
                 for (const field of fields.drop) delete values[field];
                 factNotes.push(...fields.notes);
                 check = fields.check === 'ok' ? (anchor.match === 'exact' ? 'verified' : 'approximate') : fields.check;

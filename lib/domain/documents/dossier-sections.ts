@@ -11,6 +11,7 @@
  * Il testo che nessuna proposta copre resta un residuo esplicito.
  */
 
+import { clinicalHeadingPattern, contextReview, familyHeadings, headingQualifiers, legacySectionFamily, legacySectionNegation, suspensionHeadings } from './clinical-context-lexicon';
 import { LOINC_PENDING_VALIDATION, searchStaticTerminology } from '../../terminology';
 
 export type DossierSectionKind =
@@ -19,8 +20,9 @@ export type DossierSectionKind =
 
 export interface DossierSection { kind: DossierSectionKind; label: string; labelStart: number; start: number; end: number }
 
+const labelSource = (label: string) => label.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&').replace(/ /gu, '\\s+');
 const LABELS: Array<{ kind: DossierSectionKind; source: string }> = [
-    { kind: 'anamnesis_family', source: String.raw`anamnesi\s+familiare` },
+    ...familyHeadings.map((label) => ({ kind: 'anamnesis_family' as const, source: labelSource(label) })),
     { kind: 'anamnesis', source: String.raw`anamnesi(?:\s+(?:patologica\s+(?:remota|prossima)|fisiologica|remota|prossima|clinica))?` },
     { kind: 'diagnosis', source: String.raw`diagnosi(?:\s+(?:principale|secondari[ae]|alla\s+dimissione|di\s+dimissione|clinica|di\s+ingresso))?` },
     { kind: 'medication', source: String.raw`(?:terapia(?:\s+(?:domiciliare|in\s+atto|attuale|in\s+corso|alla\s+dimissione|consigliata|farmacologica|pregressa|precedente))?|farmaci(?:\s+in\s+uso)?)` },
@@ -35,28 +37,46 @@ const LABELS: Array<{ kind: DossierSectionKind; source: string }> = [
 const LABEL_RE = new RegExp(String.raw`(?<![\p{L}\p{N}])(${LABELS.map((label) => `(?:${label.source})`).join('|')})\s*:`, 'giu');
 const HEADING_RE = new RegExp(String.raw`^[ \t]*#{1,6}[ \t]*(${LABELS.map((label) => `(?:${label.source})`).join('|')})[ \t]*:?[ \t]*$`, 'gimu');
 
-function kindOf(label: string): DossierSectionKind {
-    for (const entry of LABELS) if (new RegExp(`^(?:${entry.source})$`, 'iu').test(label.trim())) return entry.kind;
-    return 'assessment';
+const suspensionLabels = suspensionHeadings.map(labelSource);
+const SUSPENSION_LABEL_RE = new RegExp(String.raw`(?<![\p{L}\p{N}])(${suspensionLabels.join('|')})[ \t]*:`, 'giu');
+
+function kindOf(label: string, structured: boolean): DossierSectionKind | undefined {
+    if (structured && suspensionLabels.some((source) => new RegExp(`^(?:${source})$`, 'iu').test(label))) return 'medication';
+    const hasCue = structured && contextReview(headingQualifiers(label));
+    return LABELS.find(({ kind, source }) => {
+        const ending = hasCue && (kind === 'medication' || kind === 'diagnosis') ? String.raw`(?:[ \t].*)?$` : '$';
+        return new RegExp(`^(?:${source})${ending}`, 'iu').test(label);
+    })?.kind;
 }
 
-/** Sezioni esplicite di un'unità di testo, con offset nel testo dell'unità. */
-export function segmentDossierSections(text: string): DossierSection[] {
+export function segmentDossierSections(text: string, structured = false): DossierSection[] {
     const marks: Array<{ label: string; labelStart: number; start: number }> = [];
-    for (const match of text.matchAll(LABEL_RE)) marks.push({ label: match[1], labelStart: match.index!, start: match.index! + match[0].length });
-    for (const match of text.matchAll(HEADING_RE)) marks.push({ label: match[1], labelStart: match.index!, start: match.index! + match[0].length });
+    for (const match of [...text.matchAll(LABEL_RE), ...text.matchAll(HEADING_RE)]) {
+        marks.push({ label: match[1], labelStart: match.index, start: match.index + match[0].length });
+    }
+    const headings = structured ? [...text.matchAll(clinicalHeadingPattern)] : [];
+    if (structured) {
+        for (const match of text.matchAll(SUSPENSION_LABEL_RE)) {
+            marks.push({ label: match[1], labelStart: match.index, start: match.index + match[0].length });
+        }
+        for (const match of headings) {
+            const label = match[1] ?? match[2];
+            if (kindOf(label, true)) marks.push({ label, labelStart: match.index + match[0].indexOf(label), start: match.index + match[0].length });
+        }
+    }
     marks.sort((a, b) => a.labelStart - b.labelStart);
     const unique = marks.filter((mark, index) => index === 0 || mark.labelStart >= marks[index - 1].start);
     return unique.map((mark, index) => {
-        const next = index + 1 < unique.length ? unique[index + 1].labelStart : text.length;
-        // Contenuto sulla stessa riga dell'etichetta: la sezione è quella riga. Contenuto a capo:
-        // prosegue fino alla riga vuota. Un paragrafo unito dall'estrattore si ferma all'etichetta successiva.
+        const next = unique[index + 1]?.labelStart ?? text.length;
         const lineEnd = text.indexOf('\n', mark.start);
-        const inline = text.slice(mark.start, lineEnd === -1 ? text.length : lineEnd).trim().length > 0;
-        const blank = /\n[ \t]*\n/gu; blank.lastIndex = mark.start;
+        const endOfLine = lineEnd === -1 ? text.length : lineEnd;
+        const inline = text.slice(mark.start, endOfLine).trim().length > 0;
+        const blank = structured ? /\r?\n[ \t]*\r?\n/gu : /\n[ \t]*\n/gu;
+        blank.lastIndex = mark.start;
         const paragraphEnd = blank.exec(text)?.index ?? text.length;
-        const end = Math.min(next, inline ? (lineEnd === -1 ? text.length : lineEnd) : paragraphEnd);
-        return { kind: kindOf(mark.label), label: mark.label.replace(/\s+/gu, ' ').trim(), labelStart: mark.labelStart, start: mark.start, end };
+        const nextHeading = headings.find((heading) => heading.index >= mark.start)?.index ?? text.length;
+        const end = Math.min(next, nextHeading, inline ? endOfLine : paragraphEnd);
+        return { kind: kindOf(mark.label, structured) ?? 'assessment', label: mark.label.replace(/\s+/gu, ' ').trim(), labelStart: mark.labelStart, start: mark.start, end };
     }).filter((section) => text.slice(section.start, section.end).trim().length > 0);
 }
 
@@ -82,23 +102,33 @@ export function splitSectionItems(text: string, start: number, end: number): Dos
     return items;
 }
 
-const NEGATION = /\b(?:non|nega|negano|negativ[oaie]|assenza\s+di|assente|esclus[oaie]|escludere|no)\b/iu;
 const UNCERTAINTY = /\b(?:sospett[oaie]?|probabil[ei]|possibil[ei]|verosimil[ei]|da\s+escludere|in\s+corso\s+di\s+accertamento|da\s+confermare|dubbi[oa])\b|\?/iu;
-const FAMILY = /\b(?:padre|madre|fratell[oi]|sorell[ae]|figli[oa]?|nonn[oaie]|zi[oa]|familiar[ei]|genitor[ei])\b/iu;
 
 export interface DossierQualifiers { negated: boolean; subject: 'paziente' | 'familiare'; certainty: '' | 'incerta'; temporality: string }
 
-export function qualifiersOf(item: string, sectionKind: DossierSectionKind, sectionLabel: string): DossierQualifiers {
+export function legacyQualifiersOf(item: string, sectionKind: DossierSectionKind, sectionLabel: string): DossierQualifiers {
     const label = sectionLabel.toLowerCase();
     const temporality = /remot|pregress|precedent/u.test(label) || /\b(?:pregress|in\s+passato|anni\s+fa|esiti\s+di)\w*/iu.test(item) ? 'storica'
         : /dimission|consigliat/u.test(label) ? 'consigliata alla dimissione'
             : /in atto|attuale|in corso|domiciliare/u.test(label) ? 'in atto secondo il documento'
                 : sectionKind === 'followup' ? 'pianificata' : '';
     return {
-        negated: NEGATION.test(item.split(/[,:]/u)[0] ?? item) || /^\s*(?:nega|non|no)\b/iu.test(item),
-        subject: sectionKind === 'anamnesis_family' || FAMILY.test(item) ? 'familiare' : 'paziente',
+        negated: legacySectionNegation.test(item.split(/[,:]/u)[0] ?? item) || /^\s*(?:nega|non|no)\b/iu.test(item),
+        subject: sectionKind === 'anamnesis_family' || legacySectionFamily.test(item) ? 'familiare' : 'paziente',
         certainty: UNCERTAINTY.test(item) ? 'incerta' : '',
         temporality,
+    };
+}
+
+export function qualifiersOf(item: string, sectionKind: DossierSectionKind, sectionLabel: string, context = headingQualifiers(sectionLabel + '\n' + item)) {
+    const legacy = legacyQualifiersOf(item, sectionKind, sectionLabel);
+    return {
+        ...legacy,
+        negated: context.negated,
+        subject: context.family ? 'familiare' as const : 'paziente' as const,
+        temporality: context.suspended ? '' : legacy.temporality,
+        suspended: context.suspended,
+        contextReview: contextReview(context),
     };
 }
 
@@ -156,7 +186,7 @@ export function findInvalidityMentions(text: string): DossierSpan[] {
 }
 export function invalidityDetails(text: string): { percentage: string; allowance: string } {
     const percentage = /\b(\d{1,3})\s*%/u.exec(text)?.[1] ?? '';
-    return { percentage: Number(percentage) <= 100 ? percentage : '', allowance: /indennit[àa]\s+di\s+accompagnamento/iu.test(text) ? (NEGATION.test(text) ? 'negata o non riconosciuta' : 'riconosciuta') : '' };
+    return { percentage: Number(percentage) <= 100 ? percentage : '', allowance: /indennit[àa]\s+di\s+accompagnamento/iu.test(text) ? (legacySectionNegation.test(text) ? 'negata o non riconosciuta' : 'riconosciuta') : '' };
 }
 
 const normalizedName = (value: string) => value.toLocaleLowerCase('it-IT').normalize('NFKD').replace(/[̀-ͯ]/gu, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();

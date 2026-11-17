@@ -818,3 +818,29 @@ test('WUL-878 profile physician code is excluded without labels and cannot recei
     const [mixed] = await buildDossierInventory(other.ports, other.files, live);
     assert.equal(evaluateDraftGroupIdentity(mixed, patientsFixture(), 'pa').status, 'mixed');
 });
+
+test('l’applicazione conserva la sospensione dichiarata e ferma una riattivazione in revisione', async () => {
+    const text = letterText(CF_A).replace('Terapia: Ramipril 5 mg 1 cp al mattino', [
+        'Terapie sospese:', 'Ramipril 5 mg 1 cp al mattino', 'Atenololo 25 mg 1 cp al mattino',
+        'Bisoprololo 5 mg 1 cp al mattino', 'Metoprololo 50 mg 1 cp al mattino', '',
+    ].join('\n'));
+    const facts = [
+        ['Ramipril', '5 mg', 'suspended'], ['Atenololo', '25 mg', 'completed'],
+        ['Bisoprololo', '5 mg', 'active'], ['Metoprololo', '50 mg', 'suspended'],
+    ].map(([drugName, dosage, status]) => ({
+        kind: 'therapy', quote: `${drugName} ${dosage} 1 cp al mattino`, values: { drugName, dosage, status },
+    }));
+    const { files, ports, records } = setup([['D/R/lettera.pdf', text]]);
+    const [group] = await buildDossierInventory(ports, files, { ...live, prepared: preparedFor([{ text, cf: CF_A, facts }]) });
+    const [stored] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    assert.equal(stored.status, 'stored');
+    const attachmentId = (stored as { attachmentId: string }).attachmentId;
+    const document = await acceptAll(ports, 'pa', attachmentId, record => ({
+        ...record, facts: record.facts.filter(fact => fact.kind === 'therapy' && fact.origin === 'prepared').map(fact =>
+            fact.values.drugName === 'Metoprololo' ? { ...fact, values: { ...fact.values, status: 'active' } } : fact),
+    }));
+    const result = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live });
+    assert.deepEqual(result.outcomes.map(item => [item.target, item.outcome]), [['therapies', 'applied'], ['therapies', 'applied']]);
+    const therapies = [...records].filter(([key]) => key.startsWith('therapies:')).map(([, value]) => [value.drugName, value.status]);
+    assert.deepEqual(therapies, [['Ramipril', 'suspended'], ['Atenololo', 'completed']]);
+});

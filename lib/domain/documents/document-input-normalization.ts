@@ -1,3 +1,4 @@
+import { negationCues } from './clinical-context-lexicon';
 import { splitDocumentIntoLines } from './document-excerpt';
 
 export type DocumentInputSourceKind = 'text' | 'ocr' | 'xml';
@@ -69,16 +70,6 @@ const HEADING_BOUNDARY_REGEX = new RegExp(
     `\\s{2,}(?=(?:${HEADING_KEYWORDS.join('|')})\\w*)`,
     'giu',
 );
-
-const NEGATION_PATTERNS = [
-    /\bnega(?:to|ta|te|ti)?\b/giu,
-    /\bnegativ[oaie]\b/giu,
-    /\bassenza di\b/giu,
-    /\bnon evidenza\b/giu,
-    /\bnon si rileva\b/giu,
-    /\bnon riferisce\b/giu,
-    /\bsenza\b/giu,
-];
 
 const TEMPORALITY_PATTERNS = [
     /\banamnesi remota\b/giu,
@@ -318,23 +309,16 @@ function collectNormalizedDates(text: string): DocumentNormalizationDateHint[] {
     return dates;
 }
 
-function collectPatternHits(text: string, patterns: RegExp[]): string[] {
+function uniquePhraseHits(phrases: Iterable<string>): string[] {
     const seen = new Set<string>();
     const hits: string[] = [];
-
-    for (const pattern of patterns) {
-        for (const match of text.matchAll(pattern)) {
-            const value = match[0].replace(/\s+/g, ' ').trim();
-            if (!value) continue;
-
-            const key = value.toLowerCase();
-            if (seen.has(key)) continue;
-
-            seen.add(key);
-            hits.push(value);
-        }
+    for (const phrase of phrases) {
+        const value = phrase.replace(/\s+/gu, ' ').trim();
+        const key = value.toLowerCase();
+        if (!value || seen.has(key)) continue;
+        seen.add(key);
+        hits.push(value);
     }
-
     return hits;
 }
 
@@ -354,8 +338,8 @@ export function normalizeDocumentInput(
             structuredNarrative: sourceKind === 'xml' && base.sections.length > 0,
             detectedHeadings: base.sections.map((section) => section.heading),
             normalizedDates: collectNormalizedDates(normalizedText),
-            negationPhrases: collectPatternHits(normalizedText, NEGATION_PATTERNS),
-            temporalityPhrases: collectPatternHits(normalizedText, TEMPORALITY_PATTERNS),
+            negationPhrases: uniquePhraseHits(Array.from(negationCues(normalizedText), ({ text }) => text)),
+            temporalityPhrases: uniquePhraseHits(TEMPORALITY_PATTERNS.flatMap((pattern) => Array.from(normalizedText.matchAll(pattern), ([text]) => text))),
         },
     };
 }
