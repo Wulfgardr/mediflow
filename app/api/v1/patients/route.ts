@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { hasPatientIdentifierConflict, PatientIdentifierConflictError, PATIENT_IDENTIFIER_DUPLICATE } from '@/lib/patient-identifier-conflict';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { PatientCreateConflictError, PatientCreateDestinationNotFoundError } from '@/lib/patient-create-service';
@@ -95,6 +96,8 @@ export async function POST(request: Request) {
         }
 
         /* resolve the host actor before entering the synchronous transaction. */
+        const persistedSealedError = rejectUnsealedV1Write('patients', body);
+        if (persistedSealedError) return persistedSealedError;
         const auditContext = auditContextFromRequest(request, actorSession);
         const requestId = requestIdFromRequest(request);
 

@@ -217,7 +217,7 @@ async function createSeedPatient(ambulatoryId) {
             lastName: 'Smoke',
             taxCode: syntheticTaxCode(suffix),
             ambulatoryId,
-            notes: 'network-home-base-readonly-smoke',
+            notes: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2UtcmVhZG9ubHktc21va2U=',
             isAdi: false,
             isArchived: false,
         },

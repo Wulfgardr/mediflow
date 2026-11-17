@@ -354,7 +354,7 @@ async function createSeedPatient(ambulatoryId) {
             lastName: 'Therapy',
             taxCode: `NTT${suffix}`,
             ambulatoryId,
-            notes: 'network-home-base-therapy-write-smoke',
+            notes: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2UtdGhlcmFweS13cml0ZS1zbW9rZQ==',
             isAdi: false,
             isArchived: false,
         },

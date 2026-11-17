@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
@@ -86,6 +87,8 @@ export async function PUT(request: Request,
         if (shape) return NextResponse.json({ error: shape.error }, { status: shape.status });
         const normalized = normalizeObservationUpdateInput(parsed.body);
         if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const persistedSealedError = rejectUnsealedV1Write('observations', parsed.body);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = updateObservationOperation({
             patientId: id, observationId, expectedVersion, values: normalized.values, mode: 'v1',
@@ -116,6 +119,8 @@ export async function DELETE(request: Request,
         if (!deletion.ok) return NextResponse.json({ error: deletion.error }, { status: deletion.status });
         const normalized = normalizeObservationUpdateInput(deletion.body);
         if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const persistedSealedError = rejectUnsealedV1Write('observations', parsed.body);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = updateObservationOperation({
             patientId: id, observationId, expectedVersion: deletion.expectedVersion,

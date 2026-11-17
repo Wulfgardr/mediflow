@@ -342,7 +342,7 @@ async function createSeedPatient(ambulatoryId) {
             lastName: 'Writer',
             taxCode: syntheticTaxCode(suffix),
             ambulatoryId,
-            notes: 'network-home-base-write-smoke',
+            notes: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2Utd3JpdGUtc21va2U=',
             isAdi: false,
             isArchived: false,
         },
