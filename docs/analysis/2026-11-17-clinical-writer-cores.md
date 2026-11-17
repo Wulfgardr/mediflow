@@ -87,3 +87,13 @@ argomenti ed il nucleo è sincrono. Restano i controlli che membership ed
 audit usino il medesimo `tx`. Mutanti aggiuntivi fanno fallire il test se
 cambiano handle o input, manca il return o il nucleo diventa async.
 La suite mirata di membership, composizione e gate audit passa con 57 test.
+
+## Controllo delle schede eliminate
+
+Il controllo statico dei percorsi di profilo segue il nucleo sincrono con
+lo stesso normalizzatore stretto del gate audit. Conserva il filtro delle
+schede eliminate, il404 e il controllo sull'UPDATE finale. I25 mutanti per
+route restano respinti, compresa la variante OR nel nucleo. La fixture di
+composizione legge soltanto il paziente attivo; non richiede nuove eccezioni
+all'elenco dei lettori ammessi. Passano gli11 controlli statici e le27 prove
+di composizione, compresi rollback ed esecutori concorrenti.
