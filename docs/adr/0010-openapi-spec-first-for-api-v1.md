@@ -192,8 +192,8 @@ Il roster è `lib/backup-encrypted-fields.json`; il validatore è quello della r
 Il rifiuto vale su POST, PUT e DELETE delle cinque famiglie: pazienti, diario,
 terapie, osservazioni e checkup. Null svuota solo i campi opzionali.
 
-Per creare una voce del diario locale il client deve fornire sia `title` sia
-`content` cifrati. Non è più ammesso generare il titolo in chiaro sul server.
+Il titolo e il contenuto del diario forniti dal client devono essere cifrati.
+Se il titolo è omesso, il server conserva il valore predefinito `Voce clinica`.
 Il motivo di cancellazione fornito dal client deve arrivare cifrato. Se omesso,
 il server conserva il motivo operativo `api-v1-delete`: il controllo riguarda
 i valori del client, dopo le validazioni di forma esistenti e prima della scrittura.
