@@ -395,7 +395,7 @@ function buildPatientPayload(name) {
         caregiver: null,
         isAdi: false,
         isArchived: false,
-        notes: `seed:${name}`
+        notes: `ENC:c3ludGhldGlj:${Buffer.from(`seed:${name}`).toString('base64')}`
     };
 }
 

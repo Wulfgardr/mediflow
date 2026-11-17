@@ -585,7 +585,7 @@ async function createSeedPatient(ambulatoryId) {
             lastName: 'Observation',
             taxCode: `NTT${suffix}`,
             ambulatoryId,
-            notes: 'network-home-base-observation-write-smoke',
+            notes: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2Utb2JzZXJ2YXRpb24td3JpdGUtc21va2U=',
             isAdi: false,
             isArchived: false,
         },

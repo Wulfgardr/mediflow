@@ -302,7 +302,7 @@ async function createSeedPatient(ambulatoryId, lastName = 'Discovery') {
             lastName,
             taxCode: `NDS${suffix}`,
             ambulatoryId,
-            notes: 'network-home-base-discovery-read-smoke',
+            notes: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2UtZGlzY292ZXJ5LXJlYWQtc21va2U=',
             isAdi: false,
             isArchived: false,
         },

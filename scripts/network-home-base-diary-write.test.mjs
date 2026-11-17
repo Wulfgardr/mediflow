@@ -576,7 +576,7 @@ async function createSeedPatient(ambulatoryId) {
             lastName: 'Diary',
             taxCode: syntheticTaxCode(suffix),
             ambulatoryId,
-            notes: 'network-home-base-diary-write-smoke',
+            notes: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2UtZGlhcnktd3JpdGUtc21va2U=',
             isAdi: false,
             isArchived: false,
         },
@@ -597,7 +597,7 @@ async function cleanupPatient(patientId) {
             const deletion = await request('DELETE', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
                 headers: localApiHeaders(),
                 // WUL-308: child DELETEs require optimistic concurrency.
-                body: { version: entry.version, deletionReason: 'network-home-base-diary-write-cleanup' },
+                body: { version: entry.version, deletionReason: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2UtZGlhcnktd3JpdGUtY2xlYW51cA==' },
             });
             assert.equal(deletion.response.status, 200);
         }
