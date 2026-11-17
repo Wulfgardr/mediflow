@@ -53,7 +53,12 @@ fn group_identity(group: &Value, patients: &[Value], patient: Option<&str>) -> V
         .filter(|s| s["status"] == "ready")
         .map(|s| json!({"taxCodes":s["taxCodes"],"patientNames":s["patientNames"]}))
         .collect();
-    dossier::identity(&documents, patients, patient)
+    dossier::identity(
+        &documents,
+        patients,
+        patient,
+        group["physicianTaxCode"].as_str(),
+    )
 }
 impl ClinicalApp {
     pub(super) fn cancel_dossier(&mut self, cx: &mut Context<Self>) {

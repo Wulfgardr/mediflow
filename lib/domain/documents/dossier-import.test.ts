@@ -470,10 +470,18 @@ test('patient names are read only from a labelled line, as capitalised words', a
 
 test('WUL-878 labeled prescriber blocks exclude only professional occurrences', () => {
     const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
-    for (const block of [`Medico prescrittore\n${CF_B}`, `Medico prescrittore\nPersona Sintetica\nCF: ${CF_B}`, `Codice fiscale del medico\n${CF_B}`, `Medico prescrittore\nCognome e nome del medico: Persona Sintetica\nCodice fiscale\n${CF_B}`]) {
+    for (const block of [`Medico prescrittore\n${CF_B}`, `Medico prescrittore\nDott. Persona Sintetica\nCF: ${CF_B}`, `Codice fiscale del medico\n${CF_B}`, `Medico prescrittore\nCognome e nome del medico: Persona Sintetica\nCodice fiscale\n${CF_B}`]) {
         const codes = collectDossierTaxCodes(`Paziente CF ${CF_A}\n\n${block}`);
         assert.equal(evaluateDossierGroupIdentity([{ taxCodes: codes }], patients, 'pa').status, 'matched');
         const repeated = collectDossierTaxCodes(`${block}\n\nPaziente CF ${CF_B}\nPaziente CF ${CF_A}`);
         assert.equal(evaluateDossierGroupIdentity([{ taxCodes: repeated }], patients).status, 'mixed');
+    }
+});
+
+test('a patient label inside a prescriber section stops professional attribution', () => {
+    const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
+    for (const label of ['Paziente: Persona Sintetica', 'Assistito: Persona Sintetica', 'Referto clinico', 'Referto Clinico', 'Paziente Persona Sintetica', 'Assistito Persona Sintetica']) {
+        const taxCodes = collectDossierTaxCodes(`Paziente CF ${CF_A}\nMedico prescrittore\n${label}\nCF: ${CF_B}`);
+        assert.equal(evaluateDossierGroupIdentity([{ taxCodes }], patients, 'pa').status, 'mixed');
     }
 });
