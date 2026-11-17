@@ -1,106 +1,20 @@
 # Contribuire a MediFlow
 
-MediFlow tratta **dati sanitari**. Ogni contributo deve proteggere dati,
-accessi e storico delle modifiche. Per le prove usa solo dati sintetici.
+Se lavori al progetto, parti dai dati delle prove, che devono essere sintetici. Non introdurre PHI o PII reali nella repository, nelle fixture, nei log o nelle catture, inclusi screenshot, database esportati e campioni anonimizzati reversibili. Anche gli accessi e la storia delle modifiche vanno protetti.
 
----
+Apri una PR per problema, così riesco a seguire la modifica e le prove. Dimmi cosa non hai verificato e riconosci le fonti esterne in [CREDITS.md](./CREDITS.md).
 
-## ⚠️ Regole base (non negoziabili)
+## Prima di iniziare
 
-- **Nessun PHI/PII nel repository.**
-  Non committare dati reali di pazienti, screenshot, log, database esportati
-  o campioni "anonimizzati ma reversibili".
-- **Local-first di default.**
-  Non introdurre invii al cloud — telemetria, chiamate AI remote o sincronizzazione —
-  se non siano richiesti esplicitamente e documentati.
-- Preferisci **diff piccoli e revisionabili**, nei quali sia riconoscibile
-  lo scopo del cambiamento. Evita refactor ampi "per pulizia".
+Ho scelto local-first, quindi per introdurre invii al cloud, telemetria, chiamate AI remote o sincronizzazione servono richiesta esplicita e documentazione. Se vuoi spostare un confine di sicurezza, prima serve un ADR.
 
-> [!IMPORTANT]
-> Per cambiare i confini di sicurezza, scrivi prima un ADR (vedi sotto).
+Il lavoro va nella repository pubblica [`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow), unica sede per issue, branch, PR, tag e release. Quella privata precedente è archiviata e non va usata come mirror o destinazione di export. Dati ed artefatti sensibili restano fuori da Git: [SECURITY.md](./SECURITY.md) e [topologia del repository](./docs/repository-topology.md).
 
-## Repository e consegna
+Verifica lo stato del worktree e del branch, poi parti da una issue pertinente ed apri un branch dedicato. Lascia intatte le modifiche altrui e separa i lavori concorrenti. Tieni commit e diff piccoli e coerenti, senza refactor laterali, e suddividi il lavoro per risultati verificabili, non per numero di file. Consulta la [mappa della documentazione](./docs/README.md), l’[architettura](./ARCHITECTURE.md) e gli ADR pertinenti. Consulta anche lo stato del sistema e la sicurezza per il componente, ricordando che le fotografie storiche valgono per la revisione indicata. In Linear registra risultato, criteri di accettazione, sequenza e dipendenze. Dopo aver consultato la documentazione, se resta un dubbio, fammi una domanda mirata sul punto aperto. Le prove valgono per la revisione verificata: se cambia un contratto, riesamina quelle interessate. Una consegna tecnica non autorizza da sola l’uso clinico o di dati reali.
 
-Il lavoro confluisce nella repository pubblica
-[`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow), unica sede
-operativa: issue, branch, pull request, tag e release devono nascere qui.
-La precedente repository privata è archiviata e non va usata come mirror o
-destinazione di export. Questo non cambia il confine dei dati: dati e artefatti
-sensibili restano fuori da Git, secondo
-[`SECURITY.md`](./SECURITY.md) e
-[`docs/repository-topology.md`](./docs/repository-topology.md).
+## Avvio in locale
 
----
-
-## Orientamento e perimetro del contributo
-
-Verifica branch e stato del worktree prima di modificare file. Usa una issue
-pertinente e un branch dedicato; conserva le modifiche altrui e separa i lavori
-concorrenti. Mantieni ogni commit coerente e riesaminabile, senza refactor
-laterali. Suddividi per risultati verificabili, non per numero di file.
-
-La [mappa canonica](./docs/README.md) individua i contratti del prodotto.
-Consulta stato del sistema, architettura, sicurezza e ADR pertinenti al
-componente: le fotografie storiche attestano soltanto la revisione indicata.
-Linear conserva risultato, criteri di accettazione, sequenza e dipendenze.
-Le prove tecniche restano associate alla revisione verificata; una modifica
-che cambia il contratto richiede di riesaminare le prove interessate.
-
-Una funzione è consegnata quando il percorso previsto funziona nella
-destinazione dichiarata, compresi avvio, configurazione e collegamenti
-necessari. Distingui codice verificato, integrato, pubblicato e operativo;
-la consegna tecnica non autorizza da sola l’uso clinico o di dati reali.
-
-Per modifiche solo documentali, verifica almeno:
-
-```bash
-git diff --check
-rg --files -g '*.md' | sort
-```
-
-Restano applicabili i controlli richiesti dalla CI e le verifiche pertinenti
-alla modifica. Per interfacce, dati e comportamenti valgono i criteri della
-Definition of Done qui sotto.
-
----
-
-## ⚙️ Prerequisiti
-
-- Node.js **24.x**, come fissato da `.nvmrc` e `package.json`
-- npm (incluso con Node)
-- Ollama (opzionale, per Patient Insight, Smart Import e Document Synthesis)
-
-Per eseguire `scripts/run-strip-types.mjs --test`, anche tramite npm,
-impostare `MEDIFLOW_DATA_DIR` su una directory sintetica posseduta dal run;
-pulirla solo dopo la fine dei processi figli. Se il valore è assente o vuoto,
-il launcher termina prima del target con `MEDIFLOW_TEST_DATA_DIR_REQUIRED`
-(ADR 0130). Non usare la directory dati reale dell'applicazione: un import
-statico può aprire il DB prima che intervengano gli hook della fixture.
-Il launcher conserva il percorso esplicito, ma non ne gestisce la pulizia.
-
-Un percorso dati esplicito impedisce al runtime di importare automaticamente
-`medical.db` dalla directory di lavoro (ADR 0138). Il preparatore E2E è distinto:
-il launcher dei test imposta da sé `MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1`; chi lo
-esegue fuori dal launcher deve usare la stessa variabile per impedirgli di copiare dati
-legacy prima dell'avvio del runtime. I test devono creare le proprie fixture.
-
-Nel perimetro documentato per la 0.8.5, AnyDoc è il primo passaggio automatico
-locale. Il codice comprende instradamento, manifest, materializzazione e
-rendering delle sole pagine `needsOcr`, che vengono elaborate con Apple Vision
-sul Mac; il risultato è poi ricomposto sotto il controllo dell'host sulla
-validità corrente delle fonti. DeepSeek-OCR 2/CUDA resta
-`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`: ne sono presenti soltanto il contratto
-e i punti di raccordo sintetici. Le route OCR legacy rispondono `410` dopo
-l'autenticazione.
-
-Treatment Reasoning resta nel catalogo come non disponibile. Non richiede
-modelli, runner o installazioni aggiuntive; vedi [ADR 0180](docs/adr/0180-athena-fuori-dal-nucleo-modelli-per-dominio.md).
-
----
-
-<a id="-getting-started"></a>
-
-## 🧑‍💻 Primi passi
+Servono Git, Node.js 24.x ed npm. Ollama è opzionale per Patient Insight, Smart Import e Document Synthesis.
 
 ```bash
 git clone https://github.com/Wulfgardr/mediflow
@@ -110,405 +24,71 @@ npm ci
 npm run prepare:dependencies
 ```
 
-### Avvio locale
+Apri `MediFlow.command` su macOS, `MediFlow.cmd` su Windows o `MediFlow.sh` su Linux. Da terminale, senza browser, usa `node scripts/mediflow.mjs --scelta sviluppo --senza-browser` per un albero modificato. Per la produzione usa `node scripts/mediflow.mjs --scelta web --senza-browser`: servono Git pulito e una build verificata della revisione corrente. `--scegli` ignora la preferenza salvata. Per il client Mac consulta la [guida nativa](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md).
 
-Apri `MediFlow.command` su macOS, `MediFlow.cmd` su Windows o `MediFlow.sh`
-su Linux. Tutti eseguono `scripts/mediflow.mjs` con Node 24. Per CI o terminali
-senza display:
+Per `scripts/run-strip-types.mjs --test`, anche tramite npm, imposta `MEDIFLOW_DATA_DIR` su una directory sintetica posseduta dal run. Non usare la directory reale e pulisci solo dopo la fine dei processi figli, perché il launcher conserva il percorso fornito esplicitamente ma non pulisce la directory. Fuori dal launcher E2E imposta anche `MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1`. I test devono creare le proprie fixture. I motivi sono negli [ADR 0130](./docs/adr/0130-node-test-data-dir-preflight.md) e 0138, indicati nella [mappa degli ADR](./docs/README.md).
 
-```bash
-node scripts/mediflow.mjs --scelta web --senza-browser
-```
+Se `MEDIFLOW_DATA_DIR` è assente o vuota, il launcher termina prima del target con `MEDIFLOW_TEST_DATA_DIR_REQUIRED`. Un import statico può aprire il database prima degli hook della fixture: il percorso esplicito impedisce al runtime la copia automatica di `medical.db` dalla directory di lavoro, mentre il preparatore E2E ha un controllo distinto e il launcher dei test imposta la variabile indicata sopra.
 
-La produzione richiede Git pulito e una build verificata della revisione
-corrente. Il lanciatore costruisce quando serve. Su un albero modificato usa
-la scelta esplicita per sviluppo:
+Per la produzione il lanciatore costruisce la build quando serve. La pagina Avvio e Ctrl+C arrestano solo i figli che gli appartengono. `scripts/Launch_MediFlowMac.command` prepara il bundle come strumento interno, mentre la voce «App per Mac» è l’ingresso per l’utente e richiede un bundle costruito e un’identità coerente.
+
+## Verifica
+
+Per i documenti parti da questi comandi:
 
 ```bash
-node scripts/mediflow.mjs --scelta sviluppo --senza-browser
+git diff --check
+rg --files -g '*.md' | sort
 ```
 
-`--scegli` ignora la preferenza salvata. La pagina Avvio e Ctrl+C arrestano
-solo i figli posseduti dal lanciatore. `scripts/Launch_MediFlowMac.command`
-resta uno strumento interno di preparazione del bundle: il punto di ingresso
-utente per Mac è la voce **App per Mac**, disponibile solo con bundle costruito
-e identità coerente. Consulta [la guida nativa](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md).
+Aggiungi i controlli della CI e quelli pertinenti alla modifica. Per una PR sono richiesti `npm run lint`, `npm run build`, `npm run check:never-regress` e `npm run check:claims`. Consiglio anche `npm run typecheck`. `npm run lint:full` mostra gli avvisi non bloccanti.
 
-### Lint / Build
+Il never-regress blocca credenziali predefinite nel runtime, endpoint runtime non locali, telemetria attivata implicitamente e violazioni delle invarianti minime zero-knowledge. Il claims guard applica i limiti dell’ADR 0065 su autonomia clinica AI, applicazione senza revisione, affermazioni di integrazione regionale SISS/FSE come già esistente, cloud predefinito, cifratura dell’intero database, FHIR non qualificato, garanzie GDPR, topologia presentata come limitata a un solo dispositivo e codifica ICD obbligatoria.
 
-```bash
-npm run lint
-npm run build
-```
+Per chiudere il lavoro chiedo che i controlli applicabili siano verdi. Quando tocchi questi percorsi, esegui anche i controlli indicati:
 
-Per includere nell'output anche gli avvisi non bloccanti:
+- `/api/v1/*`: `npm run check:openapi:drift`. Aggiorna la specifica nello stesso diff o dichiara `no contract impact`. Incompatibilità e deprecazioni richiedono un ADR nuovo o l’aggiornamento di quello applicabile prima del merge. Il controllo usa `docs/openapi/contract-policy.json` per distinguere endpoint stabili, quelli fuori dalla parte stabile e deroghe tracciate.
+- Concorrenza pazienti, `patients.version`, compare-on-write, payload `409 VERSION_CONFLICT` o write path `/api/patients/*` e `/api/v1/patients/*`: `npm run test:concurrency:patients`.
+- Nuova anagrafica da documento: `npm run test:patient-document-import`.
+- Document intelligence e allegati, compresa l’estrazione degli allegati per cui entrambi i controlli AnyDoc devono passare: `npm run test:document-synthesis`, `npm run test:ai-context`, `npm run test:pdf-service`, `npm run check:anydoc-local-only` e `npm run test:anydoc-local-only`.
+- Percorsi Fabric, composizione production, contratto di scambio o UI di ricevute e provenienza: `npm run check:fabric-generative-runtime-crosswalk` e `npm run test:fabric-generative-runtime-crosswalk`. Per il confine dei modelli anche `npm run test:function-models`.
+- Headless, AIP, MCP o Mini: `npm run check:headless-portable-imports`, `npm run test:headless-portable`, `npm run test:mcp:intelligent-host` e `npm run test:mini-cli`.
+- `/api/v1/network/*`, `lib/network-*`, pairing o sessione home-base: `npm run test:network:home-base-readonly`, `npm run test:network:home-base-write` e `npm run test:network:home-base-diary-write`. Per le prove mobile vedi [native-testing](./docs/native-testing.md).
 
-```bash
-npm run lint:full
-```
+Se cambi l’interfaccia, verifica il percorso e la comprensibilità di etichette, descrizioni, azioni e stati per un medico senza conoscenze tecniche, secondo [DESIGN.md](./DESIGN.md#plain-language-for-physicians). Una funzione interagibile richiede un percorso UI esplicito e coerente, con pulsante o CTA e label comprensibile. Il medico deve capire significato, scelta e conseguenze senza spiegazioni dello sviluppatore: gergo non spiegato e azioni ambigue impediscono l’accettazione anche con test verdi. Se cambia il comportamento o anche solo il contratto, aggiorna la documentazione nella sede pertinente, README, ARCHITECTURE o ADR. Se aggiungi, togli o rinomini file Markdown, aggiorna `docs/markdown-index.md` con elenco e sintesi dei file e, se cambia ownership o priorità, `docs/README.md`.
 
-<a id="type-checking-consigliato"></a>
+La quarantena in `e2e/quarantine.json` ammette solo le firme registrate entro la scadenza: i test continuano a girare, errori diversi e cleanup falliti bloccano il gate. Non rinnovare automaticamente le scadenze. Prima del rilascio rimuovi le voci o ottieni la decisione prevista da WUL-735.
 
-### Controllo dei tipi (consigliato)
+Nel registro di quarantena WUL-729 ogni voce ha responsabile, diagnosi e scadenza UTC. Tutte le asserzioni continuano a girare e i report list, HTML e `test-results/quarantine-*` conservano gli errori. Alla scadenza la deroga decade, e anche i processi interrotti restano bloccanti. Playwright usa il reporter condiviso e l’harness `node:test` legge lo stesso registro tramite `chatgpt-product-focused-tests.mjs`.
 
-Per controllare i tipi senza confondere questo passaggio con la build,
-usa lo script dedicato:
+Per la nuova anagrafica esegui il test indicato anche se tocchi `components/patient-document-import-review.tsx`, `lib/domain/documents/patient-import-decision.ts`, `lib/domain/documents/patient-document-review.ts` o la persistenza prudente delle terapie nel create-flow. I test di document intelligence valgono anche per `lib/ai-providers/fabric/document-synthesis-production-operation.ts`, `lib/domain/documents/document-parse-evidence-artifact.ts`, `lib/ai-context.ts`, `lib/domain/documents/anydoc-*`, route OCR legacy, `components/document-upload.tsx`, `app/api/attachments/route.ts` e lettura o persistenza di `summarySnapshot` e `parseEvidenceArtifactSnapshot`.
 
-```bash
-npm run typecheck
-```
+## Confini tecnici
 
-### Contract guard OpenAPI
+Per schema e migrazioni segui [ADR 0080](./docs/adr/0080-serialize-sqlite-schema-guards-at-bootstrap.md): conserva apertura esplicita, transazione e separazione della build dal database persistente. Preferisci migrazioni esplicite e verifica schema, route e client. Per dubbi su `drizzle-kit` consulta la documentazione Drizzle ORM, mentre per auth e dati consulta [SECURITY.md](./SECURITY.md). Gli endpoint web richiedono sessione valida, mentre quelli nativi richiedono un token API locale e restano versionati. Non mettere campi cifrati nei log. Se aggiungi un endpoint, ti chiedo di documentarlo almeno nella descrizione della PR, così la modifica è accompagnata dalle informazioni sul nuovo percorso.
 
-Per rilevare divergenze dal contratto e modifiche incompatibili non
-autorizzate sulla superficie `/api/v1`:
+Se cambi cifratura, derivazione delle chiavi, PIN, auth, sessioni, API native, discovery o networking, oppure un altro confine architetturale durevole, scrivi prima un ADR. Il [modello](./docs/adr/0000-template.md) è nella cartella degli ADR.
 
-```bash
-npm run check:openapi:drift
-```
+AnyDoc resta il primo passaggio locale: solo le pagine `needsOcr` arrivano all’elaborazione successiva, con controllo delle fonti e arresto se mancano i requisiti. Le route OCR legacy autenticate restano `410`. DeepSeek-OCR 2 è fuori dal perimetro 0.8.5: una futura promozione richiede adapter, benchmark sintetico italiano, soglie ed E2E con provenienza, hash e qualità per pagina, senza invii impliciti.
 
-### Never-regress guard
+Nei percorsi intelligenti l’host governa provider, modello, endpoint, prompt, ripiego e applicazione. Il risultato resta `proposal_only`. Per le opzioni ammesse consulta [ADR 0129](./docs/adr/0129-function-model-catalog-preferences.md). I provider remoti restano disattivati per default e le prove non richiedono credenziali reali. Se li modifichi, mantieni distinti tipo, istanza, auth, modello, capability, gruppi, binding, allowlist e classi di credenziale. Un login consumer o una sottoscrizione consumer o dell’host non autorizzano inferenza via API. Non copiare codice GPL né implementare OAuth privati o ricostruiti da sessioni consumer.
 
-Per impedire regressioni sui vincoli minimi di sicurezza:
+Per Headless, AIP, MCP e Mini consulta l’[architettura](./ARCHITECTURE.md) e gli ADR pertinenti nella [mappa](./docs/README.md). Per F10 MCP può creare solo l’anteprima della transizione checkup e non riceve né la proof né l’autorità di commit. Proof e commit restano nella UI Web trusted, che rilegge i dati e richiede ruolo medico attivo, step-up, gesto specifico per l’operazione, validità corrente, CAS, idempotenza, audit e ricevuta.
 
-```bash
-npm run check:never-regress
-```
+Nel bootstrap del database conserva gli import senza apertura o migrazione dell’archivio e la serializzazione di schema e versione nella stessa transazione SQLite `IMMEDIATE`, dopo la verifica di un originale recuperabile. Durante `NEXT_PHASE=phase-production-build` i metadati usano SQLite in memoria: non introdurre effetti sul database persistente, seconde connessioni di controllo o aggiramenti della transazione. Le regressioni dedicate usano database temporanei sintetici. Lo schema runtime, le dichiarazioni ORM e le migrazioni storiche sono fonti distinte e queste ultime non vengono rieseguite automaticamente. Se aggiungi o rinomini colonne, verifica insieme schema e migrazione, route di lettura e scrittura e client. Mantieni stabili i contratti per i client nativi quando aggiungi endpoint.
 
-Il controllo fallisce se trova:
-- credenziali predefinite scritte direttamente nel runtime;
-- endpoint runtime non locali o telemetria attivata implicitamente;
-- violazioni delle invarianti zero-knowledge minime.
+Nel confine OCR della 0.8.5, instradamento, manifest, materializzazione, rendering e controllo preliminare devono rispettare i limiti e fermarsi se mancano i requisiti, senza ripieghi impliciti. Apple Vision sul Mac elabora solo le pagine PDF marcate `needsOcr` e l’host ricompone il risultato controllando la validità delle fonti. Gli input non supportati falliscono chiusi, AnyDoc non è un provider né una sede Fabric e DeepSeek-OCR 2/CUDA resta fuori dal perimetro, con soli contratti e raccordi sintetici. Treatment Reasoning resta nel catalogo come non disponibile e non richiede modelli, runner o installazioni aggiuntive, come spiegato nell’[ADR 0180](./docs/adr/0180-athena-fuori-dal-nucleo-modelli-per-dominio.md).
 
-### Claims guard
-
-Il controllo delle affermazioni di prodotto applica i limiti dell'ADR 0065:
-blocca autonomia clinica AI, applicazione automatica senza revisione,
-integrazione regionale SISS/FSE, cloud predefinito, cifratura dell'intero
-database, affermazioni FHIR non qualificate, garanzie GDPR, topologia limitata
-a un solo dispositivo e codifica ICD obbligatoria. Per eseguirlo:
-
-```bash
-npm run check:claims
-```
-
-### Quarantena E2E temporanea
-
-`e2e/quarantine.json` elenca le sole instabilità ammesse da WUL-729, con
-owner, diagnosi e scadenza UTC. I test e le loro asserzioni continuano a
-eseguire. List/HTML e i report `test-results/quarantine-*` conservano gli
-errori; soltanto le firme registrate, prima della scadenza, non bloccano il
-gate. Alla scadenza tornano bloccanti automaticamente. Errori diversi,
-cleanup falliti e processi interrotti restano bloccanti.
-
-Playwright usa il reporter dalla configurazione condivisa; l'harness
-`node:test` usa lo stesso registro tramite `chatgpt-product-focused-tests.mjs`.
-Prima del rilascio rimuovere le voci, oppure ottenere la decisione esplicita
-prevista da WUL-735. Non rinnovare le scadenze automaticamente.
-
-### Test concorrenza pazienti
-
-Per verificare come vengono gestiti i conflitti fra client su
-`patients.version`:
-
-```bash
-npm run test:concurrency:patients
-```
-
-### Test import documentale nuova anagrafica
-
-Per verificare la revisione dei dati estratti da un documento durante
-la creazione dell'anagrafica paziente:
-
-```bash
-npm run test:patient-document-import
-```
-
-Usalo quando tocchi:
-- `components/patient-document-import-review.tsx`
-- `lib/domain/documents/patient-import-decision.ts`
-- `lib/domain/documents/patient-document-review.ts`
-- la persistenza prudente delle terapie nel create-flow
-
-### Test document intelligence / parse-evidence
-
-Per verificare la prima parte implementata del registro delle evidenze
-documentali, il `document evidence ledger`:
-
-```bash
-npm run test:document-synthesis
-npm run test:ai-context
-npm run test:pdf-service
-npm run check:anydoc-local-only
-npm run test:anydoc-local-only
-```
-
-Usalo quando tocchi:
-- `lib/ai-providers/fabric/document-synthesis-production-operation.ts`
-- `lib/domain/documents/document-parse-evidence-artifact.ts`
-- `lib/ai-context.ts`
-- `lib/domain/documents/anydoc-*`
-- le route OCR legacy fail-closed
-- `components/document-upload.tsx`
-- `app/api/attachments/route.ts`
-- la persistenza/lettura di `summarySnapshot` o `parseEvidenceArtifactSnapshot`
-
-Se modifichi il confine OCR della 0.8.5, conserva AnyDoc come primo passaggio:
-solo le pagine `needsOcr` possono accedere all'elaborazione successiva.
-Instradamento, manifest, materializzazione, rendering e controllo preliminare
-devono rispettare i limiti previsti e arrestarsi quando i requisiti mancano,
-senza percorsi alternativi impliciti; le route legacy autenticate restano
-`410`. AnyDoc non è un provider né una sede di esecuzione Fabric.
-
-DeepSeek-OCR 2 non è nel codice. Per una futura promozione servono adapter, benchmark sintetico italiano,
-soglie dichiarate ed E2E, con provenienza, hash e qualità per pagina,
-senza alcun invio implicito all'esterno.
-
-### Verifica del crosswalk Fabric 0.8.5
-
-Esegui i controlli seguenti quando modifichi uno dei quattro percorsi
-intelligenti, il punto di composizione production, il contratto di scambio
-o la UI che mostra ricevute e provenienza:
-
-```bash
-npm run check:fabric-generative-runtime-crosswalk
-npm run test:fabric-generative-runtime-crosswalk
-```
-
-Patient Insight, Smart Import, Document Synthesis e Treatment Reasoning
-sono i quattro percorsi interessati. La scelta resta governata dall'host:
-il chiamante non deve scegliere provider, modello libero, endpoint, sede di
-esecuzione, prompt, ripiego o applicazione del risultato. ADR 0129 ammette
-soltanto un `modelOptionId` opaco del catalogo host, accompagnato da
-`expectedCatalogRevision` e risolto nel servizio nominato
-`FunctionModelDispatch`. Preferenze e preset non ammettono provider; per questo
-confine esegui anche `npm run test:function-models`. I punti di composizione
-production controllati dall'host devono mantenere lo stadio massimo
-`proposal_only`: il risultato rimane una proposta.
-
-### Gate del modello provider F7
-
-Sono integrati il modello provider v2, il secret broker e gli adapter HTTPS
-ufficiali OpenAI e Anthropic, ma le prove amministrative Document Synthesis
-restano soggette a revisione e `default OFF`. Il contratto tiene distinti tipo
-e istanza del provider, autenticazione, modello, capability, gruppi, binding
-e allowlist delle funzioni, perché la presenza di un componente non gli
-attribuisca automaticamente ogni possibilità di accesso. Le classi di
-credenziale sono:
-
-- `local_model`;
-- `api_key`;
-- `provider_oauth`, soltanto tramite flusso ufficiale del provider;
-- `host_subscription`, come classe distinta e non come accesso API implicito.
-
-Un login consumer, un abbonamento ChatGPT/Claude o una subscription dell'host
-non autorizzano inferenza API. La composizione production richiede invece
-ciclo di vita attivo, adesione esplicita dell'host, condizioni esplicite di
-invio e conservazione dei dati e riferimento al segreto. I test usano un
-trasporto simulato: non dichiarare credenziali, rete reale o disponibilità
-cloud verificata. Non copiare codice GPL né implementare OAuth privati,
-ricostruiti tramite reverse engineering o dipendenti da sessioni consumer.
-
-Mantieni distinta l'esecuzione di un provider dentro MediFlow dall'invocazione
-di MediFlow come servizio governato da un host intelligente. Nel secondo caso,
-il Supervisor Node locale avvia Web standalone e MCP `stdio` come processi
-figli distinti su IPC ereditato; MCP usa soltanto RPC AIP e Application Services
-nominate, senza listener proprio né accesso diretto a SQLite. La lane Mini
-WUL-696 aggiunge `mini:production`, con Web e Mini figli, sessione NDJSON che
-espone gli stessi comandi della CLI e attivazione Web obbligatoria. Mini deve
-arrestarsi se manca il parent AIP. Non dichiarare installer, onboarding o
-compatibilità con host MCP esterni e non introdurre broker residente o UDS
-nella `0.8.5`.
-
-Per F10, MCP può creare soltanto l'anteprima della transizione checkup.
-La proof e il commit devono restare nella UI Web trusted: richiedono
-rilettura, ruolo medico attivo, step-up, gesto specifico per l'operazione,
-validità corrente dei dati, CAS, idempotenza, audit e ricevuta. Non concedere
-all'agente la proof o l'autorità di commit.
-
----
-
-## 📚 Mappa progetto
-
-- Web app: `app/`, `components/`
-- API locali (web): `app/api/*`
-- Native API (versionata): `app/api/v1/*`
-- Facade dati/cifratura (client-side): `lib/db.ts`, `lib/security/security.ts`
-- Layer DB server (SQLite + Drizzle): `lib/db-server.ts`, `lib/schema.ts`
-- Migrazioni: `drizzle/`
-- Client nativo macOS: `native/`
-- Script: `scripts/`
-- Guard revisione shell locale: `lib/app-revision.ts`, `app/api/system/revision/route.ts`, `components/app-revision-guard.tsx`, `scripts/mediflow.mjs`
-
-Documentazione tecnica:
-- [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (lettura completa dello stato corrente)
-- [docs/README.md](./docs/README.md) (mappa canonica documentazione)
-- [docs/markdown-index.md](./docs/markdown-index.md) (inventario completo markdown)
-- [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md)
-- [docs/system_architecture.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/system_architecture.md)
-- [docs/ARCHITETTURA.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ARCHITETTURA.md)
-
----
-
-## 🗄️ Modifiche database (Drizzle / SQLite)
-
-Nel runtime dev/server, `lib/db-server.ts` apre esplicitamente la connessione
-tramite `lib/sqlite-schema-open.ts`. L'inizializzatore corrente in
-`lib/sqlite-schema.ts` e lo stamp della versione sono serializzati nella stessa
-transazione SQLite `IMMEDIATE`, dopo la verifica di un originale recuperabile.
-Gli import non aprono né migrano archivi. Ordine e origini supportate sono in
-[ADR0080](./docs/adr/0080-serialize-sqlite-schema-guards-at-bootstrap.md#emendamento-2026-10-10-apertura-esplicita-e-schema-versionato-c09).
-La raccolta dei metadati Next durante la sola fase
-`NEXT_PHASE=phase-production-build` usa invece SQLite in memoria: non apre,
-copia, recupera o migra il database clinico persistente. Questa separazione
-va conservata: non introdurre effetti persistenti durante la build né
-controlli runtime che aprano una seconda connessione o aggirino la transazione.
-Le regressioni dedicate,
-`lib/db-server-attachment-currentness-bootstrap.test.ts` e
-`npm run test:db-bootstrap-concurrency`, usano soltanto database temporanei
-sintetici.
-
-Fonti autorevoli:
-- Schema runtime corrente: `lib/sqlite-schema.ts` e helper richiamati
-- Dichiarazioni ORM: `lib/schema.ts`
-- Migrazioni storiche: `drizzle/` (nessun replay runtime)
-
-Linee guida:
-- Preferisci **migrazioni esplicite** invece di patch schema runtime.
-- Se aggiungi/rinomini colonne, verifica sempre:
-  - coerenza schema + migrazione
-  - route API in lettura/scrittura sui nuovi campi
-  - interfacce client (`lib/db.ts`) allineate
-
-> Nota: la repo usa `drizzle.config.ts` (SQLite file nella directory dati di MediFlow).
-> Se hai dubbi sui comandi drizzle-kit, consulta la documentazione Drizzle ORM.
-
----
-
-## 🔌 Modifiche API
-
-### Regole di autenticazione
-
-- Endpoint web (`/api/*`) devono richiedere sessione valida.
-- Endpoint native (`/api/v1/*`) devono richiedere token API locale e restare versionati.
-
-Se aggiungi un nuovo endpoint:
-- documentalo, almeno nella descrizione della PR;
-- evita che i campi cifrati finiscano nei log;
-- conserva contratti stabili per i client nativi.
-
-Per `/api/v1/*` vale ADR 0010 (`spec-first` OpenAPI):
-- ogni PR con impatto contrattuale deve aggiornare la specifica OpenAPI nello
-  stesso diff oppure dichiarare esplicitamente `no contract impact`;
-- modifiche incompatibili e deprecazioni richiedono un ADR nuovo o aggiornato
-  prima del merge e non vanno introdotte silenziosamente in `v1`;
-- il controllo automatico usa `docs/openapi/contract-policy.json` per
-  distinguere endpoint già documentati, endpoint implementati ma fuori dalla
-  parte stabile e deroghe tracciate per modifiche incompatibili.
-
-Se cambi la concorrenza ottimistica dei pazienti (`patients.version`, compare-on-write,
-payload `409 VERSION_CONFLICT`), esegui anche:
-
-```bash
-npm run test:concurrency:patients
-```
-
-Se modifichi `/api/v1/network/*`, `lib/network-*` o il confine di pairing
-e sessione della home-base, esegui anche:
-
-```bash
-npm run test:network:home-base-readonly
-npm run test:network:home-base-write
-npm run test:network:home-base-diary-write
-```
-
----
-
-## 🧱 Processo ADR (obbligatorio per cambi non banali)
-
-Gli ADR stanno in: `docs/adr/`
-
-Scrivi un ADR quando cambi:
-- modello di cifratura / key derivation / flow PIN
-- confini auth/session
-- contratti native API
-- discovery locale / networking
-- qualsiasi aspetto con impatto architetturale di lungo periodo
-
-Template: `docs/adr/0000-template.md`
-
----
-
-## ✅ Definition of Done (per PR)
-
-Una PR è considerata conclusa quando:
-
-- `npm run lint` passa
-- `npm run build` passa
-- (consigliato) `npm run typecheck` passa
-- `npm run check:never-regress` passa
-- `npm run check:claims` passa
-- se cambi `/api/v1/*`, `npm run check:openapi:drift` passa
-- se cambi la concorrenza pazienti o i write path `/api/patients/*` / `/api/v1/patients/*`, `npm run test:concurrency:patients` passa
-- se cambi il create-flow da documento della nuova anagrafica, `npm run test:patient-document-import` passa
-- se cambi un path Fabric 0.8.5, il check e il test del crosswalk generativo
-  passano
-- se cambi l'estrazione degli allegati, i check AnyDoc local-only passano,
-  Apple Vision riceve soltanto le pagine PDF `needsOcr`, gli input non
-  supportati falliscono chiusi e le route OCR legacy autenticate restano `410`
-- se cambi Headless, AIP, MCP o Mini, esegui
-  `npm run check:headless-portable-imports`,
-  `npm run test:headless-portable`,
-  `npm run test:mcp:intelligent-host` e `npm run test:mini-cli`
-- se cambi un provider cloud, tipo, istanza, auth, modello, capability, gruppi,
-  binding, allowlist e classi di credenziale restano separati; il default resta
-  OFF e i test non richiedono credenziali live
-- Nessun PHI/PII introdotto in repo, fixture, log o screenshot
-- Se una feature è user-facing e interagibile, deve avere una UI/UX esplicita e coerente
-  (CTA/pulsante, label comprensibile, percorso utente verificabile).
-- Per ogni modifica all'interfaccia, verificare sul percorso interessato che
-  etichette, descrizioni, azioni e stati siano comprensibili a un medico senza
-  conoscenze tecniche, secondo [DESIGN.md](./DESIGN.md#plain-language-for-physicians).
-  Il medico deve capire significato, scelta richiesta e conseguenze senza una
-  spiegazione dello sviluppatore; gergo non spiegato o azioni ambigue impediscono
-  l'accettazione anche con test verdi.
-- Se cambia `/api/v1/*`, la documentazione contrattuale (spec OpenAPI o nota esplicita
-  `no contract impact`) deve stare nello stesso diff.
-- Se cambiano comportamenti/contratti, documentazione aggiornata:
-  - README / ARCHITECTURE / ADR (quando appropriato)
-- Se aggiungi/rimuovi/rinomini `.md`, aggiorna anche:
-  - `docs/README.md` (se cambia ownership o priorità)
-  - `docs/markdown-index.md` (lista + sintesi file)
-
----
-
-## 🧭 Come contribuire (workflow)
-
-- Apri una issue (bug / feature / discussione).
-- Proponi un piano piccolo (cosa cambia, file toccati, come verificare).
-- Invia una PR con il [modello](.github/pull_request_template.md):
-  - diff piccolo
-  - descrizione chiara
-  - prove: come hai stabilito il problema, come hai controllato la modifica,
-    che cosa hai osservato e che cosa non hai potuto controllare
-  - modello e strumento usati, se ha lavorato un agente
+Nel crosswalk i quattro percorsi sono Patient Insight, Smart Import, Document Synthesis e Treatment Reasoning. Il chiamante non sceglie provider, modello libero, endpoint, sede di esecuzione, prompt, ripiego o applicazione. Il catalogo host ammette solo `modelOptionId` opaco con `expectedCatalogRevision`, risolto da `FunctionModelDispatch`, e preferenze e preset non ammettono provider.
+
+Per F7, le prove amministrative Document Synthesis restano soggette a revisione e `default OFF`. Tieni distinte le credenziali `local_model`, `api_key`, `provider_oauth` tramite flusso ufficiale e `host_subscription`, che non equivale ad accesso API. Il modello provider v2 comprende secret broker e adapter HTTPS ufficiali OpenAI e Anthropic. La composizione production richiede ciclo di vita attivo, opt-in dell’host, condizioni esplicite di invio e conservazione e riferimento al segreto. I test usano trasporto simulato: non dichiarare verificati credenziali, rete reale o disponibilità cloud e non usare OAuth ricostruito tramite reverse engineering.
+
+Tieni distinta l’esecuzione di un provider in MediFlow dall’invocazione di MediFlow da un host intelligente. Nel secondo caso il Supervisor Node locale avvia Web standalone e MCP `stdio` come figli distinti su IPC ereditato, e MCP usa solo RPC AIP e Application Services nominate, senza listener proprio o accesso diretto a SQLite. La lane WUL-696 usa `mini:production`, con Web e Mini figli, sessione NDJSON con gli stessi comandi della CLI e attivazione Web obbligatoria. Mini si arresta senza parent AIP. Per la 0.8.5 non dichiarare installer, onboarding o compatibilità con host MCP esterni e non introdurre broker residente o UDS.
+
+## Aprire una PR
+
+Apri una issue, proponi un piano piccolo che dica cosa cambia, quali file tocchi e come verifichi, e usa il [modello di PR](./.github/pull_request_template.md). Raccontami come hai accertato il problema, cosa hai cambiato, le prove svolte, cosa hai osservato e cosa resta non verificato. Chi apre la PR ne risponde e deve saper spiegare scopo e prove. Una consegna è completa quando il percorso funziona nella destinazione dichiarata, compresi avvio, configurazione e collegamenti necessari: distingui verifica, integrazione, pubblicazione e funzionamento.
 
 ### Contributi scritti con agenti
 
-MediFlow stesso è sviluppato così: [chi fa che cosa](./docs/development-usage.md#che-cosa-significa-assistito).
-Le PR scritte con un agente sono benvenute alle stesse condizioni delle altre.
-
-- Valutiamo problema, perimetro e prove, non lo stile di scrittura né il
-  sospetto che a scrivere sia stato un agente.
-- Chi apre la PR ne risponde: deve saperne spiegare lo scopo e le prove.
-- Dichiara modello e strumento in fondo alla PR e con `Co-Authored-By` nei
-  commit.
-- Se l'agente ha ripreso o adattato codice, testi o design di altri progetti,
-  indica fonte e licenza nella PR ed aggiorna [CREDITS.md](./CREDITS.md).
-- «I test passano» da solo non basta: servono le prove sul comportamento
-  cambiato.
-
-Quando resta un dubbio, consulta prima la documentazione: formula poi
-**una domanda mirata** sul punto che non chiarisce.
-
----
+Uso anch’io gli agenti e accolgo questi contributi alle stesse condizioni degli altri. Se contribuisci con il loro aiuto, inserisci il trailer `Co-Authored-By` in ogni commit scritto con un agente, indica le fonti in [CREDITS.md](./CREDITS.md) e documenta le prove. Valuto problema, perimetro e prove, non lo stile di scrittura né il sospetto che abbia scritto un agente. L’attribuzione serve per il contributo, non lo stile di scrittura. Il codice va comunque verificato: i test verdi da soli non bastano senza prove sul comportamento cambiato. Indica modello e strumento in fondo alla PR e, per codice, testi o design ripresi da altri, fonte e licenza nella PR e aggiorna [CREDITS.md](./CREDITS.md). Spiego come lavoro nella [pagina sullo sviluppo assistito](./docs/development-usage.md#che-cosa-significa-assistito).
