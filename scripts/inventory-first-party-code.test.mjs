@@ -23,7 +23,6 @@ function fixture(t) {
   git('config', 'commit.gpgsign', 'false');
   git('config', 'tag.gpgsign', 'false');
   git('config', 'core.autocrlf', 'false');
-  // Run the actual CLI from the fixture root without adding it to the census.
   write('.gitignore', 'scripts/inventory-first-party-code.mjs\n');
   write('scripts/inventory-first-party-code.mjs', '');
   copyFileSync(script, path.join(root, 'scripts/inventory-first-party-code.mjs'));
