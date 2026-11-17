@@ -2,7 +2,6 @@ import type { Page, Response as PlaywrightResponse } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { installSameResponseCapture, type Capture, type CaptureGlobal } from './browser-response-stream.ts';
 
-// Same ceiling as boundedResponseText(project), not a larger inspector buffer.
 const MAX_PROJECT_BYTES = 8 * 1024 * 1024 + 4096 + 2048;
 const ACTION = 'x-mediflow-extraction-action';
 const GRANT = 'x-mediflow-extraction-grant';
@@ -68,8 +67,6 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
   };
   const finish = () => {
     if (disposed || failure || (!finished && !noStoreAborted) || prefix === undefined || !capture) return;
-    // dataLength is decoded body length, NOT loadingFinished.encodedDataLength.
-    // The prefix covers all pre-stream bytes; data-bearing events cover the rest.
     if (status === undefined || receivedBytes === 0 || prefix.length + streamedBytes !== receivedBytes) {
       fail('incomplete response bytes'); return;
     }
@@ -91,7 +88,6 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
     const diagnostic = header(event.request.headers, 'x-mediflow-anydoc-diagnostic');
     if (diagnostic && /^ad1-[a-f0-9]{32}-[12]-[1-8]$/u.test(diagnostic)) diagnosticId = diagnostic;
     if (!grant) { fail('missing project grant'); return; }
-    // No pause/continue handshake. The application proceeds independently.
     void session.send('Network.streamResourceContent', { requestId }).then(({ bufferedData }) => {
       if (disposed || failure) return;
       try { prefix = decode(bufferedData); finish(); }

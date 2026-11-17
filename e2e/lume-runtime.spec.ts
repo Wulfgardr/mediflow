@@ -4,8 +4,6 @@ import { bootstrapUnlockedSession } from './utils';
 const GIORNO_CANVAS_RGB = 'rgb(232, 234, 238)'; // #e8eaee
 const GRAFITE_CANVAS_RGB = 'rgb(16, 18, 22)'; // #101216
 
-// Custom properties compute to raw var() text, so resolve an alias by consuming
-// it on a throwaway probe element.
 async function resolveActiveVar(page: Page, varName: string): Promise<string> {
   return page.evaluate((name) => {
     const probe = document.createElement('div');
@@ -24,7 +22,6 @@ async function readNamespacedVar(page: Page, varName: string): Promise<string> {
   );
 }
 
-// Flip the theme class the way the bootstrap does — F2a adds no Lume selector.
 async function setThemeClass(page: Page, theme: 'light' | 'dark'): Promise<void> {
   await page.evaluate((next) => {
     const root = document.documentElement;
@@ -37,22 +34,17 @@ test('lume runtime tokens are the live default across theme changes, reload and 
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const html = page.locator('html');
   await expect(html).toHaveAttribute('data-lume', 'true');
-  // The redesign identity (ADR 0078) still coexists; F2a does not replace it.
   await expect(html).toHaveAttribute('data-ui-style', 'redesign');
-  // Both register-scoped mirrors are present regardless of the active theme.
   expect(await readNamespacedVar(page, '--lume-giorno-surface-canvas')).toBe('#e8eaee');
   expect(await readNamespacedVar(page, '--lume-grafite-surface-canvas')).toBe('#101216');
-  // The active alias selects giorno under light and grafite under .dark.
   await setThemeClass(page, 'light');
   expect(await resolveActiveVar(page, '--lume-surface-canvas')).toBe(GIORNO_CANVAS_RGB);
   await setThemeClass(page, 'dark');
   expect(await resolveActiveVar(page, '--lume-surface-canvas')).toBe(GRAFITE_CANVAS_RGB);
   await setThemeClass(page, 'light');
-  // The live cockpit is visible on the app root and paints the Lume giorno canvas.
   const liveCockpit = page.getByLabel('MediFlow · spazio clinico Kree8');
   await expect(liveCockpit).toBeVisible({ timeout: 20_000 });
   expect(await liveCockpit.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(GIORNO_CANVAS_RGB);
-  // A patient-facing cockpit route reachable with only synthetic review data.
   await page.goto('/mockups/kree8');
   await page.waitForLoadState('domcontentloaded');
   await expect(html).toHaveAttribute('data-lume', 'true');
@@ -60,7 +52,6 @@ test('lume runtime tokens are the live default across theme changes, reload and 
   const reviewCockpit = page.getByLabel('MediFlow · Kree8 review surface');
   await expect(reviewCockpit).toBeVisible({ timeout: 20_000 });
   expect(await reviewCockpit.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(GIORNO_CANVAS_RGB);
-  // The bootstrap restores the persisted theme and matching alias on reload.
   await page.evaluate(() => localStorage.setItem('mediflow-theme', 'dark'));
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
@@ -94,19 +85,14 @@ test('lume context tokens, focal light primitive and SVG filo retain their contr
   expect(lightSamples.incarico.temperature).toBe('1.8%');
   expect(lightSamples.scheda.light).toBe('7%');
   expect(lightSamples.scheda.temperature).toBe('2.4%');
-  // ADR 0123 promotes the workspace whose canvas stays at the focal surface.
-  // Context tokens remain distinct; this canvas no longer animates their light.
   const focalBackground = await resolveActiveVar(page, '--lume-surface-focal');
   expect(lightSamples.incarico.background).toBe(focalBackground);
   expect(lightSamples.scheda.background).toBe(focalBackground);
 
-  // Exercise the shared light primitive independently, as for the SVG below.
-  // A CSS probe proves property consumption, not live canvas animation.
   const focalSamples = await page.evaluate(({ incarico, scheda }) => {
     const probe = document.createElement('div');
     probe.classList.add('lume-focal');
     probe.style.transition = 'none';
-    // Distinct synthetic colors isolate the primitive from equal live surfaces.
     probe.style.setProperty('--lume-surface-field', '#000000');
     probe.style.setProperty('--lume-surface-focal', '#ffffff');
     document.body.appendChild(probe);
@@ -132,7 +118,6 @@ test('lume context tokens, focal light primitive and SVG filo retain their contr
       path.style.setProperty('--lume-filo-fill', fill);
       return Number.parseFloat(getComputedStyle(path).strokeDashoffset);
     };
-    // Numbers follow pathLength; a percentage would resolve against the viewport diagonal.
     const result = { quarter: read('25'), threeQuarters: read('75'), drawing: getComputedStyle(path).strokeDasharray, complete: '' };
     path.setAttribute('data-lume-filo-complete', 'true');
     result.complete = getComputedStyle(path).strokeDasharray;
@@ -148,7 +133,6 @@ test('lume context tokens, focal light primitive and SVG filo retain their contr
 test('lume mobile theme and privacy controls retain 44px touch targets and state', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  // ADR 0123: theme controls live in the ordinary appearance settings.
   await page.goto('/settings/aspetto');
   await expect(page.getByTestId('settings-appearance-section')).toBeVisible();
 

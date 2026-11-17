@@ -1,4 +1,3 @@
-/* WUL-674/673: browser states on synthetic configuration, no WHO egress. */
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 import { WHO_LOCAL_BINDING_ID } from '../lib/reference-data/icd11-who-local-contract';
@@ -91,7 +90,6 @@ test('WHO local verification is explicit and separates direct response, cache an
 });
 
 test('WHO selection survives real encrypted patient create/update/read and unrelated edit in the isolated fixture DB', async ({ page, baseURL }) => {
-    // This test writes only the marked temporary database prepared by the E2E runner.
     const dataDir = process.env.MEDIFLOW_DATA_DIR;
     if (!dataDir || !path.resolve(dataDir).startsWith(path.resolve(os.tmpdir()) + path.sep)
         || !readFileSync(path.join(dataDir, 'SYNTHETIC_ONLY'), 'utf8').includes('WHO local sidecar')
@@ -133,7 +131,6 @@ test('WHO selection survives real encrypted patient create/update/read and unrel
     expect(written.diagnoses).toMatch(/^ENC:/u);
     expect(written.diagnoses).not.toContain(canonicalUri);
     const patientId = written.id as string;
-    // WUL-732: la scheda nuova apre la lista pazienti senza dipendere dal profilo.
     await expect(page).toHaveURL(new URL('/?area=incarico', baseURL!).href);
     const assertReread = async () => {
         await page.goto(`/patients/${patientId}/edit`);
@@ -173,7 +170,6 @@ test('embedded ICD catalog searches, checks and saves a diagnosis with the real 
         || process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1'
         || !['localhost', '127.0.0.1'].includes(new URL(baseURL!).hostname)
         || !readFileSync(path.join(dataDir, 'SYNTHETIC_ONLY'), 'utf8').includes('WHO local sidecar')) throw new Error('Marked isolated synthetic database required');
-    // The server activates the bundled WHO release on first use; no fixture or Docker is involved.
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const readiness = await page.request.get('/api/icd/proxy');
     expect(readiness.status()).toBe(200);

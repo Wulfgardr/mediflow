@@ -15,7 +15,6 @@ test.describe.configure({ retries: 0 });
 async function fixture(page: Page, bytes = RTF, extension = 'rtf') {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const marker = randomUUID();
-  // Browser fetch carries the current archive fence; APIRequestContext does not.
   const patientId = await page.evaluate(async marker => {
     const response = await fetch('/api/patients', { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
@@ -59,8 +58,6 @@ for (const failure of ['engine_absent', 'timeout', 'crash', 'transport_interrupt
   test(`OCR recovery UI: ${failure}, manual review and explicit retry`, async ({ page }) => {
     const file = await fixture(page); let calls = 0;
     let grant: AttachmentExtractionProjectionGrant | undefined;
-    // Authentication and source acquisition stay real. Only the first parser
-    // response is simulated; a parser failure must not require a successful parse.
     await page.route(file.endpoint, async (route) => {
       if (route.request().headers()['x-mediflow-extraction-action'] === 'acquire') {
         const response = await fetchInterceptedRequest(route);
@@ -150,7 +147,6 @@ test('OCR recovery UI: interrupt waiting, ignore late result and recover with a 
     expect(response.status()).toBe(200);
     if (attempt === 1) { ready.resolve(); await release.promise; }
     else { retryReady.resolve(); await releaseRetry.promise; }
-    // A cancelled browser request can no longer receive the completed server result.
     await route.fulfill({ response }).catch(() => undefined);
     if (attempt === 1) lateDelivered.resolve();
   });
@@ -191,7 +187,6 @@ test('OCR recovery UI: deleting a pending attachment releases the other extracti
   const file = await fixture(page);
   const saved = page.waitForResponse((response) => response.request().method() === 'POST'
     && new URL(response.url()).pathname === '/api/attachments');
-  // The upload above rereads the list: a file chosen before that reread ends is held, by design.
   await expectSettledList(page, 1);
   await page.locator('#documenti input[type="file"]').setInputFiles({ name: 'synthetic-second.rtf', mimeType: 'application/rtf', buffer: RTF });
   const response = await saved;
@@ -231,8 +226,6 @@ test('OCR recovery UI: deleting a pending attachment releases the other extracti
   } finally { release.resolve(); }
 });
 
-// CI 9/11 (run 42698269227): the second file was chosen while the list was being reread and was held.
-// A slow page and a slow reread widen that moment; files chosen once the list settles are all saved.
 test('Documenti: a file chosen right after an upload waits for the reread, even on a slow page', async ({ page }) => {
   await fixture(page);
   await page.route('**/api/attachments?*', async (route) => {

@@ -1,8 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
 
-// Two gaps found by running @ui-sdk/core/testing checkPattern on the real widgets,
-// then confirmed with the real keyboard: menu type-ahead and the exemption search name.
 const PIN = process.env.E2E_PIN || '1234';
 
 async function patient(page: Page) {

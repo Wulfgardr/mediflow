@@ -1,4 +1,3 @@
-/* LUME-110/68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { bootstrapUnlockedSession } from './utils';
@@ -142,8 +141,6 @@ async function verifyAnalytics(page: Page, viewCase: ViewCase): Promise<void> {
 
   const focus = page.getByTestId('analytics-focus-surface');
   await expect(focus).toBeVisible();
-  // the ordinary overview tracks the current section in its navigation;
-  // it deliberately does not raise a second visual surface as the user scrolls.
   const sections = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
   const currentSection = sections.locator('a[aria-current="location"]');
   await expect(currentSection).toHaveCount(1);
@@ -205,8 +202,6 @@ async function verifyAnalytics(page: Page, viewCase: ViewCase): Promise<void> {
 async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
   await gotoWithRegister(page, '/settings/profilo', viewCase.register);
 
-  // the current design uses a contrasting active row instead of the
-  // former "Attiva" badge. Verify both the visible cue and accessible state.
   const expectActiveProfile = async (active: Locator) => {
     await expect(active).toBeVisible();
     await expect(active).toHaveAttribute('aria-current', 'page');
@@ -249,13 +244,8 @@ async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
 
   const networkValue = page.getByTestId('settings-network-mode-value');
   const networkAction = page.getByTestId('settings-network-mode-action');
-  // Controlli a 40 px con il mouse, 44 su touch o schermo stretto (--lume-control-height).
   expect((await networkAction.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(viewCase.viewport === 'narrow' ? 44 : 40);
-  // wait for the real network overview to resolve. The disabled control
-  // is the observable loading state; no fixture or response is substituted.
   await expect(networkAction).toBeEnabled();
-  // innerText excludes the hidden legacy label; keep the visible
-  // status exact and verify each mode transition through the ordinary action.
   await expect(networkValue).toHaveText('Stato Locale', { useInnerText: true });
   await networkAction.click();
   await expect(networkValue).toHaveText('Stato Home-base', { useInnerText: true });
@@ -264,7 +254,6 @@ async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
   await expect(networkValue).toHaveText('Stato Locale', { useInnerText: true });
 
   const preview = page.getByTestId('settings-preview-section');
-  // proposal overview sections deliberately retain a transparent surface.
   await expect(preview).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const oppositeTheme = viewCase.register === 'grafite' ? 'Chiaro' : 'Scuro';
   await page.getByRole('button', { name: `Tema ${oppositeTheme}` }).click();
