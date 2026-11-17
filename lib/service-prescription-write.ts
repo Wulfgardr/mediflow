@@ -407,25 +407,27 @@ export async function listNetworkScopedServicePrescriptionItems(input: {
 }
 
 export async function createHostServicePrescription(context: HostContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
+    return dbServer.transaction((tx) => createHostServicePrescriptionInTransaction(tx, context, rawBody), { behavior: 'immediate' });
+}
+
+export function createHostServicePrescriptionInTransaction(tx: ServicePrescriptionWriteTx, context: HostContext, rawBody: Record<string, unknown>): MutationResponse {
     const parsed = servicePrescriptionCreateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
     const normalized = normalizeServicePrescriptionCreate(parsed.data);
     if (!normalized.ok) return badRequest(normalized.error);
-    return dbServer.transaction((tx): MutationResponse => {
-        if (!activeParentExists(tx, normalized.values.patientId)) return { status: 404, value: { error: 'Not found' } };
-        if (tx.select({ id: servicePrescriptions.id }).from(servicePrescriptions)
-            .where(eq(servicePrescriptions.id, normalized.values.id)).get()) {
-            return { status: 409, value: { error: 'Prescription ID already exists' } };
-        }
-        const inserted = tx.insert(servicePrescriptions).values(normalized.values).run();
-        if (inserted.changes !== 1) throw new Error('Service prescription create did not write exactly one row');
-        writeAuditEventInTransaction(tx, serviceAuditInput(context, 'host', 'service.prescription.created', 'service_prescription', normalized.values.id, {
-            changedFields: listChangedFields(rawBody, ['id']),
-            flags: [`source:${normalized.values.source}`, `status:${normalized.values.status}`, `category:${normalized.values.category}`],
-            resourceVersion: 1,
-        }));
-        return { status: 201, value: { id: normalized.values.id, version: 1 } };
-    }, { behavior: 'immediate' });
+    if (!activeParentExists(tx, normalized.values.patientId)) return { status: 404, value: { error: 'Not found' } };
+    if (tx.select({ id: servicePrescriptions.id }).from(servicePrescriptions)
+        .where(eq(servicePrescriptions.id, normalized.values.id)).get()) {
+        return { status: 409, value: { error: 'Prescription ID already exists' } };
+    }
+    const inserted = tx.insert(servicePrescriptions).values(normalized.values).run();
+    if (inserted.changes !== 1) throw new Error('Service prescription create did not write exactly one row');
+    writeAuditEventInTransaction(tx, serviceAuditInput(context, 'host', 'service.prescription.created', 'service_prescription', normalized.values.id, {
+        changedFields: listChangedFields(rawBody, ['id']),
+        flags: [`source:${normalized.values.source}`, `status:${normalized.values.status}`, `category:${normalized.values.category}`],
+        resourceVersion: 1,
+    }));
+    return { status: 201, value: { id: normalized.values.id, version: 1 } };
 }
 
 export async function updateHostServicePrescription(context: HostContext & { id: string }, rawBody: Record<string, unknown>): Promise<MutationResponse> {
@@ -742,7 +744,7 @@ export async function readServiceCatalog(searchParams: URLSearchParams) {
 }
 
 export function readNetworkPatientOpenLoops(patientId: string, ambulatoryId: string) {
-    return dbServer.transaction(tx => {
+    return dbServer.transaction((tx) => {
         const member = tx.select({ id: patientsToAmbulatories.patientId }).from(patientsToAmbulatories)
             .where(and(eq(patientsToAmbulatories.patientId, patientId),
                 eq(patientsToAmbulatories.ambulatoryId, ambulatoryId))).get();

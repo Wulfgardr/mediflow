@@ -168,3 +168,10 @@ dbServer.$client.close();
 rmSync(dir, { recursive: true, force: true });
 assert.deepEqual(afterNaive, before, 'A5: zero clinical writes and zero success audit must remain after failure of any element');
 ```
+
+## Seguito della verifica
+
+La [prova dei nuclei sincroni](2026-11-17-clinical-writer-cores.md) registra
+la correzione del prerequisito, il test di regressione selezionato dalla CI
+e il confine ancora da provare per l’applicatore della cassetta. La prova
+storica sopra conserva base, esito e sorgente originari.

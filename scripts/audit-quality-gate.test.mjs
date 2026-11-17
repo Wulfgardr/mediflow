@@ -1362,3 +1362,30 @@ test('patient-delete audit guard binds both DELETE routes to one tombstone and r
     assert.notDeepEqual(validate(route, core,
         replaceOnce(audit, 'if (result.changes !== 1) {', 'if (false) {')), [], 'required insert result ignored');
 });
+
+test('synchronous diary cores retain transaction identity, input, return and mandatory audit across the wrapper', () => {
+    const coreSource = fs.readFileSync('lib/entry-write-operation.ts', 'utf8');
+    const spec = { handler: 'POST', mode: 'web', operation: 'create', ownerFile: 'lib/entry-write-operation.ts',
+        ownerName: 'createEntryOperation', serviceExport: 'createEntryOperation', serviceModule: '@/lib/entry-write-operation' };
+    const routeSource = fs.readFileSync('app/api/entries/route.ts', 'utf8');
+    const validate = source => validateRequiredDiaryAudit({ spec, routeSource, coreSource: source });
+    assert.deepEqual(validate(coreSource), []);
+    const call = 'createEntryOperationInTransaction(tx, input)';
+    for (const [before, after] of [
+        [call, 'createEntryOperationInTransaction(dbServer, input)'],
+        [call, 'createEntryOperationInTransaction(tx, otherInput)'],
+        [call, `input.allowed ? ${call} : { status: 201, value: {} }`],
+        [call, `Promise.resolve(${call})`],
+        ['export function createEntryOperationInTransaction', 'export async function createEntryOperationInTransaction'],
+        ['export function createEntryOperationInTransaction', 'function createEntryOperationInTransaction'],
+        ["writeAuditEventInTransaction(tx, {", "if (false) writeAuditEventInTransaction(tx, {"],
+    ]) {
+        assert.ok(coreSource.includes(before));
+        const mutation = coreSource.replace(before, after);
+        assertParseClean('split-core.ts', mutation);
+        assert.notDeepEqual(validate(mutation), [], before + ' -> ' + after);
+    }
+    const droppedReturn = coreSource.replace(`return dbServer.transaction((tx) => ${call}`, `dbServer.transaction((tx) => ${call}`);
+    assertParseClean('split-core.ts', droppedReturn);
+    assert.notDeepEqual(validate(droppedReturn), []);
+});

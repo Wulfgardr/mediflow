@@ -35,32 +35,33 @@ function activeParentExists(tx: Tx, patientId: string): boolean {
 
 /* IMMEDIATE serializes the admission, duplicate check, row insert and required audit. */
 export function createTherapyOperation(input: CreateInput): Result {
-    return dbServer.transaction((tx): Result => {
-        const denial = input.authorizeCommit?.(tx);
-        if (denial) return denial;
-        const admitted = input.mode === 'network'
-            ? networkScopeContains(tx, input.patientId, input.scopeAmbulatoryId!)
-                && activeParentExists(tx, input.patientId)
-            : activeParentExists(tx, input.patientId);
-        if (!admitted) return { status: 404, value: { error: input.mode === 'network' ? 'Not found' : 'Patient not found' } };
+    return dbServer.transaction((tx) => createTherapyOperationInTransaction(tx, input), { behavior: 'immediate' });
+}
 
-        const duplicate = tx.select({ id: therapies.id }).from(therapies).where(eq(therapies.id, input.therapyId)).get();
-        if (duplicate) return { status: 409, value: { error: 'Conflict' } };
-        // WUL-800: una terapia registrata già conclusa ha sempre una data di fine.
-        const values = parseTherapyStatus(input.values.status) === 'completed' && !input.values.endDate
-            ? { ...input.values, endDate: new Date() } : input.values;
-        const inserted = tx.insert(therapies).values(values).run();
-        if (inserted.changes !== 1) throw new Error('Therapy create did not write exactly one row');
-        writeAuditEventInTransaction(tx, {
-            eventType: 'therapy.created', outcome: 'success',
-            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
-            subjectType: 'therapy', subjectRef: input.therapyId,
-            sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
-            redactedMetadata: { changedFields: values === input.values || input.changedFields.includes('endDate')
-                ? input.changedFields : [...input.changedFields, 'endDate'], resourceVersion: 1, flags: input.audit.flags },
-        });
-        return { status: 201, value: { id: input.therapyId, version: 1 } };
-    }, { behavior: 'immediate' });
+export function createTherapyOperationInTransaction(tx: Tx, input: CreateInput): Result {
+    const denial = input.authorizeCommit?.(tx);
+    if (denial) return denial;
+    const admitted = input.mode === 'network'
+        ? networkScopeContains(tx, input.patientId, input.scopeAmbulatoryId!)
+            && activeParentExists(tx, input.patientId)
+        : activeParentExists(tx, input.patientId);
+    if (!admitted) return { status: 404, value: { error: input.mode === 'network' ? 'Not found' : 'Patient not found' } };
+
+    const duplicate = tx.select({ id: therapies.id }).from(therapies).where(eq(therapies.id, input.therapyId)).get();
+    if (duplicate) return { status: 409, value: { error: 'Conflict' } };
+    const values = parseTherapyStatus(input.values.status) === 'completed' && !input.values.endDate
+        ? { ...input.values, endDate: new Date() } : input.values;
+    const inserted = tx.insert(therapies).values(values).run();
+    if (inserted.changes !== 1) throw new Error('Therapy create did not write exactly one row');
+    writeAuditEventInTransaction(tx, {
+        eventType: 'therapy.created', outcome: 'success',
+        archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+        subjectType: 'therapy', subjectRef: input.therapyId,
+        sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+        redactedMetadata: { changedFields: values === input.values || input.changedFields.includes('endDate')
+            ? input.changedFields : [...input.changedFields, 'endDate'], resourceVersion: 1, flags: input.audit.flags },
+    });
+    return { status: 201, value: { id: input.therapyId, version: 1 } };
 }
 
 /* a matched UPDATE IGNORE is an integrity fault, not an optimistic 409. */
