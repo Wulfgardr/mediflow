@@ -1,0 +1,72 @@
+import { expect, test } from './fixtures/isolated-runtime';
+import { bootstrapUnlockedSession } from './utils';
+import Database from 'better-sqlite3';
+import path from 'node:path';
+
+const pin = '24682468';
+const passphrase = 'mandato sintetico visita novembre';
+test.describe.configure({ retries: 0 });
+
+test('doctor creates, reloads and revokes a mandate; inactivity preserves it and manual lock revokes it', async ({ page, isolatedRuntime }, testInfo) => {
+    test.setTimeout(120000);
+    await page.clock.install();
+    await bootstrapUnlockedSession(page, pin);
+    await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
+    await page.getByRole('link', { name: 'Accesso', exact: true }).click();
+    await page.getByLabel('PIN attuale', { exact: true }).first().fill(pin);
+    await page.getByLabel('Nuova passphrase', { exact: true }).fill(passphrase);
+    await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(passphrase);
+    await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
+    const kit = page.getByTestId('recovery-kit');
+    const download = page.waitForEvent('download');
+    await kit.getByRole('button', { name: 'Scarica kit di recupero' }).click(); await download;
+    await kit.getByRole('checkbox').check();
+    await kit.getByRole('button', { name: 'Attiva la nuova passphrase' }).click();
+    await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+    await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+    await page.getByLabel('Passphrase', { exact: true }).fill(passphrase);
+    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+    await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agenti', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: 'Agenti', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Nuovo mandato', exact: true })).toBeVisible();
+    await page.getByLabel('PIN di conferma', { exact: true }).fill('0000');
+    await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
+    await expect(page.getByRole('alert')).toHaveText('Operazione non riuscita. Riprova.');
+    await page.getByLabel('PIN di conferma', { exact: true }).fill(pin);
+    await page.getByLabel('Autorizzo il passaggio di documenti e trascrizioni al fornitore scelto', { exact: true }).check();
+    const creation = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
+    const response = await creation;
+    expect(response.status()).toBe(201);
+    const mandate = await response.json();
+    expect(mandate.expiresAt - mandate.createdAt).toBe(43200000);
+    expect(mandate.wrappedPrivateKey).toMatch(/^ENC:/u);
+    expect(mandate).not.toHaveProperty('pin');
+    await expect(page.getByRole('button', { name: 'Revoca', exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('mandato-creato.png'), fullPage: true });
+    const read = () => {
+        const database = new Database(path.join(isolatedRuntime.dataDirectory, 'medical.db'), { readonly: true });
+        try { return database.prepare('SELECT revoked_at,wrapped_private_key FROM agent_mandates WHERE id=?').get(mandate.id) as { revoked_at: number | null; wrapped_private_key: string }; }
+        finally { database.close(); }
+    };
+    expect(read()).toEqual({ revoked_at: null, wrapped_private_key: mandate.wrappedPrivateKey });
+    const idleLock = page.waitForResponse(response => response.url().endsWith('/api/auth/lock') && response.request().method() === 'POST');
+    await page.clock.fastForward('15:01');
+    expect((await idleLock).request().headers()['x-mediflow-lock-reason']).toBe('inactivity');
+    await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+    expect(read().revoked_at).toBeNull();
+    await page.screenshot({ path: testInfo.outputPath('blocco-inattivita.png'), fullPage: true });
+    await page.reload();
+    await page.getByLabel('Passphrase', { exact: true }).fill(passphrase);
+    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+    await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Revoca', exact: true })).toBeVisible();
+    expect(read().wrapped_private_key).toBe(mandate.wrappedPrivateKey);
+    const manualLock = page.waitForResponse(response => response.url().endsWith('/api/auth/lock') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Blocca', exact: true }).first().click();
+    expect((await manualLock).request().headers()['x-mediflow-lock-reason']).toBe('manual');
+    await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+    expect(read().revoked_at).not.toBeNull();
+});
