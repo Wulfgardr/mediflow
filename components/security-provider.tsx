@@ -348,7 +348,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         updateAuthRecoveryState('pending');
         setAuthErrorMessage(null);
         let health;
-        try { health = await checkAuthHealthRequest({ fresh: true }); } catch { updateAuthRecoveryState('failed'); return; }
+        try { health = await checkAuthHealthRequest({ fresh: true }); } catch {
+            if (authorityAttemptGenerationRef.current === attempt) updateAuthRecoveryState('failed');
+            return;
+        }
         if (authorityAttemptGenerationRef.current !== attempt) return;
         if (!health.response.ok || health.controlState !== 'accepted' || health.payload?.status !== 'ok') { updateAuthRecoveryState('failed'); return; }
         if (health.payload.hasSession === false) { updateAuthRecoveryState('ready'); return; }
