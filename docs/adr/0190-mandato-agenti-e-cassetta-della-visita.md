@@ -113,15 +113,15 @@ DDL e prove di rollback della migrazione secondo ADR 0080.
 | [0094 D5/D6](0094-intelligence-fabric-headless-contract-085.md) | Il deposito diventa `mandated_proposal`. Per i soli elementi ammessi senza gesto, il mandato autorizza l'applicazione condizionata alla verifica corrente. Per le altre voci serve la conferma per visita o lotto. Restano revisione attesa, audit e ricevuta. |
 | [0097](0097-active-role-session-and-step-up-authorization.md) | Il PIN nella UI fidata autorizza il mandato a tempo. Il token agente non è uno step-up riusabile e non concede commit clinico. I vecchi contratti monouso non vengono riattivati. |
 | [0113](0113-recording-visita-trascrizione-locale-085.md) | La trascrizione può nascere nella CLI locale ed entrare nella cassetta. Il suo testo può essere applicato secondo il mandato. Audio solo in memoria, eventuale invio al modello dichiarato e registrato. |
-| [0176](0176-estrazione-preparata-per-il-dossier.md) | Il nuovo canale ammette nota e trascrizione come fonti della visita e il passaggio senza gesto sopra delimitato. Le proposte strutturate richiedono ancora conferma. |
+| [0176](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0176-estrazione-preparata-per-il-dossier.md) | Il nuovo canale ammette nota e trascrizione come fonti della visita e il passaggio senza gesto sopra delimitato. Le proposte strutturate richiedono ancora conferma. |
 | [0103](0103-headless-clinician-authorized-soap-entry-write.md) | La cassetta è il nuovo canale di deposito, senza ripristinare il runtime SOAP ritirato. |
 | [0114](0114-intelligent-host-aip-mcp-isolation.md), [0117](0117-headless-portable-agent-first-and-capability-first-fabric.md) | Il nuovo trasporto inoltra il token agente con perimetro, senza accesso al database o alle credenziali cliniche. |
 | [0116](0116-agentic-checkup-status-transition.md) | La conferma fidata del nuovo canale può riguardare una visita o un lotto esplicito. Il contratto checkup esistente resta distinto. |
 | [0143](0143-strong-unlock-credential.md) | La master key avvolge la privata del mandato. La condivisione della CryptoKey fra schede dello stesso browser e «Rinnova accesso» non distruttivo richiedono le prove di WUL-877. La custodia nativa resta rinviata. |
 | [0096](0096-owner-sessione-selezione-e-lifetime-broker.md) | L'identità del paziente è legata alla cassetta, senza dipendere dalla selezione condivisa. |
-| [0175](0175-dossier-import-da-cartella.md) | Nel canale agenti il resolver gira nel browser e distingue i CF dei prescrittori da quelli dei pazienti. |
+| [0175](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0175-dossier-import-da-cartella.md) | Nel canale agenti il resolver gira nel browser e distingue i CF dei prescrittori da quelli dei pazienti. |
 | [0183](0183-autore-delle-voci-di-diario.md) | Proponente e mandato si aggiungono all'autore, senza riscrivere l'attribuzione storica. |
-| [0187](0187-network-ingress-and-commit-authority.md) | Il proxy LAN esclude `/api/agent/v1/*`. |
+| [0187](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0187-network-ingress-and-commit-authority.md) | Il proxy LAN esclude `/api/agent/v1/*`. |
 
 [ADR 0165](0165-native-chat-access-channel.md) e ADR 0172 conservano i
 propri confini: la trascrizione GPUI non passa alla chat, nessuna passphrase

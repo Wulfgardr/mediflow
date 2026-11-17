@@ -5,7 +5,7 @@ Status: Accepted
 
 Issue: WUL-513
 
-Related: [ADR 0015](./0015-audit-taxonomy-minimum-catalog.md), [ADR 0016](./0016-backup-artifact-v1-manifest-preflight.md), [ADR 0064](./0064-service-prescription-itemization-and-catalog-matching.md), [ADR 0066](./0066-patient-soft-delete-lifecycle.md), [ADR 0079](./0079-local-open-loops-and-result-link.md), [ADR 0080](./0080-serialize-sqlite-schema-guards-at-bootstrap.md)
+Related: [ADR 0015](./0015-audit-taxonomy-minimum-catalog.md), [ADR 0016](./0016-backup-artifact-v1-manifest-preflight.md), [ADR 0064](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0064-service-prescription-itemization-and-catalog-matching.md), [ADR 0066](./0066-patient-soft-delete-lifecycle.md), [ADR 0079](./0079-local-open-loops-and-result-link.md), [ADR 0080](./0080-serialize-sqlite-schema-guards-at-bootstrap.md)
 
 ---
 

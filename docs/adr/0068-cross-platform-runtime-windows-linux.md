@@ -3,7 +3,7 @@
 Date: 2026-06-18
 Status: Accepted
 
-Supersedes: [ADR 0022](./0022-nightly-backup-via-macos-launchd.md) (limitatamente
+Supersedes: [ADR 0022](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0022-nightly-backup-via-macos-launchd.md) (limitatamente
 allo scheduling backup, che da macOS-only diventa cross-platform via adapter).
 
 Related: [ARCHITECTURE.md](../../ARCHITECTURE.md), [README.md](../../README.md),

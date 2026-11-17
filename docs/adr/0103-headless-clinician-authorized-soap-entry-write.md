@@ -10,7 +10,7 @@ Program line: candidato `0.8.5`
 Related: [ADR 0094](./0094-intelligence-fabric-headless-contract-085.md),
 [ADR 0095](./0095-broker-projection-e-servizi-host-per-capability.md),
 [ADR 0096](./0096-owner-sessione-selezione-e-lifetime-broker.md),
-[ADR 0098](./0098-physician-terminal-review-authority.md) e
+[ADR 0098](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0098-physician-terminal-review-authority.md) e
 [ADR 0100](./0100-fabric-vs-headless-semantic-plane.md).
 
 Candidate evidence only, non-ancestor: commit

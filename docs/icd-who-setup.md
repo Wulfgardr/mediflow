@@ -31,7 +31,7 @@ oppure acquisire di nuovo lo stesso archivio autorizzato. Non copiare un DB in u
 
 L’archivio originale è incluso in
 `assets/reference-data/icd11/catalog.zip` con `manifest.json`, secondo il
-[contratto degli asset](../assets/reference-data/icd11/README.md). Il primo uso
+[contratto degli asset](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/assets/reference-data/icd11/README.md). Il primo uso
 nel processo verifica hash, dimensioni, schema e conteggi; non sovrascrive un
 catalogo attivo. Il bundle è incluso nel tracciamento standalone.
 `MEDIFLOW_ICD_EMBEDDED_DISABLED=1` disabilita ricerca e aggiornamento incorporati;

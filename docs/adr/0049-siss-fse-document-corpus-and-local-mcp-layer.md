@@ -20,9 +20,9 @@ scraping fragile e perdita di contesto tra sessioni/agenti.
 
 ## Contesto
 
-- [docs/siss-baseline.md](../siss-baseline.md) chiarisce che MediFlow oggi non
+- [docs/siss-baseline.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/siss-baseline.md) chiarisce che MediFlow oggi non
   ha ancora una catena SISS certificata.
-- [docs/fse-gtw-baseline-alignment.md](../fse-gtw-baseline-alignment.md)
+- [docs/fse-gtw-baseline-alignment.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/fse-gtw-baseline-alignment.md)
   distingue gia il baseline ufficiale FSE 2.0 dai gap reali del prodotto.
   decisioni persistenti scritte su disco.
 - Il repository possiede gia un pattern utile per MCP documentali di sviluppo:

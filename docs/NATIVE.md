@@ -25,7 +25,7 @@ Riferimenti correlati:
 - [docs/README.md](./README.md) (mappa canonica documentazione)
 - [docs/markdown-index.md](./markdown-index.md) (indice completo markdown)
 - [docs/walkthrough.md](./walkthrough.md) (flusso end-to-end)
-- [docs/local-api-tls.md](./local-api-tls.md) (trasporto TLS locale)
+- [docs/local-api-tls.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/local-api-tls.md) (trasporto TLS locale)
 - [docs/native-testing.md](./native-testing.md) (strategia test ufficiale)
 - [docs/parity-matrix.md](./parity-matrix.md) (stato verificato delle capability)
 - [docs/design/lume/README.md](./design/lume/README.md) (lingua di design attiva)

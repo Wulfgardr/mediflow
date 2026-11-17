@@ -107,7 +107,7 @@ Le origini di aggiornamento dichiarate sono gli schemi non versionati
 (`user_version=0`) delle release sorgente v0.5.0, v0.6.0, v0.7.0, v0.7.2,
 v0.7.3, v0.8.0, v0.8.2 e v0.8.6 ricostruiti dai rispettivi SQL pubblicati e
 dalle guard dello stesso tag; per v0.8.6 è coperto anche il bootstrap fresh.
-I pin e l'ordine preciso sono nel [manifest delle origini](../../scripts/fixtures/schema-convergence/README.md).
+I pin e l'ordine preciso sono nel [manifest delle origini](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/scripts/fixtures/schema-convergence/README.md).
 Questa lista non autorizza schemi modificati a mano o ogni possibile storia
 di provisioning: l'ammissione richiede che la migrazione in avanti raggiunga
 lo schema canonico, compresi indici, FK, CHECK e trigger; viste inattese sono negate.

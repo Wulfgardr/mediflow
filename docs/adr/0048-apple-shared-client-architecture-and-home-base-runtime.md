@@ -44,12 +44,12 @@ Senza questa decisione, il rischio e aprire tre derive pericolose:
   la colloca in rebuild controllato.
 - [ADR 0005](./0005-web-native-functional-parity.md) impone la parity tramite
   contratto condiviso, non tramite accessi diretti al DB.
-- [ADR 0034](./0034-local-only-default-and-network-home-base-opt-in.md)
+- [ADR 0034](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0034-local-only-default-and-network-home-base-opt-in.md)
   dichiara `network home-base` come modalita esplicita, paired e non
   server-first.
 - ADR 0037 (private)
   separa l'AI plane dal data plane clinico.
-- [ADR 0038](./0038-network-readonly-data-plane-auth-boundary.md) vieta di
+- [ADR 0038](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0038-network-readonly-data-plane-auth-boundary.md) vieta di
   promuovere `local-api-token` a credenziale remota generale e impone pairing
   device + sessione operatore sul data plane `network`.
   prossimo ciclo concreto `home-base` + rebuild native.
@@ -263,7 +263,7 @@ Negativo:
 
 ## Emendamento WUL-793 del 25 ottobre 2026 (Proposed)
 
-[ADR 0163](./0163-mobile-visit-dossier.md) definisce un dossier visita opt-in
+[ADR 0163](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0163-mobile-visit-dossier.md) definisce un dossier visita opt-in
 separato dalla cache legata alla sessione. Lo sblocco locale dopo riavvio riguarda
 soltanto quella copia derivata e gli appunti cifrati; non crea una sessione host.
 La cache precedente conserva integralmente il binding, incluso sessionDigest.

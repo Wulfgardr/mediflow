@@ -171,7 +171,7 @@ il runtime locale attraverso il browser.
 * **Vantaggi**: avvio rapido, integrazione macOS e schermata di blocco con PIN.
 * **Come si usa**: scegli **App per Mac** in Avvio. La voce è disponibile
   solo su Mac con il bundle già costruito per questa revisione. Per costruirlo
-  serve Xcode completo, seguendo [la guida nativa](native-launch.md).
+  serve Xcode completo, seguendo [la guida nativa](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md).
 * **Nota**: la vecchia shell macOS resta una fotografia alpha, mentre il
   lavoro attivo prosegue sul backend/API `home-base`. In caso di problemi
   usa l'interfaccia web, che resta la superficie operativa primaria.

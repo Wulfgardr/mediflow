@@ -59,7 +59,7 @@ riconoscimento automatico del plugin, i pannelli dell'app desktop o l'aggiunta
 del testo al contesto tramite l'interfaccia. I risultati dei tool arrivano
 comunque al contesto dell'agente; il server locale non garantisce che il modello
 elabori i dati localmente. Non è una prova di funzionamento in ChatGPT classico.
-Vedi la [prova Codex del prototipo](../plugins/mediflow-synthetic/README.md#prova-opzionale-dellagente-codex-reale).
+Vedi la [prova Codex del prototipo](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/plugins/mediflow-synthetic/README.md#prova-opzionale-dellagente-codex-reale).
 
 ## Nota successiva: tipografia web, ottobre 2026
 

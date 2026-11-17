@@ -208,7 +208,7 @@ attribuibile al relativo guard, non mascherata da un precedente errore JSON.
 
 ## Che cosa deve misurare il banco
 
-Corpus e 18 soglie del [banco](../quality/athena/README.md) sono approvati dal
+Corpus e 18 soglie del [banco](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/quality/athena/README.md) sono approvati dal
 30 ottobre e restano invariati, inclusi i loro hash. Le prime cinque metriche
 contano ancore nelle sole proposte accettate: con tutti i positivi negati,
 0/5 significa nessuna proposta accettata, non una misura semantica del grezzo.
@@ -232,7 +232,7 @@ un holdout cieco. Nessuna loro media compensa un criterio fallito.
 
 - `[U]` [ATHENA originale][upstream]: [licenza MIT][license], [README][readme], [agent.py][agent], [_prompts.py][prompts], [versione del pacchetto][package]. Verificati in sola lettura il 30 ottobre 2026.
 - `[M]` [Model card ATHENA-R1-Qwen3-8B][model], snapshot verificato; licenza dichiarata MIT e limite d'uso per ricerca. Non prova la filiera del Q4 locale.
-- [Analisi MediFlow del 26 ottobre](../analysis/2026-10-26-athena-method.md): hash di config/tokenizer/template, runner osservato MLX-LM 0.32.2 e limiti di provenienza.
+- [Analisi MediFlow del 26 ottobre](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/analysis/2026-10-26-athena-method.md): hash di config/tokenizer/template, runner osservato MLX-LM 0.32.2 e limiti di provenienza.
 - [Versione precedente di ADR 0166][previous]: estrazione del builder a byte conservati e profilo claims solo diagnostico. Restano evidenze storiche; nessuna promozione di claims, parser legacy o venue remote è introdotta qui. Il presente aggiornamento propone il disegno successivo, senza cambiare il runtime.
 
 [upstream]: https://github.com/mims-harvard/ATHENA/tree/d5bbccb06ceaf0b37bd6c9808bca1f1e9b07afdc
