@@ -1,6 +1,3 @@
-// WUL-306 (ADR 0066): anti-drift guard for PATIENT_CHILD_TABLES (WUL-316 pattern).
-// Clinical patient children must be covered; the exact ADR0168 terminal ledger
-// retains historical bindings after patient purge and must never enter the cascade.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -31,8 +28,6 @@ function unwrapExpression(expression) {
   return expression;
 }
 
-// Collects every `export const <name> = sqliteTable('<sqlName>', { ... })` declaration
-// and whether its column map contains a column bound to the SQL name 'patient_id'.
 function collectSchemaTables(sourceFile) {
   const tables = [];
   function visit(node) {
@@ -70,7 +65,6 @@ function findVariableInitializer(sourceFile, variableName) {
   return initializer;
 }
 
-// PATIENT_CHILD_TABLES entries are `{ name: '<n>', table: <ident>, patientId: ... }`.
 function extractCascadeEntries(sourceFile) {
   const initializer = unwrapExpression(findVariableInitializer(sourceFile, 'PATIENT_CHILD_TABLES'));
   assert(initializer && ts.isArrayLiteralExpression(initializer), 'PATIENT_CHILD_TABLES must be an array literal');
@@ -145,7 +139,6 @@ test('a bootstrapped DB classifies patient_id tables and gives the preserved led
       sqlite.exec(sql);
     }
 
-    // Raw-SQL tables that exist only in lib/sqlite-schema.ts must be covered too.
     const dbServerSource = fs.readFileSync(path.join(ROOT_DIR, 'lib/sqlite-schema.ts'), 'utf8');
     const createStatements = (dbServerSource.match(/CREATE TABLE IF NOT EXISTS[\s\S]*?\n\s*\)/g) ?? [])
       .filter((statement) => /^CREATE TABLE IF NOT EXISTS [A-Za-z_]/.test(statement));

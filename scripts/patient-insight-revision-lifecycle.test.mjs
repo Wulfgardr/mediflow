@@ -1,8 +1,3 @@
-/* post-fix ADR 0066 reader tests, real Drizzle/better-sqlite3 only.
- * Captures the production root's readPatientRevision callback, not a rewritten
- * query. Column mappings + activePatients are real. Assembly/auth/provider
- * dependencies are explicit, non-executable doubles; no real DB bootstrap.
- */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -19,7 +14,6 @@ const PRODUCTION = 'lib/ai-providers/fabric/patient-insight-authenticated-previe
 
 function fixture(t) {
     const sqlite = new Database(':memory:'); t.after(() => sqlite.close());
-    // Minimal synthetic physical schema; real lib/schema.ts supplies ORM mappings.
     sqlite.exec(`CREATE TABLE patients(id TEXT PRIMARY KEY, version INTEGER NOT NULL,
         deleted_at INTEGER, is_archived INTEGER);
         INSERT INTO patients VALUES ('synthetic-active', 4, NULL, 0),

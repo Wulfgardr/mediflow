@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# portable Foundation DTO tests only; never substitutes for a Mac build.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"

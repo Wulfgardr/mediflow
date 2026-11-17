@@ -70,7 +70,6 @@ test('performance seed can open and submit the current patient editor without ch
         })),
       };
     } finally { db.close(); }
-    // Use the actual form schema/session through the existing Node24 loader.
     const result = spawnSync(process.execPath, ['scripts/run-strip-types.mjs', '--input-type=module', '--eval', `
       import assert from 'node:assert/strict';
       import fs from 'node:fs';

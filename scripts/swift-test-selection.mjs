@@ -38,8 +38,6 @@ export function collectSwiftTestSources(root) {
       }
       regularFile(root, `${SWIFT_PACKAGE}/Tests/${target}/${source}`);
     }
-    // SwiftPM formerly discovered these recursively. An added source must never
-    // disappear merely because the now-explicit definition was not updated.
     function checkUnregistered(directory, prefix = '') {
       for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
         const relative = `${prefix}${entry.name}`;

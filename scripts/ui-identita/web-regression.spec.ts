@@ -12,7 +12,6 @@ function reference() {
 async function navigate(page: Page, path: string) {
   await page.goto(path);
   if (await isVisible(page.getByLabel('PIN operatore').first(), 2500)) {
-    // Lo sblocco resta occupato finché la sessione aperta dal banco non è chiusa: si agisce dopo.
     await expect(page.locator('form[aria-busy="true"]')).toHaveCount(0, { timeout: 30_000 });
     await unlockIfNeeded(page, '314159');
   }
@@ -88,7 +87,6 @@ test('voce con data ora tipo luogo e autore conserva provenienza e stato', async
   await openPatientSection(page, 'diario');
   const row = page.locator('#diario article').filter({ hasText: 'Pressione 132/78' });
   await expect(row).toBeVisible();
-  // ADR 0183: l'autore nei metadati non attesta chi ha registrato; vale l'operatore autenticato.
   await expect(row.locator('[data-ink="dry"]')).toHaveText(/^Registrata da Benchmark sintetico il \d{2} \p{L}+ \d{4} alle \d{2}:\d{2}$/u);
   await expect.soft(row.locator('[class*="identity"] > span').first()).toHaveCSS('font-weight', '600');
   await expect(row).toContainText('Ambulatorio');

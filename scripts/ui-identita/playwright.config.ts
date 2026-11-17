@@ -8,7 +8,6 @@ export default defineConfig({
   expect: { timeout: 20000 }, outputDir: `${scratch}/playwright-results`,
   reporter: [['list'], ['json', { outputFile: `${scratch}/web-results.json` }]],
   use: { ...secureBrowserUse, baseURL: `http://127.0.0.1:${httpPort}`, locale: 'it-IT', screenshot: 'only-on-failure' },
-  // Le prove legate a una larghezza o a un tema si escludono per progetto: uno skip renderebbe incompleta la prova locale.
   projects: ['giorno', 'grafite'].flatMap(theme => [1440, 390].map(width => ({
     name: `${theme}-${width}`,
     grepInvert: width === 390 ? /@largo|@giorno-largo/ : theme === 'giorno' ? /@stretto/ : /@stretto|@giorno-largo/,

@@ -1,4 +1,3 @@
-/* WUL-574: characterize the existing encrypted notes operation over real HTTP. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -21,8 +20,6 @@ assert.equal(url.hostname, '127.0.0.1', 'The synthetic HTTP target must be loopb
 assert.equal(url.username + url.password, '');
 const databasePath = path.join(dataDir, 'medical.db');
 
-// Reopen read-only after each HTTP response: observe committed SQLite state,
-// without becoming a second writer or replacing any production dependency.
 function snapshot() {
     const db = new Database(databasePath, { readonly: true, fileMustExist: true });
     try {
@@ -127,7 +124,6 @@ test('Web and API v1 preserve encrypted notes, one commit/audit, lifecycle reads
         const previous = before.patients.find(row => row.id === selected.id);
         const plain = `SYNTHETIC WUL-574 ${lane.label}: nota modificata con è, à, \"virgolette\" e\nseconda riga.`;
         const notes = await seal(plain);
-        // Exactly the proposed pilot body: no identity, membership or status fields.
         const body = { version: selected.version, notes };
         const result = await request('PUT', `${lane.base}/${selected.id}`, lane.headers, body);
         assert.equal(result.status, 200, `${lane.label}: notes update`);
