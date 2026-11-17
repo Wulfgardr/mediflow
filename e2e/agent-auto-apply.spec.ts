@@ -6,6 +6,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { createSyntheticAgentMandate } from './agent-visit-utils';
+import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 const execute = promisify(execFile);
 const repository = path.resolve(__dirname, '..');
@@ -41,21 +42,25 @@ for (const reviewed of [false, true]) test(reviewed ? 'the physician explicitly 
     expect(access.status).toBe('approved');
     expect(access.expiresAt - Date.now()).toBeGreaterThan(43100000);
     expect(access.expiresAt - Date.now()).toBeLessThanOrEqual(43200000);
-    const patient = await page.evaluate(async cf => {
+    const createPatient = (taxCode: string) => page.evaluate(async cf => {
         const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ firstName: 'Persona', lastName: 'Sintetica cassetta', taxCode: cf, birthDate: '1980-01-01T00:00:00.000Z', address: '', phone: '', diagnoses: [] }) });
         if (!response.ok) throw new Error('SYNTHETIC_PATIENT_SETUP_FAILED');
         return response.json();
-    }, fiscalCode);
+    }, taxCode);
+    const patient = await createPatient(fiscalCode);
     const source = info.outputPath('visit-input');
     mkdirSync(source, { mode: 0o700 });
-    const pdf = await PDFDocument.create(), font = await pdf.embedFont(StandardFonts.Helvetica), sheet = pdf.addPage();
     const therapy = 'Farmaco Sintetico 1 compressa al giorno dal 2026-11-17';
     const service = 'Prestazione Sintetica prescritta 2026-11-17';
     const diagnosis = 'Diagnosi sintetica E11.9 ICD-10 2026-11-17';
     const exemption = 'Esenzione 013';
-    ['Paziente CF ' + fiscalCode, sentinel, therapy, service, diagnosis, exemption].forEach((line, index) => sheet.drawText(line, { x: 40, y: 780 - index * 24, font, size: 11 }));
-    const bytes = Buffer.from(await pdf.save());
+    const makePdf = async (taxCode: string) => {
+        const pdf = await PDFDocument.create(), font = await pdf.embedFont(StandardFonts.Helvetica), sheet = pdf.addPage();
+        ['Paziente CF ' + taxCode, sentinel, therapy, service, diagnosis, exemption].forEach((line, index) => sheet.drawText(line, { x: 40, y: 780 - index * 24, font, size: 11 }));
+        return Buffer.from(await pdf.save());
+    };
+    const bytes = await makePdf(fiscalCode);
     writeFileSync(path.join(source, 'nota-visita.pdf'), bytes, { mode: 0o600 });
     const extraction = { schema: 'mediflow.dossier_prepared_extraction.v1', preparedAt: new Date().toISOString(), preparedBy: 'synthetic-cli-trial', sources: [{
         sha256: createHash('sha256').update(bytes).digest('hex'), fileName: 'nota-visita.pdf', patient: { taxCode: fiscalCode }, documentDate: '2026-11-17', documentType: 'visita', summary: null,
@@ -134,6 +139,21 @@ for (const reviewed of [false, true]) test(reviewed ? 'the physician explicitly 
             ({ ...document, patient: { taxCode: doubtfulCf } })) }), { mode: 0o600 });
         const doubtful = await cli('deposita', '--agente', access.agentRef, '--estrazione', doubtfulFile, '--cf', doubtfulCf, '--visita', doubtfulId);
         expect(doubtful.status).toBe('closed');
+        const concurrentCf = 'BNCLGU78C15H501Y';
+        const concurrentPatient = await createPatient(concurrentCf);
+        const concurrentId = randomUUID(), concurrentSource = path.join(source, 'visita-concorrente');
+        mkdirSync(concurrentSource, { mode: 0o700 });
+        const concurrentFile = path.join(concurrentSource, 'estrazione-preparata.json');
+        const concurrentPdf = await makePdf(concurrentCf);
+        writeFileSync(path.join(concurrentSource, 'nota-visita.pdf'), concurrentPdf, { mode: 0o600 });
+        writeFileSync(concurrentFile, JSON.stringify({ ...extraction, sources: extraction.sources.map(document =>
+            ({ ...document, patient: { taxCode: concurrentCf },
+                sha256: createHash('sha256').update(concurrentPdf).digest('hex') })) }), { mode: 0o600 });
+        expect((await cli('deposita', '--agente', access.agentRef, '--estrazione', concurrentFile, '--cf', concurrentCf, '--visita', concurrentId)).status).toBe('closed');
+        const secondVisitId = randomUUID();
+        const second = await cli('deposita', '--agente', access.agentRef, '--estrazione', extractionFile, '--cf', fiscalCode, '--visita', secondVisitId);
+        expect(second.status).toBe('closed');
+        await expect.poll(counts).toEqual([2, 2, 0, 0]);
         const catalog = await page.evaluate(async () => {
             const response = await fetch('/api/exemptions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code: '013', description: 'Esenzione sintetica per prova isolata', source: 'synthetic' }) });
@@ -143,15 +163,44 @@ for (const reviewed of [false, true]) test(reviewed ? 'the physician explicitly 
         expect(catalog.body.count).toBe(1);
         await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
         const validVisit = page.getByRole('region', { name: 'Visita ' + visitId });
+        const secondVisit = page.getByRole('region', { name: 'Visita ' + secondVisitId });
         const doubtfulVisit = page.getByRole('region', { name: 'Visita ' + doubtfulId });
+        const concurrentVisit = page.getByRole('region', { name: 'Visita ' + concurrentId });
         await expect(validVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
+        await expect(secondVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
+        await expect(concurrentVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
         await expect(doubtfulVisit.getByText('Codice fiscale non confermato in una scheda esistente.', { exact: true })).toBeVisible();
         await expect(doubtfulVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeDisabled();
-        expect(await counts()).toEqual([1, 1, 0, 0]);
+        expect(await counts()).toEqual([2, 2, 0, 0]);
+        const batchOrder: string[] = [];
+        const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
+        await page.route('**/api/agent-mandates/incoming', async route => {
+            const request = route.request();
+            if (request.method() === 'POST') {
+                const input = request.postDataJSON();
+                batchOrder.push(input.visitId);
+                if (input.visitId === concurrentId) {
+                    const update = await page.request.put('/api/patients/' + concurrentPatient.id, {
+                        headers: archiveHeaders,
+                        data: { version: input.expectedVersion, phone: '0000000000' },
+                    });
+                    expect(update.status()).toBe(200);
+                }
+            }
+            await route.continue();
+        });
+        const rejected = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates/incoming')
+            && response.request().method() === 'POST' && response.request().postDataJSON().visitId === concurrentId);
         await page.getByRole('button', { name: 'Applica tutte le visite senza dubbi', exact: true }).click();
-        await expect.poll(counts).toEqual([1, 1, 1, 1]);
+        expect((await rejected).status()).toBe(409);
+        await expect.poll(counts).toEqual([2, 2, 2, 2]);
+        expect(batchOrder).toEqual([visitId, concurrentId, secondVisitId]);
         await expect(validVisit).toHaveCount(0);
+        await expect(secondVisit).toHaveCount(0);
         await expect(doubtfulVisit).toBeVisible();
+        await expect(concurrentVisit).toBeVisible();
+        const concurrentReceipt = await (await page.request.get('/api/agent-mandates/incoming?visit=' + concurrentId)).json();
+        expect(concurrentReceipt.appliedItemIds).toHaveLength(2);
         const pendingIndex = await (await page.request.get('/api/agent-mandates/incoming')).json();
         expect(pendingIndex.visits).not.toContainEqual(expect.objectContaining({ id: visitId }));
         expect(pendingIndex.visits).toContainEqual(expect.objectContaining({ id: doubtfulId }));

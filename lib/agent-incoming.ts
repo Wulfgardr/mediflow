@@ -116,23 +116,34 @@ export function startAgentIncoming(): () => void {
 }
 export async function applyReviewedAgentVisits(ids: string[]): Promise<void> {
     const signal = db.getSessionReadSignal();
-    if (inFlight) await inFlight;
+    while (inFlight) await inFlight;
     signal.throwIfAborted();
     const task = (async () => {
         publish({ ...snapshot, busy: true, error: null });
+        const versions = new Map<string, { reviewed: number; committed: number }>();
         try {
             for (const id of ids) {
+                if (signal.aborted) return;
                 const review = snapshot.visits.find(value => value.visit.cassette.id === id);
-                if (!review || review.blockers.length || review.proposalBlockers.length) continue;
-                const applied = await apply(review, 'review', signal);
-                publish({ ...snapshot, visits: snapshot.visits.map(value => value === review ? applied : value) });
+                const patient = review?.patient;
+                if (!review || !patient?.version || review.blockers.length || review.proposalBlockers.length) continue;
+                const known = versions.get(patient.id);
+                const expectedVersion = known?.reviewed === patient.version ? known.committed : patient.version;
+                const current = expectedVersion === patient.version ? review : { ...review, patient: { ...patient, version: expectedVersion } };
+                try {
+                    const applied = await apply(current, 'review', signal);
+                    if (applied === current || !applied.patient?.version) continue;
+                    versions.set(patient.id, { reviewed: patient.version, committed: applied.patient.version });
+                    publish({ ...snapshot, visits: snapshot.visits.map(value => value === review ? applied : value) });
+                } catch (error) {
+                    if (!signal.aborted && !snapshot.error) publish({ ...snapshot, error: error instanceof Error ? error.message : 'Visita non applicata.' });
+                }
             }
-        } catch (error) {
-            if (!signal.aborted) publish({ ...snapshot, error: error instanceof Error ? error.message : 'Visita non applicata.' });
         } finally { if (!signal.aborted) publish({ ...snapshot, busy: false }); }
     })();
     inFlight = task;
     try { await task; } finally { if (inFlight === task) inFlight = null; }
+    if (signal.aborted) return;
     const failure = snapshot.error;
     await refreshAgentIncoming(signal);
     if (failure && !signal.aborted) publish({ ...snapshot, error: failure });

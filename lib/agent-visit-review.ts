@@ -8,6 +8,7 @@ import { agentApplicationSchema, automaticAgentKind, type AgentApplicationInput,
     type IncomingAgentCassette } from './agent-visit-application-contract';
 import { collectDossierTaxCodes, evaluateDossierGroupIdentity, dossierFactBlockers } from './domain/documents/dossier-import';
 import { verifyPreparedFields, preparedTokens } from './domain/documents/dossier-prepared';
+import { clinicalFactContext, contextReview, isHistoricalTherapy } from './domain/documents/clinical-context-lexicon';
 import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';
 import { isValidItalianTaxCode } from './patient-identity';
 import { agentVisitPdfText } from './agent-visit-pdf-text';
@@ -18,6 +19,15 @@ const proposalLabels: Record<string, string> = { therapy: 'la terapia', service:
 const hex = (value: ArrayBuffer) => [...new Uint8Array(value)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
 const normalized = (value: string) => value.replace(/\s+/gu, ' ').trim().toLocaleLowerCase('it-IT');
+function locateQuote(source: string, quote: string): RegExpExecArray | null {
+    if (quote.length < 12 || quote.length > 600) return null;
+    const pattern = quote.split(/\s+/u).map(part => part.replace(/[.*+?^$(){}|[\]\\]/gu, '\\$&')).join('\\s+');
+    const start = /^[\p{L}\p{N}]/u.test(quote) ? '(?<![\\p{L}\\p{N}])' : '';
+    const end = /[\p{L}\p{N}]$/u.test(quote) ? '(?![\\p{L}\\p{N}])' : '';
+    const literal = new RegExp(start + pattern + end, 'giu');
+    const match = literal.exec(source);
+    return match && !literal.test(source) ? match : null;
+}
 function sourceHash(item: OpenedAgentVisit['items'][number]): string {
     const source = item.value.source;
     return source && typeof source === 'object' && !Array.isArray(source) ? text((source as Record<string, unknown>).sha256) : '';
@@ -61,14 +71,17 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
     for (const item of visit.items.filter(item => !automaticAgentKind(item.kind))) {
         const source = documents.get(sourceHash(item));
         const quote = text(item.value.quote);
-        if (!source || quote.length < 12 || !normalized(source.text).includes(normalized(quote))) {
+        const match = source ? locateQuote(source.text, quote) : null;
+        if (!source || !match) {
             proposalBlockers.push('Fonte da verificare per ' + (proposalLabels[item.kind] ?? 'questa proposta') + '.'); continue;
         }
         const fields = values(item);
         const kind = item.kind === 'service' ? 'service_prescription' : item.kind;
         if (kind !== 'note' && kind !== 'transcription' && kind !== 'pdf') {
-            const verified = verifyPreparedFields(kind, fields, preparedTokens(quote).map(token => token.text));
-            proposalBlockers.push(...dossierFactBlockers({ factId: item.id, kind, values: fields, negated: verified.negated, origin: 'prepared', evidence: null, decision: 'pending' }, { exemptionCodes }));
+            const verified = verifyPreparedFields(kind, fields, preparedTokens(match[0]).map(token => token.text));
+            const context = clinicalFactContext(kind, fields, source.text, match.index, match.index + match[0].length);
+            const contextualFields = { ...fields, contextReview: contextReview(context, kind === 'therapy' && isHistoricalTherapy(fields.status)) };
+            proposalBlockers.push(...dossierFactBlockers({ factId: item.id, kind, values: contextualFields, negated: context.negated, origin: 'prepared', evidence: null, decision: 'pending' }, { exemptionCodes }));
             if (verified.check !== 'ok' || verified.drop.length || fields.subject && fields.subject !== 'paziente') proposalBlockers.push('Valori o soggetto della proposta da verificare sulla fonte.');
         }
         if (item.kind === 'service' && (fields.items ?? '').split('\n').map(line => line.trim()).filter(Boolean).some(line => !normalized(quote).includes(normalized(line)))) proposalBlockers.push('Voci della prestazione da verificare sulla fonte.');
