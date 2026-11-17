@@ -48,6 +48,7 @@ const ports: DossierPorts = {
     sessionSignal: () => controller.signal,
     extract: async value => remote('extract', Buffer.from(value).toString('base64')) as Awaited<ReturnType<DossierPorts['extract']>>,
     sha256: async value => createHash('sha256').update(value).digest('hex'),
+    physicianTaxCode: async () => remote('physicianTaxCode') as string | null,
     listPatients: async () => remote('patients') as Awaited<ReturnType<DossierPorts['listPatients']>>,
     getPatient: async id => remote('patient', id) as Awaited<ReturnType<DossierPorts['getPatient']>>,
     updatePatientCodes: async (id, change) => { remote('patientCodes', id, change); },
@@ -90,7 +91,7 @@ for (;;) {
             }));
             groups = await buildDossierInventory(ports, files, { signal: controller.signal, isCurrent: current, prepared: parsed.value });
             const patients = await ports.listPatients(controller.signal);
-            send({ result: { warnings: parsed.warnings, patients, groups: groups.map(group => ({ key: group.key,
+            send({ result: { warnings: parsed.warnings, patients, groups: groups.map(group => ({ key: group.key, physicianTaxCode: group.physicianTaxCode,
                 sources: group.sources.map(source => Object.fromEntries(Object.entries(source).filter(([key]) => key !== 'file'))),
                 identity: evaluateDraftGroupIdentity(group, patients, command.patientId ?? null) })) } });
         } else if (command.op === 'apply') {

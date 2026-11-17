@@ -652,3 +652,40 @@ test('archive replacement is only reported to an admitted paired client', async 
     // Keep the synthetic authority's later sessions from leaking into the remaining state.
     nativeAuthority = repaired;
 });
+
+test('WUL-878 physician CF persists per account, participates in CAS and rejects invalid checksum', async () => {
+    const before = await currentProfile();
+    const payload = { expectedVersion: before.profileVersion, displayName: NATIVE_DISPLAY_NAME,
+        ambulatoryName: NATIVE_AMBULATORY_NAME, doctorTaxCode: ' rssmra85t10a562s ' };
+    const auditsBefore = auditCount();
+    const saved = await profileRoute.PUT(request(payload));
+    assert.equal(saved.status, 200, await saved.clone().text());
+    const profile = await saved.json();
+    assert.equal(profile.doctorTaxCode, 'RSSMRA85T10A562S');
+    assert.notEqual(profile.profileVersion, before.profileVersion);
+    assert.equal(auditCount(), auditsBefore + 1);
+    const reread = await (await profileRoute.GET(profileRequest())).json();
+    assert.equal(reread.doctorTaxCode, profile.doctorTaxCode);
+    assert.equal(reread.profileVersion, profile.profileVersion);
+    process.env.MEDIFLOW_LOCAL_API_TOKEN = 'synthetic-profile-token';
+    const settingKey = `accountProfile.doctorTaxCode:${nativeUserId}`;
+    const settingRoute = load('../../app/api/settings/[key]/route.ts') as typeof import('../../app/api/settings/[key]/route');
+    const hidden = await settingRoute.GET(new Request('http://127.0.0.1/api/settings/key', { headers: { authorization: 'Bearer synthetic-profile-token' } }), { params: Promise.resolve({ key: settingKey }) });
+    assert.equal(hidden.status, 404);
+    const generic = load('../../app/api/settings/route.ts') as typeof import('../../app/api/settings/route');
+    const rejected = await generic.POST(new Request('http://127.0.0.1/api/settings', { method: 'POST', headers: { authorization: 'Bearer synthetic-profile-token', 'content-type': 'application/json' }, body: JSON.stringify({ key: settingKey, value: 'RSSMRA80A01F205X' }) }));
+    assert.equal(rejected.status, 403);
+    selectNativeCookies();
+    const stale = await profileRoute.PUT(request({ ...payload, doctorTaxCode: '' }));
+    assert.equal(stale.status, 409);
+    const invalid = await profileRoute.PUT(request({ ...payload, expectedVersion: profile.profileVersion, doctorTaxCode: 'RSSMRA85T10A562X' }));
+    assert.equal(invalid.status, 400);
+    assert.equal(auditCount(), auditsBefore + 1);
+    selectWebCookies();
+    const other = await (await profileRoute.GET(profileRequest())).json();
+    assert.equal(other.doctorTaxCode, undefined);
+    selectNativeCookies();
+    const cleared = await profileRoute.PUT(request({ ...payload, expectedVersion: profile.profileVersion, doctorTaxCode: '' }));
+    assert.equal(cleared.status, 200);
+    assert.equal((await cleared.json()).doctorTaxCode, undefined);
+});

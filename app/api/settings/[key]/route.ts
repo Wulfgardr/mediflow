@@ -20,6 +20,7 @@ export async function GET(
 
     try {
         const { key } = await params;
+        if (key.startsWith('accountProfile.doctorTaxCode:')) return NextResponse.json({ error: 'Not found' }, { status: 404 });
         if (key.startsWith(RESTORE_RECEIPT_PREFIX)) return NextResponse.json({ error: 'Dedicated restore receipt service required' }, { status: 403 });
         const result = await dbServer.select().from(settings).where(eq(settings.key, key)).get();
 

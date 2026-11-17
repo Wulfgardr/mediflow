@@ -589,6 +589,7 @@ mod tests {
             username: "mario.rossi".into(),
             display_name: display.map(str::to_owned),
             ambulatory_name: ambulatory.map(str::to_owned),
+            doctor_tax_code: None,
             profile_version: version.into(),
             archive_generation: "archive_1".into(),
         }
@@ -600,6 +601,7 @@ mod tests {
             username: "mario.rossi".into(),
             display_name: display.map(str::to_owned),
             ambulatory_name: ambulatory.map(str::to_owned),
+            doctor_tax_code: None,
             profile_version: version.into(),
             archive_generation: "archive_1".into(),
         }
