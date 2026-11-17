@@ -29,11 +29,6 @@ function infrastructure(message) {
     || launchTimeout(message);
 }
 
-// Su un simulatore appena azzerato XCTest a volte non vede partire l'app entro
-// il suo tempo massimo: misurato il 9/11/2026, 5 avvii su 42 a freddo, prima di
-// qualunque asserzione del test. Vale come infrastruttura soltanto il tempo
-// scaduto, e soltanto se il tentativo successivo riesce (vedi `accepted`): un
-// avvio fallito per un altro motivo, per esempio un crash, resta bloccante.
 function launchTimeout(message) {
   return /(?:^|: )Failed to get launch progress for <XCUIApplicationImpl: [^>]+>: Timed out while requesting launch progress\.?$/u.test(message)
     || /(?:^|: )Failed to launch <XCUIApplicationImpl: [^>]+> via Xcode: Timed out while launching application via Xcode\.?$/u.test(message);
@@ -44,8 +39,6 @@ function cell(value) {
     .replaceAll('|', '&#124;').replace(/\r?\n/gu, '<br>');
 }
 
-// xcresulttool get test-results tests exposes every attempt as a Repetition,
-// including recovered failures whose parent still has result=Failed.
 export function retryReport(data) {
   if (!Array.isArray(data?.testNodes)) throw new Error('testNodes assente nel risultato xcresult');
   const cases = data.testNodes.flatMap(node => descendants(node, 'Test Case'));

@@ -7,7 +7,6 @@ import net from 'node:net';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const visionScratch = '/Volumes/Vision/mf-ui-identita-20261107-scratch';
-// Vision è exFAT e chiede il contenitore APFS; uno scratch sul disco interno (prova.mjs) è già APFS.
 export const scratch = path.resolve(process.env.MF_BANCO_SCRATCH || visionScratch);
 const needsContainer = scratch === visionScratch;
 export const httpPort = port('MF_BANCO_HTTP_PORT', 3100);

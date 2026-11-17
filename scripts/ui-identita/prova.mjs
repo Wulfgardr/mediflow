@@ -1,6 +1,3 @@
-// Identità UI senza il disco Vision: banco sintetico in una cartella temporanea
-// sul disco interno (APFS), porte libere scelte al momento, solo loopback.
-// Avvia il banco, esegue web-regression, arresta il banco anche se la prova fallisce.
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, realpathSync } from 'node:fs';
 import net from 'node:net';
@@ -42,8 +39,6 @@ let code = 1;
 try {
   const started = banco('start');
   if (started.status !== 0) throw new Error(`banco non avviato; log in ${env.MEDIFLOW_DATA_DIR}`);
-  // next dev compila ogni pagina alla prima richiesta: senza riscaldamento il primo test
-  // trova la schermata di sblocco ancora in idratazione (pulsanti disabilitati).
   const { referenceId } = JSON.parse(readFileSync(path.join(env.MEDIFLOW_DATA_DIR, 'reference.json'), 'utf8'));
   for (const route of ['/', '/?area=incarico', '/settings', `/patients/${referenceId}/modules`, `/patients/${referenceId}/entries/new`]) {
     await fetch(`http://127.0.0.1:${httpPort}${route}`).then(response => response.arrayBuffer());

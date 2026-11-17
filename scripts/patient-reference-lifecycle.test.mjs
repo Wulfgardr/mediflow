@@ -1,8 +1,3 @@
-/* post-fix ADR 0066 tests. Real Drizzle + better-sqlite3 and unchanged
- * production schema mappings, synthetic :memory: tables only; no bootstrap.
- * DB composition/schema-readiness/auth/provider factories are declared doubles.
- * Transactions use real SQLite IMMEDIATE; no fallback ORM or dependency skip.
- */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
