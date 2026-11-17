@@ -7,6 +7,7 @@ import { db, type Patient } from './db';
 import { inspectAgentVisit, prepareAgentApplication } from './agent-visit-review';
 import type { AgentItemKind } from './agent-cassette-crypto';
 import { AGENT_ITEM_OPERATION } from './agent-cassette-contract';
+import { readPatientDiaryMetadata } from './patient-diary-metadata';
 
 const cfA = 'RSSMRA80A01F205X', cfB = 'RSSMRA85T10A562S';
 function patient(cf: string): Patient { return { id: 'synthetic-' + cf, taxCode: cf, firstName: 'Persona', lastName: 'Sintetica',
@@ -112,6 +113,25 @@ test('a patient revision changed after the displayed review cannot be silently a
     } finally { db.patients.get = original; f.close(); }
 });
 
+
+test('a deposited note has readable diary metadata and preserves the document reference', async () => {
+    const f = await fixture();
+    const get = mock.method(db.patients, 'get', async () => patient(cfA));
+    const quote = 'Sintesi clinica sintetica';
+    const source = { sha256: 'a'.repeat(64), fileName: 'synthetic.pdf' };
+    try {
+        const signal = new AbortController().signal;
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, async () => 'Paziente CF ' + cfA);
+        review.visit.items.push({ kind: 'note', id: randomUUID(), value: { text: quote, quote, source } });
+        const application = await prepareAgentApplication(review, 'automatic', signal);
+        const note = application?.items.find(item => item.kind === 'note');
+        assert.ok(note?.kind === 'note');
+        const metadata = readPatientDiaryMetadata(await db.openLocalDraft(note.values.metadata));
+        assert.equal(metadata.state, 'readable');
+        assert.equal(metadata.value?.sourceLabel, 'Cassetta della visita');
+        assert.deepEqual(metadata.value?.provenance, { visitId: f.row.id, source, quote });
+    } finally { get.mock.restore(); f.close(); }
+});
 
 test('service line items absent from the cited PDF cannot enter the no-doubts batch', async () => {
     const quote = 'Prestazione Sintetica prescritta il 2026-11-17';
