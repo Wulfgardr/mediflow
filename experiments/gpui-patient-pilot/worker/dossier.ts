@@ -91,7 +91,7 @@ for (;;) {
             }));
             groups = await buildDossierInventory(ports, files, { signal: controller.signal, isCurrent: current, prepared: parsed.value });
             const patients = await ports.listPatients(controller.signal);
-            send({ result: { warnings: parsed.warnings, patients, groups: groups.map(group => ({ key: group.key,
+            send({ result: { warnings: parsed.warnings, patients, groups: groups.map(group => ({ key: group.key, physicianTaxCode: group.physicianTaxCode,
                 sources: group.sources.map(source => Object.fromEntries(Object.entries(source).filter(([key]) => key !== 'file'))),
                 identity: evaluateDraftGroupIdentity(group, patients, command.patientId ?? null) })) } });
         } else if (command.op === 'apply') {

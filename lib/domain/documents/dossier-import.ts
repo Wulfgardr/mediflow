@@ -186,10 +186,13 @@ function professionalOccurrenceScope(prefix: string): 'same_line' | 'prescriber_
     if (!current.trim() && EXPLICIT_PROFESSIONAL_CF.test(previous)) return 'prescriber_block';
     if (heading.test(previous)) return 'prescriber_block';
     if (!current.trim() && !genericCodeLabel.test(previous)) return null;
-    for (const line of lines.slice(-3).reverse()) {
+    const block = current.trim() ? [...lines, previous] : lines;
+    let unlabelledName = false;
+    for (const line of block.slice(-3).reverse()) {
         const value = line.trim();
-        if (heading.test(value)) return 'prescriber_block';
+        if (heading.test(value)) return !unlabelledName || /^cognome/iu.test(value) ? 'prescriber_block' : null;
         if (!/^(?:(?:Dott|Dott\.ssa|Dr)\.?\s+)?\p{Lu}[\p{L}’'-]+(?:\s+\p{Lu}[\p{L}’'-]+){1,3}$/u.test(value)) return null;
+        if (!/^(?:Dott|Dr)\b/u.test(value)) unlabelledName = true;
     }
     return null;
 }
