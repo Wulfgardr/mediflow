@@ -17,7 +17,6 @@ test('SISS: diario locale, pre-controllo ed esportazione senza servizi regionali
         if (new URL(route.request().url()).origin !== new URL(baseURL).origin) { external.push(route.request().url()); return route.abort(); }
         return route.continue();
     });
-    // Install before mounting SISS: the real observer must never read browser history.
     await page.route('**/api/siss/session-status', route => route.fulfill({ json: { status: 'unavailable', source: 'atlas-history', checkedAt: '2026-10-26T10:00:00Z', browserProfile: null, warning: 'Stato sintetico: nessuna osservazione reale.', sessionHealth: 'none', lastModule: null, lastModuleLabel: null, lastModuleAt: null, checkpoints: [] } }));
     await page.route('**/api/fse/validate-patient?*', route => {
         if (validationMode === 'error') return route.fulfill({ status: 503, json: { error: 'Controllo sintetico indisponibile' } });

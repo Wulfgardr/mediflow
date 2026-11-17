@@ -1,4 +1,3 @@
-/* WUL-676: actual workflows on the marked, synthetic prototype only. */
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
@@ -22,8 +21,6 @@ test.beforeAll(async ({ browser, baseURL }) => {
   context = await browser.newContext({ baseURL, viewport: { width: 1440, height: 960 } });
   page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
   await bootstrapUnlockedSession(page, '086086');
-  // The comparison toolbar is also visible on lock. Wait for the actual app,
-  // using the ordinary PIN flow if auth hydration exposes the lock late.
   await expect(page.getByRole('navigation', { name: 'Navigazione principale' }).or(page.getByRole('heading', { name: 'Sblocca MediFlow' })).first()).toBeVisible();
   await unlockIfNeeded(page, '086086');
   await expect(page.getByRole('navigation', { name: 'Navigazione principale' })).toBeVisible();
@@ -55,8 +52,6 @@ test('single click opens the right patient and two records can be revisited', as
 
 test('all thirteen modules remain reachable and a therapy draft survives comparison', async () => {
   test.setTimeout(90_000);
-  // A document reload clears the intentional in-memory record list. Open both
-  // records through client navigation in this test's own session.
   await page.goto('/patients/twin-086-06/modules');
   await page.getByRole('navigation', { name: 'Navigazione principale' }).getByRole('link', { name: 'Pazienti', exact: true }).click();
   await page.getByTestId('lume-patient-row').filter({ hasText: 'Persona 02' }).click();
@@ -94,7 +89,6 @@ test('progressive entry preserves writing through tools, comparison and cancelle
   await expect(leaveDialog).toBeVisible();
   await leaveDialog.getByRole('button', { name: 'Continua la compilazione' }).click();
   await expect(editor).toContainText(draft);
-  // Deliberate discard closes exactly the test's active tab after confirmation.
   await page.getByRole('navigation', { name: 'Cartelle aperte' }).getByRole('link', { name: 'Chiudi cartella 1', exact: true }).click();
   await leaveDialog.getByRole('button', { name: 'Esci senza salvare' }).click();
   await expect(page).toHaveURL(/\/?\?area=incarico/);

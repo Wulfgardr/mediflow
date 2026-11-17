@@ -1,7 +1,3 @@
-/* real isolated runtime, real setup/key wrapping/client encryption/API.
- * Every name, CF, address, telephone and PIN below is a SYNTHETIC fixture.
- * No route interception, auth substitution, DB manipulation, skipped tests or custom timeouts.
- */
 import type { Page, Request } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
 import { syntheticTaxCode } from '../lib/patient-identity.test-support';
@@ -70,8 +66,6 @@ async function unlockPassphrase(page: Page): Promise<void> {
     const input = page.getByLabel('Passphrase', { exact: true });
     await expect(input).toBeVisible();
     const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
-    // After first setup the tab closes its own session: the renew button can
-    // appear for a moment and leave. Its disappearance means no renewal is due.
     if (await renew.isVisible() && await renew.isEnabled({ timeout: 1_000 }).catch(() => false)) {
         await renew.click({ timeout: 1_000 }).catch(() => undefined);
     }
@@ -85,14 +79,12 @@ async function unlockPassphrase(page: Page): Promise<void> {
     expect(login.request().postData()).not.toContain(PASSPHRASE);
 }
 async function unlockAfterReload(page: Page): Promise<void> {
-    // v3 deliberately keeps no key in sessionStorage: reload uses the real passphrase form.
     const input = page.getByLabel('Passphrase', { exact: true });
     const panel = page.getByTestId('patient-bulk-import');
     await expect(panel.or(input).first()).toBeVisible();
     if (await input.isVisible()) await unlockPassphrase(page);
     await expect(panel).toBeVisible();
 }
-// first access can open Agenda; use the visible patient-area navigation.
 async function openNewPatient(page: Page): Promise<void> {
     await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
         .getByRole('link', { name: 'Pazienti', exact: true }).click();
@@ -112,7 +104,6 @@ async function createExistingFromUi(page: Page): Promise<WirePatient> {
     const saved = page.waitForResponse(item => isPatientCreate(item.request()));
     await page.getByRole('button', { name: 'Crea scheda', exact: true }).click();
     expect((await saved).status()).toBe(201);
-    // WUL-732: la creazione torna esplicitamente alla lista pazienti.
     await expect(page).toHaveURL(/\/\?area=incarico$/u);
     const rows = await list(page); expect(rows).toHaveLength(1);
     return rows[0];
@@ -127,8 +118,6 @@ async function enterImportViaNewPatient(page: Page): Promise<void> {
 async function present(page: Page, width: number, theme: 'light' | 'dark'): Promise<void> {
     await page.setViewportSize({ width, height: 1000 });
     await page.emulateMedia({ colorScheme: theme });
-    // Presentation-only CSS fixture using the actual :root.dark/:root.light contract in globals.css.
-    // This does NOT claim coverage of the missing theme-picker/provider implementation.
     await page.evaluate(mode => {
         document.documentElement.classList.remove('dark', 'light');
         document.documentElement.classList.add(mode);
@@ -162,7 +151,6 @@ for (const width of [390, 1440]) for (const theme of ['light', 'dark'] as const)
         });
         await enterImportViaNewPatient(page);
         await present(page, width, theme);
-        // The only permitted download is the header-only blank template. It never contains an existing record.
         const template = page.getByRole('link', { name: 'Scarica modello CSV', exact: true });
         await expect(template).toHaveAttribute('href', /^data:text\/csv;charset=utf-8,/u);
         const downloadPromise = page.waitForEvent('download'); await template.click();
@@ -189,7 +177,6 @@ for (const width of [390, 1440]) for (const theme of ['light', 'dark'] as const)
         const confirm = page.getByRole('button', { name: 'Conferma e aggiungi 2 pazienti', exact: true });
         await expect(confirm).toBeDisabled();
         expect(creates).toHaveLength(0); expect(await list(page)).toEqual([before]);
-        // Exact decrypted optional values remain visible in the actual preview.
         const firstRow = page.getByTestId('patient-bulk-preview-row-1');
         await firstRow.getByText('Altri dati riga 1', { exact: true }).click();
         await expect(firstRow).toContainText('Via Sintetica; interno 1');
@@ -221,7 +208,6 @@ for (const width of [390, 1440]) for (const theme of ['light', 'dark'] as const)
         expect(new Set(creates.map(item => item.id)).size).toBe(2);
         await page.reload(); await unlockAfterReload(page);
         const after = await list(page); expect(after).toHaveLength(3);
-        // Compare the whole original wire record, including timestamps/version and encrypted fields.
         expect(after.find(item => item.id === before.id)).toEqual(before);
         const savedFirst = after.find(item => item.id === sentFirst.id)!;
         const savedSecond = after.find(item => item.id === sentSecond.id)!;
@@ -229,7 +215,6 @@ for (const width of [390, 1440]) for (const theme of ['light', 'dark'] as const)
             birthDate: sentFirst.birthDate, address: sentFirst.address, phone: sentFirst.phone, ambulatoryId: before.ambulatoryId });
         expect(savedSecond).toMatchObject({ firstName: 'Elena', lastName: 'Dimostrativa', taxCode: secondCode,
             birthDate: null, address: null, phone: null, ambulatoryId: before.ambulatoryId });
-        // Re-read through the actual decrypted client on reload; nothing is auto-resumed.
         await page.getByTestId('patient-bulk-file').setInputFiles(file(body));
         await expect(preview).toHaveText('0 da aggiungere · 4 escluse · 4 righe totali');
         await page.getByRole('button', { name: 'Annulla anteprima', exact: true }).click();
@@ -259,8 +244,6 @@ test('cancelled preview sends zero patient POSTs and preserves the real preexist
     expect(await list(page)).toEqual([before]); expect(creates).toBe(0); expect(downloaded).toEqual([]);
 });
 
-// Real React mount/subscription/unmount/remount through the existing application shell.
-// No synthetic provider or ignored console warning; run only on the jointly built candidate.
 test('React lifecycle: mount, template, preview, cleanup and remount never auto-create', async ({ page }, testInfo) => {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -286,7 +269,6 @@ test('React lifecycle: mount, template, preview, cleanup and remount never auto-
         await enterImportViaNewPatient(page);
         await expect(template).toHaveAttribute('href', href!);
     }
-    // A fresh controller/subscription renders and handles input after both cleanups.
     await page.getByTestId('patient-bulk-file').setInputFiles(file(body));
     await expect(page.getByTestId('patient-bulk-preview-count')).toHaveText('2 da aggiungere · 2 escluse · 4 righe totali');
     await page.getByRole('button', { name: 'Annulla anteprima', exact: true }).click();

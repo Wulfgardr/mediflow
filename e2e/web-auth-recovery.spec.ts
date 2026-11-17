@@ -1,4 +1,3 @@
-/* ordinary shared-cookie tabs; no injected key/session or auth response. */
 import { expect, test, type Page, type Request } from '@playwright/test';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
@@ -57,7 +56,6 @@ test('an active session without the tab key needs explicit renewal and waits for
   const release = deferred();
   let returnedFence: string | undefined;
   await sibling.route('**/api/auth/lock', async route => {
-    // Forward the real operation, but keep its response pending at the browser boundary.
     const response = await fetchInterceptedRequest(route);
     expect(response.status()).toBe(200);
     expect(await response.json()).toEqual({
@@ -100,7 +98,6 @@ test('an active session without the tab key needs explicit renewal and waits for
     await expect(navigation(sibling)).toBeVisible();
     const loginRequests = mutations.filter(request => authPath(request) === '/api/auth/login');
     expect(loginRequests).toHaveLength(1);
-    // Keep the actual opaque values out of assertion output.
     expect(await loginRequests[0].headerValue('if-match') === returnedFence).toBe(true);
     expect(errors).toEqual([]);
     expect(consoleErrors).toEqual([]);
@@ -115,7 +112,6 @@ test('failed renewal keeps the PIN disabled and requires another explicit succes
   const { sibling, mutations, errors } = await openSibling(page);
   const failedPaths: string[] = [];
   sibling.on('requestfailed', request => failedPaths.push(authPath(request)));
-  // A narrow transport fault; the production client performs its existing same-key replay.
   await sibling.route('**/api/auth/lock', route => route.abort('failed'));
   try {
     await renewButton(sibling).click();

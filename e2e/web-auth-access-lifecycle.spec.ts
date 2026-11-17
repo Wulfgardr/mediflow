@@ -19,8 +19,6 @@ test('Web access recovers across application lock, logout, and synthetic admin r
   const pin = process.env.E2E_PIN || '1234';
   const request = page.request;
 
-  // Bootstrap with only PM2 service files, through ordinary UI and a real wrapped key.
-  // Close the UI before retiring its session, then exercise the original API lifecycle.
   const setupContext = await browser.newContext({ baseURL });
   try {
     const setupPage = await setupContext.newPage();
@@ -112,15 +110,12 @@ test('Web access recovers across application lock, logout, and synthetic admin r
   expect(setupCheck.status()).toBe(200);
   await expect(setupCheck.json()).resolves.toMatchObject({ isSetup: false, hasSession: false });
 
-  // Re-provision the compatibility PIN through the real API fixture, which checks
-  // the setup response itself and generates a real wrapped master key.
   await bootstrapUnlockedSession(page, '5678');
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
 
   const afterSetup = await request.get('/api/patients');
   expect(afterSetup.status()).toBe(200);
 
-  // A new browser context must also unlock the newly configured account using its real key.
   const recoveredContext = await browser.newContext({ baseURL });
   try {
     const recoveredPage = await recoveredContext.newPage();

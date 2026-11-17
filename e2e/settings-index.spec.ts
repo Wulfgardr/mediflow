@@ -90,7 +90,6 @@ test('Indice Impostazioni: gerarchia, stati e risposta persa dopo PUT reale', as
         await capture('risposta-persa'); hold = false; gate.release();
         if (!baseline) { await expect(value).toContainText('Home-base'); await expect(action).toBeEnabled(); expect(writes).toHaveLength(1); expect(overviewReads).toBe(1); }
         await page.unroute('**/api/settings/network.mode');
-        // Reset only the owned fixture through the same real writer.
         expect(await page.evaluate(async () => (await fetch('/api/settings/network.mode', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ value: 'local-only' }) })).ok)).toBe(true);
         failRead = true; await page.reload();
         await expect(value).toContainText('Non disponibile'); await expect(action).toBeDisabled();

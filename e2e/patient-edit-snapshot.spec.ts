@@ -1,6 +1,4 @@
 import { scopedNotesOpenInput, syntheticScopedNotesView } from './fixtures/scoped-profile-notes-query';
-// Run only with the existing isolated E2E environment, never a clinical runtime.
-// The real route/form/facade run; patient/checkup API responses below are synthetic.
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 

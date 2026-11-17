@@ -3,9 +3,6 @@ import { generateMasterKey, wrapMasterKeyVersioned } from '../lib/security/secur
 import { checkPassphrase } from '../lib/security/unlock-credential';
 import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
-/* The widths exercise responsive reflow only. They are intentionally
-   not labelled as browser zoom: Playwright does not provide a reliable
-   page-zoom primitive for layout assertions in this harness. */
 export const REFLOW_PROXY_VIEWPORTS = [
   { viewport: 'reflow-proxy-400', width: 320, height: 760 },
   { viewport: 'phone', width: 390, height: 844 },
@@ -17,8 +14,6 @@ export type ReflowProxyViewport = (typeof REFLOW_PROXY_VIEWPORTS)[number];
 
 type OverflowTarget = { label: string; selector: string };
 
-/* ADR 0123: reach a clinical pane through the ordinary section menu,
-   including sections disclosed under "Altro". */
 export async function openPatientSection(page: Page, id: string): Promise<void> {
   const navigation = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
   const link = navigation.locator(`a[href="#${id}"]`);
@@ -28,8 +23,6 @@ export async function openPatientSection(page: Page, id: string): Promise<void> 
   await expect(link).toBeVisible();
   await link.click();
   await expect(navigation.locator('[aria-current="location"]:visible')).toHaveCount(1);
-  // ordinary sections use navigation state and visibility; the twin-only
-  // data-folder-active attribute is not part of their contract.
   const pane = page.locator(`#${id}`);
   await expect(pane).toBeVisible();
 }
@@ -76,10 +69,6 @@ export async function isVisible(locator: Locator, timeout = 1200): Promise<boole
 }
 
 async function hasSecurityOverlay(page: Page): Promise<boolean> {
-  // WUL-274/Kree8: the lock chrome moved to the Kree8 lock shell
-  // (components/lock-screen.tsx). The unlock title is now "Sblocca MediFlow"
-  // and the setup title "Crea il tuo PIN"; the shell root carries
-  // aria-label="MediFlow lock screen". "Chi sei?" keys the onboarding wizard.
   const surfaces = await Promise.all([
     isVisible(page.getByRole('heading', { name: 'Chi sei?' }), 250),
     isVisible(page.getByRole('heading', { name: 'Crea il tuo PIN' }), 250),
@@ -93,9 +82,6 @@ async function hasSecurityOverlay(page: Page): Promise<boolean> {
 async function hasStableUnlockedShell(page: Page): Promise<boolean> {
   if (await hasSecurityOverlay(page)) return false;
 
-  // The lock surface can be absent while SecurityProvider is still resolving
-  // the initial auth check. Wait for the authenticated application chrome, or
-  // for the authenticated work-profile flow rendered in place of that chrome.
   const [navigationVisible, lockControlVisible, workProfileVisible] = await Promise.all([
     isVisible(page.getByRole('navigation', { name: 'Navigazione principale', exact: true }), 750),
     isVisible(page.getByRole('button', { name: 'Blocca', exact: true }), 750),
@@ -118,8 +104,6 @@ async function hasStableUnlockedShell(page: Page): Promise<boolean> {
   return (navigationVisible && lockControlVisible) || workProfileVisible;
 }
 
-/* Compatibility fixture only: legacy PIN accounts are provisioned through the real
-   supported API. The dedicated first-use spec qualifies the ordinary v3 wizard. */
 export async function completeOnboardingIfNeeded(page: Page, pin: string): Promise<void> {
   const stepProfile = page.getByRole('heading', { name: 'Chi sei?' });
   if (!(await isVisible(stepProfile))) return;
@@ -145,8 +129,6 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   const pinInput = page.getByLabel('PIN operatore').first();
   const unlockButton = page.getByRole('button', { name: /Sblocca/ }).first();
 
-  /* a tab without its local key first offers explicit session renewal.
-     Observe that real UI state and its receipt before entering the PIN. */
   const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
   if (await renew.isVisible()) {
     try { await renew.click({ timeout: 1000 }); }
@@ -188,7 +170,6 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     if (await hasStableUnlockedShell(page)) {
-      // unrelated E2E flows use the always-available manual entry.
       if (await isVisible(page.getByTestId('work-profile-onboarding'))) {
         await page.getByRole('link', { name: 'Apri la cartella manualmente' }).click();
       }
@@ -208,7 +189,6 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
 async function openAiSettingsPage(page: Page, route: 'funzioni' | 'modelli'): Promise<void> {
   await page.goto(`/settings/ai/${route}`);
   await expect(page).toHaveURL(new RegExp(`/settings/ai/${route}$`));
-  // Controls become available only after the stored draft has been applied.
   await expect(page.getByTestId('ai-settings-controls')
     .getByRole('button', { name: route === 'modelli' ? 'Salva configurazione' : 'Salva parametri avanzati', exact: true })).toBeEnabled();
 }
@@ -235,9 +215,6 @@ export async function setAiLaneKillSwitch(page: Page, key: string, value: 'enabl
 }
 
 export async function waitForUnlockedInteractiveShell(page: Page): Promise<void> {
-  // WUL-274/Kree8: the lock shell is identified by aria-label="MediFlow lock screen"
-  // (components/lock-screen.tsx). The setup and onboarding surfaces are keyed by their
-  // headings ("Crea il tuo PIN" and "Chi sei?"). The legacy z-[9999] overlay is gone.
   const lockShell = page.getByLabel('MediFlow lock screen');
   const setupHeading = page.getByRole('heading', { name: 'Crea il tuo PIN' });
   const onboardingHeading = page.getByRole('heading', { name: 'Chi sei?' });

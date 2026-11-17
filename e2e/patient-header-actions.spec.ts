@@ -32,7 +32,6 @@ for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test
  await trigger.focus();await page.keyboard.press('ArrowDown');
  const menu=page.getByRole('menu',{name:'Azioni scheda',exact:true});
  await expect(menu).toBeVisible();
- // «Condividi FHIR» exists only where the browser can share a file (Google Chrome on macOS yes, bundled Chromium no).
  const canShareFile=await page.evaluate(()=>typeof navigator.canShare==='function'&&navigator.canShare({files:[new File(['{}'],'probe.json',{type:'application/json'})]}));
  const names=['Accesso assistente','Gestisci checkup','Modifica','Esporta FHIR',...(canShareFile?['Condividi FHIR']:[]),'Report PDF','Archivia'];
  await expect(menu.getByRole('menuitem')).toHaveText(names);

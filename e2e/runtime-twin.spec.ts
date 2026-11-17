@@ -1,4 +1,3 @@
-/* WUL-676: exhaustive route presence, bounded representative actions. */
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -53,8 +52,6 @@ for (const route of routes) {
         await expect(page.locator('h1').first()).toBeVisible();
         if (route === `/patients/${patient}`) await expect(page).toHaveURL(new RegExp(`/patients/${patient}/modules`));
         if (route === '/settings/ai') await expect(page).toHaveURL(/\/settings\/ai\/fabric$/);
-        // Let canonical URL updates and auth hydration finish before the next
-        // hard navigation; otherwise an alias replace can abort the next visit.
         await page.waitForTimeout(350);
         await expect(page.getByText('This page could not be found.', { exact: true })).toHaveCount(0);
         await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toHaveCount(0);
@@ -104,8 +101,6 @@ test('design comparison preserves an unfinished form and profile writes reach st
     await page.goto('/settings/accesso');
     await page.getByRole('button', { name: 'Blocca sessione adesso', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
-    // Reload the locked document before submitting a new auth challenge;
-    // the old settings document can still have requests completing at lock.
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
     await unlockIfNeeded(page, '086086');
@@ -129,15 +124,11 @@ test('real diary save returns to the folder and survives reload', async () => {
             if (!response.ok) throw new Error(`Diary reread ${response.status}`);
             return response.json() as Promise<Array<{ id: string; version: number; content: string }>>;
         });
-        // The normal UI writer encrypts content; the public API seed is not an
-        // encryption proof. Verify this real write separately from route coverage.
         const written = entries.find(entry => entry.id === saved.id);
         expect(written?.content.startsWith('ENC:')).toBe(true);
         await page.goto(`/patients/${patient}/modules#diario`);
         await expect(page.locator('#diario').getByText(text, { exact: true }).first()).toBeVisible();
     } finally {
-        // Cleanup also runs after a failed navigation or assertion. Only the id
-        // returned by this test's POST may be removed; preserve all other records.
         const rows = await page.evaluate(async () => await (await fetch('/api/entries?patientId=twin-086-01')).json() as Array<{ id: string; version: number }>);
         const own = rows.find(row => row.id === saved.id);
         expect(own).toBeDefined();
@@ -151,9 +142,6 @@ test('real diary save returns to the folder and survives reload', async () => {
     }
 });
 
-// directory single-click, patient navigation, draft preservation and
-// replacement geometry are asserted in runtime-workbench.spec.ts. The earlier
-// selection-lens and nested-sidebar assertions described the rejected proposal.
 
 test('settings search, mobile navigation, focus and both palettes', async () => {
     test.setTimeout(90_000);

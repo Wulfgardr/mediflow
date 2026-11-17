@@ -4,8 +4,6 @@ import type { FunctionModelPreferences } from '../lib/function-models/browser';
 import { parsePatientInsightPreviewRequest, type PatientInsightPreviewRequest } from '../lib/ai-providers/fabric/patient-insight-preview-contract';
 import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
 
-// Synthetic data only. The preview transport is the only fixture; diary and
-// therapy writes go through the real routes from the same patient page.
 const MODEL = 'synthetic-patient-insight:latest';
 const MODEL_OPTION_ID = `model_option_${'a'.repeat(32)}`;
 const ENTRY_TITLE = 'Controllo sintetico superata';
@@ -93,7 +91,6 @@ async function expectSuperseded(page: Page) {
   await expect(panel.getByTestId('patient-insight-review-proposal')).toHaveCount(0);
   const superseded = panel.getByTestId('patient-insight-superseded');
   await expect(superseded.getByRole('heading', { name: 'Proposta superata', exact: true })).toBeVisible();
-  // the reason is said once, under the heading, without repeating it.
   await expect(superseded.locator('p')).toHaveText('Profilo, diario o terapie sono cambiati dopo la generazione.');
   await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
 }
@@ -130,8 +127,6 @@ test('una voce di diario eliminata dopo la generazione rende la proposta superat
 
 test('controesempio: una scrittura che non cambia le fonti lascia la proposta attuale', async ({ page }) => {
   const { panel, requests } = await generatedProposal(page);
-  // The therapy note is not among the minimized sources: the therapies are
-  // read again, the sources a request would send are identical.
   const reread = page.waitForResponse(response => response.request().method() === 'GET' && /\/api\/therapies\?/u.test(response.url()));
   await editTherapy(page, 'motivation', 'Nota cambiata sintetica');
   await reread;

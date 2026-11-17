@@ -1,9 +1,3 @@
-/* First-use UI acceptance: the existing isolated fixture owns an initially
- * empty synthetic DB and a genuine standalone child. No route interception,
- * account/session injection, readiness replacement or database seeding here.
- * Theme class changes below are presentation-only, not theme-provider coverage.
- * Reflow viewports are NOT claimed as native browser zoom.
- */
 import type { Locator, Page, TestInfo } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
 import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow } from './utils';
@@ -44,7 +38,6 @@ function observe(page: Page, baseURL: string) {
         });
         expect(remote).toEqual([]);
         expect(pageErrors).toEqual([]);
-        // Preserve the same precise startup diagnostic allowance as the existing spec.
         expect(consoleErrors.filter(({ text, url }) => !(url.endsWith('/api/auth/lock') && text.includes('409 (Conflict)')))).toEqual([]);
         expect(apiCalls.filter(call => call.path === '/api/proxy/ollama/chat')).toEqual([]);
         await expect(page.locator('nextjs-error-overlay')).toHaveCount(0);
@@ -54,7 +47,6 @@ function observe(page: Page, baseURL: string) {
 async function present(page: Page, width: number, theme: 'light' | 'dark', height = 960) {
     await page.setViewportSize({ width, height });
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
-    // This uses the class contract present in globals.css, not an invented theme API.
     await page.evaluate(mode => {
         document.documentElement.classList.remove('light', 'dark');
         document.documentElement.classList.add(mode);
@@ -63,16 +55,12 @@ async function present(page: Page, width: number, theme: 'light' | 'dark', heigh
 }
 
 async function focusVisible(page: Page, control: Locator) {
-    // Traverse the real tab order, including a possible document-boundary stop.
-    // Never focus the target programmatically: that would bypass keyboard reachability.
     const tabLimit = await page.locator('a[href], button, input, select, textarea, summary, [tabindex]').count() + 1;
     for (let step = 0; step < tabLimit; step += 1) {
         await page.keyboard.press('Tab');
         if (await control.evaluate(element => document.activeElement === element)) break;
     }
     await expect(control).toBeFocused();
-    // Focus ownership can precede its painted style. Re-read each predicate within
-    // the project's existing expect timeout; do not add sleeps or widen any limit.
     await expect.poll(() => control.evaluate(element => element.matches(':focus-visible'))).toBe(true);
     await expect.poll(() => control.evaluate(element => parseFloat(getComputedStyle(element).outlineWidth)))
         .toBeGreaterThanOrEqual(2);
@@ -96,7 +84,6 @@ async function geometry(page: Page, selector: string) {
         expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
         expect(await control.evaluate(element => getComputedStyle(element).borderTopLeftRadius)).toBe('10px');
     }
-    // No entry animation even while the reduced-motion preference is active.
     const moving = await surface.evaluate(element => [element, ...element.querySelectorAll('*')]
         .filter(node => getComputedStyle(node).animationName !== 'none').length);
     expect(moving).toBe(0);
@@ -204,8 +191,6 @@ async function setup(page: Page, info?: TestInfo) {
     expect(setupBodies).toHaveLength(1);
     expect(JSON.parse(setupBodies[0])).toMatchObject({ password: PIN, encryptedMasterKey: expect.stringMatching(/^v3:/u) });
     for (const secret of [PASSPHRASE, key]) expect(setupBodies[0]).not.toContain(secret);
-    /* the tab that has just created the archive closes its own session: no renewal step, no
-       claim of another session or of a changed passphrase. */
     await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Rinnova accesso', exact: true })).toHaveCount(0);
     await expect(page.getByText(/Una sessione è già attiva|Passphrase aggiornata/u)).toHaveCount(0);
@@ -312,7 +297,6 @@ test('first use: manual entry creates the first synthetic patient without saving
     const initial = await page.request.get('/api/patients');
     expect(initial.status()).toBe(200);
     expect(await initial.json()).toEqual([]);
-    // Ordinary form/locators from the frozen patient-bulk-import spec, not a mocked patient API.
     await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
         .getByRole('link', { name: 'Pazienti', exact: true }).click();
     await page.getByRole('link', { name: /^Nuova scheda(?: da documento)?$/u }).click();
@@ -335,7 +319,6 @@ test('first use: manual entry creates the first synthetic patient without saving
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ firstName: 'Prima', lastName: 'Sintetica', taxCode });
     expect(await readProfile(page)).toEqual(before);
-    // The same synthetic record remains readable after changing and recovering the access wrapping.
     const nextPassphrase = 'Cambio sintetico sicuro nuovo';
     const recoveredPassphrase = 'Recupero sintetico sicuro nuovo';
     const mutations: string[] = [];

@@ -86,8 +86,6 @@ test('Compliance settings renders the technical evidence inventory without a leg
   await expect(legalApplicability).toContainText('Valutazione esterna necessaria');
   await expect(legalApplicability).toContainText('non produce una certificazione o un parere legale');
   await expect(legalApplicability.getByRole('link')).toHaveCount(3);
-  // assert the versioned public references already adopted by the
-  // inventory; they do not change its explicit not-assessed claim ceiling.
   await expect(legalApplicability.getByRole('link', {
     name: 'GDPR, artt. 25 e 32 (consolidato 04/05/2016, rettifica 23/05/2018)', exact: true,
   })).toHaveAttribute(

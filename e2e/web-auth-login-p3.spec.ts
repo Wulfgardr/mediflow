@@ -7,8 +7,6 @@ const AUTH_CONTROL_COOKIE = /^[A-Za-z0-9_-]{32,256}$/u;
 test('Web login publishes one P3 session accepted by authenticated routes', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
 
-  /* The page-owned request context persists the opaque control cookie
-     from bootstrap through login and the authenticated route read. */
   const bootstrap = await page.request.get('/api/auth/check', {
     headers: { 'Cache-Control': 'no-store' },
   });

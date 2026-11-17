@@ -21,10 +21,6 @@ async function createPatient(
   }, payload);
 }
 
-// WUL-560: the canonical patient view is /patients/:id/modules. Its Scheda semantics
-// expose the lead diagnosis in Riepilogo clinico and the secondary coding in
-// Clinica. Keep every code, description and system assertion scoped to
-// the current region so a duplicated or stale aggregate string cannot satisfy the test.
 test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   const suffix = `${Date.now()}`.slice(-4);
@@ -100,8 +96,6 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   await expect(leadDiagnosis).toContainText(diagnosisDescription);
   await expect(leadDiagnosis).toContainText('EF00 · ICD-11');
 
-  /* la lista clinica espone ciascun codice come item autonomo e
-     conserva codice, descrizione e sistema nel suo contenuto. */
   const secondaryDiagnosisItem = diagnosesList
     .getByRole('listitem')
     .filter({ hasText: secondaryDiagnosisDescription });
