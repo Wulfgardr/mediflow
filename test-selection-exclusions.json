@@ -258,5 +258,10 @@
     "path": "scripts/check-apple-lume-colors.mjs",
     "reason": "Guard e self-test eseguiti direttamente dal job native-build-test in .github/workflows/apple-native.yml.",
     "owner": "WUL-834"
+  },
+  {
+    "path": "e2e/agent-visit-utils.ts",
+    "reason": "WUL-870: setup sintetico del mandato e del pairing usato da agent-cassette.spec.ts; nessuna registrazione autonoma di test.",
+    "owner": "WUL-870"
   }
 ]

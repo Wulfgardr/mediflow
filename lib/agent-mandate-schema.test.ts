@@ -13,7 +13,7 @@ test('opening schema12 adds mandate storage only after preserving a recoverable 
     try {
         const old = new Database(file);
         initializeSqliteSchema(old);
-        old.exec('DROP TABLE IF EXISTS agent_clients; DROP TABLE IF EXISTS agent_pairing_requests; DROP TABLE IF EXISTS agent_mandates');
+        old.exec('DROP TABLE IF EXISTS agent_cassettes; DROP TABLE IF EXISTS agent_clients; DROP TABLE IF EXISTS agent_pairing_requests; DROP TABLE IF EXISTS agent_mandates');
         old.pragma('user_version=12');
         old.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run('synthetic-mandate-schema', 'preserved');
         old.close();
@@ -45,7 +45,7 @@ test('a failed mandate DDL leaves schema12 and its data unchanged and retry can 
     const file = join(directory, 'medical.db');
     try {
         const old = new Database(file);
-        initializeSqliteSchema(old); old.exec('DROP TABLE IF EXISTS agent_clients; DROP TABLE IF EXISTS agent_pairing_requests; DROP TABLE IF EXISTS agent_mandates'); old.pragma('user_version=12');
+        initializeSqliteSchema(old); old.exec('DROP TABLE IF EXISTS agent_cassettes; DROP TABLE IF EXISTS agent_clients; DROP TABLE IF EXISTS agent_pairing_requests; DROP TABLE IF EXISTS agent_mandates'); old.pragma('user_version=12');
         const before = old.prepare('SELECT type,name,sql FROM sqlite_schema ORDER BY type,name').all(); old.close();
         assert.throws(() => openVersionedSqliteDatabase(file, path => {
             const connection = new Database(path), exec = connection.exec.bind(connection);

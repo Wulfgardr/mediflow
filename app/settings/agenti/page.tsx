@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { AgentPairingRequest } from '@/lib/agent-pairing-store';
 import { AGENT_OPERATIONS, type AgentMandate, type AgentMandateInput } from '@/lib/agent-mandate-contract';
 import { generateMandateKeys } from '@/lib/agent-mandate-client';
@@ -33,6 +34,7 @@ export default function AgentSettingsPage() {
     }
     return <main className="mx-auto max-w-3xl space-y-8 p-6">
         <h1 className="type-page-title">Agenti</h1>
+        <Link href="/in-arrivo" className={SETTINGS_SECONDARY_BUTTON_CLASS}>In arrivo</Link>
         <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh); }}>Aggiorna</button>
         <form className="space-y-4" onSubmit={event => { event.preventDefault(); void run(async () => {
             const keys = await generateMandateKeys();
