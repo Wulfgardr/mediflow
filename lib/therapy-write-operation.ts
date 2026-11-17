@@ -57,7 +57,7 @@ export function createTherapyOperationInTransaction(tx: Tx, input: CreateInput):
         eventType: 'therapy.created', outcome: 'success',
         archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
         subjectType: 'therapy', subjectRef: input.therapyId,
-        sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+        sourceSurface: input.audit.sourceSurface, agentProvenance: input.audit.agentProvenance, requestId: input.audit.requestId,
         redactedMetadata: { changedFields: values === input.values || input.changedFields.includes('endDate')
             ? input.changedFields : [...input.changedFields, 'endDate'], resourceVersion: 1, flags: input.audit.flags },
     });
@@ -98,7 +98,7 @@ export function updateTherapyOperationInTransaction(tx: Tx, input: TherapyUpdate
         eventType: input.values.deletedAt ? 'therapy.deleted' : 'therapy.updated', outcome: 'success', occurredAt: input.occurredAt,
         archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
         subjectType: 'therapy', subjectRef: input.therapyId,
-        sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+        sourceSurface: input.audit.sourceSurface, agentProvenance: input.audit.agentProvenance, requestId: input.audit.requestId,
         redactedMetadata: { changedFields,
             resourceVersion: input.expectedVersion + 1, flags: input.audit.flags },
     });

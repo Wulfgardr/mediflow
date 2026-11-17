@@ -100,7 +100,7 @@ export function createEntryOperationInTransaction(tx: Tx, input: CreateInput): R
         eventType: 'entry.created', outcome: 'success',
         archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
         subjectType: 'entry', subjectRef: input.id,
-        sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+        sourceSurface: input.audit.sourceSurface, agentProvenance: input.audit.agentProvenance, requestId: input.audit.requestId,
         redactedMetadata: { changedFields: input.changedFields, resourceVersion: 1, flags: input.audit.flags },
     });
     return { status: 201, value: input.mode === 'web' ? { id: input.id, version: 1 }
@@ -143,7 +143,7 @@ export function updateEntryOperationInTransaction(tx: Tx, input: UpdateInput): R
         eventType: input.values.deletedAt ? 'entry.deleted' : 'entry.updated', outcome: 'success',
         archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
         subjectType: 'entry', subjectRef: input.entryId,
-        sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+        sourceSurface: input.audit.sourceSurface, agentProvenance: input.audit.agentProvenance, requestId: input.audit.requestId,
         redactedMetadata: { changedFields: input.changedFields,
             resourceVersion: input.expectedVersion + 1, flags: input.audit.flags },
     });

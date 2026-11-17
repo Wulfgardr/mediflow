@@ -21,7 +21,7 @@ function quote(identifier: string): string { return '"' + identifier.replaceAll(
 function validateCandidate(file: string, prepareReplacement = false): Database.Database {
     const probe = new Database(file, { readonly: true, fileMustExist: true });
     try {
-        if (![3, 4, 5, 6, 9, 10, CURRENT_SQLITE_SCHEMA_VERSION].includes(Number(probe.pragma('user_version', { simple: true })))
+        if (![3, 4, 5, 6, 9, 10, 11, CURRENT_SQLITE_SCHEMA_VERSION].includes(Number(probe.pragma('user_version', { simple: true })))
             || probe.pragma('integrity_check', { simple: true }) !== 'ok'
             || (probe.pragma('foreign_key_check') as unknown[]).length !== 0) fail();
         if (probe.pragma('user_version', { simple: true }) !== CURRENT_SQLITE_SCHEMA_VERSION) assertAmbulatoryCommandPredecessorRecoverySchema(probe);
@@ -68,7 +68,8 @@ function isHostBootstrap(destination: Database.Database): boolean {
         && JSON.stringify(event) === JSON.stringify({ schema_version: 1, event_type: 'territorial.packs.initialized',
             outcome: 'success', actor_type: 'system', actor_ref: TERRITORIAL_PACK_OWNER, subject_type: 'settings',
             subject_ref: 'territorial.packs', source_surface: 'job', request_id: null,
-            redacted_metadata: JSON.stringify({ flags: ['before:core', 'after:core', 'origin:new'] }) });
+            redacted_metadata: JSON.stringify({ flags: ['before:core', 'after:core', 'origin:new'] }),
+            proposer_ref: null, mandate_ref: null, model_provider: null });
 }
 
 /** Only the exact host bootstrap is exempt from the otherwise empty destination requirement. */

@@ -147,7 +147,7 @@ export function updatePatientOperationInTransaction(tx: Tx, input: PatientUpdate
         actorRef: input.audit.actorRef,
         subjectType: 'patient',
         subjectRef: input.patientId,
-        sourceSurface: input.audit.sourceSurface,
+        sourceSurface: input.audit.sourceSurface, agentProvenance: input.audit.agentProvenance,
         requestId: input.audit.requestId,
         occurredAt: journal ? new Date(journal.receipt.committedAt) : undefined,
         redactedMetadata: {

@@ -66,7 +66,7 @@ export function createObservationOperationInTransaction(tx: Tx, input: CreateInp
         eventType: 'observation.created', outcome: 'success',
         archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
         subjectType: 'observation', subjectRef: input.observationId,
-        sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+        sourceSurface: input.audit.sourceSurface, agentProvenance: input.audit.agentProvenance, requestId: input.audit.requestId,
         redactedMetadata: { changedFields: input.changedFields, resourceVersion: 1, flags: input.audit.flags },
     });
     return { status: 201, value: { id: input.observationId, version: 1 } };
@@ -105,7 +105,7 @@ export function updateObservationOperationInTransaction(tx: Tx, input: UpdateInp
         eventType: input.values.deletedAt ? 'observation.deleted' : 'observation.updated', outcome: 'success',
         archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
         subjectType: 'observation', subjectRef: input.observationId,
-        sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+        sourceSurface: input.audit.sourceSurface, agentProvenance: input.audit.agentProvenance, requestId: input.audit.requestId,
         redactedMetadata: { changedFields: input.changedFields,
             resourceVersion: input.expectedVersion + 1, flags: input.audit.flags },
     });

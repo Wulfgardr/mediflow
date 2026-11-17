@@ -98,7 +98,8 @@ export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
 export type AuditSubjectType = 'backup' | 'audit_event' | 'therapy_command' | 'session' | 'active_role_attestation' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review' | 'agent_operation' | 'reference_data';
-export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job';
+export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job' | 'agent';
+export type AgentAuditProvenance = Readonly<{ proposerRef: string; mandateRef: string; modelProvider: 'openai' | 'anthropic' | 'local' }>;
 export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
 
 export type AuditContext = {
@@ -130,6 +131,7 @@ export type AuditRedactedMetadata = {
 };
 
 type AuditWriteInput = {
+    agentProvenance?: AgentAuditProvenance;
     archiveGeneration?: string;
     eventType: AuditEventType;
     outcome: AuditOutcome;
@@ -146,6 +148,7 @@ type AuditWriteInput = {
 /* host-derived identity/correlation only; the patient core owns event and subject. */
 export type RequiredAuditContext = Pick<AuditWriteInput, 'actorType' | 'actorRef' | 'sourceSurface' | 'requestId'> & {
     flags: string[];
+    agentProvenance?: AgentAuditProvenance;
     archiveGeneration: string | undefined;
 };
 
@@ -170,6 +173,9 @@ type AuditListFilters = {
 export type AuditRecord = {
     origin: BackupOrigin;
     schemaVersion: number;
+    proposerRef: string | null;
+    mandateRef: string | null;
+    modelProvider: string | null;
     eventId: string;
     eventType: AuditEventType;
     occurredAt: string;
@@ -377,6 +383,12 @@ export function classifyPatientMutationEvent(previousIsArchived: boolean | null,
 }
 
 function buildAuditEventRow(input: AuditWriteInput): typeof auditEvents.$inferInsert {
+    const provenance = input.agentProvenance;
+    if (input.sourceSurface === 'agent') {
+        if (input.actorType !== 'user' || !provenance
+            || ![provenance.proposerRef, provenance.mandateRef].every(ref => /^[A-Za-z0-9_-]{1,128}$/u.test(ref))
+            || !['openai', 'anthropic', 'local'].includes(provenance.modelProvider)) throw new Error('Invalid agent audit provenance');
+    } else if (provenance !== undefined) throw new Error('Agent audit requires agent surface');
     const occurredAt = input.occurredAt ?? new Date();
     const redactedMetadata = sanitizeAuditMetadata(input.redactedMetadata);
     const journal = redactedMetadata?.profileNotesCommit;
@@ -395,6 +407,9 @@ function buildAuditEventRow(input: AuditWriteInput): typeof auditEvents.$inferIn
     const eventId = create ? (input.eventType === 'patient.create.issued' ? `${create.commandId}:issued` : create.commandId) : journal?.receipt.reference ?? uuidv4();
     return {
         eventId,
+        proposerRef: provenance?.proposerRef ?? null,
+        mandateRef: provenance?.mandateRef ?? null,
+        modelProvider: provenance?.modelProvider ?? null,
         schemaVersion: AUDIT_SCHEMA_VERSION,
         eventType: input.eventType,
         occurredAt,
@@ -454,6 +469,9 @@ export async function listAuditEvents(filters: AuditListFilters = {}): Promise<A
         origin,
         schemaVersion: row.schemaVersion,
         eventId: row.eventId,
+        proposerRef: row.proposerRef ?? null,
+        mandateRef: row.mandateRef ?? null,
+        modelProvider: row.modelProvider ?? null,
         eventType: row.eventType as AuditEventType,
         occurredAt: toIsoString(row.occurredAt) ?? new Date(0).toISOString(),
         outcome: row.outcome as AuditOutcome,
@@ -479,6 +497,7 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
         native: 0,
         api: 0,
         job: 0,
+        agent: 0,
     };
     const subjectTypes: Record<AuditSubjectType, number> = {
         backup: 0,
