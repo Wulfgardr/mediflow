@@ -1,5 +1,6 @@
 'use client';
 
+import { clientArchiveGeneration } from './security/client-auth-api';
 import { db } from './db';
 import { notifyDbChange } from './live-query';
 import { inspectAgentVisit, prepareAgentApplication, type AgentVisitReview, type IncomingAgentCassette } from './agent-visit-review';
@@ -49,6 +50,7 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal()): 
                 let review: AgentVisitReview;
                 try { review = await inspectAgentVisit(row, patients, profile.doctorTaxCode ?? null, signal, undefined, codes); }
                 catch (error) { if (signal.aborted) throw error; unreadable = true; continue; }
+                if (row.archiveGeneration !== clientArchiveGeneration()) review = { ...review, blockers: [...review.blockers, 'Visita da un archivio precedente. Apri i PDF per recuperarla nella scheda.'] };
                 if (review.appliedItemIds.length === review.visit.items.length) continue;
                 let current = review;
                 if (row.status === 'closed' && !review.blockers.length) {
