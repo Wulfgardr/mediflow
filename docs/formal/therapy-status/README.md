@@ -1106,3 +1106,12 @@ controlli di recupero. I cinque file aggiornati non cambiano gli eventi o
 le transizioni del controller delle terapie. Il modello resta invariato;
 le proprietà delle cassette, della cifratura e della loro futura
 applicazione richiedono prove separate e non sono attribuite a TLC.
+
+
+### Accesso condiviso fra schede, WUL-877
+
+Il broker del browser usa la coppia opaca ETag e generazione già osservata
+per legare la CryptoKey alla sessione corrente. L'accessor non cambia
+ammissione, conferma, trasporto o commit delle terapie. Il modello resta
+invariato e non qualifica il trasferimento della chiave o l'applicazione
+delle cassette, che hanno prove separate.
