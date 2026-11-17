@@ -1,12 +1,14 @@
+import { identifierError } from '../patient-identity';
 import { z } from 'zod';
 
 const profileSchema = z.object({
     userId: z.string().min(1), username: z.string().min(1),
     displayName: z.string().nullable(), ambulatoryName: z.string().nullable(),
+    doctorTaxCode: z.string().optional(),
     profileVersion: z.string().min(1), archiveGeneration: z.string().min(1),
 });
 export type AccountProfile = z.infer<typeof profileSchema>;
-export type ProfileDraft = { doctorName: string; clinicName: string };
+export type ProfileDraft = { doctorName: string; clinicName: string; doctorTaxCode?: string };
 export type ProfileEditorState = {
     draft: ProfileDraft; current: AccountProfile | null; busy: boolean;
     requiresRead: boolean; message: string;
@@ -69,7 +71,7 @@ export class AccountProfileEditor {
             const profile = this.parse(body, true);
             this.apply(profile, () => this.current(request));
             this.publish({ current: profile, requiresRead: false,
-                ...(initial ? { draft: { doctorName: profile.displayName ?? '', clinicName: profile.ambulatoryName ?? '' } } : {}),
+                ...(initial ? { draft: { doctorName: profile.displayName ?? '', clinicName: profile.ambulatoryName ?? '', ...(profile.doctorTaxCode ? { doctorTaxCode: profile.doctorTaxCode } : {}) } } : {}),
                 message: initial ? '' : 'Profilo riletto. Confronta i valori salvati con la tua bozza prima di salvare.',
             });
         } catch {
@@ -81,13 +83,17 @@ export class AccountProfileEditor {
     async save() {
         const expected = this.state.current;
         if (!expected || this.state.busy || this.state.requiresRead || !this.active || !this.authorityCurrent()) return;
-        const request = ++this.request;
         const draft = this.state.draft;
+        if (draft.doctorTaxCode?.trim() && identifierError('cf', draft.doctorTaxCode.trim().toUpperCase()) !== null) {
+            this.publish({ message: 'Codice fiscale non valido.' });
+            return;
+        }
+        const request = ++this.request;
         this.publish({ busy: true, message: '' });
         try {
             const response = await this.transport('/api/auth/profile', {
                 method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-mediflow-archive-generation': expected.archiveGeneration },
-                body: JSON.stringify({ expectedVersion: expected.profileVersion, displayName: draft.doctorName, ambulatoryName: draft.clinicName }),
+                body: JSON.stringify({ expectedVersion: expected.profileVersion, displayName: draft.doctorName, ambulatoryName: draft.clinicName, doctorTaxCode: draft.doctorTaxCode }),
             });
             const body = await response.json();
             if (!this.current(request)) return;
@@ -99,7 +105,7 @@ export class AccountProfileEditor {
             if (!response.ok || typeof body?.changed !== 'boolean') throw new Error('Salvataggio non confermato');
             const profile = this.parse(body, false);
             this.apply(profile, () => this.current(request));
-            this.publish({ current: profile, draft: { doctorName: profile.displayName ?? '', clinicName: profile.ambulatoryName ?? '' },
+            this.publish({ current: profile, draft: { doctorName: profile.displayName ?? '', clinicName: profile.ambulatoryName ?? '', ...(profile.doctorTaxCode ? { doctorTaxCode: profile.doctorTaxCode } : {}) },
                 message: body.changed ? 'Profilo aggiornato.' : 'Il profilo è già aggiornato.' });
         } catch {
             if (this.current(request)) this.publish({ requiresRead: true, message: 'Salvataggio non confermato. La bozza è conservata. Verifica l’accesso e rileggi il profilo prima di riprovare.' });

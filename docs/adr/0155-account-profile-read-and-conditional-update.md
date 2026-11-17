@@ -193,3 +193,19 @@ I Command Line Tools locali non contengono XCTest e il plug-in SwiftUIMacros
 richiesto dalla SDK SwiftUI. Parsing e controlli del core non sostituiscono
 quindi l’esecuzione della suite Apple nella CI macOS. Nessuna prova su simulatore,
 app installata, volumi Linux o Windows è dichiarata da questa migrazione.
+
+## Emendamento 17 novembre 2026, WUL-878
+
+`doctorTaxCode` è un campo opzionale del profilo. GET lo restituisce quando è
+valorizzato; PUT lo valida come CF italiano con checksum, normalizza le lettere
+maiuscole e permette di svuotarlo. Ometterlo conserva il valore precedente,
+anche nei client precedenti. Il valore partecipa alla versione opaca, al confronto
+CAS e alla stessa transazione con audit del profilo. Non compare nell'audit.
+
+La persistenza usa `settings`, come le impostazioni del profilo, con chiave
+`accountProfile.doctorTaxCode:<userId>` derivata dalla sessione. Le route generiche
+delle impostazioni non possono leggere o scrivere queste chiavi. Non cambia
+lo schema del database. I consumer GPUI ammettono il campo aggiuntivo e il Dossier
+lo legge dal profilo dell'account autenticato.
+
+Dopo l'installazione Leonardo deve inserire il proprio CF nella pagina Profilo.

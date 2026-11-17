@@ -23,3 +23,19 @@ test('the dossier reads the whole exemption catalog, beyond the first 100 codes'
         globalThis.fetch = original;
     }
 });
+
+test('the dossier reads the current account physician code and refuses failed profile reads', async () => {
+    const original = globalThis.fetch;
+    let status = 200;
+    globalThis.fetch = (async (input, init) => {
+        assert.equal(input, '/api/auth/profile');
+        assert.equal(init?.cache, 'no-store');
+        return Response.json({ doctorTaxCode: 'RSSMRA85T10A562S' }, { status });
+    }) as typeof fetch;
+    try {
+        const ports = createDossierPorts();
+        assert.equal(await ports.physicianTaxCode!(new AbortController().signal), 'RSSMRA85T10A562S');
+        status = 401;
+        await assert.rejects(ports.physicianTaxCode!(new AbortController().signal));
+    } finally { globalThis.fetch = original; }
+});

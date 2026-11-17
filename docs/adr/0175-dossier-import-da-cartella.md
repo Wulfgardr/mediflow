@@ -173,3 +173,17 @@ ad alto rischio, fuori da questo ADR.
 - La copertura del corpus reale si attesta sul runtime, documento per documento, e non
   coincide con la consegna software. Nessuna cancellazione di originali o backup;
   l'acquisizione non è conservazione a norma.
+
+## Emendamento 17 novembre 2026, WUL-878
+
+Il profilo del medico ammette un codice fiscale opzionale con formato e carattere
+di controllo validati. Il Dossier legge il profilo dell'account corrente e scarta
+quel codice dal confronto in ogni posizione del documento. Non propone né permette
+il collegamento alla scheda il cui CF coincide con quello del medico. Un profilo
+senza CF conserva il confronto prudenziale ordinario.
+
+Le etichette professionali complete possono attribuire anche il codice sulla riga
+successiva o nel blocco esplicito del prescrittore. Una frase narrativa, un'etichetta
+paziente o una ripetizione del codice fuori dal blocco impediscono l'esclusione.
+Ogni altro CF valido continua a bloccare un gruppo misto. Non nasce un registro
+di prescrittori. Conferma del medico e confini di scrittura restano quelli sopra.

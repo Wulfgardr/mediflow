@@ -107,6 +107,11 @@ impl Fixture {
                     }
                 } else if first.starts_with("GET /api/v1/network/identity ") {
                     json!({"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}})
+                } else if first.starts_with("GET /api/auth/profile ") {
+                    json!({"operation":"account-profile.read.v1","contractVersion":1,
+                        "userId":server_session.inner.user.id,"username":server_session.inner.user.username,
+                        "archiveGeneration":server_session.inner.user.archive_generation,
+                        "displayName":null,"ambulatoryName":null,"profileVersion":"synthetic-profile"})
                 } else if first.starts_with("GET /api/v1/network/patients ") {
                     json!([patient()])
                 } else if first.starts_with("GET /api/patients/p-a ") {

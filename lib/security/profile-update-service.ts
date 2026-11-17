@@ -35,6 +35,7 @@ export type AccountProfileSnapshot = {
     username: string;
     displayName: string | null;
     ambulatoryName: string | null;
+    doctorTaxCode?: string;
     profileVersion: string;
     archiveGeneration: string;
 };
@@ -58,6 +59,7 @@ export type AccountProfileAuthorityInput = {
 };
 
 export type ProfileConditionalUpdateInput = AccountProfileAuthorityInput & {
+    doctorTaxCode?: string | null;
     expectedVersion: string;
     displayName: string | null;
     ambulatoryName: string | null;
@@ -87,14 +89,15 @@ export function deriveProfileVersion(
     userId: string,
     displayName: string | null,
     ambulatoryName: string | null,
+    doctorTaxCode?: string | null,
 ): string {
     const digest = createHash('sha256')
-        .update(JSON.stringify([userId, displayName, ambulatoryName]))
+        .update(JSON.stringify([userId, displayName, ambulatoryName, ...(doctorTaxCode ? [doctorTaxCode] : [])]))
         .digest('hex');
     return `p1:${digest}`;
 }
 
-function snapshotFromRow(row: ProfileRow, archiveGeneration: string): AccountProfileSnapshot {
+function snapshotFromRow(row: ProfileRow, archiveGeneration: string, doctorTaxCode?: string | null): AccountProfileSnapshot {
     const displayName = row.displayName ?? null;
     const ambulatoryName = row.ambulatoryName ?? null;
     return {
@@ -102,7 +105,8 @@ function snapshotFromRow(row: ProfileRow, archiveGeneration: string): AccountPro
         username: row.username,
         displayName,
         ambulatoryName,
-        profileVersion: deriveProfileVersion(row.id, displayName, ambulatoryName),
+        ...(doctorTaxCode ? { doctorTaxCode } : {}),
+        profileVersion: deriveProfileVersion(row.id, displayName, ambulatoryName, doctorTaxCode),
         archiveGeneration,
     };
 }
@@ -137,9 +141,11 @@ export async function readAccountProfile(
         if (denial) return { kind: 'denied', denial } as const;
         const row = tx.select(profileColumns).from(users).where(eq(users.id, input.session.userId)).get();
         if (!row) return { kind: 'not-found' } as const;
+        const taxCodeKey = `accountProfile.doctorTaxCode:${input.session.userId}`;
+        const doctorTaxCode = tx.select().from(settings).where(eq(settings.key, taxCodeKey)).get()?.value || null;
         return {
             kind: 'success',
-            profile: { operation: 'account-profile.read.v1', contractVersion: 1, ...snapshotFromRow(row, generation) },
+            profile: { operation: 'account-profile.read.v1', contractVersion: 1, ...snapshotFromRow(row, generation, doctorTaxCode) },
         } as const;
     });
 }
@@ -163,13 +169,16 @@ export async function updateProfileConditionally(
 
         const row = tx.select(profileColumns).from(users).where(eq(users.id, input.session.userId)).get();
         if (!row) return { kind: 'not-found' } as const;
+        const taxCodeKey = `accountProfile.doctorTaxCode:${input.session.userId}`;
+        const doctorTaxCode = tx.select().from(settings).where(eq(settings.key, taxCodeKey)).get()?.value || null;
 
-        const current = snapshotFromRow(row, generation);
+        const current = snapshotFromRow(row, generation, doctorTaxCode);
         if (current.profileVersion !== input.expectedVersion) {
             return { kind: 'version-conflict', profile: current } as const;
         }
 
-        if (row.displayName === input.displayName && row.ambulatoryName === input.ambulatoryName) {
+        const nextTaxCode = input.doctorTaxCode === undefined ? doctorTaxCode : input.doctorTaxCode || null;
+        if (row.displayName === input.displayName && row.ambulatoryName === input.ambulatoryName && doctorTaxCode === nextTaxCode) {
             return { kind: 'success', changed: false, profile: current } as const;
         }
 
@@ -189,6 +198,10 @@ export async function updateProfileConditionally(
             .onConflictDoUpdate({ target: settings.key, set: { value: input.ambulatoryName ?? '' } })
             .run();
 
+        if (doctorTaxCode !== nextTaxCode) {
+            tx.insert(settings).values({ key: taxCodeKey, value: nextTaxCode ?? '' })
+                .onConflictDoUpdate({ target: settings.key, set: { value: nextTaxCode ?? '' } }).run();
+        }
         const context = auditContextFromSession(input.session);
         writeAuditEventInTransaction(tx, {
             archiveGeneration: generation,
@@ -201,7 +214,7 @@ export async function updateProfileConditionally(
             sourceSurface: context.sourceSurface,
             requestId: requestIdFromRequest(input.request),
             redactedMetadata: withAuditContextMetadata(context, {
-                changedFields: ['displayName', 'ambulatoryName', 'doctorName', 'clinicName'],
+                changedFields: ['displayName', 'ambulatoryName', 'doctorName', 'clinicName', ...(doctorTaxCode !== nextTaxCode ? ['doctorTaxCode'] : [])],
                 flags: ['profile-update', 'conditional'],
                 reasonCode: 'profile_update',
             }),
@@ -210,6 +223,6 @@ export async function updateProfileConditionally(
         const updated = tx.select(profileColumns).from(users).where(eq(users.id, input.session.userId)).get();
         if (!updated) throw new Error('Profile row is unavailable after update.');
 
-        return { kind: 'success', changed: true, profile: snapshotFromRow(updated, generation) } as const;
+        return { kind: 'success', changed: true, profile: snapshotFromRow(updated, generation, nextTaxCode) } as const;
     }, { behavior: 'immediate' });
 }

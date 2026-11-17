@@ -58,6 +58,7 @@ export interface DossierPorts {
     sessionSignal(): AbortSignal;
     extract(bytes: Uint8Array, signal: AbortSignal): Promise<DossierHostExtraction | { status: 'busy' }>;
     sha256(bytes: Uint8Array): Promise<string>;
+    physicianTaxCode?(signal: AbortSignal): Promise<string | null>;
     listPatients(signal: AbortSignal): Promise<DossierPatient[]>;
     getPatient(id: string, signal: AbortSignal): Promise<DossierPatient | undefined>;
     /** P-01 con versione attesa. Lancia DossierVersionConflict su 409 di versione. */
@@ -115,7 +116,7 @@ export interface DossierDraftSource {
     prepared?: { patient: PreparedPatient | null; patientLabel: string; notes: string[]; facts: number };
 }
 
-export interface DossierDraftGroup { key: string; sources: DossierDraftSource[] }
+export interface DossierDraftGroup { physicianTaxCode?: string | null; key: string; sources: DossierDraftSource[] }
 
 export class DossierAbortedError extends Error { constructor() { super('Operazione interrotta: sessione bloccata o contesto cambiato.'); } }
 
@@ -143,6 +144,7 @@ export async function buildDossierInventory(
 ): Promise<DossierDraftGroup[]> {
     const { signal, isCurrent } = options;
     const preparedSources = new Map((options.prepared?.sources ?? []).map((source) => [source.sha256, source]));
+    const physicianTaxCode = await ports.physicianTaxCode?.(signal) ?? null;
     const exemptionCodes = await ports.exemptionCodes(signal);
     assertLive(signal, isCurrent);
     const sources: DossierDraftSource[] = [];
@@ -221,11 +223,11 @@ export async function buildDossierInventory(
     }
     const groups = new Map<string, DossierDraftSource[]>();
     for (const source of sources) groups.set(source.group, [...(groups.get(source.group) ?? []), source]);
-    return [...groups.entries()].map(([key, items]) => ({ key, sources: items }));
+    return [...groups.entries()].map(([key, items]) => ({ key, sources: items, physicianTaxCode }));
 }
 
 export function evaluateDraftGroupIdentity(group: DossierDraftGroup, patients: readonly DossierPatient[], linkedPatientId: string | null): DossierIdentityEvaluation {
-    return evaluateDossierGroupIdentity(group.sources.filter((source) => source.status === 'ready'), patients, linkedPatientId);
+    return evaluateDossierGroupIdentity(group.sources.filter((source) => source.status === 'ready'), patients, linkedPatientId, group.physicianTaxCode);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +287,9 @@ export async function acquireDossierGroup(
     if (!input.confirmed) throw new Error('Collegamento non confermato dal medico.');
     const patients = await ports.listPatients(signal);
     guard();
-    const identity = evaluateDraftGroupIdentity(group, patients, patientId);
+    const physicianTaxCode = await ports.physicianTaxCode?.(signal) ?? null;
+    guard();
+    const identity = evaluateDraftGroupIdentity({ ...group, physicianTaxCode }, patients, patientId);
     if (identity.blocking || !patients.some((patient) => patient.id === patientId)) throw new DossierIdentityBlocked(identity);
     const confirmedAt = ports.now().toISOString();
     const outcomes: DossierAcquireOutcome[] = [];
@@ -481,6 +485,7 @@ export interface DossierPatientView {
 }
 
 export async function loadPatientDossier(ports: DossierPorts, patientId: string, signal: AbortSignal): Promise<DossierPatientView | null> {
+    const physicianTaxCode = await ports.physicianTaxCode?.(signal) ?? null;
     const patient = await ports.getPatient(patientId, signal);
     if (!patient || signal.aborted) return null;
     const [attachments, current, exemptionCodes] = await Promise.all([
@@ -498,7 +503,7 @@ export async function loadPatientDossier(ports: DossierPorts, patientId: string,
             && await ports.sha256(new TextEncoder().encode(text)) === read.record.extraction.text.sha256;
         let artifactCiphertextChars: number | null = null;
         try { artifactCiphertextChars = await ports.measureArtifact(attachment.parseEvidenceArtifactSnapshot!); } catch { artifactCiphertextChars = null; }
-        const identity = evaluateDossierGroupIdentity([read.record.identity], [patient], patientId);
+        const identity = evaluateDossierGroupIdentity([read.record.identity], [patient], patientId, physicianTaxCode);
         const coverageRecord = { ...read.record, identity: { ...read.record.identity, status: identity.status } };
         documents.push({ attachment, record: read.record, text, textVerified,
             preservationCurrent: preservationIsCurrent(read.record, attachment.currentness?.sourceRef),
@@ -619,8 +624,10 @@ export async function retryDossierExtraction(
         guard();
         if (!patient) return 'stale';
         const taxCodes = collectDossierTaxCodes(text);
+        const physicianTaxCode = await ports.physicianTaxCode?.(input.signal) ?? null;
+        guard();
         const patientNames = collectDossierPatientNames(text);
-        const identity = evaluateDossierGroupIdentity([{ taxCodes, patientNames }], [patient], input.patientId);
+        const identity = evaluateDossierGroupIdentity([{ taxCodes, patientNames }], [patient], input.patientId, physicianTaxCode);
         const known = new Set(record.facts.map((fact) => fact.factId));
         next = { ...record, updatedAt: at, extraction, documentDate: date,
             identity: { ...record.identity, taxCodes, patientNames, status: identity.status },
@@ -844,10 +851,11 @@ export async function applyDossierDocument(
     const first = await rereadDocument(ports, patientId, attachmentId, signal);
     guard();
     if (!first || !sameCurrentness(first.attachment.currentness, input.expected)) return finish('stale');
+    const physicianTaxCode = await ports.physicianTaxCode?.(signal) ?? null;
     const patient = await ports.getPatient(patientId, signal);
     guard();
     if (!patient || first.attachment.patientId !== patientId || !preservationIsCurrent(first.record, first.attachment.currentness?.sourceRef)
-        || evaluateDossierGroupIdentity([first.record.identity], [patient], patientId).blocking) return finish('identity');
+        || evaluateDossierGroupIdentity([first.record.identity], [patient], patientId, physicianTaxCode).blocking) return finish('identity');
     const exemptionCodes = await ports.exemptionCodes(signal);
     guard();
     const planned = first.record.facts.filter((fact) => eligible(first.record, fact, exemptionCodes)).map((fact) => fact.factId);
@@ -908,7 +916,7 @@ export async function applyDossierDocument(
             const linked = await ports.getPatient(patientId, signal);
             guard();
             const freshFact = fresh?.record.facts.find((item) => item.factId === factId);
-            return Boolean(fresh && linked && !evaluateDossierGroupIdentity([fresh.record.identity], [linked], patientId).blocking
+            return Boolean(fresh && linked && !evaluateDossierGroupIdentity([fresh.record.identity], [linked], patientId, await ports.physicianTaxCode?.(signal)).blocking
                 && freshFact && fresh.record.pendingWrites?.some((item) => item.factId === factId && item.factFingerprint === activeClaim.factFingerprint)
                 && dossierFactFingerprint(freshFact) === activeClaim.factFingerprint && freshFact.decision === 'accepted'
                 && preservationIsCurrent(fresh.record, fresh.attachment.currentness?.sourceRef));

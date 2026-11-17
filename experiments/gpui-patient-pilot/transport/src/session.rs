@@ -4668,6 +4668,7 @@ mod tests {
             username: "synthetic".into(),
             display_name: Some("Dott.ssa Sintetica".into()),
             ambulatory_name: None,
+            doctor_tax_code: None,
             profile_version: "p1:synthetic".into(),
             archive_generation: "synthetic-generation".into(),
         }

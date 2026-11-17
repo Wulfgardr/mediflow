@@ -746,20 +746,36 @@ pub fn patient_names(text: &str) -> Value {
 fn professional(code: &Value) -> bool {
     code["role"] == "professional_cf"
         && code["explicitProfessional"] == true
-        && code["professionalLabelScope"] == "same_line"
+        && (code["professionalLabelScope"] == "same_line"
+            || code["professionalLabelScope"] == "prescriber_block")
 }
-pub fn identity(documents: &[Value], patients: &[Value], linked: Option<&str>) -> Value {
+pub fn identity(
+    documents: &[Value],
+    patients: &[Value],
+    linked: Option<&str>,
+    physician: Option<&str>,
+) -> Value {
+    let physician = physician.unwrap_or("").trim().to_uppercase();
     let codes: BTreeSet<_> = documents
         .iter()
         .flat_map(|d| array(&d["taxCodes"]))
-        .filter(|c| c["checksumValid"] == true && !professional(c))
+        .filter(|c| {
+            c["checksumValid"] == true
+                && !professional(c)
+                && string(&c["value"]).trim().to_uppercase() != physician
+        })
         .map(|c| string(&c["value"]).trim().to_uppercase())
         .collect();
     let codes: Vec<_> = codes.into_iter().collect();
     let unattributed = documents
         .iter()
         .flat_map(|d| array(&d["taxCodes"]))
-        .any(|c| c["checksumValid"] == true && c["role"] != "patient_cf" && !professional(c));
+        .any(|c| {
+            c["checksumValid"] == true
+                && c["role"] != "patient_cf"
+                && !professional(c)
+                && string(&c["value"]).trim().to_uppercase() != physician
+        });
     let result = |status: &str, blocking: bool, ids: Vec<Value>, message: &str| json!({"status":status,"blocking":blocking,"confirmationRequired":true,"documentPatientCodes":codes,"candidatePatientIds":ids,"message":message});
     if codes.len() > 1 {
         return result(
@@ -767,6 +783,18 @@ pub fn identity(documents: &[Value], patients: &[Value], linked: Option<&str>) -
             true,
             vec![],
             "I documenti contengono più codici fiscali distinti, inclusi quelli di attribuzione incerta. Controlla a chi si riferiscono ed escludi le fonti discordanti prima di procedere.",
+        );
+    }
+    if !physician.is_empty()
+        && linked
+            .and_then(|id| patients.iter().find(|p| p["id"] == id))
+            .is_some_and(|p| string(&p["taxCode"]).trim().to_uppercase() == physician)
+    {
+        return result(
+            "discordant",
+            true,
+            vec![],
+            "La scheda scelta ha il codice fiscale del medico. Scegli la scheda del paziente.",
         );
     }
     let holders = || {
@@ -1309,9 +1337,12 @@ pub fn verify_call(call: &Value) -> Value {
                 .collect::<Vec<_>>(),
         ),
         "preparedDossierFacts" => prepared_facts(&a[0]),
-        "evaluateDossierGroupIdentity" => {
-            identity(array(&a[0]), array(&a[1]), a.get(2).and_then(Value::as_str))
-        }
+        "evaluateDossierGroupIdentity" => identity(
+            array(&a[0]),
+            array(&a[1]),
+            a.get(2).and_then(Value::as_str),
+            a.get(3).and_then(Value::as_str),
+        ),
         "collectDossierPatientNames" => patient_names(string(&a[0])),
         "preparedPatientKey" => patient_key(&a[0], a[1].as_str()),
         "parsePreparedExtraction" => parse_prepared(string(&a[0])),
@@ -1333,6 +1364,33 @@ pub fn verify_call(call: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn physician_code_is_never_a_patient_candidate() {
+        let patients = vec![
+            json!({"id":"p","taxCode":"RSSMRA80A01F205X"}),
+            json!({"id":"doctor","taxCode":"RSSMRA85T10A562S"}),
+        ];
+        let documents = vec![
+            json!({"taxCodes":[{"value":"RSSMRA80A01F205X","checksumValid":true,"role":"patient_cf"}, {"value":"RSSMRA85T10A562S","checksumValid":true,"role":"unknown_cf"}]}),
+        ];
+        assert_eq!(
+            identity(&documents, &patients, Some("p"), Some("RSSMRA85T10A562S"))["status"],
+            "matched"
+        );
+        assert_eq!(
+            identity(
+                &documents,
+                &patients,
+                Some("doctor"),
+                Some("RSSMRA85T10A562S")
+            )["blocking"],
+            true
+        );
+        assert_eq!(
+            identity(&documents, &patients, None, None)["status"],
+            "mixed"
+        );
+    }
     fn canonical(value: &Value) -> String {
         match value {
             Value::Array(items) => format!(

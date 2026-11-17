@@ -118,3 +118,9 @@ test('archive restore receipts cannot be forged through any generic settings cha
         }
     }
 });
+
+test('physician tax code is owned by the conditional profile service', () => {
+    for (const authority of [webSession, webAdminSession, nativeSession, localTokenSession]) {
+        assert.equal(evaluateSettingsWrite('accountProfile.doctorTaxCode:synthetic-user', authority).allowed, false);
+    }
+});

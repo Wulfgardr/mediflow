@@ -77,6 +77,12 @@ export function createDossierPorts(): DossierPorts {
             }
         },
         async sha256(bytes) { return toHex(await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))); },
+        async physicianTaxCode(signal) {
+            const response = await fetch('/api/auth/profile', { signal, cache: 'no-store' });
+            if (!response.ok) throw new Error('Profilo medico non disponibile.');
+            const profile = await response.json();
+            return typeof profile.doctorTaxCode === 'string' ? profile.doctorTaxCode : null;
+        },
         async listPatients(signal) {
             const patients = await db.patients.toArray({ signal, rejectAuthUnavailable: true });
             return patients.filter((patient) => !patient.deletedAt && !patient.isArchived).map(patientView);
