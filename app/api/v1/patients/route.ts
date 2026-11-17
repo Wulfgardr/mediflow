@@ -81,8 +81,6 @@ export async function POST(request: Request) {
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
-        const sealedError = rejectUnsealedV1Write('patients', body);
-        if (sealedError) return sealedError;
         if (body.ambulatoryId !== undefined && body.ambulatoryId !== null &&
             (typeof body.ambulatoryId !== 'string' || body.ambulatoryId.trim().length === 0)) {
             return NextResponse.json({ error: 'Invalid ambulatoryId' }, { status: 400 });
@@ -98,7 +96,7 @@ export async function POST(request: Request) {
         }
 
         /* resolve the host actor before entering the synchronous transaction. */
-        const persistedSealedError = rejectUnsealedV1Write('patients', normalized.values);
+        const persistedSealedError = rejectUnsealedV1Write('patients', body);
         if (persistedSealedError) return persistedSealedError;
         const auditContext = auditContextFromRequest(request, actorSession);
         const requestId = requestIdFromRequest(request);

@@ -100,7 +100,7 @@ export async function parseEntryDeleteInput(request: Request, defaultReason: str
     if (hasOwn(body, 'deletedAt') && (body.deletedAt === null || body.deletedAt === '')) return invalid('Invalid deletedAt');
     const reason = hasOwn(body, 'deletionReason') ? body.deletionReason : defaultReason;
     if (typeof reason !== 'string' || !reason.trim()) return invalid('Invalid deletionReason');
-    return { ok: true as const, body: {
+    return { ok: true as const, clientValues: hasOwn(body, 'deletionReason') ? { deletionReason: body.deletionReason } : {}, body: {
         version: body.version,
         deletedAt: hasOwn(body, 'deletedAt') ? body.deletedAt : new Date(),
         deletionReason: reason.trim(),

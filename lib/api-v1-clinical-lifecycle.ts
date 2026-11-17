@@ -10,7 +10,7 @@ export type ClinicalDeleteBodyValues = {
 };
 
 export type ClinicalDeleteBodyResult =
-    | { ok: true; values: ClinicalDeleteBodyValues }
+    | { ok: true; values: ClinicalDeleteBodyValues; clientValues: Record<string, unknown> }
     | { ok: false; error: string; status?: 413; code?: 'JSON_BODY_TOO_LARGE' };
 
 function hasOwn(input: Record<string, unknown>, key: string): boolean {
@@ -51,6 +51,7 @@ export async function parseClinicalDeleteBody(
 
     return {
         ok: true,
+        clientValues: hasOwn(body, 'deletionReason') ? { deletionReason: body.deletionReason } : {},
         values: {
             version: body.version,
             deletedAt: hasOwn(body, 'deletedAt') ? body.deletedAt : new Date(),

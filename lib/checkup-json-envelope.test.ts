@@ -72,12 +72,13 @@ function snapshot() {
             [table, fresh.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()])) as Record<string, Record<string, unknown>[]>;
     } finally { fresh.close(); }
 }
+const sealed = 'ENC:c3ludGhldGlj:c3ludGhldGlj';
 function validBody(surface: Surface, operation: Operation) {
     return operation === 'POST'
         ? { id: ids.checkupId, ...(surface === 'web' ? { patientId: ids.patientId } : {}), date: '2026-05-02T09:00:00.000Z',
-            title: 'Synthetic checkup', notes: 'ENC:synthetic:notes', status: 'pending', source: 'manual' }
+            title: 'Synthetic checkup', notes: surface === 'v1' ? sealed : 'ENC:synthetic:notes', status: 'pending', source: 'manual' }
         : operation === 'DELETE' ? { version: 3 }
-            : { version: 3, title: 'Synthetic update', notes: 'ENC:synthetic:notes' };
+            : { version: 3, title: 'Synthetic update', notes: surface === 'v1' ? sealed : 'ENC:synthetic:notes' };
 }
 function request(operation: Operation, body?: string | Uint8Array | ReadableStream<Uint8Array>, headers: Record<string, string> = {}, signal?: AbortSignal) {
     const init = { method: operation, body, signal, headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', ...headers },
@@ -110,7 +111,18 @@ function chunked(bytes: Uint8Array, chunkSize = 16381) {
     }, cancel() { cancels++; } }, { highWaterMark: 0 });
     return { body, counts: () => ({ pulls, cancels }) };
 }
-function padded(body: Record<string, unknown>, size: number, multibyte: boolean) {
+function padded(body: Record<string, unknown>, size: number, multibyte: boolean, surface: Surface = 'web') {
+    if (surface === 'v1') {
+        const prefix = 'ENC:c3ludGhldGlj:';
+        const base = { ...body, notes: sealed, title: '' };
+        const budget = size - new TextEncoder().encode(JSON.stringify(base)).byteLength;
+        const notes = multibyte ? sealed : prefix + 'x'.repeat(Math.floor(budget / 4) * 4);
+        const titleBudget = multibyte ? budget : budget - (notes.length - sealed.length);
+        const title = multibyte ? '🩺'.repeat(Math.floor(titleBudget / 4)) + 'x'.repeat(titleBudget % 4) : 'x'.repeat(titleBudget);
+        const text = JSON.stringify({ ...base, notes, title });
+        assert.equal(new TextEncoder().encode(text).byteLength, size);
+        return { text, notes };
+    }
     const empty = JSON.stringify({ ...body, notes: 'ENC:' });
     const budget = size - new TextEncoder().encode(empty).byteLength;
     const notes = 'ENC:' + (multibyte ? '🩺'.repeat(Math.floor(budget / 4)) + 'x'.repeat(budget % 4) : 'x'.repeat(budget));
@@ -133,7 +145,7 @@ for (const surface of ['web', 'v1'] as const) for (const operation of ['POST', '
     });
     for (const multibyte of [false, true]) for (const size of [CAP - 1, CAP]) test(`${surface} ${operation}: ${multibyte ? 'multibyte' : 'ASCII'} ${size} bytes admitted unchanged`, async () => {
         reset(operation);
-        const { text, notes } = padded(validBody(surface, operation), size, multibyte);
+        const { text, notes } = padded(validBody(surface, operation), size, multibyte, surface);
         const stream = chunked(new TextEncoder().encode(text));
         const before = snapshot();
         const response = await invoke(surface, operation, request(operation, stream.body, { 'content-length': 'invalid' }));
@@ -157,7 +169,7 @@ for (const surface of ['web', 'v1'] as const) for (const operation of ['POST', '
     });
     for (const header of [undefined, '0', 'invalid', '-1', '4194305']) test(`${surface} ${operation}: over cap with Content-Length ${header} denies without effects`, async () => {
         reset(operation);
-        const { text } = padded(validBody(surface, operation), CAP + 1, true);
+        const { text } = padded(validBody(surface, operation), CAP + 1, true, surface);
         const stream = chunked(new TextEncoder().encode(text));
         await denied(surface, operation, `oversize-${header}`, request(operation, stream.body, header === undefined ? {} : { 'content-length': header }), 413);
         assert.equal(stream.body.locked, false); assert.equal(stream.counts().cancels, 1);
@@ -205,12 +217,14 @@ for (const surface of ['web', 'v1'] as const) for (const operation of ['POST', '
     test(`${surface} ${operation}: Request.json replacement UTF8 and last duplicate key preserved`, async () => {
         reset(operation);
         const before = snapshot();
-        const raw = JSON.stringify(validBody(surface, operation)).replace(/}$/, ',"title":"first","title":"last","notes":"ENC:replacement-X","unknownCompatibilityField":true}');
+        const replacement = surface === 'v1' ? `,"title":"first","title":"replacement-X","notes":"${sealed}","unknownCompatibilityField":true}`
+            : ',"title":"first","title":"last","notes":"ENC:replacement-X","unknownCompatibilityField":true}';
+        const raw = JSON.stringify(validBody(surface, operation)).replace(/}$/, replacement);
         const bytes = new TextEncoder().encode(raw); bytes[raw.indexOf('replacement-X') + 'replacement-'.length] = 0xff;
         const response = await invoke(surface, operation, request(operation, bytes));
         assert.equal(response.status, operation === 'POST' ? 201 : 200);
-        const after = snapshot(); assert.equal(after.checkups[0].title, operation === 'DELETE' ? 'Before' : 'last');
-        assert.equal(after.checkups[0].notes, operation === 'DELETE' ? 'ENC:synthetic:before' : 'ENC:replacement-�');
+        const after = snapshot(); assert.equal(after.checkups[0].title, operation === 'DELETE' ? 'Before' : surface === 'v1' ? 'replacement-�' : 'last');
+        assert.equal(after.checkups[0].notes, operation === 'DELETE' ? 'ENC:synthetic:before' : surface === 'v1' ? sealed : 'ENC:replacement-�');
         assert.equal(after.audit_events.length, before.audit_events.length + 1);
     });
 }
@@ -250,14 +264,14 @@ for (const surface of ['web', 'v1'] as const) {
     });
     test(`${surface} DELETE preserves custom tombstone, replacement UTF8 and last duplicate values`, async () => {
         reset('DELETE'); const before = snapshot();
-        const raw = '{"version":2,"version":3,"deletedAt":"2026-05-02T12:00:00.000Z",'
+        const raw = (surface === 'v1' ? `{"version":2,"version":3,"deletedAt":"2026-05-02T12:00:00.000Z","deletionReason":"first","deletionReason":"${sealed}","future":"replacement-X"}` : '{"version":2,"version":3,"deletedAt":"2026-05-02T12:00:00.000Z",'
             + '"deletionReason":"first","deletionReason":"  replacement-X  ","future":true,'
-            + '"__proto__":{"deletedAt":null}}';
+            + '"__proto__":{"deletedAt":null}}');
         const bytes = new TextEncoder().encode(raw); bytes[raw.indexOf('replacement-X') + 'replacement-'.length] = 0xff;
         const response = await invoke(surface, 'DELETE', request('DELETE', bytes));
         assert.equal(response.status, 200); assert.deepEqual(await response.json(), { success: true });
         const after = snapshot(); assert.equal(after.checkups[0].deleted_at, Date.parse('2026-05-02T12:00:00.000Z') / 1000);
-        assert.equal(after.checkups[0].deletion_reason, 'replacement-�'); assert.equal(after.checkups[0].version, 4);
+        assert.equal(after.checkups[0].deletion_reason, surface === 'v1' ? sealed : 'replacement-�'); assert.equal(after.checkups[0].version, 4);
         assert.equal(after.checkups[0].title, before.checkups[0].title); assert.equal(after.checkups[0].notes, before.checkups[0].notes);
         assert.deepEqual(after.patients, before.patients); assert.deepEqual(after.patients_to_ambulatories, before.patients_to_ambulatories);
         assert.equal(after.audit_events.length, before.audit_events.length + 1);

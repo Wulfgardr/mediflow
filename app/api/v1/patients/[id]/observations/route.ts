@@ -87,14 +87,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const { id } = await params;
         const parsed = await readObservationJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
-        const sealedError = rejectUnsealedV1Write('observations', parsed.body);
-        if (sealedError) return sealedError;
         const shape = validateObservationInput(parsed.body, 'v1', 'create');
         if (shape) return NextResponse.json({ error: shape.error }, { status: shape.status });
         const observationId = observationCreateId(parsed.body);
         const normalized = normalizeObservationCreateInput(parsed.body, { id: observationId, patientId: id });
         if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
-        const persistedSealedError = rejectUnsealedV1Write('observations', normalized.values);
+        const persistedSealedError = rejectUnsealedV1Write('observations', parsed.body);
         if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = createObservationOperation({

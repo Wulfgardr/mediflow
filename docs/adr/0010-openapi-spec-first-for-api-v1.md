@@ -194,8 +194,10 @@ terapie, osservazioni e checkup. Null svuota solo i campi opzionali.
 
 Per creare una voce del diario locale il client deve fornire sia `title` sia
 `content` cifrati. Non è più ammesso generare il titolo in chiaro sul server.
-Anche il motivo delle cancellazioni deve arrivare cifrato: manca al server la
-chiave per cifrare un testo predefinito. Queste route locali del diario restano
+Il motivo di cancellazione fornito dal client deve arrivare cifrato. Se omesso,
+il server conserva il motivo operativo `api-v1-delete`: il controllo riguarda
+i valori del client, dopo le validazioni di forma esistenti e prima della scrittura.
+Queste route locali del diario restano
 nel perimetro implementation-only della contract-policy; `EntryCreateRequest`
 descrive invece il writer paired-network, che non cambia in questa correzione.
 L'incompatibilità per i vecchi client che inviano testo in chiaro ripristina il
