@@ -74,6 +74,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
         if (item.kind === 'service' && (fields.items ?? '').split('\n').map(line => line.trim()).filter(Boolean).some(line => !normalized(quote).includes(normalized(line)))) proposalBlockers.push('Voci della prestazione da verificare sulla fonte.');
         if (item.kind === 'observation' && [fields.refLow, fields.refHigh, fields.refText].some(value => value && !normalized(quote).includes(normalized(value)))) proposalBlockers.push('Intervallo di riferimento da verificare sulla fonte.');
         if (item.kind === 'diagnosis' && (!fields.code || !fields.system || !normalized(quote).includes(normalized(fields.code)))) proposalBlockers.push('Codice della diagnosi da verificare sulla fonte.');
+        if (item.kind === 'observation' && (!fields.code || !normalized(quote).includes(normalized(fields.code)))) proposalBlockers.push('Codice dell’osservazione da verificare sulla fonte.');
         if (item.kind === 'exemption' && (!fields.code || !normalized(quote).includes(normalized(fields.code)))) proposalBlockers.push('Codice di esenzione da verificare sulla fonte.');
     }
     const currentSummary = new Map<string, string>();
