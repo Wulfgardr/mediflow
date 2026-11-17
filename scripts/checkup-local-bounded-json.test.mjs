@@ -90,7 +90,6 @@ test('six local checkup POST/PUT/DELETE paths enforce their object/byte contract
             const beforeUnauthorized = snapshot();
             const unauthorized = await send(operation, url, { 'Content-Type': 'application/json' }, notesBody(body, cap + 1, surface));
             assert.equal(unauthorized.response.status, 401); assert.equal(snapshot(), beforeUnauthorized);
-            // A real successful POST supplies the target for the subsequent PUT.
             const raw = notesBody(body, cap, surface);
             const accepted = await send(operation, url, headers, raw, true);
             assert.equal(accepted.response.status, operation === 'POST' ? 201 : 200);
@@ -134,8 +133,6 @@ test('six local checkup POST/PUT/DELETE paths enforce their object/byte contract
         assert.equal((await send('DELETE', item, { 'Content-Type': 'application/json' }, notesBody({ version: 2 }, cap + 1, surface))).response.status, 401);
         assert.equal(snapshot(), beforeUnauthorized);
 
-        // A client disconnect has no observable HTTP response. Assert SQLite after
-        // the pending body read is interrupted; route-level tests assert its 400.
         const beforeAbort = snapshot();
         await new Promise((resolve, reject) => {
             const req = http.request(new URL(`${base}${item}`), { method: 'DELETE', headers: { ...headers, 'Transfer-Encoding': 'chunked' } }, () => reject(new Error('incomplete body responded before disconnect')));

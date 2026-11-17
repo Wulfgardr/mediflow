@@ -5,7 +5,6 @@ import { test } from 'node:test';
 import ts from 'typescript';
 
 const root = path.resolve(import.meta.dirname, '..');
-// Fixed inventory: removal of a reader must not silently remove a regression case.
 const operations = [
     ['auth/native/login', 'POST'],
     ['v1/network/pairing-intents', 'POST'],
@@ -96,16 +95,12 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
             if (name === '@/lib/patient-json-object') {
                 return load('lib/patient-json-object.ts');
             }
-            // exercise the actual diary object check, not the fallback dependency stub.
             if (name === '@/lib/entry-write-input') {
                 return load('lib/entry-write-input.ts');
             }
-            // preserve the real therapy envelope check when exercising admitted network bodies.
             if (name === '@/lib/therapy-write-input') {
                 return load('lib/therapy-write-input.ts');
             }
-            // Load the real resolver and binder. Only these fixed auth/identity
-            // dependencies of the resolver module use the closed stub set below.
             const syntheticScopeDependency = relative === 'lib/network-write-context.ts' && [
                 './network-home-base-server', './network-contract', './security/local-api-auth',
                 './network-discovery-auth', './security/server-auth', './security/paired-native-session',
@@ -139,7 +134,6 @@ function request(h, text = '{}', headers = {}) {
         },
         cancel() { cancels++; },
     }, { highWaterMark: 0 });
-    // Observe even header access: denied routes must never enter the reader.
     const req = {
         signal: new AbortController().signal,
         url: 'http://127.0.0.1/?patientId=synthetic-patient',

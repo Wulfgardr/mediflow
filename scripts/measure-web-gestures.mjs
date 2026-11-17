@@ -40,7 +40,6 @@ if (process.argv[2] === '--server') {
   const seedLog = openSync(path.join(evidence, 'seed.log'), 'w');
   try { if (await run(['scripts/prepare-e2e-db.mjs'], seedLog)) throw new Error('Fixture non preparata.'); }
   finally { closeSync(seedLog); }
-  // Run Next's server in this direct child, without the CLI's extra process.
   const tsconfigPath = path.join(root, 'tsconfig.json');
   const tsconfigBefore = readFileSync(tsconfigPath, 'utf8');
   const serverLog = openSync(path.join(evidence, 'server.log'), 'w');
@@ -57,9 +56,6 @@ if (process.argv[2] === '--server') {
       await delay(500);
     }
     if (!ready) throw new Error('Server non pronto.');
-    // Il server di sviluppo compila ogni rotta alla prima richiesta, e dopo una pagina
-    // nuova il browser può ricaricarsi e tornare allo sblocco. Le rotte si compilano qui,
-    // prima che un browser apra la sessione: la misura non paga la compilazione.
     for (const route of ['/', '/patients/riscaldamento/modules', '/api/patients', '/api/entries', '/api/therapies', '/api/attachments', '/api/observations', '/api/checkups']) {
       try { await fetch(`${url}${route}`, { redirect: 'manual', signal: AbortSignal.timeout(180_000) }); }
       catch (error) { console.log(`Riscaldamento ${route}: ${error instanceof Error ? error.message : error}`); }

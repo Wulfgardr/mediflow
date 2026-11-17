@@ -49,7 +49,6 @@ export function collectExplicitNpmNodeTests(root, scriptName) {
   const seen = new Set();
   const realPaths = new Set();
   for (const file of files) {
-    // Closed literal grammar: no flags, traversal, expansion, quoting or shell.
     if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$/u.test(file)) {
       throw new Error(`Unsupported literal test path: ${JSON.stringify(file)}`);
     }
@@ -76,8 +75,6 @@ function npmRunBlock(run, selfTestCall, companionCall) {
   for (const raw of run.split(/\r?\n/u)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
-    // Argument-bearing calls must match a declared literal. The OpenAPI scan
-    // may accompany its self-test, but never satisfies the self-test binding.
     if (selfTestCall && line === `npm run ${selfTestCall}`) {
       commands.push(selfTestCall);
       continue;
@@ -111,8 +108,6 @@ function runDefaults(owner, label) {
 }
 
 function ciBinding(root, suite) {
-  // JSON schema keeps booleans unambiguous and rejects custom executable tags.
-  // js-yaml's default duplicate-key check stays enabled (json option is not used).
   const workflow = load(readText(root, suite.workflow), { schema: JSON_SCHEMA });
   checkYamlTree(workflow);
   if (suite.triggers && !isDeepStrictEqual(workflow.on, suite.triggers)) throw new Error('Required CI triggers changed');
@@ -234,8 +229,6 @@ function collectPluginSelections(root, directory, workflow, job, paths, scripts)
       const binding = collectNpmScriptBinding(root, { ...common, ...suite }, suite.command);
       let files;
       if (suite.script === 'test') {
-        // Exactly the package's literal nonrecursive shell glob; hidden files
-        // are not matched. No second roster and no test imports or execution.
         const group = `${directory}/test`;
         const real = fs.realpathSync(path.join(root, group));
         if (!real.startsWith(fs.realpathSync(root) + path.sep)) throw new Error('Plugin test group escapes root');

@@ -49,7 +49,6 @@ test('paired ambulatory write preserves capability, concurrency, default, delete
     } finally { if (linkedPatientId) await cleanupPatient(linkedPatientId); for (const id of createdIds.reverse()) await cleanupAmbulatory(id, writer, sessionHeaders, intentionallyGuardedIds); }
 });
 
-/* admitted paired HTTP must roll back both default changes and clear batches. */
 test('paired ambulatory audit failures roll back indirect defaults and patient clear before explicit retry',
     { skip: process.env.MF085_SYNTHETIC_E2E !== '1' }, async () => {
     const dataDir = process.env.MEDIFLOW_DATA_DIR;
