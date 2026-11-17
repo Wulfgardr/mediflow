@@ -41,7 +41,7 @@ test('missing and non-string provenance references roll back the clinical writes
     for (const invalid of [
         { proposerRef: undefined }, { proposerRef: null }, { mandateRef: undefined }, { mandateRef: null }, { mandateRef: 42 },
     ]) {
-        const claimed = { ...agentProvenance, ...invalid } as typeof agentProvenance;
+        const claimed = { ...agentProvenance, ...invalid } as unknown as typeof agentProvenance;
         assert.throws(() => composeAll('invalid-agent-reference', { agentProvenance: claimed }), /Invalid agent audit provenance/);
         assert.deepEqual(compositionSnapshot(), before);
     }
