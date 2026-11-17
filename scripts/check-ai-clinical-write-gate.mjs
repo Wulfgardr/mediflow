@@ -1,10 +1,5 @@
 #!/usr/bin/env node
-/* @Codex */
 
-// ADR 0084 e 0086: il percorso AI non scrive record clinici strutturati.
-// Le preview Fabric documentali sono proposal-only; i backend legacy senza
-// caller runtime sono ritirati. Le proiezioni e gli stati di review persistiti
-// restano dichiarati qui, con allowlist chiusa e contratti stale-sensitive.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,31 +11,16 @@ const ROOT = process.cwd();
 const DEFAULT_OUT = 'tmp-ai-clinical-write-gate-report.json';
 const SCHEMA_FILE = 'lib/schema.ts';
 
-// Il percorso AI, dichiarato per esteso. Il report stampa quanti file sono stati
-// analizzati: se un refactor sposta un servizio fuori da questi glob, il numero cala e
-// la riduzione di perimetro resta visibile invece di passare per un gate verde.
 const AI_PATH_GLOBS = [
     { dir: 'lib', prefix: 'ai-' },
     { dir: 'lib', prefix: 'network-ai-' },
     { dir: 'lib', prefix: 'patient-insight' },
     { dir: 'lib', prefix: 'patient-smart-import' },
     { dir: 'lib', prefix: 'treatment-reasoning' },
-    /* WUL-547. Queste due voci non filtrano per nome: dichiarano «questa directory È il
-       percorso AI». La discesa deve quindi essere ricorsiva. Non lo era, e i 13 moduli
-       non-test di `lib/ai-providers/fabric` restavano fuori: il gate stampava «75 file
-       sul percorso AI» su un insieme che è di 88. Oggi lì non ci sono scritture su tabelle
-       cliniche, solo `Set.add`, quindi nessun finding era sfuggito — ma un perimetro
-       dichiarato più grande di quello ispezionato è verde per il motivo sbagliato, ed è
-       la forma esatta di WUL-542.
-
-       Le voci con `prefix` restano piatte di proposito: il prefisso filtra il basename, e
-       ricorrere su tutto `lib/` (276 file in radice) tirerebbe dentro omonimi estranei. */
     { dir: 'lib/ai-providers', prefix: '', ricorsiva: true },
     { dir: 'lib/domain/documents', prefix: '', ricorsiva: true },
 ];
 
-// I soli campi di `patients` che il percorso AI può scrivere: proiezioni derivate e
-// rivedibili, non record clinici. Ogni voce cita l'ADR che la ammette.
 const DERIVED_PROJECTION_FIELDS = new Map([
     ['aiSummary', 'ADR 0086 §3 — proiezione derivata'],
     ['aiSummaryGeneratedAt', 'ADR 0086 §3 — metadato della proiezione'],
@@ -48,17 +28,13 @@ const DERIVED_PROJECTION_FIELDS = new Map([
     ['documentInsights', 'ADR 0084 — le diagnosi proposte restano qui'],
 ]);
 
-// Contabilità di riga, non contenuto clinico.
 const BOOKKEEPING_FIELDS = new Set(['version', 'updatedAt']);
 
-// Tabelle che contengono record clinici strutturati. Una scrittura su queste dal percorso
-// AI è vietata a prescindere dai campi.
 const CLINICAL_TABLES = new Set([
     'patients', 'therapies', 'entries', 'observations',
     'prostheticPrescriptions', 'documentDiagnosisProposals',
 ]);
 
-// Ogni scrittura del percorso AI, dichiarata. `policy` decide che cosa viene verificato.
 const AI_PATH_WRITE_CONTRACTS = [
     {
         module: 'lib/ai-providers/fabric/function-model-settings-write.ts',
@@ -68,7 +44,6 @@ const AI_PATH_WRITE_CONTRACTS = [
         reason: 'Persiste le impostazioni autorizzate dai controller HTTP esistenti e la generazione di revoca AI nella stessa transazione; nessuna scrittura clinica o ammissione provider.',
         reference: 'docs/adr/0076-paired-document-domain-write-policy.md',
     },
-    /* @Codex: named CAS owner, no patient or other clinical table. */
     {
         module: 'lib/ai-providers/fabric/function-model-preferences-production.ts',
         lane: 'function-preferences',
@@ -105,7 +80,6 @@ const AI_PATH_WRITE_CONTRACTS = [
     },
 ];
 
-// ADR 0086 §4: le write policy di Atena sono un insieme chiuso. `auto_apply` non esiste.
 const TREATMENT_REASONING_CONTRACT = 'lib/treatment-reasoning-contract.ts';
 const ALLOWED_WRITE_POLICIES = ['no_write', 'review_only', 'form_prefill_only'];
 const FORBIDDEN_WRITE_POLICY = 'auto_apply';
@@ -141,7 +115,6 @@ function aiPathFiles() {
             if (!name.endsWith('.ts') && !name.endsWith('.tsx')) continue;
             if (name.includes('.test.') || name.includes('.fixtures.')) continue;
             if (!name.startsWith(prefix)) continue;
-            /* Con `recursive` il file puo' stare in una sottodirectory: `parentPath` la porta. */
             const relativa = path.relative(absolute, path.join(voce.parentPath ?? absolute, name));
             files.push(path.posix.join(dir, relativa.split(path.sep).join('/')));
         }
@@ -157,9 +130,6 @@ function unwrap(expression) {
     return current;
 }
 
-// Le chiavi di un object literal, oppure `null` se la forma non è analizzabile
-// staticamente: spread e chiavi calcolate possono introdurre qualunque campo, quindi
-// valgono come fallimento e non come assenza di campi.
 function literalKeys(node) {
     if (!node || !ts.isObjectLiteralExpression(node)) return null;
     const keys = [];
@@ -176,9 +146,6 @@ function literalKeys(node) {
     return keys;
 }
 
-// Trova le scritture in un modulo, in due forme:
-//   - astrazione db:  db.<table>.update(id, {...})  ·  db.<table>.put({...})
-//   - drizzle:        tx.update(<table>).set({...}) ·  tx.insert(<table>).values(...)
 function findWrites(sourceFile, tableSymbols = schemaTableSymbols()) {
     const writes = [];
     const collectionMethods = new Set(['update', 'create', 'delete', 'put', 'add']);
@@ -192,7 +159,6 @@ function findWrites(sourceFile, tableSymbols = schemaTableSymbols()) {
                 const method = callee.name.text;
                 const receiver = unwrap(callee.expression);
 
-                // Astrazione db: db.<table>.<method>(...)
                 if (collectionMethods.has(method)
                     && ts.isPropertyAccessExpression(receiver)
                     && ts.isIdentifier(receiver.expression)
@@ -208,9 +174,6 @@ function findWrites(sourceFile, tableSymbols = schemaTableSymbols()) {
                     });
                 }
 
-                // Drizzle: (tx|db).update(<table>).set({...}) · .insert(<table>) · .delete(<table>)
-                // L'argomento deve essere un simbolo tabella dello schema, altrimenti
-                // `inflight.delete(patientId)` verrebbe letto come una cancellazione.
                 if (drizzleMethods.has(method)
                     && ts.isIdentifier(receiver)
                     && node.arguments.length === 1) {
@@ -232,7 +195,6 @@ function findWrites(sourceFile, tableSymbols = schemaTableSymbols()) {
     return writes;
 }
 
-// Da `tx.update(patients)` risale la catena fluente fino a `.set({...})`.
 function drizzleSetKeys(updateCall) {
     let current = updateCall;
     while (current.parent && ts.isPropertyAccessExpression(current.parent)
@@ -245,9 +207,6 @@ function drizzleSetKeys(updateCall) {
 }
 
 
-// I simboli tabella esportati da lib/schema.ts. Servono a distinguere una scrittura
-// drizzle (`tx.delete(patients)`) da un'omonimia innocua (`inflight.delete(patientId)`):
-// senza questo confronto un `Map.delete` risulta una cancellazione di tabella.
 function schemaTableSymbols() {
     return new Set([...read(SCHEMA_FILE).matchAll(/^export const ([a-zA-Z][a-zA-Z0-9_]*) = sqliteTable\(/gm)]
         .map((match) => match[1]));
@@ -260,8 +219,6 @@ function schemaPatientFields() {
     return new Set([...block[0].matchAll(/^\s{2,}([a-zA-Z][a-zA-Z0-9_]*):/gm)].map((match) => match[1]));
 }
 
-// 1 + 2. Ogni scrittura del percorso AI è dichiarata, e ogni contratto descrive una
-// scrittura che esiste ancora.
 function checkDeclaredWrites(findings, files, tableSymbols) {
     const declared = new Map(AI_PATH_WRITE_CONTRACTS.map((contract) => [contract.module, contract]));
     const observed = new Map();
@@ -298,7 +255,6 @@ function checkDeclaredWrites(findings, files, tableSymbols) {
     return observed;
 }
 
-// 3. Le proiezioni derivate scrivono solo i campi ammessi, e in forma analizzabile.
 function checkDerivedProjections(findings, observed) {
     for (const contract of AI_PATH_WRITE_CONTRACTS) {
         if (contract.policy !== 'derived-projection' && contract.policy !== 'bounded-settings') continue;
@@ -310,7 +266,6 @@ function checkDerivedProjections(findings, observed) {
                     { module: contract.module, lane: contract.lane, table: write.table, line: write.line });
                 continue;
             }
-            // @Codex: settings has only key/value; the named owner validates the five writable keys.
             if (contract.policy === 'bounded-settings') continue;
             if (write.keys === null) {
                 addFinding(findings, 'AI_WRITE_OPAQUE_PAYLOAD',
@@ -330,8 +285,6 @@ function checkDerivedProjections(findings, observed) {
     }
 }
 
-// 4. L'allowlist stessa non può essere allargata a un campo clinico. È il controllo che
-// impedisce di aggirare il gate aggiungendo `diagnoses` all'elenco dei campi ammessi.
 function checkAllowlistIntegrity(findings, patientFields) {
     for (const contract of AI_PATH_WRITE_CONTRACTS) {
         if (contract.policy !== 'derived-projection') continue;
@@ -358,7 +311,6 @@ function checkAllowlistIntegrity(findings, patientFields) {
     }
 }
 
-// 7. Le write policy di Atena restano un insieme chiuso, senza auto-applicazione.
 function checkWritePolicyClosedSet(findings) {
     if (!exists(TREATMENT_REASONING_CONTRACT)) {
         addFinding(findings, 'AI_WRITE_POLICY_CONTRACT_MISSING',
@@ -372,9 +324,6 @@ function checkWritePolicyClosedSet(findings) {
             `Write policy mancante dal contratto Atena: ${policy}`,
             { file: TREATMENT_REASONING_CONTRACT, policy });
     }
-    // Solo `auto_apply` come valore quotato conta come violazione. Il contratto lo nomina
-    // dentro il prompt che lo vieta ("...: mai auto_apply."), e un match su sottostringa
-    // segnalerebbe il divieto stesso.
     if (source.includes(`'${FORBIDDEN_WRITE_POLICY}'`) || source.includes(`"${FORBIDDEN_WRITE_POLICY}"`)) {
         addFinding(findings, 'AI_WRITE_POLICY_AUTO_APPLY',
             `Il contratto Atena ammette \`${FORBIDDEN_WRITE_POLICY}\` come valore: ADR 0086 §4 limita le policy a ${ALLOWED_WRITE_POLICIES.join(', ')}`,
@@ -435,8 +384,6 @@ function main() {
     process.exit(1);
 }
 
-// Il gate deve dimostrare di saper fallire: un controllo che non distingue una violazione
-// da un caso lecito passa in silenzio proprio quando serve.
 function selfTest() {
     const failures = [];
     const check = (label, condition) => { if (!condition) failures.push(label); };
@@ -444,7 +391,6 @@ function selfTest() {
     const tables = new Set(['patients', 'therapies', 'settings']);
     const writesOf = (source) => findWrites(parse('fixture.ts', source), tables);
 
-    // Forme di scrittura riconosciute.
     const dbUpdate = writesOf('await db.patients.update(id, { aiSummary: x, version: 1 });');
     check('db.<table>.update non riconosciuta',
         dbUpdate.length === 1 && dbUpdate[0].table === 'patients');
@@ -463,34 +409,26 @@ function selfTest() {
     const insert = writesOf('tx.insert(therapies).values(row).run();');
     check('drizzle insert non riconosciuta', insert.length === 1 && insert[0].table === 'therapies');
 
-    // Le letture non sono scritture.
     check('falso positivo su una select',
         writesOf('const rows = tx.select().from(patients).where(c).get();').length === 0);
     check('falso positivo su db.patients.get',
         writesOf('const patient = await db.patients.get(patientId);').length === 0);
 
-    // Regressione: `Map.delete` ha la stessa forma di `tx.delete(<table>)`. A distinguerli
-    // è solo il confronto con i simboli tabella dello schema. Senza, il gate segnalava
-    // tre scritture inesistenti in lib/ai-summary-service.ts.
     check('falso positivo su Map.delete',
         writesOf('inflight.delete(patientId); pendingRerun.delete(patientId);').length === 0);
     check('scrittura drizzle persa dopo il filtro sui simboli',
         writesOf('tx.delete(patients).where(c).run();').length === 1);
 
-    // Il divieto di `auto_apply` non deve segnalare sé stesso: il contratto Atena nomina
-    // la policy dentro la stringa che la vieta.
     const policyFindings = [];
     checkWritePolicyClosedSet(policyFindings);
     check('il divieto di auto_apply viene segnalato come violazione',
         !policyFindings.some((finding) => finding.code === 'AI_WRITE_POLICY_AUTO_APPLY'));
 
-    // Payload non analizzabili: devono risultare opachi, non vuoti.
     check('spread non rilevato come opaco',
         writesOf('await db.patients.update(id, { ...payload });')[0]?.keys === null);
     check('chiave calcolata non rilevata come opaca',
         writesOf('await db.patients.update(id, { [field]: value });')[0]?.keys === null);
 
-    // Il fail-closed dell'allowlist: `diagnoses` non è una proiezione derivata.
     check('`diagnoses` ammesso come proiezione derivata',
         !DERIVED_PROJECTION_FIELDS.has('diagnoses') && !BOOKKEEPING_FIELDS.has('diagnoses'));
     const widened = [];
@@ -507,7 +445,6 @@ function selfTest() {
         check(`${contract.module} rifiuta key/value`, settingsFindings.length === 0);
     }
 
-    // Ogni contratto porta motivo e riferimento leggibili.
     for (const contract of AI_PATH_WRITE_CONTRACTS) {
         check(`contratto ${contract.module} senza motivo o riferimento`,
             Boolean(contract.reason && contract.reference));

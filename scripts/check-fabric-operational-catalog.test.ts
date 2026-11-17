@@ -80,8 +80,6 @@ test('follows an imported guard wrapper invoked through an alias', () => {
     assert.ok(result.text.includes('lib/auth.ts: requireSession'));
 });
 test('keeps a route whose service is reached through a guard-named callback', () => {
-    // Come app/api/ai/patient-insight/preview: la callback ha un nome da controllo e la sua
-    // implementazione è l'unico ponte fra la route e il servizio.
     const sources = fixture();
     sources.set('lib/synthetic-preview.ts', `
         export function createSyntheticPreviewService(options) { return { acquire: () => options.createCapability() }; }

@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// Lume token contract checker (WUL-55, L1a). Dependency-free ESM.
-// Verifies WCAG 2.x relative-luminance contrast for the declared Lume
-// text/background pairs across the three registers giorno/grafite/guardia.
-// Pure functions are exported for tests; running the file measures the
-// committed docs/design/lume/tokens/lume.tokens.json and prints a report.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -15,7 +10,6 @@ export const DEFAULT_TOKENS_PATH = path.join(ROOT_DIR, 'docs/design/lume/tokens/
 export const DEFAULT_CSS_MIRROR_PATH = path.join(ROOT_DIR, 'app/lume-tokens.css');
 export const DEFAULT_GLOBAL_CSS_PATH = path.join(ROOT_DIR, 'app/globals.css');
 
-// fail-closed repository scan for literal colors outside Lume.
 const PALETTE_SOURCE_DIRS = ['app', 'components'];
 const PALETTE_SOURCE_EXTENSIONS = new Set(['.css', '.tsx']);
 const TAILWIND_PALETTE = '(?:blue|sky|indigo|violet|purple|emerald|green|lime|amber|yellow|orange|rose|pink|red|teal|cyan|fuchsia|slate|gray|zinc|neutral|stone)';
@@ -26,9 +20,6 @@ const TAILWIND_COLOR_UTILITY = new RegExp(
 const HEX_COLOR = /#[0-9a-fA-F]{3,8}\b/g;
 const FUNCTION_COLOR = /\b(?:rgba?|hsla?)\((?:[^()]*)\)/gi;
 
-// Ogni voce e un percorso con impronta e motivo: l'impronta include tutti i
-// letterali legacy e le loro ripetizioni. La baseline deve combaciare
-// esattamente: una voce che copre meno letterali di quelli dichiarati fallisce.
 export const PALETTE_ALLOWLIST = [
   {"path":"app/mockups/scheda/page.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":10,"fingerprint":"0b532d8493c010f98eba790c6cca032e0c871be43eccd5bb743d13b514892219"},
   {"path":"app/patients/[id]/edit/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":2,"fingerprint":"c465f2f78534069d2c5091795196bb3c49d4428b0c2aaa3a488617f7bc16d9a4"},
@@ -42,8 +33,6 @@ export const PALETTE_ALLOWLIST = [
   {"path":"components/ui/toast-provider.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":1,"fingerprint":"7d5a19cd0a4184d467eea48394d1bd77a823ec405266a9858031ba0dac8b3620"},
 ];
 
-// Classificazione dichiarata: queste superfici mostrano o compongono la
-// scheda paziente. Tutto il resto e non clinico finche non viene aggiunto qui.
 const CLINICAL_SURFACE_PREFIXES = [
   'app/patients/',
   'app/diary/',
@@ -266,15 +255,11 @@ const INK_ROLES = ['primary', 'muted', 'fresh', 'pencil', 'secondary'];
 const EXTRA_SURFACES = ['draft', 'selected', 'hover', 'threshold'];
 const RULE_ROLES = ['default', 'strong', 'draft'];
 export const SIGNALS = ['warning', 'critical', 'success', 'plum'];
-// Normal-size text must clear WCAG AA 4.5:1. accent.minerale is documented as
-// interactive text (links, minerale admin queue), so it uses the text threshold
-// on the work surfaces (field = penombra, focal = fuoco) where it carries text.
 export const TEXT_MIN_RATIO = 4.5;
 export const SIGNAL_TEXT_WEIGHT = 0.6;
 export const SIGNAL_TINT_WEIGHT = 0.1;
 const ACCENT_TEXT_SURFACES = ['field', 'focal'];
 
-// Parse "#rrggbb" (case-insensitive). Fails closed: throws on anything else.
 export function parseHexColor(value) {
   if (typeof value !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(value)) {
     throw new Error(`malformed color: ${JSON.stringify(value)}`);
@@ -288,13 +273,11 @@ function channelLuminance(c) {
   return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
 }
 
-// WCAG relative luminance of a "#rrggbb" color.
 export function relativeLuminance(hex) {
   const { r, g, b } = parseHexColor(hex);
   return 0.2126 * channelLuminance(r) + 0.7152 * channelLuminance(g) + 0.0722 * channelLuminance(b);
 }
 
-// WCAG contrast ratio between two colors, in [1, 21].
 export function contrastRatio(hexA, hexB) {
   const la = relativeLuminance(hexA);
   const lb = relativeLuminance(hexB);
@@ -314,8 +297,6 @@ export function mixHexColors(hexA, weightA, hexB) {
     .join('')}`;
 }
 
-// Resolve a dotted token path to its "#rrggbb" value. Fails closed: throws if
-// the path is missing or the leaf is not a DTCG color token.
 export function resolveColor(tokens, dottedPath) {
   let node = tokens;
   for (const key of dottedPath.split('.')) {
@@ -327,12 +308,10 @@ export function resolveColor(tokens, dottedPath) {
   if (!node || typeof node !== 'object' || !('$value' in node)) {
     throw new Error(`missing token value: ${dottedPath}`);
   }
-  parseHexColor(node.$value); // throws on malformed
+  parseHexColor(node.$value); 
   return node.$value;
 }
 
-// Deterministic ordered contract: primary + muted text on every surface, then
-// accent text on the work surfaces, for each register.
 export function buildContract() {
   const checks = [];
   for (const register of REGISTERS) {
@@ -377,8 +356,6 @@ export function buildContract() {
   return checks;
 }
 
-// Pure evaluation: given parsed tokens, measure every contract pair. Fails
-// closed by throwing (via resolveColor) on any missing/malformed required token.
 export function evaluateContract(tokens, contract = buildContract()) {
   for (const signal of SIGNALS) resolveColor(tokens, `signal.${signal}`);
   const checks = contract.map((c) => {
@@ -394,7 +371,6 @@ export function evaluateContract(tokens, contract = buildContract()) {
   return { checks, pass: checks.every((c) => c.pass) };
 }
 
-// Concise deterministic report grouped by register.
 export function formatReport(result) {
   const lines = ['Lume token contract: WCAG contrast (measured)'];
   for (const register of REGISTERS) {
@@ -421,7 +397,6 @@ export function loadGlobalStyles(cssPath = DEFAULT_GLOBAL_CSS_PATH) {
   return readFileSync(cssPath, 'utf8');
 }
 
-// Active aliases resolve at runtime to a register-scoped variable.
 export const ACTIVE_ALIASES = [
   { alias: '--lume-surface-canvas', suffix: 'surface-canvas' },
   { alias: '--lume-surface-field', suffix: 'surface-field' },
@@ -481,10 +456,6 @@ function cssWeight(weight) {
   return `${percent}%`;
 }
 
-// WUL-517: blocca le dichiarazioni sorgente per il sottoinsieme elencato.
-// evaluateContract misura testo e tinta; il bordo resta un peso sorgente
-// esplicito. Specificità, !important e override esterni non sono una prova della
-// cascade effettiva e restano contratti separati.
 export const GLOBAL_STYLE_RECIPES = [
   ...['graphite-chip-tone', 'mf-alert'].flatMap((family) =>
     ['success', 'warning', 'critical'].map((signal) => ({
@@ -629,7 +600,7 @@ export function verifyGlobalStyles(css) {
 
 function normalizeHex(value) {
   const trimmed = value.trim();
-  parseHexColor(trimmed); // fail closed on a malformed mirror value
+  parseHexColor(trimmed); 
   return trimmed.toLowerCase();
 }
 

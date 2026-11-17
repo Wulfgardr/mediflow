@@ -557,11 +557,6 @@ function runZeroKnowledgeChecks(runtimeFiles) {
             message: 'Setup flow must accept encrypted master key and salt',
         },
         {
-            // WUL zod boundary (STREAM G) moved setup validation from an imperative
-            // `if (!username || !password || !encryptedMasterKey || !salt)` guard to
-            // a zod schema parsed via parseApiBody. The zero-knowledge invariant is
-            // now enforced by authSetupSchema requiring encryptedMasterKey and salt;
-            // assert that mechanism is wired instead of the removed literal guard.
             file: 'app/api/auth/setup/route.ts',
             token: 'parseApiBody(authSetupSchema',
             message: 'Setup flow must validate the body through authSetupSchema (which requires encrypted master key and salt)',

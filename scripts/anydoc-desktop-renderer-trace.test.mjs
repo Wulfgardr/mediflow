@@ -1,4 +1,3 @@
-/* configuration tests, not proof of a built Windows/Linux bundle. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { anyDocDesktopRendererTrace } from './anydoc-desktop-renderer-trace.mjs';

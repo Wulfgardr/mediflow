@@ -1,4 +1,3 @@
-/* post-fix provenance rules only; every URL below is inert test data. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
