@@ -1,4 +1,3 @@
-/* Punto d’inchiostro: table, keyboard selection and compact navigation. */
 import { expect, test, type Page } from '@playwright/test';
 import { assertNoHorizontalOverflow, assertNotClippedInViewport, bootstrapUnlockedSession,
   openPatientSection, REFLOW_PROXY_VIEWPORTS } from './utils';

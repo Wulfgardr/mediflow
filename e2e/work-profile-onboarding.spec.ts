@@ -34,7 +34,6 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     const panel = page.getByTestId('work-profile-onboarding');
     await expect(panel.getByRole('heading', { name: 'Il tuo modo di lavorare' })).toBeVisible();
     await expect(panel).toHaveAttribute('aria-busy', 'false');
-    // Run this spec on a dedicated fresh synthetic DB, never reset a shared node.
     expect((await read()).active).toBeNull();
     if ((await read()).draft) {
         await panel.getByRole('button', { name: 'Scarta la bozza' }).click();
@@ -76,10 +75,8 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await page.goto('/settings/profilo');
     await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Entrambi');
-    // Independent cookie/control owners use ordinary login; no session material is copied.
     const sibling = await browser.newPage();
     await sibling.goto(new URL('/settings/profilo', page.url()).href);
-    // Let the existing auth bootstrap/lock fence settle before the login gesture.
     await sibling.waitForLoadState('networkidle');
     await unlockIfNeeded(sibling, process.env.E2E_PIN || '1234');
     await sibling.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
@@ -110,8 +107,6 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await panel.getByRole('button', { name: 'Cambia profilo di lavoro' }).click();
     await panel.getByRole('button', { name: 'Scegli manualmente' }).click();
     await expect(panel.getByText(/Percorso manuale:/)).toBeVisible();
-    // failure before persistence must discard the optimistic radio on reread,
-    // even when the server revision did not advance.
     const beforeFailedSave = await read();
     expectedLostResponse = true;
     await page.route(`**${endpoint}`, async (route) => {
@@ -159,8 +154,6 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Agent');
     await page.screenshot({ path: test.info().outputPath('saved-profile.png'), fullPage: true });
     expect(pageErrors).toEqual([]);
-    // Existing dev auth startup can issue overlapping lock requests. Keep this
-    // exact diagnostic visible; it is not a work-profile persistence failure.
     await test.info().attach('console-diagnostics.json', { body: JSON.stringify(consoleErrors, null, 2), contentType: 'application/json' });
     expect(consoleErrors.filter(({ text, url }) => !(url.endsWith('/api/auth/lock') && text.includes('409 (Conflict)')))).toEqual([]);
     expect(remoteRequests).toEqual([]);

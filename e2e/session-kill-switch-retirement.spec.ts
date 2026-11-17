@@ -32,7 +32,6 @@ async function installGate(page: Page, consumer: string, selectedRead: number) {
       state.signal = init?.signal ?? undefined;
       state.captured = true;
       await dispatchGate;
-      // Transport deliberately ignores cancellation so the real facade must retire its continuation too.
       const response = await original(input, { ...init, signal: undefined });
       state.status = response.status;
       state.denied = true;

@@ -11,7 +11,6 @@ import {
 import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 const MODEL = 'synthetic-patient-insight:latest';
-// WUL-826: same literal as PATIENT_INSIGHT_REVIEW_NOTICE, written out so the check does not depend on the constant.
 const REVIEW_NOTICE = 'Controlla ogni frase sulla fonte che cita: il modello può scambiare ciò che è fatto con ciò che è da fare.';
 const REVIEW_REF = `review_${'b'.repeat(32)}`;
 const MODEL_OPTION_ID = `model_option_${'a'.repeat(32)}`;
@@ -93,7 +92,6 @@ function availablePreview(request: PatientInsightPreviewRequest) {
         provider: 'ollama',
         model: MODEL,
         preprocessing: ['context_minimization', 'envelope_validation'],
-        // the first local attempt was discarded: recorded in the provenance, never on screen.
         attempts: 2,
       },
       reviewRef: REVIEW_REF,
@@ -146,12 +144,9 @@ test('Quadro paziente invia un payload strict e mostra una proposta review-only'
   expect(previewCalls).toBe(0);
   await insightDisclosure.locator(':scope > div > [data-disclosure-control]').click();
   await expect(insightDisclosure.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'true');
-  // this spec already owns a synthetic preview transport; make its local
-  // catalog prerequisite explicit without claiming a real provider invocation.
   await page.getByTestId('model-picker-patient_insight').getByRole('button', { name: 'Cambia', exact: true }).click();
   const modelPicker = page.getByRole('combobox', { name: 'Modello per questa proposta' });
   await expect(modelPicker).toBeEnabled();
-  // the picker reads its catalog on first focus, matching ordinary UI use.
   await modelPicker.focus();
   await expect(modelPicker.locator('option')).toHaveText([
     `Predefinito · ${MODEL}`,
@@ -175,7 +170,6 @@ test('Quadro paziente invia un payload strict e mostra una proposta review-only'
   await expect(proposal).toContainText(`ollama · ${MODEL} · Processo locale · Nessuna uscita dati`);
   await expect(proposal).toContainText('Riduzione del contesto → Verifica del formato');
   await expect(proposal).toContainText('Selezione 7 · revisione 1');
-  // WUL-826: one line above the sentences asks to check each of them against its source.
   await expect(proposal.getByTestId('patient-insight-review-notice')).toHaveText(REVIEW_NOTICE);
   const proposalText = await proposal.innerText();
   expect(proposalText.split(REVIEW_NOTICE)).toHaveLength(2);

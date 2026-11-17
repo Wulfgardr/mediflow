@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
-/* ordinary UI smoke observes every console error and uncaught page error. */
 type ObservedConsoleError = Readonly<{ text: string; url: string }>;
 const errorsByPage = new WeakMap<Page, ObservedConsoleError[]>();
 const authLockReceiptsByPage = new WeakMap<Page, Array<Promise<{
@@ -28,14 +27,12 @@ test.beforeEach(async ({ page }) => {
   });
   page.on('response', response => {
     if (new URL(response.url()).pathname !== '/api/auth/lock') return;
-    // retain only the control-fence facts needed to prove the one
-    // permitted stale-fence retry; no credential or response payload is kept.
     authLockReceipts.push(response.text().then((text) => {
       let state: string | null = null;
       try {
         const payload = JSON.parse(text) as { state?: unknown };
         state = typeof payload.state === 'string' ? payload.state : null;
-      } catch { /* An unparsable receipt remains unreconciled and therefore fails. */ }
+      } catch {  }
       return {
         status: response.status(),
         state,
@@ -82,8 +79,6 @@ test.afterEach(async ({ page }, testInfo) => {
   }).length;
   const authLockConflicts = authLockReceipts.filter(receipt => receipt.status === 409).length;
   const errors = errorsByPage.get(page) ?? [];
-  // Chromium reports a handled fetch 409 as a console error. Admit it
-  // only after the immediately chained, ETag-matched lock retry is confirmed.
   const pageOrigin = new URL(page.url()).origin;
   const isReconciledAuthLockConsole = (error: ObservedConsoleError) => {
     if (error.text !== AUTH_LOCK_CONFLICT_CONSOLE) return false;
@@ -103,7 +98,6 @@ test.afterEach(async ({ page }, testInfo) => {
 test('web smoke: unlock/setup + patients filters + settings navigation', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
 
-  // WUL-55: the locked surface stays terse while retaining an accessible field name.
   await page.goto('/');
   const lockScreen = page.getByLabel('MediFlow lock screen');
   await expect(lockScreen).toBeVisible();
@@ -117,13 +111,11 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
     .getByRole('link', { name: 'Pazienti', exact: true }).click();
 
-  // Search is now a persistent field in the patient list, without a toolbar trigger.
   const patientsSearch = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' });
   await expect(patientsSearch).toBeVisible({ timeout: 20_000 });
   await patientsSearch.focus();
   await expect(patientsSearch).toBeFocused();
 
-  // Scope chips ("Attivi" / "Archivio") replaced the old view-mode toggles.
   await page.getByRole('button', { name: 'Archivio' }).click();
   await expect(page.getByRole('button', { name: 'Archivio' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Attivi' }).click();
@@ -131,7 +123,6 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await patientsSearch.fill('smoke');
   await patientsSearch.fill('');
 
-  // Real patient edit/readback fills the gap left by the mocked snapshot spec.
   const patient = await page.evaluate(async () => {
     const marker = crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase();
     const taxCode = `C17${marker}X`;
@@ -171,7 +162,6 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   expect(stored.status()).toBe(200);
   expect(await stored.json()).toMatchObject({ firstName: 'Modificato', taxCode: patient.taxCode, version: 2 });
 
-  // ADR 0123: the ordinary settings link owns the canonical /settings route.
   const settingsNav = page.getByRole('link', { name: 'Impostazioni', exact: true });
   await expect(settingsNav).toBeVisible();
   await expect(settingsNav).toHaveAttribute('href', '/settings');
@@ -182,7 +172,6 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await expect(page.getByRole('heading', { name: 'Impostazioni', level: 1, exact: true })).toBeVisible();
   await expect(page.getByTestId('settings-overview-section')).toBeVisible();
 
-  // WUL-297: the detailed appearance controls still live on the /settings/aspetto route.
   await page.locator('a[href="/settings/aspetto"]:visible').click();
   await expect(page).toHaveURL(/\/settings\/aspetto$/);
   await expect(page.getByTestId('settings-nav-sidebar')).toBeVisible();
@@ -190,7 +179,6 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await expect(page.getByTestId('ui-style-runtime-notice')).toBeVisible();
   await expect(page.getByTestId('ui-accessibility-controls')).toBeVisible();
 
-  // ADR 0123: the persistent primary navigation owns the return to patients.
   const returnToPatients = page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
     .getByRole('link', { name: 'Pazienti', exact: true });
   await expect(returnToPatients).toHaveAttribute('href', '/?area=incarico');
@@ -223,8 +211,6 @@ test('web smoke: Rivedi agenda focuses its controlled heading without leaving tu
   await expect(page).toHaveURL(/[?&]area=turno(?:&|$)/);
 });
 
-/* ADR 0123: exercise the declared live destinations with API-created
-   identities; the standalone review's AI queue and hidden lens are not product controls. */
 test('web smoke: live decision CTAs always open their declared patient context', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
@@ -242,7 +228,6 @@ test('web smoke: live decision CTAs always open their declared patient context',
   };
   const quadroPatient = await createPatient('Quadro', []);
   const documentsPatient = await createPatient('Documenti', ['031']);
-  // Put the fixture within the ordinary 50-row diary window without changing any clock.
   const latest = await page.request.get('/api/entries?limit=1&orderBy=date&orderDir=desc');
   expect(latest.status()).toBe(200);
   const rows = await latest.json() as Array<{ date: string }>;
@@ -292,7 +277,6 @@ test('web smoke: live decision CTAs always open their declared patient context',
   const exemptions = page.locator('#amministrazione').getByRole('list', { name: 'Esenzioni registrate' });
   await expect(exemptions).toContainText('031');
 
-  // The diary row selects its own patient even though the previous record was different.
   await navigation.getByRole('link', { name: 'Diario', exact: true }).click();
   const diaryEntry = page.getByTestId('lume-diario-entry').filter({ has: page.getByRole('heading', { name: entryTitle, exact: true }) });
   await expect(diaryEntry).toContainText(quadroPatient.name);
@@ -307,7 +291,6 @@ test('web smoke: live decision CTAs always open their declared patient context',
   await expect(page.getByTestId('lume-scheda-header')).toContainText(quadroPatient.taxCode);
   await expect(page.getByRole('region', { name: 'Riepilogo clinico', exact: true })).toContainText('Contesto sintetico Quadro.');
 
-  // Retire only records created here through the versioned, supported endpoints.
   const removedEntry = await page.request.delete(`/api/entries/${entry.id}`, { headers: archiveHeaders, data: { version: entry.version } });
   expect(removedEntry.status()).toBe(200);
   for (const resource of [`/api/patients/${documentsPatient.id}`, `/api/patients/${quadroPatient.id}`]) {

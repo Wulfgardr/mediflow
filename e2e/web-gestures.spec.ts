@@ -5,8 +5,6 @@ import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { installGestureMeter, type GestureReading } from './fixtures/gesture-meter';
 import { assertGestureRatchet, measuredRevision, type GestureCounts } from './fixtures/gesture-ratchet';
 
-// Il server di sviluppo compila pagine e API alla prima richiesta: su una
-// macchina lenta le attese ordinarie non bastano. I conti non dipendono dal tempo.
 const expect = baseExpect.configure({ timeout: 30_000 });
 test.use({ actionTimeout: 30_000, screenshot: 'off', video: 'off', trace: 'off' });
 
@@ -15,7 +13,6 @@ type Measurement = GestureCounts & { id: string; modo: Mode; rispostaPeggioreMs:
 type Baseline = { measurements: Measurement[] };
 const baselinePath = path.resolve(__dirname, '../docs/design/misura-base/conti.json');
 
-// Routes and sections own the initial focus. Only real Tab presses move it.
 async function reach(page: Page, locator: Locator) {
   await expect(locator).toBeVisible();
   await page.waitForLoadState('networkidle');
@@ -186,8 +183,6 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
         await expect(page.getByRole('status').filter({ hasText: '1 allegato salvato' })).toBeVisible();
         await expect(area.getByRole('heading', { name: `documento-sintetico-${mode}.txt`, exact: true })).toBeVisible();
       });
-      // Verification after the measured interval: a new real route read must
-      // retain the writes. These checks cannot supply missing product actions.
       await page.reload();
       const sections = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
       await sections.getByRole('link', { name: /Documenti/ }).click();
