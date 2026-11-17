@@ -69,3 +69,13 @@ La suite `lib/scheduled-backup-runtime-contract.test.ts` passa con 45 casi,
 inclusi payload alterati, dipendenze mancanti, symlink e import senza accesso
 in scrittura o a SQLite. Il difetto osservato è conservato nella CI del
 primo head A6, `c43d028917df9899d13b51c505b0d6c5cd05a947`.
+
+## Raccordo dei controlli di compatibilità
+
+La CI del rebase ha rilevato tre descrizioni del vecchio audit: elenco
+ammesso delle colonne aggiunte all'archivio 0.9.0, matrice dei dati a riposo
+e fixture SQL delle credenziali. Ora dichiarano le tre colonne nullable
+introdotte dalla 12. Il controllo dello storico continua a confrontare
+ogni campo preesistente e verifica che la provenienza resti null per gli
+eventi storici. Le regressioni di archivio, matrice, credenziali e
+membership passano con 44 test, senza cambi ai writer o al modello terapia.

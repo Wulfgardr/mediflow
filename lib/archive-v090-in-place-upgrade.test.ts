@@ -53,6 +53,7 @@ const NEW_TABLES: Record<string, number> = { ambulatory_destructive_commands: 0,
     prosthetics_catalog_sources: 1, portable_import_origins: 1 };
 const NEW_COLUMNS: Record<string, string[]> = {
     patients: ['identifier_type', 'birth_date_precision', 'birth_year', 'identifier_history', 'allergies'],
+    audit_events: ['proposer_ref', 'mandate_ref', 'model_provider'],
     entries: ['recorded_by'], prosthetic_prescriptions: ['catalog_snapshot'], prosthetics_catalog_entries: ['source_id'],
 };
 const NEW_SETTINGS = ['territorial.packs', 'territorial.packs.initialization'];
@@ -135,6 +136,7 @@ test('archive-v090: in-place upgrade keeps a verified schema 3 original equal to
             const columns = Object.keys(after[name][0] ?? sourceRows[0] ?? {});
             const added = columns.filter(column => sourceRows[0] && !(column in sourceRows[0]));
             assert.deepEqual(added, NEW_COLUMNS[name] ?? [], `${name}: added columns`);
+            if (name === 'audit_events') for (const row of after[name]) for (const column of NEW_COLUMNS.audit_events!) assert.equal(row[column], null);
             const kept = after[name].filter(row => name === 'settings' ? !NEW_SETTINGS.includes(row.key as string)
                 : name === 'audit_events' ? !NEW_AUDIT_EVENTS.includes(row.event_type as string) : true);
             assert.equal(after[name].length - kept.length, name === 'settings' ? NEW_SETTINGS.length : name === 'audit_events' ? NEW_AUDIT_EVENTS.length : 0, `${name}: added rows`);
