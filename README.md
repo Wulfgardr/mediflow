@@ -27,7 +27,7 @@ MediFlow è una cartella clinica gratuita e a codice aperto per l'ambulatorio e 
 
 ### Perché esiste MediFlow
 
-[DA SCRIVERE O CONFERMARE: Leonardo] Proposta: MediFlow è pensato per il lavoro del medico in ambulatorio e nella medicina territoriale, anche in Casa di Comunità e a domicilio.
+Nasce dal mio lavoro di medico di distretto. Inizialmente per me. Poi, se viene bene, per chiunque voglia uno strumento per gestire la propria attività clinica.
 
 ## Cosa non fa
 
