@@ -3,9 +3,11 @@ import type Database from 'better-sqlite3';
 import type { AgentPrincipal } from './agent-pairing-store';
 import type { AgentOperation } from './agent-mandate-contract';
 import { createAgentMandateStore } from './agent-mandate-store';
-import { AGENT_CASSETTE_COMPLETE, AGENT_ITEM_OPERATION, cassetteItems, validAgentCassetteItem, type AgentCassette,
-    type AgentCassetteIndexEntry, type AgentCassetteIndexPage } from './agent-cassette-contract';
+import { AGENT_ITEM_OPERATION, cassetteItems, validAgentCassetteItem, type AgentCassette } from './agent-cassette-contract';
 import { isAgentId, validAgentEnvelope } from './agent-cassette-crypto';
+import type { AgentCassetteIndexEntry, AgentCassetteIndexPage } from './agent-visit-application-contract';
+
+export const AGENT_CASSETTE_COMPLETE = 'cassette_complete';
 
 export class AgentCassetteDenied extends Error {
     constructor(readonly status: 400 | 403 | 404 | 409) { super('AGENT_CASSETTE_DENIED'); }

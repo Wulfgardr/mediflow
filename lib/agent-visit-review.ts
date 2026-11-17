@@ -1,10 +1,11 @@
 'use client';
 
 import { db, type Patient } from './db';
-import { cassetteItems, type AgentCassetteIndexEntry, type IncomingAgentCassette } from './agent-cassette-contract';
+import { cassetteItems } from './agent-cassette-contract';
 import { agentBytes } from './agent-cassette-crypto';
 import { openAgentVisit, type OpenedAgentVisit } from './agent-cassette-client';
-import { agentApplicationSchema, automaticAgentKind, type AgentApplicationInput } from './agent-visit-application-contract';
+import { agentApplicationSchema, automaticAgentKind, type AgentApplicationInput, type AgentCassetteIndexEntry,
+    type IncomingAgentCassette } from './agent-visit-application-contract';
 import { collectDossierTaxCodes, evaluateDossierGroupIdentity, dossierFactBlockers } from './domain/documents/dossier-import';
 import { verifyPreparedFields, preparedTokens } from './domain/documents/dossier-prepared';
 import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';

@@ -1,6 +1,6 @@
 import 'server-only';
 import type { ServerSession } from './server-session';
-import type { AgentCassetteIndexPage, IncomingAgentCassette } from '../agent-cassette-contract';
+import type { AgentCassetteIndexPage, IncomingAgentCassette } from '../agent-visit-application-contract';
 import { isAgentId } from '../agent-cassette-crypto';
 import { hasAttestedLoopbackIngress } from './loopback-ingress.mjs';
 
