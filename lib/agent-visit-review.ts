@@ -120,10 +120,16 @@ export async function prepareAgentApplication(review: AgentVisitReview, phase: '
         const provenance = { visitId: review.visit.cassette.id, source: item.value.source, quote: item.value.quote };
         const base = { id: item.id, kind: item.kind };
         switch (item.kind) {
-            case 'note': case 'transcription':
+            case 'note': case 'transcription': {
                 if (!text(item.value.text)) throw new Error('Nota vuota.');
-                prepared.push({ ...base, values: { title: await db.sealLocalDraft(item.kind === 'note' ? 'Visita' : 'Trascrizione della visita'),
-                    content: await db.sealLocalDraft(item.value.text), metadata: await db.sealLocalDraft(provenance), date: text(item.value.date) || new Date(review.visit.cassette.depositedAt).toISOString() } }); break;
+                const title = item.kind === 'note' ? 'Visita' : 'Trascrizione della visita';
+                const metadata = { sourceLabel: 'Cassetta della visita', provenance };
+                prepared.push({ ...base, values: {
+                    title: await db.sealLocalDraft(title), content: await db.sealLocalDraft(item.value.text),
+                    metadata: await db.sealLocalDraft(metadata), date: text(item.value.date) || new Date(review.visit.cassette.depositedAt).toISOString(),
+                } });
+                break;
+            }
             case 'pdf': {
                 const bytes = agentBytes(text(item.value.base64));
                 try {
