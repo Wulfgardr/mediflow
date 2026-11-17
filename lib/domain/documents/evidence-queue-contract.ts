@@ -1,3 +1,4 @@
+import { firstSuspensionOffset, hasNegation, hasSuspension, negationCues } from './clinical-context-lexicon';
 import {
     parseDocumentParseEvidenceArtifactSnapshot,
     type DocumentParseEvidenceArtifact,
@@ -253,6 +254,8 @@ function entryTypeLabel(input: EvidenceQueueDiaryInput): string {
     return type || 'diario';
 }
 
+const RESOLVED = /\b(risolt[aoie]|terminat[aoie]|resolved)\b/u;
+
 function diaryTemporalTags(
     input: EvidenceQueueDiaryInput,
     content: string,
@@ -271,7 +274,7 @@ function diaryTemporalTags(
         tags.add(ageDays > DIARY_HISTORICAL_DAYS ? 'historical' : 'recent');
     }
 
-    if (/\b(sospes[aoie]|sospende|interrott[aoie]|risolt[aoie]|terminat[aoie]|resolved|stopped|discontinued)\b/u.test(haystack)) {
+    if (hasSuspension(haystack) || RESOLVED.test(haystack)) {
         tags.add('suspended_or_resolved');
     }
     if (/\b(follow[- ]?up|controllo|rivalutazione|richiamo|review|recheck)\b/u.test(haystack)) {
@@ -280,7 +283,7 @@ function diaryTemporalTags(
     if (/\b(piano|programma|programmato|indicazione|si propone|planned|plan)\b/u.test(haystack)) {
         tags.add('plan');
     }
-    if (/\b(nega|negata|negato|non riferisce|assenza di|senza|no evidence|denies)\b/u.test(haystack)) {
+    if (hasNegation(haystack)) {
         tags.add('negation');
     }
 
@@ -317,10 +320,8 @@ function diaryEvidenceClaims(
     const lower = content.toLowerCase();
 
     const tagNeedles: Array<[EvidenceQueueDiaryTemporalTag, RegExp]> = [
-        ['suspended_or_resolved', /\b(sospes[aoie]|sospende|interrott[aoie]|risolt[aoie]|terminat[aoie]|resolved|stopped|discontinued)\b/u],
         ['follow_up', /\b(follow[- ]?up|controllo|rivalutazione|richiamo|review|recheck)\b/u],
         ['plan', /\b(piano|programma|programmato|indicazione|si propone|planned|plan)\b/u],
-        ['negation', /\b(nega|negata|negato|non riferisce|assenza di|senza|no evidence|denies)\b/u],
     ];
 
     for (const [tag, regex] of tagNeedles) {
@@ -328,6 +329,13 @@ function diaryEvidenceClaims(
         const match = regex.exec(lower);
         if (match?.index !== undefined) anchors.push({ tag, index: match.index });
     }
+
+    const suspension = firstSuspensionOffset(content);
+    const resolved = RESOLVED.exec(lower)?.index ?? -1;
+    const suspendedOrResolved = Math.min(...[suspension, resolved].filter((index) => index >= 0));
+    if (Number.isFinite(suspendedOrResolved)) anchors.unshift({ tag: 'suspended_or_resolved', index: suspendedOrResolved });
+    const negation = negationCues(content).next().value;
+    if (negation) anchors.push({ tag: 'negation', index: negation.index });
 
     if (anchors.length === 0) anchors.push({ tag: tags.includes('historical') ? 'historical' : 'recent', index: 0 });
 

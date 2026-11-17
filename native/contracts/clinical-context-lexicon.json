@@ -1,0 +1,34 @@
+{
+  "negation": [
+    "non", "no", "negativ*", "nega", "neghi", "negano", "neghiamo", "negate", "neghino", "negai", "negò",
+    "negat*", "negav*", "negar*", "negand*", "assenza", "assenza di", "assenze", "assente", "assenti", "nessun*",
+    "senza", "senza evidenza di", "esclud*", "esclus*", "non evidenza", "non si rileva", "non riferisce",
+    "no evidence", "denies", "non confermat*", "non assunt*", "non eseguit*", "non somministrat*",
+    "non valutabil*", "non in terapia", "non lo assume", "non la assume", "non assume",
+    "non prende", "nega di assumere", "non più assunt*"
+  ],
+  "suspension": [
+    "stop*", "discontinued", "sospes*", "sospension*", "sospend*", "interrott*",
+    "interromp*", "interruzion*", "interruppe", "interruppi", "interruppero"
+  ],
+  "family": [
+    "padre*", "madre*", "patrign*", "matrign*", "patern*", "matern*", "figli*", "fratell*", "sorell*",
+    "nonn*", "bisnonn*", "trisnonn*",
+    "zio", "zia", "zii", "zie", "ziett*", "prozio", "prozia", "prozii", "prozie",
+    "familiar*", "genitor*", "mamma*", "mamme", "mammin*", "papà", "papin*", "coniug*", "convivent*",
+    "moglie", "mogli", "marito", "mariti", "consorte", "consorti", "nipot*",
+    "cugin*", "suocer*", "cognat*"
+  ],
+  "suspensionHeadings": [
+    "Terapie sospese", "Terapia sospesa", "Farmaci sospesi", "Terapie interrotte", "Farmaci interrotti"
+  ],
+  "exemptionRevocation": ["revocat*", "revoca", "revoche"],
+  "familyHeadings": ["Anamnesi familiare"],
+  "qualitativeResults": ["non reattivo", "non reattiva", "negativo", "negativa", "assente"],
+  "legacyPreparedNegation": ["non", "nega", "negano", "negato", "negata", "assenza", "assente", "esclusa", "escluso", "escluse", "esclusi", "no", "senza"],
+  "legacyPreparedFamily": "^(?:padre|madre|fratell|sorell|figli|nonn|zi[oaie]$|familiar|genitor|mamma|papa$|coniug|moglie$|marito$|consorte$|nipot|cugin|suocer|cognat)",
+  "legacySectionFamily": "padre|madre|fratell[oi]|sorell[ae]|figli[oa]?|nonn[oaie]|zi[oa]|familiar[ei]|genitor[ei]",
+  "legacySectionNegation": "non|nega|negano|negativ[oaie]|assenza\\s+di|assente|esclus[oaie]|escludere|no",
+  "legacyIcdDescriptionStop": "nega|non|esclus",
+  "abbreviations": ["ca", "dec", "diab", "mell", "npl", "cp", "cpr", "dr", "dott", "sig", "sigg", "vs", "es"]
+}
