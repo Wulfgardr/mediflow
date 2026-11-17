@@ -96,7 +96,7 @@ l'import e dell'ammissione di qualsiasi database vuoto.
 | Storia e dichiarazioni ORM | `drizzle/*.sql` resta immutato e non viene replayato dal runtime; `lib/schema.ts` descrive l'ORM e viene confrontato con il bootstrap reale. |
 | Riparazione e swap | Il protocollo esistente riconcilia i propri artefatti prima dell'apertura; il reopen usa la stessa ammissione versionata. Il lifecycle della sostituzione appartiene a C15 e ADR0142. |
 
-La versione SQLite corrente è `user_version=14` (vedi [Versioni dello schema](#versioni-dello-schema)). La prima installazione ammette
+La versione SQLite corrente è `user_version=15` (vedi [Versioni dello schema](#versioni-dello-schema)). La prima installazione ammette
 un file creato esclusivamente dal processo in una directory senza residui di
 un database precedente (sidecar, originali conservati, artefatti di swap),
 oppure la prenotazione nativa riconoscibile. Un file preesistente di zero byte o un
@@ -144,6 +144,7 @@ lock persistente o schema non riconosciuto impediscono l'apertura operativa.
 | 12 | 17 novembre 2026 | Audit del canale agenti: proponente, mandato e fornitore distinti dall'autore, con originale v11 verificato e recuperabile. [ADR 0190](0190-mandato-agenti-e-cassetta-della-visita.md). |
 | 13 | 17 novembre 2026 | Mandati agenti a tempo e chiavi avvolte, con originale v12 verificato e recuperabile. ADR 0190. |
 | 14 | 17 novembre 2026 | Abbinamenti e credenziali agenti limitate al mandato, con originale v13 verificato e recuperabile. ADR 0190. |
+| 15 | 17 novembre 2026 | Cassette cifrate degli agenti con chiave avvolta conservata nel backup, originale v14 verificato e recuperabile. ADR 0190. |
 
 Poiché la versione corrente è validata senza DDL, **ogni modifica allo schema
 canonico richiede un numero nuovo**: altrimenti gli archivi già marcati con il

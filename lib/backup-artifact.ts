@@ -1,3 +1,4 @@
+import { assertAgentCassetteBackup } from './agent-cassette-contract.ts';
 import { validateAmbulatoryCommandRows } from './ambulatory-destructive-command-backup.ts';
 import { validateTherapyStatusCommandRows } from './therapy-status-command-backup.ts';
 import { types } from 'node:util';
@@ -10,6 +11,7 @@ export const BACKUP_ARTIFACT_VERSION = 1 as const;
 export const BACKUP_ARTIFACT_SCOPE = 'mediflow-web-local-backup' as const;
 
 export const BACKUP_COLLECTIONS = [
+    'agentCassettes',
     'ambulatories',
     'attachments',
     'conversations',
@@ -40,7 +42,7 @@ export const BACKUP_COLLECTIONS = [
 
 export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
-type AdditiveBackupCollection = 'ambulatoryDestructiveCommands' | 'therapyStatusCommands' | 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts';
+type AdditiveBackupCollection = 'agentCassettes' | 'ambulatoryDestructiveCommands' | 'therapyStatusCommands' | 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts';
 export type BackupDataset = Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, BackupRecord[]>
     & Partial<Record<AdditiveBackupCollection, BackupRecord[]>>;
 
@@ -54,6 +56,7 @@ const RETIRED_BACKUP_COLLECTIONS: ReadonlySet<string> = new Set([
 /* Every v1 generation is the current set minus any of these groups: each group
  * arrived in one release, so an artifact has a group whole or not at all. */
 const OPTIONAL_COLLECTION_GROUPS: readonly (readonly BackupCollectionName[])[] = [
+    ['agentCassettes'],
     ['ambulatoryDestructiveCommands'],
     ['auditEvents'],
     ['documentDiagnosisProposals'],
@@ -101,8 +104,8 @@ export interface BackupArtifactManifest {
     checksumAlgorithm: 'sha256';
     checksum: string;
     collections: readonly BackupCollectionName[];
-    recordCounts: Record<Exclude<BackupCollectionName, 'auditEvents' | 'therapyStatusCommands' | 'ambulatoryDestructiveCommands'>, number>
-        & Partial<Record<'auditEvents' | 'therapyStatusCommands' | 'ambulatoryDestructiveCommands', number>>;
+    recordCounts: Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, number>
+        & Partial<Record<AdditiveBackupCollection, number>>;
 }
 
 export interface BackupArtifact {
@@ -409,6 +412,8 @@ async function assertCollectionReferences(
     catch { throw new BackupArtifactError('invalid-manifest', 'Therapy status command ledger or audit is invalid.'); }
     try { validateAmbulatoryCommandRows(payload.ambulatoryDestructiveCommands ?? [], payload.auditEvents ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Ambulatory command ledger or audit is invalid.'); }
+    try { assertAgentCassetteBackup(payload.agentCassettes ?? []); }
+    catch { throw new BackupArtifactError('invalid-manifest', 'Encrypted agent cassettes are invalid.'); }
     assertPhysicianReviewAttestationRows(payload);
     if (backupAuditCoverage(payload) === 'included') {
         try { canonicalizeBackupAuditRows(payload.auditEvents); }
