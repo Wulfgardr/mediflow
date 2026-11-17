@@ -28,6 +28,7 @@ import {
     setWebAuthControlEtag,
     type WebAuthControlMutation,
 } from './web-auth-control-transport';
+import { mintResourcePort, registerPrivateResource, releaseResourcePort } from './web-auth-lifecycle-owner-adapter';
 
 const ObjectPrototype = Object.prototype;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
@@ -43,9 +44,8 @@ type ExactRecord = Readonly<Record<string, unknown>>;
 
 export type WebAuthApplicationLockSources = Readonly<{
     resolve(sessionId: unknown, controlId: unknown): unknown;
-    retire(projection: unknown, reason: 'lock', mutation: WebAuthControlMutation): unknown;
+    retire(projection: ServerSession | null, reason: 'lock', mutation: WebAuthControlMutation, request: Request): unknown;
     audit(session: ServerSession, sessionId: string, request: Request): unknown;
-    revokeMandates?(session: ServerSession, request: Request): void;
 }>;
 
 const confirmedReceipt: ApplicationLockReceipt = Object.freeze({
@@ -113,13 +113,23 @@ function exactRetirementReceipt(value: unknown): { outcome: string; etag: string
 
 const productionSources: WebAuthApplicationLockSources = Object.freeze({
     resolve: resolveWebAuthControlSession,
-    revokeMandates(session, request) {
-        if (request.headers.get('x-mediflow-lock-reason') !== 'inactivity') {
-            createAgentMandateStore(openDbServer()).revokeAll(session.userId, archiveGenerationForSession(session)!);
+    retire(session: ServerSession | null, _reason: 'lock', mutation: WebAuthControlMutation, request: Request) {
+        if (!session || request.headers.get('x-mediflow-lock-reason') === 'inactivity') {
+            return retireWebAuthControlForLock(session, mutation);
         }
+        const port = mintResourcePort(session);
+        try {
+            const registered = port && registerPrivateResource(port, reason => {
+                if (reason !== 'lock') return;
+                const generation = archiveGenerationForSession(session);
+                if (!generation) throw new Error('AGENT_MANDATE_LOCK_ARCHIVE_UNAVAILABLE');
+                createAgentMandateStore(openDbServer()).revokeAll(session.userId, generation);
+            });
+            const receipt = retireWebAuthControlForLock(session, mutation);
+            return !registered && receipt?.outcome === 'completed'
+                ? Object.freeze({ outcome: 'failed', etag: receipt.etag }) : receipt;
+        } finally { if (port) releaseResourcePort(port); }
     },
-    retire: (projection: unknown, _reason: 'lock', mutation: WebAuthControlMutation) =>
-        retireWebAuthControlForLock(projection, mutation),
     audit: async (session: ServerSession, sessionId: string, request: Request) => {
         const context = auditContextFromSession(session);
         await writeAuditEvent({
@@ -144,12 +154,8 @@ export async function completeExactWebP3ApplicationLock(
         try { session = exactActiveResolution(sources.resolve(sessionId, mutation.controlId), sessionId); }
         catch { /* A valid control mutation still advances the revocation fence below. */ }
     }
-    if (session) {
-        try { sources.revokeMandates?.(session, request); }
-        catch { return createApplicationLockResponse(unconfirmedReceipt); }
-    }
     let ownerReceipt: unknown;
-    try { ownerReceipt = sources.retire(session, 'lock', mutation); }
+    try { ownerReceipt = sources.retire(session, 'lock', mutation, request); }
     catch { return createApplicationLockResponse(unconfirmedReceipt); }
     const receipt = exactRetirementReceipt(ownerReceipt);
     if (!receipt) return createApplicationLockResponse(unconfirmedReceipt);
