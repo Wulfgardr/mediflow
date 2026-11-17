@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
@@ -77,6 +78,8 @@ export async function PUT(
         const { id, therapyId } = await params;
         const parsed = await readTherapyJsonObject(request, 'v1', 'update');
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const sealedError = rejectUnsealedV1Write('therapies', parsed.body);
+        if (sealedError) return sealedError;
         const expectedVersion = safeTherapyExpectedVersion(parsed.body.version);
         if (expectedVersion === null) return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         /* retain v1's 404-before-field-validation wire precedence; the IMMEDIATE core rechecks identity. */
@@ -87,6 +90,8 @@ export async function PUT(
         if (shape) return NextResponse.json({ error: shape.error }, { status: shape.status });
         const normalized = normalizeTherapyUpdateInput(parsed.body);
         if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const persistedSealedError = rejectUnsealedV1Write('therapies', normalized.values);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromSession(auditSession);
         const result = updateTherapyOperation({
             patientId: id, therapyId, expectedVersion, values: normalized.values,
@@ -115,10 +120,14 @@ export async function DELETE(
         const { id, therapyId } = await params;
         const parsed = await readTherapyJsonObject(request, 'v1', 'delete');
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+        const sealedError = rejectUnsealedV1Write('therapies', parsed.body);
+        if (sealedError) return sealedError;
         const parsedBody = parseTherapyDeleteInput(parsed.body, 'api-v1-delete');
         if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: parsedBody.status });
         const normalized = normalizeTherapyUpdateInput(parsedBody.body);
         if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const persistedSealedError = rejectUnsealedV1Write('therapies', normalized.values);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromSession(auditSession);
         const result = updateTherapyOperation({
             patientId: id, therapyId, expectedVersion: parsedBody.expectedVersion,

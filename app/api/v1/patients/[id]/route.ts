@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
@@ -44,6 +45,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
+        const sealedError = rejectUnsealedV1Write('patients', body);
+        if (sealedError) return sealedError;
         const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
@@ -81,6 +84,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
+        const sealedError = rejectUnsealedV1Write('patients', body);
+        if (sealedError) return sealedError;
         const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
@@ -90,6 +95,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
             return NextResponse.json({ error: 'Invalid deletionReason' }, { status: 400 });
         }
 
+        const deletionSealedError = rejectUnsealedV1Write('patients', { deletionReason });
+        if (deletionSealedError) return deletionSealedError;
         /* resolve the API actor before the synchronous tombstone/audit commit. */
         const auditContext = auditContextFromRequest(request, archiveActorSession);
         const result = deletePatientOperation({
