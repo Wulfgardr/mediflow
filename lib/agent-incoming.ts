@@ -51,7 +51,7 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal()): 
                 try { review = await inspectAgentVisit(row, patients, profile.doctorTaxCode ?? null, signal, undefined, codes); }
                 catch (error) { if (signal.aborted) throw error; unreadable = true; continue; }
                 if (row.archiveGeneration !== clientArchiveGeneration()) review = { ...review, blockers: [...review.blockers, 'Visita da un archivio precedente. Apri i PDF per recuperarla nella scheda.'] };
-                if (review.appliedItemIds.length === review.visit.items.length) continue;
+                if (review.visit.items.every(item => review.appliedItemIds.includes(item.id))) continue;
                 let current = review;
                 if (row.status === 'closed' && !review.blockers.length) {
                     try { current = await apply(review, 'automatic', signal); }
@@ -60,7 +60,7 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal()): 
                         current = { ...review, blockers: [...review.blockers, 'Applicazione non riuscita. Rileggi la cassetta.'] };
                     }
                 }
-                if (current.appliedItemIds.length < current.visit.items.length) visits.push(current);
+                if (current.visit.items.some(item => !current.appliedItemIds.includes(item.id))) visits.push(current);
             }
             signal.throwIfAborted();
             publish({ visits, busy: false, error: unreadable ? 'Una visita non è leggibile. Riprova dopo lo sblocco.' : null });

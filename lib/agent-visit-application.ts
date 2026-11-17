@@ -23,8 +23,8 @@ export class AgentApplicationDenied extends Error {
     constructor(readonly status: 403 | 404 | 409) { super('AGENT_APPLICATION_DENIED'); }
 }
 export function agentAppliedItemIds(visitId: string): string[] {
-    return dbServer.select({ id: auditEvents.subjectRef }).from(auditEvents).where(and(eq(auditEvents.eventType, 'agent.item.applied'),
-        eq(auditEvents.requestId, visitId), eq(auditEvents.outcome, 'success'))).all().flatMap(row => row.id ? [row.id] : []);
+    return [...new Set(dbServer.select({ id: auditEvents.subjectRef }).from(auditEvents).where(and(eq(auditEvents.eventType, 'agent.item.applied'),
+        eq(auditEvents.requestId, visitId), eq(auditEvents.outcome, 'success'), eq(auditEvents.sourceSurface, 'agent'))).all().flatMap(row => row.id ? [row.id] : []))];
 }
 export function applyAgentVisit(request: Request, session: ServerSession, value: unknown): AgentApplicationReceipt {
     const parsed = agentApplicationSchema.safeParse(value);
@@ -56,14 +56,14 @@ export function applyAgentVisit(request: Request, session: ServerSession, value:
         }
         const provenance = { proposerRef: cassette.agentRef, mandateRef: cassette.mandateRef, modelProvider: cassette.modelProvider };
         const prior = tx.select().from(auditEvents).where(and(eq(auditEvents.eventType, 'agent.visit.applied'),
-            eq(auditEvents.subjectRef, cassette.id), eq(auditEvents.requestId, input.phase + ':' + input.patientId))).all();
+            eq(auditEvents.subjectRef, cassette.id), eq(auditEvents.requestId, input.phase + ':' + input.patientId), eq(auditEvents.outcome, 'success'), eq(auditEvents.sourceSurface, 'agent'))).all();
         const appliedIds = agentAppliedItemIds(cassette.id);
         if (input.phase === 'review' && deposited.some(item => automaticAgentKind(item.kind) && !appliedIds.includes(item.id))) throw new AgentApplicationDenied(409);
         const replay = prior.find(row => row.actorRef === session.userId && row.mandateRef === cassette.mandateRef && row.proposerRef === cassette.agentRef);
         if (replay) {
             if (!selected.every(item => appliedIds.includes(item.id))) throw new AgentApplicationDenied(409);
             const metadata = JSON.parse(replay.redactedMetadata!);
-            if (metadata.reasonCode !== fingerprint) throw new AgentApplicationDenied(409);
+            if (metadata.reasonCode !== fingerprint || metadata.counts !== selected.length || !Number.isSafeInteger(metadata.resourceVersion) || metadata.resourceVersion < 1) throw new AgentApplicationDenied(409);
             return { visitId: cassette.id, phase: input.phase, status: 'applied', eventId: replay.eventId, itemCount: selected.length,
                 patientVersion: metadata.resourceVersion, modelProvider: cassette.modelProvider, allowsClinicalEgress: Boolean(cassette.allowsClinicalEgress) };
         }

@@ -91,3 +91,16 @@ test('locking during local PDF inspection discards the result', async () => {
         await assert.rejects(inspectAgentVisit(f.row, [patient(cfA)], null, controller.signal, async () => { controller.abort(); return 'Paziente CF ' + cfA; }));
     } finally { f.close(); }
 });
+
+
+test('a patient revision changed after the displayed review cannot be silently adopted', async () => {
+    const f = await fixture();
+    const original = db.patients.get;
+    try {
+        const signal = new AbortController().signal;
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, async () => 'Paziente CF ' + cfA);
+        assert.deepEqual(review.blockers, []);
+        db.patients.get = async () => ({ ...patient(cfA), version: 2 });
+        await assert.rejects(prepareAgentApplication(review, 'automatic', signal), /scheda è cambiata/);
+    } finally { db.patients.get = original; f.close(); }
+});
