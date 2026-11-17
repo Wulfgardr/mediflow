@@ -125,7 +125,7 @@ test('service line items absent from the cited PDF cannot enter the no-doubts ba
 });
 
 test('a reviewed observation preserves the reference range present in its source', async () => {
-    const quote = 'Glucosio 100 mg/dL intervallo 70 110';
+    const quote = 'LOINC 2345-7. Glucosio 100 mg/dL intervallo 70 110';
     const f = await fixture(cfA, false, { kind: 'observation', values: { code: '2345-7', display: 'Glucosio', value: '100', unitCode: 'mg/dL', unit: 'mg/dL', observedAt: '2026-11-17', refLow: '70', refHigh: '110', refText: '70 110' }, quote });
     const query = mock.method(db.observations, 'query', () => ({ toArray: async () => [] }));
     const get = mock.method(db.patients, 'get', async () => patient(cfA));
@@ -139,4 +139,16 @@ test('a reviewed observation preserves the reference range present in its source
         assert.equal(values.refHigh, '110');
         assert.equal(values.refText, '70 110');
     } finally { get.mock.restore(); query.mock.restore(); f.close(); }
+});
+
+
+test('an observation code absent from its cited source remains a proposal with a coding doubt', async () => {
+    const quote = 'Glucosio 100 mg/dL osservato il 2026-11-17';
+    const f = await fixture(cfA, false, { kind: 'observation', values: { code: '2345-7', display: 'Glucosio', value: '100', unit: 'mg/dL', unitCode: 'mg/dL', observedAt: '2026-11-17' }, quote });
+    const query = mock.method(db.observations, 'query', () => ({ toArray: async () => [] }));
+    try {
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal, async () => 'Paziente CF ' + cfA + '\n' + quote);
+        assert.deepEqual(review.blockers, []);
+        assert.match(review.proposalBlockers.join(' '), /Codice dell’osservazione/);
+    } finally { query.mock.restore(); f.close(); }
 });
