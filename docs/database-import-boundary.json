@@ -39,7 +39,8 @@
     "web-patient-document": "ADR0042: local Web document intake composition injects the existing Node handle into the same patient creation command, intake and readback used by the native route, and reads the selected or default ambulatory as the existing create flow does. No driver, new connection or writer.",
     "agent-mandate-host": "ADR0190: trusted Web mandate creation and manual-lock revocation. Existing SQL authority, no agent clinical commit or key disclosure.",
     "agent-pairing-host": "ADR0190: loopback pairing transport and trusted Web approval use the existing admitted SQL handle. Opaque scoped credentials, no clinical cleartext or external SQLite access.",
-    "agent-cassette-host": "ADR0190: loopback authenticated agent deposits only ciphertext in the caller IMMEDIATE; trusted Web admin reads encrypted cassettes and wrapped keys for browser-only review. No clinical writer or private key opening on the server."
+    "agent-cassette-host": "ADR0190: loopback authenticated agent deposits only ciphertext in the caller IMMEDIATE; trusted Web admin reads encrypted cassettes and wrapped keys for browser-only review. No clinical writer or private key opening on the server.",
+    "agent-visit-application": "ADR0190: trusted Web admin application of a closed encrypted visit. Existing SQL handle composes clinical Tx cores, current mandate and generation admission, expected patient revision, mandatory audit and item consumption receipts in one IMMEDIATE. Agent tokens cannot call this boundary; private keys and PDF identity resolution stay in the browser."
   },
   "semantics": {
     "edge": "Exact source path, resolved target, capability, import form, imported symbols and occurrence count. Value imports are conservatively treated as runtime dependencies; explicit type-only imports are not authority.",
@@ -1962,6 +1963,17 @@
       ],
       "count": 1,
       "classification": "agent-cassette-host"
+    },
+    {
+      "file": "lib/agent-visit-application.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "agent-visit-application"
     }
   ],
   "opaqueLoaders": [

@@ -5,7 +5,6 @@ import { readAgentCassettes } from '@/lib/agent-cassette-store';
 import { applyAgentVisit, agentAppliedItemIds, AgentApplicationDenied } from '@/lib/agent-visit-application';
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
 import { readNativeNetworkJson } from '@/lib/native-network-json-body';
 import { openDbServer } from '@/lib/db-server';
 
