@@ -3,7 +3,9 @@
 import { clientArchiveGeneration } from './security/client-auth-api';
 import { db } from './db';
 import { notifyDbChange } from './live-query';
-import { inspectAgentVisit, prepareAgentApplication, type AgentVisitReview, type IncomingAgentCassette } from './agent-visit-review';
+import { openAgentVisit } from './agent-cassette-client';
+import type { AgentCassetteIndexPage, IncomingAgentCassette } from './agent-cassette-contract';
+import { inspectAgentVisit, prepareAgentApplication, type AgentVisitReview } from './agent-visit-review';
 import type { AgentApplicationReceipt } from './agent-visit-application-contract';
 
 const empty = { visits: [] as AgentVisitReview[], busy: false, error: null as string | null };
@@ -14,11 +16,30 @@ export const agentIncomingSnapshot = () => snapshot;
 export const agentIncomingServerSnapshot = () => empty;
 export function subscribeAgentIncoming(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 function publish(value: typeof empty) { snapshot = value; for (const listener of listeners) listener(); }
+const inbox = '/api/agent-mandates/incoming';
+
+async function fetchIncoming<T>(query: string, signal: AbortSignal): Promise<T> {
+    const response = await fetch(inbox + query, { cache: 'no-store', signal });
+    if (!response.ok) throw new Error('Cassetta non disponibile. Riprova.');
+    return response.json();
+}
+
+export async function readIncomingAgentPdf(visitId: string, revision: number, itemId: string) {
+    const signal = db.getSessionReadSignal();
+    const row = await fetchIncoming<IncomingAgentCassette>('?visit=' + encodeURIComponent(visitId), signal);
+    if (row.id !== visitId || row.revision !== revision) throw new Error('La cassetta è cambiata. Rileggila prima di aprire il PDF.');
+    const visit = await openAgentVisit(row);
+    signal.throwIfAborted();
+    const item = visit.items.find(value => value.id === itemId && value.kind === 'pdf');
+    if (typeof item?.value.name !== 'string' || typeof item.value.base64 !== 'string') throw new Error('PDF non disponibile.');
+    return { name: item.value.name, base64: item.value.base64 };
+}
+
 async function apply(review: AgentVisitReview, phase: 'automatic' | 'review', signal: AbortSignal) {
     const input = await prepareAgentApplication(review, phase, signal);
     if (!input) return review;
     signal.throwIfAborted();
-    const response = await fetch('/api/agent-mandates/incoming', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const response = await fetch(inbox, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input), signal });
     if (!response.ok) throw new Error('La visita non è stata applicata. Rileggi la cassetta.');
     const receipt: AgentApplicationReceipt = await response.json();
@@ -34,10 +55,8 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal()): 
         publish({ ...snapshot, busy: true, error: null });
         try {
             signal.throwIfAborted();
-            const response = await fetch('/api/agent-mandates/incoming', { cache: 'no-store', signal });
-            if (!response.ok) throw new Error('Cassetta non disponibile. Riprova.');
-            const rows: IncomingAgentCassette[] = await response.json();
-            if (!rows.length) { signal.throwIfAborted(); publish(empty); return; }
+            let page = await fetchIncoming<AgentCassetteIndexPage>('', signal);
+            if (!page.visits.length) { signal.throwIfAborted(); publish(empty); return; }
             const [patients, profileResponse, exemptions] = await Promise.all([db.patients.toArray({ signal, rejectAuthUnavailable: true }),
                 fetch('/api/auth/profile', { cache: 'no-store', signal }), db.exemptions.toArray({ signal, rejectAuthUnavailable: true })]);
             if (!profileResponse.ok) throw new Error('Profilo medico non disponibile.');
@@ -45,22 +64,36 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal()): 
             const codes = new Set(exemptions.map(value => value.code));
             const visits: AgentVisitReview[] = [];
             let unreadable = false;
-            for (const row of rows) {
-                signal.throwIfAborted();
-                let review: AgentVisitReview;
-                try { review = await inspectAgentVisit(row, patients, profile.doctorTaxCode ?? null, signal, undefined, codes); }
-                catch (error) { if (signal.aborted) throw error; unreadable = true; continue; }
-                if (row.archiveGeneration !== clientArchiveGeneration()) review = { ...review, blockers: [...review.blockers, 'Visita da un archivio precedente. Apri i PDF per recuperarla nella scheda.'] };
-                if (review.visit.items.every(item => review.appliedItemIds.includes(item.id))) continue;
-                let current = review;
-                if (row.status === 'closed' && !review.blockers.length) {
-                    try { current = await apply(review, 'automatic', signal); }
-                    catch (error) {
+            for (;;) {
+                for (const summary of page.visits) {
+                    signal.throwIfAborted();
+                    let review: AgentVisitReview;
+                    try {
+                        const row = await fetchIncoming<IncomingAgentCassette>('?visit=' + summary.id, signal);
+                        review = await inspectAgentVisit(row, patients, profile.doctorTaxCode ?? null, signal, undefined, codes);
+                    } catch (error) {
                         if (signal.aborted) throw error;
-                        current = { ...review, blockers: [...review.blockers, 'Applicazione non riuscita. Rileggi la cassetta.'] };
+                        unreadable = true;
+                        continue;
+                    }
+                    const { id, archiveGeneration, status, revision, depositedAt } = review.visit.cassette;
+                    if (archiveGeneration !== clientArchiveGeneration()) review = { ...review, blockers: [...review.blockers, 'Visita da un archivio precedente. Apri i PDF per recuperarla nella scheda.'] };
+                    if (review.visit.items.every(item => review.appliedItemIds.includes(item.id))) continue;
+                    let current = review;
+                    if (status === 'closed' && !review.blockers.length) {
+                        try { current = await apply(review, 'automatic', signal); }
+                        catch (error) {
+                            if (signal.aborted) throw error;
+                            current = { ...review, blockers: [...review.blockers, 'Applicazione non riuscita. Rileggi la cassetta.'] };
+                        }
+                    }
+                    if (current.visit.items.some(item => !current.appliedItemIds.includes(item.id))) {
+                        visits.push({ ...current, visit: { ...current.visit, cassette: { id, archiveGeneration, status, revision, depositedAt },
+                            items: current.visit.items.map(item => item.kind === 'pdf' ? { ...item, value: { name: item.value.name } } : item) } });
                     }
                 }
-                if (current.visit.items.some(item => !current.appliedItemIds.includes(item.id))) visits.push(current);
+                if (!page.next) break;
+                page = await fetchIncoming<AgentCassetteIndexPage>('?after=' + page.next, signal);
             }
             signal.throwIfAborted();
             publish({ visits, busy: false, error: unreadable ? 'Una visita non è leggibile. Riprova dopo lo sblocco.' : null });

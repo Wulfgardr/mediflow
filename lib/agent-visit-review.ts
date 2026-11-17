@@ -1,7 +1,7 @@
 'use client';
 
 import { db, type Patient } from './db';
-import { cassetteItems, type AgentCassette } from './agent-cassette-contract';
+import { cassetteItems, type AgentCassetteIndexEntry, type IncomingAgentCassette } from './agent-cassette-contract';
 import { agentBytes } from './agent-cassette-crypto';
 import { openAgentVisit, type OpenedAgentVisit } from './agent-cassette-client';
 import { agentApplicationSchema, automaticAgentKind, type AgentApplicationInput } from './agent-visit-application-contract';
@@ -11,9 +11,8 @@ import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';
 import { isValidItalianTaxCode } from './patient-identity';
 import { agentVisitPdfText } from './agent-visit-pdf-text';
 
-export type IncomingAgentCassette = AgentCassette & { appliedItemIds: string[] };
-export type AgentVisitReview = { visit: OpenedAgentVisit; patient: Patient | null; appliedItemIds: string[];
-    documents: Map<string, { text: string; name: string }>; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[] };
+export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null;
+    appliedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[] };
 const proposalLabels: Record<string, string> = { therapy: 'la terapia', service: 'la prestazione', diagnosis: 'la diagnosi', exemption: 'l’esenzione', observation: 'l’osservazione' };
 const hex = (value: ArrayBuffer) => [...new Uint8Array(value)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
@@ -96,7 +95,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             currentSummary.set(item.id, before.join('; ') || 'Non presente');
         }
     }
-    return { visit, patient, appliedItemIds: row.appliedItemIds, documents, currentSummary, blockers, proposalBlockers };
+    return { visit, patient, appliedItemIds: row.appliedItemIds, currentSummary, blockers, proposalBlockers };
 }
 
 export async function prepareAgentApplication(review: AgentVisitReview, phase: 'automatic' | 'review', signal: AbortSignal): Promise<AgentApplicationInput | null> {
