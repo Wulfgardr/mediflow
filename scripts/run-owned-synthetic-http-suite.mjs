@@ -34,7 +34,6 @@ export const OWNED_HTTP_FILES = Object.freeze([
 export const SUPERVISOR_HTTP_FILE = 'scripts/mediflow-headless-supervisor-standalone-smoke.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-// Use the real registry recipe; a wrapper and its child share one invocation.
 export function ownedHttpInvocations(directory, standalone = false) {
     const recipes = localTestCommands(directory);
     const chosen = OWNED_HTTP_FILES.filter(file => (file === SUPERVISOR_HTTP_FILE) === standalone && !file.endsWith('.sh'));
@@ -139,7 +138,6 @@ async function run() {
             if (code !== 0 || timedOut || interrupted) {
                 failures.push(recipe.id);
                 console.error(`[owned-http] FAIL ${recipe.id}; exit=${code}; timeout=${timedOut}; log=${logPath}`);
-                // CI runners are ephemeral: retain the failed child's actual assertion in the job log.
                 console.error(`[owned-http] BEGIN failure output: ${recipe.id}`);
                 process.stderr.write(fs.readFileSync(logPath));
                 console.error(`[owned-http] END failure output: ${recipe.id}`);

@@ -1,9 +1,3 @@
-/* post-fix route harness. Real Drizzle/better-sqlite3, production column
- * mappings, route/normalizers/journal; synthetic DDL/data in memory or an owned
- * disposable WAL database for two-connection writer-order tests.
- * Next/auth/audit are doubles. No production DB bootstrap, HTTP server or provider.
- * Missing project dependencies are errors, never a simulated SQL fallback/skip.
- */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,8 +37,6 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
         'Before', NULL, 'pending', 'manual', 1893456000, 1893456000, NULL, NULL);`);
     if (sharedWal) {
         contender = new Database(sqlite.name);
-        // Fail-fast lock observation avoids blocking the shared JS thread. It
-        // proves writer exclusion, not production busy-timeout latency.
         contender.pragma('busy_timeout = 0');
         contender.pragma('foreign_keys = ON');
     }
@@ -52,8 +44,6 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
     const dbServer = drizzle(sqlite, { logger: {
         logQuery(query) {
             statements.push(query);
-            // The real driver logs immediately before executing its prepared SQL.
-            // Only fixture state changes here; no query is built/replaced by the test.
             if (/^update\s+"checkups"\s/i.test(query.trimStart())) {
                 const callback = beforeUpdate; beforeUpdate = undefined; callback?.();
             }
@@ -94,8 +84,6 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
         if (relative === 'lib/security/loopback-ingress.mjs') return nativeRequire(path.join(ROOT, relative));
         if (cache.has(relative)) return cache.get(relative).exports;
         const filename = path.join(ROOT, relative), loadedModule = { exports: {} }; cache.set(relative, loadedModule);
-        // Explicit mutation-test input is evaluated only by this private loader;
-        // no file or production import is rewritten.
         const source = Object.hasOwn(sourceOverrides, relative)
             ? sourceOverrides[relative] : fs.readFileSync(filename, 'utf8');
         const result = ts.transpileModule(source, { fileName: filename, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
@@ -104,7 +92,6 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
             if (name.startsWith('node:') || name === 'zod' || name === 'drizzle-orm' || name === 'drizzle-orm/sqlite-core') return nativeRequire(name);
             const resolved = name.startsWith('@/') ? name.slice(2) : path.posix.normalize(path.posix.join(path.posix.dirname(relative), name));
             const target = (resolved.endsWith('.ts') || resolved === 'lib/security/loopback-ingress.mjs') ? resolved : `${resolved}.ts`;
-            // The mutation operation uses relative imports for these same fixture seams.
             if (target === 'lib/db-server.ts') return { dbServer };
             if (target === 'lib/security/audit.ts') return auditDouble;
             if (target === 'lib/security/archive-session-generation.ts') return { archiveGenerationForSession: () => undefined, currentArchiveGeneration: () => undefined };
@@ -113,8 +100,6 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
         new Function('require', 'module', 'exports', result.outputText)(require, loadedModule, loadedModule.exports);
         return loadedModule.exports;
     }
-    // lib/schema.ts is loaded unchanged: real column names and timestamp codecs.
-    // The physical tables above intentionally cover only this synthetic fixture.
     let route, Session;
     try {
         route = load('app/api/checkups/[id]/route.ts');

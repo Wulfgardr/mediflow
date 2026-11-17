@@ -16,7 +16,6 @@ const REPORT_PATH = resolveReportPath();
 const READ_CAPABILITY = 'network.replica.readonly-patients';
 const WRITE_CAPABILITY = 'network.replica.write-patient-profile';
 
-/* this keyless-host regression needs real opaque envelopes, not ENC-prefixed plaintext. */
 function syntheticSealedPhone(label) {
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', crypto.randomBytes(32), iv);

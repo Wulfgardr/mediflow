@@ -97,14 +97,11 @@ for (const inheritedVeto of [undefined, '0']) {
 
 function defaultSelectionFixture(testFile) {
   const value = fixture('', { preserveUnitArgs: true });
-  // Supply every required selection path without importing application code.
   for (const relative of [...UNIT_TEST_GROUPS.map(group => `${group}/fixture.test.ts`), ...UNIT_SCRIPT_TESTS]) {
     const target = path.join(value.sandbox, relative);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, 'export {};\n');
   }
-  // Keep the real wrapper and its default argv. Only the child suite is synthetic:
-  // it executes physically present test files using Node's real test runner.
   fs.writeFileSync(path.join(value.sandbox, 'scripts', 'run-strip-types.mjs'), `
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';

@@ -141,7 +141,6 @@ test('run-strip-types can exclude files from glob expansion', () => {
   }
 });
 
-/* every subprocess uses synthetic HOME and/or an explicit fixture. */
 function fixture(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-runner-preflight-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
@@ -162,7 +161,6 @@ for (const value of [undefined, '', '   ']) {
     const directory = fixture(t);
     const target = path.join(directory, 'entry.test.ts');
     const marker = path.join(directory, 'target-ran');
-    // The real module must never load; HOME is also synthetic as defense in depth.
     fs.writeFileSync(target, `import '@/lib/db-server';
 import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(marker)}, 'unexpected');`);
     const probe = path.join(directory, 'probe');
@@ -189,7 +187,6 @@ test('veto', () => assert.equal(process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY, pr
   const dataDir = path.join(directory, 'data');
   const inherited = run(directory, ['--test', target], { MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: undefined, EXPECTED_LEGACY_COPY_VETO: '1' });
   assert.equal(inherited.status, 0, inherited.stderr + inherited.stdout);
-  // A test of the legacy copy itself can still ask for it.
   const optedIn = run(directory, ['--test', target], { MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '0', EXPECTED_LEGACY_COPY_VETO: '0' });
   assert.equal(optedIn.status, 0, optedIn.stderr + optedIn.stdout);
 });
@@ -208,7 +205,6 @@ test('explicit target', () => assert.equal(resolveDataPath('medical.db'), ${JSON
   assert.ok(fs.statSync(path.join(dataDir, 'medical.db')).size > 0);
   assert.equal(fs.existsSync(path.join(directory, 'Library')), false);
   assert.equal(fs.existsSync(path.join(directory, '.mediflow')), false);
-  // The runner must not delete caller-owned state after its child exits.
   assert.equal(fs.existsSync(dataDir), true);
 });
 

@@ -83,7 +83,6 @@ function isCliEntrypoint() {
     try {
         return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
     } catch (error) {
-        // stdin/eval importers may name no real file; filesystem access errors still fail.
         if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return false;
         throw error;
     }

@@ -1,4 +1,3 @@
-/* C05 synthetic real HTTP qualification, separate from route auth/cookie seams. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
@@ -34,7 +33,7 @@ async function request(method, pathname, { headers = {}, body } = {}) {
     });
     const raw = await response.text();
     let json = null;
-    try { json = raw ? JSON.parse(raw) : null; } catch { /* preserve status without payload */ }
+    try { json = raw ? JSON.parse(raw) : null; } catch {  }
     return { response, json };
 }
 
