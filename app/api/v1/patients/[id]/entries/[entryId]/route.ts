@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
@@ -75,6 +76,8 @@ export async function PUT(
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
         const prepared = prepareEntryUpdate(parsed.body, 'v1');
         if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: prepared.status });
+        const persistedSealedError = rejectUnsealedV1Write('entries', parsed.body);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromSession(auditSession);
         const result = updateEntryOperation({ patientId: id, entryId, expectedVersion: prepared.expectedVersion,
             values: prepared.values, changedFields: prepared.changedFields, mode: 'v1', audit: {
@@ -107,6 +110,8 @@ export async function DELETE(
         }
         const prepared = prepareEntryUpdate(parsedBody.body, 'v1', true);
         if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: prepared.status });
+        const persistedSealedError = rejectUnsealedV1Write('entries', parsedBody.clientValues);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromSession(auditSession);
         const result = updateEntryOperation({ patientId: id, entryId, expectedVersion: prepared.expectedVersion,
             values: prepared.values, changedFields: prepared.changedFields, mode: 'v1', audit: {

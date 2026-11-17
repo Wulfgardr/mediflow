@@ -211,7 +211,7 @@ async function createSeedPatient(ambulatoryId, lastNameSuffix) {
             lastName: lastNameSuffix,
             taxCode: `NTA${suffix}`,
             ambulatoryId,
-            notes: 'network-home-base-aggregate-read-smoke',
+            notes: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2UtYWdncmVnYXRlLXJlYWQtc21va2U=',
             isAdi: false,
             isArchived: false,
         },

@@ -258,7 +258,7 @@ async function createSeedPatient() {
         firstName: 'Legacy',
         lastName: 'Clinical',
         taxCode: `LCW${suffix}`,
-        notes: 'legacy-clinical-writes',
+        notes: 'ENC:c3ludGhldGlj:bGVnYWN5LWNsaW5pY2FsLXdyaXRlcw==',
         isAdi: false,
         isArchived: false,
     });

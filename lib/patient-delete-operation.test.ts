@@ -126,14 +126,15 @@ for (const [name, route] of [['web', web], ['v1', v1]] as const) {
     test(`${name}: successful delete commits one event and preserves child and membership`, async () => {
         reset();
         const before = snapshot();
-        const response = await del(route, JSON.stringify({ version: 3, deletionReason: 'motivo sintetico',
+        const deletionReason = name === 'v1' ? 'ENC:c3ludGhldGlj:bW90aXZv' : 'motivo sintetico';
+        const response = await del(route, JSON.stringify({ version: 3, deletionReason,
             actorRef: 'forged', sourceSurface: 'job', clinicalSentinel: 'SECRET_SYNTHETIC_CLINICAL' }));
         assert.equal(response.status, 200);
         assert.deepEqual(await response.json(), { success: true });
         const after = snapshot();
         assert.equal(after.version, 4);
         assert.ok(after.deletedAt);
-        assert.equal(after.deletionReason, 'motivo sintetico');
+        assert.equal(after.deletionReason, deletionReason);
         assert.deepEqual(after.entries, before.entries);
         assert.deepEqual(after.memberships, before.memberships);
         assert.equal(after.events.length, before.events.length + 1);
@@ -147,13 +148,14 @@ for (const [name, route] of [['web', web], ['v1', v1]] as const) {
             resourceVersion: 4, flags: [`auth:${name === 'web' ? 'session' : 'local-token'}`],
         });
         assert.doesNotMatch(JSON.stringify(event), /motivo sintetico|SECRET_SYNTHETIC_CLINICAL|forged|job/);
+        assert.equal(JSON.stringify(event).includes(deletionReason), false);
 
         const reopened = new Database(join(dataDir, 'medical.db'), { readonly: true });
         try {
             const persisted = reopened.prepare('SELECT version, deleted_at, deletion_reason FROM patients WHERE id=?').get(id) as Record<string, unknown>;
             assert.equal(persisted.version, 4);
             assert.ok(persisted.deleted_at);
-            assert.equal(persisted.deletion_reason, 'motivo sintetico');
+            assert.equal(persisted.deletion_reason, deletionReason);
             assert.equal((reopened.prepare('SELECT count(*) AS n FROM entries WHERE patient_id=?').get(id) as { n: number }).n, 1);
             assert.equal((reopened.prepare('SELECT count(*) AS n FROM audit_events WHERE subject_ref=?').get(id) as { n: number }).n,
                 before.events.length + 1);

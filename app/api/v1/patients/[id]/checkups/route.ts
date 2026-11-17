@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { checkupCreateIdSchema } from '@/lib/api-schemas/clinical-writes';
 import { readCheckupJsonObject } from '@/lib/checkup-json-body';
@@ -102,6 +103,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
 
         // preserve local-token actor selection outside the synchronous transaction.
+        const persistedSealedError = rejectUnsealedV1Write('checkups', body);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = createCheckupOperation({
             patientId: id, checkupId: normalized.values.id, values: normalized.values, mode: 'v1',

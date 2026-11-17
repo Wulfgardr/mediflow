@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { readCheckupJsonObject } from '@/lib/checkup-json-body';
 // Codex: created 2026-02-06
@@ -95,6 +96,8 @@ export async function PUT(
         }
 
         // host audit context is resolved before the synchronous IMMEDIATE mutation.
+        const persistedSealedError = rejectUnsealedV1Write('checkups', body);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = updateCheckupOperation({
             patientId: id, checkupId: checkupId, expectedVersion, values: normalized.values, mode: 'v1',
@@ -147,6 +150,8 @@ export async function DELETE(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
+        const persistedSealedError = rejectUnsealedV1Write('checkups', parsedBody.clientValues);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = updateCheckupOperation({
             patientId: id, checkupId: checkupId, expectedVersion, values: normalized.values, mode: 'v1',

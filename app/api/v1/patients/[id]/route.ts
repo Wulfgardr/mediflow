@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
@@ -5,7 +6,7 @@ import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import { parseExpectedVersion } from '@/lib/patient-concurrency';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
-import { readPatientProfile, updatePatientProfile } from '@/lib/patient-profile-service';
+import { readPatientProfile, updatePatientProfile, validateLocalPatientProfileUpdate } from '@/lib/patient-profile-service';
 import { deletePatientOperation } from '@/lib/patient-delete-operation';
 import { auditContextFromRequest, requestIdFromRequest } from '@/lib/security/audit';
 
@@ -49,6 +50,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
 
+        const invalidInput = await validateLocalPatientProfileUpdate(id, body, expectedVersion);
+        if (invalidInput) return NextResponse.json(invalidInput.value, { status: invalidInput.status });
+        const sealedError = rejectUnsealedV1Write('patients', body);
+        if (sealedError) return sealedError;
+
         const commit = await updatePatientProfile({
             patientId: id, expectedVersion,
             audit: () => {
@@ -90,6 +96,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
             return NextResponse.json({ error: 'Invalid deletionReason' }, { status: 400 });
         }
 
+        const deletionSealedError = rejectUnsealedV1Write('patients', body);
+        if (deletionSealedError) return deletionSealedError;
         /* resolve the API actor before the synchronous tombstone/audit commit. */
         const auditContext = auditContextFromRequest(request, archiveActorSession);
         const result = deletePatientOperation({

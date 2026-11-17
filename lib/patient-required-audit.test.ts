@@ -189,7 +189,7 @@ for (const [name, route] of [['web', web], ['v1', v1]] as const) {
         reset();
         const before = events().length;
         const response = await put(route, {
-            version: 3, firstName: 'Bea', notes: 'ENC:synthetic-clinical-sentinel',
+            version: 3, firstName: 'Bea', notes: 'ENC:c3ludGhldGlj:Y2xpbmljYWwtc2VudGluZWw=',
             unknownClinicalField: 'synthetic-unknown-sentinel', ambulatoryId: 'c04-b',
             actorRef: 'spoofed-body-actor', sourceSurface: 'spoofed-body-surface',
         });
@@ -207,7 +207,7 @@ for (const [name, route] of [['web', web], ['v1', v1]] as const) {
         const metadata = JSON.parse(event.redacted_metadata as string) as Record<string, unknown>;
         assert.equal(metadata.resourceVersion, 4);
         assert.deepEqual((metadata.changedFields as string[]).sort(), ['ambulatoryId', 'firstName', 'notes']);
-        assert.ok(!JSON.stringify(event).includes('synthetic-clinical-sentinel'));
+        assert.ok(!JSON.stringify(event).includes('ENC:c3ludGhldGlj:Y2xpbmljYWwtc2VudGluZWw='));
         assert.ok(!JSON.stringify(event).includes('synthetic-unknown-sentinel'));
         const after = events().length;
         assert.equal((await put(route, { version: 3, firstName: 'Retry' })).status, 409);

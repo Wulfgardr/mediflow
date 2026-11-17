@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { NextResponse } from 'next/server';
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
@@ -91,6 +92,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const observationId = observationCreateId(parsed.body);
         const normalized = normalizeObservationCreateInput(parsed.body, { id: observationId, patientId: id });
         if (!normalized.ok) return NextResponse.json({ error: normalized.error }, { status: 400 });
+        const persistedSealedError = rejectUnsealedV1Write('observations', parsed.body);
+        if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromRequest(request, auditSession);
         const result = createObservationOperation({
             patientId: id, observationId, values: normalized.values, mode: 'v1',

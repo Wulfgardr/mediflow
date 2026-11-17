@@ -39,9 +39,9 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 openDbServer();
 const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local');
+const cleanupCookies = installNetworkPatientCookieFixture(dataDir, { cookies: new Map([['ambulatory_id', 'c03-a']]) });
 const web = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route.ts');
 const v1 = load('../app/api/v1/patients/[id]/route.ts') as typeof import('../app/api/v1/patients/[id]/route.ts');
-const cleanupCookies = installNetworkPatientCookieFixture(dataDir, { cookies: new Map([['ambulatory_id', 'c03-a']]) });
 const { updateNetworkScopedPatient } = load('./network-patient-write.ts') as typeof import('./network-patient-write.ts');
 const sql = new Database(join(dataDir, 'medical.db'));
 
