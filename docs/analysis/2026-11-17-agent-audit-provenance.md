@@ -38,7 +38,8 @@ cambiano e i casi negativi continuano a rifiutare schemi alterati.
 ## Prove
 
 `lib/agent-audit-provenance.test.ts` prova gli otto writer, il diniego della
-provenienza invalida, la lettura del registro, il round trip dell'artefatto
+provenienza invalida, dell'autore system, della provenienza assente o
+associata alla superficie sbagliata, la lettura del registro, il round trip dell'artefatto
 backup e l'errore audit in ciascuna posizione con zero scritture residue.
 `lib/sqlite-schema-open.test.ts` prova originale verificato, recuperabilità,
 assenza di DDL al reopen e rollback della migrazione.

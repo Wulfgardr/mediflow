@@ -569,8 +569,8 @@ test('schema 12 preserves the v11 original, historical audit, recoverability and
         recovered.close();
         const reopened = openVersionedSqliteDatabase(w.file, file => {
             const db = new Database(file), prepare = db.prepare.bind(db), exec = db.exec.bind(db);
-            db.prepare = ((sql: string) => { assert.doesNotMatch(sql, /ALTER TABLE|CREATE TABLE/iu); return prepare(sql); }) as typeof db.prepare;
-            db.exec = ((sql: string) => { assert.doesNotMatch(sql, /ALTER TABLE|CREATE TABLE/iu); return exec(sql); }) as typeof db.exec;
+            db.prepare = ((sql: string) => { assert.doesNotMatch(sql, /\b(?:ALTER|CREATE|DROP|REINDEX)\b/iu); return prepare(sql); }) as typeof db.prepare;
+            db.exec = ((sql: string) => { assert.doesNotMatch(sql, /\b(?:ALTER|CREATE|DROP|REINDEX)\b/iu); return exec(sql); }) as typeof db.exec;
             return db;
         });
         reopened.close();
