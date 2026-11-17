@@ -9,7 +9,9 @@ process.env.MEDIFLOW_DATA_DIR = dir;
 process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY = '1';
 const { dbServer, openDbServer } = await import('./db-server.ts');
 openDbServer();
-const { composeAll, seedComposition, compositionSnapshot, session } = await import('./test-fixtures/clinical-writer-composition.ts');
+const { composeAll, seedComposition, compositionSnapshot, session, patientId } = await import('./test-fixtures/clinical-writer-composition.ts');
+const { createEntryOperation } = await import('./entry-write-operation.ts');
+const { bindSyntheticArchiveSessions } = await import('./security/web-auth-lifecycle-owner-test-fixture.ts');
 const { listAuditEvents } = await import('./security/audit.ts');
 const { readBackupAuditRows, canonicalizeBackupAuditRows } = await import('./backup-audit.ts');
 const { createBackupArtifact, parseBackupArtifact, createEmptyDataset } = await import('./backup-artifact.ts');
@@ -31,6 +33,19 @@ for (let index = 0; index < 8; index++) {
 test('invalid or incomplete agent provenance cannot produce a clinical write', () => {
     for (const invalid of [{ ...agentProvenance, proposerRef: '' }, { ...agentProvenance, mandateRef: '' }, { ...agentProvenance, modelProvider: 'unknown' }]) {
         assert.throws(() => composeAll('invalid-agent', { agentProvenance: invalid as typeof agentProvenance }), /Invalid agent audit provenance/);
+        assert.deepEqual(compositionSnapshot(), before);
+    }
+});
+
+test('agent success requires user author and complete provenance on the agent surface', () => {
+    const generation = bindSyntheticArchiveSessions('synthetic-agent-audit-negative');
+    const base = { archiveGeneration: generation, actorType: 'user' as const, actorRef: session.userId,
+        sourceSurface: 'agent' as const, agentProvenance, flags: [] };
+    for (const audit of [{ ...base, actorType: 'system' as const }, { ...base, agentProvenance: undefined }, { ...base, sourceSurface: 'web' as const }]) {
+        assert.throws(() => createEntryOperation({ patientId, id: 'invalid-agent-author',
+            values: { id: 'invalid-agent-author', patientId, type: 'visit', title: 'ENC:synthetic:title',
+                content: 'ENC:synthetic:note', date: new Date('2026-11-17') },
+            mode: 'web', audit, changedFields: ['content'] }), /Invalid agent audit provenance|Agent audit requires agent surface/);
         assert.deepEqual(compositionSnapshot(), before);
     }
 });

@@ -1,5 +1,5 @@
 {
-  "syncCommit": "0dd19cf33d0da40260aa8f4db069c1f9d0b36ca2",
+  "syncCommit": "029c175f3ca2357e3b012931d261e9e6e8ce3dc7",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -35,7 +35,7 @@
     "components/therapy-manager.tsx": "186c11cab37824399bdd2e9092434f4f0fa211f2da02601d10a8db11bac0c055",
     "lib/db.ts": "0f4387acccf94eed952fb3157a8a1de4c8da9c298c332db97dc21a6d84ad6075",
     "lib/security/client-auth-api.ts": "754aebaedb77bc9629a32d90f754ecc3ee7e89ead880c6add9088dd6449ee5ce",
-    "lib/therapy-write-operation.ts": "2d5eb67b6af4be7ae717ee6e46c018b64b884c719d9b344925fc14788b47b4c8",
+    "lib/therapy-write-operation.ts": "81716a464a1a5271b16687b4152cf2a11a1b4968c44fc93c3a17c31b53a54b6f",
     "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
     "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
     "lib/locked-field-guard.ts": "a4b64b4db1968423169937a2b491add2d2a19b6fba2489b1515e37b358a55d3a",
@@ -44,21 +44,21 @@
     "lib/therapy-status-command-contract.ts": "3432124d9b5f8b3113265d9779fa12e1411e508b0964cfd2e1bc532f49f4a7fe",
     "lib/therapy-status-command-client.ts": "e2f833b062db819108f9ffddc6443e4bfce321a7d8a359666b84bc6b9b4ad30f",
     "lib/therapy-status-command-http.ts": "7b0a7a7780d5c98973a14f17fba32b722a3cb962cc2787c7e5edcf9789b43423",
-    "lib/therapy-status-command-backup.ts": "1606ac41684c18ed2f7ff6de19e378e0ef1baac5645d1a160c4906faba4bab92",
+    "lib/therapy-status-command-backup.ts": "da7641d2b30548b09105dcbc0e202d25d9215a3e4768dff441b81c11bb6b5384",
     "lib/therapy-status-command-schema.ts": "98c0aba0a361ef83655a632be41a257f8b9e99a950591113683a8094e26f4c87",
     "lib/therapy-status-command-recovery-schema.ts": "8231c04d505139c63f36f9657e2a2a0c964cd48b39d4ae4b2d2a0f2c552f5f4a",
-    "lib/ambulatory-destructive-command-recovery-schema.ts": "9f2cda705438136d03cb454bc0cb04c018394f448709c221e6350ebe46853f9d",
+    "lib/ambulatory-destructive-command-recovery-schema.ts": "e5fe4a99ace9ff99804946eaf952a76795829cb0b6c640fe2c38960640586a99",
     "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
     "lib/backup-encrypted-fields.json": "1fe7775a81e0f2d2882946815e4e17840ca4661439c410b75a58c3dd0ce65998",
     "lib/backup-import-provenance.ts": "13eb1cc6083b5a07489d64cc9d195b82b6b8b660cb9874e4dc46b93fdf25999e",
     "lib/sqlite-schema.ts": "a920dc2429cc307687aa02f202c1495af832593f15b500d234bc4db68083d978",
-    "lib/sqlite-schema-open.ts": "de253e0e3f0b33c49c1f5f61894a2f421ef96640cedd958f7c7c7ce83963f1b5",
+    "lib/sqlite-schema-open.ts": "c70965852aa2dc3755eaf395ef3c21cdb3af55ccc285f9ad256fc08125d9d43b",
     "lib/backup-restore-executor.ts": "830d9e11fb3d14be07e1901de74e1000ec466ef488133a788b3350bf73c80086",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
     "lib/clinical-status-transitions.ts": "787915f339911dd4846d29d1fe3232be373242287390989d6a97d7a5dcea460f",
     "lib/status-normalization.ts": "fa2bbdeef55384ed1bf4a851f09a5d899d56e6331cde018f68f3d8a74d3a4e51",
     "docs/domain/clinical-status-transitions.json": "70233eaac55960b999f25768bb9f8897dcce27197ed99c1a692a2d98a0582f04",
-    "lib/recovery-backup-server.ts": "f4489e8956912faef321076891f83736c9129a6d31db2cd089a4458d124ee6fd"
+    "lib/recovery-backup-server.ts": "132846af0bde3c53a20f33ec8ac7831a791353029a8a8ab5d8ce6dea91863816"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
