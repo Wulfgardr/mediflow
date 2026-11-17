@@ -85,7 +85,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
         const prepared = prepareEntryCreate(parsed.body, 'v1', id);
         if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: prepared.status });
-        const persistedSealedError = rejectUnsealedV1Write('entries', { ...parsed.body, title: parsed.body.title ?? '' });
+        const persistedSealedError = rejectUnsealedV1Write('entries', parsed.body);
         if (persistedSealedError) return persistedSealedError;
         const context = auditContextFromSession(auditSession);
         const result = createEntryOperation({ patientId: id, id: prepared.id, values: prepared.values,

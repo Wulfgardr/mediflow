@@ -29,10 +29,15 @@ function snapshot() {
     return JSON.stringify(['patients', 'entries', 'therapies', 'observations', 'checkups', 'audit_events'].map(table =>
         dbServer.$client.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()));
 }
+const routes = {
+    patients: [load('../app/api/v1/patients/route.ts'), load('../app/api/v1/patients/[id]/route.ts')],
+    entries: [load('../app/api/v1/patients/[id]/entries/route.ts'), load('../app/api/v1/patients/[id]/entries/[entryId]/route.ts')],
+    therapies: [load('../app/api/v1/patients/[id]/therapies/route.ts'), load('../app/api/v1/patients/[id]/therapies/[therapyId]/route.ts')],
+    observations: [load('../app/api/v1/patients/[id]/observations/route.ts'), load('../app/api/v1/patients/[id]/observations/[observationId]/route.ts')],
+    checkups: [load('../app/api/v1/patients/[id]/checkups/route.ts'), load('../app/api/v1/patients/[id]/checkups/[checkupId]/route.ts')],
+};
 for (const family of families) {
-    const base = family.path ? `../app/api/v1/patients/[id]${family.path}` : '../app/api/v1/patients';
-    const collection = load(`${base}/route.ts`);
-    const item = load(`${base}/${family.item}/route.ts`);
+    const [collection, item] = routes[family.table as keyof typeof routes];
     for (const method of ['POST', 'PUT', 'DELETE'] as const) {
         test(`${family.table} ${method} rejects plaintext without data or success audit`, async () => {
             const id = `synthetic-sealed-${++serial}`;
@@ -105,11 +110,20 @@ test('every encrypted field rejects malformed envelopes and structured plaintext
     }
 });
 
-test('local diary creation requires a client-sealed title instead of a plaintext server default', async () => {
+test('local diary creation accepts the server title default and rejects a client plaintext title without effects', async () => {
     const collection = load('../app/api/v1/patients/[id]/entries/route.ts');
+    const id = `synthetic-sealed-${++serial}`;
+    dbServer.$client.prepare('INSERT INTO patients (id,first_name,last_name,tax_code,identifier_type) VALUES (?,?,?,?,?)')
+        .run(id, 'Persona', 'Sintetica', '', 'none');
+    const params = Promise.resolve({ id });
+    const body = { type: 'note', content: sealed, date: '2026-01-01' };
     const before = snapshot();
-    const response = await collection.POST(request('POST', { type: 'note', content: sealed, date: '2026-01-01' }),
-        { params: Promise.resolve({ id: 'synthetic-missing-title' }) });
-    assert.equal(response.status, 422);
+    const rejected = await collection.POST(request('POST', { ...body, title: 'Titolo sintetico' }), { params });
+    assert.equal(rejected.status, 422);
     assert.equal(snapshot(), before);
+    const accepted = await collection.POST(request('POST', body), { params });
+    assert.equal(accepted.status, 201, await accepted.text());
+    const row = dbServer.$client.prepare('SELECT title, content FROM entries WHERE patient_id=?').get(id) as { title: string; content: string };
+    assert.equal(row.title, 'Voce clinica');
+    assert.equal(row.content, sealed);
 });
