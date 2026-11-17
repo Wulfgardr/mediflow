@@ -19,7 +19,8 @@ export const agentApplicationItemSchema = z.discriminatedUnion('kind', [
     z.object({ id, kind: z.literal('exemption'), values: z.object({ exemptions: sealed }).strict() }).strict(),
     z.object({ id, kind: z.literal('observation'), values: z.object({ codeSystem: z.string().min(1).max(128), code: z.string().min(1).max(128),
         display: z.string().min(1).max(4096), unitSystem: z.string().min(1).max(128), unitCode: z.string().min(1).max(128),
-        value: z.string().min(1).max(4096), observedAt: dateInputSchema, notes: sealed }).strict() }).strict(),
+        value: z.string().min(1).max(4096), observedAt: dateInputSchema,
+        refLow: z.string().max(4096).nullable().optional(), refHigh: z.string().max(4096).nullable().optional(), refText: z.string().max(4096).nullable().optional(), notes: sealed }).strict() }).strict(),
 ]);
 export const agentApplicationSchema = z.object({ visitId: id, phase: z.enum(['automatic', 'review']), patientId: z.string().min(1).max(256),
     expectedVersion: z.number().int().positive().max(Number.MAX_SAFE_INTEGER - 129), cassetteRevision: z.number().int().positive(),

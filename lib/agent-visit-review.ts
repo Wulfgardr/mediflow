@@ -70,6 +70,8 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             proposalBlockers.push(...dossierFactBlockers({ factId: item.id, kind, values: fields, negated: verified.negated, origin: 'prepared', evidence: null, decision: 'pending' }, { exemptionCodes }));
             if (verified.check !== 'ok' || verified.drop.length || fields.subject && fields.subject !== 'paziente') proposalBlockers.push('Valori o soggetto della proposta da verificare sulla fonte.');
         }
+        if (item.kind === 'service' && (fields.items ?? '').split('\n').map(line => line.trim()).filter(Boolean).some(line => !normalized(quote).includes(normalized(line)))) proposalBlockers.push('Voci della prestazione da verificare sulla fonte.');
+        if (item.kind === 'observation' && [fields.refLow, fields.refHigh, fields.refText].some(value => value && !normalized(quote).includes(normalized(value)))) proposalBlockers.push('Intervallo di riferimento da verificare sulla fonte.');
         if (item.kind === 'diagnosis' && (!fields.code || !fields.system || !normalized(quote).includes(normalized(fields.code)))) proposalBlockers.push('Codice della diagnosi da verificare sulla fonte.');
         if (item.kind === 'exemption' && (!fields.code || !normalized(quote).includes(normalized(fields.code)))) proposalBlockers.push('Codice di esenzione da verificare sulla fonte.');
     }
@@ -152,7 +154,7 @@ export async function prepareAgentApplication(review: AgentVisitReview, phase: '
             case 'observation': {
                 const value = values(item);
                 prepared.push({ ...base, values: { codeSystem: 'LOINC', code: value.code, display: value.display, value: value.value,
-                    unitSystem: 'UCUM', unitCode: value.unitCode, observedAt: value.observedAt, notes: await db.sealLocalDraft(provenance) } }); break;
+                    unitSystem: 'UCUM', unitCode: value.unitCode, observedAt: value.observedAt, refLow: value.refLow || null, refHigh: value.refHigh || null, refText: value.refText || null, notes: await db.sealLocalDraft(provenance) } }); break;
             }
         }
     }

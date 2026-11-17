@@ -1,20 +1,21 @@
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { agentCassetteFixture } from './test-fixtures/agent-cassette';
 import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto';
 import { db, type Patient } from './db';
 import { inspectAgentVisit, prepareAgentApplication } from './agent-visit-review';
+import type { AgentItemKind } from './agent-cassette-crypto';
 import { AGENT_ITEM_OPERATION } from './agent-cassette-contract';
 
 const cfA = 'RSSMRA80A01F205X', cfB = 'RSSMRA85T10A562S';
 function patient(cf: string): Patient { return { id: 'synthetic-' + cf, taxCode: cf, firstName: 'Persona', lastName: 'Sintetica',
     address: '', phone: '', updatedAt: new Date(), createdAt: new Date(), version: 1 }; }
-async function fixture(cf = cfA, wrongHash = false) {
+async function fixture(cf = cfA, wrongHash = false, proposal?: { kind: 'service' | 'observation'; values: Record<string, string>; quote: string }) {
     const f = await agentCassetteFixture();
     db.setKey(f.masterKey);
     const visitId = randomUUID();
-    const seal = (id: string, kind: 'anchor' | 'pdf', value: unknown) => {
+    const seal = (id: string, kind: AgentItemKind, value: unknown) => {
         const bytes = new TextEncoder().encode(JSON.stringify(value));
         return { bytes, envelope: sealAgentItemNode(f.mandate.publicKey, { mandateRef: f.mandate.id, visitId, itemId: id, kind }, bytes) };
     };
@@ -26,6 +27,12 @@ async function fixture(cf = cfA, wrongHash = false) {
         documentHash: wrongHash ? 'a'.repeat(64) : createHash('sha256').update(bytes).digest('hex') };
     receipt = f.run(() => f.store.add(f.principal, visitId, receipt.revision, item));
     assert.equal(AGENT_ITEM_OPERATION[item.kind], 'visita.allega');
+    if (proposal) {
+        const proposalId = randomUUID(), value = seal(proposalId, proposal.kind, { values: proposal.values, quote: proposal.quote,
+            source: { sha256: item.documentHash, fileName: 'synthetic.pdf' } });
+        receipt = f.run(() => f.store.add(f.principal, visitId, receipt.revision, { id: proposalId, kind: proposal.kind,
+            envelope: value.envelope, byteLength: value.bytes.length, documentHash: null }));
+    }
     f.run(() => f.store.close(f.principal, visitId, receipt.revision));
     return { row: { ...f.rows()[0], appliedItemIds: [] }, close() { db.setKey(null); f.database.close(); } };
 }
@@ -103,4 +110,33 @@ test('a patient revision changed after the displayed review cannot be silently a
         db.patients.get = async () => ({ ...patient(cfA), version: 2 });
         await assert.rejects(prepareAgentApplication(review, 'automatic', signal), /scheda è cambiata/);
     } finally { db.patients.get = original; f.close(); }
+});
+
+
+test('service line items absent from the cited PDF cannot enter the no-doubts batch', async () => {
+    const quote = 'Prestazione Sintetica prescritta il 2026-11-17';
+    const f = await fixture(cfA, false, { kind: 'service', values: { serviceName: 'Prestazione Sintetica', prescribedAt: '2026-11-17', category: 'other', items: 'Esame aggiunto senza fonte' }, quote });
+    const query = mock.method(db.servicePrescriptions, 'query', () => ({ toArray: async () => [] }));
+    try {
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal, async () => 'Paziente CF ' + cfA + '\n' + quote);
+        assert.deepEqual(review.blockers, []);
+        assert.match(review.proposalBlockers.join(' '), /Voci della prestazione/);
+    } finally { query.mock.restore(); f.close(); }
+});
+
+test('a reviewed observation preserves the reference range present in its source', async () => {
+    const quote = 'Glucosio 100 mg/dL intervallo 70 110';
+    const f = await fixture(cfA, false, { kind: 'observation', values: { code: '2345-7', display: 'Glucosio', value: '100', unitCode: 'mg/dL', unit: 'mg/dL', observedAt: '2026-11-17', refLow: '70', refHigh: '110', refText: '70 110' }, quote });
+    const query = mock.method(db.observations, 'query', () => ({ toArray: async () => [] }));
+    const get = mock.method(db.patients, 'get', async () => patient(cfA));
+    try {
+        const signal = new AbortController().signal;
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, async () => 'Paziente CF ' + cfA + '\n' + quote);
+        assert.deepEqual([...review.blockers, ...review.proposalBlockers], []);
+        const application = await prepareAgentApplication(review, 'review', signal);
+        const values = application?.items.find(item => item.kind === 'observation')?.values as Record<string, unknown>;
+        assert.equal(values.refLow, '70');
+        assert.equal(values.refHigh, '110');
+        assert.equal(values.refText, '70 110');
+    } finally { get.mock.restore(); query.mock.restore(); f.close(); }
 });

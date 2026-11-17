@@ -86,8 +86,22 @@ test('a CLI paired for twelve hours deposits a visit and the unlocked tab automa
     expect(plainBodies.length).toBeGreaterThan(0);
     expect(plainBodies.join('')).not.toContain(sentinel);
     expect(plainBodies.join('')).not.toContain(fiscalCode);
+    const tokenDenied = await page.request.post('/api/agent-mandates/incoming', { headers: { Authorization: 'Bearer synthetic-token-denied' }, data: JSON.parse(plainBodies[0]) });
+    expect(tokenDenied.status()).toBe(403);
+    const stale = await page.evaluate(async input => {
+        const response = await fetch('/api/agent-mandates/incoming', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+        return { status: response.status, body: await response.json() };
+    }, { ...JSON.parse(plainBodies[0]), expectedVersion: 99999 });
+    expect(stale.status).toBe(409);
+    expect(stale.body.status).toBe('not_applied');
+    expect(await counts()).toEqual([1, 1, 0, 0]);
     await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'In arrivo', exact: true }).click();
     for (const label of ['Terapia proposta', 'Prestazione proposta', 'Diagnosi proposta', 'Esenzione proposta']) await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'nota-visita.pdf', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'nota-visita.pdf', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'nota-visita.pdf', exact: true })).toBeVisible();
+    await expect(page.getByTestId('document-preview-pdf-page')).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: 'Chiudi', exact: true }).click();
     await page.screenshot({ path: info.outputPath('nota-pdf-applicati-proposte-in-attesa.png'), fullPage: true });
     const incoming = await (await page.request.get('/api/agent-mandates/incoming')).json();
     expect(incoming.find((row: { id: string }) => row.id === visitId).appliedItemIds).toHaveLength(2);
