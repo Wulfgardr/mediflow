@@ -318,7 +318,20 @@ test('Dossier: estrazione preparata su una cartella mista di più pazienti, cita
         await expect(ramipril).toContainText('Citazione e valori trovati nel testo del documento');
         await expect(ramipril.getByLabel('Principio attivo')).toHaveValue('ramipril');
         await expect(ramipril.getByLabel('Stato')).toHaveValue('active');
-        await expect(document.locator('[data-testid="dossier-fact"][data-kind="diagnosis"][data-origin="prepared"]')).toHaveCount(1);
+        const diagnosis = document.locator('[data-testid="dossier-fact"][data-kind="diagnosis"][data-origin="prepared"]');
+        await expect(diagnosis).toHaveCount(1);
+        const fullText = document.locator('details').filter({ has: page.getByText('Testo completo', { exact: true }) });
+        const mark = fullText.locator('mark');
+        await expect(invented.getByRole('button', { name: 'Mostra nel testo' })).toHaveCount(0);
+        await expect(fullText).not.toHaveAttribute('open');
+        await ramipril.getByRole('button', { name: 'Mostra nel testo' }).press('Enter');
+        await expect(fullText).toHaveAttribute('open', '');
+        await expect(mark).toHaveText('Terapia: Ramipril 5 mg 1 cp al mattino');
+        await expect(mark).toBeInViewport();
+        await expect(mark).toBeFocused();
+        await diagnosis.getByRole('button', { name: 'Mostra nel testo' }).click();
+        await expect(mark).toHaveText('Diagnosi: Ipertensione arteriosa essenziale');
+        await expect(mark).toBeInViewport();
         // Le sintesi si accettano solo con la scelta esplicita di averle lette.
         await panel.getByTestId('dossier-bulk-summaries').check();
         await panel.getByTestId('dossier-bulk').click();
