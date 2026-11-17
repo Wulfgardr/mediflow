@@ -12,6 +12,7 @@ import { sql } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import {
     attachments,
+    agentCassettes,
     ambulatories,
     checkups,
     conversations,
@@ -118,6 +119,7 @@ function buildBackupDataset(): BackupDataset {
     );
 
         return {
+            agentCassettes: tx.select().from(agentCassettes).all(),
             ambulatories: sortBackupRows(ambulatoriesRows),
             attachments: sortBackupRows(filterRowsByReference(attachmentsRows, 'patientId', patientIds)),
             conversations: sortBackupRows(conversationsRows),

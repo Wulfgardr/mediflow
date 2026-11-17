@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Activity, BookOpen, CalendarDays, ChevronDown, CircleHelp, ClipboardList, FolderOpen, LockKeyhole, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, Users, X } from 'lucide-react';
+import { Activity, BookOpen, CalendarDays, ChevronDown, CircleHelp, ClipboardList, FolderOpen, Inbox, LockKeyhole, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, Users, X } from 'lucide-react';
 import { db } from '@/lib/db';
 import { currentWorkspaceDestination } from '@/lib/workspace-destination';
 import { useLiveQuery } from '@/lib/live-query';
@@ -22,6 +22,7 @@ const destinations = [
   { href: '/?area=incarico', label: 'Pazienti', icon: Users },
   { href: '/?area=turno', label: 'Agenda', icon: CalendarDays },
   { href: '/?area=diario', label: 'Diario', icon: BookOpen },
+  { href: '/in-arrivo', label: 'In arrivo', icon: Inbox },
   { href: '/?area=repertori', label: 'Repertori', icon: FolderOpen },
   { href: '/analytics', label: 'Analisi', icon: Activity },
   { href: '/scales', label: 'Scale', icon: ClipboardList },

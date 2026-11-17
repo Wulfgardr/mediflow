@@ -10,7 +10,7 @@ export async function generateMandateKeys(): Promise<Pick<AgentMandateInput, 'pu
         return { publicKey, wrappedPrivateKey };
     } finally { raw.fill(0); }
 }
-export async function openMandatePrivateKey(mandate: AgentMandate): Promise<CryptoKey> {
+export async function openMandatePrivateKey(mandate: Pick<AgentMandate, 'wrappedPrivateKey'>): Promise<CryptoKey> {
     const raw = await db.openLocalDraft(mandate.wrappedPrivateKey);
     if (typeof raw !== 'string') throw new Error('Mandato non disponibile.');
     const bytes = Uint8Array.from(atob(raw), char => char.charCodeAt(0));
