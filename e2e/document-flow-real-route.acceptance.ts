@@ -1,10 +1,4 @@
 import { scopedNotesOpenInput } from './fixtures/scoped-profile-notes-query';
-/* * Test-only scenario for the coordinator's real authenticated synthetic Page.
- * Does not log in, read credentials/storageState, seed a patient, intercept routes,
- * instantiate a substitute component, change settings or manufacture readiness.
- * NOT auto-discovered as a spec: the authoritative bootstrap fixture is absent
- * from this partial package. Invoke inside that existing fixture's test().
- */
 import { randomUUID } from 'node:crypto';
 import { expect, type Page, type Request, type TestInfo } from '@playwright/test';
 import { parseDocumentSynthesisPreviewWire } from '../lib/ai-providers/fabric/document-synthesis-preview-wire';
@@ -41,7 +35,6 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         const method = request.method(); const path = requestUrl.pathname;
         if (!path.startsWith('/api/')) return;
         const keys = path.startsWith(PREFIX) && method === 'POST' ? Object.keys(request.postDataJSON() ?? {}).sort() : undefined;
-        // Only the size of the reviewed-collection precondition is kept: no identifiers or currentness.
         const collection = (method === 'POST' && path === '/api/attachments') || (method === 'DELETE' && /^\/api\/attachments\/[^/]+$/u.test(path))
             ? (request.postDataJSON() as { expectedCollection?: unknown } | null)?.expectedCollection : undefined;
         const collectionRows = collection === undefined ? undefined : Array.isArray(collection) ? collection.length : null;
@@ -53,8 +46,6 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         if (scopedNotesOpenInput(request, url.pathname.split('/')[2], url.origin)) return;
         const attachmentWrite = (method === 'POST' && path === '/api/attachments')
             || (method === 'DELETE' && /^\/api\/attachments\/[^/]+$/u.test(path));
-        // Existing shell migration resets this retired visual preference on mount.
-        // Permit only its exact non-clinical payload, not arbitrary settings writes.
         const settings = method === 'POST' && path === '/api/settings' ? request.postDataJSON() : null;
         const shellPreference = settings?.key === 'uiReduceTransparency' && settings.value === false
             && Object.keys(settings).sort().join(',') === 'key,value';
@@ -106,7 +97,6 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         const suffix = randomUUID();
         const names = [`synthetic-document-a-${suffix}.txt`, `synthetic-document-b-${suffix}.txt`];
         const files = names.map((name, index) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(`Documento di prova inventato ${index + 1}. La sfera è blu. Nessun dato personale o clinico reale.`) }));
-        // Rejection must not consume files, persist anything, or dispatch synthesis.
         await docs.locator('input[type="file"]').setInputFiles(Array.from({ length: 11 }, (_, index) => ({ ...files[0], name: `synthetic-rejected-${index}.txt` })));
         await expect(docs.getByRole('alert')).toContainText('al massimo 10 file');
         expect(writes('POST')).toHaveLength(0);
@@ -116,7 +106,6 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         });
         await expect(rows).toHaveCount(2);
         expect(writes('POST')).toHaveLength(2);
-        // Each file carries the list that was on screen, extended only by the batch's own first write.
         expect(writes('POST').map((item) => item.collectionRows)).toEqual([0, 1]);
         expect(synthesisCalls()).toEqual([]);
         await expect(docs.getByLabel('Documento da sintetizzare')).toHaveValue('');
@@ -125,7 +114,6 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
             await expect(row).toContainText('Caricato il');
             await expect(row.getByTestId('document-source-status')).toHaveText('Allegato salvato · testo non verificato in questa sessione');
         }
-        // A fresh real route read must recover persisted sources, not component memory.
         await page.reload(); await openDocuments(); await expect(rows).toHaveCount(2);
         expect(writes('POST')).toHaveLength(2); expect(synthesisCalls()).toEqual([]);
         const first = rows.filter({ has: page.getByRole('heading', { name: names[0], exact: true }) });
@@ -245,7 +233,6 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         await expect(docs.getByText('Nessun documento caricato.', { exact: false })).toBeVisible();
         await verifyHealth();
     } finally {
-        // Only synthetic request metadata is attached. No headers, cookies, bodies or patient records.
         await info.attach('document-flow-observed-requests', { body: Buffer.from(JSON.stringify({ requests, unexpectedWrites, externalRequests, pageErrors, consoleProblems }, null, 2)), contentType: 'application/json' });
         page.off('request', observe); page.off('pageerror', onPageError); page.off('console', onConsole);
     }

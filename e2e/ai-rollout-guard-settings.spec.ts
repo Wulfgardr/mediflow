@@ -54,8 +54,6 @@ test('settings warns when selected AI model is still on hold in rollout readines
 
   await bootstrapUnlockedSession(page, pin);
   await page.evaluate(async () => {
-    // Reset model selections so the clinical selector starts from a known
-    // recommended state; other specs share this DB and may leave a custom model.
     for (const key of ['aiModel_clinical', 'aiModel_reasoning']) {
       await fetch('/api/settings', {
         method: 'POST',
@@ -69,14 +67,12 @@ test('settings warns when selected AI model is still on hold in rollout readines
       body: JSON.stringify({ key: 'aiPatientInsightKillSwitch', value: 'disabled' }),
     });
   });
-  // WUL-297: model selectors and the rollout guard live on the AI models sub-route.
   await openAiModelsSettings(page);
   await expect(page).toHaveURL(/\/settings\/ai\/modelli$/);
 
   const guardNotice = page.getByTestId('ai-rollout-guard-notice');
   await expect(guardNotice).toBeVisible();
   await expect(guardNotice).toContainText('Quadro paziente');
-  // A disabled local control stays explicit even if a model has readiness evidence.
   await expect(guardNotice).toContainText('Spenta nelle impostazioni');
 
   const clinicalSelector = page.getByTestId('ai-model-selector-clinical');
@@ -89,7 +85,6 @@ test('settings warns when selected AI model is still on hold in rollout readines
 
   await expect(guardNotice).toBeVisible();
   await expect(guardNotice).toContainText('gemma4:e4b');
-  // The hold state remains explicit while a different model is selected.
   await expect(guardNotice).toContainText('In attesa di verifica');
   await expect(guardNotice).toContainText('Generative Challenger');
   await expect(guardNotice).toContainText('therapyStateRecall 0.7 < 0.95');

@@ -54,14 +54,10 @@ export function installAnyDocConsumerDiagnostic(config: string | { pathname: str
         id = `ad1-${scope}-${owner}-${++sequence}`;
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
         headers.set('x-mediflow-anydoc-diagnostic', id);
-        // Fetch reads dictionary properties, including inherited/non-enumerable
-        // values. Preserve their receiver; an empty target also avoids proxy
-        // invariants for non-configurable properties on the original init.
         diagnosticInit = new Proxy({}, {
           get(_target, key) {
             return key === 'headers' ? headers : init == null ? undefined : Reflect.get(init, key, init);
           },
-          // Existing fetch wrappers may spread init before calling native fetch.
           ownKeys: () => Reflect.ownKeys(init ?? {}),
           getOwnPropertyDescriptor(_target, key) {
             const descriptor = Reflect.getOwnPropertyDescriptor(init ?? {}, key);
@@ -87,8 +83,6 @@ export function installAnyDocConsumerDiagnostic(config: string | { pathname: str
     if (observe) void promise.then(response => {
       if (disposed) return;
       try {
-        // Observe the existing cleanup request without reading its body or
-        // delaying it. Its ordering is evidence, never a success criterion.
         if (releasing) { report('release_response', response.status); return; }
         report('fetch_response', response.status);
         const stream = response.body;

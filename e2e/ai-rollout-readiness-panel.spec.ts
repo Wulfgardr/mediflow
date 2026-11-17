@@ -90,7 +90,6 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
 
   });
 
-  // Wave 0.8.1: governance/readiness has its own AI sub-route.
   await page.goto('/settings/ai/governance');
   await expect(page).toHaveURL(/\/settings\/ai\/governance$/);
 

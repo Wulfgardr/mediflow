@@ -1,6 +1,3 @@
-/* WUL-730, criterio 6. Un backup creato non e' un backup verificato: la verifica
-   passa per la rotta che non scrive e un file alterato viene dichiarato non
-   valido. Il ripristino non viene mai avviato da questo test. */
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 

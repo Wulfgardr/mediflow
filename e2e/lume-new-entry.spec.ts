@@ -1,4 +1,3 @@
-/* #71, #75 */
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
 
@@ -34,7 +33,6 @@ async function openNewEntry(page: Page, patient: SyntheticPatient): Promise<void
 }
 
 async function forceSyntheticDraftError(page: Page): Promise<void> {
-  // reach the optional tools through the ordinary disclosure.
   const session = page.locator('details#sessione-visita');
   if (await session.getAttribute('open') === null) {
     await session.locator(':scope > summary').click();
@@ -88,8 +86,6 @@ async function attachVisualProof(
   await editor.focus();
   await expect(editor).toBeFocused();
 
-  // the ordinary composer has one sheet and inline disclosures;
-  // validate their actual geometry instead of the retired rail/aside grid.
   const overflowProof = await page.getByTestId('progressive-entry-composer').evaluate((composer) => {
     const form = composer.querySelector<HTMLElement>('form[aria-label="Nuova voce clinica"]');
     const sheet = composer.querySelector<HTMLElement>('[data-testid="lume-editor-workflow"]');
@@ -141,7 +137,6 @@ async function attachVisualProof(
     expect(surface.backdropFilter).toBe('none');
   }
 
-  /* #75: toolbar, canvas e campo restano opachi e contenuti sul viewport reale. */
   const editorSurfaces = await page.locator('[data-lume-editor-surface]').evaluateAll((elements) =>
     elements.map((element) => {
       const node = element as HTMLElement;
@@ -189,7 +184,6 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
     await expect(dateInput).toBeEditable();
     await expect(dateInput).not.toHaveAttribute('aria-describedby', /.+/u);
 
-    /* #75 */
     const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
     await expect(editor).toHaveAttribute('aria-multiline', 'true');
     await expect(editor).toHaveAttribute('aria-required', 'true');
@@ -221,8 +215,6 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
       await expect(moreTools).toHaveAttribute('aria-expanded', 'false');
     }
 
-    // ordinary native selects preserve type/setting values and
-    // keyboard order; the previous segmented buttons are no longer rendered.
     const entryType = page.getByRole('combobox', { name: 'Tipo di voce', exact: true });
     const setting = page.getByRole('combobox', { name: 'Luogo della voce clinica', exact: true });
     await expect(entryType).toHaveValue('visit');

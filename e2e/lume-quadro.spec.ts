@@ -1,4 +1,3 @@
-/* #98, #68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   assertKeyboardFocusProgresses,
@@ -71,8 +70,6 @@ async function setRegister(page: Page, register: QuadroCase['register']): Promis
   }, register);
 }
 
-/* ADR 0123: the real synoptic reader replaces the four static mockup
-   metric cards. Clinical numbers below come from API-created records. */
 async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<{ quadro: Locator; patient: LivePatientFixture }> {
   await page.setViewportSize({ width: quadroCase.width, height: quadroCase.height });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -103,7 +100,6 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
   await expect(quadro.getByText('Controllo sintetico del Quadro', { exact: true })).toBeVisible();
   await expect(quadro.getByText('5 mg · 1-0-0', { exact: true })).toBeVisible();
   await expect(quadro.locator('[aria-pressed]')).toHaveCount(0);
-  // A reader remains a flat surface: no second focal card or decorative shadow.
   const elevations = await quadro.evaluate((element) => [element, ...element.querySelectorAll('*')]
     .filter(node => (node as HTMLElement).offsetParent !== null && getComputedStyle(node).boxShadow !== 'none')
     .map(node => node.tagName));
@@ -195,7 +191,6 @@ for (const quadroCase of QUADRO_CASES) {
     ]);
     if (quadroCase.width <= 390) await assertReflowStack(quadro);
     await page.screenshot({ path: test.info().outputPath('quadro.png'), fullPage: true, animations: 'disabled' });
-    // Values lead to the same patient and the underlying working modules.
     await openPatientSection(page, 'terapie');
     await expect(page.locator('#terapie')).toHaveAttribute('data-folder-active', 'true');
     await expect(page.locator('#terapie')).toContainText('Ramipril sintetico');

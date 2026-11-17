@@ -3,7 +3,6 @@ export type Capture = { id: string; url: string; status: number; cacheControl: s
 export type CaptureApi = { arm(id: string, operation: CaptureOperation): void; take(id: string): Promise<Capture>; check(): void; dispose(): void };
 export type CaptureGlobal = typeof globalThis & { __mfSameResponse?: CaptureApi };
 
-// Self-contained: Playwright serializes this function into the fresh fixture page.
 export function installSameResponseCapture(options: { base: string; namespace: string; projectUrl?: string }) {
     const host = globalThis as CaptureGlobal;
     const origin = new URL(options.base);
@@ -55,8 +54,6 @@ export function installSameResponseCapture(options: { base: string; namespace: s
     };
     Object.defineProperty(host, '__mfSameResponse', { value: Object.freeze(api), configurable: true });
     const wrappedFetch: typeof fetch = function(this: unknown, input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-        // Only this real caller's selected POST is observed. Arguments and native
-        // promise/Response/stream/reader/read-promise identity are preserved.
         const url = new URL(input instanceof Request ? input.url : String(input), globalThis.location.href).href;
         const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
@@ -80,8 +77,6 @@ export function installSameResponseCapture(options: { base: string; namespace: s
         try { promise = Reflect.apply(nativeFetch, this, [input, init]); }
         catch (error) { if (record) fail(record, 'ORACLE_FETCH_REJECTED'); throw error; }
         if (record && record.count === 1) {
-            // An extra observation reaction does affect scheduling. It does not
-            // replace a native promise or consume data; tests cover that boundary.
             void promise.then(response => {
                 try {
                     record.response = response; // Hold THIS Response through the network/EOF assertion, never a server substitute.
@@ -107,7 +102,6 @@ export function installSameResponseCapture(options: { base: string; namespace: s
                             return result;
                         } });
                         Object.defineProperty(reader, 'cancel', { configurable: true, value: function(this: ReadableStreamDefaultReader<Uint8Array>, reason?: unknown) {
-                            // done:true AFTER cancel is not evidence of natural EOF.
                             if (!record.eof) fail(record, 'ORACLE_CANCEL_BEFORE_EOF');
                             return Reflect.apply(cancel, this, [reason]);
                         } });

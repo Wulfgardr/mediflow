@@ -1,4 +1,3 @@
-/* J-3 (ADR 0177): catalogo farmaci di un'altra agenzia dal browser, ritorno ad AIFA, terapie salvate con i codici invariati. */
 import { test, expect } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import Database from 'better-sqlite3';
@@ -6,9 +5,7 @@ import { join } from 'node:path';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 
-// Feed AIFA inventato: tre confezioni valide e una riga scartata.
 const AIFA_CSV = readFileSync(join(__dirname, '../scripts/fixtures/aifa-confezioni-synthetic.csv'));
-// Catalogo di un'agenzia inventata, con intestazioni che non coincidono con i nomi attesi: le colonne si associano a mano.
 const AGENCY_CSV = Buffer.from([
   'Identificativo;Prodotto;Sostanza;Classe terapeutica;Nota interna',
   'AGX-0001;PASTIGLIA INVENTATA;Sostanza inventata;N02BE01;nessuna',
@@ -72,14 +69,12 @@ test('J-3: catalogo di un’altra agenzia con fonte, colonne, anteprima e confer
   const db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
   const therapies = () => db.prepare('SELECT id, drug_name, aic, atc FROM therapies WHERE patient_id=? ORDER BY drug_name').all(patientId) as TherapyCodes[];
   try {
-    // 1. Catalogo AIFA (inventato) e una terapia scelta da lì.
     await importAifa(page, 'Feed sintetico J3 uno');
     expect(await status()).toMatchObject({ count: 3, state: 'ready', manifest: { version: 'Feed sintetico J3 uno' } });
     await saveTherapyFromCatalog(page, patientId, 'ACIDO', 'ACIDO SINTETICO');
     const aifaTherapy = therapies();
     expect(aifaTherapy).toEqual([expect.objectContaining({ drug_name: 'ACIDO SINTETICO', aic: '000000101', atc: 'B01AC06' })]);
 
-    // 2. Catalogo di un'altra agenzia: fonte, file, colonne, anteprima, conferma.
     await openRepertori(page, /^Farmaci da un’altra agenzia/u);
     const panel = page.getByRole('region', { name: 'Catalogo farmaci di un’altra agenzia', exact: true });
     await panel.getByLabel('Agenzia o ente').fill(AGENCY);
@@ -91,7 +86,6 @@ test('J-3: catalogo di un’altra agenzia con fonte, colonne, anteprima e confer
     const columns = panel.getByRole('group', { name: 'Associazione delle colonne', exact: true });
     await expect(columns).toContainText('Colonne di agenzia-inventata.csv');
     await expect(columns.getByLabel(/^Separatore/u)).toHaveValue(';');
-    // Nessuna intestazione è riconosciuta: le obbligatorie restano da associare e l'anteprima è ferma.
     await expect(columns.getByLabel(/^Codice \(obbligatorio\)/u)).toHaveValue('');
     await expect(columns.getByRole('button', { name: 'Genera anteprima', exact: true })).toBeDisabled();
     await columns.getByLabel(/^Codice \(obbligatorio\)/u).selectOption({ label: 'Identificativo' });
@@ -107,7 +101,6 @@ test('J-3: catalogo di un’altra agenzia con fonte, colonne, anteprima e confer
     await expect(preview.getByRole('row').filter({ hasText: 'AGX-0001' })).toContainText('N02BE01');
     const importButton = preview.getByRole('button', { name: 'Importa catalogo', exact: true });
     await expect(importButton).toBeDisabled();
-    // Nulla è scritto finché l'anteprima non è confermata.
     expect((await status()).manifest?.version).toBe('Feed sintetico J3 uno');
     await page.screenshot({ path: join(evidence, 'anteprima.png'), fullPage: true });
     await preview.getByLabel('Ho controllato fonte, colonne e anteprima.').check();
@@ -119,7 +112,6 @@ test('J-3: catalogo di un’altra agenzia con fonte, colonne, anteprima e confer
     await expect(page.getByTestId('aifa-catalog-guide')).toContainText('Catalogo attivo da un’altra agenzia');
     await expect(page.getByTestId('aifa-catalog-guide')).toContainText(`${AGENCY} · AGX 2026.1 del 2026-10-15 · 3 voci`);
 
-    // Con il catalogo dell'agenzia il codice resta nel catalogo e non diventa un AIC.
     await saveTherapyFromCatalog(page, patientId, 'PASTIGLIA', 'PASTIGLIA INVENTATA');
     const beforeReturn = therapies();
     expect(beforeReturn).toEqual([
@@ -127,7 +119,6 @@ test('J-3: catalogo di un’altra agenzia con fonte, colonne, anteprima e confer
       expect.objectContaining({ drug_name: 'PASTIGLIA INVENTATA', aic: '', atc: 'N02BE01' }),
     ]);
 
-    // 3. Ritorno ad AIFA: il catalogo dell'agenzia è sostituito, le terapie no.
     await importAifa(page, 'Feed sintetico J3 due');
     const back = await status();
     expect(back).toMatchObject({ count: 3, state: 'ready', manifest: { version: 'Feed sintetico J3 due' } });

@@ -78,7 +78,6 @@ for (const area of ['turno', 'diario'] as const) test(`Agenda and global diary: 
   let release = () => {};
   page.on('pageerror', error => errors.push(error.message));
   const surface = area === 'turno' ? page.getByTestId('agenda-area') : page.getByTestId('lume-diario');
-  // The baseline predates the Agenda test id; the owning heading identifies the same surface.
   const baselineSurface = area === 'turno' ? page.getByRole('heading', { level: 1, name: /^Agenda/ }).locator('../../..') : surface;
   const targetSurface = baseline ? baselineSurface : surface;
   const content = area === 'turno' ? 'Controllo inventato 0' : 'Voce inventata 0';
