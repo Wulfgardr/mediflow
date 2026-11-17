@@ -9,6 +9,7 @@ import { RETIRED_FEATURE_TABLES_SQL } from './ambulatory-destructive-command-rec
 
 function predecessor() {
     const db = new Database(':memory:'); initializeSqliteSchema(db);
+    for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) db.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
     for (const sql of RETIRED_FEATURE_TABLES_SQL) db.exec(sql);
     for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) db.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
     db.exec('ALTER TABLE entries DROP COLUMN recorded_by');

@@ -35,7 +35,7 @@ export type PatientProfileUpdateEnvelope = PatientProfileUpdateContract & Readon
     idempotencyKey: string;
     executor: 'legacy-node';
     purpose: 'patient-profile-update';
-    author: Readonly<{ kind: 'user' | 'system'; ref: string; surface: 'web' | 'native' | 'api' | 'job' }>;
+    author: Readonly<{ kind: 'user' | 'system'; ref: string; surface: 'web' | 'native' | 'api' | 'job' | 'agent' }>;
     authorization: Readonly<{ kind: 'existing-host-admission'; commitGuard: 'paired-transaction' | 'archive-audit' }>;
     scope: Readonly<{ kind: 'local' } | { kind: 'ambulatory'; ambulatoryId: string }>;
     confirmation: 'legacy-not-attested';

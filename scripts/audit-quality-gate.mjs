@@ -1320,7 +1320,7 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
     const input = audit.arguments[1] && unwrap(audit.arguments[1]);
     const props = input && ts.isObjectLiteralExpression(input)
         ? exactPropertyAssignments(input, ['eventType', 'outcome', 'archiveGeneration', 'actorType', 'actorRef',
-            'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata']) : null;
+            'subjectType', 'subjectRef', 'sourceSurface', 'requestId', ...(input.properties.some(property => property.name?.text === 'agentProvenance') ? ['agentProvenance'] : []), 'redactedMetadata']) : null;
     const literal = (name, value) => {
         const node = props?.get(name)?.initializer;
         return node && ts.isStringLiteral(node) && node.text === value;
@@ -1758,7 +1758,7 @@ export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSour
     }
     const input = audit.arguments[1] && unwrap(audit.arguments[1]);
     const auditKeys = ['eventType', 'outcome', 'archiveGeneration', 'actorType', 'actorRef',
-        'subjectType', 'subjectRef', 'sourceSurface', 'requestId', ...(spec.profileFile ? ['occurredAt'] : []), 'redactedMetadata'];
+        'subjectType', 'subjectRef', 'sourceSurface', 'requestId', ...(input?.properties?.some(property => property.name?.text === 'agentProvenance') ? ['agentProvenance'] : []), ...(spec.profileFile ? ['occurredAt'] : []), 'redactedMetadata'];
     const props = input && ts.isObjectLiteralExpression(input) ? exactPropertyAssignments(input, auditKeys) : null;
     const event = props?.get('eventType')?.initializer;
     const subject = props?.get('subjectType')?.initializer;

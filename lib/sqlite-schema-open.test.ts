@@ -538,3 +538,69 @@ test('ADR 0080 elenca ogni versione dello schema fino a quella corrente', () => 
     assert.doesNotMatch(table, /\|\n\n\|/u, 'una riga vuota spezza la tabella');
     assert.ok(adr.includes(`La versione SQLite corrente è \`user_version=${CURRENT_SQLITE_SCHEMA_VERSION}\``));
 });
+
+test('schema 12 preserves the v11 original, historical audit, recoverability and no-DDL reopen', () => {
+    const w = workspace();
+    try {
+        const old = seed(w.file);
+        for (const field of ['proposer_ref', 'mandate_ref', 'model_provider']) {
+            if ((old.pragma('table_info(audit_events)') as { name: string }[]).some(column => column.name === field)) old.exec(`ALTER TABLE audit_events DROP COLUMN ${field}`);
+        }
+        old.pragma('user_version = 11');
+        old.exec("INSERT INTO audit_events(event_id,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,source_surface) VALUES ('synthetic-v11','patient.updated',1,'success','user','synthetic-doctor','patient','web')");
+        const historical = old.prepare('SELECT * FROM audit_events').all();
+        old.close();
+        const migrated = openVersionedSqliteDatabase(w.file);
+        assert.equal(migrated.pragma('user_version', { simple: true }), 12);
+        assert.deepEqual(migrated.prepare('SELECT proposer_ref,mandate_ref,model_provider FROM audit_events').get(), { proposer_ref: null, mandate_ref: null, model_provider: null });
+        migrated.close();
+        assert.equal(originals(w.directory).length, 1);
+        const originalPath = path.join(w.directory, originals(w.directory)[0]);
+        const original = new Database(originalPath, { readonly: true });
+        assert.equal(original.pragma('user_version', { simple: true }), 11);
+        assert.equal(original.pragma('integrity_check', { simple: true }), 'ok');
+        assert.deepEqual(original.prepare('SELECT * FROM audit_events').all(), historical);
+        original.close();
+        const recoveredPath = path.join(w.directory, 'synthetic-recovered.db');
+        fs.copyFileSync(originalPath, recoveredPath);
+        const recovered = openVersionedSqliteDatabase(recoveredPath);
+        assert.equal(recovered.pragma('user_version', { simple: true }), 12);
+        assert.equal(recovered.prepare("SELECT event_id FROM audit_events WHERE event_id='synthetic-v11'").pluck().get(), 'synthetic-v11');
+        recovered.close();
+        const reopened = openVersionedSqliteDatabase(w.file, file => {
+            const db = new Database(file), prepare = db.prepare.bind(db), exec = db.exec.bind(db);
+            db.prepare = ((sql: string) => { assert.doesNotMatch(sql, /\b(?:ALTER|CREATE|DROP|REINDEX)\b/iu); return prepare(sql); }) as typeof db.prepare;
+            db.exec = ((sql: string) => { assert.doesNotMatch(sql, /\b(?:ALTER|CREATE|DROP|REINDEX)\b/iu); return exec(sql); }) as typeof db.exec;
+            return db;
+        });
+        reopened.close();
+    } finally { w.cleanup(); }
+});
+
+test('schema 12 migration failure rolls back all provenance columns and permits retry from v11', () => {
+    const w = workspace();
+    try {
+        const old = seed(w.file);
+        for (const field of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${field}`);
+        old.pragma('user_version = 11');
+        const schema = old.prepare('SELECT type,name,sql FROM sqlite_schema ORDER BY type,name').all();
+        old.close();
+        assert.throws(() => openVersionedSqliteDatabase(w.file, file => {
+            const db = new Database(file), prepare = db.prepare.bind(db);
+            db.prepare = ((sql: string) => {
+                const statement = prepare(sql);
+                if (sql.includes('ADD COLUMN mandate_ref')) { statement.run(); throw new Error('SYNTHETIC_AGENT_DDL_FAILURE'); }
+                return statement;
+            }) as typeof db.prepare;
+            return db;
+        }), /SYNTHETIC_AGENT_DDL_FAILURE/);
+        const rolledBack = new Database(w.file, { readonly: true });
+        assert.equal(rolledBack.pragma('user_version', { simple: true }), 11);
+        assert.deepEqual(rolledBack.prepare('SELECT type,name,sql FROM sqlite_schema ORDER BY type,name').all(), schema);
+        rolledBack.close();
+        assert.equal(originals(w.directory).length, 0);
+        const retried = openVersionedSqliteDatabase(w.file);
+        assert.equal(retried.pragma('user_version', { simple: true }), 12);
+        retried.close();
+    } finally { w.cleanup(); }
+});

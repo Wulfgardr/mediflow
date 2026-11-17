@@ -84,7 +84,7 @@ async function fixture(paddingBytes = 0) {
     const statusAudit = { eventId: '31111111-1111-4111-8111-111111111111', schemaVersion: 1, eventType: 'therapy.updated',
         occurredAt: 1783000000, outcome: 'success', actorType: 'user', actorRef: actor, subjectType: 'therapy', subjectRef: 'synthetic-historical-therapy',
         sourceSurface: 'web', requestId: statusCommand, redactedMetadata: JSON.stringify({ changedFields: ['status', 'endDate'], resourceVersion: 2 }), createdAt: 1783000000 };
-    db.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(...Object.values(statusAudit));
+    db.prepare('INSERT INTO audit_events (event_id,schema_version,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,request_id,redacted_metadata,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(...Object.values(statusAudit));
     db.prepare(`INSERT INTO therapy_status_commands VALUES (?, 'therapy.status.change.v1', ?, ?, 'synthetic-patient', 'synthetic-historical-therapy', 1,
         'completed', 'applied', NULL, 1783000000, 2, 1783000000, ?, ?)`).run(statusCommand, readSqliteArchiveGeneration(db), actor, statusAudit.eventId, JSON.stringify(statusAudit));
     db.prepare(`INSERT INTO therapy_status_commands VALUES ('41111111-1111-4111-8111-111111111111', 'therapy.status.change.v1', ?, ?, 'synthetic-patient',
@@ -92,7 +92,7 @@ async function fixture(paddingBytes = 0) {
     const ambulatoryAudit = { eventId: '61111111-1111-4111-8111-111111111111', schemaVersion: 1, eventType: 'ambulatory.cleared',
         occurredAt: 1783000000, outcome: 'success', actorType: 'user', actorRef: actor, subjectType: 'ambulatory', subjectRef: 'synthetic-historical-ambulatory',
         sourceSurface: 'web', requestId: '51111111-1111-4111-8111-111111111111', redactedMetadata: JSON.stringify({ resourceVersion: 2 }), createdAt: 1783000000 };
-    db.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(...Object.values(ambulatoryAudit));
+    db.prepare('INSERT INTO audit_events (event_id,schema_version,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,request_id,redacted_metadata,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(...Object.values(ambulatoryAudit));
     const insertAmbulatory = db.prepare(`INSERT INTO ambulatory_destructive_commands VALUES (?, 'ambulatory.destructive.v1', 'ambulatory.clear-test.v1', ?,
         'synthetic-original-scope', 'synthetic-historical-ambulatory', 1, ?, ?, 'synthetic-paired-client', 'ios', ?, ?, ?, 1783000000, ?, ?)`);
     const result = JSON.stringify({ targetVersion: 2, affectedAmbulatories: [{ id: 'synthetic-historical-ambulatory', version: 2 }],
@@ -245,7 +245,7 @@ test(`initialized destination rejects ${mutation} without changing any bytes`, a
         const target = openVersionedSqliteDatabase(f.destination);
         if (mutation === 'extra-setting') target.exec("INSERT INTO settings VALUES ('synthetic-extra','keep')");
         if (mutation === 'changed-marker') target.exec("UPDATE settings SET value='{}'");
-        if (mutation === 'extra-audit') target.exec("INSERT INTO audit_events SELECT '11111111-1111-4111-8111-111111111111',schema_version,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,request_id,redacted_metadata,created_at FROM audit_events");
+        if (mutation === 'extra-audit') target.exec("INSERT INTO audit_events(event_id,schema_version,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,request_id,redacted_metadata,created_at) SELECT '11111111-1111-4111-8111-111111111111',schema_version,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,request_id,redacted_metadata,created_at FROM audit_events");
         if (mutation === 'changed-audit') { target.exec('DROP TRIGGER audit_events_no_update'); target.exec("UPDATE audit_events SET actor_ref='synthetic-other'"); }
         if (mutation === 'authority') commitTerritorialPackTransition(target, { schemaVersion: TERRITORIAL_PACK_SCHEMA,
             preset: 'core+it', expectedRevision: 0, confirmed: true }, { actorType: 'system', actorRef: 'synthetic', sourceSurface: 'job' }, () => {});
@@ -260,7 +260,7 @@ test(`initialized destination rejects ${mutation} without changing any bytes`, a
 
 function assertPredecessorAuditHistory(actual: Record<string, unknown>[], expected: Record<string, unknown>[]): void {
     const originalIds = new Set(expected.map(row => row.event_id));
-    for (const row of expected) assert.deepEqual(actual.find(candidate => candidate.event_id === row.event_id), row);
+    for (const row of expected) assert.deepEqual(actual.find(candidate => candidate.event_id === row.event_id), { ...row, proposer_ref: null, mandate_ref: null, model_provider: null });
     const added = actual.filter(row => !originalIds.has(row.event_id));
     assert.deepEqual(added.map(row => row.event_type).sort(), ['backup.provenance.unattested', 'territorial.packs.preserved']);
 }
@@ -275,6 +275,7 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
+        for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
@@ -315,6 +316,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
+        for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
@@ -357,6 +359,7 @@ for (const alteration of ['none', 'column', 'index', 'view', 'authority-table'])
         old.exec('DROP TABLE synthetic_extension');
         old.exec('DROP TABLE portable_import_origins');
         old.pragma('user_version=6');
+        for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN drift TEXT');
         if (alteration === 'index') old.exec('CREATE INDEX drift ON therapies(status)');
@@ -442,6 +445,7 @@ test('encrypted v10 predecessor recovers without the tables of the removed featu
         const file = path.join(f.root, 'canonical10.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
         old.exec('DROP TABLE synthetic_extension; PRAGMA user_version=10;');
+        for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
         old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE');
         const expected = contents(old); old.close();
@@ -463,6 +467,7 @@ test('encrypted v9 predecessor resta recuperabile dopo l’aggiunta dell’autor
         const file = path.join(f.root, 'canonical9.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
         old.exec('DROP TABLE synthetic_extension; ALTER TABLE entries DROP COLUMN recorded_by; PRAGMA user_version=9;');
+        for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
         old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE');
         const expected = contents(old); old.close();
@@ -488,6 +493,7 @@ test(`encrypted 0.9.0 predecessor (schema 3) ${alteration}: the published releas
             DROP TABLE prosthetics_catalog_documents; DROP TABLE prosthetics_catalog_sources;
             ALTER TABLE prosthetics_catalog_entries DROP COLUMN source_id; ALTER TABLE prosthetic_prescriptions DROP COLUMN catalog_snapshot;
             PRAGMA user_version=3;`);
+        for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
         // A 0.9.0 archive cannot carry tables introduced after the release.
         if (alteration === 'prosthetics-source') old.exec('CREATE TABLE prosthetics_catalog_sources (id TEXT PRIMARY KEY)');
@@ -509,6 +515,28 @@ test(`encrypted 0.9.0 predecessor (schema 3) ${alteration}: the published releas
                 assert.equal(await decryptData(ciphertext, iv, f.key), 'nota clinica sintetica recuperabile');
             } finally { restored.close(); }
         }
+        assert.deepEqual(fs.readFileSync(file), bytes);
+    } finally { f.cleanup(); }
+});
+
+test('encrypted v11 predecessor restores historical audit into schema 12 without fabricating agent provenance', async () => {
+    const f = await fixture();
+    try {
+        const file = path.join(f.root, 'canonical11.db');
+        fs.writeFileSync(file, f.snapshot);
+        const old = new Database(file);
+        old.exec('DROP TABLE synthetic_extension; PRAGMA user_version=11;');
+        for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
+        old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE');
+        const expected = contents(old); old.close();
+        const bytes = fs.readFileSync(file), artifact = await encryptRecoveryBackup(bytes, f.key);
+        await f.restore({ artifact });
+        const restored = openVersionedSqliteDatabase(f.destination);
+        try {
+            assert.equal(restored.pragma('user_version', { simple: true }), 12);
+            for (const table of ['users', 'patients', 'entries', 'therapy_status_commands', 'ambulatory_destructive_commands']) assert.deepEqual(contents(restored)[table], expected[table]);
+            assertPredecessorAuditHistory(contents(restored).audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
+        } finally { restored.close(); }
         assert.deepEqual(fs.readFileSync(file), bytes);
     } finally { f.cleanup(); }
 });

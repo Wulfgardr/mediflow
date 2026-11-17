@@ -1,18 +1,18 @@
 import type { dbServer } from './db-server';
 import type { ServerSession } from './security/server-session';
-import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction, type AuditRedactedMetadata } from './security/audit';
+import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction, type AgentAuditProvenance, type AuditRedactedMetadata } from './security/audit';
 
-/** Actor and surface come only from the admitted host session. */
 export function writeAttachmentWebAudit(
     tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
     request: Request, session: ServerSession,
     eventType: 'attachment.created' | 'attachment.deleted' | 'attachment.updated', id: string,
     metadata?: Pick<AuditRedactedMetadata, 'changedFields' | 'resourceVersion'>,
+    agentProvenance?: AgentAuditProvenance,
 ): void {
     const actor = auditContextFromSession(session);
     writeAuditEventInTransaction(tx, {
         eventType, outcome: 'success', archiveGeneration: actor.archiveGeneration, actorType: actor.actorType, actorRef: actor.actorRef,
-        sourceSurface: actor.sourceSurface, subjectType: 'attachment', subjectRef: id,
+        sourceSurface: agentProvenance ? 'agent' : actor.sourceSurface, agentProvenance, subjectType: 'attachment', subjectRef: id,
         requestId: requestIdFromRequest(request), redactedMetadata: withAuditContextMetadata(actor, metadata),
     });
 }

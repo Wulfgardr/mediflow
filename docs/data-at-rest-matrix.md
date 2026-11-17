@@ -95,8 +95,8 @@ locali salvano ciò che ricevono.
 
 ### `audit_events`: registro di audit
 
-- In chiaro: `event_id`, `schema_version`, `event_type`, `occurred_at`, `outcome`, `actor_type`, `actor_ref`, `subject_type`, `subject_ref`, `source_surface`, `request_id`, `redacted_metadata`, `created_at`
-- Leggibile senza chiave: tipo di evento, attore, identificativo del soggetto e metadati minimizzati.
+- In chiaro: `event_id`, `schema_version`, `event_type`, `occurred_at`, `outcome`, `actor_type`, `actor_ref`, `subject_type`, `subject_ref`, `source_surface`, `request_id`, `redacted_metadata`, `created_at`, `proposer_ref`, `mandate_ref`, `model_provider`
+- Leggibile senza chiave: tipo di evento, attore, identificativo del soggetto e metadati minimizzati. La superficie agente conserva anche i riferimenti opachi di proponente e mandato ed il fornitore dichiarato. Questi metadati non sono cifrati.
 
 ### `portable_import_origins`: provenienza assegnata dall'archivio (schema 7)
 
