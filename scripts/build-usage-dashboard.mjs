@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// publication renderer; reads only the sanitized aggregate snapshot.
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';

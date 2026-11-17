@@ -29,7 +29,6 @@ function parseArgs(argv) {
     runs: 7,
     port: 3113,
     out: path.join(ROOT_DIR, 'docs/analysis/2026-07-17-baseline-performance.json'),
-    // Keep the absolute path below the macOS Unix-socket limit used by PM2.
     dataRoot: path.join(ROOT_DIR, 'tmp-perf'),
     distDir: '.next-performance-baseline',
     skipBuild: false,
@@ -119,7 +118,6 @@ async function waitForServer(server, baseUrl) {
       const response = await fetch(`${baseUrl}/api/system/revision`, { cache: 'no-store' });
       if (response.ok) return;
     } catch {
-      // Avvio non ancora completato.
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }

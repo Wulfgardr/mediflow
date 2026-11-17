@@ -19,7 +19,6 @@ type FrozenBaseline = { baseline: string; baselineSourceSha256: string;
 
 export async function measureClinicalFalsePositives() {
     const started = performance.now();
-    // The historical run is frozen evidence, never executable runtime authority.
     const baselineBytes = fs.readFileSync(path.join(ROOT, BASELINE_FILE));
     if (sha(baselineBytes) !== BASELINE_SHA256) throw new Error('baseline_snapshot_changed');
     const baseline = JSON.parse(baselineBytes.toString('utf8')) as FrozenBaseline;

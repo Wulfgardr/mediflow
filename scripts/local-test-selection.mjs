@@ -85,8 +85,6 @@ export function localTestCommands(root) {
   });
 }
 export function collectLocalTestSelections(root) {
-  // An absent registry is allowed for small synthetic inventory fixtures. A mapped
-  // local entry still fails UNKNOWN_SUITE; deleting the real registry never waives it.
   if (!fs.existsSync(path.join(root, 'scripts/local-test-recipes.json'))) return {};
   try { return Object.fromEntries(localTestCommands(root).map(command => ['local:' + command.id,
     { files: command.files, errors: [], mode: 'local', binding: { command: ['node', 'scripts/local-test-selection.mjs', command.id], parameters: command.parameters ?? [], prerequisites: command.prerequisites } }])); }

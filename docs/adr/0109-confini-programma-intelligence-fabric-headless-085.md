@@ -6,7 +6,7 @@ Status: Accepted
 Issue: WUL-522, WUL-564
 Program line: candidato sorgente locale `0.8.5`
 
-Related: [ADR 0072](./0072-voice-visit-capture-fluid-boundary.md),
+Related: [ADR 0072](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0072-voice-visit-capture-fluid-boundary.md),
 [ADR 0094](./0094-intelligence-fabric-headless-contract-085.md),
 [ADR 0100](./0100-fabric-vs-headless-semantic-plane.md),
 [ADR 0103](./0103-headless-clinician-authorized-soap-entry-write.md),

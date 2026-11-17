@@ -1,9 +1,4 @@
 #!/bin/bash
-# Structural guard for the universal Apple app (Fase 0). The Xcode project
-# (native/MediFlowAppleApp) is the sole shippable artifact; the SPM package
-# (native/MediFlowMac) must stay a library + tests only. This fails if the
-# retired duplicate app shells or executables reappear, so the dead-code
-# regression the review found cannot silently come back.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

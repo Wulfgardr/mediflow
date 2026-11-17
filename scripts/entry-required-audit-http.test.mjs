@@ -1,4 +1,3 @@
-/* synthetic real HTTP proof for Web-cookie and local-token diary admission. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
@@ -31,7 +30,7 @@ async function request(method, pathname, { headers = {}, body, rawBody } = {}) {
     });
     const raw = await response.text();
     let json = null;
-    try { json = raw ? JSON.parse(raw) : null; } catch { /* status remains authoritative */ }
+    try { json = raw ? JSON.parse(raw) : null; } catch {  }
     return { status: response.status, json };
 }
 

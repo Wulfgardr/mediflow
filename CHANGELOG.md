@@ -19,7 +19,7 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
   e alias non ammessi. Il controllo precede anche la verifica delle dipendenze
   nel comando `npm run build`; un input rifiutato richiede un'area di build pulita.
   La DerivedData Mac predefinita rimane esterna ai sorgenti
-  ([guida nativa](./docs/native-launch.md)).
+  ([guida nativa](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md)).
 - Un solo lanciatore per macOS, Windows e Linux: `MediFlow.command`,
   `MediFlow.cmd` e `MediFlow.sh` chiedono come vuoi usare MediFlow e avviano
   la build di produzione nell'uso ordinario. La configurazione sta nella

@@ -11,7 +11,7 @@ Issue: [GitHub #278](https://github.com/Wulfgardr/mediflow/issues/278)
 
 Program line: candidata `0.8.5`, packet `F6`
 
-Related: [ADR 0088](./0088-deterministic-pdf-page-router.md),
+Related: [ADR 0088](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0088-deterministic-pdf-page-router.md),
 [ADR 0092](./0092-limite-digest-bound-readiness-ai-locale.md),
 [ADR 0099](./0099-ocr-document-locator-and-source-currentness.md),
 [ADR 0107](./0107-anydoc-local-attachment-extraction.md) e

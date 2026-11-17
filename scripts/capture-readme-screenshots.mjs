@@ -115,7 +115,6 @@ async function waitForServer(server) {
     try {
       if ((await fetch(`${BASE_URL}/api/system/revision`, { cache: 'no-store' })).ok) return;
     } catch {
-      // The server is still compiling. The next poll observes readiness.
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -203,9 +202,6 @@ async function main() {
   const originalTsconfig = fs.readFileSync(TSCONFIG_PATH, 'utf8');
   await run('npm', ['run', 'check:node-runtime']);
   if (!REUSE_SERVER) {
-    /* Preflight fail-closed: un server stantio sulla porta risponderebbe con un
-       database gia' popolato e i seed collidono. Meglio fermarsi con un rimedio
-       chiaro che catturare dati imprevedibili. */
     const stale = await fetch(BASE_URL, { signal: AbortSignal.timeout(1500) })
       .then(() => true)
       .catch(() => false);

@@ -235,13 +235,13 @@ function exactParsedApplicationLockReceiptState(value: unknown): 'server_invalid
     }
 }
 
-export async function requestApplicationLockConfirmation(): Promise<boolean> {
+export async function requestApplicationLockConfirmation(reason: 'manual' | 'inactivity' = 'manual'): Promise<boolean> {
     const initialEtag = currentAuthControlEtag;
     if (!initialEtag) return false;
 
     const send = async (etag: string, idempotencyKey: string) => {
         const execute = async () => {
-            const response = await fetch('/api/auth/lock', authMutationInit({ method: 'POST' }, etag, idempotencyKey));
+            const response = await fetch('/api/auth/lock', authMutationInit({ method: 'POST', headers: { 'x-mediflow-lock-reason': reason } }, etag, idempotencyKey));
             const responseEtag = retainAuthControlEtag(response, etag).etag;
             const text = await response.text();
             if (!text) return { response, responseEtag, state: null } as const;

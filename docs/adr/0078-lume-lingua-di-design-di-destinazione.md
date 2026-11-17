@@ -26,7 +26,7 @@ l'intensita nel ciclo successivo.
   `docs/design/vetro-clinico/` (canone consolidato dello stato attuale) e
   `docs/design/lume/` (lingua nuova proposta, con dimostratore).
 - Lume deriva da ricerca documentale in tre ambiti con fonti
-  (`docs/design/lume/02-derivazione.md`) e sintesi progettuale.
+  ([docs/design/lume/02-derivazione.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/design/lume/02-derivazione.md)) e sintesi progettuale.
 - Vincoli invarianti: ADR 0047 (nessun selettore di stile UI persistito),
   ADR 0060 (cockpit alla root), ADR 0065 (claims guard), regole redazionali
   (niente trattino lungo, niente meta-testo, stati vuoti onesti), contratto
@@ -68,7 +68,7 @@ Si adotta l'opzione 2:
    i consumatori web coinvolti, DS-2 le slice strutturali native e DS-3 i flussi
    di feedback toccati. Le prime slice web hanno chiuso la parte necessaria del
    proprio perimetro; questo non dichiara DS-1..DS-3 complete in tutta l'app.
-3. La migrazione segue `docs/design/lume/03-migrazione.md` (fasi L0-L6 con
+3. La migrazione segue [docs/design/lume/03-migrazione.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/design/lume/03-migrazione.md) (fasi L0-L6 con
    gate); il marker fisso `data-lume="true"` segnala la convivenza, ma non
    governa la cascata e non e un selettore utente: ADR 0047 resta pienamente in
    vigore. La condizione di uscita da quella convivenza e formalizzata qui

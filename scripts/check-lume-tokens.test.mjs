@@ -25,13 +25,11 @@ import {
   scanPaletteSource,
 } from './check-lume-tokens.mjs';
 
-// Reuse the public token fixture so new roles cannot silently escape mutation tests.
 function validTokens() {
   return structuredClone(loadTokens());
 }
 
 test('WCAG primitives match known reference values', () => {
-  // Black on white is the canonical 21:1 pair; equal colors are 1:1.
   assert.equal(Math.round(contrastRatio('#000000', '#ffffff')), 21);
   assert.equal(contrastRatio('#abcdef', '#abcdef'), 1);
   assert.deepEqual(parseHexColor('#33506b'), { r: 0x33, g: 0x50, b: 0x6b });
@@ -42,9 +40,8 @@ test('WCAG primitives match known reference values', () => {
 test('committed token source passes the whole contract', () => {
   const result = evaluateContract(loadTokens());
   assert.equal(result.pass, true);
-  assert.equal(result.checks.length, 90); // Includes new inks and direct signals on both active registers.
+  assert.equal(result.checks.length, 90); 
   assert.ok(result.checks.every((c) => c.ratio >= c.minRatio));
-  // The adjusted binding pair: giorno muted on chrome clears 4.5 with margin.
   const bind = result.checks.find(
     (c) => c.register === 'giorno' && c.label === 'ink.muted on surface.chrome',
   );
@@ -86,7 +83,6 @@ test('malformed color value fails closed', () => {
 
 test('a deliberately low-contrast pair is reported as a violation', () => {
   const failing = validTokens();
-  // Muted on chrome lifted to near-chrome luminance drops well below 4.5:1.
   failing.register.giorno.ink.muted.$value = '#c8ccd0';
   const result = evaluateContract(failing);
   assert.equal(result.pass, false);
@@ -98,7 +94,6 @@ test('a deliberately low-contrast pair is reported as a violation', () => {
   assert.match(formatReport(result), /CONTRACT VIOLATED/);
 });
 
-// CSS mirror (app/lume-tokens.css)
 test('parseCssBlocks strips comments and reads namespaced + alias declarations', () => {
   const blocks = parseCssBlocks('/* x */\n:root { --lume-a: #fff; --lume-b: var(--lume-a); }');
   assert.equal(blocks.length, 1);
@@ -109,7 +104,6 @@ test('parseCssBlocks strips comments and reads namespaced + alias declarations',
 
 test('committed CSS mirror matches the committed token source', () => {
   const summary = verifyCssMirror(loadTokens(), loadCssMirror());
-  // All register-scoped roles plus the register-independent legacy plum signal.
   assert.equal(summary.tokens, expectedMirror(loadTokens()).size);
   assert.equal(summary.tokens, 64);
   assert.equal(summary.aliases, ACTIVE_ALIASES.length);
@@ -136,7 +130,6 @@ test('a mirror whose .dark alias points at the wrong register fails closed', () 
   assert.throws(() => verifyCssMirror(loadTokens(), css), /alias --lume-ink in \.dark\/grafite/);
 });
 
-// WUL-515
 test('committed global CSS pins the listed semantic, scrim and shadow source recipes', () => {
   const summary = verifyGlobalStyles(loadGlobalStyles());
   assert.deepEqual(summary, { recipes: 11, semanticRecipes: 7, scrimRecipes: 2, shadowRecipes: 2 });
@@ -425,7 +418,6 @@ test('palette guard fails a regression beyond the declared allowlist entry', () 
   assert.equal(result.allowlistIssues.length, 0);
 });
 
-// The type guard complements color tokens with source-level escape detection.
 const { scanTypeSource, scanTypeScale, checkTailwindScale, TYPE_ALLOWLIST } = await import('./check-type-scale.mjs');
 
 test('type scale: committed web sources use the bounded roles', () => {

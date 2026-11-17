@@ -49,7 +49,7 @@ async function dataFolder() {
 // The only changes the upgrade may make to an archive born in 0.9.0. Anything else fails.
 const DROPPED_EMPTY_TABLES = ['durable_review_command_operations', 'durable_review_command_states', 'durable_review_operations',
     'durable_review_patient_links', 'durable_review_records', 'headless_soap_active_role_attestations', 'headless_soap_entry_commits'];
-const NEW_TABLES: Record<string, number> = { ambulatory_destructive_commands: 0, therapy_status_commands: 0, prosthetics_catalog_documents: 0,
+const NEW_TABLES: Record<string, number> = { agent_cassettes: 0, agent_pairing_requests: 0, agent_clients: 0, agent_mandates: 0, ambulatory_destructive_commands: 0, therapy_status_commands: 0, prosthetics_catalog_documents: 0,
     prosthetics_catalog_sources: 1, portable_import_origins: 1 };
 const NEW_COLUMNS: Record<string, string[]> = {
     patients: ['identifier_type', 'birth_date_precision', 'birth_year', 'identifier_history', 'allergies'],

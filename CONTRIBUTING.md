@@ -132,7 +132,7 @@ node scripts/mediflow.mjs --scelta sviluppo --senza-browser
 solo i figli posseduti dal lanciatore. `scripts/Launch_MediFlowMac.command`
 resta uno strumento interno di preparazione del bundle: il punto di ingresso
 utente per Mac è la voce **App per Mac**, disponibile solo con bundle costruito
-e identità coerente. Consulta [la guida nativa](docs/native-launch.md).
+e identità coerente. Consulta [la guida nativa](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/native-launch.md).
 
 ### Lint / Build
 
@@ -344,9 +344,9 @@ Documentazione tecnica:
 - [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (lettura completa dello stato corrente)
 - [docs/README.md](./docs/README.md) (mappa canonica documentazione)
 - [docs/markdown-index.md](./docs/markdown-index.md) (inventario completo markdown)
-- [docs/walkthrough.md](./docs/walkthrough.md)
-- [docs/system_architecture.md](./docs/system_architecture.md)
-- [docs/ARCHITETTURA.md](./docs/ARCHITETTURA.md)
+- [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md)
+- [docs/system_architecture.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/system_architecture.md)
+- [docs/ARCHITETTURA.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ARCHITETTURA.md)
 
 ---
 

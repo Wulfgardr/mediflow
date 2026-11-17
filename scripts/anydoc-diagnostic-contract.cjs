@@ -1,4 +1,3 @@
-// Temporary synthetic E2E diagnostics (AnyDoc correlation v2), never product telemetry.
 const fs = require('node:fs');
 const path = require('node:path');
 const HEADER = 'x-mediflow-anydoc-diagnostic';
@@ -39,8 +38,6 @@ function serverComplete(input) {
     && end.requests === records.filter(record => record.event === 'request').length;
 }
 
-// No timestamp comparisons. Completeness concerns the captured window, not
-// HTTP success: a fully recorded failed request is still a failed request.
 function auditJoin(attachment, server) {
   const consumer = attachment?.consumer?.events ?? [];
   const browser = attachment?.browser?.events ?? [];

@@ -3,7 +3,7 @@
 Date: 2026-03-17  
 Status: Accepted
 
-Updates: `docs/adr/0011-ocr-first-qwen-clinical-and-prudent-icd-autofill.md` (solo scelta default text-only)
+Updates: [docs/adr/0011-ocr-first-qwen-clinical-and-prudent-icd-autofill.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0011-ocr-first-qwen-clinical-and-prudent-icd-autofill.md) (solo scelta default text-only)
 
 ---
 

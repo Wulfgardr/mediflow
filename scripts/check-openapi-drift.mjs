@@ -158,7 +158,6 @@ function hasRecognizedApiV1AuthGuard(sourcePath, source) {
         || source.includes('requireNetworkCapabilityContext(')
         || source.includes('requireNetworkWriteContext(')
         || source.includes('requireNetworkDiscoveryAuth(');
-    // ADR0135 delegates to one named native authority, not a Web adapter.
     const nativeConfigurationRoutes = new Set([
         'app/api/v1/network/ai/functions/route.ts',
         'app/api/v1/network/ai/functions/preview/route.ts',
@@ -297,12 +296,6 @@ function normalizeSchema(schema, document, seen = new Set()) {
     }
 
     const normalized = {};
-    // WUL-547. `const` era assente da questo elenco, e non e' un dettaglio: lo spec
-    // la usa 65 volte per i valori fissi che stanno sul filo — nomi di header di
-    // auth, cookie, codici d'errore, porta TLS, `schemaVersion`. Non copiandola, due
-    // schemi che differiscono SOLO per quel valore normalizzavano identici, l'uguaglianza
-    // in testa a `schemaDiff` scattava, e il cambiamento usciva senza un solo segnale.
-    // Un client che fa match su quel valore si sarebbe rotto sotto un gate verde.
     for (const key of ['type', 'format', 'nullable', 'additionalProperties', 'const']) {
         if (schema[key] !== undefined) normalized[key] = stable(schema[key]);
     }
@@ -370,8 +363,6 @@ function normalizeParameters(pathItem, operation, document) {
             for (const option of ['style', 'explode', 'allowReserved', 'allowEmptyValue', 'content']) {
                 if (parameter[option] !== undefined) normalized[option] = stable(parameter[option]);
             }
-            // OpenAPI lets an operation override the same (in, name) parameter
-            // inherited from its path; it cannot silently remove other ones.
             effective.set(key, stable(normalized));
         }
     }
@@ -412,10 +403,6 @@ function normalizeSpec(document) {
     return operations;
 }
 
-// Un nodo `$ref` normalizzato porta la forma vera sotto `resolved`. Va srotolato
-// su ENTRAMBI i lati prima del confronto: senza, inlinare un `$ref` senza cambiare
-// nulla somiglia all'aggiunta simultanea di tutti i suoi `required`, e rinominare
-// uno schema a contenuto identico somiglia a un cambiamento.
 function unwrapRef(node) {
     if (node && typeof node === 'object' && node.ref !== undefined && node.resolved !== undefined) {
         return node.resolved;
@@ -423,27 +410,15 @@ function unwrapRef(node) {
     return node;
 }
 
-// Sul wrapper del request body `required` è un **booleano**, non un elenco di
-// proprietà (normalizeRequestBody, riga 181). Senza questa guardia un confronto
-// per proprietà ci chiamerebbe sopra `.includes` e lancerebbe.
 function requiredSet(schema) {
     return new Set(Array.isArray(schema?.required) ? schema.required : []);
 }
 
-// `oneOf`/`anyOf` con le stesse varianti in ordine diverso descrivono lo stesso
-// contratto: confrontarli per posizione segnalerebbe ogni variante spostata.
 function sameVariantSet(baseList, currentList) {
     const fingerprint = (list) => JSON.stringify(list.map((item) => JSON.stringify(item)).sort());
     return fingerprint(baseList) === fingerprint(currentList);
 }
 
-// Forma canonica di uno schema normalizzato: srotola ricorsivamente i `$ref` e
-// ordina le varianti dei composite. Serve per il confronto di uguaglianza in testa
-// a `schemaDiff`: senza, tre riscritture che non toccano il contratto sul filo —
-// inlinare un `$ref`, rinominare uno schema, riordinare un `oneOf` — arriverebbero
-// in fondo alla funzione e uscirebbero come `<label> changed`, cioè come breaking
-// da derogare a mano. L'identità di un `$ref` e l'ordine delle varianti non sono
-// visibili sul filo; quello che c'è dentro sì.
 function canonicalSchema(node) {
     if (Array.isArray(node)) return node.map(canonicalSchema);
     if (!node || typeof node !== 'object') return node;
@@ -463,15 +438,6 @@ function canonicalSchema(node) {
     return out;
 }
 
-// I nodi che arrivano qui sono avvolti in strutture che non espongono `properties`:
-// `{content}` per le risposte, `{required, content}` per i request body,
-// `{ref, resolved}` per i `$ref`. Fino a WUL-545 questa funzione non le attraversava:
-// misurato sull'intera storia dello spec, 39 confronti con zero ricorsioni e zero
-// proprietà viste, quindi ogni cambiamento collassava nell'unico `<label> changed`
-// finale — ed è per questo che tutte le deroghe in contract-policy.json hanno la
-// forma grossolana `<operazione> response <codice> changed`. Il confronto per
-// proprietà, incluso il ramo `became required` già scritto per le richieste, non è
-// mai stato eseguito.
 function schemaDiff(rawBaseSchema, rawCurrentSchema, context, label) {
     const baseSchema = unwrapRef(rawBaseSchema);
     const currentSchema = unwrapRef(rawCurrentSchema);
@@ -483,8 +449,6 @@ function schemaDiff(rawBaseSchema, rawCurrentSchema, context, label) {
     const breaking = [];
     const additive = [];
 
-    // Il label non cambia scendendo per media type: le stringhe restano leggibili
-    // e stabili, e `compareOperations` deduplica comunque.
     if (baseSchema.content || currentSchema.content) {
         const mediaTypes = new Set([
             ...Object.keys(baseSchema.content ?? {}),
@@ -528,11 +492,6 @@ function schemaDiff(rawBaseSchema, rawCurrentSchema, context, label) {
             breaking.push(`${label}.${key} was removed`);
         }
         for (const key of Object.keys(currentProperties).filter((property) => !baseProperties[property])) {
-            // Una proprietà nuova e già obbligatoria è una rottura anche su una
-            // RISPOSTA, non solo su una richiesta: rompe ogni client che decodifica
-            // con un tipo non opzionale. Il client Apple lo è — 47 tipi rigidi, 225
-            // proprietà non opzionali, zero `decodeIfPresent` — ed è così che si è
-            // rotto con WUL-542.
             if (currentRequired.has(key)) breaking.push(`${label}.${key} became required`);
             else additive.push(`${label}.${key} was added`);
         }
@@ -549,9 +508,6 @@ function schemaDiff(rawBaseSchema, rawCurrentSchema, context, label) {
     }
 
     if (breaking.length || additive.length) return { breaking, additive };
-    // I due nodi differiscono ma nessuna regola sa dire in che modo (enum ristretto,
-    // `type` cambiato, media type aggiunto): resta il segnale grossolano di prima,
-    // che è conservativo e va derogato a mano.
     return { breaking: [`${label} changed`], additive: [] };
 }
 
@@ -649,7 +605,6 @@ function serializeOperations(operations) {
     return JSON.stringify([...operations.entries()].sort(([left], [right]) => left.localeCompare(right)));
 }
 
-// Additive namespace only. Conflicts or a supplement outside the named Mac lane fail closed.
 function mergeNativeSpec(main, native, namespace = '/api/v1/network/ai/chatgpt/ordinary/') {
     if (!native) return main;
     for (const key of Object.keys(native.paths ?? {})) {
@@ -764,13 +719,6 @@ function main() {
     }
 }
 
-// Self-test del solo diff semantico. Non tocca il filesystem né git: costruisce
-// due documenti OpenAPI in memoria, li passa per lo stesso `normalizeSpec` +
-// `compareOperations` usati in produzione, e asserisce su quello che ne esce.
-//
-// Esiste perché fino a WUL-545 questo era l'unico dei guard di Repository Guards
-// senza self-test, ed è così che il confronto per proprietà è rimasto codice morto
-// senza che nessuno se ne accorgesse.
 function specWith(responseSchema, { requestSchema = null, extraSchemas = {} } = {}) {
     const operation = {
         responses: { '200': { content: { 'application/json': { schema: responseSchema } } } }
@@ -1006,10 +954,6 @@ export async function ${method}(request${query ? ', context' : ''}) { return sco
             run: () => diffOf(specWith(OBJ({ a: STR }, ['a'])), specWith(OBJ({ a: STR }, ['a']))),
             expect: (d) => d.breaking.length === 0 && d.additive.length === 0
         },
-        /* WUL-547. Il valore fisso di una proprieta' e' sul filo tanto quanto il suo
-           tipo: un client che fa match su `code: 'internal_error'` si rompe se quel
-           valore cambia. Prima che `const` entrasse in normalizeSchema questo caso
-           usciva con zero segnali — lo spec la usa 65 volte. */
         {
             name: 'valore fisso `const` cambiato → segnalato',
             run: () => diffOf(

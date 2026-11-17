@@ -86,6 +86,34 @@ locali salvano ciò che ricevono.
 - In chiaro: `session_ref`, `generation`, `expires_at`
 - Leggibile senza chiave: hash SHA-256 dell'identificatore casuale di sessione, generazione e scadenza. Non contiene cookie né chiavi e non autentica una sessione.
 
+### `agent_cassettes`: visite depositate dagli agenti
+
+- Altra protezione: `wrapped_private_key`, `anchor_ciphertext`, `items_ciphertext`
+- In chiaro: `id`, `mandate_ref`, `agent_ref`, `actor_ref`, `archive_generation`, `public_key`, `model_provider`, `allows_clinical_egress`, `status`, `revision`, `deposited_at`, `modified_at`
+- L'àncora CF e tutti i valori clinici sono buste ECDH/HKDF/AES-GCM legate a mandato, visita, elemento e tipo. Il JSON degli elementi lascia leggibili identificativo opaco, tipo, dimensione ed eventuale hash del PDF. Non contiene nomi di file o testo clinico aperti. La privata è avvolta dalla master key nel browser.
+- Il backup portabile e quello completo conservano cassette e private avvolte. Il controllo della chiave prima del ripristino comprende questa privata. Il ripristino cambia la generazione dell'archivio: conserva il deposito senza rendere nuovamente validi mandato o token.
+
+### `agent_mandates`: mandato locale e chiave avvolta
+
+- Altra protezione: `wrapped_private_key`
+- In chiaro: `id`, `actor_ref`, `archive_generation`, `operations`, `provider`, `allows_clinical_egress`, `public_key`, `created_at`, `expires_at`, `revoked_at`
+- La privata viene cifrata nel browser con la master key tramite `sealLocalDraft`. Non è un campo del contratto generico `ENCRYPTED_FIELDS`. Pubblica, perimetro e stato sono metadati del mandato.
+- Autorità locale esclusa dal backup portabile. Il recupero completo cifrato conserva l'archivio fisico, mentre la nuova generazione impedisce di riattivare il deposito con il vecchio mandato. Le cassette cliniche conservano una copia della privata avvolta nel proprio backup, senza esportare l'autorità del mandato.
+
+### `agent_pairing_requests`: richieste di abbinamento
+
+- Altra protezione: `claim_hash`
+- In chiaro: `id`, `code`, `name`, `operations`, `created_at`, `expires_at`, `status`, `mandate_ref`
+- Il segreto di polling è rappresentato da un hash SHA-256 con separazione di dominio. Codice, nome dell'agente e perimetro sono metadati in chiaro. La richiesta scade dopo cinque minuti e non concede accesso prima dell'approvazione UI.
+- Autorità locale esclusa dal portabile, inclusa soltanto nel recupero completo cifrato.
+
+### `agent_clients`: credenziali degli agenti
+
+- Altra protezione: `token_hash`
+- In chiaro: `id`, `mandate_ref`, `name`, `operations`, `expires_at`, `revoked_at`
+- Il DB conserva l'hash del bearer. Il token aperto resta nel file privato del client, fuori dalle cartelle sincronizzate, con permessi `0600` su POSIX. Il file non contiene PIN, cookie o master key. Le ACL Windows non sono qualificate da questa prova.
+- Autorità locale esclusa dal portabile. La generazione corrente e lo stato del mandato restano necessari anche dopo un recupero completo.
+
 ### `attachments`: documenti allegati e loro estratti
 
 - Cifrate: `name`, `path`, `data`, `summary_snapshot`, `parse_evidence_artifact_snapshot`

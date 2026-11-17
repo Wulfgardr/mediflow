@@ -102,7 +102,7 @@ cat >"$SUMMARY_FILE" <<EOF
 ## Manual checklist reference
 
 - \`docs/parity-click-map-macos.md\`
-- \`docs/parity-matrix.md\`
+- \`docs/apple-parity-matrix.json\`
 EOF
 
 echo "Parity smoke summary: $SUMMARY_FILE"

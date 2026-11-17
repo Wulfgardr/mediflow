@@ -2,8 +2,8 @@
 
 Data: 2026-11-05. Stato: **Accepted** (decisione di Leonardo del 5 novembre 2026).
 Supera la parte di [ADR 0166](./0166-athena-method-runner-boundary.md) che
-teneva aperta la ripresa di ATHENA come filone del nucleo; integra
-[ADR 0073](./0073-treatment-reasoning-athena-boundary.md),
+teneva aperta la ripresa di ATHENA come filone del nucleo. Supera
+[ADR 0073](https://github.com/Wulfgardr/mediflow/blob/28c17d07f937ac663638c90070490a88927d6d9b/docs/adr/0073-treatment-reasoning-athena-boundary.md) e integra
 [ADR 0077](./0077-ai-provider-abstraction-and-egress-anonymization-boundary.md),
 [ADR 0086](./0086-intelligent-scaffold-and-graded-automation-boundary.md) e
 [ADR 0117](./0117-headless-portable-agent-first-and-capability-first-fabric.md).
@@ -120,3 +120,11 @@ La fixture golden della preparazione ChatGPT conserva invariati i tre
 percorsi disponibili e rimuove soltanto il quarto caso di esecuzione
 Treatment Reasoning. I test di consenso, contenuto e cancellazione continuano
 sui tre percorsi; per Treatment Reasoning verificano l’indisponibilità.
+
+## 17/11/2026, Regole ereditate da ADR 0073
+
+Fermarsi e aprire ADR/issue separata se una proposta:
+
+- salva prompt completi, risposte raw o trace PHI-bearing;
+- espone stderr/stdout del runtime del modello, prompt completi o output grezzi in risposte HTTP,
+  log persistenti o report.

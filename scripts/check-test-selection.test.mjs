@@ -39,7 +39,6 @@ test('a new or renamed test that no suite takes fails, and so does a stale or co
   const errors = (files, selections = suites, exclusions = []) => checkTestSelection(files, selections, exclusions).errors;
   assert.deepEqual(errors(['lib/a.test.ts']), []);
   assert.deepEqual(errors(['lib/a.test.ts', 'lib/new.test.ts']), ['TEST_NOT_SELECTED: lib/new.test.ts']);
-  // Renamed: the suite still names the old path, and nothing takes the new one.
   assert.deepEqual(errors(['lib/renamed.test.ts']), ['TEST_NOT_SELECTED: lib/renamed.test.ts', 'SELECTED_NOT_A_TEST: lib/a.test.ts']);
   assert.deepEqual(errors(['lib/a.test.ts', 'lib/support.ts'], suites, [exclusion('lib/support.ts')]), []);
   assert.deepEqual(errors(['lib/a.test.ts'], suites, [exclusion('lib/gone.ts')]), ['STALE_EXCLUSION: lib/gone.ts']);

@@ -82,7 +82,6 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         });
         assert.equal(outsideScopeServiceCreate.response.status, 404);
 
-        // observe rollback through the real admitted paired HTTP adapter.
         const faultDb = openTestDb();
         const snapshotService = () => ({
             prescriptions: faultDb.prepare('SELECT * FROM service_prescriptions WHERE patient_id=?').all(patientId),
@@ -186,15 +185,12 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         assert.equal(staleServiceUpdate.json?.entity, 'service_prescription');
         assert.equal(staleServiceUpdate.json?.currentVersion, 2);
 
-        // the paired item PUT has its own CAS, mandatory event and rollback.
         const itemId = itemA.json.id;
         const itemDb = openTestDb();
-        // A status change without `items` (Apple 0.9.0) moves the items that were in the prescription's status.
         const aligned = itemDb.prepare('SELECT id, status, version FROM service_prescription_items WHERE prescription_id=? ORDER BY ordinal').all(servicePrescriptionId);
         assert.deepEqual(aligned.map((row) => [row.status, row.version]), [['performed', 2], ['performed', 2]]);
         const alignedReason = itemDb.prepare("SELECT redacted_metadata FROM audit_events WHERE subject_ref=? AND event_type='service.prescription_item.updated'").get(itemB.json.id);
         assert.equal(JSON.parse(alignedReason.redacted_metadata).reasonCode, 'status_cascade_without_items');
-        // The per-item call that follows in that client carries the old version and succeeds without writing.
         const echo = await request('PUT', `/api/v1/network/service-prescription-items/${itemB.json.id}`, {
             headers: { ...pairedHeaders(writerClient), ...sessionHeaders }, body: { version: 1, status: 'performed', performedAt: '2026-07-08T09:30:00.000Z' },
         });
@@ -205,8 +201,6 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
             events: itemDb.prepare('SELECT event_type, actor_ref, source_surface, redacted_metadata FROM audit_events WHERE subject_ref=? ORDER BY rowid').all(itemId),
         });
         try {
-            // The route opens and admits the archive before the fault trigger exists:
-            // admission refuses an archive that already carries a foreign audit trigger.
             await request('PUT', `/api/v1/network/service-prescription-items/${itemId}`, {
                 headers: { ...pairedHeaders(writerClient), ...sessionHeaders }, body: { version: 999, status: 'report_received' },
             });

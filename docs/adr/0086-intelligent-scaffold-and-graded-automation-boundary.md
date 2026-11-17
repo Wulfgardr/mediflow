@@ -14,7 +14,7 @@ Related:
 [ADR 0012](./0012-operator-reviewed-smart-import-from-patient-context.md),
 [ADR 0042](./0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md),
 [ADR 0051](./0051-patient-import-decision-contract-between-review-and-persistence.md),
-[ADR 0065](./0065-intended-purpose-and-claims-guard.md), [ADR 0073](./0073-treatment-reasoning-athena-boundary.md),
+[ADR 0065](./0065-intended-purpose-and-claims-guard.md), [ADR 0073](https://github.com/Wulfgardr/mediflow/blob/28c17d07f937ac663638c90070490a88927d6d9b/docs/adr/0073-treatment-reasoning-athena-boundary.md),
 [ADR 0077](./0077-ai-provider-abstraction-and-egress-anonymization-boundary.md) e
 [ADR 0084](./0084-document-diagnoses-review-only.md).
 

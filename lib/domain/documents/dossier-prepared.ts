@@ -454,7 +454,7 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
         || (fact.origin === 'parser:lab' && Boolean(fact.values.code)));
     const facts: DossierFact[] = [];
     const ids = new Set<string>();
-    let uncoded = 0;
+    const uncoded = new Set<string>();
     for (const item of source.facts) {
         const factId = stableFactId(source.sha256, item);
         if (ids.has(factId)) continue;
@@ -479,7 +479,10 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
                 // Codice e unità solo dal catalogo locale, qualunque cosa proponga il file.
                 delete values.code; delete values.unitCode;
                 const coded = catalogObservationCode(values.display ?? '', values.unit ?? '');
-                if (!coded) { uncoded += 1; continue; }
+                if (!coded) {
+                    uncoded.add(values.display?.trim() || 'Esame senza nome');
+                    continue;
+                }
                 values.code = coded.code; values.unitCode = coded.unitCode; values.codeSource = 'catalogo locale: nome e unità coincidenti';
                 break;
             }
@@ -531,7 +534,7 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
         if (codedParser.some((fact) => fact.kind === item.kind && sameIdentity(fact, values))) continue;
         facts.push({ factId, kind: item.kind, origin: 'prepared', evidence, negated, values, decision: 'pending' });
     }
-    if (uncoded) notes.push(`${uncoded} ${uncoded === 1 ? 'valore di laboratorio senza codice LOINC verificato resta' : 'valori di laboratorio senza codice LOINC verificato restano'} nella sintesi e nel testo conservato.`);
+    if (uncoded.size) notes.push(`Esami senza codice LOINC: ${[...uncoded].join(', ')}.`);
     if (source.summary) {
         const values: Record<string, string> = { title: source.summary.title, date: notFuture(source.summary.date, now) ?? date, text: source.summary.text,
             textSource: 'prepared', preparedCheck: 'summary', preparedCoverage: source.coverage.complete ? 'complete' : 'partial',

@@ -237,7 +237,7 @@ un secondo catalogo di capacità o di dati a riposo.
 | Projection clinica e handle monouso | Broker tipizzato autonomo: la validità del contenuto non prova il lifecycle della sessione. | [Broker](../../lib/typed-projection-broker.ts) controlla target, capability, freschezza e consumo; [binding](../../lib/security/server-session-projection-broker.ts) lo revoca con la risorsa autentica. Le proiezioni per capability restano quelle dell'[ADR0095](./0095-broker-projection-e-servizi-host-per-capability.md), non dati arbitrari. |
 | Grant di ruolo, child session, proposal e prova umana headless | Autorità già separate, non controlli equivalenti da fondere. | [ADR0097](./0097-active-role-session-and-step-up-authorization.md) e [ADR0103](./0103-headless-clinician-authorized-soap-entry-write.md) possiedono la mappa dei grant e i controlli a emissione, uso e conferma. Dipendono dalla sessione/selection autentica; nessuna conferma passa al client o al modello. |
 | Passphrase, PIN di conferma, chiave clinica e recupero | Sblocco Web tramite PIN e involucro storico. | [ADR0143](./0143-strong-unlock-credential.md) possiede custodia e formato correnti C07: wrapping nel browser, chiave residente non estraibile, rinnovo esplicito dopo reload. Il cambio prepara il ritiro prima del CAS; non cambia l'owner packed. |
-| Segreti provider, file e risorse di processo | Autorità differenti dalla sessione, non trasferibili al broker. | [Census](../authority-census.md#altre-autorità-owner-e-fonte-da-consultare) rimanda ai rispettivi owner; [matrice a riposo](../data-at-rest-matrix.md) possiede i residui. C15 lega le sessioni anche alla [generazione dell'archivio](../../lib/security/archive-session-generation.ts): non si riusa autorità dopo una sostituzione. |
+| Segreti provider, file e risorse di processo | Autorità differenti dalla sessione, non trasferibili al broker. | [Census](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/authority-census.md#altre-autorità-owner-e-fonte-da-consultare) rimanda ai rispettivi owner; [matrice a riposo](../data-at-rest-matrix.md) possiede i residui. C15 lega le sessioni anche alla [generazione dell'archivio](../../lib/security/archive-session-generation.ts): non si riusa autorità dopo una sostituzione. |
 
 ### Consolidamento e controlli che restano
 
@@ -259,7 +259,7 @@ sintetici non sono provider o autorizzazione clinica.
 
 La corrispondenza sorgente/archivio/installato e il rifiuto di membri alterati
 usano il [guard packed esistente](../../lib/security/web-auth-lifecycle-owner-boundary.test.ts)
-e il profilo `local-package` del [ledger runtime](../runtime-payload-ledger.md#local-packed-owner-package),
+e il profilo `local-package` del [ledger runtime](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/runtime-payload-ledger.md#local-packed-owner-package),
 non una nuova lista. La sessione senza AI è provata dai percorsi produzione
 [Web ordinario](../../e2e/web-smoke.spec.ts) e [logout ostile/valido](../../e2e/web-cookie-mutation-admission.spec.ts);
 non dipende da eseguire un provider. Gli esiti appartengono alla PR e alla CI,

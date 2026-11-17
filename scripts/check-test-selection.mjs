@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Every test file must be taken by a suite selector, or be listed in
-// test-selection-exclusions.json with a reason and an owner. A new or renamed
-// test that no suite runs fails this check.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -20,7 +17,6 @@ const defaultRoot = fileURLToPath(new URL('..', import.meta.url));
 const EXCLUSIONS = 'test-selection-exclusions.json';
 const sourceExtension = /\.(?:[cm]?[jt]sx?|py|rs|swift|sh|bash|bats|ps1|command|c|h|m|mm)$/u;
 const conventionalName = /(?:\.(?:test|spec)\.[^/]+$|(?:^|\/)(?:test_[^/]+\.py|[^/]+_test\.py|[^/]+Tests?\.swift|[^/]+[-_]test\.(?:sh|py)|test[^/]*\.rs)$)/u;
-// A file without a conventional name is still a test when it loads a test framework.
 const signals = [
   /(?:from\s*['"]node:test['"]|(?:require|import)\s*\(\s*['"]node:test['"])/u,
   /(?:from\s*['"]@playwright\/test['"]|require\s*\(\s*['"]@playwright\/test['"])/u,

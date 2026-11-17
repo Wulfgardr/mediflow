@@ -1,0 +1,24 @@
+name: Proponi una modifica
+description: Descrivi un bisogno.
+body:
+  - type: markdown
+    attributes:
+      value: Non allegare archivi, chiavi, credenziali o dati sanitari reali.
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema
+    validations:
+      required: true
+  - type: textarea
+    id: persone
+    attributes:
+      label: Chi lo vive
+    validations:
+      required: true
+  - type: textarea
+    id: beneficio
+    attributes:
+      label: Beneficio atteso
+    validations:
+      required: true

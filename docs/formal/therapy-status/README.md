@@ -8,7 +8,7 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 12 ed i predecessori canonici 3, 4, 5, 6, 9, 10 e 11; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 14 ed i predecessori canonici 3, 4, 5, 6, 9, 10, 11, 12 e 13; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
 ## Raccordo schema 12 del 17 novembre 2026
 
@@ -1059,3 +1059,50 @@ invariato. Il comportamento è provato in
 `lib/therapy-status-command-admission.test.ts` (due test rossi sul codice di
 main, verdi dopo la correzione) e il comando completo
 `npm run verify:therapy-status` è rieseguito sul manifest aggiornato.
+
+
+## Raccordo A1 del 17 novembre 2026: mandato e blocco
+
+La versione 13 aggiunge la tabella dei mandati. Il recupero riconosce anche
+il predecessore 12 con impronta misurata sul suo inizializzatore originale.
+Le fixture delle versioni precedenti rimuovono la nuova tabella prima del
+confronto, mantenendo le impronte storiche. Le prove del mandato e del
+recupero cifrato restano esterne a TLC.
+
+Il client del blocco distingue il gesto manuale dall'inattività. Il primo
+revoca i mandati prima del ritiro della sessione, la seconda conserva il
+mandato. Il client continua a cancellare prima la propria chiave e a
+richiedere una ricevuta di ritiro confermato. Un errore della revoca nega la
+ricevuta. Restano invariati CAS, ledger, transizioni e conferma del comando
+di stato terapia. Il modello legacy non rappresenta i mandati e non viene
+esteso implicitamente a qualificarli.
+
+I digest collegano questi cambiamenti al commit di implementazione A1.
+Le regressioni del client di blocco, dell'owner e del recupero passano.
+Il comando completo di verifica terapia viene rieseguito dopo il raccordo.
+
+
+## Raccordo A2 del 17 novembre 2026: abbinamenti
+
+La versione 14 aggiunge richieste di abbinamento e credenziali locali.
+La versione 13 resta recuperabile con l'impronta misurata sul suo
+inizializzatore originale. Le fixture dei predecessori rimuovono le due
+nuove tabelle prima del confronto, senza cambiare le impronte storiche.
+La selezione unit include il nuovo store del file credenziali.
+
+Il canale agenti legge il mandato entro la transazione chiamante, senza
+modificare transizioni, CAS, ledger o ricevute del comando di stato
+terapia. Il modello TLC resta limitato al controller legacy. Le prove del
+pairing, del socket loopback e del file privato sono esterne a TLC.
+La prova TLS non loopback sul Mac si ferma prima di HTTP e non viene
+qualificata da un aggiornamento dei digest. Il gate completo terapia
+viene rieseguito sul raccordo, mantenendo questo limite distinto.
+
+
+### Cassette cifrate e recupero, WUL-870
+
+La sincronizzazione include la nuova raccolta cifrata nel bootstrap e nei
+controlli di recupero. I cinque file aggiornati non cambiano gli eventi o
+le transizioni del controller delle terapie. Il modello resta invariato;
+le proprietà delle cassette, della cifratura e della loro futura
+applicazione richiedono prove separate e non sono attribuite a TLC.

@@ -414,7 +414,7 @@ applicabili; non è richiesta qui una nuova attribuzione personale pubblica.
 ## 1. Perimetro e metodo
 
 Sono stati letti AGENTS, CONTRIBUTING, SECURITY, i confini pertinenti di
-ARCHITECTURE, la guida [privacy e AI](../privacy-and-ai-governance.md),
+ARCHITECTURE, la guida [privacy e AI](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/privacy-and-ai-governance.md),
 [ADR 0065](../adr/0065-intended-purpose-and-claims-guard.md),
 [COMPLIANCE](../COMPLIANCE.md), la matrice dei runtime e la
 roadmap 0.8.6, sezione 7.
@@ -493,12 +493,12 @@ non eseguito in questa lane è soltanto una possibile superficie di verifica.
 
 | ID | Evidenza pubblica letta | Cosa dimostra / limite |
 | --- | --- | --- |
-| E1 | [ADR 0065](../adr/0065-intended-purpose-and-claims-guard.md), [privacy e AI](../privacy-and-ai-governance.md), [COMPLIANCE](../COMPLIANCE.md) | Finalità assistiva e claim ammessi. ADR 0065 è `Accepted`, 24/05/2026; non è una decisione MDR o una nomina privacy. |
+| E1 | [ADR 0065](../adr/0065-intended-purpose-and-claims-guard.md), [privacy e AI](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/privacy-and-ai-governance.md), [COMPLIANCE](../COMPLIANCE.md) | Finalità assistiva e claim ammessi. ADR 0065 è `Accepted`, 24/05/2026; non è una decisione MDR o una nomina privacy. |
 | E2 | [SECURITY](../../SECURITY.md), [ARCHITECTURE](../../ARCHITECTURE.md), [campi cifrati](../../lib/db.ts), [primitive crittografiche](../../lib/security/security.ts) | `ENCRYPTED_FIELDS`, cifratura per campo, confini auth e topologia dichiarati. Non cifratura integrale né prova della macchina dell'operatore. |
 | E3 | [cascade paziente](../../lib/patient-cascade.ts), [purge admin](../../app/api/system/purge-patient/route.ts), SECURITY | Distinzione tombstone/purge, conteggi dry-run e sessione admin. La purge del database live non raggiunge copie esportate. |
 | E4 | [mapper FHIR](../../lib/fhir/bundle-mapper.ts), [test mapper](../../lib/fhir/bundle-mapper.test.ts), [test report PDF](../../lib/report-service.test.ts), COMPLIANCE | Mappatura di Patient, Condition, Encounter, MedicationStatement e Observation; copertura per categoria in §6.1. Non un export completo di tutti i dati personali e degli allegati. |
 | E5 | [ADR retention](../adr/0023-backup-retention-policy-keep-last-n.md), [preflight](../../lib/backup-restore-preflight.ts), [formato backup](../../lib/backup-artifact.ts), [drill](../../scripts/backup-restore-drill.mjs) | Contratti e strumenti presenti. `keep-last-N` copre file dello scheduler; nessun drill eseguito qui né periodo legale di conservazione determinato. |
-| E6 | [matrice runtime](../ai-runtime-serving-matrix.md), [gate egress](../../lib/ai-egress-gate.ts), [stato Fabric](../../lib/ai-providers/fabric/status.ts) | Quattro percorsi generativi `proposal_only`; `available_unqualified`; gate narrativo chiuso. Le classi Fabric `deterministic/generative` non sono qualificazioni giuridiche. |
+| E6 | [matrice runtime](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/ai-runtime-serving-matrix.md), [gate egress](../../lib/ai-egress-gate.ts), [stato Fabric](../../lib/ai-providers/fabric/status.ts) | Quattro percorsi generativi `proposal_only`; `available_unqualified`; gate narrativo chiuso. Le classi Fabric `deterministic/generative` non sono qualificazioni giuridiche. |
 | E7 | [contratto Treatment Reasoning](../../lib/treatment-reasoning-contract.ts), [contratto output ATHENA v2](https://github.com/Wulfgardr/mediflow/blob/710561000a8a481719c0badf55e25c93544aff3a/lib/ai-providers/fabric/treatment-reasoning-athena-output-contract-v2.ts) | `recommendation`, `safetyFlags`, azioni di review/prefill; output v2 con `writesPerformed: 0` e `applyPolicy: none`. Motivo concreto per lo screening MDR per funzione. |
 | E8 | [inventario compliance](../../lib/compliance-evidence-inventory.ts), [test inventario](../../lib/compliance-evidence-inventory.test.ts), [E2E compliance](../../e2e/settings-compliance.spec.ts) | Inventario statico `mediflow.compliance-evidence.v1`, `technical_evidence_inventory_only`, `legalVerdict: not_assessed`. Riferimenti versionati aggiornati in P9; test unitari eseguiti nel seguito tecnico, E2E non eseguito. |
 | E9 | [claims guard](../../scripts/check-claims-guard.mjs), [ADR 0092](../adr/0092-limite-digest-bound-readiness-ai-locale.md), SECURITY | Guard testuale e limiti di readiness. Non audit legale, qualifica clinica o prova di assenza di egress del processo reale. |
