@@ -114,7 +114,10 @@ function makeDatabase() {
             source_surface TEXT NOT NULL,
             request_id TEXT,
             redacted_metadata TEXT,
-            created_at INTEGER
+            created_at INTEGER,
+            proposer_ref TEXT,
+            mandate_ref TEXT,
+            model_provider TEXT
         );
     `);
     return { sqlite, db: drizzle(sqlite) as TestDatabase };
