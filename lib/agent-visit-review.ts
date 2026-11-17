@@ -99,6 +99,7 @@ export async function prepareAgentApplication(review: AgentVisitReview, phase: '
     if (!review.patient || review.blockers.length || phase === 'review' && review.proposalBlockers.length || review.visit.cassette.status !== 'closed') return null;
     const patient = await db.patients.get(review.patient.id, { signal });
     if (!patient || patient.deletedAt || patient.isArchived || patient.taxCode !== review.visit.anchor.fiscalCode || !patient.version) return null;
+    if (patient.version !== review.patient.version) throw new Error('La scheda è cambiata. Rileggi le differenze prima di applicare la visita.');
     const selected = review.visit.items.filter(item => !review.appliedItemIds.includes(item.id) && automaticAgentKind(item.kind) === (phase === 'automatic'));
     if (!selected.length) return null;
     const diagnoses = [...(patient.diagnoses ?? [])], exemptions = [...(patient.exemptions ?? [])];
