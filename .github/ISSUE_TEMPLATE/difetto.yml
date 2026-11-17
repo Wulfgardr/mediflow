@@ -1,0 +1,36 @@
+name: Segnala un difetto
+description: Descrivi un problema di MediFlow.
+body:
+  - type: markdown
+    attributes:
+      value: Non allegare archivi, chiavi, credenziali o dati sanitari reali.
+  - type: input
+    id: versione
+    attributes:
+      label: Versione
+    validations:
+      required: true
+  - type: input
+    id: sistema
+    attributes:
+      label: Sistema
+    validations:
+      required: true
+  - type: textarea
+    id: attivita
+    attributes:
+      label: Che cosa stavi facendo
+    validations:
+      required: true
+  - type: textarea
+    id: accaduto
+    attributes:
+      label: Che cosa è successo
+    validations:
+      required: true
+  - type: textarea
+    id: atteso
+    attributes:
+      label: Che cosa ti aspettavi
+    validations:
+      required: true
