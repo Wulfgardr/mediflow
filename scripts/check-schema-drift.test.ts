@@ -8,9 +8,6 @@ import Database from 'better-sqlite3';
 
 import { collectAuditAppendOnlyProblems } from './schema-drift-audit-append-only.mjs';
 
-// WUL-268 (STREAM A): happy-path test for the schema drift check. On a clean
-// checkout, lib/schema.ts and the current runtime initializer agree, so the
-// check must exit 0 and print an OK line. Historical SQL is not replayed.
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CHECK_SCRIPT = path.join(HERE, 'check-schema-drift.mjs');
@@ -30,8 +27,6 @@ test('check:schema-drift passes on a clean checkout', () => {
     assert.match(output, /\[schema-drift\] OK:/);
 });
 
-// WUL-724: the drift check also probes the guard-only audit schema. These cases
-// use in-memory databases only.
 const AUDIT_TABLE = `
     CREATE TABLE audit_events (
         event_id TEXT PRIMARY KEY NOT NULL,

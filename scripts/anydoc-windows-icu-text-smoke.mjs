@@ -1,4 +1,3 @@
-// One explicitly requested Windows text discriminator; never imported by product code.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';

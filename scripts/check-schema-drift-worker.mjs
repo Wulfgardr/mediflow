@@ -1,11 +1,3 @@
-// WUL-268 (STREAM A): schema drift check worker.
-//
-// Runs under the strip-types loader + the "@/" resolve hook (see
-// check-schema-drift.mjs). Explicitly opening "@/lib/db-server" executes the REAL
-// bootstrap: it opens the temp SQLite database at MEDIFLOW_DATA_DIR/medical.db
-// and runs applySchemaGuards(). We then introspect
-// sqlite_master and compare the live tables / columns / indices against the
-// drizzle declarations in "@/lib/schema.ts". Drift => exit 1 with a diff.
 
 import Database from 'better-sqlite3';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
@@ -15,9 +7,6 @@ import * as schema from '@/lib/schema';
 
 import { collectAuditAppendOnlyProblems } from './schema-drift-audit-append-only.mjs';
 
-// Explicitly opening db-server exercises the real brand-new database path: the empty
-// database receives its minimal base schema and then the runtime guards layer
-// on additive columns, guard-owned tables, constraints, and indices.
 const { openDbServer, hasCanonicalPhysicianReviewAttestationSchema } = await import('@/lib/db-server');
 openDbServer();
 
@@ -29,7 +18,7 @@ function collectExpected() {
         try {
             cfg = getTableConfig(value);
         } catch {
-            continue; // not a drizzle table export
+            continue; 
         }
         expectedTables.set(cfg.name, new Set(cfg.columns.map((col) => col.name)));
         for (const idx of cfg.indexes) {
@@ -62,8 +51,6 @@ function collectLive(dbPath) {
 }
 
 function collectAuditProblems(dbPath) {
-    // Separate writable connection on the check-owned temp database: the probe
-    // needs to attempt writes, which it always rolls back.
     const db = new Database(dbPath);
     try {
         return collectAuditAppendOnlyProblems(db);
@@ -85,11 +72,6 @@ function main() {
 
     problems.push(...collectAuditProblems(dbPath));
 
-    // Every table declared in schema.ts must exist in the bootstrapped runtime
-    // schema, with all its columns. (The runtime may carry extra tables/columns/
-    // indices that are not modeled in schema.ts, e.g. audit or service internals;
-    // those are not treated as drift here, to keep the check scoped to the
-    // schema.ts contract rather than failing on legitimately guard-only objects.)
     for (const [tableName, expectedCols] of expectedTables) {
         const liveCols = live.tables.get(tableName);
         if (!liveCols) {
@@ -103,7 +85,6 @@ function main() {
         }
     }
 
-    // Every index declared in schema.ts must be created by the runtime bootstrap.
     for (const idxName of expectedIndices) {
         if (!live.indices.has(idxName)) {
             problems.push(`MISSING INDEX: "${idxName}" is declared in lib/schema.ts but is not created by the guards in lib/db-server.ts.`);
