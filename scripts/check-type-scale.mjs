@@ -23,7 +23,6 @@ export const TYPE_ROLES = Object.freeze({
   code: '400 0.75rem/1.5 var(--font-registro), monospace',
 });
 
-// Zero hides a word in the collapsed rail; it never renders visible text.
 export const TYPE_ALLOWLIST = Object.freeze([
   { path: 'components/runtime-twin-workspace.module.css', selector: ".workspace[data-rail-open='false'] .brand strong", property: 'font-size', value: '0', reason: 'Marchio contratto nella navigazione chiusa.' },
   { path: 'components/kree8/kree8-clinical-cockpit-shell.module.css', selector: '.commandToolChip', property: 'font-size', value: '0', reason: 'Etichetta nascosta nella navigazione compatta storica.' },
@@ -38,7 +37,6 @@ export function scanTypeSource(relativePath, source, allowlist = TYPE_ALLOWLIST)
   const report = (line, value) => problems.push({ path: relativePath, line, value });
   const clean = source.replace(/\/\*[\s\S]*?\*\//g, match => match.replace(/[^\n]/g, ' '));
   for (const match of clean.matchAll(forbiddenUtilities)) {
-    // CSS custom property --font-serif is the family token, not a utility.
     if (clean.slice(Math.max(0, match.index - 2), match.index) === '--') continue;
     report(clean.slice(0, match.index).split('\n').length, match[0]);
   }

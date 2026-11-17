@@ -180,7 +180,6 @@ async function enableHomeBaseMode() {
 }
 
 async function seedCatalogs(webHeaders) {
-    // WUL-802: the legacy replacement is an administrative command (token, admin session, snapshot, confirmation).
     const legacyBody = await request('POST', '/api/v1/drugs', {
         headers: { ...localApiHeaders(), ...webHeaders },
         body: [TERMINOLOGY_PARITY.webDrug],
@@ -204,7 +203,6 @@ async function seedCatalogs(webHeaders) {
 
     const exemptions = await request('POST', '/api/v1/exemptions', {
         headers: localApiHeaders(),
-        // single manual fixture; full imports require preview/commit.
         body: {
             code: 'E01',
             description: 'Esenzione catalog smoke',

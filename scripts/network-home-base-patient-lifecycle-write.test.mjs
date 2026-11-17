@@ -478,7 +478,6 @@ async function cleanupPatient(patientId) {
     assert.equal(deletion.response.status, 200);
 }
 
-/* direct readback of the same synthetic DB used by the real HTTP server. */
 function patientMutationSnapshot(patientId) {
     const dataDir = process.env.MEDIFLOW_DATA_DIR;
     assert.ok(dataDir);
