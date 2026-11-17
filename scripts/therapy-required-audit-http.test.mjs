@@ -74,8 +74,8 @@ test('real Web cookie and local v1 token admit therapy writes, enforce 4 MiB and
                 'x-mediflow-source-surface': 'job', 'x-actor-ref': 'synthetic-spoof' }
             : { authorization: `Bearer ${token}` };
         const body = { id: therapyId, ...(surface === 'web' ? { patientId } : {}),
-            drugName: 'ENC:synthetic:drug', dosage: 'ENC:synthetic:dose',
-            motivation: 'ENC:synthetic:motivation', startDate: '2026-05-02T09:00:00.000Z' };
+            drugName: 'ENC:c3ludGhldGlj:ZHJ1Zw==', dosage: 'ENC:c3ludGhldGlj:ZG9zZQ==',
+            motivation: 'ENC:c3ludGhldGlj:bW90aXZhdGlvbg==', startDate: '2026-05-02T09:00:00.000Z' };
         const before = readBack(patientId, therapyId);
         const raw = JSON.stringify(body);
         const oversized = `${raw}${' '.repeat(4_194_305 - Buffer.byteLength(raw, 'utf8'))}`;
@@ -151,8 +151,8 @@ test('real paired therapy create and PUT rollback audit FAIL and IGNORE', async 
     const therapyId = randomUUID();
     seedPatient(patientId, ambulatory.id);
     const route = `/api/v1/network/patients/${patientId}/therapies`;
-    const body = { id: therapyId, drugName: 'ENC:synthetic:drug', dosage: 'ENC:synthetic:dose',
-        motivation: 'ENC:synthetic:motivation', startDate: '2026-05-02T09:00:00.000Z' };
+    const body = { id: therapyId, drugName: 'ENC:c3ludGhldGlj:ZHJ1Zw==', dosage: 'ENC:c3ludGhldGlj:ZG9zZQ==',
+        motivation: 'ENC:c3ludGhldGlj:bW90aXZhdGlvbg==', startDate: '2026-05-02T09:00:00.000Z' };
     const created = await request('POST', route, { headers, body });
     assert.equal(created.status, 201);
     assert.deepEqual(created.json, { id: therapyId, version: 1 });
@@ -175,7 +175,7 @@ test('real paired therapy create and PUT rollback audit FAIL and IGNORE', async 
             assert.deepEqual(readBack(patientId, failedId), beforeCreate);
             const beforeUpdate = readBack(patientId, therapyId);
             const failedUpdate = await request('PUT', `${route}/${therapyId}`,
-                { headers, body: { version: 1, dosage: 'ENC:synthetic:changed-dose' } });
+                { headers, body: { version: 1, dosage: 'ENC:c3ludGhldGlj:Y2hhbmdlZC1kb3Nl' } });
             assert.equal(failedUpdate.status, 500);
             assert.deepEqual(readBack(patientId, therapyId), beforeUpdate);
             observations.push({ surface: 'paired', fault, createStatus: failedCreate.status,

@@ -28,7 +28,16 @@ function snapshot() {
         return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
     } finally { db.close(); }
 }
-function notesBody(body, size) {
+const sealedNotes = 'ENC:c3ludGhldGlj:bm90ZXM=';
+function notesBody(body, size, surface) {
+    if (surface === 'v1') {
+        const base = { ...body, title: '' };
+        const budget = size - Buffer.byteLength(JSON.stringify(base));
+        const title = '🩺'.repeat(Math.floor(budget / 4)) + 'x'.repeat(budget % 4);
+        const raw = JSON.stringify({ ...base, title });
+        assert.equal(Buffer.byteLength(raw), size);
+        return raw;
+    }
     const empty = JSON.stringify({ ...body, notes: 'ENC:' });
     const budget = size - Buffer.byteLength(empty);
     const notes = 'ENC:' + '🩺'.repeat(Math.floor(budget / 4)) + 'x'.repeat(budget % 4);
@@ -60,16 +69,16 @@ test('six local checkup POST/PUT/DELETE paths enforce their object/byte contract
         const headers = surface === 'web' ? { 'Content-Type': 'application/json', Cookie: login.cookieHeader, 'x-mediflow-archive-generation': login.json.archiveGeneration } : localHeaders;
         const checkupId = crypto.randomUUID();
         const createBody = { id: checkupId, ...(surface === 'web' ? { patientId } : {}), date: '2026-05-02T09:00:00.000Z',
-            title: 'Synthetic checkup', notes: 'ENC:synthetic:notes', status: 'pending', source: 'manual' };
+            title: 'Synthetic checkup', notes: surface === 'v1' ? sealedNotes : 'ENC:synthetic:notes', status: 'pending', source: 'manual' };
         const collection = surface === 'web' ? '/api/checkups' : `/api/v1/patients/${patientId}/checkups`;
         const item = surface === 'web' ? `/api/checkups/${checkupId}` : `${collection}/${checkupId}`;
         for (const operation of ['POST', 'PUT']) {
             const url = operation === 'POST' ? collection : item;
-            const body = operation === 'POST' ? createBody : { version: 1, title: 'Synthetic update', notes: 'ENC:synthetic:notes' };
+            const body = operation === 'POST' ? createBody : { version: 1, title: 'Synthetic update', notes: surface === 'v1' ? sealedNotes : 'ENC:synthetic:notes' };
             for (const [name, raw, expected, chunked] of [
                 ['malformed', '{', 400, false], ['null', 'null', 400, false], ['array', '[]', 400, false],
-                ['scalar', '42', 400, false], ['oversize-declared', notesBody(body, cap + 1), 413, false],
-                ['oversize-chunked', notesBody(body, cap + 1), 413, true],
+                ['scalar', '42', 400, false], ['oversize-declared', notesBody(body, cap + 1, surface), 413, false],
+                ['oversize-chunked', notesBody(body, cap + 1, surface), 413, true],
             ]) {
                 const before = snapshot();
                 const { response, json } = await send(operation, url, headers, raw, chunked);
@@ -79,10 +88,10 @@ test('six local checkup POST/PUT/DELETE paths enforce their object/byte contract
                 records.push({ surface, operation, name, status: response.status, unchanged: true });
             }
             const beforeUnauthorized = snapshot();
-            const unauthorized = await send(operation, url, { 'Content-Type': 'application/json' }, notesBody(body, cap + 1));
+            const unauthorized = await send(operation, url, { 'Content-Type': 'application/json' }, notesBody(body, cap + 1, surface));
             assert.equal(unauthorized.response.status, 401); assert.equal(snapshot(), beforeUnauthorized);
             // A real successful POST supplies the target for the subsequent PUT.
-            const raw = notesBody(body, cap);
+            const raw = notesBody(body, cap, surface);
             const accepted = await send(operation, url, headers, raw, true);
             assert.equal(accepted.response.status, operation === 'POST' ? 201 : 200);
             if (operation === 'POST') assert.deepEqual(accepted.json, { id: checkupId, version: 1 });
@@ -107,8 +116,8 @@ test('six local checkup POST/PUT/DELETE paths enforce their object/byte contract
             ['null', 'null', 400, 'Invalid JSON body', false],
             ['array', '[]', 400, 'Invalid JSON body', false],
             ['scalar', '42', 400, 'Invalid JSON body', false],
-            ['oversize-declared', notesBody({ version: 2 }, cap + 1), 413, 'JSON payload too large', false],
-            ['oversize-chunked', notesBody({ version: 2 }, cap + 1), 413, 'JSON payload too large', true],
+            ['oversize-declared', notesBody({ version: 2 }, cap + 1, surface), 413, 'JSON payload too large', false],
+            ['oversize-chunked', notesBody({ version: 2 }, cap + 1, surface), 413, 'JSON payload too large', true],
             ['invalid-tombstone', '{"deletedAt":null}', 400, 'Invalid deletedAt', false],
             ['stale-version', '{"version":1}', 409, 'Conflict', false],
         ]) {
@@ -122,7 +131,7 @@ test('six local checkup POST/PUT/DELETE paths enforce their object/byte contract
             records.push({ surface, operation: 'DELETE', name, status: response.status, unchanged: true });
         }
         const beforeUnauthorized = snapshot();
-        assert.equal((await send('DELETE', item, { 'Content-Type': 'application/json' }, notesBody({ version: 2 }, cap + 1))).response.status, 401);
+        assert.equal((await send('DELETE', item, { 'Content-Type': 'application/json' }, notesBody({ version: 2 }, cap + 1, surface))).response.status, 401);
         assert.equal(snapshot(), beforeUnauthorized);
 
         // A client disconnect has no observable HTTP response. Assert SQLite after
@@ -142,15 +151,15 @@ test('six local checkup POST/PUT/DELETE paths enforce their object/byte contract
         records.push({ surface, operation: 'DELETE', name: 'pending-body-client-disconnect', responseObservable: false, unchanged: true });
 
         const beforeDelete = snapshot();
-        const acceptedDelete = await send('DELETE', item, headers, notesBody({ version: 2 }, cap), true);
+        const acceptedDelete = await send('DELETE', item, headers, notesBody({ version: 2 }, cap, surface), true);
         assert.equal(acceptedDelete.response.status, 200); assert.deepEqual(acceptedDelete.json, { success: true });
         const db = new Database(path.join(dataDir, 'medical.db'), { readonly: true });
         try {
             const row = db.prepare('SELECT * FROM checkups WHERE id=?').get(checkupId);
             assert.equal(row.version, 3); assert.ok(row.deleted_at);
             assert.equal(row.deletion_reason, surface === 'web' ? 'web-delete' : 'api-v1-delete');
-            assert.equal(row.title, 'Synthetic update');
-            assert.equal(row.notes, JSON.parse(notesBody({ version: 1, title: 'Synthetic update', notes: 'ENC:synthetic:notes' }, cap)).notes);
+            assert.equal(row.title, JSON.parse(notesBody({ version: 1, title: 'Synthetic update', notes: surface === 'v1' ? sealedNotes : 'ENC:synthetic:notes' }, cap, surface)).title);
+            assert.equal(row.notes, JSON.parse(notesBody({ version: 1, title: 'Synthetic update', notes: surface === 'v1' ? sealedNotes : 'ENC:synthetic:notes' }, cap, surface)).notes);
             const events = db.prepare("SELECT * FROM audit_events WHERE subject_type='checkup' AND subject_ref=? AND event_type='checkup.deleted'").all(checkupId);
             assert.equal(events.length, 1);
         } finally { db.close(); }

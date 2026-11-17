@@ -28,8 +28,8 @@ test('clinical PUT routes reject invalid provided fields with deterministic 400 
     const ids = await createClinicalResources(patientId);
     const cases = [
         // WUL-308: child PUTs require optimistic concurrency, so version travels with the payload.
-        ['entries missing version', `/api/v1/patients/${patientId}/entries/${ids.entryId}`, { content: 'updated' }, 400, 'Version is required'],
-        ['entries invalid date', `/api/v1/patients/${patientId}/entries/${ids.entryId}`, { version: 1, date: 'bad-date', content: 'updated' }, 400, 'Invalid date'],
+        ['entries missing version', `/api/v1/patients/${patientId}/entries/${ids.entryId}`, { content: 'ENC:c3ludGhldGlj:dXBkYXRlZA==' }, 400, 'Version is required'],
+        ['entries invalid date', `/api/v1/patients/${patientId}/entries/${ids.entryId}`, { version: 1, date: 'bad-date', content: 'ENC:c3ludGhldGlj:dXBkYXRlZA==' }, 400, 'Invalid date'],
         ['entries no valid fields', `/api/v1/patients/${patientId}/entries/${ids.entryId}`, { version: 1 }, 400, 'No valid fields to update'],
         ['therapies missing version', `/api/v1/patients/${patientId}/therapies/${ids.therapyId}`, { dosage: '500 mg' }, 400, 'Version is required'],
         ['therapies invalid required drugName', `/api/v1/patients/${patientId}/therapies/${ids.therapyId}`, { version: 1, drugName: '', dosage: '500 mg' }, 400, 'Invalid drugName'],
@@ -69,7 +69,7 @@ test('clinical PUT routes return 409 with a version-conflict payload on stale ve
 
     const patientId = await createSeedPatient();
     const resources = [
-        ['entries', 'entry', { content: 'Contenuto aggiornato' }],
+        ['entries', 'entry', { content: 'ENC:c3ludGhldGlj:Q29udGVudXRvIGFnZ2lvcm5hdG8=' }],
         ['therapies', 'therapy', { dosage: '850 mg' }],
         ['checkups', 'checkup', { title: 'Controllo aggiornato' }],
         ['observations', 'observation', { value: '76' }],
@@ -125,22 +125,22 @@ test('clinical DELETE soft-deletes with version guard and hides tombstones from 
         const listPath = `/api/v1/patients/${patientId}/${resource}`;
         const detailPath = `${listPath}/${idByResource[resource]}`;
 
-        const missingVersion = await request('DELETE', detailPath, { deletionReason: 'senza-versione' });
+        const missingVersion = await request('DELETE', detailPath, { deletionReason: 'ENC:c3ludGhldGlj:c2VuemEtdmVyc2lvbmU=' });
         assert.equal(missingVersion.status, 400, `${resource} DELETE without version should return 400`);
         assert.deepEqual(missingVersion.json, { error: 'Version is required' });
 
-        const staleVersion = await request('DELETE', detailPath, { version: 99, deletionReason: 'versione-stantia' });
+        const staleVersion = await request('DELETE', detailPath, { version: 99, deletionReason: 'ENC:c3ludGhldGlj:dmVyc2lvbmUtc3RhbnRpYQ==' });
         assert.equal(staleVersion.status, 409, `${resource} DELETE with stale version should return 409`);
         assert.equal(staleVersion.json?.code, 'VERSION_CONFLICT');
         assert.equal(staleVersion.json?.currentVersion, 1);
 
-        const deletion = await request('DELETE', detailPath, { version: 1, deletionReason: 'api-v1-lifecycle-smoke' });
+        const deletion = await request('DELETE', detailPath, { version: 1, deletionReason: 'ENC:c3ludGhldGlj:YXBpLXYxLWxpZmVjeWNsZS1zbW9rZQ==' });
         assert.equal(deletion.status, 200, `${resource} DELETE with matching version should succeed`);
 
         const deletedDetail = await request('GET', detailPath);
         assert.equal(deletedDetail.status, 200, `${resource} tombstone should remain readable by id`);
         assert.ok(deletedDetail.json?.deletedAt, `${resource} tombstone should carry deletedAt`);
-        assert.equal(deletedDetail.json?.deletionReason, 'api-v1-lifecycle-smoke');
+        assert.equal(deletedDetail.json?.deletionReason, 'ENC:c3ludGhldGlj:YXBpLXYxLWxpZmVjeWNsZS1zbW9rZQ==');
         assert.equal(deletedDetail.json?.version, 2);
 
         const hiddenList = await request('GET', listPath);
@@ -173,9 +173,9 @@ test('clinical entry PUT soft-delete hides by default and restore clears tombsto
     const patientId = await createSeedPatient();
     const entry = await createResource(`/api/v1/patients/${patientId}/entries`, {
         type: 'note',
-        title: 'Nota soft delete',
+        title: 'ENC:c3ludGhldGlj:Tm90YSBzb2Z0IGRlbGV0ZQ==',
         date: '2026-05-02T09:00:00.000Z',
-        content: 'Voce da cancellare in modo reversibile',
+        content: 'ENC:c3ludGhldGlj:Vm9jZSBkYSBjYW5jZWxsYXJlIGluIG1vZG8gcmV2ZXJzaWJpbGU=',
     });
 
     const beforeList = await request('GET', `/api/v1/patients/${patientId}/entries`);
@@ -188,14 +188,14 @@ test('clinical entry PUT soft-delete hides by default and restore clears tombsto
     const softDelete = await request('PUT', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
         version: beforeDetail.json.version,
         deletedAt: softDeleteAt,
-        deletionReason: 'api-v1-soft-delete-smoke',
+        deletionReason: 'ENC:c3ludGhldGlj:YXBpLXYxLXNvZnQtZGVsZXRlLXNtb2tl',
     });
     assert.equal(softDelete.status, 200);
 
     const deletedDetail = await request('GET', `/api/v1/patients/${patientId}/entries/${entry.id}`);
     assert.equal(deletedDetail.status, 200);
     assert.equal(deletedDetail.json?.deletedAt, softDeleteAt);
-    assert.equal(deletedDetail.json?.deletionReason, 'api-v1-soft-delete-smoke');
+    assert.equal(deletedDetail.json?.deletionReason, 'ENC:c3ludGhldGlj:YXBpLXYxLXNvZnQtZGVsZXRlLXNtb2tl');
     assert.equal(deletedDetail.json?.version, beforeDetail.json.version + 1);
 
     const hiddenList = await request('GET', `/api/v1/patients/${patientId}/entries`);
@@ -238,9 +238,9 @@ test('clinical entry DELETE writes a validated soft-delete tombstone instead of 
     const patientId = await createSeedPatient();
     const entry = await createResource(`/api/v1/patients/${patientId}/entries`, {
         type: 'note',
-        title: 'Nota DELETE soft',
+        title: 'ENC:c3ludGhldGlj:Tm90YSBERUxFVEUgc29mdA==',
         date: '2026-05-02T11:00:00.000Z',
-        content: 'Voce da cancellare tramite DELETE sicuro',
+        content: 'ENC:c3ludGhldGlj:Vm9jZSBkYSBjYW5jZWxsYXJlIHRyYW1pdGUgREVMRVRFIHNpY3Vybw==',
     });
 
     const invalidDelete = await request('DELETE', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
@@ -253,7 +253,7 @@ test('clinical entry DELETE writes a validated soft-delete tombstone instead of 
     const invalidDeleteDate = await request('DELETE', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
         version: 1,
         deletedAt: 'not-a-date',
-        deletionReason: 'invalid-date-smoke',
+        deletionReason: 'ENC:c3ludGhldGlj:aW52YWxpZC1kYXRlLXNtb2tl',
     });
     assert.equal(invalidDeleteDate.status, 400);
     assert.deepEqual(invalidDeleteDate.json, { error: 'Invalid deletedAt' });
@@ -266,14 +266,14 @@ test('clinical entry DELETE writes a validated soft-delete tombstone instead of 
     const deletion = await request('DELETE', `/api/v1/patients/${patientId}/entries/${entry.id}`, {
         version: detailBeforeDelete.json.version,
         deletedAt,
-        deletionReason: 'api-v1-delete-soft-smoke',
+        deletionReason: 'ENC:c3ludGhldGlj:YXBpLXYxLWRlbGV0ZS1zb2Z0LXNtb2tl',
     });
     assert.equal(deletion.status, 200);
 
     const deletedDetail = await request('GET', `/api/v1/patients/${patientId}/entries/${entry.id}`);
     assert.equal(deletedDetail.status, 200);
     assert.equal(deletedDetail.json?.deletedAt, deletedAt);
-    assert.equal(deletedDetail.json?.deletionReason, 'api-v1-delete-soft-smoke');
+    assert.equal(deletedDetail.json?.deletionReason, 'ENC:c3ludGhldGlj:YXBpLXYxLWRlbGV0ZS1zb2Z0LXNtb2tl');
     assert.equal(deletedDetail.json?.version, detailBeforeDelete.json.version + 1);
 
     const hiddenList = await request('GET', `/api/v1/patients/${patientId}/entries`);
@@ -307,7 +307,7 @@ async function createSeedPatient() {
         firstName: 'Route',
         lastName: 'Negative',
         taxCode: `RTE${suffix}`,
-        notes: 'api-v1-put-negative-routes',
+        notes: 'ENC:c3ludGhldGlj:YXBpLXYxLXB1dC1uZWdhdGl2ZS1yb3V0ZXM=',
         isAdi: false,
         isArchived: false,
     });
@@ -321,9 +321,9 @@ async function createClinicalResources(patientId) {
     const [entry, therapy, checkup, observation] = await Promise.all([
         createResource(`/api/v1/patients/${patientId}/entries`, {
             type: 'visit',
-            title: 'Visita',
+            title: 'ENC:c3ludGhldGlj:VmlzaXRh',
             date: '2026-05-01T09:00:00.000Z',
-            content: 'Contenuto sintetico',
+            content: 'ENC:c3ludGhldGlj:Q29udGVudXRvIHNpbnRldGljbw==',
         }),
         createResource(`/api/v1/patients/${patientId}/therapies`, {
             drugName: 'Metformina',

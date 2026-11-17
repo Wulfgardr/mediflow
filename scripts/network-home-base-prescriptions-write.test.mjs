@@ -389,7 +389,7 @@ function servicePrescriptionPayload(patientId) {
         provider: 'Ambulatorio smoke',
         requestReference: 'W2-S3-SMOKE',
         source: 'manual',
-        notes: 'network-home-base-prescriptions-write-smoke',
+        notes: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2UtcHJlc2NyaXB0aW9ucy13cml0ZS1zbW9rZQ==',
     };
 }
 
@@ -424,7 +424,7 @@ function prostheticPrescriptionPayload(patientId) {
         supplier: 'Fornitore smoke',
         collaudoAt: null,
         source: 'manual',
-        notes: 'network-home-base-prescriptions-write-smoke',
+        notes: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2UtcHJlc2NyaXB0aW9ucy13cml0ZS1zbW9rZQ==',
     };
 }
 
@@ -513,7 +513,7 @@ async function createSeedPatient(ambulatoryId, lastName = 'Prescriptions') {
             lastName,
             taxCode: `NPS${suffix}`,
             ambulatoryId,
-            notes: 'network-home-base-prescriptions-write-smoke',
+            notes: 'ENC:c3ludGhldGlj:bmV0d29yay1ob21lLWJhc2UtcHJlc2NyaXB0aW9ucy13cml0ZS1zbW9rZQ==',
             isAdi: false,
             isArchived: false,
         },

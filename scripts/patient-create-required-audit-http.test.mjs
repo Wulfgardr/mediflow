@@ -51,7 +51,7 @@ function snapshot(id) {
 
 function bodyFor(id, ambulatoryId) {
     return { id, firstName: 'Ada', lastName: 'Sintetica', taxCode: `SYN${id.replaceAll('-', '').slice(0, 11)}`,
-        ambulatoryId, notes: 'ENC:synthetic:sealed', unknownClinicalProperty: 'CLINICAL_SENTINEL' };
+        ambulatoryId, notes: 'ENC:c3ludGhldGlj:c2VhbGVk', unknownClinicalProperty: 'CLINICAL_SENTINEL' };
 }
 
 function checkEvent(id, expectedActorRef, expectedActorType, expectedSurface) {
@@ -69,7 +69,7 @@ function checkEvent(id, expectedActorRef, expectedActorType, expectedSurface) {
     const metadata = JSON.parse(event.redacted_metadata);
     assert.equal(metadata.resourceVersion, 1);
     assert.equal(JSON.stringify(metadata).includes('CLINICAL_SENTINEL'), false);
-    assert.equal(JSON.stringify(metadata).includes('ENC:synthetic:sealed'), false);
+    assert.equal(JSON.stringify(metadata).includes('ENC:c3ludGhldGlj:c2VhbGVk'), false);
     return state;
 }
 
