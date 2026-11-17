@@ -26,7 +26,8 @@ export function readAgentCassetteIndex(database: Database.Database, actorRef: st
         AND NOT EXISTS (
             SELECT 1 FROM audit_events AS event
             WHERE event.event_type='agent.visit.applied' AND event.actor_ref=cassette.actor_ref
-            AND event.subject_ref=cassette.id AND event.proposer_ref=cassette.agent_ref AND event.mandate_ref=cassette.mandate_ref
+            AND event.subject_type='agent_operation' AND event.subject_ref=cassette.id
+            AND event.proposer_ref=cassette.agent_ref AND event.mandate_ref=cassette.mandate_ref
             AND event.outcome='success' AND event.source_surface='agent'
             AND EXISTS (SELECT 1 FROM json_each(
                 CASE WHEN json_valid(event.redacted_metadata) THEN event.redacted_metadata ELSE '{}' END, '$.flags'
