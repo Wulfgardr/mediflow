@@ -2,12 +2,11 @@
 
 # Crediti e attribuzioni
 
-**MediFlow è software originale**, ma il suo sviluppo si confronta con idee,
-modelli e strumenti di altri. Dichiararli permette di capire da dove provenga
-una scelta e quale contributo sia effettivamente entrato nel progetto: questa
-pagina ne raccoglie ruolo, collegamento e licenza.
+**MediFlow è software originale**. Nel progettarlo mi confronto con idee,
+modelli e strumenti di altri. Qui ne raccolgo ruolo, collegamento e licenza,
+per chiarire da dove viene una scelta e quale contributo è entrato nel progetto.
 
-Una relazione di _ispirazione_ non equivale all'inclusione di un componente:
+Quando parlo di _ispirazione_, non intendo l'inclusione di un componente:
 in quei casi l'implementazione di MediFlow è originale e non comprende asset,
 codice o dati di terzi, salvo dove indicato.
 
@@ -29,8 +28,8 @@ implica approvazione del prodotto da parte della WHO.
 
 ## Ispirazione
 
-Questi riferimenti hanno suggerito una forma o un metodo, senza che ne sia
-stato importato il codice.
+Questi riferimenti mi hanno suggerito una forma o un metodo. Non ne ho
+importato il codice.
 
 ### Kree8: il look
 
@@ -294,8 +293,8 @@ sostituiscono queste decisioni.
 
 ## Sviluppo assistito
 
-Questi strumenti scrivono gran parte del codice di MediFlow, su istruzioni e
-con decisioni di Leonardo Pegollo; non costituiscono fonti del prodotto.
+Questi strumenti scrivono gran parte del codice di MediFlow, su mie istruzioni
+e con le mie decisioni (Leonardo Pegollo). Non costituiscono fonti del prodotto.
 [Chi fa che cosa](./docs/development-usage.md#che-cosa-significa-assistito).
 
 [![Codex: OpenAI](https://img.shields.io/badge/Codex-OpenAI-412991?logo=openai&logoColor=white)](https://openai.com/codex)
@@ -320,9 +319,8 @@ sono esclusi. La copertura è parziale; i token non misurano costo o qualità.
 - **[steipete/agent-scripts](https://github.com/steipete/agent-scripts)** (MIT): parte del flusso di review deriva da qui.
 - **[T3 Code](https://github.com/pingdotgg/t3code)** (Theo Browne, Julius Marminge e team, MIT): il modo di dichiarare lo sviluppo con agenti, il modello di PR e la regola «si valutano le prove, non chi ha scritto» sono adattati dalle loro pratiche pubbliche. MediFlow è sviluppato anche dentro T3 Code.
 
-L'uso dei modelli non trasferisce loro le decisioni: le proposte restano
-materiale da verificare e decisioni, attribuzioni e responsabilità del
-progetto rimangono umane.
+L'uso dei modelli non trasferisce loro le decisioni. Le proposte restano da
+verificare. Decisioni, attribuzioni e responsabilità del progetto restano umane.
 
 ---
 
