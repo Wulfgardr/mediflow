@@ -5,7 +5,6 @@ import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import { ViewState } from '@/components/ui/view-state';
 import { formatCountLabel } from '@/lib/format-count';
-import { Disclosure } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { clientArchiveGeneration } from '@/lib/security/client-auth-api';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -564,8 +563,8 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                                 {errors.drugName && <p className="text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{errors.drugName.message}</p>}
                             </div>
                             <div className="space-y-1">
-                                <label className={fieldLabelClassName}>Principio attivo</label>
-                                <input {...register('activePrinciple')} className={inputClassName} placeholder="Es. Furosemide" readOnly={!isGalenic} />
+                                <label htmlFor={`therapy-principle-${patientId}`} className={fieldLabelClassName}>Principio attivo</label>
+                                <input id={`therapy-principle-${patientId}`} {...register('activePrinciple')} className={inputClassName} placeholder="Es. Furosemide" readOnly={!isGalenic} />
                             </div>
                             <div className="col-span-full space-y-1">
                                 <label htmlFor={`therapy-dosage-${patientId}`} className={fieldLabelClassName}>Posologia</label>
@@ -578,11 +577,11 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                             </div>
 
                             <div className="col-span-full space-y-1">
-                                <label className={fieldLabelClassName}>Collegamento clinico</label>
+                                <label id={`therapy-diagnosis-label-${patientId}`} htmlFor={`therapy-diagnosis-${patientId}`} className={fieldLabelClassName}>Collegamento clinico</label>
 
                                 {/* Quick Suggestions */}
                                 {patient && (
-                                    <div className="flex flex-wrap gap-3 mb-2">
+                                    <div role="group" aria-labelledby={`therapy-diagnosis-label-${patientId}`} className="flex flex-wrap gap-3 mb-2">
                                         {patient.diagnoses?.map(d => (
                                             <button
                                                 key={d.code}
@@ -614,6 +613,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                                 )}
 
                                 <ICDAutocomplete
+                                    inputId={`therapy-diagnosis-${patientId}`}
                                     onSelect={(code, title) => setSelectedDiagnosis({ code, title })}
                                     initialValue={selectedDiagnosis}
                                 />
@@ -671,18 +671,14 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                     { title: 'Concluse', rows: endedTherapies, status: 'completed' },
                 ].filter(group => group.rows.length > 0).map((group) => <section key={group.status}>
                     <header className={styles.sectionHead}><h3>{group.title}</h3></header>
-                    <table className={`${styles.table} ${styles.therapyTable}`}><thead><tr><th>Farmaco</th><th>Posologia</th><th className={styles.secondaryColumn}>Periodo</th><th className={styles.secondaryColumn}>Codici</th><th>Azioni</th></tr></thead><tbody>
+                    <table className={`${styles.table} ${styles.therapyTable} ${styles.therapyRegister}`}><thead><tr><th>Farmaco</th><th>Posologia</th><th>Indicazione</th><th>Periodo</th><th>Azioni</th></tr></thead><tbody>
                         {group.rows.map(t => <tr key={t.id}>
                             <td><strong>{t.drugName}</strong>{t.activePrinciple && <small>{t.activePrinciple}</small>}
-                                {(t.motivation || t.diagnosisCode || t.atc || t.aic || t.startDate) && <Disclosure className={styles.recordDetails} title="Dettagli terapia">
-                                    {t.startDate && <p>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</p>}
-                                    {t.motivation && <p>{t.motivation}</p>}{t.diagnosisCode && <p><span className="lume-code">{t.diagnosisCode}</span> {t.diagnosisName}</p>}
-                                    {(t.atc || t.aic) && <p className="lume-code">{t.atc && <>ATC {t.atc} </>}{t.aic && <>AIC {t.aic}</>}</p>}
-                                </Disclosure>}
+                                {(t.atc || t.aic) && <small className="lume-code">{[t.atc && `ATC ${t.atc}`, t.aic && `AIC ${t.aic}`].filter(Boolean).join(' · ')}</small>}
                             </td>
                             <td className="lume-registro">{t.dosage}</td>
-                            <td className={`${styles.secondaryColumn} ${styles.muted}`}>{group.status === 'completed' ? <>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</> : t.startDate ? <>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</> : '—'}</td>
-                            <td className={`${styles.secondaryColumn} lume-code`}>{t.atc && <div>ATC {t.atc}</div>}{t.aic && <div>AIC {t.aic}</div>}{!t.atc && !t.aic && '—'}</td>
+                            <td data-therapy-cell="indication" data-empty={!t.motivation && !t.diagnosisCode}>{t.motivation && <span>{t.motivation}</span>}{t.diagnosisCode && <small><span className="lume-code">{t.diagnosisCode}</span> {t.diagnosisName}</small>}{!t.motivation && !t.diagnosisCode && <span className={styles.muted}>—</span>}</td>
+                            <td data-therapy-cell="period" className={styles.muted}>{group.status === 'completed' ? <>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</> : t.startDate ? <>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</> : '—'}</td>
                             <td><div className={styles.therapyActions}>
                                 {group.status === 'active' ? <Button variant="text" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => startEditing(t)}>Modifica</Button>
                                     : <Button variant="text" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'active')}>Riattiva</Button>}
@@ -692,7 +688,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                                     <button type="button" role="menuitem" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'completed')}>Concludi</button>
                                     {group.status === 'active' && <button type="button" role="menuitem" disabled={!!deleteRecovery || statusChange.blocked || isAdding} onClick={() => handleSoftDelete(t.id)}>Elimina (inserita per errore)</button>}
                                 </PatientSheetMenu>}
-                            </div>{group.status === 'completed' && <small className={styles.compactOnly}>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</small>}</td>
+                            </div></td>
                         </tr>)}
                     </tbody></table>
                 </section>)}

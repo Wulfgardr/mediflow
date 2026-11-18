@@ -22,8 +22,8 @@ interface DrugAutocompleteProps {
 }
 
 const drugInputClassName = `mf-input mf-search-input h-11 text-sm ${styles.input}`;
-const drugPopoverClassName = 'absolute z-[100] mt-2 max-h-80 w-full overflow-y-auto rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-2 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]';
-const drugRowClassName = 'w-full rounded-[var(--lume-radius-control)] px-3 py-3 text-left transition-[background-color] duration-[var(--lume-dur-riga)] hover:bg-[color:var(--lume-surface-focal)] focus:bg-[color:var(--lume-surface-focal)] focus:outline-none';
+const drugPopoverClassName = 'absolute z-[100] mt-2 max-h-80 w-full overflow-y-auto rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-2 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]';
+const drugRowClassName = 'w-full rounded-[calc(var(--lume-radius-control)_-_4px)] px-3 py-3 text-left transition-[background-color] duration-[var(--lume-dur-riga)] hover:bg-[color:var(--lume-surface-focal)] focus:bg-[color:var(--lume-surface-focal)] focus:outline-none';
 
 export default function DrugAutocomplete({ onSelect, id, placeholder = "Cerca per nome o principio attivo...", autoFocus = false, defaultValue = "" }: DrugAutocompleteProps) {
     const [query, setQuery] = useState(defaultValue);
