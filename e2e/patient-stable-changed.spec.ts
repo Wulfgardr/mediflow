@@ -21,8 +21,8 @@ function updateSyntheticArchive(update: (database: Database.Database) => void) {
     finally { database.close(); }
 }
 
-async function seed(page: Page, crowded = false, twin = false) {
-    const fixture = await page.evaluate(async ({ original, sourceName, crowded, twin }) => {
+async function seed(page: Page, { crowded = false, twin = false, withDocument = true } = {}) {
+    const fixture = await page.evaluate(async ({ original, sourceName, crowded, twin, withDocument }) => {
         async function post(entity: string, body: object) {
             const response = await fetch(`/api/${entity}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
             if (!response.ok) throw new Error(`Fixture ${entity}: ${response.status}`);
@@ -66,10 +66,10 @@ async function seed(page: Page, crowded = false, twin = false) {
                     path: `uploads/${name}`, data: `data:text/plain;base64,${btoa(original)}` });
             }
         }
-        const source = await post('attachments', { id: crypto.randomUUID(), patientId: patient.id, name: sourceName, type: 'text/plain', size: original.length,
+        if (withDocument) await post('attachments', { id: crypto.randomUUID(), patientId: patient.id, name: sourceName, type: 'text/plain', size: original.length,
             path: `uploads/${sourceName}`, data: `data:text/plain;base64,${btoa(original)}` });
-        return { patient, other, returning, first, source, visit, active, activeName, changed, suspendedName, observationId, previousObservationId };
-    }, { original, sourceName, crowded, twin });
+        return { patient, other, returning, first, visit, active, activeName, changed, suspendedName, observationId, previousObservationId };
+    }, { original, sourceName, crowded, twin, withDocument });
     const at = (day: number) => Date.UTC(2026, 1, day, 12) / 1000;
     const offset = twin ? 2 : 0;
     updateSyntheticArchive(database => {
@@ -169,7 +169,7 @@ test('D: dalla lista, primo sguardo al ritorno e cartella senza storico al cambi
 test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e riletta', async ({ page }) => {
     await page.setViewportSize({ width: 1180, height: 660 });
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    const { patient, returning, other, first } = await seed(page, true);
+    const { patient, returning, other, first } = await seed(page, { crowded: true });
     await page.reload();
     const openingStarted = performance.now();
     await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
@@ -282,7 +282,7 @@ test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e r
 test('D gemella: un contatto nello stesso giorno si legge come voce, e una lettura fallita resta esplicita', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 780 });
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    const { patient, returning, activeName, suspendedName } = await seed(page, true, true);
+    const { patient, returning, activeName, suspendedName } = await seed(page, { crowded: true, twin: true });
     await page.reload();
     await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
     const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
@@ -345,7 +345,7 @@ test('D: due misure dello stesso codice in unità diverse restano distinte nella
 
 test('D: il solo referto aggiunto dopo la visita è raggiungibile e apre l’originale', async ({ page }) => {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    const { patient, returning, visit } = await seed(page);
+    const { patient, returning, visit } = await seed(page, { withDocument: false });
     updateSyntheticArchive(database => {
         const old = Date.UTC(2026, 1, 4, 12) / 1000;
         database.prepare('UPDATE therapies SET created_at = ?, updated_at = ? WHERE patient_id = ?').run(old, old, patient.id);
@@ -353,7 +353,18 @@ test('D: il solo referto aggiunto dopo la visita è raggiungibile e apre l’ori
     });
     await page.reload();
     await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
+    await expect(page.getByText(/nessuna variazione registrata/)).toBeVisible();
+    const firstReadSecond = Math.floor(Date.now() / 1000);
+    await openPatientSection(page, 'documenti');
+    await expect.poll(() => Math.floor(Date.now() / 1000)).toBeGreaterThan(firstReadSecond);
+    const uploaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/attachments' && response.request().method() === 'POST');
+    await page.locator('#documenti input[type=file]').setInputFiles({
+        name: sourceName, mimeType: 'text/plain', buffer: Buffer.from(original),
+    });
+    expect((await uploaded).status()).toBe(201);
+    await openPatientSection(page, 'quadro');
     const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
+    await expect(changes).toContainText('06/02/2026');
     await expect(changes.locator('li')).toHaveCount(0);
     const disclosure = changes.getByRole('checkbox', { name: 'Mostra anche documenti e proposte' });
     await disclosure.check();

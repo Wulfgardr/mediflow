@@ -161,12 +161,16 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
     );
     const followupRead = projectFollowupReadState({ data: checkups, loading: checkupsLoading, error: checkupsError });
     /* The sheet consumes metadata and stored summaries, not original file bytes. */
-    const { data: attachments, loading: attachmentsLoading, error: attachmentsError, refresh: refreshAttachments } = useLiveQueryState(
-        async () => db.attachments.query({ patientId: id, metadataOnly: true }).toArray({ signal: db.getSessionReadSignal(), rejectAuthUnavailable: true }),
+    const { data: attachmentSnapshot, loading: attachmentsLoading, error: attachmentsError, refresh: refreshAttachments } = useLiveQueryState(
+        async () => ({
+            records: await db.attachments.query({ patientId: id, metadataOnly: true }).toArray({ signal: db.getSessionReadSignal(), rejectAuthUnavailable: true }),
+            readAt: new Date(),
+        }),
         [id],
         undefined,
         ['attachments'],
     );
+    const attachments = attachmentSnapshot?.records;
     /* WUL-UIUX Fase 7: array completi per buildPatientWorkspaceFromRecords,
        le stesse letture che il cockpit fa per il Quadro (tutte le terapie e tutte
        le osservazioni del paziente, senza filtri). */
@@ -189,12 +193,16 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
             }),
         [therapies],
     );
-    const { data: observations, loading: observationsLoading, error: observationsError } = useLiveQueryState(
-        async () => db.observations.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }),
+    const { data: observationSnapshot, loading: observationsLoading, error: observationsError } = useLiveQueryState(
+        async () => ({ records: await db.observations.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }), readAt: new Date() }),
         [id],
         undefined,
         ['observations'],
     );
+    const observations = observationSnapshot?.records;
+    const comparisonReadAt = new Date(Math.max(currentTimestampMs,
+        diarySnapshot?.readAt.getTime() ?? 0, therapySnapshot?.readAt.getTime() ?? 0,
+        attachmentSnapshot?.readAt.getTime() ?? 0, observationSnapshot?.readAt.getTime() ?? 0));
     const servicePrescriptionItems = useLiveQuery(
         async () => db.servicePrescriptionItems.query({ patientId: id }).toArray(),
         [id],
@@ -722,7 +730,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                     composer={writing ? <PatientEntryComposer key={id} embedded sheetSource={sourceSelection} /> : undefined}
                     sources={<PatientSheetSources patientId={id} selection={sourceSelection} entries={entriesError ? undefined : entries} data={attachments} loading={attachmentsLoading} error={attachmentsError}
                         onRefresh={refreshAttachments} archiveLink />}
-                    activity={<PatientSheetActivity patientId={id} reference={visitReference} now={new Date(Math.max(currentTimestampMs, diarySnapshot?.readAt.getTime() ?? 0, therapySnapshot?.readAt.getTime() ?? 0))}
+                    activity={<PatientSheetActivity patientId={id} reference={visitReference} now={comparisonReadAt}
                         entries={entriesError ? undefined : entries} therapies={therapiesError ? undefined : therapies}
                         measures={observationsError ? undefined : observations} attachments={attachmentsError ? undefined : attachments}
                         unavailable={Boolean(entriesError || therapiesError || observationsError || attachmentsError)}
