@@ -11,7 +11,7 @@ pub(super) enum Command {
 
 pub(super) const PRIMARY_LABELS: &[(Command, Option<FormKind>, &str)] = &[
     (Command::Review, Some(FormKind::Scale), "Prepara e rivedi"),
-    (Command::Review, None, "Registra 1 elemento"),
+    (Command::Review, None, "Rivedi"),
     (Command::Reread, Some(FormKind::Scale), "Rileggi e verifica"),
     (Command::Reread, None, "Rileggi la scheda"),
     (Command::Copy, None, "Copia bozza"),

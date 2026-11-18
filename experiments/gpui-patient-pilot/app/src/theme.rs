@@ -30,6 +30,7 @@ pub struct Theme {
     pub appearance_selected_text: Hsla,
     pub warning: Hsla,
     pub critical: Hsla,
+    pub success: Hsla,
     pub threshold_text: Hsla,
     pub control_radius: f32,
     pub paper_radius: f32,
@@ -75,6 +76,7 @@ impl Theme {
             },
             warning: color("signal", "warning"),
             critical: color("signal", "critical"),
+            success: color("signal", "success"),
             threshold_text: color("ink", "threshold"),
             control_radius: if cfg!(any(target_os = "ios", target_os = "macos")) {
                 12.
@@ -143,6 +145,7 @@ impl Theme {
             TypeRole::Threshold => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.5, true),
             TypeRole::Meta => (SYSTEM, 13., FontWeight::NORMAL, 1.5, true),
             TypeRole::Section => (SYSTEM, 12., FontWeight::SEMIBOLD, 1.5, true),
+            TypeRole::Title => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.4, true),
             TypeRole::Code => (CODES, 12., FontWeight::NORMAL, 1.5, false),
         };
         let size = self.size(points * if register { native_body / 14. } else { 1. });
@@ -170,6 +173,7 @@ pub enum TypeRole {
     Threshold,
     Meta,
     Section,
+    Title,
     Code,
 }
 
@@ -219,6 +223,7 @@ impl From<TextRole> for TypeRole {
             TextRole::Body => Self::Body,
             TextRole::Strong => Self::Strong,
             TextRole::Meta => Self::Meta,
+
             TextRole::Code => Self::Code,
         }
     }
@@ -230,6 +235,7 @@ pub enum TitleRole {
     PageTitle,
     PersonPreview,
     Section,
+    SectionTitle,
     Threshold,
 }
 impl From<TitleRole> for TypeRole {
@@ -240,6 +246,7 @@ impl From<TitleRole> for TypeRole {
             TitleRole::PageTitle => Self::PageTitle,
             TitleRole::PersonPreview => Self::PersonPreview,
             TitleRole::Section => Self::Section,
+            TitleRole::SectionTitle => Self::Title,
             TitleRole::Threshold => Self::Threshold,
         }
     }

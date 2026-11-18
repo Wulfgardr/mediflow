@@ -362,7 +362,7 @@ impl ClinicalApp {
                 }
                 pane = pane
                     .child(muted("Un riepilogo temporaneo dal modello locale dell’home-base, da confrontare con la scheda. Nessun aggiornamento automatico.".into()))
-                    .child(prepare("Genera proposta", true));
+                    .child(prepare("Genera proposta", false));
             }
             InsightPhase::Checking => {
                 pane = pane.child(notice(
@@ -394,7 +394,7 @@ impl ClinicalApp {
                     )))
                     .child(muted("Il testo non lascia il home-base. La cartella non cambia.".into()))
                     .child(
-                        button("patient-insight-confirm", "Genera proposta", theme, true, true)
+                        button("patient-insight-confirm", "Genera proposta", theme, false, true)
                             .on_click(cx.listener(|this, _, _, cx| this.insight_confirm(cx))),
                     )
                     .child(
