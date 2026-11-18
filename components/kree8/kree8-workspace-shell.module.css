@@ -936,6 +936,11 @@
 :global(html[data-runtime-twin-design='proposal']) .clinicalSection,
 :global(html[data-runtime-twin-design='proposal']) .synoptic,
 :global(html[data-runtime-twin-design='proposal']) .attentionBand { padding: 0; border: 0; scroll-margin-top: 24px; }
+@media (min-width: 701px) and (min-height: 600px) {
+  :global(html[data-runtime-twin-design='proposal']) .clinicalSection,
+  :global(html[data-runtime-twin-design='proposal']) .synoptic,
+  :global(html[data-runtime-twin-design='proposal']) .attentionBand { scroll-margin-top: 72px; }
+}
 :global(html[data-runtime-twin-design='proposal']) .clinicalSection > div:not([data-section-header]) { padding-top: 24px !important; }
 :global(html[data-runtime-twin-design='proposal']) .sectionTitle { margin: 0; }
 :global(html[data-runtime-twin-design='proposal']) .synopticDetails { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }

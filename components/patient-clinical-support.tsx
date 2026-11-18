@@ -7,6 +7,8 @@ import type { Patient } from '@/lib/db';
 import disclosure from '@/components/patient-disclosure.module.css';
 import styles from './patient-insight.module.css';
 import { useRuntimeTwinFolder } from '@/components/runtime-twin-design';
+import { InkState } from '@/components/ui/ink-state';
+import { Sparkles } from 'lucide-react';
 
 export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProposal, smartImportAvailable }: {
     hasInsightProposal: boolean;
@@ -15,9 +17,9 @@ export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProp
 }) {
     const count = Number(hasInsightProposal) + Number(hasSmartImportProposal);
     return <div className={styles.summary} data-testid="patient-proposals-summary">
-        <span>{count === 0 ? 'Nessuna proposta da rivedere' : `${count} ${count === 1 ? 'proposta' : 'proposte'} da rivedere`}</span>
+        <InkState state="pencil">{count === 0 ? 'Nessuna proposta da rivedere' : `${count} ${count === 1 ? 'proposta' : 'proposte'} da rivedere`}</InkState>
         <span className={styles.links}>
-            <a href="#patient-insight" className="mf-button-text">Quadro paziente</a>
+            <a href="#patient-insight" className="mf-button-secondary"><Sparkles size={16} aria-hidden="true" />Quadro paziente</a>
             {smartImportAvailable ? <a href="#smart-import" className="mf-button-text">Smart Import</a> : null}
         </span>
     </div>;

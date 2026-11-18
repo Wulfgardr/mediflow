@@ -234,7 +234,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                 {results.some(item => item.partial) && <p>Risultati parziali: affina il termine di ricerca.</p>}
             </details>}
             {isOpen && results.length > 0 && (
-                <div className="absolute z-[100] mt-2 w-full max-h-64 overflow-y-auto rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-1 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]" role="listbox" id={listboxId} aria-label="Risultati diagnosi ICD">
+                <div className="absolute z-[100] mt-2 w-full max-h-64 overflow-y-auto rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-1 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]" role="listbox" id={listboxId} aria-label="Risultati diagnosi ICD">
                     {results.map((item, index) => (
                         <button
                             key={`${item.system}-${item.code}`}
@@ -260,7 +260,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
 
             {isOpen && searchError && (
                 <div
-                    className="absolute z-[100] mt-2 w-full rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-3 text-left text-xs leading-5 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]"
+                    className="absolute z-[100] mt-2 w-full rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-3 text-left text-xs leading-5 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]"
                     style={{ color: 'var(--lume-signal-warning)' }}
                     role="status"
                 >
@@ -269,7 +269,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
             )}
 
             {isOpen && !searchError && results.length === 0 && query.length > 1 && (
-                <div className="absolute z-[100] mt-2 w-full rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-3 text-center text-xs italic shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]" style={{ color: 'var(--lume-ink-muted)' }}>
+                <div className="absolute z-[100] mt-2 w-full rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-3 text-center text-xs italic shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]" style={{ color: 'var(--lume-ink-muted)' }}>
                     Nessuna corrispondenza. Prova a cercare in Inglese (es. &quot;Amyloid&quot;).
                 </div>
             )}

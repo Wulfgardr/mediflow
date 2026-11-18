@@ -13,7 +13,7 @@
 /* named actions stay quiet until focus or interaction. */
 .documentAction { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; min-width: 44px; padding: 8px 10px; border: 0; border-radius: var(--lume-radius-control); background: transparent; color: var(--lume-ink); font: inherit; font-size: 0.875rem; line-height: 1.5; cursor: pointer; }
 .documentAction svg { flex-shrink: 0; }
-.documentAction:hover:not(:disabled) { background: var(--lume-surface-field); }
+.documentAction:hover:not(:disabled) { background: var(--lume-surface-hover); }
 .documentAction:disabled { opacity: .5; cursor: not-allowed; }
 .removeAction { color: var(--lume-ink-muted); }
 .removeAction:hover:not(:disabled) { color: var(--lume-signal-critical); }
