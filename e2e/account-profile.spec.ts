@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { bootstrapUnlockedSession, signInAfterSharedLock } from './utils';
+import { bootstrapUnlockedSession, lockAllTabsAndSignIn } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 test('two profile editors retain a conflicting draft, reread explicitly and save canonical values', async ({ browser, baseURL }, testInfo) => {
@@ -101,7 +101,8 @@ test('same-account login in another tab preserves draft and requires an explicit
     });
     const other = await context.newPage();
     try {
-        await signInAfterSharedLock(other, '1234');
+        await other.goto('/');
+        await lockAllTabsAndSignIn(other, '1234');
         const checked = page.waitForResponse(response => response.url().endsWith('/api/auth/check') && response.request().method() === 'GET');
         await page.evaluate(() => window.dispatchEvent(new Event('focus')));
         expect((await checked).status()).toBe(200);
