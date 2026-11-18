@@ -71,37 +71,20 @@ def dictated_cf(text):
     return found
 
 
-def text_pdf(path, text):
+def text_pdf(path, text, config):
     lines = [part for line in text.splitlines() for part in (textwrap.wrap(line, 88, replace_whitespace=False) or [''])]
-    objects = [b'', b'']
-    font = 3
-    objects.append(b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>')
-    pages = []
-    for offset in range(0, len(lines), 52):
-        content = b'BT /F1 10 Tf 40 790 Td 14 TL\n'
-        for line in lines[offset:offset+52]:
-            raw = line.encode('cp1252')
-            raw = raw.replace(b'\\', b'\\\\').replace(b'(', b'\\(').replace(b')', b'\\)')
-            content += b'(' + raw + b') Tj T*\n'
-        content += b'ET'
-        page = len(objects) + 1
-        pages.append(page)
-        objects.extend([f'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 {font} 0 R >> >> /Contents {page+1} 0 R >>'.encode(), b'<< /Length '+str(len(content)).encode()+b' >>\nstream\n'+content+b'\nendstream'])
-    objects[0] = b'<< /Type /Catalog /Pages 2 0 R >>'
-    objects[1] = ('<< /Type /Pages /Kids ['+' '.join(f'{p} 0 R' for p in pages)+f'] /Count {len(pages)} >>').encode()
-    data = b'%PDF-1.4\n'
-    offsets = [0]
-    for n, obj in enumerate(objects, 1):
-        offsets.append(len(data))
-        data += f'{n} 0 obj\n'.encode()+obj+b'\nendobj\n'
-    start = len(data)
-    data += f'xref\n0 {len(offsets)}\n0000000000 65535 f \n'.encode()
-    data += b''.join(f'{o:010d} 00000 n \n'.encode() for o in offsets[1:])
-    data += f'trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{start}\n%%EOF\n'.encode()
-    path.write_bytes(data)
+    renderer = Path(__file__).resolve().parent / 'render-pdf.mjs'
+    result = subprocess.run([config['node'], str(renderer)], input=json.dumps(lines).encode('utf-8'),
+                            capture_output=True, timeout=30)
+    if result.returncode or not result.stdout.startswith(b'%PDF-'):
+        raise VisitError('PDF_NOTA_NON_GENERATO')
+    path.write_bytes(result.stdout)
 
 
 PDF_MAX = 8 * 1024 * 1024
+DICTATION_MAX = 120000
+NOTE_PDF = 'nota-visita.pdf'
+DICTATION_PDF = 'trascrizione-visita.pdf'
 PHYSICIAN = re.compile(r'CODICE\s+FISCALE\s+DEL\s+MEDICO\s*[:-]?\s*(' + CF_RE.pattern + ')')
 PROPOSALS = {
     'therapy': 'terapia', 'service_prescription': 'prestazione',
@@ -202,13 +185,13 @@ def view(folder, manifest):
     return result
 
 
-def verify(folder, cf, extraction, config):
+def verify(folder, cf, extraction, config, transcript):
     files = []
     for source in extraction['sources']:
         path = regular(folder / source['fileName'])
         content = path.read_bytes()
         files.append(dict(sha256=hashlib.sha256(content).hexdigest(), text=pdf_text(path)))
-    payload = dict(cf=cf, extraction=extraction, files=files, physicianCodes=config['physicianCodes'])
+    payload = dict(cf=cf, extraction=extraction, files=files, physicianCodes=config['physicianCodes'], transcript=transcript)
     args = [config['node'], str(Path(config['repository']) / 'scripts/run-strip-types.mjs'),
             str(Path(__file__).resolve().parent / 'verify.mjs'), config['repository']]
     result = subprocess.run(args, input=json.dumps(payload), capture_output=True, text=True, timeout=90)
@@ -220,8 +203,28 @@ def verify(folder, cf, extraction, config):
 def source(path, cf, date, facts):
     return dict(sha256=hashlib.sha256(path.read_bytes()).hexdigest(), fileName=path.name,
                 patient=dict(taxCode=cf), documentDate=date,
-                documentType='visita_specialistica' if path.name == 'nota-visita.pdf' else 'altro',
+                documentType='visita_specialistica' if path.name == NOTE_PDF else 'altro',
                 facts=facts, coverage=dict(pages=None, unreadablePages=[], complete=False, note='Originale da rivedere dal medico'))
+
+
+def versioned_dictation(folder, manifest):
+    original = regular(folder / 'trascrizione.txt').read_bytes()
+    if hashlib.sha256(original).hexdigest() != manifest['dettatoSha256']:
+        raise VisitError('TRASCRIZIONE_MODIFICATA')
+    passages = [original.decode('utf-8')]
+    passages.extend(f"Correzione dettata dal medico ({entry['ora']})\n{entry['testo']}" for entry in manifest.get('correzioni', []))
+    return '\n\n'.join(passages)
+
+
+def append_correction(folder, manifest, correction):
+    previous = manifest.get('correzioni', [])
+    if not previous or previous[-1]['testo'] != correction:
+        version = {**manifest, 'correzioni': [*previous, {'ora': stamp(), 'testo': correction}], 'dossier': None}
+        if len(versioned_dictation(folder, version)) > DICTATION_MAX:
+            raise VisitError('TRASCRIZIONE_TROPPO_LUNGA')
+        save(folder / 'manifest.json', version)
+        previous = version['correzioni']
+    return {'visitId': folder.name, 'stato': 'correzione_salvata', 'revisione': len(previous)}
 
 
 def build(folder, manifest, config, args):
@@ -233,12 +236,12 @@ def build(folder, manifest, config, args):
     note = match.group(1).strip() if match else ''
     if not note or len(note) >= 12000 or not all(re.search(r'^' + label + ':', note, re.M) for label in 'SOAP') or re.search(r'^## Correzioni', sheet, re.M):
         raise VisitError('NOTA_SOAP_INCOMPLETA')
-    transcript = regular(folder / 'trascrizione.txt').read_text()
+    transcript = versioned_dictation(folder, manifest)
     date = manifest['date']
     with tempfile.TemporaryDirectory(prefix='.dossier-', dir=folder) as temporary:
         stage = Path(temporary)
         documents = {}
-        texts = {'nota-visita.pdf': transcript}
+        texts = {DICTATION_PDF: transcript}
         for digest in manifest['pdf_accettati']:
             filename = digest + '.pdf'
             original = regular(folder / filename)
@@ -249,26 +252,30 @@ def build(folder, manifest, config, args):
             (stage / filename).write_bytes(data)
             documents[filename] = source(stage / filename, cf, None, [])
             texts[filename] = text
-        quotes = []
+        facts = []
         for fact in args['fatti']:
-            filename, quote = fact['file'], fact['quote']
+            filename = DICTATION_PDF if fact['file'] == NOTE_PDF else fact['file']
+            quote = fact['quote']
             if filename not in texts or quote not in texts[filename]:
                 raise VisitError('CITAZIONE_NON_PRESENTE')
             if fact['kind'] == 'diagnosis' and fact['values'].get('code') and fact['values']['code'] not in transcript:
                 raise VisitError('CODICE_DIAGNOSI_NON_DETTATO')
-            if filename == 'nota-visita.pdf' and quote not in note:
-                quotes.append(quote)
-        appendix = '\n\nPassi del dettato per i fatti strutturati:\n' + '\n'.join(quotes) if quotes else ''
-        text_pdf(stage / 'nota-visita.pdf', f'Codice fiscale paziente: {cf}\nData visita: {date}\n\n{note}' + appendix)
-        documents['nota-visita.pdf'] = source(stage / 'nota-visita.pdf', cf, date, [
+            facts.append({**fact, 'file': filename})
+        header = f'Codice fiscale paziente: {cf}\nData visita: {date}\n\n'
+        text_pdf(stage / NOTE_PDF, header + note, config)
+        documents[NOTE_PDF] = source(stage / NOTE_PDF, cf, date, [
             dict(kind='document_entry', values=dict(text=note, date=date), quote=note[:600])])
-        for fact in args['fatti']:
+        if any(fact['file'] == DICTATION_PDF for fact in facts):
+            text_pdf(stage / DICTATION_PDF, header + transcript, config)
+            documents[DICTATION_PDF] = source(stage / DICTATION_PDF, cf, date, [])
+        for fact in facts:
             documents[fact['file']]['facts'].append({key: fact[key] for key in ('kind', 'values', 'quote')})
         extraction = dict(schema='mediflow.dossier_prepared_extraction.v1', preparedAt=stamp(), preparedBy='MediFlow Ambulatorio',
                           sources=list(documents.values()))
-        checked = verify(stage, cf, extraction, config)
+        checked = verify(stage, cf, extraction, config, transcript)
+        (stage / 'trascrizione.txt').write_bytes(transcript.encode('utf-8'))
         save(stage / 'estrazione-preparata.json', extraction)
-        save(stage / 'fatti-dossier.json', args['fatti'])
+        save(stage / 'fatti-dossier.json', facts)
         (stage / 'scheda-inserimento.md').write_text(sheet)
         save(stage / 'verifica.json', checked)
         fingerprint = hashlib.sha256((stage / 'estrazione-preparata.json').read_bytes()).hexdigest()
@@ -286,13 +293,22 @@ def prepare_deposit(folder, manifest, config):
     if hashlib.sha256(file.read_bytes()).hexdigest() != manifest['dossier']:
         raise VisitError('DOSSIER_MODIFICATO')
     extraction = read(file)
-    verify(stage, manifest['cf'], extraction, config)
+    if any(source['fileName'] == NOTE_PDF and any(fact['kind'] != 'document_entry' for fact in source['facts'])
+           for source in extraction['sources']):
+        raise VisitError('DOSSIER_DA_RIGENERARE')
+    transcript = versioned_dictation(folder, manifest)
+    snapshot = stage / 'trascrizione.txt'
+    if not snapshot.exists() and not snapshot.is_symlink() and not manifest.get('correzioni'):
+        snapshot = folder / 'trascrizione.txt'
+    if regular(snapshot).read_bytes() != transcript.encode('utf-8'):
+        raise VisitError('TRASCRIZIONE_MODIFICATA')
+    verify(stage, manifest['cf'], extraction, config, transcript)
     manifest['frozen'] = True
     save(folder / 'manifest.json', manifest)
     proposals = [{'tipo': PROPOSALS[fact['kind']], 'fonte': source['fileName']}
                  for source in extraction['sources'] for fact in source['facts'] if fact['kind'] in PROPOSALS]
     return dict(extraction=str(file), fiscalCode=manifest['cf'],
-                transcription=str(regular(folder / 'trascrizione.txt')), proposals=proposals)
+                transcription=str(snapshot), proposals=proposals)
 
 
 def run(root, config, action, args):
@@ -350,6 +366,8 @@ def run(root, config, action, args):
             raise VisitError('DEPOSITO_GIA_AVVIATO')
         if action == 'prepare':
             return build(folder, manifest, config, args)
+        if action == 'correct':
+            return append_correction(folder, manifest, args['correzione'])
         if args.get('conferma'):
             cf = normalize_cf(args['conferma'])
             if not valid_cf(cf) or manifest['cf'] not in (None, cf) or cf in config['physicianCodes'] or any(cf in item['doctors'] for item in manifest['pdf'].values()):
