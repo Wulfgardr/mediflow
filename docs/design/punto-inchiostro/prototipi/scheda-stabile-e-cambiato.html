@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="it">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scheda: stabile e cambiato</title>
+<style>
+:root {
+  --penombra: #e8eaee; --piano: #ffffff; --filetto: #dfe2e7; --filetto-forte: #c9ced6; --asciutto: #14161a; --fresco: #2346b0;
+  --matita: #5f6878; --secondario: #555e6b; --voce: #f3f6fd; --selezionata: #eef2fb; --avviso: #8a5a1c; --critico: #a33a2f; --esito: #3f5a49;
+  --contorno-campo: var(--secondario);
+  --sistema: system-ui, -apple-system, "Segoe UI", sans-serif; --voce-serif: "Newsreader", "Iowan Old Style", Georgia, serif; --codice: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --penombra: #101216; --piano: #1a1d22; --filetto: #2a2e35; --filetto-forte: #3b414b; --asciutto: #e9ecef; --fresco: #9db4ff;
+  --matita: #9aa3b0; --secondario: #a3acb8; --voce: #1d2333; --selezionata: #232a3d; --avviso: #d9a75f; --critico: #f08a7d; --esito: #8fbf9f; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --penombra: #101216; --piano: #1a1d22; --filetto: #2a2e35; --filetto-forte: #3b414b; --asciutto: #e9ecef; --fresco: #9db4ff;
+  --matita: #9aa3b0; --secondario: #a3acb8; --voce: #1d2333; --selezionata: #232a3d; --avviso: #d9a75f; --critico: #f08a7d; --esito: #8fbf9f; color-scheme: dark }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--penombra); color: var(--asciutto); font: 400 14px/1.5 var(--sistema); display: grid; grid-template-rows: auto minmax(0, 1fr); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--fresco); outline-offset: 2px; }
+h2, h3, p, dl, dd { margin: 0; }
+.banco { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--filetto-forte); font-size: 13px; color: var(--secondario); }
+.banco .scelte { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.banco button { border: 1px solid var(--filetto-forte); background: var(--piano); border-radius: 10px; padding: 6px 10px; min-height: 36px; }
+.banco button[aria-pressed="true"] { border-color: var(--asciutto); font-weight: 600; color: var(--asciutto); }
+.banco output { margin-left: auto; font-variant-numeric: tabular-nums; }
+.app { container-type: inline-size; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); }
+.nav { width: 192px; padding: 20px 12px; display: grid; gap: 4px; align-content: start; color: var(--secondario); }
+.nav strong { font: 500 21px var(--voce-serif); color: var(--asciutto); padding: 0 8px 12px; }
+.nav span { padding: 8px; border-radius: 10px; }
+.nav span[aria-current] { background: var(--piano); color: var(--asciutto); font-weight: 600; }
+.piano { min-width: 0; min-height: 0; background: var(--piano); display: grid; grid-template-rows: auto auto minmax(0, 1fr); border-radius: 16px 0 0 0; }
+.testata { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 20px 28px 12px; }
+.testata .nome { font: 400 28px/1.1 var(--voce-serif); }
+.testata .dati { color: var(--secondario); font-size: 13px; display: flex; flex-wrap: wrap; gap: 2px 14px; padding-top: 4px; }
+.testata .comandi { display: flex; gap: 12px; }
+.codice { font: 400 12px var(--codice); }
+.cmd { border: 1px solid var(--filetto-forte); background: var(--piano); border-radius: 10px; padding: 0 14px; min-height: 40px; font-weight: 600; }
+.cmd.principale { background: var(--fresco); border-color: var(--fresco); color: var(--piano); }
+.cmd.testuale { border-color: transparent; background: transparent; color: var(--fresco); padding-inline: 4px; text-align: left; }
+.segmenti { display: flex; gap: 20px; padding: 0 28px; border-bottom: 1px solid var(--filetto-forte); overflow-x: auto; }
+.segmenti span { padding: 10px 0; color: var(--secondario); white-space: nowrap; border-bottom: 2px solid transparent; }
+.segmenti span[aria-current] { color: var(--asciutto); font-weight: 600; border-bottom-color: var(--asciutto); }
+.zone { min-height: 0; display: grid; grid-template-columns: 270px minmax(0, 1fr) 340px; }
+.laterale, .contesto, .riposo { display: contents; }
+.stabile, .centro { min-width: 0; min-height: 0; overflow-y: auto; padding: 20px; display: grid; gap: 16px; align-content: start; }
+.stabile { grid-column: 1; grid-row: 1; border-right: 1px solid var(--filetto); }
+.centro { grid-column: 2; grid-row: 1; padding-inline: 28px; }
+.contesto { display: grid; grid-column: 3; grid-row: 1; border-left: 1px solid var(--filetto); min-width: 0; min-height: 0; overflow-y: auto; padding: 20px; gap: 16px; align-content: start; }
+.aperto { display: grid; gap: 16px; }
+.aperto:empty { display: none; }
+.sezione { display: grid; align-content: start; }
+.sezione > header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--filetto-forte); }
+.sezione h3, .titolo { font: 600 15px/1.4 var(--sistema); }
+.sezione > header > span { color: var(--secondario); font-size: 13px; white-space: nowrap; }
+.blocco { background: var(--penombra); border-radius: 10px; padding: 12px 14px; }
+.riga { padding: 8px 0; border-bottom: 1px solid var(--filetto); display: grid; gap: 1px; }
+.riga:last-child { border-bottom: 0; }
+.riga small, .meta { color: var(--secondario); font-size: 13px; }
+.riga small.segno { color: var(--asciutto); font-weight: 600; }
+.riga.due { grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline; }
+.valore { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.valore.fuori { color: var(--critico); }
+.matita { background: var(--voce); border: 1px dashed var(--matita); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; }
+.matita .intestazione { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.parola { font: 600 12px/1 var(--sistema); padding: 4px 8px; border-radius: 999px; white-space: nowrap; color: var(--secondario); background: var(--penombra); }
+.parola.proposta { color: var(--matita); background: transparent; border: 1px dashed var(--matita); }
+.parola.avviso { color: var(--avviso); background: transparent; border: 1px solid var(--avviso); }
+.fascia { background: var(--selezionata); border: 1px solid var(--filetto-forte); border-radius: 10px; padding: 12px 14px; display: grid; gap: 2px; }
+.fascia > header { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; padding-bottom: 4px; }
+.fascia label { display: flex; gap: 6px; align-items: center; min-height: 32px; }
+.giorno { font: 600 12px var(--sistema); color: var(--secondario); letter-spacing: .05em; text-transform: uppercase; padding-top: 8px; }
+.variazione { border-top: 1px solid var(--filetto-forte); padding: 4px 0; display: grid; gap: 4px; }
+.variazione > button { all: unset; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 40px; }
+.variazione > button:focus-visible { outline: 2px solid var(--fresco); outline-offset: 2px; border-radius: 6px; }
+.dettaglio { display: grid; gap: 4px; font-size: 13px; padding: 0 0 8px; }
+.dettaglio .confronto { font-variant-numeric: tabular-nums; }
+.stato-riga { color: var(--secondario); }
+.voce { border-bottom: 1px solid var(--filetto); padding: 12px 0; display: grid; gap: 2px; }
+.voce p { font: 400 17px/1.5 var(--voce-serif); max-width: 64ch; }
+.voce.nuova { background: var(--penombra); border-radius: 10px; padding: 12px 14px; border-bottom: 0; }
+.punto { display: inline-block; width: .44em; height: .44em; border-radius: 50%; background: currentColor; margin-right: .4em; vertical-align: .12em; }
+.punto.fresco { background: var(--fresco); }
+textarea { width: 100%; min-height: 150px; border: 1px solid var(--contorno-campo); border-radius: 10px; padding: 10px 12px; background: var(--piano); color: var(--fresco); font: 400 17px/1.5 var(--voce-serif); resize: vertical; }
+textarea[readonly] { color: var(--asciutto); }
+label.campo { font-weight: 600; }
+.passi { display: flex; gap: 6px; flex-wrap: wrap; font-size: 13px; }
+.passi span { padding: 4px 10px; border-radius: 999px; background: var(--penombra); color: var(--secondario); }
+.passi span[aria-current] { color: var(--asciutto); font-weight: 600; outline: 1px solid var(--asciutto); }
+.bozza { background: var(--voce); border: 1px solid var(--filetto-forte); border-radius: 12px; padding: 12px 14px; display: grid; gap: 10px; }
+.revisione { border-top: 1px solid var(--filetto-forte); padding-top: 10px; display: grid; gap: 8px; }
+.revisione dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 4px 12px; font-size: 13px; }
+.revisione dt { color: var(--secondario); }
+.comandi-bozza { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; position: sticky; bottom: 0; background: var(--voce); padding-block: 6px; }
+.foglio { border: 1px solid var(--filetto-forte); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; }
+.foglio > header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.foglio p, .riletta { font: 400 17px/1.5 var(--voce-serif); }
+.contatti { border-top: 1px solid var(--filetto-forte); padding-top: 4px; }
+
+@container (max-width: 1279px) {
+  .zone { grid-template-columns: minmax(0, 1fr) 340px; }
+  .centro { grid-column: 1; }
+  .laterale { display: flex; flex-direction: column; gap: 16px; grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: 20px; border-left: 1px solid var(--filetto); }
+  .contesto { display: contents; }
+  .stabile { border-right: 0; padding: 0; overflow: visible; order: 1; }
+  .aperto { order: 0; }
+  .riposo { display: grid; gap: 16px; order: 2; }
+}
+@container (max-width: 999px) {
+  .nav { width: 160px; }
+  .piano { display: block; }
+  .testata, .segmenti { padding-inline: 24px; }
+  .zone { display: flex; flex-direction: column; gap: 16px; padding: 16px 24px 24px; }
+  .laterale, .centro, .riposo { display: contents; }
+  .centro > *, .riposo > *, .stabile, .aperto { min-width: 0; }
+  .ingresso-quadro { order: 0; }
+  .aperto { order: 1; }
+  .fascia, .senza-fascia, .modifiche { order: 2; }
+  .stabile { order: 3; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; align-items: start; overflow: visible; padding: 0; }
+  .stabile .note { grid-column: 1 / -1; }
+  .diario { order: 4; }
+  .parametri, .controlli { order: 5; }
+  .documenti { order: 6; }
+  .zone[data-bozza] .documenti { order: 1; }
+  .matita.ingresso-quadro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; padding-block: 6px; }
+  .voce.oltre { display: none; }
+}
+@container (max-width: 699px) {
+  .app > .nav { display: none; }
+  .piano { border-radius: 0; }
+  .testata, .segmenti { padding-inline: 16px; }
+  .testata .nome { font-size: 26px; }
+  .zone { padding: 16px; }
+  .stabile { grid-template-columns: minmax(0, 1fr); }
+  .cmd { min-height: 44px; }
+}
+@container (min-width: 1000px) {
+  .tutto-il-diario { display: none; }
+}
+@media (max-width: 999px) { body { display: block; } html, body { height: auto; } }
+@media (prefers-reduced-motion: no-preference) { .cmd { transition: background-color .16s ease; } }
+</style>
+
+<div class="banco">
+  <span>Riferimento della specifica 04, dati sintetici</span>
+  <span class="scelte" role="group" aria-label="Caso" id="casi"></span>
+  <span class="scelte" role="group" aria-label="Contatti dopo la visita" id="contatti"></span>
+  <span class="scelte" role="group" aria-label="Variazioni di terapia" id="terapia"></span>
+  <span class="scelte" role="group" aria-label="Tema" id="temi"></span>
+  <output id="classe"></output>
+</div>
+<div class="app" id="app">
+  <nav class="nav" aria-label="Aree"><strong>MediFlow.</strong><span aria-current="page">Pazienti</span><span>Agenda</span><span>Diario</span><span>Repertori</span><span>Analisi</span><span>Scale</span></nav>
+  <main class="piano" id="piano"></main>
+</div>
+
+<script>
+const AUTORE = 'Dott.ssa Prova Banco';
+const SCHEDA = {
+  nome: 'Ferraldi Bianca', dati: ['79 anni', 'Nascita 12/06/1947', 'CF FRRBNC47H52Z000K', 'Allergie: nessuna registrata'],
+  problemi: [['Scompenso cardiaco non specificato', 'I50.9'], ['Fibrillazione atriale', 'I48.91'], ['Diabete mellito tipo 2', 'E11.9'], ['Malattia renale cronica stadio 3', 'N18.3']],
+  terapie: [
+    { farmaco: 'Furosemide 25 mg cpr', posologia: '1 cp ore 8:00, ½ cp ore 14:00', indicazione: 'Scompenso cardiaco', stato: 'attiva', inizio: '03/2024', versione: 2, registrata: '2026-11-12' },
+    { farmaco: 'Spironolattone 25 mg cpr', posologia: '1 cp al mattino', indicazione: 'Scompenso cardiaco', stato: 'sospesa', inizio: '03/2024', versione: 2, registrata: '2026-11-12' },
+    { farmaco: 'Apixaban 5 mg cpr', posologia: '1 cp ogni 12 ore', stato: 'attiva', inizio: '03/2024', versione: 1, registrata: '2024-03-11' },
+    { farmaco: 'Bisoprololo 2,5 mg cpr', posologia: '1 cp al mattino', stato: 'attiva', inizio: '03/2024', versione: 1, registrata: '2024-03-11' },
+    { farmaco: 'Metformina 500 mg cpr', posologia: '1 cp a pranzo e 1 a cena', stato: 'attiva', inizio: '2016', versione: 1, registrata: '2016-05-02' },
+    { farmaco: 'Ramipril 5 mg cpr', posologia: '1 cp la sera', stato: 'attiva', inizio: '09/2025', versione: 1, registrata: '2025-09-15' },
+    { farmaco: 'Pantoprazolo 20 mg cpr', posologia: '1 cp prima di colazione', stato: 'attiva', inizio: '2022', versione: 1, registrata: '2022-02-07' },
+  ],
+  parametri: [
+    { nome: 'Potassio', valore: '5,6 mmol/L', data: '10/11', registrata: '2026-11-10', riferimento: '3,5–5,1 mmol/L', fuori: true, precedente: '4,8 mmol/L (02/10)' },
+    { nome: 'Creatinina', valore: '1,32 mg/dL', data: '10/11', registrata: '2026-11-10', riferimento: null, fuori: false, precedente: '1,28 mg/dL (02/10)' },
+    { nome: 'Peso', valore: '71,4 kg', data: '04/11', registrata: '2026-11-04', riferimento: null, fuori: false, precedente: null },
+  ],
+  voci: [
+    { data: '05/11/2026', registrata: '2026-11-05', tipo: 'Nota', titolo: 'Nota organizzativa', testo: 'Richiesta attivazione infermiere di famiglia per monitoraggio settimanale.', autore: 'Inf. Sintetica' },
+    { data: '04/11/2026', registrata: '2026-11-04', tipo: 'Visita', luogo: 'a domicilio', testo: 'Parametri stabili. Educazione al controllo quotidiano del peso.', autore: AUTORE },
+    { data: '03/11/2026', registrata: '2026-11-03', tipo: 'Telefonata', testo: 'La figlia riferisce aderenza regolare. Chiede rivalutazione del potassio.', autore: AUTORE },
+    { data: '21/10/2026', registrata: '2026-10-21', tipo: 'Nota', testo: 'Consegnato il diario del peso.', autore: 'Inf. Sintetica' },
+    { data: '02/10/2026', registrata: '2026-10-02', tipo: 'Esame', testo: 'Ematochimici di controllo nella norma per età.', autore: AUTORE },
+    { data: '18/09/2026', registrata: '2026-09-18', tipo: 'Telefonata', testo: 'Nessun episodio di dispnea notturna.', autore: AUTORE },
+    { data: '04/09/2026', registrata: '2026-09-04', tipo: 'Accesso', testo: 'Rinnovo del piano terapeutico.', autore: AUTORE },
+  ],
+  documento: { nome: 'esami-ematochimici-ottobre.pdf', registrata: '2026-11-10', testo: 'Potassio 5,6 mmol/L. Creatinina 1,32 mg/dL. Emoglobina glicata 7,1 %.' },
+  quadro: { registrata: '2026-11-11' },
+  controlli: [['Potassio di controllo', 'entro il 24/11']],
+  note: 'Vive con la figlia. Preferisce le visite al mattino.',
+};
+const EVENTO = { attiva: ['Avviata', 'Aggiornata'], sospesa: ['Sospesa', 'Sospesa'], conclusa: ['Conclusa', 'Conclusa'] };
+const VISITA_RECENTE = { data: '14/11/2026', registrata: '2026-11-14', tipo: 'Visita', testo: 'Controllo dopo la sospensione. Potassio da ripetere fra dieci giorni.', autore: AUTORE };
+const TELEFONATA_DEL_12 = { data: '12/11/2026', registrata: '2026-11-12', tipo: 'Telefonata', titolo: 'Controllo telefonico', testo: 'Edemi declivi in aumento, peso +1,2 kg. Potassio 5,6 mmol/L agli esami del 10/11: sospeso lo spironolattone, furosemide con mezza compressa alle 14.', autore: AUTORE };
+const MOLTI_CONTATTI = [
+  ['17', 'Telefonata', 'Conferma dell’appuntamento per il prelievo.'], ['17', 'Nota', 'Ritirata la richiesta per il laboratorio.'],
+  ['16', 'Telefonata', 'La figlia riferisce crampi alle gambe e debolezza da due giorni.'], ['15', 'Telefonata', 'Spostato l’orario dell’infermiere di famiglia.'],
+  ['14', 'Accesso', 'Consegnato il promemoria della terapia.'], ['14', 'Telefonata', 'Richiesta del certificato per il trasporto.'],
+  ['13', 'Nota', 'Aggiornato il recapito del caregiver.'], ['13', 'Telefonata', 'Conferma della consegna dei presidi.'],
+].map(([g, tipo, testo]) => ({ data: `${g}/11/2026`, registrata: `2026-11-${g}`, tipo, testo, autore: tipo === 'Nota' ? 'Inf. Sintetica' : AUTORE }));
+const TIPI = [['Visita', 'visita', 'visite'], ['Telefonata', 'telefonata', 'telefonate'], ['Esame', 'esame', 'esami'], ['Ricovero', 'ricovero', 'ricoveri'], ['Accesso', 'accesso', 'accessi'], ['Nota', 'nota', 'note']];
+const CASI = [['ritorno', 'Ritorno con variazioni'], ['molti-contatti', 'Ritorno con molti contatti'], ['senza-variazioni', 'Ritorno senza variazioni'], ['senza-visita', 'Nessuna visita registrata']];
+const CONTATTI = [['conteggio', 'Contatti contati per tipo'], ['righe', 'Contatti come righe']];
+const TERAPIA = [['fascia', 'Terapia nella fascia'], ['elenco', 'Terapia segnata nell’elenco']];
+const TEMI = [['', 'Sistema'], ['light', 'Giorno'], ['dark', 'Grafite']];
+const stato = { caso: 'ritorno', tema: '', contatti: 'conteggio', terapia: 'fascia', aperta: null, fonte: null, anche: false, altre: false, bozza: null, passo: 0, testo: '', cursore: [0, 0], registrata: null, notaRegistrata: null, rifocalizza: false };
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ora = () => new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+
+const giorno = iso => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+const voci = () => { const base = [TELEFONATA_DEL_12, ...SCHEDA.voci];
+  return stato.caso === 'senza-visita' ? base.filter(v => v.tipo !== 'Visita') : stato.caso === 'senza-variazioni' ? [VISITA_RECENTE, ...base] : stato.caso === 'molti-contatti' ? [...MOLTI_CONTATTI, ...base] : base; };
+const riferimento = () => voci().find(v => v.tipo === 'Visita') ?? null;
+const eventoTerapia = t => ({ nome: t.farmaco, registrata: t.registrata, parola: EVENTO[t.stato][t.versione > 1 ? 1 : 0], terapia: t });
+const dopoLaVisita = r => { const visita = riferimento(); return Boolean(visita) && r.registrata > visita.registrata; };
+const contattiDopo = () => voci().filter(dopoLaVisita);
+const conteggioContatti = () => TIPI.map(([tipo, uno, molti]) => { const n = contattiDopo().filter(v => v.tipo === tipo).length; return n ? `${n} ${n === 1 ? uno : molti}` : ''; }).filter(Boolean).join(', ');
+const variazioni = () => {
+  const stato_ = [
+    ...(stato.terapia === 'fascia' ? SCHEDA.terapie.filter(dopoLaVisita).map(eventoTerapia) : []),
+    ...SCHEDA.parametri.filter(p => p.fuori && dopoLaVisita(p)).map(p => ({ nome: p.nome, registrata: p.registrata, parola: 'Fuori intervallo', avviso: true, parametro: p })),
+  ];
+  const contatti = stato.contatti === 'righe' ? contattiDopo().map(v => ({ nome: v.titolo ?? v.testo, registrata: v.registrata, parola: v.tipo, voce: v })) : [];
+  const altre = stato.anche ? [
+    { nome: SCHEDA.documento.nome, registrata: SCHEDA.documento.registrata, parola: 'Documento aggiunto', documento: SCHEDA.documento },
+    { nome: 'Quadro paziente', registrata: SCHEDA.quadro.registrata, parola: 'Proposta', proposta: true },
+  ].filter(dopoLaVisita) : [];
+  return [...contatti, ...stato_, ...altre].sort((a, b) => b.registrata.localeCompare(a.registrata));
+};
+const ultimeModifiche = () => SCHEDA.terapie.map(eventoTerapia).sort((a, b) => b.registrata.localeCompare(a.registrata)).slice(0, 4);
+const fonteAperta = () => { if (stato.fonte === 'documento') return { titolo: SCHEDA.documento.nome, testo: SCHEDA.documento.testo, meta: `Documento aggiunto il ${giorno(SCHEDA.documento.registrata)}` };
+  const v = voci()[stato.fonte]; return { titolo: `${v.tipo} del ${giorno(v.registrata)}`, testo: v.testo, meta: `Registrata da ${v.autore}` }; };
+const apriVoce = (v, etichetta) => `<button class="cmd testuale" data-atto="fonte" data-fonte="${voci().indexOf(v)}">${etichetta}</button>`;
+
+const dettaglio = v => {
+  if (v.terapia) { const t = v.terapia; const stessoGiorno = voci().filter(x => x.registrata === t.registrata);
+    return `<span>Stato attuale: ${t.stato === 'attiva' ? 'Attiva' : 'Sospesa'} · ${t.posologia}</span>${t.indicazione ? `<span>Indicazione: ${t.indicazione}</span>` : ''}<span class="meta">Inizio ${t.inizio} · Registrata il ${giorno(t.registrata)}</span><span class="meta">Valore precedente non conservato</span>${stessoGiorno.map(x => `<span>${apriVoce(x, `Diario del ${giorno(x.registrata)}: ${x.tipo}`)}</span>`).join('')}`; }
+  if (v.parametro) { const p = v.parametro; return `<span class="confronto">${p.precedente ? `${p.precedente} → <strong>${p.valore}</strong>` : `<strong>${p.valore}</strong>`}</span>${p.precedente ? '' : '<span class="meta">Nessuna misura precedente</span>'}<span class="meta">Riferimento ${p.riferimento} · Misura del ${p.data}</span>`; }
+  if (v.voce) return `<span>${v.voce.testo}</span><span class="meta">Registrata da ${v.voce.autore}</span><span>${apriVoce(v.voce, 'Apri la voce')}</span>`;
+  if (v.documento) return `<span><button class="cmd testuale" data-atto="fonte" data-fonte="documento">Apri il documento</button></span>`;
+  return `<span class="meta">Generata l'${giorno(SCHEDA.quadro.registrata)}</span>`;
+};
+const modificheTerapia = () => `<section class="sezione modifiche"><header><h3>Ultime modifiche di terapia</h3><span>${ultimeModifiche().length} più recenti</span></header>${ultimeModifiche().map(m => `<div class="riga due"><span>${m.nome}</span><span class="meta">${m.parola} · ${m.registrata.slice(0, 4) === '2026' ? giorno(m.registrata) : m.terapia.inizio}</span></div>`).join('')}</section>`;
+const fascia = () => {
+  const visita = riferimento();
+  if (!visita) return `<p class="senza-fascia stato-riga">Nessuna visita registrata.</p>${modificheTerapia()}`;
+  const titolo = `Dall'ultima visita · ${giorno(visita.registrata)} · ${visita.autore}`;
+  const tutte = variazioni();
+  const contati = stato.contatti === 'conteggio' && contattiDopo().length ? `<div class="contatti"><button class="cmd testuale" data-atto="vai-diario">Nel diario dopo la visita: ${conteggioContatti()}</button></div>` : '';
+  if (!tutte.length && !contati) return `<p class="senza-fascia stato-riga">${titolo}: nessuna variazione registrata.</p>${modificheTerapia()}`;
+  const visibili = stato.contatti === 'righe' && !stato.altre ? tutte.slice(0, 5) : tutte;
+  let corrente = '';
+  const righe = visibili.map(v => { const i = tutte.indexOf(v); const testa = v.registrata !== corrente ? `<div class="giorno">${giorno(v.registrata)}</div>` : ''; corrente = v.registrata;
+    return `${testa}<div class="variazione" data-riga><button data-atto="apri" data-i="${i}" aria-expanded="${stato.aperta === i}"><strong>${esc(v.nome)}</strong><span class="parola${v.proposta ? ' proposta' : v.avviso ? ' avviso' : ''}">${v.avviso ? '▲ ' : ''}${v.parola}</span></button>${stato.aperta === i ? `<div class="dettaglio">${dettaglio(v)}</div>` : ''}</div>`; }).join('');
+  const resto = tutte.length - visibili.length;
+  return `<section class="fascia" aria-label="${titolo}"><header><h3 class="titolo">${titolo}</h3><label><input type="checkbox" data-atto="anche" ${stato.anche ? 'checked' : ''}> Mostra anche documenti e proposte</label></header>${righe}${resto > 0 ? `<div><button class="cmd testuale" data-atto="altre">Altre ${resto} variazioni</button></div>` : ''}${contati}</section>${tutte.some(v => v.terapia) || stato.terapia === 'elenco' ? '' : modificheTerapia()}`;
+};
+const registrazione = quando => `<span class="meta"><span class="punto"></span>Registrata alle ${quando} da ${AUTORE}</span>`;
+const diario = () => { const elenco = voci();
+  return `<section class="sezione diario"><header><h3>Diario</h3><span>${elenco.length + (stato.registrata ? 1 : 0)} voci</span></header>
+  ${stato.registrata ? `<article class="voce nuova"><strong>Oggi · Visita</strong><p>${esc(stato.registrata.testo)}</p>${registrazione(stato.registrata.ora)}</article>` : ''}
+  ${elenco.map((v, i) => `<article class="voce${i >= 5 ? ' oltre' : ''}"><strong>${v.data} · ${v.tipo}${v.luogo ? ` <span class="meta">${v.luogo}</span>` : ''}</strong><p>${v.testo}</p><span class="meta"><span class="punto"></span>Registrata da ${v.autore}</span></article>`).join('')}
+  <div class="tutto-il-diario"><button class="cmd testuale">Tutto il diario</button></div></section>`; };
+const stabile = () => { const attive = SCHEDA.terapie.filter(t => t.stato === 'attiva'); const segnate = stato.terapia === 'elenco';
+  const cessate = segnate ? SCHEDA.terapie.filter(t => t.stato !== 'attiva' && dopoLaVisita(t)) : [];
+  return `<section class="stabile">
+  <div class="sezione blocco"><header><h3>Problemi</h3><span>${SCHEDA.problemi.length} documentati</span></header>${SCHEDA.problemi.map(p => `<div class="riga due"><span>${p[0]}</span><span class="codice">${p[1]}</span></div>`).join('')}</div>
+  <div class="sezione blocco"><header><h3>Terapie attive</h3><span>${attive.length}</span></header>${attive.map(t => `<div class="riga"><span>${t.farmaco}</span><small>${t.posologia}</small>${segnate && dopoLaVisita(t) ? `<small class="segno">${eventoTerapia(t).parola} il ${giorno(t.registrata)}</small>` : ''}</div>`).join('')}${cessate.length ? `<div class="giorno">Non più attive dopo la visita</div>${cessate.map(t => `<div class="riga"><span>${t.farmaco}</span><small class="segno">${eventoTerapia(t).parola} il ${giorno(t.registrata)}</small></div>`).join('')}` : ''}</div>
+  <div class="sezione blocco note"><header><h3>Note della scheda</h3>${stato.bozza === 'nota' ? '' : `<button class="cmd testuale" data-atto="scrivi" data-oggetto="nota">Modifica</button>`}</header><div class="riga"><span>${esc(stato.notaRegistrata?.testo ?? SCHEDA.note)}</span>${stato.notaRegistrata ? registrazione(stato.notaRegistrata.ora) : ''}</div></div>
+  </section>`; };
+const foglio = () => { if (stato.fonte === null) return ''; const f = fonteAperta();
+  return `<section class="foglio" aria-label="${f.titolo}"><header><h3 class="titolo">${f.titolo}</h3>${stato.bozza ? `<button class="cmd" data-atto="torna">Torna alla bozza</button>` : `<button class="cmd testuale" data-atto="chiudi-fonte">Chiudi</button>`}</header><p>${f.testo}</p><span class="meta">${f.meta}</span></section>`; };
+const bozza = () => { if (!stato.bozza) return ''; const nota = stato.bozza === 'nota'; const etichetta = nota ? 'Note della scheda' : 'Voce di oggi · Visita';
+  const passi = ['Scrivi', 'Rivedi', 'Registrata'].map((p, i) => `<span${stato.passo === i ? ' aria-current="step"' : ''}>${i + 1} · ${p}</span>`).join('');
+  if (stato.passo === 2) return `<section class="bozza" aria-label="${etichetta}"><div class="passi">${passi}</div><p role="status"><span class="punto"></span><strong>Registrata alle ${(nota ? stato.notaRegistrata : stato.registrata).ora}</strong></p><p class="riletta">${esc((nota ? stato.notaRegistrata : stato.registrata).testo)}</p>${nota ? '' : `<div><button class="cmd" data-atto="altra">Scrivi un'altra voce</button></div>`}</section>`;
+  return `<section class="bozza" aria-label="${etichetta}"><div class="passi">${passi}</div><label class="campo" for="testo">${etichetta}</label>
+    <textarea id="testo" ${stato.passo === 1 ? 'readonly' : ''}>${esc(stato.testo)}</textarea>
+    ${stato.passo === 0 ? `<div class="comandi-bozza"><button class="cmd principale" data-atto="rivedi">Rivedi</button><span class="meta"><span class="punto fresco"></span>Bozza non registrata</span></div>`
+    : `<div class="revisione"><h3 class="titolo">Che cosa verrà registrato</h3><dl><dt>Paziente</dt><dd>${SCHEDA.nome}, 79 anni</dd><dt>${nota ? 'Oggetto' : 'Tipo'}</dt><dd>${nota ? 'Note della scheda' : 'Visita, oggi'}</dd><dt>Testo</dt><dd>${esc(stato.testo) || 'Nessun testo'}</dd></dl>
+       <div class="comandi-bozza"><button class="cmd" data-atto="indietro">Torna alla bozza</button><button class="cmd principale" data-atto="conferma">Conferma e registra</button></div></div>`}</section>`; };
+const riposo = () => { const quadro = `<div class="matita ingresso-quadro"><div class="intestazione"><h3 class="titolo">Quadro paziente</h3><span class="parola proposta">Proposta dell'${giorno(SCHEDA.quadro.registrata)}</span></div><div><button class="cmd">Apri il Quadro e le fonti</button></div></div>`;
+  const parametri = `<div class="sezione blocco parametri"><header><h3>Parametri recenti</h3><span>${SCHEDA.parametri.length}</span></header>${SCHEDA.parametri.map(p => `<div class="riga due"><span>${p.nome}<small style="display:block">${p.data}</small></span><span class="valore${p.fuori ? ' fuori' : ''}">${p.fuori ? '▲ ' : ''}${p.valore}</span></div>`).join('')}</div>`;
+  const controlli = `<div class="sezione blocco controlli"><header><h3>Controlli aperti</h3><span>${SCHEDA.controlli.length}</span></header>${SCHEDA.controlli.map(c => `<div class="riga due"><span>${c[0]}</span><span class="meta">${c[1]}</span></div>`).join('')}</div>`;
+  const documenti = `<div class="sezione blocco documenti"><header><h3>Documenti recenti</h3><span>1</span></header><div class="riga"><span><button class="cmd testuale" data-atto="fonte" data-fonte="documento">Apri il documento: ${SCHEDA.documento.nome}</button></span></div></div>`;
+  return `<div class="riposo">${stato.bozza ? documenti + quadro + parametri + controlli : quadro + parametri + controlli + documenti}</div>`; };
+
+function classe() { const w = $('app').clientWidth; return `Contenitore ${w} px · ${w >= 1280 ? 'tre zone' : w >= 1000 ? 'due zone' : w >= 700 ? 'una colonna, media' : 'una colonna, compatta'}`; }
+function disegna() {
+  document.documentElement.dataset.theme = stato.tema;
+  $('casi').innerHTML = CASI.map(([k, l]) => `<button type="button" data-caso="${k}" aria-pressed="${stato.caso === k}">${l}</button>`).join('');
+  $('contatti').innerHTML = CONTATTI.map(([k, l]) => `<button type="button" data-contatti="${k}" aria-pressed="${stato.contatti === k}">${l}</button>`).join('');
+  $('terapia').innerHTML = TERAPIA.map(([k, l]) => `<button type="button" data-terapia="${k}" aria-pressed="${stato.terapia === k}">${l}</button>`).join('');
+  $('temi').innerHTML = TEMI.map(([k, l]) => `<button type="button" data-tema="${k}" aria-pressed="${stato.tema === k}">${l}</button>`).join('');
+  const tieni = document.activeElement?.id === 'testo' || stato.rifocalizza;
+  $('piano').innerHTML = `<header class="testata"><div><div class="nome">${SCHEDA.nome}</div><div class="dati">${SCHEDA.dati.map((d, i) => `<span${i === 2 ? ' class="codice"' : ''}>${d}</span>`).join('')}</div></div>
+    <div class="comandi">${stato.bozza ? `<button class="cmd" data-atto="chiudi-bozza">${stato.bozza === 'nota' ? 'Chiudi la nota' : 'Chiudi la voce'}</button>` : `<button class="cmd principale" data-atto="scrivi" data-oggetto="voce">Nuova voce</button>`}<button class="cmd">Azioni</button></div></header>
+    <div class="segmenti" role="navigation" aria-label="Sezioni della cartella"><span aria-current="page">Riepilogo</span><span>Terapie</span><span>Misure</span><span>Documenti</span><span>Altro</span></div>
+    <div class="zone"${stato.bozza ? ' data-bozza' : ''}><div class="centro">${fascia()}${diario()}</div><div class="laterale">${stabile()}<section class="contesto"><div class="aperto">${foglio()}${bozza()}</div>${riposo()}</section></div></div>`;
+  if (tieni) { const t = $('testo'); if (t) { t.focus(); t.setSelectionRange(stato.cursore[0], stato.cursore[1]); t.scrollIntoView({ block: 'nearest' }); } stato.rifocalizza = false; }
+  $('classe').textContent = classe();
+}
+function azzera() { Object.assign(stato, { aperta: null, fonte: null, anche: false, altre: false, bozza: null, passo: 0, testo: '', cursore: [0, 0], registrata: null, notaRegistrata: null, rifocalizza: false }); }
+document.addEventListener('click', e => {
+  const caso = e.target.closest('[data-caso]'), tema = e.target.closest('[data-tema]');
+  if (caso) { stato.caso = caso.dataset.caso; azzera(); return disegna(); }
+  if (tema) { stato.tema = tema.dataset.tema; return disegna(); }
+  const terapia = e.target.closest('[data-terapia]');
+  if (terapia) { stato.terapia = terapia.dataset.terapia; azzera(); return disegna(); }
+  const contatti = e.target.closest('[data-contatti]');
+  if (contatti) { stato.contatti = contatti.dataset.contatti; azzera(); return disegna(); }
+  const a = e.target.closest('[data-atto]'); if (!a) return;
+  const atto = a.dataset.atto;
+  if (atto === 'apri') { const i = Number(a.dataset.i); stato.aperta = stato.aperta === i ? null : i; }
+  if (atto === 'anche') { stato.anche = !stato.anche; stato.aperta = null; }
+  if (atto === 'altre') stato.altre = true;
+  if (atto === 'fonte') stato.fonte = a.dataset.fonte === 'documento' ? 'documento' : Number(a.dataset.fonte);
+  if (atto === 'vai-diario') { disegna(); return document.querySelector('.diario').scrollIntoView({ block: 'start' }); }
+  if (atto === 'chiudi-fonte') stato.fonte = null;
+  if (atto === 'torna') { stato.fonte = null; stato.rifocalizza = true; }
+  if (atto === 'scrivi') { stato.bozza = a.dataset.oggetto; stato.passo = 0; stato.testo = stato.bozza === 'nota' ? (stato.notaRegistrata?.testo ?? SCHEDA.note) : ''; stato.cursore = [stato.testo.length, stato.testo.length]; stato.rifocalizza = true; }
+  if (atto === 'chiudi-bozza') { stato.bozza = null; stato.passo = 0; }
+  if (atto === 'rivedi') stato.passo = 1;
+  if (atto === 'indietro') { stato.passo = 0; stato.rifocalizza = true; }
+  if (atto === 'conferma') { const esito = { testo: stato.testo, ora: ora() }; if (stato.bozza === 'nota') stato.notaRegistrata = esito; else stato.registrata = esito; stato.passo = 2; }
+  if (atto === 'altra') { stato.passo = 0; stato.testo = ''; stato.cursore = [0, 0]; stato.rifocalizza = true; }
+  disegna();
+});
+document.addEventListener('input', e => { if (e.target.id === 'testo') stato.testo = e.target.value; });
+document.addEventListener('selectionchange', () => { const t = $('testo'); if (t && document.activeElement === t) stato.cursore = [t.selectionStart, t.selectionEnd]; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && stato.bozza && stato.passo === 1) { stato.passo = 0; stato.rifocalizza = true; disegna(); } });
+new ResizeObserver(() => { $('classe').textContent = classe(); }).observe($('app'));
+disegna();
+</script>
+</html>
