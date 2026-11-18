@@ -18,15 +18,42 @@ export function functionModelErrorResponse(error: unknown): Response {
     return Response.json({ error: 'La richiesta richiede una nuova verifica delle impostazioni.', code }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
+type SessionResourceOwner = Pick<typeof import('../../security/web-auth-lifecycle-owner-adapter'),
+    'mintResourcePort' | 'releaseResourcePort' | 'registerPrivateResource' | 'unregisterPrivateResource'>;
+export type FunctionModelSessionHold = Readonly<{ session: string; revoked: AbortSignal; release(): void }>;
+
+/** Ties a preview to the web session: retiring it (lock, logout, expiry) aborts the held signal. */
+export function holdFunctionModelSession(owner: SessionResourceOwner, projection: unknown, session: string): FunctionModelSessionHold | null {
+    const port = owner.mintResourcePort(projection);
+    if (!port) return null;
+    const controller = new AbortController();
+    const registration = owner.registerPrivateResource(port, () => controller.abort());
+    if (!registration) { owner.releaseResourcePort(port); return null; }
+    let released = false;
+    return Object.freeze({ session, revoked: controller.signal, release() {
+        if (released) return;
+        released = true;
+        owner.unregisterPrivateResource(port, registration);
+        owner.releaseResourcePort(port);
+    } });
+}
+
 /** Host-only decorator; only the four named preview routes may introduce a scope. */
 export function createFunctionModelDispatch(dependencies: Readonly<{
     authenticate(): Promise<string | null>; readSources(): FunctionModelSources;
+    holdSession?(): Promise<FunctionModelSessionHold | null>;
 }>) {
     return (id: FunctionModelId, handler: (request: Request) => Promise<Response>) => async (request: Request): Promise<Response> => {
         let active = true;
+        let hold: FunctionModelSessionHold | null = null;
         try {
             const session = await dependencies.authenticate();
             if (!session || request.signal.aborted) throw new FunctionModelError('session_stale');
+            if (dependencies.holdSession) {
+                hold = await dependencies.holdSession();
+                if (!hold || hold.session !== session) throw new FunctionModelError('session_stale');
+            }
+            const signal = hold ? AbortSignal.any([request.signal, hold.revoked]) : request.signal;
             // A UI query is never admission or model configuration.
             if (new URL(request.url).search !== '') throw new FunctionModelError('input_invalid');
             const raw = request.headers.get(FUNCTION_MODEL_CHOICE_HEADER);
@@ -38,16 +65,16 @@ export function createFunctionModelDispatch(dependencies: Readonly<{
             }
             const selection = resolveFunctionModelDispatch(dependencies.readSources(), id, choice);
             const verify = async () => {
-                if (!active || request.signal.aborted) throw new FunctionModelError('session_stale');
+                if (!active || signal.aborted) throw new FunctionModelError('session_stale');
                 const currentSession = await dependencies.authenticate();
                 // Authentication may yield while the request is cancelled or its
                 // response closes. A captured guard cannot outlive that preview.
-                if (!active || request.signal.aborted || currentSession !== session) throw new FunctionModelError('session_stale');
+                if (!active || signal.aborted || currentSession !== session) throw new FunctionModelError('session_stale');
                 const current = resolveFunctionModelDispatch(dependencies.readSources(), id, choice);
                 if (current.catalogRevision !== selection.catalogRevision || current.preferenceRevision !== selection.preferenceRevision
                     || current.binding.modelOptionId !== selection.binding.modelOptionId) throw new FunctionModelError('binding_stale');
             };
-            return await scopes.run(Object.freeze({ selection, verify, signal: request.signal }), async () => {
+            return await scopes.run(Object.freeze({ selection, verify, signal }), async () => {
                 await verify(); const response = await handler(request); await verify();
                 // Selection evidence contains no endpoints, session/patient identifiers or authority.
                 response.headers.set('Cache-Control', 'no-store');
@@ -57,7 +84,7 @@ export function createFunctionModelDispatch(dependencies: Readonly<{
                 return response;
             });
         } catch (error) { return functionModelErrorResponse(error); }
-        finally { active = false; }
+        finally { active = false; hold?.release(); }
     };
 }
 

@@ -21,6 +21,7 @@ import {
     buildSmartImportExtractionPrompt as buildSmartImportPromptDirect,
     PATIENT_INSIGHT_DECISION_FIDELITY_RULE,
 } from './ai-task-contract-prompts';
+import { PATIENT_INSIGHT_CLAIM_MAX_LENGTH } from './ai-providers/extraction-json-schemas';
 
 /* WUL-362 R5: il contatore misura visite di caratteri, non tempo. */
 function assertFragmentScanWorkBound(text: string): void {
@@ -91,12 +92,23 @@ test('patient insight extraction prompt enforces recency, neutral tone, and evid
     assert.match(prompt, /in gaps privilegia aderenza, risposta a terapia, andamento funzionale, sintomi non rivalutati o dati che mancano per leggere il problema attuale/i);
     assert.match(prompt, /non usare gaps per duplicare nextSteps, per elencare dati mancanti ovvi o per riempire spazio/i);
     assert.match(prompt, /non scrivere frasi rassicuranti o boilerplate come nessuna criticita/i);
-    assert.match(prompt, /hard fail interno: se anche una sola stringa non contiene \[Sx\] o \[DATI-INCOMPLETI\]/i);
-    assert.match(prompt, /mantieni sempre i marker \[Sx\] anche quando riassumi piu fatti clinici/i);
-    assert.match(prompt, /non usare placeholder come \[Sx\], \[S\?\] o riferimenti generici/i);
+    assert.match(prompt, /hard fail interno: se anche una sola stringa non contiene il marker di una fonte o \[DATI-INCOMPLETI\]/i);
+    assert.match(prompt, /un secondo fatto va in un altro elemento della stessa lista, con il suo marker, non nella stessa stringa/i);
+    assert.match(prompt, /non ripetere in piu stringhe o sezioni lo stesso elenco di terapie o di eventi/i);
+    assert.match(prompt, /non usare segnaposto o riferimenti generici/i);
     assert.match(prompt, /evita etichette inferite o enfatiche/i);
     assert.match(prompt, /non trasformare da soli codici storici, fattori sociali o stili di vita/i);
     assert.match(prompt, /italiano clinico neutro e non moralizzante/i);
+});
+
+test('patient insight prompt shows the model only source markers the host accepts and no rule that merges facts into one string', () => {
+    const instructions = buildPatientInsightExtractionPrompt('').split('DATI PAZIENTE:')[0];
+    const accepted = /^\[(?:S\d+|DATI-INCOMPLETI)(?:,\s*(?:S\d+|DATI-INCOMPLETI))*\]$/u;
+    const markers = instructions.match(/\[[^[\]\n]*\]/gu) ?? [];
+    assert.ok(markers.length > 0);
+    assert.deepEqual(markers.filter((marker) => !accepted.test(marker)), []);
+    assert.doesNotMatch(instructions, /riassumi piu fatti clinici nella stessa stringa/iu);
+    assert.match(instructions, new RegExp(`al massimo ${PATIENT_INSIGHT_CLAIM_MAX_LENGTH} caratteri compresi i marker`, 'u'));
 });
 
 test('patient insight prompt tells the model to keep decision state and urgency as written (ADR 0189)', () => {
