@@ -16,7 +16,7 @@ jobs:
           - verdict: base
             revision: 8abbef40c
           - verdict: diff
-            revision: bcb5f05c6
+            revision: b357222d6
     env:
       MEDIFLOW_NEXT_DIST_DIR: .next-e2e
       E2E_DOCUMENTS_SYNTHETIC_ONLY: '1'
@@ -31,7 +31,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci && npm run prepare:dependencies
-      - run: npx --no-install playwright install --with-deps chromium
+      - name: Install Chromium and verify sandbox
+        run: |
+          npx --no-install playwright install chromium
+          check_browser='import { chromium } from "@playwright/test"; const browser = await chromium.launch({ chromiumSandbox: true }); await browser.close();'
+          if ! node --input-type=module -e "$check_browser"; then
+            npx --no-install playwright install-deps chromium
+            node --input-type=module -e "$check_browser"
+          fi
       - name: Build synthetic isolated runtime
         run: |
           test -z "$(git status --porcelain)"
