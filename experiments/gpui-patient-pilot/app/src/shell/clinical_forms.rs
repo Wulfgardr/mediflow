@@ -1,7 +1,23 @@
 use super::*;
 
 impl ClinicalApp {
+    pub(super) fn quiet_record(&self) -> bool {
+        self.area == Area::Patients
+            && self.patient_section == PatientSection::Overview
+            && self.selected_id.is_some()
+            && self.verified.is_none()
+            && self
+                .patient
+                .detail
+                .ready()
+                .is_some_and(|patient| !patient.is_archived)
+    }
+
     pub(super) fn form_view(&self, cx: &Context<Self>) -> Div {
+        self.form_body(true, cx)
+    }
+
+    pub(super) fn form_body(&self, preamble: bool, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let Some(form) = &self.form else {
             return div();
@@ -22,7 +38,7 @@ impl ClinicalApp {
         let comparison = form.kind == FormKind::Notes && self.core.has_notes_comparison();
         div().min_w_0().max_w_full().flex().flex_col().gap(px(20.))
             .when(comparison, |el| el.child(self.notes_comparison_view()))
-            .when(!comparison, |el| el.child(div().flex().flex_col().gap(px(8.))
+            .when(!comparison && preamble, |el| el.child(div().flex().flex_col().gap(px(8.))
                 .child(section("clinical-workspace-draft-heading", if review { "RIVEDI PRIMA DI REGISTRARE" } else { "BOZZA NON REGISTRATA" }, theme))
                 .child(div().text_color(theme.fresh).child(crate::title::title(form.edit.as_ref().map_or(form.kind.title(), editing::Record::title), theme).with_role(crate::theme::TitleRole::PageTitle)))
                 .child(div().text_color(theme.secondary).child(text!(match form.kind {
@@ -431,6 +447,9 @@ impl ClinicalApp {
                         .on_click(cx.listener(move |this, _, _, cx| this.finish_discard(action, cx)))));
         }
         let Some(form) = &self.form else {
+            if !layout.compact && self.quiet_record() {
+                return threshold.border_t_0().py(px(0.));
+            }
             threshold = threshold.child(
                 div()
                     .flex()
