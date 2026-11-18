@@ -114,6 +114,19 @@ locali salvano ciò che ricevono.
 - Il DB conserva l'hash del bearer. Il token aperto resta nel file privato del client, fuori dalle cartelle sincronizzate, con permessi `0600` su POSIX. Il file non contiene PIN, cookie o master key. Le ACL Windows non sono qualificate da questa prova.
 - Autorità locale esclusa dal portabile. La generazione corrente e lo stato del mandato restano necessari anche dopo un recupero completo.
 
+### `agent_registrations`: registrazioni dei client
+
+- Altra protezione: `token_hash`
+- In chiaro: `id`, `template_ref`, `current_mandate_ref`, `revoked_at`
+- Il client conserva la credenziale lunga nel proprio file privato. Il server conserva l'hash e i riferimenti all'approvazione e al mandato corrente.
+
+### `agent_unlock_grants`: mandati emessi allo sblocco
+
+- Altra protezione: `token_hash`, `unlock_ref`
+- In chiaro: `mandate_ref`, `agent_ref`
+- `unlock_ref` è l'hash della ricevuta di sblocco. Il legame con la sessione corrente resta nel processo Web.
+- Le due tabelle sono escluse dal backup portabile. La generazione dell'archivio e la sessione attiva limitano l'autorità dopo il recupero completo.
+
 ### `attachments`: documenti allegati e loro estratti
 
 - Cifrate: `name`, `path`, `data`, `summary_snapshot`, `parse_evidence_artifact_snapshot`
