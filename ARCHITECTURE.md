@@ -1,19 +1,18 @@
 # ARCHITECTURE: MediFlow
 
-L’architettura di MediFlow parte da una scelta: il lavoro ordinario deve
-rimanere possibile sulla postazione locale, anche senza intelligenza
-artificiale. Dati, servizi applicativi e strumenti opzionali hanno quindi
-responsabilità separate. La modularità serve a poter aggiungere una funzione
-senza trasferirle il controllo della cartella o rendere necessarie tutte le
-altre.
+Ho progettato MediFlow così: il lavoro ordinario deve rimanere possibile
+sulla postazione locale, anche senza intelligenza artificiale. Per questo ho separato
+le responsabilità di dati, servizi applicativi e strumenti opzionali. Posso
+aggiungere una funzione senza trasferirle il controllo della cartella o rendere
+necessarie tutte le altre.
 
-Questo documento conserva i **confini stabili ad alto livello** e deve cambiare
-raramente. I dettagli e le prove appartengono ai riferimenti pertinenti:
+Qui descrivo i **confini stabili ad alto livello**. Questo documento deve
+cambiare raramente. I dettagli e le prove devono stare nei riferimenti pertinenti:
 [walkthrough](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md) per i flussi web e nativi,
 [stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) per implementazione e verifiche,
 [topologia dei dati](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md) per il percorso delle
 informazioni. Gli approfondimenti sono in [docs/ARCHITETTURA.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ARCHITETTURA.md)
-e [docs/system_architecture.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/system_architecture.md); le decisioni
+e [docs/system_architecture.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/system_architecture.md). Le decisioni sono
 negli [ADR](./docs/adr/README.md), la mappa in [docs/README.md](./docs/README.md)
 e l’inventario in [docs/markdown-index.md](./docs/markdown-index.md).
 
@@ -21,10 +20,10 @@ e l’inventario in [docs/markdown-index.md](./docs/markdown-index.md).
 
 ## 🎯 Obiettivi
 
-Il funzionamento **local-first / offline-first** è il punto di partenza, non
-una promessa di sincronizzazione o continuità offline universali. Nessuna
-uscita verso servizi esterni — telemetria, sincronizzazione o chiamate AI —
-può essere introdotta senza implementazione e documentazione esplicite.
+Parto dal funzionamento **local-first / offline-first**, senza promettere
+sincronizzazione o continuità offline universali. Un’uscita verso servizi esterni,
+per telemetria, sincronizzazione o chiamate AI, richiede implementazione e
+documentazione esplicite.
 
 I campi clinici sensibili devono essere cifrati lato client con AES-256-GCM
 prima della persistenza. Questa protezione per campo non copre integralmente
@@ -48,13 +47,13 @@ dipendere dai dettagli della UI. La sua parte `network`, accessibile dopo
 pairing, comprende lettura dei pazienti e scritture versionate di
 profilo/status, diario clinico, terapie, checkup e osservazioni.
 
-La cartella non dipende dai modelli. Quando configurati, Ollama può servire
-Patient Insight, Smart Import e Document Synthesis; ATHENA-R1-Qwen3-8B su MLX
+La cartella non dipende dai modelli. Quando sono configurati, Ollama può servire
+Patient Insight, Smart Import e Document Synthesis e ATHENA-R1-Qwen3-8B su MLX
 è riservata a Treatment Reasoning. Gli allegati iniziano invece da AnyDoc,
 un passaggio deterministico locale: Apple Vision prosegue soltanto sulle
 pagine PDF supportate `needsOcr`. Il servizio ICD-11 WHO è un Application
 Service accessibile solo dal server, con sidecar locale opzionale nel percorso
-0.8.6; OpenMed è un sidecar locale per oscuramento dei dati identificativi (redaction) in shadow/benchmark, non
+0.8.6. OpenMed è un sidecar locale per oscuramento dei dati identificativi (redaction) in shadow/benchmark, non
 esposto ai client.
 
 La web app sul Mac è la superficie primaria del perimetro distribuito come
@@ -91,10 +90,10 @@ e rilegge tramite la live query dopo il successo. Non cambia la superficie
 | --- | --- | --- |
 | Next.js (UI + API) | `http://127.0.0.1:3000` | Solo locale. |
 | TLS proxy (trasporto native) | `https://127.0.0.1:3443` | Inoltra verso :3000. |
-| Ollama (AI generativa generale) | `http://127.0.0.1:11434` | Opzionale; non esegue OCR nel percorso allegati 0.8.5. |
-| ATHENA su MLX | processo locale bounded | Opzionale, solo Treatment Reasoning; richiede runner e modello locali configurati. |
-| AnyDoc + Apple Vision | processi locali bounded | AnyDoc esegue il primo passaggio; Apple Vision continua soltanto le pagine PDF `needsOcr`, senza rete. |
-| ICD-11 WHO | Loopback fisso, solo dal server | Sidecar locale opt-in; il provisioning manuale non è attestato da questa architettura. |
+| Ollama (AI generativa generale) | `http://127.0.0.1:11434` | Opzionale, non esegue OCR nel percorso allegati 0.8.5. |
+| ATHENA su MLX | processo locale bounded | Opzionale, solo Treatment Reasoning. Richiede runner e modello locali configurati. |
+| AnyDoc + Apple Vision | processi locali bounded | AnyDoc esegue il primo passaggio. Apple Vision continua soltanto le pagine PDF `needsOcr`, senza rete. |
+| ICD-11 WHO | Loopback fisso, solo dal server | Sidecar locale opt-in. Il provisioning manuale non è attestato da questa architettura. |
 | OpenMed redaction (shadow) | `http://127.0.0.1:18080` | Opzionale, non accessibile dai client. |
 
 ---
@@ -122,18 +121,18 @@ Il solo `attachments.data` della creazione del paziente da documento usa `ENC2:<
 Lo swap di manutenzione conserva una snapshot SQLite autonoma dell'originale
 in `medical.db.swap-recovery` prima di rinominare il database. La snapshot
 include le pagine WAL tramite l'API di backup SQLite. Un journal locale lega
-target e digest delle due snapshot; dopo la riapertura e i controlli schema,
+target e digest delle due snapshot. Dopo la riapertura e i controlli schema,
 il runtime sincronizza database/WAL e registra un commit persistente prima di
 restituire il controllo all'applicazione. Da quel punto un errore di pulizia
 non autorizza il ritorno all'originale: le scritture successive restano valide.
 
-All'avvio, l'assenza di residui produce `CLEAN`; un journal valido di un owner
+All'avvio, l'assenza di residui produce `CLEAN`. Un journal valido di un owner
 terminato consente `RECOVERED`, scegliendo l'originale prima del commit o il
 database corrente dopo il commit. Journal incompleti, target discordi, link,
 collisioni e residui legacy `.old-*`/`.repair-tmp*` senza provenienza verificata
 producono `HOLD` prima dell'apertura, della copia legacy e del bootstrap.
 L'operatore deve conservare l'intera directory, fermare gli accessi concorrenti
-e far verificare l'identità dell'archivio da recuperare; rinominare o cancellare
+e far verificare l'identità dell'archivio da recuperare. Rinominare o cancellare
 residui solo per superare il blocco non è una procedura di recupero. Le build
 Next.js non ispezionano né recuperano l'archivio persistente.
 
@@ -161,8 +160,8 @@ trasportato su HTTPS locale tramite TLS proxy.
 
 La **Network API** (`/api/v1/network/*`) esiste operativamente soltanto in
 modalità `network-home-base` e richiede sia il pairing esplicito del dispositivo
-sia una sessione operatore valida. La lettura resta il punto di partenza;
-le scritture versionate sono limitate a creazione, cestino e ripristino del
+sia una sessione operatore valida. La lettura resta il punto di partenza.
+Le scritture versionate sono limitate a creazione, cestino e ripristino del
 paziente, profilo/status, diario, terapie, checkup, osservazioni, prestazioni
 e protesica.
 
@@ -181,14 +180,14 @@ offline (ADR 0076). Spegnere la modalità di rete non revoca i pairing:
 i token diventano inerti e il data plane risponde `403 NETWORK_MODE_DISABLED`
 finché la modalità non viene riattivata.
 
-I client nativi non devono dipendere da scraping HTML o dettagli interni di
-React/Next: usano questi contratti, non scorciatoie verso la UI o il database.
+I client nativi usano questi contratti. Non devono dipendere da scraping HTML
+o dettagli interni di React/Next, né prendere scorciatoie verso la UI o il database.
 
 ### Proxy verso servizi locali
 
-Un proxy non rende fidata la risposta di un servizio. Ogni endpoint deve
-ammettere soltanto destinazioni localhost in allowlist, impedire SSRF e target
-remoti e trattare ogni risposta come input non fidato.
+La risposta di un servizio non diventa fidata perché passa da un proxy. Ogni
+endpoint deve ammettere soltanto destinazioni localhost in allowlist, impedire
+SSRF e target remoti e trattare ogni risposta come input non fidato.
 
 ### Application Services, Fabric e Headless 0.8.5
 
@@ -200,17 +199,16 @@ sottili e adapter headless non duplicano queste regole e non aprono il database.
 Alcune route Web storiche importano ancora `dbServer`: restano fuori da questa
 affermazione generale e non ne costituiscono una prova.
 
-La Fabric è l’impalcatura che rende possibile usare le funzioni intelligenti
-solo dove servano. Nel sorgente locale 0.8.5 i quattro percorsi end-to-end sono
+Ho previsto la Fabric per usare le funzioni intelligenti solo dove servono. Nel sorgente locale 0.8.5 i quattro percorsi end-to-end sono
 Patient Insight, Smart Import, Document Synthesis e Treatment Reasoning.
 La tabella conserva il perimetro di quella fase, non lo stato della successiva
 pubblicazione 0.8.6.
 
 | Stato | Perimetro 0.8.5 |
 | --- | --- |
-| `INCLUDED` | Quattro percorsi Fabric con sole proposte; AnyDoc e Apple Vision locale sulle pagine PDF `needsOcr`; selettore guidato e associazione atomica; provider v2 e prova amministrativa `default OFF`; Supervisor locale con figli Web e MCP; planner in sola lettura collegato; F10 end-to-end; registrazione Apple sul dispositivo, con revisione. |
-| `VERIFIED_LOCAL` | Evidenze mirate nel tree per contratti, production root e crosswalk; la suite integrata finale resta una prova separata. |
-| `NOT_READY` | Credenziali o rete cloud live; installer, onboarding e compatibilità con host MCP esterni; microfono reale e validazione clinica della registrazione; prova terminale sul tree finale di quella fase. |
+| `INCLUDED` | Quattro percorsi Fabric con sole proposte, AnyDoc e Apple Vision locale sulle pagine PDF `needsOcr`, selettore guidato e associazione atomica, provider v2 e prova amministrativa `default OFF`, Supervisor locale con figli Web e MCP, planner in sola lettura collegato, F10 end-to-end, registrazione Apple sul dispositivo, con revisione. |
+| `VERIFIED_LOCAL` | Evidenze mirate nel tree per contratti, production root e crosswalk. La suite integrata finale resta una prova separata. |
+| `NOT_READY` | Credenziali o rete cloud live, installer, onboarding e compatibilità con host MCP esterni, microfono reale e validazione clinica della registrazione, prova terminale sul tree finale di quella fase. |
 | `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING` | DeepSeek-OCR 2/CUDA, benchmark di qualifica e disponibilità OCR universale. |
 
 Il chiamante entra da una route autenticata e riceve una proposta con ricevuta,
@@ -218,10 +216,10 @@ provenienza e controllo di validità del contesto. Il livello massimo resta
 `proposal_only`: provider, endpoint, sede di esecuzione, prompt, fallback e
 applicazione non sono scelte libere del chiamante. Per il modello, ADR0129
 ammette soltanto preferenze e override opachi risolti contro il catalogo
-corrente dell’host; non trasforma il browser in un configuratore arbitrario.
+corrente dell’host. Non trasforma il browser in un configuratore arbitrario.
 
-Ollama serve, quando configurato, i primi tre percorsi; ATHENA su MLX soltanto
-Treatment Reasoning. I loro cicli di vita sono separati e non si trasferiscono
+Ollama serve, quando configurato, i primi tre percorsi. ATHENA su MLX serve
+soltanto Treatment Reasoning. I loro cicli di vita sono separati e non si trasferiscono
 stato, autorizzazioni o fallback. OpenAI e Anthropic restano `default OFF` e
 non sono destinazioni alternative implicite.
 
@@ -240,16 +238,16 @@ delle rispettive API: i loro adapter HTTPS ufficiali e la prova amministrativa
 Document Synthesis non sono l’integrazione consumer ChatGPT.
 
 Quella prova è riservata agli amministratori e richiede l’intento esatto
-`run_synthetic_nonclinical_probe`. Il default resta `OFF`; ogni composizione
+`run_synthetic_nonclinical_probe`. Il default resta `OFF`. Ogni composizione
 richiede ciclo di vita attivo, istanza dell’host, riferimento al segreto e
 politiche esplicite di uscita e conservazione. I test usano trasporti simulati,
 non attestano credenziali, rete live, account o retention. Login consumer e
-abbonamento dell’host non costituiscono accesso API; OAuth privati o ricostruiti
+abbonamento dell’host non costituiscono accesso API. OAuth privati o ricostruiti
 restano vietati. Il canale ChatGPT successivo mantiene i controlli distinti
 di ADR0134, senza una nuova qualifica live consumer sul candidato finale.
 
 Il selettore Fabric lavora sulle cinque capability nominate. La discovery
-mostra solo profili compatibili; lo smoke usa fixture sintetiche; il binding
+mostra solo profili compatibili. Lo smoke usa fixture sintetiche. Il binding
 si attiva in modo atomico, versionato e reversibile. Scoprire un profilo o
 superare uno smoke non qualifica il runtime e non persiste segreti.
 
@@ -259,7 +257,7 @@ finalità, ambito, durata dei permessi (*lease*), revoca e audit. MCP `stdio` e
 Mini condividono catalogo, ricerca terminologica, lettura delle Open Loops
 nel paziente autorizzato, proposta follow-up `proposal_only` e interrogazione
 semantica circoscritta in sola lettura. Mini nella 0.8.5 era una base CLI
-senza callsite del Supervisor di produzione; WUL-696 aggiunge quel raccordo
+senza callsite del Supervisor di produzione. WUL-696 aggiunge quel raccordo
 nelle revisioni successive, senza attestare il completamento clinico generale.
 Gli adapter non importano SQLite, non accettano autorità dal chiamante e non
 aprono listener propri. Non si dichiarano installer, onboarding universale o
@@ -267,7 +265,7 @@ compatibilità con host MCP esterni.
 
 F10 espone via MCP soltanto l’anteprima della transizione
 `pending -> completed|cancelled`. La UI Web fidata rilegge la risorsa e richiede
-ruolo medico attivo, step-up e gesto specifico per l’operazione; il commit
+ruolo medico attivo, step-up e gesto specifico per l’operazione. Il commit
 mantiene CAS, idempotenza, audit e ricevuta atomici. La prova autorizzativa e
 la scrittura non attraversano MCP e non sono delegate all’agente.
 
@@ -284,7 +282,7 @@ direttamente a SQLite.
 
 Su macOS 26 o successivo, la shell comprende cattura e trascrizione italiana
 con API Apple sul dispositivo. Occorrono consenso esplicito e revisione prima
-di trasferire il testo alla bozza; l’audio rimane limitato alla RAM. Non sono
+di trasferire il testo alla bozza. L’audio rimane limitato alla RAM. Non sono
 eseguite scritture cliniche automatiche. Microfono reale e validazione clinica
 restano fuori dalle prove dichiarate per quel candidato.
 
@@ -379,7 +377,7 @@ Solo le pagine PDF supportate `needsOcr` raggiungono materializzazione,
 rendering e Apple Vision. La ricomposizione conserva ordine e provenienza e
 si blocca se la fonte non è più corrente o il motore non è disponibile.
 DeepSeek-OCR 2/CUDA conserva lo stato
-`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`; le route OCR legacy rispondono `410`
+`OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy rispondono `410`
 dopo l’autenticazione.
 
 Le preferenze Fabric seguono [ADR 0129](./docs/adr/0129-function-model-catalog-preferences.md):
@@ -400,8 +398,8 @@ separate, non si deducono da questo contratto.
 Per ogni modifica non banale, scrivi un ADR in `docs/adr/`, breve e concreto:
 problema, opzioni, compromessi, decisione e primo intervento circoscritto.
 Aggiorna [ARCHITECTURE.md](./ARCHITECTURE.md) solo quando cambino la visione
-stabile o i confini; il [walkthrough](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md) quando cambi il
-flusso reale end-to-end; la [topologia dei dati](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md)
+stabile o i confini. Aggiorna il [walkthrough](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md) quando cambi il
+flusso reale end-to-end. Aggiorna la [topologia dei dati](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md)
 quando cambino percorsi, confini di fiducia o superfici API.
 
 Se cambia chi governa un tema o dove trovarne il contratto, riallinea
@@ -411,10 +409,10 @@ Se cambia chi governa un tema o dove trovarne il contratto, riallinea
 
 [ADR 0159](docs/adr/0159-plugin-local-ui-navigation.md) aggiunge una composizione
 fissa `plugin_local_ui` sopra Supervisor, MCP e canale Web privato esistenti.
-Accetta solo quattro intenti di navigazione, anche prima del login; nessun
+Accetta solo quattro intenti di navigazione, anche prima del login. Nessun
 owner, lease o servizio clinico viene composto nel parent del profilo. Il
 Web conferma la propria readiness tecnica prima dell'inoltro. Notifiche senza
-coda o replay raggiungono i documenti locali correnti; le viste richiedono
+coda o replay raggiungono i documenti locali correnti. Le viste richiedono
 conferma locale e verifica della validità del contesto. Senza un documento
 connesso viene aperta una pagina locale fissa, senza argomenti clinici.
 
