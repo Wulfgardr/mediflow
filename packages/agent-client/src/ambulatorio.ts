@@ -39,7 +39,7 @@ class AmbulatorioError extends Error {}
 
 const visit = { visitId: z.string().uuid() };
 const fact = z.object({
-    file: z.string().regex(/^(?:nota-visita|[a-f0-9]{64})\.pdf$/u),
+    file: z.string().regex(/^(?:trascrizione-visita|nota-visita|[a-f0-9]{64})\.pdf$/u),
     kind: z.enum(['therapy', 'service_prescription', 'diagnosis', 'exemption']),
     values: z.record(z.string(), z.string().max(12000)),
     quote: z.string().min(12).max(600).refine(value => value.trim().split(/\s+/u).length >= 3),
@@ -121,6 +121,13 @@ export function createAmbulatorioServer(home: string, value: unknown, plugin: st
     }, (args, { mcpReq }) => run(async () => {
         await active(mcpReq.signal);
         return worker('update', args, mcpReq.signal);
+    }));
+    server.registerTool('mediflow_correggi_visita', {
+        description: 'Accoda il messaggio di correzione dettato dal medico alla stessa visita e rende necessario rigenerare il Dossier.',
+        inputSchema: z.object({ ...visit, correzione: z.string().min(1).max(60000).refine(value => Boolean(value.trim())) }).strict(), annotations,
+    }, (args, { mcpReq }) => run(async () => {
+        await active(mcpReq.signal);
+        return worker('correct', args, mcpReq.signal);
     }));
     server.registerTool('mediflow_prepara_dossier', {
         description: 'Salva la scheda con nota S/O/A/P, genera il PDF della nota e verifica il Dossier con MediFlow. Accetta solo citazioni letterali.',

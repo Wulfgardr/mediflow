@@ -321,25 +321,14 @@ test('oversized or empty stdin is refused without depositing or echoing its cont
     } finally { await f.cleanup(); }
 });
 
-test('Ambulatorio admits only a verified visit and retries the same encrypted deposit', {
-    skip: process.platform === 'win32',
-}, async () => {
+async function ambulatorioFixture() {
     const f = await fixture('openai');
     const home = path.join(f.root, 'ambulatorio');
-    const repository = process.cwd();
-    const physician = 'RSSMRA80A01F205X', foreign = 'RSSMRA85T10A562S';
-    configureAmbulatorio(home, path.join(home, 'config.json'), { repository, origin: f.origin, downloads: f.files, physicianCodes: [] });
+    configureAmbulatorio(home, path.join(home, 'config.json'), {
+        repository: process.cwd(), origin: f.origin, downloads: f.files, physicianCodes: [],
+    });
     const credentials = path.join(home, 'credenziali');
-    saveAgentCredential(credentials, { ...JSON.parse(fs.readFileSync(path.join(f.credentials, f.principal.agentRef + '.json'), 'utf8')) });
-    const pdf = async (name: string, lines: string[]) => {
-        const document = await PDFDocument.create(), font = await document.embedFont(StandardFonts.Helvetica);
-        const page = document.addPage();
-        lines.forEach((text, i) => page.drawText(text, { x: 50, y: 780 - 22 * i, font, size: 11 }));
-        fs.writeFileSync(path.join(f.files, name), await document.save());
-    };
-    const quote = 'Assume Paracetamolo 500 mg al bisogno.';
-    await pdf('sintetico.pdf', ['Codice fiscale paziente: ' + cf, 'CODICE FISCALE DEL MEDICO: ' + physician, 'Documento sintetico consentito']);
-    const dettato = 'Visita sintetica senza codice fiscale. ' + quote;
+    saveAgentCredential(credentials, JSON.parse(fs.readFileSync(path.join(f.credentials, f.principal.agentRef + '.json'), 'utf8')));
     const start = path.resolve('plugins/mediflow-ambulatorio/start.mjs');
     const child = spawn(process.execPath, [start], { env: { ...process.env, MEDIFLOW_AMBULATORIO_HOME: home } });
     const closed = new Promise<void>(resolve => child.once('close', () => resolve()));
@@ -360,7 +349,31 @@ test('Ambulatorio admits only a verified visit and retries the same encrypted de
         const { result } = response;
         return result.isError ? JSON.parse(result.content[0].text) : result.structuredContent;
     };
-    const deadline = setTimeout(() => child.kill('SIGTERM'), 30000);
+    const deadline = setTimeout(() => child.kill('SIGTERM'), 60000);
+    return { ...f, home, send, async dispose() {
+        clearTimeout(deadline);
+        child.stdin.end();
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+        await closed;
+        await f.cleanup();
+    } };
+}
+
+test('Ambulatorio admits only a verified visit and retries the same encrypted deposit', {
+    skip: process.platform === 'win32',
+}, async () => {
+    const f = await ambulatorioFixture();
+    const { home, send } = f;
+    const physician = 'RSSMRA80A01F205X', foreign = 'RSSMRA85T10A562S';
+    const pdf = async (name: string, lines: string[]) => {
+        const document = await PDFDocument.create(), font = await document.embedFont(StandardFonts.Helvetica);
+        const page = document.addPage();
+        lines.forEach((text, i) => page.drawText(text, { x: 50, y: 780 - 22 * i, font, size: 11 }));
+        fs.writeFileSync(path.join(f.files, name), await document.save());
+    };
+    const quote = 'Assume Paracetamolo 500 mg al bisogno.';
+    await pdf('sintetico.pdf', ['Codice fiscale paziente: ' + cf, 'CODICE FISCALE DEL MEDICO: ' + physician, 'Documento sintetico consentito']);
+    const dettato = 'Visita sintetica senza codice fiscale. ' + quote;
     try {
         assert.equal(spawnSync('pdftotext', ['-v']).status, 0, 'Install poppler-utils for the Ambulatorio acceptance test');
         const acquired = await send('mediflow_acquisisci_visita', { dettato, inizio: new Date(Date.now() - 60000).toISOString() });
@@ -393,18 +406,111 @@ test('Ambulatorio admits only a verified visit and retries the same encrypted de
         assert.equal(f.rows()[0].status, 'open');
         const receipt = await send('mediflow_riprendi_visita', { visitId });
         assert.equal(receipt.status, 'closed', JSON.stringify(receipt));
-        assert.deepEqual(receipt.proposteInArrivo, { stato: 'da_verificare_in_mediflow', elementi: [{ tipo: 'terapia', fonte: 'nota-visita.pdf' }] });
+        assert.deepEqual(receipt.proposteInArrivo, { stato: 'da_verificare_in_mediflow', elementi: [{ tipo: 'terapia', fonte: 'trascrizione-visita.pdf' }] });
         assert.deepEqual(await send('mediflow_deposita_visita', { visitId }), receipt);
         assert.equal(f.rows().length, 1);
-        assert.equal(receipt.itemCount, 5);
+        assert.equal(receipt.itemCount, 6);
         assert.ok(f.bodies.every(body => ![dettato, cf, quote, f.token].some(secret => body.includes(secret))));
         assert.deepEqual(await send('mediflow_aggiorna_visita', { visitId }), { error: 'DEPOSITO_GIA_AVVIATO' });
         assert.equal(fs.statSync(path.join(home, 'visite', visitId, 'trascrizione.txt')).mode & 0o777, 0o600);
     } finally {
-        clearTimeout(deadline);
-        child.stdin.end();
-        if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
-        await closed;
-        await f.cleanup();
+        await f.dispose();
     }
+});
+
+
+const syntheticSheet = (plan: string) => '## Nota clinica\nS: Motivo della visita sintetico.\nO: Rilievi non riportati.\nA: Valutazione non esplicitata.\nP: ' + plan;
+const dictationTherapy = (quote: string, drugName: string, dosage: string) => ({
+    file: 'nota-visita.pdf', kind: 'therapy', values: { drugName, dosage, status: 'active' }, quote,
+});
+const openAmbulatorio = async (f: Awaited<ReturnType<typeof ambulatorioFixture>>, dettato: string) => {
+    const result = await f.send('mediflow_acquisisci_visita', { dettato: `Visita sintetica. CF paziente ${cf}. ${dettato}` });
+    assert.equal(result.stato, 'CF stabilito');
+    return result.visitId as string;
+};
+
+for (const lead of ['Il coniuge assume', 'Non assume']) {
+    test(`Ambulatorio conserva il contesto ${lead} anche se il SOAP omette il passo`, { skip: process.platform === 'win32' }, async () => {
+        const f = await ambulatorioFixture();
+        try {
+            const quote = 'Ramipril 5 mg 1 cp al mattino';
+            const visitId = await openAmbulatorio(f, `${lead} ${quote}. Assume Paracetamolo 500 mg al bisogno.`);
+            const scheda = syntheticSheet('Rivalutazione al controllo.');
+            assert.deepEqual(await f.send('mediflow_prepara_dossier', {
+                visitId, scheda, fatti: [dictationTherapy(quote, 'Ramipril', '5 mg 1 cp al mattino')],
+            }), { error: 'DOSSIER_VERIFICA_FALLITA' });
+            const good = await f.send('mediflow_prepara_dossier', {
+                visitId, scheda, fatti: [dictationTherapy('Assume Paracetamolo 500 mg al bisogno.', 'Paracetamolo', '500 mg al bisogno')],
+            });
+            assert.equal(good.stato, 'verificato');
+        } finally { await f.dispose(); }
+    });
+}
+
+test('Ambulatorio conserva Unicode nella nota PDF e nella citazione', { skip: process.platform === 'win32' }, async () => {
+    const f = await ambulatorioFixture();
+    try {
+        const quote = 'Assume Levotiroxina 25 µg ogni mattina.';
+        const note = 'È già presente la misura β ≥ 37 °C.';
+        const visitId = await openAmbulatorio(f, quote);
+        const dossier = await f.send('mediflow_prepara_dossier', {
+            visitId, scheda: syntheticSheet(note), fatti: [dictationTherapy(quote, 'Levotiroxina', '25 µg ogni mattina')],
+        });
+        assert.equal(dossier.stato, 'verificato', JSON.stringify(dossier));
+        const root = path.join(f.home, 'visite', visitId);
+        const version = fs.readdirSync(root).find(file => file.startsWith('dossier-'))!;
+        const pdfText = (file: string) => spawnSync('pdftotext', ['-layout', path.join(root, version, file), '-'], { encoding: 'utf8' }).stdout;
+        assert.ok(pdfText('nota-visita.pdf').includes(note));
+        assert.ok(pdfText('trascrizione-visita.pdf').includes(quote));
+    } finally { await f.dispose(); }
+});
+
+test('Ambulatorio registra una correzione dettata sulla stessa visita e deposita una sola versione', { skip: process.platform === 'win32' }, async () => {
+    const f = await ambulatorioFixture();
+    try {
+        const original = 'Assume Paracetamolo 500 mg al bisogno.';
+        const corrected = 'Assume Ibuprofene 200 mg al bisogno.';
+        const diagnosis = 'Diagnosi sintetica rinite allergica ICD-10 J30.9.';
+        const visitId = await openAmbulatorio(f, original);
+        const before = await f.send('mediflow_prepara_dossier', {
+            visitId, scheda: syntheticSheet(original), fatti: [dictationTherapy(original, 'Paracetamolo', '500 mg al bisogno')],
+        });
+        assert.equal(before.stato, 'verificato');
+        const correzione = `Correggi la terapia e la diagnosi. ${corrected} ${diagnosis}`;
+        const correction = await f.send('mediflow_correggi_visita', { visitId, correzione });
+        assert.deepEqual(correction, { visitId, stato: 'correzione_salvata', revisione: 1 });
+        assert.deepEqual(await f.send('mediflow_correggi_visita', { visitId, correzione }), correction);
+        assert.deepEqual(await f.send('mediflow_deposita_visita', { visitId }), { error: 'DOSSIER_NON_VERIFICATO' });
+        const after = await f.send('mediflow_prepara_dossier', {
+            visitId, scheda: syntheticSheet(corrected), fatti: [
+                dictationTherapy(corrected, 'Ibuprofene', '200 mg al bisogno'),
+                { file: 'nota-visita.pdf', kind: 'diagnosis', values: { description: 'rinite allergica', code: 'J30.9', system: 'ICD-10' }, quote: diagnosis },
+            ],
+        });
+        assert.equal(after.stato, 'verificato', JSON.stringify(after));
+        const receipt = await f.send('mediflow_deposita_visita', { visitId });
+        assert.equal(receipt.status, 'closed');
+        assert.deepEqual(await f.send('mediflow_riprendi_visita', { visitId }), receipt);
+        assert.equal(f.rows().length, 1);
+        const row = f.rows()[0];
+        const [,, encoded] = row.wrappedPrivateKey.split(':');
+        const key = await crypto.subtle.importKey('pkcs8', agentBytes(await decryptData(encoded, row.wrappedPrivateKey.split(':')[1], f.masterKey) as string),
+            { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+        const items = JSON.parse(row.itemsCiphertext);
+        const decode = async (kind: string) => {
+            const item = items.find((entry: { kind: string }) => entry.kind === kind);
+            return JSON.parse(new TextDecoder().decode(await openAgentItem(key,
+                { mandateRef: row.mandateRef, visitId, itemId: item.id, kind: item.kind }, item.envelope)));
+        };
+        assert.equal(items.filter((item: { kind: string }) => item.kind === 'therapy').length, 1);
+        assert.deepEqual((await decode('therapy')).values, { drugName: 'Ibuprofene', dosage: '200 mg al bisogno', status: 'active' });
+        assert.equal((await decode('diagnosis')).values.code, 'J30.9');
+        const { text } = await decode('transcription');
+        assert.match(text, /Paracetamolo 500 mg/);
+        assert.equal(text.split(correzione).length, 2);
+        const root = path.join(f.home, 'visite', visitId);
+        assert.doesNotMatch(fs.readFileSync(path.join(root, 'trascrizione.txt'), 'utf8'), /Ibuprofene/);
+        assert.equal(fs.readdirSync(root).filter(file => file.startsWith('dossier-')).length, 2);
+        assert.deepEqual(await f.send('mediflow_correggi_visita', { visitId, correzione: 'Correggi ancora.' }), { error: 'DEPOSITO_GIA_AVVIATO' });
+    } finally { await f.dispose(); }
 });
