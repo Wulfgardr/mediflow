@@ -116,6 +116,14 @@ impl Theme {
         })
     }
 
+    pub fn around_control(self, inset: f32) -> f32 {
+        self.control_radius + inset
+    }
+
+    pub fn nested(outer: f32, inset: f32) -> f32 {
+        (outer - inset).max(0.)
+    }
+
     pub fn focus_ring(self, primary: bool) -> BoxShadow {
         BoxShadow::new(px(0.), px(0.), if primary { self.ink } else { self.fresh })
             .spread_radius(px(1.))
@@ -281,6 +289,21 @@ impl<T: Styled> TypeStyle for T {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_frame_around_a_control_keeps_its_corners_concentric() {
+        for dark in [false, true] {
+            let theme = Theme::for_dark(dark);
+            for inset in [0., 8., 12.] {
+                let outer = theme.around_control(inset);
+                assert_eq!(Theme::nested(outer, inset), theme.control_radius);
+                assert_eq!(
+                    Theme::nested(theme.control_radius, inset + theme.control_radius),
+                    0.
+                );
+            }
+        }
+    }
 
     fn check(
         role: TypeRole,

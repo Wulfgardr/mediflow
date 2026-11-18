@@ -106,6 +106,28 @@ impl Drop for OwnedChild {
     }
 }
 
+#[cfg(test)]
+pub mod test_worker {
+    static PATH: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+    pub fn path() -> Option<std::path::PathBuf> {
+        PATH.get().cloned()
+    }
+
+    pub fn use_built_binary() -> bool {
+        let Some(binary) = std::env::current_exe().ok().and_then(|test| {
+            Some(test.parent()?.parent()?.join(format!(
+                "{}{}",
+                env!("CARGO_PKG_NAME"),
+                std::env::consts::EXE_SUFFIX
+            )))
+        }) else {
+            return false;
+        };
+        binary.is_file() && (PATH.set(binary.clone()).is_ok() || PATH.get() == Some(&binary))
+    }
+}
+
 pub fn render(
     source: Arc<Zeroizing<Vec<u8>>>,
     page: usize,
@@ -122,6 +144,9 @@ pub fn render(
         return Err(Error::Unavailable);
     }
     context.check().map_err(|_| Error::Cancelled)?;
+    #[cfg(test)]
+    let executable = test_worker::path().ok_or(Error::Engine)?;
+    #[cfg(not(test))]
     let executable = std::env::current_exe().map_err(|_| Error::Engine)?;
     let child = OwnedChild(
         Command::new(executable)

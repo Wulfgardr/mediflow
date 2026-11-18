@@ -6,6 +6,8 @@ macro_rules! text {
 }
 use super::*;
 
+pub(super) const READING_INSET: f32 = 12.;
+
 #[derive(Clone, Default)]
 pub(super) struct RecordState {
     pub(super) anchor: Option<Option<VisitAnchor>>,
@@ -382,7 +384,13 @@ impl ClinicalApp {
         let zones = Zones::for_width(layout.width / self.effective_text_scale());
         let writing = self.form.is_some().then(|| self.record_composer(cx));
         let done = self.record_registered_step();
-        let reading = self.record_reading(cx);
+        let beside = zones != Zones::One && self.reading_document();
+        let reading = self.record_reading(beside, cx);
+        let (wide_reading, reading) = if beside {
+            (reading, None)
+        } else {
+            (None, reading)
+        };
         let drafting = self.form.is_some();
         let zone_height = (self.viewport_height - 300. * self.theme.scale).max(280.);
         let column = |id: &'static str| {
@@ -416,8 +424,10 @@ impl ClinicalApp {
                         .border_l_1()
                         .border_r_1()
                         .border_color(theme.rule)
-                        .child(self.record_band(cx))
-                        .child(self.record_diary(cx)),
+                        .map(|el| match wide_reading {
+                            Some(reading) => el.child(reading),
+                            None => el.child(self.record_band(cx)).child(self.record_diary(cx)),
+                        }),
                 )
                 .child(
                     zone("clinical-record-context")
@@ -435,11 +445,12 @@ impl ClinicalApp {
                 .flex()
                 .items_start()
                 .child(
-                    zone("clinical-record-changed")
-                        .flex_1()
-                        .pr(px(20.))
-                        .child(self.record_band(cx))
-                        .child(self.record_diary(cx)),
+                    zone("clinical-record-changed").flex_1().pr(px(20.)).map(
+                        |el| match wide_reading {
+                            Some(reading) => el.child(reading),
+                            None => el.child(self.record_band(cx)).child(self.record_diary(cx)),
+                        },
+                    ),
                 )
                 .child(
                     zone("clinical-record-side")
@@ -1110,11 +1121,7 @@ impl ClinicalApp {
                                         true,
                                     )
                                     .on_click(cx.listener(
-                                        move |this, _, _, cx| {
-                                            this.patient.record.reading =
-                                                Some(Source::Entry(entry.clone()));
-                                            cx.notify();
-                                        },
+                                        move |this, _, _, cx| this.read_record_entry(&entry, cx),
                                     ))
                                 }))
                                 .when_some(document, |el, id| {
@@ -1130,9 +1137,7 @@ impl ClinicalApp {
                                         )
                                         .on_click(
                                             cx.listener(move |this, _, _, cx| {
-                                                this.patient.record.reading =
-                                                    Some(Source::Document(id.clone()));
-                                                cx.notify();
+                                                this.read_record_document(&id, cx)
                                             }),
                                         ),
                                     )
@@ -1162,7 +1167,41 @@ impl ClinicalApp {
             })
     }
 
-    pub(super) fn record_reading(&self, cx: &Context<Self>) -> Option<Stateful<Div>> {
+    pub(super) fn read_record_document(&mut self, id: &str, cx: &mut Context<Self>) {
+        self.patient.record.reading = Some(Source::Document(id.to_owned()));
+        if !self
+            .patient
+            .document_original
+            .as_ref()
+            .is_some_and(|original| original.id == id)
+        {
+            self.patient.document_original = None;
+            self.open_document_original(id, cx);
+        }
+        cx.notify();
+    }
+
+    pub(super) fn read_record_entry(&mut self, id: &str, cx: &mut Context<Self>) {
+        self.patient.document_original = None;
+        self.patient.record.reading = Some(Source::Entry(id.to_owned()));
+        cx.notify();
+    }
+
+    pub(super) fn close_record_reading(&mut self, cx: &mut Context<Self>) {
+        self.patient.record.reading = None;
+        self.patient.document_original = None;
+        if self.form.is_some() {
+            self.focus_after_render = true;
+            self.focus_first_field = true;
+        }
+        cx.notify();
+    }
+
+    fn reading_document(&self) -> bool {
+        matches!(self.patient.record.reading, Some(Source::Document(_)))
+    }
+
+    pub(super) fn record_reading(&self, beside: bool, cx: &Context<Self>) -> Option<Stateful<Div>> {
         let theme = self.theme;
         let writing = self.form.is_some();
         let (title, body, registration): (String, AnyElement, String) =
@@ -1210,6 +1249,12 @@ impl ClinicalApp {
                         .ready()?
                         .iter()
                         .find(|row| &row.id == id)?;
+                    let original = self
+                        .patient
+                        .document_original
+                        .as_ref()
+                        .filter(|original| &original.id == id);
+                    let reload = id.clone();
                     (
                         document.name.clone(),
                         div()
@@ -1221,28 +1266,51 @@ impl ClinicalApp {
                                 document.mime_type,
                                 format_size(document.size)
                             )))
-                            .child(div().text_color(theme.secondary).child(text!(if writing {
-                                "L’originale si apre in Documenti, dopo aver chiuso la bozza."
-                            } else {
-                                "L’originale si apre in Documenti."
-                            })))
-                            .child(
-                                div().flex().child(
-                                    button(
-                                        "clinical-record-reading-document-open",
-                                        "Apri in Documenti",
-                                        theme,
-                                        false,
-                                        !writing,
+                            .child(match original {
+                                Some(original) => self
+                                    .document_original_content(
+                                        original,
+                                        document_details::OriginalPlace::Record { save: !writing },
+                                        cx,
                                     )
-                                    .when(!writing, |el| {
-                                        el.on_click(cx.listener(|this, _, _, cx| {
-                                            this.patient.record.reading = None;
-                                            this.section_selected(PatientSection::Documents, cx)
-                                        }))
-                                    }),
-                                ),
-                            )
+                                    .into_any_element(),
+                                None => div()
+                                    .flex()
+                                    .child(
+                                        button(
+                                            "clinical-record-reading-document-load",
+                                            "Mostra l’originale",
+                                            theme,
+                                            false,
+                                            true,
+                                        )
+                                        .on_click(
+                                            cx.listener(move |this, _, _, cx| {
+                                                this.read_record_document(&reload, cx)
+                                            }),
+                                        ),
+                                    )
+                                    .into_any_element(),
+                            })
+                            .when(!writing, |el| {
+                                el.child(
+                                    div().flex().child(
+                                        button(
+                                            "clinical-record-reading-document-open",
+                                            "Apri in Documenti",
+                                            theme,
+                                            false,
+                                            true,
+                                        )
+                                        .on_click(
+                                            cx.listener(|this, _, _, cx| {
+                                                this.close_record_reading(cx);
+                                                this.section_selected(PatientSection::Documents, cx)
+                                            }),
+                                        ),
+                                    ),
+                                )
+                            })
                             .into_any_element(),
                         format!(
                             "Aggiunto il {}",
@@ -1258,10 +1326,10 @@ impl ClinicalApp {
                 .role(Role::Region)
                 .aria_label(SharedString::from(title.clone()))
                 .min_w_0()
-                .p(px(12.))
+                .p(px(READING_INSET))
                 .border_1()
                 .border_color(theme.secondary)
-                .rounded(px(theme.control_radius))
+                .rounded(px(theme.around_control(READING_INSET)))
                 .bg(theme.paper)
                 .flex()
                 .flex_col()
@@ -1291,14 +1359,7 @@ impl ClinicalApp {
                                 false,
                                 true,
                             )
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.patient.record.reading = None;
-                                if this.form.is_some() {
-                                    this.focus_after_render = true;
-                                    this.focus_first_field = true;
-                                }
-                                cx.notify();
-                            })),
+                            .on_click(cx.listener(|this, _, _, cx| this.close_record_reading(cx))),
                         ),
                 )
                 .child(body)
@@ -1308,7 +1369,7 @@ impl ClinicalApp {
                         .text_color(theme.secondary)
                         .child(text!(registration)),
                 )
-                .when(writing, |el| {
+                .when(writing && !beside, |el| {
                     el.child(
                         div()
                             .type_role(theme, crate::theme::TextRole::Meta)
@@ -1522,13 +1583,11 @@ impl ClinicalApp {
                                 false,
                                 true,
                             )
-                            .on_click(cx.listener(
-                                move |this, _, _, cx| {
-                                    this.patient.record.reading =
-                                        Some(Source::Document(id.clone()));
-                                    cx.notify();
-                                },
-                            )),
+                            .on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    this.read_record_document(&id, cx)
+                                }),
+                            ),
                         ),
                     ))
                     .child(

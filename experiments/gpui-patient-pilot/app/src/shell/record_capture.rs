@@ -6,12 +6,18 @@ use std::sync::Arc;
 
 const ADDITION: &str = "\nQ7 0.9.1: rilettura completata.";
 
+const PDF_ONLY: &str = "K59-S3-4417";
+const PDF_ADDITION: &str = "\nS3: potassio da ricontrollare.";
+
 struct Bench {
     pairing: Value,
     scope: String,
     returning: [String; 2],
     crowded: String,
     first: String,
+    reader: String,
+    referto: String,
+    damaged: String,
 }
 
 fn login(pairing: &Value) -> RuntimeSession {
@@ -33,17 +39,26 @@ fn login(pairing: &Value) -> RuntimeSession {
 }
 
 fn independent_notes(bench: &Bench, patient: &str) -> Option<String> {
+    independent_profile(bench, patient).0
+}
+
+fn independent_profile(bench: &Bench, patient: &str) -> (Option<String>, u64, Vec<(String, u64)>) {
     let reader = login(&bench.pairing["reader"]);
     reader.list_ambulatories().unwrap();
     reader
         .select_profile_patient(&bench.scope, patient)
         .unwrap();
-    let notes = reader
+    let profile = reader
         .open_patient_profile(&bench.scope, patient, &reader.profile_query_intent())
+        .unwrap();
+    let documents = reader
+        .list_attachments(&bench.scope, patient)
         .unwrap()
-        .notes;
+        .into_iter()
+        .map(|row| (row.id, row.size))
+        .collect();
     reader.lock();
-    notes
+    (profile.notes, profile.version, documents)
 }
 
 fn bench(path: &str) -> Bench {
@@ -267,9 +282,48 @@ fn bench(path: &str) -> Bench {
         )
         .unwrap()
         .id;
+    let reader = "perf-patient-000003".to_owned();
+    session.select_profile_patient(&scope, &reader).unwrap();
+    session
+        .create_entry(
+            &scope,
+            &reader,
+            &EntryDraft {
+                entry_type: "visit".into(),
+                title: "Visita di controllo".into(),
+                content: "Richiesti esami ematici di controllo.".into(),
+                date: day(14),
+                setting: None,
+            },
+        )
+        .unwrap();
+    let pdf = include_bytes!("../../test_support/referto-s3-consultazione.pdf");
+    let referto = session
+        .create_attachment(
+            &scope,
+            &reader,
+            "Referto laboratorio sintetico.pdf",
+            "application/pdf",
+            pdf,
+        )
+        .unwrap()
+        .id;
+    let damaged = session
+        .create_attachment(
+            &scope,
+            &reader,
+            "Referto danneggiato.pdf",
+            "application/pdf",
+            &pdf[..pdf.len() / 3],
+        )
+        .unwrap()
+        .id;
     session.clear_profile_selection();
     session.lock();
     Bench {
+        reader,
+        referto,
+        damaged,
         pairing,
         scope,
         returning,
@@ -382,6 +436,31 @@ impl Run<'_> {
                 (caret, input.value().to_owned())
             })
         })
+    }
+
+    fn wait_for_original(&mut self) -> &'static str {
+        for _ in 0..200 {
+            self.settle();
+            let state = self.app(|app, _, _| {
+                match app
+                    .patient
+                    .document_original
+                    .as_ref()
+                    .map(|original| &original.state)
+                {
+                    Some(ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(_)))) => Some("pdf"),
+                    Some(ReadLoad::Ready(Ok(_))) => Some("altro"),
+                    Some(ReadLoad::Ready(Err(_)) | ReadLoad::Failed(_)) => Some("rifiutato"),
+                    None => Some("assente"),
+                    _ => None,
+                }
+            });
+            if let Some(state) = state {
+                return state;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        panic!("original preview did not settle")
     }
 
     fn caret_and_text(&mut self) -> (usize, String) {
@@ -571,19 +650,15 @@ fn crowded_and_interrupted(run: &mut Run, bench: &Bench, prefix: &str) -> Value 
     });
     let linked = entry.is_some();
     run.app(move |app, _, cx| {
-        app.patient.record.reading = entry.map(patient_record::Source::Entry);
-        cx.notify();
+        if let Some(entry) = entry {
+            app.read_record_entry(&entry, cx);
+        }
     });
     run.shot(
         &format!("{prefix}-13-voce-sopra-la-bozza"),
         "La voce dello stesso giorno si apre nel Contesto sopra la bozza",
     );
-    run.app(|app, _, cx| {
-        app.patient.record.reading = None;
-        app.focus_after_render = true;
-        app.focus_first_field = true;
-        cx.notify();
-    });
+    run.app(|app, _, cx| app.close_record_reading(cx));
     let after_entry = run.caret_and_text();
     let document = run.app(|app, _, _| {
         app.patient
@@ -594,19 +669,16 @@ fn crowded_and_interrupted(run: &mut Run, bench: &Bench, prefix: &str) -> Value 
     });
     let referto = document.is_some();
     run.app(move |app, _, cx| {
-        app.patient.record.reading = document.map(patient_record::Source::Document);
-        cx.notify();
+        if let Some(document) = document {
+            app.read_record_document(&document, cx);
+        }
     });
+    run.wait_for_original();
     run.shot(
         &format!("{prefix}-14-referto-sopra-la-bozza"),
         "Il referto si apre nel Contesto sopra la bozza",
     );
-    run.app(|app, _, cx| {
-        app.patient.record.reading = None;
-        app.focus_after_render = true;
-        app.focus_first_field = true;
-        cx.notify();
-    });
+    run.app(|app, _, cx| app.close_record_reading(cx));
     run.shot(
         &format!("{prefix}-15-torna-alla-bozza"),
         "Torna alla bozza: testo e punto di scrittura",
@@ -639,6 +711,82 @@ fn crowded_and_interrupted(run: &mut Run, bench: &Bench, prefix: &str) -> Value 
         "independentReadEndsWithAddition": true})
 }
 
+fn pdf_while_drafting(run: &mut Run, bench: &Bench, prefix: &str) -> Value {
+    let patient = bench.reader.clone();
+    let before = independent_profile(bench, &patient);
+    run.open(&patient);
+    run.app(|app, window, cx| app.open_form(FormKind::Notes, window, cx));
+    let typed = run.type_at_end(PDF_ADDITION);
+    run.shot(
+        &format!("{prefix}-21-bozza-prima-del-referto"),
+        "Bozza aperta, referto ancora chiuso",
+    );
+    let referto = bench.referto.clone();
+    run.app(move |app, _, cx| app.read_record_document(&referto, cx));
+    let opened = run.wait_for_original();
+    run.shot(
+        &format!("{prefix}-22-pdf-accanto-alla-bozza"),
+        "Il PDF si legge nel riepilogo mentre la bozza resta aperta",
+    );
+    run.app(|_, window, cx| window.focus_prev(cx));
+    run.shot(
+        &format!("{prefix}-22b-fuoco"),
+        "Fuoco sul comando che precede la bozza",
+    );
+    let during = independent_profile(bench, &patient);
+    run.app(|app, _, cx| app.close_record_reading(cx));
+    run.shot(
+        &format!("{prefix}-23-torna-alla-bozza"),
+        "Torna alla bozza: stesso testo e stesso punto",
+    );
+    let after_pdf = run.caret_and_text();
+    let damaged = bench.damaged.clone();
+    run.app(move |app, _, cx| app.read_record_document(&damaged, cx));
+    let refused = run.wait_for_original();
+    run.shot(
+        &format!("{prefix}-24-pdf-illeggibile"),
+        "PDF danneggiato: anteprima rifiutata, bozza intatta",
+    );
+    run.app(|app, _, cx| app.close_record_reading(cx));
+    let after_damaged = run.caret_and_text();
+    let unchanged = independent_profile(bench, &patient);
+    run.app(|app, window, cx| app.review_form(window, cx));
+    run.shot(
+        &format!("{prefix}-25-revisione"),
+        "Revisione dopo la consultazione",
+    );
+    run.app(|app, _, cx| app.confirm_form(cx));
+    run.shot(
+        &format!("{prefix}-26-registrata"),
+        "Registrata una sola volta",
+    );
+    let stored = independent_profile(bench, &patient);
+    assert_eq!(
+        opened, "pdf",
+        "the real PDF reaches the authenticated preview"
+    );
+    assert_eq!(refused, "rifiutato", "a damaged PDF is refused");
+    assert_eq!(after_pdf, typed, "text and caret survive reading the PDF");
+    assert_eq!(
+        after_damaged, typed,
+        "text and caret survive the refused PDF"
+    );
+    assert_eq!(during, before, "reading the PDF writes nothing");
+    assert_eq!(unchanged, before, "the refused PDF writes nothing");
+    let expected = format!("{}{PDF_ADDITION}", before.0.clone().unwrap_or_default());
+    assert_eq!(
+        stored.0.as_deref(),
+        Some(expected.as_str()),
+        "a second session reads the note"
+    );
+    assert_eq!(stored.1, before.1 + 1, "one confirmation, one version");
+    assert_eq!(stored.2, before.2, "documents untouched");
+    serde_json::json!({"patient": patient, "pdfOnlyMarker": PDF_ONLY, "opened": opened, "damaged": refused,
+        "caretAfterTyping": typed.0, "caretAfterPdf": after_pdf.0, "caretAfterDamaged": after_damaged.0,
+        "versionBefore": before.1, "versionDuringReading": during.1, "versionAfterConfirm": stored.1,
+        "independentReadMatches": true})
+}
+
 #[test]
 fn capture_record_d_on_the_synthetic_bench() {
     let (Ok(directory), Ok(pairing)) = (
@@ -648,6 +796,7 @@ fn capture_record_d_on_the_synthetic_bench() {
         return;
     };
     std::fs::create_dir_all(&directory).unwrap();
+    assert!(documents::pdf::test_worker::use_built_binary());
     let bench = bench(&pairing);
     let mut summary = vec![];
     for (dark, theme) in [(false, "giorno"), (true, "grafite")] {
@@ -666,12 +815,13 @@ fn capture_record_d_on_the_synthetic_bench() {
         } else {
             crowded_and_interrupted(&mut run, &bench, &format!("{theme}-1180"))
         };
+        let pdf = pdf_while_drafting(&mut run, &bench, &format!("{theme}-1180"));
         run.open(&bench.first);
         run.shot(
             &format!("{theme}-1180-10-primo-accesso"),
             "Primo accesso, senza identificativo e senza visite",
         );
-        summary.push(serde_json::json!({"theme": theme, "gesture": result, "crowded": crowded, "shots": run.log}));
+        summary.push(serde_json::json!({"theme": theme, "gesture": result, "crowded": crowded, "pdf": pdf, "shots": run.log}));
         for (width, height, label) in [
             (1440., 900., "1440"),
             (820., 660., "820"),
