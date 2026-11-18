@@ -1,4 +1,5 @@
-import { hasPatientIdentifierConflict } from './patient-identifier-conflict';
+import { hasPatientIdentifierConflict, PatientIdentifierConflictError } from './patient-identifier-conflict';
+import { normalizeIdentifierValue, type PatientIdentifierType } from './patient-identity';
 import { isSealedAttachmentData } from './attachment-payload';
 import 'server-only';
 import { randomUUID } from 'node:crypto';
@@ -38,12 +39,19 @@ export type PatientDocumentSourcePort = Readonly<{
 }>;
 type Field = Readonly<{ action: 'approve' | 'correct'; value: string }>;
 export type PatientDocumentCreateReview = Readonly<{
-    firstName: Field; lastName: Field; taxCode: Field; birthDate?: Field;
+    firstName: Field; lastName: Field;
     duplicate: 'none' | 'create-separate';
-}>;
+} & (
+    | { identifierType?: never; taxCode: Field; birthDate?: Field; birthYear?: never }
+    | ({ identifierType: Exclude<PatientIdentifierType, 'none'>; taxCode: Field }
+        & ({ birthDate?: Field; birthYear?: never } | { birthDate?: never; birthYear: number }))
+    | ({ identifierType: 'none'; taxCode?: never }
+        & ({ birthDate: Field; birthYear?: never } | { birthDate?: never; birthYear: number }))
+)>;
 type Command = Readonly<{
     commandId: string; patientId: string; source: PreparedPatientDocument;
-    values: typeof patients.$inferInsert; duplicates: string; port: PatientDocumentSourcePort;
+    values: typeof patients.$inferInsert; declaredIdentifierType: PatientIdentifierType | undefined;
+    duplicates: string; port: PatientDocumentSourcePort;
 }>;
 export class PatientDocumentDuplicateReviewRequired extends Error {
     constructor() { super('Possible duplicate: review the separate creation choice'); }
@@ -71,13 +79,17 @@ function snapshot(port: PatientDocumentSourcePort, tx: Tx, host: PatientDocument
         type: source.type, size: source.size, identity: source.identity, quality: source.quality,
         candidates: Object.freeze(candidates) });
 }
-function reviewed(source: PreparedPatientDocument, value: PatientDocumentCreateReview, id: string) {
-    if (!value || Object.keys(value).some(key => !['firstName', 'lastName', 'taxCode', 'birthDate', 'duplicate'].includes(key))
+function reviewed(source: PreparedPatientDocument, value: PatientDocumentCreateReview, id: string, surface: PatientDocumentCreateHost['surface']) {
+    if (!value || typeof value !== 'object' || Object.keys(value).some(key => !['firstName', 'lastName', 'taxCode', 'birthDate', 'duplicate', 'identifierType', 'birthYear'].includes(key))
         || !['none', 'create-separate'].includes(value.duplicate) || source.quality === 'ocr_error') return deny();
-    const body: Record<string, string> = {};
+    const declared = 'identifierType' in value;
+    if ((declared && (surface !== 'web' || value.identifierType === undefined))
+        || ('birthYear' in value && (!declared || !Number.isInteger(value.birthYear) || 'birthDate' in value))
+        || (value.identifierType === 'none' && 'taxCode' in value)) return deny();
+    const body: Record<string, unknown> = declared ? { identifierType: value.identifierType, birthYear: value.birthYear } : {};
     for (const key of ['firstName', 'lastName', 'taxCode', 'birthDate'] as const) {
         const field = value[key];
-        if (field === undefined && key === 'birthDate') continue;
+        if (field === undefined && (key === 'birthDate' || (key === 'taxCode' && value.identifierType === 'none'))) continue;
         if (!field || Object.keys(field).sort().join(',') !== 'action,value' || !['approve', 'correct'].includes(field.action)
             || typeof field.value !== 'string' || !field.value.trim() || field.value.length > 256
             || field.value !== field.value.trim() || /[\u0000-\u001f]/u.test(field.value)
@@ -86,17 +98,21 @@ function reviewed(source: PreparedPatientDocument, value: PatientDocumentCreateR
             || (source.quality === 'uncertain' && field.action !== 'correct')) return deny();
         body[key] = field.value;
     }
-    if (body.birthDate && (!/^\d{4}-\d{2}-\d{2}$/u.test(body.birthDate)
-        || !Number.isFinite(Date.parse(body.birthDate)) || new Date(body.birthDate).toISOString().slice(0, 10) !== body.birthDate)) return deny();
+    const birthDate = value.birthDate?.value;
+    if (birthDate && (!/^\d{4}-\d{2}-\d{2}$/u.test(birthDate)
+        || !Number.isFinite(Date.parse(birthDate)) || new Date(birthDate).toISOString().slice(0, 10) !== birthDate)) return deny();
     const normalized = normalizePatientCreateInput(body, { id: () => id });
     if (!normalized.ok) return deny();
     return Object.freeze(normalized.values);
 }
-function duplicateSet(tx: Tx, values: typeof patients.$inferInsert): string {
+function duplicateSet(tx: Tx, values: typeof patients.$inferInsert, declaredIdentifierType: PatientIdentifierType | undefined): string {
     const name = (value: string) => value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('it-IT');
-    const taxCode = values.taxCode.trim().toUpperCase();
-    return tx.select({ id: patients.id, firstName: patients.firstName, lastName: patients.lastName, taxCode: patients.taxCode }).from(patients).where(activePatients()).all()
-        .filter(row => row.taxCode.trim().toUpperCase() === taxCode
+    const normalizeIdentifier = (value: string) => normalizeIdentifierValue(declaredIdentifierType ?? 'cf', value);
+    const taxCode = normalizeIdentifier(values.taxCode);
+    return tx.select({ id: patients.id, firstName: patients.firstName, lastName: patients.lastName, taxCode: patients.taxCode,
+        identifierType: patients.identifierType }).from(patients).where(activePatients()).all()
+        .filter(row => (taxCode !== '' && (declaredIdentifierType === undefined || row.identifierType === declaredIdentifierType)
+            && normalizeIdentifier(row.taxCode) === taxCode)
             || (name(row.firstName) === name(values.firstName) && name(row.lastName) === name(values.lastName)))
         .map(row => row.id).sort().join(',');
 }
@@ -144,7 +160,9 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
             redactedMetadata: { patientDocumentCreate: { commandId, archiveGeneration: host.archiveGeneration,
                 ambulatoryId: host.ambulatoryId, patientId: command?.patientId ?? null, sourceId: command?.source.sourceId ?? null,
                 ...(host.pairedClientId ? { pairedClientId: host.pairedClientId } : {}) },
-            changedFields: command ? ['firstName', 'lastName', 'taxCode', ...(command.values.birthDate ? ['birthDate'] : [])] : undefined },
+            changedFields: command ? ['firstName', 'lastName', 'identifierType', 'taxCode',
+                ...(command.values.birthDate ? ['birthDate', 'birthDatePrecision'] : []),
+                ...(command.values.birthYear != null ? ['birthYear', 'birthDatePrecision'] : [])] : undefined },
         });
     }
     function issuedTo(tx: Tx, host: PatientDocumentCreateHost, commandId: string) {
@@ -191,14 +209,18 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
         preview(host: PatientDocumentCreateHost, viewId: string, review: PatientDocumentCreateReview) {
             const view = views.get(viewId);
             if (!view) return deny();
-            const patientId = randomUUID(), values = reviewed(view.source, review, patientId);
+            const patientId = randomUUID(), values = reviewed(view.source, review, patientId, host.surface);
+            const declaredIdentifierType = review.identifierType;
             const command = database.transaction(tx => {
                 admit(tx, host);
                 if (receipt(tx, host, view.commandId).outcome !== 'unknown' || JSON.stringify(snapshot(view.port, tx, host)) !== JSON.stringify(view.source)) return deny();
-                const duplicates = duplicateSet(tx, values);
+                if (declaredIdentifierType !== undefined && hasPatientIdentifierConflict(tx, { ...values, identifierType: declaredIdentifierType, ambulatoryId: host.ambulatoryId })) {
+                    throw new PatientIdentifierConflictError();
+                }
+                const duplicates = duplicateSet(tx, values, declaredIdentifierType);
                 if (Boolean(duplicates) !== (review.duplicate === 'create-separate')) throw new PatientDocumentDuplicateReviewRequired();
                 admit(tx, host);
-                return Object.freeze({ commandId: view.commandId, patientId, source: view.source, values, duplicates, port: view.port });
+                return Object.freeze({ commandId: view.commandId, patientId, source: view.source, values, declaredIdentifierType, duplicates, port: view.port });
             }, { behavior: 'immediate' });
             approvals.preview(viewId, binding(host, view.source.sourceId), view.commandId, command, () => {});
             views.delete(viewId);
@@ -220,7 +242,7 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
                     approvals.check(preview);
                     const command = preview.command;
                     if (preview.selection !== host.epoch || JSON.stringify(snapshot(command.port, tx, host)) !== JSON.stringify(command.source)
-                        || duplicateSet(tx, command.values) !== command.duplicates) return deny();
+                        || duplicateSet(tx, command.values, command.declaredIdentifierType) !== command.duplicates) return deny();
                     const used = tx.select({ id: auditEvents.eventId }).from(auditEvents).where(sql`json_extract(${auditEvents.redactedMetadata}, '$.patientDocumentCreate.sourceId') = ${command.source.sourceId}`).get();
                     if (used) return deny();
                     if (hasPatientIdentifierConflict(tx, { ...command.values, identifierType: command.values.identifierType ?? 'cf', ambulatoryId: host.ambulatoryId })) return deny();

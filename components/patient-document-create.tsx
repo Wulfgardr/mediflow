@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
 import { FileUp } from 'lucide-react';
 import { db } from '@/lib/db';
 import { useToast } from '@/components/ui/toast-provider';
@@ -18,7 +18,9 @@ import {
     type PatientDocumentView,
 } from '@/lib/patient-document-create-client';
 import { OCR_MIN_SHORT_SIDE_PIXELS } from '@/lib/patient-document-image-geometry';
+import { birthError, identifierError, IDENTIFIER_LABELS, IDENTIFIER_TYPES, PATIENT_IDENTIFIER_DUPLICATE, type PatientIdentifierType } from '@/lib/patient-identity';
 import type { DossierIdentityProposal } from '@/lib/domain/documents/dossier-sections';
+import type { PatientDocumentCreateReview } from '@/lib/patient-document-create-command';
 
 /** Dossier (ADR 0175): documento già scelto nel lotto e proposte d'identità con evidenza. */
 export type PatientDocumentDossierSource = Readonly<{
@@ -27,18 +29,19 @@ export type PatientDocumentDossierSource = Readonly<{
     onCreated: (created: { patientId: string; attachmentId: string }) => void;
 }>;
 
-type Fields = { firstName: string; lastName: string; taxCode: string; birthDate: string };
+type Fields = { firstName: string; lastName: string; identifierType: PatientIdentifierType; taxCode: string; birthDate: string; estimatedBirth: boolean; birthYear: string };
+type Duplicate = 'possible' | 'identifier' | null;
 type Source = { fileName: string; size: number; converted: boolean; reduction: number };
 type Phase =
     | { kind: 'idle'; notice?: { tone: 'info' | 'critical'; text: string } }
     | { kind: 'reading'; fileName: string }
-    | { kind: 'review'; view: PatientDocumentView; source: Source; markerKept: boolean; duplicate: boolean }
-    | { kind: 'confirm'; view: PatientDocumentView; source: Source; markerKept: boolean; duplicate: boolean }
+    | { kind: 'review'; view: PatientDocumentView; source: Source; markerKept: boolean; duplicate: Duplicate }
+    | { kind: 'confirm'; view: PatientDocumentView; source: Source; markerKept: boolean; duplicate: Duplicate }
     | { kind: 'sending'; commandId: string }
     | { kind: 'applied'; patientId: string; verified: 'matched' | 'opened' | 'failed'; commandId: string }
     | { kind: 'uncertain'; commandId: string; text: string; forgettable?: boolean };
 
-const EMPTY: Fields = { firstName: '', lastName: '', taxCode: '', birthDate: '' };
+const EMPTY: Fields = { firstName: '', lastName: '', identifierType: 'cf', taxCode: '', birthDate: '', estimatedBirth: false, birthYear: '' };
 const UNCERTAIN = 'Esito da verificare. Non ripetere la creazione: rileggi l’esito oppure ritira la lavorazione.';
 const RETIRED = 'Lavorazione ritirata. Nessuna scheda creata.';
 const EXPIRED = 'La revisione non è più valida: la lavorazione scade dopo cinque minuti o al cambio di sessione o ambulatorio.';
@@ -61,9 +64,12 @@ function stageRefusal(status: number, code: unknown, detail: unknown, converted:
 }
 
 function fieldError(fields: Fields): string | null {
-    if (!fields.firstName.trim() || !fields.lastName.trim() || !fields.taxCode.trim()) return 'Inserisci nome, cognome e codice fiscale.';
-    if (fields.birthDate && !/^\d{4}-\d{2}-\d{2}$/u.test(fields.birthDate)) return 'La data di nascita deve avere il formato AAAA-MM-GG.';
-    return null;
+    if (!fields.firstName.trim() || !fields.lastName.trim()) return 'Inserisci nome e cognome.';
+    return identifierError(fields.identifierType, fields.taxCode) ?? birthError({
+        identifierType: fields.identifierType, birthDate: fields.birthDate,
+        birthDatePrecision: fields.estimatedBirth ? 'estimated' : fields.birthDate ? 'exact' : 'unknown',
+        birthYear: fields.birthYear ? Number(fields.birthYear) : null,
+    });
 }
 
 /** Creates a patient from one document through the shared command: local extraction, field-by-field
@@ -167,7 +173,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
             const view = response.body as PatientDocumentView | null;
             if (response.status === 200 && view && typeof view.commandId === 'string' && typeof view.viewId === 'string' && typeof view.text === 'string') {
                 const markerKept = patientDocumentMarker.write(stageScope, view.commandId);
-                setPhase({ kind: 'review', view, source: { fileName: prepared.fileName, size: prepared.bytes.length, converted: prepared.converted, reduction: prepared.reduction }, markerKept, duplicate: false });
+                setPhase({ kind: 'review', view, source: { fileName: prepared.fileName, size: prepared.bytes.length, converted: prepared.converted, reduction: prepared.reduction }, markerKept, duplicate: null });
                 return;
             }
             restart();
@@ -199,7 +205,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
             const receipt = response.status === 200 ? parsePatientDocumentReceipt(response.body) : null;
             if (receipt?.outcome === 'unknown') {
                 if (work.current.epoch !== token.epoch) return;
-                setPhase({ kind: 'uncertain', commandId, forgettable: true, text: 'Questa sessione non può leggere né ritirare la lavorazione: può appartenere a un altro operatore o a un altro ambulatorio, oppure il server è stato riavviato. Non è possibile dire da qui se la scheda è stata creata. Per verificarlo, nell’ambulatorio e con l’operatore che l’hanno avviata cerca nell’elenco pazienti il nome e il codice fiscale inseriti.' });
+                setPhase({ kind: 'uncertain', commandId, forgettable: true, text: 'Questa sessione non può leggere né ritirare la lavorazione. Per verificare se la scheda è stata creata, cerca nome e cognome nell’elenco pazienti dell’ambulatorio in cui hai avviato la lavorazione.' });
                 return;
             }
             if (receipt?.outcome === 'retired') showToast({ tone: 'info', title: RETIRED });
@@ -207,20 +213,35 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
         } catch { await settle(null, commandId, token); }
     }
 
-    async function submit(event: FormEvent, view: PatientDocumentView) {
-        event.preventDefault();
-        const token = work.current, commandId = view.commandId;
+    function changeFields(changes: Partial<Fields>) {
+        setFields((value) => ({ ...value, ...changes }));
+        if (phase.kind === 'review' && phase.duplicate) {
+            setSeparate(false);
+            setPhase({ ...phase, duplicate: null });
+        }
+    }
+
+    async function submit(back: Extract<Phase, { kind: 'confirm' }>) {
+        const token = work.current, { commandId, viewId } = back.view;
         const entered = (value: string) => ({ action: 'correct' as const, value: value.trim() });
-        const body = { firstName: entered(fields.firstName), lastName: entered(fields.lastName), taxCode: entered(fields.taxCode.toUpperCase()),
-            ...(fields.birthDate ? { birthDate: entered(fields.birthDate) } : {}), duplicate: separate ? 'create-separate' : 'none' };
-        const back = phase.kind === 'confirm' ? phase : null;
+        const common = { firstName: entered(fields.firstName), lastName: entered(fields.lastName), duplicate: separate ? 'create-separate' as const : 'none' as const };
+        const birth = fields.estimatedBirth ? { birthYear: Number(fields.birthYear) }
+            : fields.birthDate ? { birthDate: entered(fields.birthDate) } : null;
+        const identifierType = fields.identifierType;
+        const review: PatientDocumentCreateReview | null = identifierType === 'none'
+            ? birth && { ...common, identifierType, ...birth }
+            : { ...common, identifierType, taxCode: entered(fields.taxCode), ...birth };
+        if (!review) return;
         setPhase({ kind: 'sending', commandId });
         try {
-            const previewed = await requestPatientDocument({ operation: 'preview', commandId, viewId: view.viewId, review: body }, token.controller.signal);
+            const previewed = await requestPatientDocument({ operation: 'preview', commandId, viewId, review }, token.controller.signal);
             if (!current(token)) return;
-            if (previewed.status === 409 && previewed.body?.status === 'duplicate-review-required' && back) {
+            const duplicate = previewed.body?.code === PATIENT_IDENTIFIER_DUPLICATE.code ? 'identifier'
+                : previewed.body?.status === 'duplicate-review-required' ? 'possible' : null;
+            if (previewed.status === 409 && duplicate) {
                 setPin('');
-                setPhase({ ...back, kind: 'review', duplicate: true });
+                setSeparate(false);
+                setPhase({ ...back, kind: 'review', duplicate });
                 return;
             }
             if (previewed.status !== 200) { setPin(''); await readReceipt(commandId, token, EXPIRED); return; }
@@ -254,6 +275,9 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
 
     const sourceLine = (source: Source) => `${source.fileName}, ${(source.size / 1024).toLocaleString('it-IT', { maximumFractionDigits: 0 })} KiB${source.converted
         ? `, immagine allegata come PDF di una pagina${source.reduction < 1 ? `, ridotta al ${Math.round(source.reduction * 100)}% per l’estrazione locale` : ''}` : ''}`;
+    const identityError = fieldError(fields);
+    const canConfirm = (phase.kind === 'review' || phase.kind === 'confirm') && phase.markerKept && !identityError
+        && (phase.duplicate === null || (phase.duplicate === 'possible' && separate));
 
     return (
         <div className="space-y-5" data-testid="patient-document-create">
@@ -299,9 +323,10 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
 
             {(phase.kind === 'review' || phase.kind === 'confirm') && (
                 <form className="space-y-5" onSubmit={(event) => {
-                    if (phase.kind === 'confirm') { void submit(event, phase.view); return; }
                     event.preventDefault();
-                    if (!fieldError(fields)) setPhase({ ...phase, kind: 'confirm' });
+                    if (!canConfirm) return;
+                    if (phase.kind === 'confirm') { void submit(phase); return; }
+                    setPhase({ ...phase, kind: 'confirm' });
                 }}>
                     <div className="mf-alert mf-alert-warning">
                         <h3 ref={heading} tabIndex={-1} className="font-semibold">{phase.kind === 'review' ? 'Revisione dei dati' : 'Conferma della creazione'}</h3>
@@ -315,11 +340,12 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
                             Il browser non ha conservato il riferimento della lavorazione: senza riferimento una risposta persa non sarebbe recuperabile. Conferma bloccata; puoi solo annullare.
                         </div>
                     )}
-                    {phase.duplicate && (
+                    {phase.duplicate === 'possible' && (
                         <div className="mf-alert mf-alert-warning" role="alert">
-                            Esiste già una scheda con lo stesso codice fiscale o lo stesso nome e cognome. Verifica l’identità: se è una persona diversa, scegli di creare una scheda separata. Le schede non vengono unite.
+                            Esiste già una scheda con lo stesso identificativo o con lo stesso nome e cognome. Verifica che si tratti di un’altra persona prima di creare una scheda separata.
                         </div>
                     )}
+                    {phase.duplicate === 'identifier' && <div className="mf-alert mf-alert-warning" role="alert">{PATIENT_IDENTIFIER_DUPLICATE.error}</div>}
                     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                         <section aria-labelledby="patient-document-create-text" className="space-y-2 min-w-0">
                             <h4 id="patient-document-create-text" className="mf-eyebrow">Testo estratto</h4>
@@ -336,7 +362,9 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
                                         <li key={`${proposal.field}-${proposal.value}`} className="flex flex-wrap items-center gap-2 text-sm">
                                             <span>{proposal.excerpt}</span>
                                             <button type="button" className="mf-button-secondary"
-                                                onClick={() => setFields((value) => ({ ...value, [proposal.field]: proposal.value }))}>
+                                                onClick={() => changeFields(proposal.field === 'taxCode' ? { identifierType: 'cf', taxCode: proposal.value }
+                                                    : proposal.field === 'birthDate' ? { birthDate: proposal.value, birthYear: '', estimatedBirth: false }
+                                                        : { [proposal.field]: proposal.value })}>
                                                 Usa per {proposal.field === 'taxCode' ? 'codice fiscale' : proposal.field === 'firstName' ? 'nome' : proposal.field === 'lastName' ? 'cognome' : 'data di nascita'}
                                             </button>
                                         </li>))}</ul>
@@ -344,27 +372,49 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
                             {([
                                 ['firstName', 'Nome', 'given-name'],
                                 ['lastName', 'Cognome', 'family-name'],
-                                ['taxCode', 'Codice fiscale', 'off'],
-                                ['birthDate', 'Data di nascita (facoltativa)', 'off'],
                             ] as const).map(([key, label, autoComplete]) => (
                                 <div key={key} className="space-y-1">
                                     <label htmlFor={`patient-document-${key}`} className="mf-field-label">{label}</label>
-                                    <input id={`patient-document-${key}`} className="mf-input" type={key === 'birthDate' ? 'date' : 'text'} autoComplete={autoComplete}
-                                        value={fields[key]} required={key !== 'birthDate'} maxLength={256}
-                                        onChange={(event) => {
-                                            setFields((value) => ({ ...value, [key]: event.target.value }));
-                                            // A changed identity is checked again: the earlier duplicate and separate choice no longer apply.
-                                            if (key !== 'birthDate' && phase.kind === 'review' && phase.duplicate) { setSeparate(false); setPhase({ ...phase, duplicate: false }); }
-                                        }} />
+                                    <input id={`patient-document-${key}`} className="mf-input" autoComplete={autoComplete}
+                                        value={fields[key]} required maxLength={256} onChange={(event) => changeFields({ [key]: event.target.value })} />
                                 </div>
                             ))}
-                            {phase.duplicate && (
+                            <div className="space-y-1">
+                                <label htmlFor="patient-document-identifierType" className="mf-field-label">Identificativo</label>
+                                <select id="patient-document-identifierType" className="mf-input" value={fields.identifierType}
+                                    onChange={(event) => changeFields({ identifierType: event.target.value as PatientIdentifierType, taxCode: '' })}>
+                                    {IDENTIFIER_TYPES.map(type => <option key={type} value={type}>{type === 'none' ? 'La persona non ha un identificativo' : IDENTIFIER_LABELS[type]}</option>)}
+                                </select>
+                            </div>
+                            {fields.identifierType !== 'none' && <div className="space-y-1">
+                                <label htmlFor="patient-document-taxCode" className="mf-field-label">{IDENTIFIER_LABELS[fields.identifierType]}</label>
+                                <input id="patient-document-taxCode" className="mf-input" autoComplete="off" value={fields.taxCode} required
+                                    maxLength={['cf', 'stp', 'eni'].includes(fields.identifierType) ? 16 : 128}
+                                    onChange={(event) => changeFields({ taxCode: event.target.value })} />
+                            </div>}
+                            <div className="space-y-1">
+                                {fields.estimatedBirth ? <>
+                                    <label htmlFor="patient-document-birthYear" className="mf-field-label">Anno di nascita stimato</label>
+                                    <input id="patient-document-birthYear" className="mf-input" type="number" inputMode="numeric" value={fields.birthYear} required
+                                        onChange={(event) => changeFields({ birthYear: event.target.value })} />
+                                </> : <>
+                                    <label htmlFor="patient-document-birthDate" className="mf-field-label">Data di nascita</label>
+                                    <input id="patient-document-birthDate" className="mf-input" type="date" value={fields.birthDate}
+                                        onChange={(event) => changeFields({ birthDate: event.target.value })} />
+                                </>}
+                                <label className="flex items-start gap-2 text-sm">
+                                    <input type="checkbox" checked={fields.estimatedBirth} className="mt-1"
+                                        onChange={(event) => changeFields({ estimatedBirth: event.target.checked, birthDate: '', birthYear: '' })} />
+                                    <span>Conosco solo l’anno di nascita</span>
+                                </label>
+                            </div>
+                            {phase.duplicate === 'possible' && (
                                 <label className="flex items-start gap-2 text-sm">
                                     <input type="checkbox" checked={separate} onChange={(event) => setSeparate(event.target.checked)} className="mt-1" />
                                     <span>Crea una scheda separata: è una persona diversa da quella già presente.</span>
                                 </label>
                             )}
-                            {phase.kind === 'review' && fieldError(fields) && <p className="mf-field-helper">{fieldError(fields)}</p>}
+                            {phase.kind === 'review' && identityError && <p className="mf-field-helper">{identityError}</p>}
                         </fieldset>
                     </div>
 
@@ -380,10 +430,10 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
                     )}
 
                     <div className="flex flex-wrap gap-3">
-                        {phase.kind === 'review' && <button type="submit" className="mf-button-primary" disabled={!!fieldError(fields) || !phase.markerKept}>Prosegui alla conferma</button>}
+                        {phase.kind === 'review' && <button type="submit" className="mf-button-primary" disabled={!canConfirm}>Prosegui alla conferma</button>}
                         {phase.kind === 'confirm' && <button type="submit" className="mf-button-primary" disabled={pin.length < 4}>Conferma creazione con PIN</button>}
                         {phase.kind === 'confirm' && <button type="button" className="mf-button-secondary" onClick={() => { setPin(''); setPhase({ ...phase, kind: 'review' }); }}>Torna alla revisione</button>}
-                        <button type="button" className="mf-button-text" onClick={() => void withdraw(phase.view.commandId, Object.values(fields).some(Boolean))}>Annulla e ritira</button>
+                        <button type="button" className="mf-button-text" onClick={() => void withdraw(phase.view.commandId, fields !== EMPTY)}>Annulla e ritira</button>
                     </div>
                 </form>
             )}
