@@ -125,19 +125,29 @@ export async function completeOnboardingIfNeeded(page: Page, pin: string): Promi
   await page.reload();
 }
 
+export async function renewAccessIfNeeded(page: Page, credential: Locator): Promise<void> {
+  const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
+  if (!await renew.isVisible()) return;
+  const noPeer = page.getByText('Apri una scheda già sbloccata oppure blocca tutte le schede per accedere di nuovo.', { exact: true });
+  if (await renew.isEnabled() && !await noPeer.isVisible()) {
+    try { await renew.click({ timeout: 1000 }); }
+    catch (error) {
+      if (await renew.isVisible()) throw error;
+      return;
+    }
+  }
+  await expect.poll(async () => !await credential.isVisible() || await credential.isEnabled() || await noPeer.isVisible()).toBe(true);
+  if (await noPeer.isVisible()) await page.getByRole('button', { name: 'Blocca tutte le schede', exact: true }).click();
+}
+
 export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   const lockHeading = page.getByRole('heading', { name: 'Sblocca MediFlow' });
   if (!(await isVisible(lockHeading))) return;
 
   const pinInput = page.getByLabel('PIN operatore').first();
   const unlockButton = page.getByRole('button', { name: /Sblocca/ }).first();
-
-  const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
-  if (await renew.isVisible()) {
-    try { await renew.click({ timeout: 1000 }); }
-    catch (error) { if (await renew.isVisible()) throw error; }
-  }
-  if (await hasStableUnlockedShell(page)) return;
+  await renewAccessIfNeeded(page, pinInput);
+  if (!await lockHeading.isVisible() || await hasStableUnlockedShell(page)) return;
   await expect(pinInput).toBeEnabled();
   await pinInput.fill(pin);
   await expect(pinInput).toHaveValue(pin);

@@ -250,6 +250,7 @@ test('entry survives disclosure, cross-tab layout change and cancelled navigatio
     await expect(page.locator('html')).toHaveAttribute('data-twin-composition', 'workbench');
     await expect(editor).toContainText(draft);
     await sibling.reload();
+    await unlockIfNeeded(sibling, pin);
     await expect(sibling.getByRole('radio', { name: 'Barra laterale', exact: true })).toBeChecked();
     await noComparison(sibling);
   } finally { await sibling.close(); }
