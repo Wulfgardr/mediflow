@@ -68,3 +68,41 @@ test('Analisi: dopo la scelta, lo scorrimento restituisce l’indice alla posizi
   await page.mouse.wheel(0, -4000);
   await expect(index(page).locator('[aria-current]')).toHaveText([/^Popolazione/u]);
 });
+
+for (const action of ['Indietro', 'Apri in nuova scheda'] as const) {
+  test(`Analisi: ${action} conserva la posizione quando arriva il conteggio audit`, async ({ page }) => {
+    let releaseAudit = () => {};
+    const auditHeld = new Promise<void>(resolve => { releaseAudit = resolve; });
+    await page.route('**/api/system/audit?**', async route => { await auditHeld; await route.continue(); });
+    try {
+      await page.goto('/analytics');
+      await unlockIfNeeded(page, pin);
+      const auditLink = index(page).getByRole('link', { name: 'Audit', exact: true });
+      const population = index(page).getByRole('link', { name: 'Popolazione', exact: true });
+      await expect(population).toHaveAttribute('aria-current', 'location');
+      await expect(page.locator('#audit')).toBeAttached();
+      if (action === 'Indietro') {
+        await auditLink.click();
+        await expectArrival(page, destinations[3]);
+        await Promise.all([
+          page.evaluate(() => new Promise<void>(resolve => window.addEventListener('hashchange', () => resolve(), { once: true }))),
+          page.goBack(),
+        ]);
+        await page.locator('#domanda').evaluate(element => element.scrollIntoView({ block: 'start' }));
+      } else {
+        const [otherTab] = await Promise.all([
+          page.context().waitForEvent('page'),
+          auditLink.click({ modifiers: ['ControlOrMeta'] }),
+        ]);
+        await otherTab.close();
+      }
+      await expect(page).toHaveURL(/\/analytics$/u);
+      releaseAudit();
+      await expect(page.locator('#audit').getByText('Eventi locali registrati', { exact: true })).toBeVisible();
+      await expect(population).toHaveAttribute('aria-current', 'location');
+      await expect(page.getByRole('heading', { name: 'Schede attive nel filtro', exact: true })).toBeInViewport();
+    } finally {
+      releaseAudit();
+    }
+  });
+}

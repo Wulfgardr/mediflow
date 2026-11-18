@@ -60,6 +60,15 @@ type Kree8WorkspaceShellProps = {
   children: ReactNode;
 };
 
+function samePageLinkHash(event: MouseEvent): string | null {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return null;
+  const link = event.target instanceof Element ? event.target.closest('a') : null;
+  if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download')) return null;
+  const url = new URL(link.href, window.location.href);
+  if (url.origin !== window.location.origin || url.pathname !== window.location.pathname || url.search !== window.location.search) return null;
+  return url.hash;
+}
+
 export function Kree8WorkspaceShell({
   variant = 'default',
   writing = false,
@@ -181,11 +190,8 @@ export function Kree8WorkspaceShell({
     const selectFromHash = () => select(window.location.hash);
     // Reopening a closed disclosure must also work when the URL hash is unchanged.
     const selectFromLink = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      const link = event.target instanceof Element ? event.target.closest('a') : null;
-      if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
-      const url = new URL(link.href, window.location.href);
-      if (url.origin === window.location.origin && url.pathname === window.location.pathname && url.search === window.location.search) select(url.hash);
+      const hash = samePageLinkHash(event);
+      if (hash) select(hash);
     };
     selectFromHash();
     window.addEventListener('hashchange', selectFromHash);
@@ -343,17 +349,19 @@ export function Kree8WorkspaceShell({
       holdsChosenPosition = true;
       return true;
     };
+    const releaseChosenDestination = () => { chosenHref = null; holdsChosenPosition = false; };
     const onHashChange = () => {
-      if (chooseDestination(window.location.hash)) pickActive();
+      if (!followsChosenDestination) return;
+      if (!chooseDestination(window.location.hash)) {
+        arrivedHash = null;
+        releaseChosenDestination();
+      }
+      pickActive();
     };
     const onDestinationClick = (event: MouseEvent) => {
-      const link = event.target instanceof Element ? event.target.closest('a') : null;
-      if (!link || event.defaultPrevented) return;
-      const url = new URL(link.href, window.location.href);
-      if (url.pathname !== window.location.pathname || url.search !== window.location.search) return;
-      if (chooseDestination(url.hash)) requestAnimationFrame(() => { if (!cancelled) pickActive(); });
+      const hash = samePageLinkHash(event);
+      if (hash && chooseDestination(hash)) requestAnimationFrame(() => { if (!cancelled) pickActive(); });
     };
-    const releaseChosenDestination = () => { chosenHref = null; holdsChosenPosition = false; };
     const onKey = (event: KeyboardEvent) => {
       holdsChosenPosition = false;
       if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) releaseChosenDestination();
