@@ -37,6 +37,7 @@
     "chat-checkup-booking": "C-9b: paired native checkup booking preview/authorization/receipt boundary. Admission, CAS and receipt run as the commit guard of the shared createCheckupOperation IMMEDIATE transaction; the receipt is its required audit row. No independent SQLite connection, schema or clinical writer.",
     "native-patient-document": "ADR0042: named native document intake composition injects the existing Node handle into the common patient creation command and its readback. No driver, new connection, generic writer or agent source locator.",
     "web-patient-document": "ADR0042: local Web document intake composition injects the existing Node handle into the same patient creation command, intake and readback used by the native route, and reads the selected or default ambulatory as the existing create flow does. No driver, new connection or writer.",
+    "agent-registration-host": "ADR0190: PIN-approved client registration, Web unlock, and loopback mandate retrieval use scoped agent authority.",
     "agent-mandate-host": "ADR0190: trusted Web mandate creation and manual-lock revocation. Existing SQL authority, no agent clinical commit or key disclosure.",
     "agent-pairing-host": "ADR0190: loopback pairing transport and trusted Web approval use the existing admitted SQL handle. Opaque scoped credentials, no clinical cleartext or external SQLite access.",
     "agent-cassette-host": "ADR0190: loopback authenticated agent deposits only ciphertext in the caller IMMEDIATE; trusted Web admin reads encrypted cassettes and wrapped keys for browser-only review. No clinical writer or private key opening on the server.",
@@ -1908,6 +1909,39 @@
       ],
       "count": 1,
       "classification": "agent-mandate-host"
+    },
+    {
+      "file": "app/api/agent-mandates/registrations/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "agent-registration-host"
+    },
+    {
+      "file": "app/api/agent-mandates/unlock/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "agent-registration-host"
+    },
+    {
+      "file": "app/api/agent/v1/mandate/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "agent-registration-host"
     },
     {
       "file": "app/api/agent/v1/pairings/route.ts",

@@ -12,7 +12,7 @@ si eseguono dalla radice della repository.
 
 ## Collegare il client
 
-In MediFlow, sbloccare con la passphrase, aprire Impostazioni, Agenti e creare
+In MediFlow, sbloccare con la credenziale dell’account, aprire Impostazioni, Agenti e creare
 un mandato di dodici ore. Il PIN conferma il mandato, che indica operazioni,
 fornitore del modello e autorizzazione ad inviare dati clinici al fornitore.
 
@@ -27,7 +27,18 @@ e `code`. Confrontare il codice nella pagina Agenti ed approvarlo, poi eseguire:
 npm run agent:visita -- completa --richiesta UUID-DELLA-RICHIESTA
 ```
 
-Conservare `agentRef` dalla ricevuta. Il token rimane in un file privato 0600,
+Conservare `agentRef` dalla ricevuta. Dopo lo sblocco con PIN o passphrase, o dopo
+«Rinnova accesso» riuscito, il client registrato può ritirare il mandato di 12 ore. Il blocco, la scadenza
+della sessione o la revoca in Agenti interrompono l’accesso.
+
+```sh
+npm run agent:visita -- ritira --agente UUID-AGENTE
+```
+
+`deposita` ritira il mandato da sé se quello in uso è scaduto o il server lo
+rifiuta. In MCP, il comando esplicito è `mediflow_ritira_mandato`.
+
+Il token rimane in un file privato 0600,
 fuori dalle cartelle sincronizzate. Il client usa soltanto HTTP loopback,
 senza cookie, PIN o accesso diretto al database. La scadenza del token non
 supera quella del mandato. Revoca e blocco manuale impediscono nuovi depositi.
@@ -61,7 +72,7 @@ Cambiare file o identità richiede una nuova visita, anziché riusare il suo UUI
 Il client rifiuta file SQLite, link simbolici e PDF con hash diversi.
 
 La ricevuta `closed` conferma che la visita è stata depositata nella cassetta
-cifrata. Dopo lo sblocco con passphrase, MediFlow controlla le visite in attesa
+cifrata. Quando la scheda è sbloccata, MediFlow controlla le visite in attesa
 e inserisce nota, trascrizione e PDF con codice fiscale coincidente con la scheda.
 I CF discordanti, mancanti o ambigui bloccano l’applicazione automatica.
 
@@ -76,6 +87,6 @@ npm run agent:mcp -- --credenziali /percorso/privato
 ```
 
 Il processo comunica su standard input/output. Espone `mediflow_collega`,
-`mediflow_completa_collegamento`, `mediflow_deposita_visita` e
+`mediflow_completa_collegamento`, `mediflow_ritira_mandato`, `mediflow_deposita_visita` e
 `mediflow_riprendi_visita`. CLI e MCP chiamano lo stesso client, con gli stessi
 permessi e ricevute. Standard output contiene soltanto il protocollo MCP.

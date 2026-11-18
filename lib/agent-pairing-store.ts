@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import type Database from 'better-sqlite3';
 import { AGENT_OPERATIONS, type AgentOperation } from './agent-mandate-contract';
 import { AgentMandateDenied, createAgentMandateStore } from './agent-mandate-store';
+import { createAgentRegistrationStore } from './agent-registration-store';
 import { readSqliteArchiveGeneration } from './archive-generation';
 
 export type AgentPairingRequest = { id: string; code: string; name: string; operations: AgentOperation[]; createdAt: number; expiresAt: number;
@@ -44,7 +45,7 @@ export function createAgentPairingStore(database: Database.Database, now = Date.
         pending() {
             return database.prepare(`SELECT ${requestProjection} FROM agent_pairing_requests WHERE status='pending' AND expires_at>? ORDER BY created_at`).all(now()).map(row => requestFrom(row)!);
         },
-        approve(id: string, code: string, mandateRef: string, actorRef: string, generation: string) {
+        approve(id: string, code: string, mandateRef: string, actorRef: string, generation: string, renewOnUnlock = false) {
             return database.transaction(() => {
                 const request = requestFrom(database.prepare(`SELECT ${requestProjection} FROM agent_pairing_requests WHERE id=?`).get(id));
                 if (!request || request.status !== 'pending' || request.code !== code || request.expiresAt <= now()
@@ -53,7 +54,8 @@ export function createAgentPairingStore(database: Database.Database, now = Date.
                 if (mandate.actorRef !== actorRef || !request.operations.every(operation => mandate.operations.includes(operation))) throw new AgentMandateDenied();
                 const approved = database.prepare("UPDATE agent_pairing_requests SET status='approved',mandate_ref=? WHERE id=? AND status='pending'").run(mandate.id, request.id);
                 if (approved.changes !== 1) throw new AgentMandateDenied();
-                audit(database, actorRef, request.id, 'agent.client.approved', now());
+                if (renewOnUnlock) createAgentRegistrationStore(database, now).register(request, mandate);
+                else audit(database, actorRef, request.id, 'agent.client.approved', now());
                 return { requestId: request.id, agentRef: request.id, mandateRef: mandate.id, status: 'approved' as const, expiresAt: mandate.expiresAt };
             }).immediate();
         },
@@ -65,6 +67,9 @@ export function createAgentPairingStore(database: Database.Database, now = Date.
                 if (!row || !request || !equalHash(row.claimHash, hash('mediflow.agent.claim.v1', claim))
                     || request.expiresAt <= now() || request.createdAt > now() || request.status === 'rejected') throw new AgentMandateDenied();
                 if (request.status !== 'approved' || !request.mandateRef) return { receipt: { requestId: request.id, status: 'pending' as const }, credential: null };
+                const registrationCredential = createAgentRegistrationStore(database, now).registrationCredential(request.id, claim);
+                if (registrationCredential) return { receipt: { requestId: request.id, agentRef: request.id, status: 'registered' as const },
+                    credential: null, registrationCredential };
                 const mandate = mandates.admit(request.mandateRef, request.operations[0]!);
                 const token = tokenFor(request.id, claim);
                 const existing = database.prepare('SELECT token_hash AS tokenHash,revoked_at AS revokedAt FROM agent_clients WHERE id=?').get(request.id) as { tokenHash: string; revokedAt: number | null } | undefined;

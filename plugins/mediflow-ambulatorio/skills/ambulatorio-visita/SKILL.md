@@ -9,7 +9,9 @@ Una chat per visita. Usa soltanto gli strumenti MCP `mediflow-visit-agent`. Ques
 
 ## Collega MediFlow
 
-A «Collega MediFlow» chiama `mediflow_collega`. Mostra il codice di otto caratteri. Chiedi al medico di confrontarlo e approvarlo in MediFlow, in Impostazioni → Agenti, e poi di scrivere «Fatto». A «Fatto» chiama `mediflow_completa_collegamento` usando il requestId ricevuto in questa chat. Se l'approvazione è ancora in attesa, chiedi di completarla dalla schermata Agenti. Il mandato per Codex deve dichiarare OpenAI e autorizzare il passaggio dei dati clinici. Alla scadenza o revoca, segui l'esito del server per riprendere il collegamento.
+A «Collega MediFlow» chiama `mediflow_collega`. Mostra il codice di otto caratteri. Chiedi al medico di confrontarlo in Impostazioni → Agenti, scegliere «Rinnova allo sblocco», approvare con il PIN e poi scrivere «Fatto». A «Fatto» chiama `mediflow_completa_collegamento` usando il requestId ricevuto in questa chat. Se l'approvazione è ancora in attesa, chiedi di completarla dalla schermata Agenti. Il mandato per Codex deve dichiarare OpenAI e autorizzare il passaggio dei dati clinici.
+
+Con esito `registered`, la registrazione è completa. Il primo mandato sarà disponibile dopo il successivo sblocco di MediFlow con PIN, passphrase o «Rinnova accesso». Il server ritira il mandato quando gli serve. Se il medico chiede di ritirarlo esplicitamente e hai l'`agentRef` della registrazione, usa `mediflow_ritira_mandato`. Se il server restituisce `AGENT_ACCESS_DENIED`, chiedi al medico di sbloccare MediFlow e riprova con la stessa visita. Se il diniego persiste, chiedi di verificare in Agenti se la registrazione è attiva. Usa «Collega MediFlow» solo quando manca una registrazione o il medico vuole registrarne una nuova.
 
 ## Visita e identità
 
@@ -36,6 +38,6 @@ Dichiara il Dossier pronto soltanto allo stato `verificato` con zero rifiuti. Se
 
 ## Fine visita
 
-A «Fine visita» verifica il CF e prepara il Dossier sulla stessa visita, se serve. Quando il Dossier è verificato chiama subito `mediflow_deposita_visita` con il visitId. Se il deposito si interrompe, ripeti sulla stessa visita. Per riprendere le buste già preparate puoi chiamare `mediflow_riprendi_visita`. Se il server restituisce `DOSSIER_DA_RIGENERARE`, rigenera il Dossier dal dettato originale e dalle correzioni sulla stessa visita prima di riprovare. In assenza di mandato attivo, usa l'esito del server per sapere se serve «Collega MediFlow».
+A «Fine visita» verifica il CF e prepara il Dossier sulla stessa visita, se serve. Quando il Dossier è verificato chiama subito `mediflow_deposita_visita` con il visitId. Se il deposito si interrompe, ripeti sulla stessa visita. Per riprendere le buste già preparate puoi chiamare `mediflow_riprendi_visita`. Se il server restituisce `DOSSIER_DA_RIGENERARE`, rigenera il Dossier dal dettato originale e dalle correzioni sulla stessa visita prima di riprovare. Se manca un mandato attivo, segui le indicazioni di «Collega MediFlow» per il diniego di accesso.
 
 Comunica il deposito soltanto se la ricevuta dice `closed`. Elenca le proposte riportate in `proposteInArrivo.elementi` e rimanda a «In arrivo» per verificarle e confermarle. La ricevuta riguarda la cassetta. MediFlow verifica l'identità prima di applicare nota, trascrizione e PDF. Nelle risposte usa soltanto le ultime quattro cifre del CF e segnala i dubbi clinici. Niente trattino lungo.

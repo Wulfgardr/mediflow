@@ -22,6 +22,6 @@ export async function GET(request: Request): Promise<Response> {
         const claim = /^Pairing ([A-Za-z0-9_-]{43})$/u.exec(request.headers.get('authorization') ?? '')?.[1];
         if (!id || !claim || [...url.searchParams.keys()].join(',') !== 'requestId') return reply({ code: 'PAIRING_DENIED' }, 401);
         const result = createAgentPairingStore(openDbServer()).poll(id, claim);
-        return reply(result, result.credential ? 200 : 202);
+        return reply(result, result.receipt.status === 'pending' ? 202 : 200);
     } catch (error) { return error instanceof AgentMandateDenied ? reply({ code: 'PAIRING_DENIED' }, 401) : agentChannelFailure(error); }
 }

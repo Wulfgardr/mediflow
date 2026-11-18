@@ -1,17 +1,19 @@
 import { defaultAgentCredentialDirectory } from './credentials';
-import { AgentClientError, completeAgentPairing, prepareAndDepositAgentVisit, requestAgentPairing, resumeAgentVisit } from './visit-client';
+import { AgentClientError, completeAgentPairing, prepareAndDepositAgentVisit, requestAgentPairing, resumeAgentVisit, retrieveAgentMandate } from './visit-client';
 import { AGENT_OPERATIONS, type AgentOperation } from '../../../lib/agent-mandate-contract';
 
 export type AgentCommand =
     | { command: 'collega'; origin: string; name: string; operations?: AgentOperation[] }
     | { command: 'completa'; requestId: string }
     | { command: 'deposita'; agentRef: string; extraction: string; fiscalCode: string; transcription?: string; visitId: string }
+    | { command: 'ritira'; agentRef: string }
     | { command: 'riprendi'; agentRef: string; visitId: string };
 export function executeAgentCommand(command: AgentCommand, directory = defaultAgentCredentialDirectory(), signal?: AbortSignal) {
     switch (command.command) {
         case 'collega': return requestAgentPairing(directory, command.origin, command.name, command.operations, signal);
         case 'completa': return completeAgentPairing(directory, command.requestId, signal);
         case 'deposita': return prepareAndDepositAgentVisit(directory, command.agentRef, command.extraction, command.fiscalCode, command.transcription, command.visitId, signal);
+        case 'ritira': return retrieveAgentMandate(directory, command.agentRef, signal);
         case 'riprendi': return resumeAgentVisit(directory, command.agentRef, command.visitId, signal);
     }
 }
@@ -38,6 +40,7 @@ export function parseAgentCommand(argv: string[]): { command: AgentCommand; dire
         }
         case 'completa': command = { command: 'completa', requestId: take('--richiesta')! }; break;
         case 'deposita': command = { command: 'deposita', agentRef: take('--agente')!, extraction: take('--estrazione')!, fiscalCode: take('--cf')!, visitId: take('--visita')!, transcription: take('--trascrizione', true) }; break;
+        case 'ritira': command = { command: 'ritira', agentRef: take('--agente')! }; break;
         case 'riprendi': command = { command: 'riprendi', agentRef: take('--agente')!, visitId: take('--visita')! }; break;
         default: throw new AgentClientError('AGENT_INPUT_INVALID');
     }

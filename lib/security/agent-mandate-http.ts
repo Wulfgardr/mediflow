@@ -10,6 +10,7 @@ import { readNativeNetworkJson } from '../native-network-json-body';
 type Sources = {
     session(): Promise<ServerSession | null>;
     verifyPin(username: string, pin: string): Promise<string | null>;
+    list?(actorRef: string): ReturnType<ReturnType<typeof createAgentMandateStore>['list']>;
     store(): ReturnType<typeof createAgentMandateStore>;
 };
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -27,7 +28,7 @@ export function createAgentMandateHttp(sources: Sources) {
         GET: async (request: Request): Promise<Response> => {
             try {
                 const session = await admitted(request, false);
-                return session ? reply(sources.store().list(session.userId)) : denied(401);
+                return session ? reply(sources.list ? sources.list(session.userId) : sources.store().list(session.userId)) : denied(401);
             } catch { return denied(503); }
         },
         POST: async (request: Request): Promise<Response> => {
