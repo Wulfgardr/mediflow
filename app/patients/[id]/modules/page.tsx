@@ -675,6 +675,7 @@ export default function PatientDetailPage() {
 
                 <PluginLocalUiNavigation key={id} patientId={id} patientVersion={patient.version} patientLabel={`${patient.firstName} ${patient.lastName}`} />
                 <PatientSynopticSheet
+                    zones
                     clinicalSupport={<>
                         <PatientProposalsSummary hasInsightProposal={hasInsightProposal}
                             hasSmartImportProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput}

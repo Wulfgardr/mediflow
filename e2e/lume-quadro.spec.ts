@@ -133,7 +133,13 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
   const diaryBox = await diary.boundingBox();
   expect(overview).not.toBeNull();
   expect(diaryBox).not.toBeNull();
-  if (page.viewportSize()!.width > 1000) {
+  const facts = await quadro.locator('[data-zone="facts"]').boundingBox();
+  const care = await quadro.locator('[data-zone="care"]').boundingBox();
+  if (care!.x >= facts!.x + facts!.width) {
+    expect(facts!.x + facts!.width).toBeLessThanOrEqual(diaryBox!.x);
+    expect(diaryBox!.x + diaryBox!.width).toBeLessThanOrEqual(care!.x);
+    expect(Math.abs(diaryBox!.y - facts!.y)).toBeLessThanOrEqual(1);
+  } else if (page.viewportSize()!.width > 1000) {
     expect(diaryBox!.x).toBeGreaterThanOrEqual(overview!.x + overview!.width);
     expect(Math.abs(diaryBox!.y - overview!.y)).toBeLessThanOrEqual(1);
   } else {
@@ -155,7 +161,7 @@ async function assertReflowStack(quadro: Locator): Promise<void> {
       const rect = node.getBoundingClientRect();
       return { top: rect.top, bottom: rect.bottom, left: rect.left };
     };
-    return [...element.querySelectorAll(':scope > section')].map(box);
+    return [...element.querySelectorAll('[data-zone] > section')].map(box);
   });
   expect(geometry).toHaveLength(5);
   for (let index = 1; index < geometry.length; index++) {

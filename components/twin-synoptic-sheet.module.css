@@ -8,8 +8,6 @@
 .problems th:nth-child(3) { width: 6.5rem; }
 .therapies th:first-child { width: 46%; }
 .therapies th:nth-child(3) { width: 5.5rem; }
-.changes th:first-child { width: 6.5rem; }
-.changes th:nth-child(3) { width: 6.5rem; }
 .notes { min-width: 0; }
 .notes h3 { font: var(--type-section); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
 .notes p { font: var(--type-prose); white-space: pre-line; }
@@ -18,3 +16,17 @@
  .measures th:nth-child(2) { width: 32%; }
 }
 @media (pointer: coarse) { .sheet td { height: 44px; } }
+.zones { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; width: 100%; }
+.zone { display: grid; gap: 16px; min-width: 0; align-content: start; }
+.zones section, .zones .notes { min-width: 0; padding: 14px 16px 6px; border-radius: 12px; background: var(--lume-surface-hover); }
+.zones .notes { padding-bottom: 14px; }
+:global(:root) .zones section > :global(.lume-section-heading) { padding: 0 0 6px; border-bottom: 0; font: 600 0.9375rem/1.4 var(--lume-font-sans); letter-spacing: 0; text-transform: none; }
+:global(:root) .zones section > :global(.lume-section-heading) > span { font: var(--type-meta); text-transform: none; letter-spacing: 0; }
+.zones .notes h3 { font: 600 0.9375rem/1.4 var(--lume-font-sans); letter-spacing: 0; text-transform: none; }
+.rows { width: 100%; border-collapse: collapse; font: var(--type-body); }
+.rows td { padding: 8px 0; border-top: 1px solid var(--lume-rule); vertical-align: top; overflow-wrap: anywhere; }
+.rows td + td { padding-left: 12px; }
+.rows th { font: 600 0.75rem/1.5 var(--lume-font-sans); }
+.rows small { display: block; margin-top: 2px; color: var(--lume-ink-muted); font: var(--type-meta); }
+.rows .value { text-align: right; white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums; }
+.zones :global([data-testid='patient-proposals-summary']) { margin: 0; padding: 14px 16px; border: 1px dashed var(--lume-ink-pencil); border-radius: 12px; background: var(--lume-surface-draft); }

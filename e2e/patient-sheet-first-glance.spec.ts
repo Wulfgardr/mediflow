@@ -41,7 +41,7 @@ test.beforeEach(async ({ page }) => {
   await bootstrapUnlockedSession(page, pin);
 });
 
-test('Riepilogo: il primo sguardo mostra identità, problemi, ultime modifiche di terapia e l’ingresso al Quadro paziente', async ({ page }) => {
+test('Riepilogo: il primo sguardo mostra identità, problemi, variazioni di terapia e l’ingresso al Quadro paziente', async ({ page }) => {
   const id = await syntheticPatient(page, { taxCode: '', identifierType: 'none', birthDatePrecision: 'estimated', birthYear: 1984 });
   await openSheet(page, id);
 
@@ -57,13 +57,10 @@ test('Riepilogo: il primo sguardo mostra identità, problemi, ultime modifiche d
   expect(await insideWorkArea(quadro)).toBe(true);
   const problems = page.locator('#quadro').getByRole('table', { name: 'Problemi' });
   await expect(problems).toBeVisible();
-  await expect.poll(() => page.evaluate(() => {
-    const summary = document.querySelector('[data-testid="patient-proposals-summary"]');
-    const table = document.querySelector('#quadro table[aria-label="Problemi"]');
-    return summary && table ? summary.getBoundingClientRect().bottom <= table.getBoundingClientRect().top : null;
-  })).toBe(true);
+  expect(await insideWorkArea(problems.getByText('Scompenso cardiaco sintetico', { exact: true }))).toBe(true);
+  await expect(problems.getByText(/I50\.9/u)).toBeVisible();
 
-  const changes = page.locator('#quadro').getByRole('table', { name: 'Ultime modifiche di terapia' });
+  const changes = page.locator('#quadro').getByRole('table', { name: 'Variazioni di terapia' });
   expect(await insideWorkArea(changes.getByRole('row').nth(1))).toBe(true);
   await expect(changes.getByRole('row').filter({ hasText: 'Farmaco sintetico concluso' })).toContainText('20/09/2026');
   await expect(changes.getByRole('row').filter({ hasText: 'Farmaco sintetico concluso' })).toContainText('Conclusa');
