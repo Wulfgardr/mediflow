@@ -59,6 +59,31 @@ for (const destination of destinations) {
   });
 }
 
+test('Analisi: l’indice si presenta come indice della pagina, non come una serie di schede', async ({ page }) => {
+  await page.goto('/analytics');
+  await unlockIfNeeded(page, pin);
+  await expect(index(page).getByText('In questa pagina', { exact: true })).toBeVisible();
+  await index(page).getByRole('link', { name: 'Diagnosi', exact: true }).click();
+  await expectArrival(page, destinations[2]);
+  const appearance = await index(page).getByRole('link').evaluateAll(links => links.map(link => {
+    const style = getComputedStyle(link);
+    const box = link.getBoundingClientRect();
+    return { current: link.hasAttribute('aria-current'), weight: style.fontWeight, underline: style.boxShadow, width: box.width, height: box.height };
+  }));
+  expect(appearance.filter(link => link.current)).toHaveLength(1);
+  for (const link of appearance) {
+    expect(link.weight).toBe(link.current ? '600' : '400');
+    expect(link.underline).toBe('none');
+    expect(link.width).toBeGreaterThanOrEqual(40);
+    expect(link.height).toBeGreaterThanOrEqual(40);
+  }
+  const widths = () => index(page).getByRole('link').evaluateAll(links => links.map(link => link.getBoundingClientRect().width));
+  const before = await widths();
+  await index(page).getByRole('link', { name: 'Audit', exact: true }).click();
+  await expectArrival(page, destinations[3]);
+  expect(await widths()).toEqual(before);
+});
+
 test('Analisi: dopo la scelta, lo scorrimento restituisce l’indice alla posizione letta', async ({ page }) => {
   await page.goto('/analytics');
   await unlockIfNeeded(page, pin);

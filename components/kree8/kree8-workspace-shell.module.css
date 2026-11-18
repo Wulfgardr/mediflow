@@ -1094,12 +1094,33 @@
   box-shadow: none;
   transform: none;
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--lume-ink-muted);
 }
 :global(html[data-runtime-twin-design='proposal']) .overviewShell .sectionLink[aria-current='location'] {
   color: var(--lume-ink);
-  box-shadow: inset 0 -2px var(--lume-ink);
+  font-weight: 600;
+  box-shadow: none;
+}
+:global(html[data-runtime-twin-design='proposal']) .overviewShell .sectionLink > span {
+  display: inline-grid;
+  justify-items: center;
+}
+:global(html[data-runtime-twin-design='proposal']) .overviewShell .sectionLink > span::after {
+  content: attr(data-label);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 600;
+}
+.indexLabel { display: none; }
+:global(html[data-runtime-twin-design='proposal']) .overviewShell .indexLabel {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 44px;
+  font: var(--type-meta);
+  color: var(--lume-ink-muted);
 }
 :global(html[data-runtime-twin-design='proposal']) .overviewShell .workspaceBody {
   padding: 24px var(--ink-plane-inset) 50px;

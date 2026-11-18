@@ -502,6 +502,7 @@ export function Kree8WorkspaceShell({
               }
             }}
           >
+            {overviewMode ? <span className={styles.indexLabel}>In questa pagina</span> : null}
             {navGroups ? navGroups.map((group) => {
               const activeItem = group.items.find((item) => item.href === activeHref);
               const expanded = folderMode || openGroups[group.id] === true;
@@ -547,7 +548,7 @@ export function Kree8WorkspaceShell({
                 className={styles.sectionLink}
                 aria-current={item.href === activeHref ? 'location' : undefined}
               >
-                <span>{item.label}</span>
+                <span data-label={item.label}>{item.label}</span>
                 {item.meta ? <small>{item.meta}</small> : null}
               </a>
             ))}
