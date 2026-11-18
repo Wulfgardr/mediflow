@@ -22,6 +22,7 @@ import { readCockpitRows } from '@/components/kree8/cockpit-read-snapshot';
 import { subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
 import { db } from '@/lib/db';
 import { SCALES } from '@/lib/scale-definitions';
+import { scaleDisplayTitle } from '@/lib/scale-history';
 import styles from './scales.module.css';
 import scaleStyles from '@/components/scales/scale-workspace.module.css';
 
@@ -133,7 +134,7 @@ export default function ScalesLibraryPage() {
             backHref="/?area=incarico"
             backLabel="Torna ai pazienti"
             statusLabel={selectedScaleDefinition
-                ? `${selectedScaleDefinition.title}: manca la scheda paziente.`
+                ? `${scaleDisplayTitle(selectedScaleDefinition)}: manca la scheda paziente.`
                 : 'Sono elencate solo le scale già digitalizzate.'}
             navItems={navItems}
         >
@@ -169,7 +170,7 @@ export default function ScalesLibraryPage() {
                                         >
                                             <Icon size={20} aria-hidden="true" />
                                             <span>
-                                                <strong className={scaleStyles.catalogTitle}>{scale.title}</strong>
+                                                <strong className={scaleStyles.catalogTitle}>{scaleDisplayTitle(scale)}</strong>
                                                 <span className={scaleStyles.catalogDescription}>{scale.description}</span>
                                             </span>
                                             <ArrowRight size={18} aria-hidden="true" />
@@ -191,7 +192,7 @@ export default function ScalesLibraryPage() {
                                 Scegli il paziente
                             </h2>
                             <p className="max-w-3xl text-sm leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
-                                Hai scelto <strong className="font-semibold" style={{ color: 'var(--lume-ink)' }}>{selectedScaleDefinition.title}</strong>.
+                                Hai scelto <strong className="font-semibold" style={{ color: 'var(--lume-ink)' }}>{scaleDisplayTitle(selectedScaleDefinition)}</strong>.
                             </p>
                         </div>
                         <button
@@ -225,7 +226,7 @@ export default function ScalesLibraryPage() {
                                 key={patient.id}
                                 type="button"
                                 onClick={() => handleSelectPatient(patient.id)}
-                                aria-label={`Avvia ${selectedScaleDefinition.title} per ${patient.lastName} ${patient.firstName}`}
+                                aria-label={`Avvia ${scaleDisplayTitle(selectedScaleDefinition)} per ${patient.lastName} ${patient.firstName}`}
                                 className={scaleStyles.catalogLink}
                             >
                                 <span className="min-w-0">
