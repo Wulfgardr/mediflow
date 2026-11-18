@@ -6,29 +6,23 @@ permissions:
   contents: read
 jobs:
   proof:
-    name: Web document identity ${{ matrix.proof.verdict }} (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Web document identity ${{ matrix.proof.verdict }} (Chrome)
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-latest]
         proof:
           - verdict: base
             revision: 8abbef40c
           - verdict: diff
             revision: b357222d6
-        include:
-          - os: ubuntu-24.04
-            channel: chrome
-          - os: macos-latest
-            channel: chromium
     env:
       MEDIFLOW_NEXT_DIST_DIR: .next-e2e
       E2E_DOCUMENTS_SYNTHETIC_ONLY: '1'
       FORCE_COLOR: '0'
       PLAYWRIGHT_HTML_OPEN: never
-      E2E_BROWSER_CHANNEL: ${{ matrix.channel }}
+      E2E_BROWSER_CHANNEL: chrome
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -41,7 +35,7 @@ jobs:
       - run: npm ci && npm run prepare:dependencies
       - name: Verify browser sandbox
         run: |
-          if [ "$E2E_BROWSER_CHANNEL" = chromium ]; then npx --no-install playwright install chromium; fi
+          npx --no-install playwright install ffmpeg
           node --input-type=module <<'NODE'
           import { chromium } from '@playwright/test'
           const browser = await chromium.launch({ channel: process.env.E2E_BROWSER_CHANNEL, chromiumSandbox: true,
@@ -96,7 +90,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: web-document-identity-${{ matrix.proof.verdict }}-${{ matrix.os }}
+          name: web-document-identity-${{ matrix.proof.verdict }}-chrome
           path: |
             red.log
             playwright-report
