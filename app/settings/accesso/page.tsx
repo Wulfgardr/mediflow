@@ -62,7 +62,7 @@ export default function SettingsAccessPage() {
                     {passphrase ? <>
                         <p className={styles.copy}>Questo archivio si sblocca con la passphrase. Il PIN resta per le conferme di revisione e di ruolo: non apre l’archivio.</p>
                         <p className={styles.copy}>Il cambio aggiorna passphrase e kit di recupero. Il PIN di conferma rimane separato e invariato.</p>
-                    </> : <p className={styles.copy}>Il PIN attuale è una protezione transitoria. La passphrase aprirà l’archivio; il PIN resterà solo per le conferme. I backup e le copie Time Machine precedenti non vengono ripuliti. Dopo un ricaricamento, usa Rinnova accesso e inserisci di nuovo il PIN prima di preparare il kit.</p>}
+                    </> : <p className={styles.copy}>Il PIN attuale è una protezione transitoria. La passphrase aprirà l’archivio e il PIN resterà per le conferme. I backup e le copie Time Machine precedenti non vengono ripuliti.</p>}
                     <PassphraseAccessForm mode={passphrase ? 'change' : 'adopt'} onPrepare={preparePassphraseChange} />
                 </div>
             </Disclosure>
@@ -109,7 +109,7 @@ export default function SettingsAccessPage() {
                         <p className={styles.copy}>Una sola sessione attiva su questa postazione. Il blocco richiede {passphrase ? 'la passphrase' : 'il PIN'} al prossimo accesso.</p>
                     </div>
                     <button type="button" onClick={() => lock()} className={SETTINGS_SECONDARY_BUTTON_CLASS}>
-                        <Lock className="h-4 w-4" />{passphrase ? 'Blocca sessione adesso' : 'Rinnova accesso'}
+                        <Lock className="h-4 w-4" />{passphrase ? 'Blocca sessione adesso' : 'Blocca tutte le schede'}
                     </button>
                 </div>
             </section>
