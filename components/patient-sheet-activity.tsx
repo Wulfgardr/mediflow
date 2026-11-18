@@ -4,6 +4,7 @@ import type { Attachment, ClinicalEntry, Observation, Therapy } from '@/lib/db';
 import { diaryContactsAfter, diaryTypeLabel, outOfRangeAfter } from '@/lib/patient-sheet-activity';
 import { projectTherapyRecordUpdates, type projectVisitReference, recordDate } from '@/lib/patient-therapy-changes';
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import PrivacyBlur from './privacy-blur';
 import { InkSectionHeading } from './ui/ink-state';
 import styles from './twin-synoptic-sheet.module.css';
@@ -24,7 +25,7 @@ function TherapyDetails({ update, entries, openDiary }: {
     const end = recordDate(therapy.endDate);
     const sameDay = entries.filter(entry => !entry.deletedAt && recordDate(entry.createdAt)?.toDateString() === date.toDateString());
     return <details className={styles.changeDetails}>
-        <summary><strong><PrivacyBlur>{therapy.drugName}</PrivacyBlur></strong><span>{label}</span></summary>
+        <summary><strong><PrivacyBlur>{therapy.drugName}</PrivacyBlur></strong><span>{label}<ChevronDown aria-hidden="true" size={14} /></span></summary>
         <p>Stato attuale: {therapy.status === 'active' ? 'Attiva' : therapy.status === 'suspended' ? 'Sospesa' : 'Conclusa'} · <PrivacyBlur>{therapy.dosage}</PrivacyBlur></p>
         {therapy.motivation ? <p>Indicazione: <PrivacyBlur>{therapy.motivation}</PrivacyBlur></p> : null}
         <p>{start ? <>Inizio <SheetDate date={start} /> · </> : null}{end ? <>Fine <SheetDate date={end} /> · </> : null}Data della scheda <SheetDate date={date} /></p>
@@ -35,7 +36,7 @@ function TherapyDetails({ update, entries, openDiary }: {
     </details>;
 }
 
-export function PatientSheetActivity({ patientId, reference, now, entries, therapies, measures, attachments, proposalDate, unavailable, openDiary, openDocument }: {
+export function PatientSheetActivity({ patientId, reference, now, entries, therapies, measures, attachments, proposalDate, unavailable, loading, openDiary, openDocument }: {
     patientId: string;
     reference?: ReturnType<typeof projectVisitReference>;
     now: Date;
@@ -45,6 +46,7 @@ export function PatientSheetActivity({ patientId, reference, now, entries, thera
     attachments?: Attachment[];
     proposalDate?: Date | null;
     unavailable: boolean;
+    loading: boolean;
     openDiary: (entryId: string) => void;
     openDocument: (attachmentId: string) => void;
 }) {
@@ -68,7 +70,7 @@ export function PatientSheetActivity({ patientId, reference, now, entries, thera
         ...results.map(row => ({
             id: `measure:${row.id}`, date: row.date,
             content: <details className={styles.changeDetails}>
-                <summary><strong><PrivacyBlur>{row.display} · {row.value}</PrivacyBlur></strong><span className={styles.outOfRange}>▲ Fuori intervallo</span></summary>
+                <summary><strong><PrivacyBlur>{row.display} · {row.value}</PrivacyBlur></strong><span className={styles.outOfRange}>▲ Fuori intervallo<ChevronDown aria-hidden="true" size={14} /></span></summary>
                 <p>{row.previous ? <><PrivacyBlur>{row.previous.value}</PrivacyBlur> (<SheetDate date={row.previous.date} />) → </> : null}<PrivacyBlur>{row.value}</PrivacyBlur> · Misura del <SheetDate date={row.observed} /></p>
                 <p>Riferimento {row.low !== null ? `da ${row.low.toLocaleString('it-IT')}` : ''}{row.high !== null ? ` fino a ${row.high.toLocaleString('it-IT')}` : ''}</p>
                 {!row.previous ? <p>Nessuna misura precedente.</p> : null}
@@ -97,7 +99,7 @@ export function PatientSheetActivity({ patientId, reference, now, entries, thera
             {contacts.length ? <a href="#diario" className="mf-button-text">Nel diario dopo la visita: {contacts.join(', ')}</a> : null}
             {mayShowDocuments ? <label className={styles.activityToggle}><input type="checkbox" checked={showDocuments} onChange={event => setShowDocuments(event.target.checked)} />Mostra anche documenti e proposte</label> : null}
         </section> : <p className={styles.noComparison} role="status">{partial ? 'Confronto incompleto. Alcuni dati non sono disponibili.'
-            : !reference ? 'Lettura del diario…'
+            : loading || !reference ? 'Lettura della cartella…'
                 : visit ? <>{heading}: nessuna variazione registrata.</> : 'Nessuna visita registrata.'}</p>}
         {changed.length === 0 && recent.length > 0 ? <section aria-label="Ultime modifiche di terapia">
             <InkSectionHeading>Ultime modifiche di terapia</InkSectionHeading>

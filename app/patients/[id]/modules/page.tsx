@@ -725,8 +725,8 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                     activity={<PatientSheetActivity patientId={id} reference={visitReference} now={new Date(Math.max(currentTimestampMs, diarySnapshot?.readAt.getTime() ?? 0, therapySnapshot?.readAt.getTime() ?? 0))}
                         entries={entriesError ? undefined : entries} therapies={therapiesError ? undefined : therapies}
                         measures={observationsError ? undefined : observations} attachments={attachmentsError ? undefined : attachments}
-                        unavailable={Boolean(entriesError || therapiesError || observationsError || attachmentsError
-                            || !therapies || !observations || !attachments)}
+                        unavailable={Boolean(entriesError || therapiesError || observationsError || attachmentsError)}
+                        loading={entries === undefined || therapies === undefined || observations === undefined || attachments === undefined}
                         openDiary={entryId => sourceSelection.select({ kind: 'entry', id: entryId })}
                         openDocument={attachmentId => sourceSelection.select({ kind: 'document', id: attachmentId })}
                         proposalDate={patient.aiSummary?.trim() ? patient.aiSummaryGeneratedAt : undefined} />}

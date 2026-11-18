@@ -1019,7 +1019,7 @@ export function PatientEntryComposer({ embedded = false, sheetSource }: { embedd
                     </details>
                 ) : null}
                 <div className={proposal ? composerStyles.actions : "flex justify-end border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-4"}>
-                    {proposal ? <div className={composerStyles.saveSummary} role="status"><InkState state="fresh">{isSubmitting ? 'Registrazione in corso' : 'Bozza non registrata'}</InkState><p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : patientRead.loading ? 'Caricamento paziente…' : 'Paziente non disponibile.'} · 1 voce di diario{files.length ? ` · ${files.length} allegati` : ''}</p></div> : null}
+                    {proposal && !inlineSheet ? <div className={composerStyles.saveSummary} role="status"><InkState state="fresh">{isSubmitting ? 'Registrazione in corso' : 'Bozza non registrata'}</InkState><p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : patientRead.loading ? 'Caricamento paziente…' : 'Paziente non disponibile.'} · 1 voce di diario{files.length ? ` · ${files.length} allegati` : ''}</p></div> : null}
                     {writeFailed && inlineSheet ? <p role="alert">Voce non registrata. La bozza è ancora aperta.</p> : null}
                     {inlineSheet && reviewing ? <button type="button" className="mf-button-text" disabled={isSubmitting}
                         onClick={resumeEditor}>Torna alla bozza</button> : null}
