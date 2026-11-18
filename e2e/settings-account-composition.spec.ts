@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, unlockIfNeeded, assertNoHorizontalOverflow } from './utils';
+import { bootstrapUnlockedSession, unlockIfNeeded, assertNoHorizontalOverflow, lockAllTabsAndSignIn } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 function requireSynthetic(baseURL?: string) {
@@ -116,9 +116,8 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
         expect(pinPosts).toBe(1);
         await stateCapture(page, zoom, 'accesso-diniego', access.getByRole('status'));
         await page.unroute('**/api/auth/change-pin');
-        await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
-        await expect(page.getByLabel('MediFlow lock screen', { exact: true })).toBeVisible();
-        await test.step('ordinary unlock after Access lock', () => unlockIfNeeded(page, '1234'));
+        await expect(access.getByRole('button', { name: 'Blocca tutte le schede', exact: true })).toBeVisible();
+        await test.step('lock all tabs from Access and sign in', () => lockAllTabsAndSignIn(page, '1234'));
 
         let releaseRead!: () => void;
         const readGate = new Promise<void>(resolve => { releaseRead = resolve; releaseGates.push(resolve); });
@@ -168,7 +167,9 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
             const siblingGoto = sibling.goto.bind(sibling);
             sibling.goto = (url, options) => siblingGoto(new URL(url, baseURL!).href, options);
             await protect(sibling, baseURL!);
-            await bootstrapUnlockedSession(sibling, '1234'); await page.bringToFront();
+            await sibling.goto('/');
+            await test.step('lock all tabs from the new tab and sign in', () => lockAllTabsAndSignIn(sibling, '1234'));
+            await page.bringToFront();
             await page.evaluate(() => window.dispatchEvent(new Event('focus')));
             await expect(profile.getByRole('status')).toContainText('La sessione è cambiata');
             await expect(save).toBeDisabled(); await keepDraft();

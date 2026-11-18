@@ -9,7 +9,7 @@ import { LONG_PIN_CONFIRM_LABEL, LONG_PIN_NOTICE } from '@/lib/security/unlock-p
 import styles from './kree8/kree8-lock-screen.module.css';
 
 export function LockScreen() {
-    const { isLocked, requiresSetup, authErrorMessage, authRecoveryState, unlockCredential, login, preparePassphraseRecovery, lock } = useSecurity();
+    const { isLocked, requiresSetup, authErrorMessage, authRecoveryState, unlockCredential, login, preparePassphraseRecovery, lock, renewAccess } = useSecurity();
     // ADR 0143: an account with a passphrase is unlocked by it; the field, its name and its minimum follow.
     const passphrase = !requiresSetup && unlockCredential === 'passphrase';
     const [pin, setPin] = useState('');
@@ -85,13 +85,13 @@ export function LockScreen() {
     const recoveryPending = authRecoveryState === 'pending';
     const credentialsDisabled = loading || authRecoveryState !== 'ready';
     const visibleError = error || authErrorMessage || (authRecoveryState === 'failed'
-        ? 'Chiusura della sessione non confermata. Rinnova di nuovo l’accesso.' : '');
+        ? 'Chiusura della sessione non confermata. Riprova il blocco.' : '');
     // A held text can be confirmed only while its notice is what the person sees: the same text,
     // no other message in its place, no lock under way. Anything else starts over.
     const longPinNotice = heldText !== null && heldText === pin && !visibleError && authRecoveryState === 'ready';
     const recoveryMessage = authRecoveryState === 'required'
         ? 'Una sessione è già attiva. Rinnova l’accesso per usare questa scheda.'
-        : recoveryPending ? 'Sto chiudendo la sessione precedente…' : null;
+        : recoveryPending ? 'Verifica dell’accesso…' : null;
 
     return (
         // WUL-55 F2d-A: lock chrome uses the landed Lume identity without changing auth semantics.
@@ -192,8 +192,6 @@ export function LockScreen() {
                             </>
                         )}
                     </button>
-                    {/* renewal is explicit because the session may be shared with
-                        another tab. The next PIN submission waits for the lock receipt. */}
                     {!requiresSetup && (visibleError || authRecoveryState !== 'ready') && (
                         <div className="text-center text-sm">
                             <button type="button" disabled={loading || recoveryPending}
@@ -202,12 +200,12 @@ export function LockScreen() {
                                     setHeldText(null);
                                     setPin('');
                                     setError('');
-                                    lock();
+                                    void renewAccess();
                                     setFailedAttempt((n) => n + 1);
                                 }}>
                                 Rinnova accesso
                             </button>
-                            <p className="px-2 text-xs leading-5">Chiude la sessione condivisa con le altre schede. Poi inserisci di nuovo {passphrase ? 'la passphrase' : 'il PIN'}.</p>
+                            <button type="button" disabled={loading || recoveryPending} className="min-h-11 px-4 py-2 underline underline-offset-4" onClick={() => lock()}>Blocca tutte le schede</button>
                         </div>
                     )}
                 </form>

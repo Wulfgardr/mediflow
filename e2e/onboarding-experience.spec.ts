@@ -1,6 +1,6 @@
 import type { Locator, Page, TestInfo } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
-import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow } from './utils';
+import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow, renewAccessIfNeeded } from './utils';
 import { parseWorkProfileState } from '../lib/work-profile';
 import { syntheticTaxCode } from '../lib/patient-identity.test-support';
 
@@ -100,9 +100,9 @@ async function unlockPassphrase(page: Page, passphrase = PASSPHRASE) {
     const lock = page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true });
     await expect(lock.or(page.getByTestId('work-profile-onboarding')).or(page.getByTestId('settings-access-section')).first()).toBeVisible();
     if (!await lock.isVisible()) return;
-    const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
-    if (await renew.isVisible() && await renew.isEnabled()) await renew.click();
     const field = page.getByLabel('Passphrase', { exact: true });
+    await renewAccessIfNeeded(page, field);
+    if (!await lock.isVisible()) return;
     await expect(field).toBeEnabled(); await field.fill(passphrase);
     await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
     await expect(lock).toHaveCount(0);
@@ -336,8 +336,7 @@ test('first use: manual entry creates the first synthetic patient without saving
     await unlockPassphrase(page, nextPassphrase);
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
-    const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
-    if (await renew.isVisible()) await renew.click();
+    await renewAccessIfNeeded(page, page.getByLabel('Passphrase', { exact: true }));
     await page.getByRole('button', { name: 'Recupera con kit e chiave', exact: true }).click();
     await page.getByLabel('Kit di recupero', { exact: true }).setInputFiles({ name: 'synthetic-kit.json', mimeType: 'application/json', buffer: Buffer.from(saved.content) });
     await page.getByLabel('Chiave di recupero', { exact: true }).fill(saved.key);

@@ -1,5 +1,6 @@
 import type { Page, Request } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
+import { renewAccessIfNeeded } from './utils';
 import { syntheticTaxCode } from '../lib/patient-identity.test-support';
 
 const PIN = 'bulk086086';
@@ -65,10 +66,8 @@ async function setup(page: Page): Promise<void> {
 async function unlockPassphrase(page: Page): Promise<void> {
     const input = page.getByLabel('Passphrase', { exact: true });
     await expect(input).toBeVisible();
-    const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
-    if (await renew.isVisible() && await renew.isEnabled({ timeout: 1_000 }).catch(() => false)) {
-        await renew.click({ timeout: 1_000 }).catch(() => undefined);
-    }
+    await renewAccessIfNeeded(page, input);
+    if (!await input.isVisible()) return;
     await expect(input).toBeEnabled();
     await input.fill(PASSPHRASE);
     const response = page.waitForResponse(item => item.request().method() === 'POST' && new URL(item.url()).pathname === '/api/auth/login');

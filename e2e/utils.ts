@@ -119,21 +119,30 @@ export async function completeOnboardingIfNeeded(page: Page, pin: string): Promi
       encryptedMasterKey, salt: Buffer.from(salt).toString('base64') },
   });
   expect(response.status()).toBe(200);
+  const closed = await page.request.post('/api/auth/lock', { headers: { ...trustedWebRequestHeaders(page.url()),
+    'If-Match': response.headers()['etag'], 'Idempotency-Key': crypto.randomUUID() } });
+  expect(closed.status()).toBe(200);
   await page.reload();
 }
 
-export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
-  const lockHeading = page.getByRole('heading', { name: 'Sblocca MediFlow' });
-  if (!(await isVisible(lockHeading))) return;
+export async function renewAccessIfNeeded(page: Page, credential: Locator): Promise<void> {
+  const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
+  if (!await renew.isVisible()) return;
+  const noPeer = page.getByText('Apri una scheda già sbloccata oppure blocca tutte le schede per accedere di nuovo.', { exact: true });
+  if (await renew.isEnabled() && !await noPeer.isVisible()) {
+    try { await renew.click({ timeout: 1000 }); }
+    catch (error) {
+      if (await renew.isVisible()) throw error;
+      return;
+    }
+  }
+  await expect.poll(async () => !await credential.isVisible() || await credential.isEnabled() || await noPeer.isVisible()).toBe(true);
+  if (await noPeer.isVisible()) await page.getByRole('button', { name: 'Blocca tutte le schede', exact: true }).click();
+}
 
+async function submitPin(page: Page, pin: string): Promise<void> {
   const pinInput = page.getByLabel('PIN operatore').first();
   const unlockButton = page.getByRole('button', { name: /Sblocca/ }).first();
-
-  const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
-  if (await renew.isVisible()) {
-    try { await renew.click({ timeout: 1000 }); }
-    catch (error) { if (await renew.isVisible()) throw error; }
-  }
   await expect(pinInput).toBeEnabled();
   await pinInput.fill(pin);
   await expect(pinInput).toHaveValue(pin);
@@ -141,12 +150,35 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   await unlockButton.click();
   const confirm = page.getByRole('button', { name: 'È il mio PIN', exact: true });
   if (checkPassphrase(pin).ok) { await expect(confirm).toBeVisible(); await confirm.click(); }
-  await expect(lockHeading).toBeHidden({ timeout: 5_000 });
+  await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeHidden({ timeout: 5_000 });
 
   const invalidPinError = page.getByText('PIN non valido');
   if (await isVisible(invalidPinError, 500)) {
     throw new Error(`Unable to unlock E2E session with configured PIN "${pin}"`);
   }
+}
+
+export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
+  const lockHeading = page.getByRole('heading', { name: 'Sblocca MediFlow' });
+  if (!(await isVisible(lockHeading))) return;
+  await renewAccessIfNeeded(page, page.getByLabel('PIN operatore').first());
+  if (!await lockHeading.isVisible() || await hasStableUnlockedShell(page)) return;
+  await submitPin(page, pin);
+}
+
+export async function lockAllTabsAndSignIn(page: Page, pin: string): Promise<void> {
+  const [lock] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/lock'
+      && response.request().method() === 'POST' && response.status() === 200, { timeout: 15_000 }),
+    page.getByRole('button', { name: 'Blocca tutte le schede', exact: true }).click({ timeout: 5_000 }),
+  ]);
+  expect(await lock.json()).toMatchObject({ state: 'server_invalidation_confirmed' });
+  const [login] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/login'
+      && response.request().method() === 'POST', { timeout: 15_000 }),
+    submitPin(page, pin),
+  ]);
+  expect(login.status()).toBe(200);
 }
 
 export async function setupPinLegacyIfNeeded(page: Page, pin: string): Promise<void> {
