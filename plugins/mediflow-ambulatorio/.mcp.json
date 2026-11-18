@@ -1,10 +1,12 @@
 {
   "mcpServers": {
     "mediflow-visit-agent": {
-      "type": "stdio",
       "command": "node",
-      "args": ["${PLUGIN_ROOT}/start.mjs"],
-      "cwd": "${PLUGIN_ROOT}",
+      "args": [
+        "--input-type=module",
+        "--eval",
+        "import { realpathSync, lstatSync } from 'node:fs';\nimport { homedir } from 'node:os';\nimport { join } from 'node:path';\nimport { pathToFileURL } from 'node:url';\nconst root = process.env.MEDIFLOW_AMBULATORIO_HOME ?? join(homedir(), '.mediflow-ambulatorio');\nconst info = lstatSync(root);\nif (!info.isDirectory() || info.uid !== process.getuid() || (info.mode & 0o7777) !== 0o700) \n  throw Error('MEDIFLOW_AMBULATORIO_SETUP_REQUIRED');\n\nconst file = join(realpathSync(root), 'launcher.mjs');\nconst metadata = lstatSync(file);\nif (!metadata.isFile() || metadata.uid !== process.getuid() || metadata.nlink !== 1 || (metadata.mode & 0o7777) !== 0o600) \n  throw Error('MEDIFLOW_AMBULATORIO_SETUP_REQUIRED');\nawait import(pathToFileURL(file).href);"
+      ],
       "tool_timeout_sec": 240
     }
   }

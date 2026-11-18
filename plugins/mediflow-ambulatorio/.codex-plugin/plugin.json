@@ -1,0 +1,17 @@
+{
+  "name": "mediflow-ambulatorio",
+  "version": "0.1.0",
+  "description": "Dal dettato al Dossier verificato e alla cassetta della visita di MediFlow.",
+  "repository": "https://github.com/Wulfgardr/mediflow",
+  "skills": "./skills/",
+  "author": {
+    "name": "MediFlow"
+  },
+  "interface": {
+    "displayName": "MediFlow Ambulatorio",
+    "shortDescription": "Prepara il Dossier e deposita la visita.",
+    "developerName": "MediFlow",
+    "category": "Productivity"
+  },
+  "mcpServers": "./.mcp.json"
+}

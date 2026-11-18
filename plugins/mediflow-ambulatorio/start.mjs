@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,6 +20,11 @@ try {
     if (settingUp) {
         const [origin, downloads = path.join(os.homedir(), 'Downloads'), ...physicianCodes] = process.argv.slice(3);
         configureAmbulatorio(home, configPath, { repository, origin, downloads, physicianCodes });
+        const launchPath = path.join(home, 'launcher.mjs');
+        const temporary = path.join(home, 'launcher-' + randomUUID() + '.tmp');
+        fs.writeFileSync(temporary, 'await import(' + JSON.stringify(import.meta.url) + ');\n', { flag: 'wx', mode: 0o600 });
+        try { fs.renameSync(temporary, launchPath); }
+        finally { fs.rmSync(temporary, { force: true }); }
         process.stdout.write('MediFlow Ambulatorio configurato.\n');
     } else {
         serveAmbulatorio(home, readConfig(), plugin);

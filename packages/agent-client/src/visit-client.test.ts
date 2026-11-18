@@ -339,7 +339,6 @@ test('Ambulatorio admits only a verified visit and retries the same encrypted de
     };
     const quote = 'Assume Paracetamolo 500 mg al bisogno.';
     await pdf('sintetico.pdf', ['Codice fiscale paziente: ' + cf, 'CODICE FISCALE DEL MEDICO: ' + physician, 'Documento sintetico consentito']);
-    await pdf('discordante.pdf', ['Codice fiscale paziente: ' + cf, 'Altro paziente codice fiscale: ' + foreign, 'DOCUMENTO_DA_ESCLUDERE']);
     const dettato = 'Visita sintetica senza codice fiscale. ' + quote;
     const start = path.resolve('plugins/mediflow-ambulatorio/start.mjs');
     const child = spawn(process.execPath, [start], { env: { ...process.env, MEDIFLOW_AMBULATORIO_HOME: home } });
@@ -368,6 +367,10 @@ test('Ambulatorio admits only a verified visit and retries the same encrypted de
         const { visitId } = acquired;
         assert.equal(acquired.stato, 'CF da confermare');
         assert.deepEqual(acquired.pdf_accettati, []);
+        assert.equal(acquired.cf_proposto, cf);
+        await pdf('discordante.pdf', ['Codice fiscale paziente: ' + cf, 'Altro paziente codice fiscale: ' + foreign, 'DOCUMENTO_DA_ESCLUDERE']);
+        await pdf('ruoli-discordanti.pdf', ['Codice fiscale paziente: ' + cf, 'CODICE FISCALE DEL MEDICO: ' + physician,
+            'Altro paziente codice fiscale: ' + physician, 'DOCUMENTO_DA_ESCLUDERE']);
         assert.equal((await send('mediflow_acquisisci_visita', { dettato })).visitId, visitId);
         const scheda = '## Nota clinica\nS: Riferisce dolore sintetico.\nO: Rilievi non riportati.\nA: Valutazione non esplicitata.\nP: Assume Paracetamolo 500 mg al bisogno.';
         const therapy = { file: 'nota-visita.pdf', kind: 'therapy', values: { drugName: 'Paracetamolo', dosage: '500 mg al bisogno', status: 'active' }, quote };

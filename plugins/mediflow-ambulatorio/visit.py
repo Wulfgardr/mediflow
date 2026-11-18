@@ -133,9 +133,11 @@ def pdf_text(path):
 
 
 def roles(text, configured):
-    codes = {code for code in CF_RE.findall(text.upper()) if valid_cf(code)}
-    doctors = set(configured) | {match[1] for match in PHYSICIAN.finditer(text.upper()) if valid_cf(match[1])}
-    return codes - doctors, codes & doctors
+    normalized = text.upper()
+    labels = {match.span(1) for match in PHYSICIAN.finditer(normalized)}
+    occurrences = [match for match in CF_RE.finditer(normalized) if valid_cf(match[0])]
+    patients = {match[0] for match in occurrences if match.span() not in labels and match[0] not in configured}
+    return patients, {match[0] for match in occurrences} - patients
 
 
 def collect(folder, manifest, scans, claimed, config):

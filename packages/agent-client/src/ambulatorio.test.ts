@@ -8,7 +8,8 @@ test('the Codex marketplace ships the Ambulatorio skill and its local MCP server
     assert.ok(plugin);
     const root = plugin.source.path;
     assert.match(fs.readFileSync(root + '/skills/ambulatorio-visita/SKILL.md', 'utf8'), /mediflow_deposita_visita/);
-    const definition = JSON.parse(fs.readFileSync(root + '/.mcp.json', 'utf8'));
+    const manifest = JSON.parse(fs.readFileSync(root + '/.codex-plugin/plugin.json', 'utf8'));
+    const definition = JSON.parse(fs.readFileSync(root + '/' + manifest.mcpServers, 'utf8'));
     assert.equal(definition.mcpServers['mediflow-visit-agent'].command, 'node');
     assert.ok(fs.existsSync(root + '/start.mjs'));
 });

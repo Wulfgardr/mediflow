@@ -4,7 +4,7 @@ Una chat per visita. «Visita» acquisisce il dettato e individua i PDF del pazi
 
 ## Installazione
 
-Servono Codex con i comandi `codex plugin`, Node 24, Python 3.9 o successivo e `pdftotext` (Poppler) nel PATH di Codex. La configurazione va fatta da una checkout MediFlow della stessa revisione, disponibile in un percorso stabile fuori da iCloud. Il server MCP usa il client agenti e il verificatore di quella checkout.
+Servono Codex con i comandi `codex plugin`, Node 24, Python 3.9 o successivo e `pdftotext` (Poppler) nel PATH di Codex. La configurazione va fatta da una checkout MediFlow della stessa revisione, disponibile in un percorso stabile fuori da iCloud. Il server MCP si avvia tramite un launcher privato creato dal comando di configurazione e usa il client agenti e il verificatore di quella checkout.
 
 Dalla radice di MediFlow, con l'indirizzo dell'istanza locale al posto dell'esempio:
 
@@ -28,4 +28,4 @@ La finestra temporale seleziona i candidati. Il filtro ammette un solo CF pazien
 
 Il plugin porta dal kit Python solo il riconoscimento del dettato, la selezione dei PDF e la generazione della nota. Questa scelta conserva i controlli già esercitati nel kit e rende installabile la visita da una chat qualsiasi. Il server TypeScript chiama il client agenti condiviso per il collegamento e il deposito. La verifica usa il parser MediFlow della checkout configurata. Il kit originale, il suo progetto Codex e il suo file di deposito restano fuori da questo percorso.
 
-La prova tecnica usa dati sintetici. Per replicarla, configura un'origine isolata e una cartella PDF di prova con `MEDIFLOW_AMBULATORIO_HOME` e `CODEX_HOME` temporanee. Avvia Codex con quella home e da una cartella di lavoro vuota, mantenendo la stessa variabile del plugin anche sul processo MCP.
+La prova tecnica usa dati sintetici. Per replicarla, usa un archivio MediFlow sintetico e una cartella PDF di prova. Configura il plugin con una `HOME` di prova e installalo in una `CODEX_HOME` temporanea. Avvia Codex con entrambe le variabili da una cartella di lavoro vuota.
