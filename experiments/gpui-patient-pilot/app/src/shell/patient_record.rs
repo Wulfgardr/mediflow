@@ -815,15 +815,17 @@ impl ClinicalApp {
         };
         let mut changes =
             record_changes::changes_since(&anchor, therapies, observations, &chrono::Local);
+        let documents = record_changes::documents_since(
+            &anchor,
+            self.patient
+                .attachments
+                .ready()
+                .map(Vec::as_slice)
+                .unwrap_or(&[]),
+        );
+        let new_documents = !documents.is_empty();
         if self.patient.record.documents {
-            changes.extend(record_changes::documents_since(
-                &anchor,
-                self.patient
-                    .attachments
-                    .ready()
-                    .map(Vec::as_slice)
-                    .unwrap_or(&[]),
-            ));
+            changes.extend(documents);
             changes.sort_by(|a, b| b.at.cmp(&a.at).then_with(|| a.subject.cmp(&b.subject)));
         }
         let diary = record_changes::diary_after(&anchor, entries);
@@ -834,7 +836,7 @@ impl ClinicalApp {
         if let Some(author) = anchor.recorded_by.as_deref() {
             title.push_str(&format!(" · {author}"));
         }
-        if changes.is_empty() && diary.is_none() && !self.patient.record.documents {
+        if changes.is_empty() && diary.is_none() && !new_documents {
             return div()
                 .min_w_0()
                 .flex()
@@ -2029,6 +2031,62 @@ mod tests {
         assert_eq!(
             identity_facts(&unknown, today)[1],
             "Nessun identificativo per ora"
+        );
+    }
+
+    #[gpui::test]
+    fn a_report_alone_after_the_visit_keeps_the_command_that_shows_it(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let visit: Entry = serde_json::from_value(json!({"id":"v","patientId":"p","type":"visit",
+            "title":"Visita","date":"2026-11-04","content":"c","version":1,"createdAt":"2026-11-04T09:00:00Z"}))
+        .unwrap();
+        let report: Attachment = serde_json::from_value(json!({"id":"d","patientId":"p",
+            "name":"Referto sintetico.pdf","path":"r.pdf","type":"application/pdf","size":4,
+            "createdAt":"2026-11-10T09:00:00Z"}))
+        .unwrap();
+        let buttons = |view: &Entity<ClinicalApp>, cx: &mut gpui::VisualTestContext| {
+            view.update(cx, |app, cx| {
+                rendered_command::button_ids(|| {
+                    let _ = app.record_band(cx);
+                })
+            })
+        };
+        view.update(cx, |app, _| {
+            app.selected_id = Some("p".into());
+            app.patient.entries = ReadLoad::Ready(vec![visit.clone()]);
+            app.patient.therapies = ReadLoad::Ready(vec![]);
+            app.patient.observations = ReadLoad::Ready(vec![]);
+            app.patient.attachments = ReadLoad::Ready(vec![report.clone()]);
+            app.patient.record.fix_anchor(&[visit]);
+        });
+        let shown = buttons(&view, cx);
+        assert!(
+            shown
+                .iter()
+                .any(|id| id == "clinical-record-band-documents"),
+            "the only news is a report: {shown:?}"
+        );
+        view.update(cx, |app, _| {
+            app.patient.record.documents = true;
+            app.patient.record.open = Some("document-d".into());
+        });
+        assert!(
+            buttons(&view, cx)
+                .iter()
+                .any(|id| id == "clinical-record-open-document-d")
+        );
+        view.update(cx, |app, _| {
+            app.patient.record.documents = false;
+            app.patient.attachments = ReadLoad::Ready(vec![]);
+        });
+        assert!(
+            !buttons(&view, cx)
+                .iter()
+                .any(|id| id == "clinical-record-band-documents"),
+            "nothing new: no command"
         );
     }
 
