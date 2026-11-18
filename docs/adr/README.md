@@ -49,8 +49,6 @@ verifica dello stato successivo.
 
 - [0119-anydoc-apple-vision-current-source.md](./0119-anydoc-apple-vision-current-source.md): fissa la precedenza del ripiego PDF AnyDoc + Apple Vision, separato da Fabric, con matrice e provenienza dell’anteprima.
 
-<!-- @Codex MF085-002/003: bounded source-bound scale contract. -->
-
 - [0117-headless-portable-agent-first-and-capability-first-fabric.md](./0117-headless-portable-agent-first-and-capability-first-fabric.md): rende Headless/CLI/MCP, progettati per gli agenti e indipendenti dal sistema operativo, un requisito della 0.8.5; definisce un insieme minimo utile attraverso Application Services e riclassifica OCR come funzione indipendente dal modello, con DeepSeek facoltativo.
 - [0116-agentic-checkup-status-transition.md](./0116-agentic-checkup-status-transition.md): accetta la prima scrittura agentica non-SOAP soltanto come transizione `pending -> completed|cancelled` di un checkup esistente: servono proposta AIP, conferma UI specifica per l’operazione, CAS, idempotenza e ricevuta PHI-safe; il pacchetto iniziale resta solo documentale.
 - [0115-icd11-who-reference-data-adapter.md](./0115-icd11-who-reference-data-adapter.md): accetta un Application Service ICD-11 sotto l’autorità dell’host, con WHO API v2/MMS/release esplicitamente vincolati, uscita dati solo su scelta, cache sul vincolo esatto e trasporto ufficiale separato; il primo pacchetto usa un trasporto sostitutivo e non migra i chiamanti.

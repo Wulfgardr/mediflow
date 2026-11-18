@@ -121,16 +121,21 @@ internet per l'elaborazione.
 ### Caricare un documento
 
 1. Vai nella scheda di un paziente.
-2. Clicca su **"Carica Documento"** (PDF o foto).
-3. Attendi l'elaborazione.
+2. Clicca su **Carica documenti** e scegli il file. Puoi allegare PDF, JPEG,
+   PNG e file di altri tipi riconosciuti dal browser.
+3. Il caricamento salva l’allegato. Per leggerne il testo, scegli
+   **Estrai testo** dal menu **Altro**.
 
 ### Cosa succede?
 
-1. **OCR**: estrae il testo da PDF o immagine. I documenti senza testo entrano
-   nella **Coda OCR**, che ne mostra stato e motivo in italiano e permette di
-   riprovare. Finché il testo non basta, l'AI non avanza proposte cliniche.
-2. **Sintesi clinica**: prepara un riassunto strutturato che devi rivedere
-   prima di conservarlo. Gli eventuali errori restano visibili.
+1. **Estrazione del testo**. MediFlow legge il testo presente nei PDF supportati.
+   Usa l’OCR locale solo sulle pagine dei PDF che lo richiedono, se il motore
+   è disponibile. L’estrazione si ferma sui file immagine. Puoi consultarli
+   con **Apri**. Se manca un testo utilizzabile, la sintesi si ferma.
+2. **Sintesi clinica**. Scegli **Prepara sintesi** dal menu **Altro**.
+   Clicca su **Genera proposta**. Verifica i dati e scegli
+   **Conferma e genera proposta**. Rivedi il riassunto confrontandolo con il
+   documento. Gli eventuali errori restano visibili.
     * *Esempio*: Un referto ospedaliero di 10 pagine può dare luogo a una sintesi
       come: *"Paziente dimesso dopo polmonite. Terapia: Augmentin per 5gg. Controllo RX tra 1 mese."*
 3. **Archiviazione**: documento e sintesi restano associati al paziente,
