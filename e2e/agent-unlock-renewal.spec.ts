@@ -1,3 +1,5 @@
+import Database from 'better-sqlite3';
+import path from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { expect, test } from './fixtures/isolated-runtime';
 import { agentVisitPassphrase, agentVisitPin, createSyntheticAgentMandate } from './agent-visit-utils';
@@ -103,10 +105,26 @@ test('one PIN-approved registration receives a twelve-hour mandate on each unloc
         const replacement = await second.json();
         expect(replacement.receipt.mandateRef).not.toBe(renewed.mandateRef);
         expect((await deposit(credential.token)).status()).toBe(401);
+        const syntheticArchive = new Database(path.join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
+        try {
+            const expiry = Date.now() - 1;
+            expect(syntheticArchive.prepare('UPDATE agent_mandates SET created_at=?,expires_at=? WHERE id=?')
+                .run(expiry - 43200000, expiry, replacement.receipt.mandateRef).changes).toBe(1);
+        } finally { syntheticArchive.close(); }
+        expect((await deposit(replacement.credential.token)).status()).toBe(401);
+        expect((await retrieve()).status()).toBe(401);
+
+        await lock();
+        await unlock();
+        const third = await retrieve();
+        expect(third.status()).toBe(200);
+        const latest = await third.json();
+        const latestContext = await agent.get('/api/agent/v1/context', { headers: bearer(latest.credential.token) });
+        expect(latestContext.status()).toBe(200);
         await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
         await page.getByRole('button', { name: 'Revoca ' + registrationName, exact: true }).click();
         await expect(page.getByRole('button', { name: 'Revoca ' + registrationName, exact: true })).toHaveCount(0);
-        expect((await deposit(replacement.credential.token)).status()).toBe(401);
+        expect((await deposit(latest.credential.token)).status()).toBe(401);
         expect((await retrieve()).status()).toBe(401);
         await lock();
         await unlock();
