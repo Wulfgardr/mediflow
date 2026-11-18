@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { initializeSqliteSchema } from '../sqlite-schema';
 import { createAgentPairingStore } from '../agent-pairing-store';
 import { createAgentMandateStore } from '../agent-mandate-store';
-import { createAgentCassetteStore, readAgentCassettes } from '../agent-cassette-store';
+import { createAgentCassetteStore, readAgentCassette } from '../agent-cassette-store';
 import { readSqliteArchiveGeneration } from '../archive-generation';
 import { AGENT_OPERATIONS, type AgentOperation } from '../agent-mandate-contract';
 import { agentBase64, type AgentCipherContext } from '../agent-cassette-crypto';
@@ -33,5 +33,7 @@ export async function agentCassetteFixture(operations: AgentOperation[] = [...AG
     const anchor = sealAgentItemNode(publicKey, { ...context, itemId: visitId, kind: 'anchor' }, new TextEncoder().encode(JSON.stringify({ fiscalCode: 'SYNTHETIC_CF_6742' })));
     const item = { id: itemId, kind: 'note' as const, envelope: sealAgentItemNode(publicKey, context, bytes), byteLength: bytes.length, documentHash: null };
     return { database, actorRef, generation, mandate, mandates, pairings, store, principal, token, visitId, anchor, item, sentinel, masterKey,
-        rows: () => readAgentCassettes(database), run: <T>(action: () => T) => database.transaction(action).immediate(), advance: (delta: number) => { time += delta; } };
+        rows: () => (database.prepare('SELECT id FROM agent_cassettes ORDER BY deposited_at,id').all() as { id: string }[])
+            .map(({ id }) => readAgentCassette(database, id, actorRef)!),
+        run: <T>(action: () => T) => database.transaction(action).immediate(), advance: (delta: number) => { time += delta; } };
 }

@@ -61,8 +61,13 @@ Cambiare file o identità richiede una nuova visita, anziché riusare il suo UUI
 Il client rifiuta file SQLite, link simbolici e PDF con hash diversi.
 
 La ricevuta `closed` conferma che la visita è stata depositata nella cassetta
-cifrata. Per rileggerla, sblocca MediFlow, apri «In arrivo» e scegli «Aggiorna».
-L’applicazione al dossier seguirà il flusso previsto dall’ADR 0190.
+cifrata. Dopo lo sblocco con passphrase, MediFlow controlla le visite in attesa
+e inserisce nota, trascrizione e PDF con codice fiscale coincidente con la scheda.
+I CF discordanti, mancanti o ambigui bloccano l’applicazione automatica.
+
+In «In arrivo» puoi confrontare i dati della scheda con le proposte, leggere
+il PDF originale e applicare una visita o tutte quelle senza dubbi. Le proposte
+cliniche richiedono la tua conferma.
 
 ## Trasporto MCP
 
