@@ -4,6 +4,7 @@ import path from 'node:path';
 export const UNIT_TEST_GROUPS = Object.freeze(['lib', 'components']);
 export const UNIT_SCRIPT_TESTS = Object.freeze([
   'packages/agent-client/src/credentials.test.ts',
+  'packages/agent-client/src/ambulatorio.test.ts',
   'packages/agent-client/src/visit-client.test.ts',
   'scripts/local-provider-cold-start.test.ts',
   'scripts/measure-cb-redaction.test.ts',
