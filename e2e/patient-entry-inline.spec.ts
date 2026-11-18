@@ -101,3 +101,33 @@ test('la voce inline dichiara il diario non leggibile senza perdere la bozza', a
   await expect(alert).toHaveAttribute('data-view-state', 'error');
   await expect(editor).toHaveText('Bozza sintetica conservata durante il guasto del diario.');
 });
+
+
+test('una risposta persa dopo la scrittura rilegge la stessa voce senza un secondo invio', async ({ page }) => {
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const id = await page.evaluate(async () => {
+    const saved = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      firstName: 'Esito', lastName: 'Sintetico risposta persa', identifierType: 'none', taxCode: '', birthDatePrecision: 'estimated', birthYear: 1984,
+    }) });
+    if (!saved.ok) throw new Error(`Fixture ${saved.status}`);
+    return (await saved.json()).id as string;
+  });
+  await page.goto(`/patients/${id}/modules?voce=nuova`);
+  await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill('Voce sintetica con risposta persa.');
+  let posts = 0;
+  await page.route('**/api/entries', async route => {
+    if (route.request().method() !== 'POST') { await route.continue(); return; }
+    posts += 1;
+    const committed = await route.fetch();
+    expect(committed.status()).toBe(201);
+    await route.abort('connectionreset');
+  });
+  await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
+  await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
+  const receipt = page.getByRole('region', { name: 'Esito della registrazione' });
+  await expect(receipt).toContainText('Registrata alle');
+  await expect(receipt).toContainText('Voce sintetica con risposta persa.');
+  expect(posts).toBe(1);
+  const rows = await page.evaluate(async patientId => (await fetch(`/api/entries?patientId=${patientId}`)).json(), id);
+  expect(rows).toHaveLength(1);
+});

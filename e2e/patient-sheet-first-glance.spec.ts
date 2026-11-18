@@ -105,9 +105,10 @@ test('Terapie: indicazione, periodo e codici si leggono nella riga, e le sezioni
   await expect(pane.getByRole('textbox', { name: 'Principio attivo', exact: true })).toHaveValue('Principio sintetico');
   await expect(pane.getByRole('group', { name: 'Collegamento clinico', exact: true })).toBeVisible();
   await expect(pane.getByRole('combobox', { name: 'Collegamento clinico', exact: true })).toBeVisible();
-  const boundary = () => pane.getByRole('textbox', { name: 'Posologia', exact: true }).evaluate(element => {
+  const boundary = () => pane.getByRole('textbox', { name: 'Posologia', exact: true }).evaluate(async element => {
     const channel = (value: number) => { const unit = value / 255; return unit <= 0.03928 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4; };
     const luminance = (color: string) => { const [red, green, blue] = color.match(/[\d.]+/gu)!.map(Number); return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue); };
+    await Promise.allSettled(element.getAnimations().map(animation => animation.finished));
     const style = getComputedStyle(element);
     const border = luminance(style.borderTopColor);
     const surrounding = getComputedStyle(element.closest('main')!).getPropertyValue('--lume-surface-focal').trim();

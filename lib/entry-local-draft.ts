@@ -9,6 +9,7 @@ export type EntryLocalDraft = {
     entryDate: string;
     dictatedDraft: string;
     sheetStep?: 'review';
+    entryAttempt?: string;
 };
 type Scope = { archive: string; user: string; patient: string };
 type Cipher = { sealLocalDraft(value: unknown): Promise<string>; openLocalDraft(value: string): Promise<unknown> };
