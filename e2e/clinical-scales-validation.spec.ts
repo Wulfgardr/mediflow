@@ -115,7 +115,9 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     expect(writes()).toBe(2);
 });
 
-test('Tinetti POMA-28: all 20 questions and corrections by keyboard, then explicit registration', async ({ page, baseURL }, testInfo) => {
+for (const theme of ['light', 'dark']) test(`Tinetti POMA-28: all 20 questions and corrections by keyboard, then explicit registration (${theme})`, async ({ page, baseURL }, testInfo) => {
+    await page.setViewportSize({ width: 1180, height: 780 });
+    await page.addInitScript(value => localStorage.setItem('mediflow-theme', value), theme);
     const { patientId, writes } = await openSyntheticChart(page, baseURL, 'SCLKBD');
     await page.goto(`/patients/${patientId}/scales`);
     const link = page.getByRole('link', { name: /^Tinetti POMA-28 / });
@@ -123,6 +125,8 @@ test('Tinetti POMA-28: all 20 questions and corrections by keyboard, then explic
     await page.keyboard.press('Enter');
 
     const form = page.locator('#scala');
+    await expect(page.locator('html')).toHaveClass(new RegExp(`(?:^| )${theme}(?: |$)`));
+    expect(await page.evaluate(() => window.visualViewport?.scale)).toBe(1);
     const question = form.getByRole('heading', { level: 3 }).first();
     const zero = form.getByRole('radio', { name: /^0\./ });
     const one = form.getByRole('radio', { name: /^1\./ });
@@ -151,8 +155,31 @@ test('Tinetti POMA-28: all 20 questions and corrections by keyboard, then explic
     await page.keyboard.press('ArrowRight');
     await expect(one).toBeFocused();
     await expect(one).toBeChecked();
-    await expect(one.locator('..')).toHaveCSS('outline-style', 'solid');
-    await capture(testInfo, form, 'tinetti-keyboard-focus');
+    const selected = one.locator('..');
+    const unselected = zero.locator('..');
+    await expect(selected).toHaveAttribute('data-selected', 'true');
+    await expect(unselected).toHaveAttribute('data-selected', 'false');
+    await expect(selected).toHaveCSS('outline-style', 'solid');
+    await capture(testInfo, form, `tinetti-${theme}-keyboard-focus`);
+    const shape = await selected.evaluate(label => {
+        const style = getComputedStyle(label);
+        const selectedColor = document.createElement('span');
+        selectedColor.style.backgroundColor = 'var(--lume-surface-selected)';
+        label.append(selectedColor);
+        const selection = getComputedStyle(selectedColor).backgroundColor;
+        selectedColor.remove();
+        return {
+            radius: style.borderTopLeftRadius,
+            height: label.getBoundingClientRect().height,
+            gap: label.getBoundingClientRect().top - label.previousElementSibling!.getBoundingClientRect().bottom,
+            fillsSelection: style.backgroundColor === selection,
+            outline: parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset),
+        };
+    });
+    await testInfo.attach(`risposta-tinetti-${theme}`, { body: JSON.stringify(shape), contentType: 'application/json' });
+    expect(shape).toMatchObject({ radius: '10px', gap: 0, fillsSelection: true, outline: 0 });
+    expect(shape.height).toBeGreaterThanOrEqual(44);
+    await expect(unselected).toHaveCSS('border-top-left-radius', '10px');
     await page.keyboard.press('Enter');
     await atQuestion(2);
 

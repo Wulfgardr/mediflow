@@ -4,10 +4,22 @@
 .allergies { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 8px 0 0; list-style: none; }
 .allergy { padding: 4px 10px; border: 1px solid var(--lume-signal-warning); border-radius: 999px; color: var(--lume-ink); font: 400 0.8125rem/1.5 var(--lume-font-sans); }
 .actionsMenu { position: relative; }
-.menu { position: fixed; z-index: 40; width: 240px; max-width: calc(100vw - 32px); max-height: min(440px, 70dvh); overflow-y: auto; box-sizing: border-box; }
-.menu > :is(a, button) { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: calc(var(--lume-radius-control) - 4px); font: 0.875rem/1.5 var(--lume-font-sans); color: var(--lume-ink); width: 100%; min-height: 44px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.menu:global(.mf-popover) {
+    --patient-menu-inset: 4px;
+    --patient-menu-border: 1px;
+    position: fixed;
+    z-index: 40;
+    width: 240px;
+    max-width: calc(100vw - 32px);
+    max-height: min(440px, 70dvh);
+    overflow-y: auto;
+    box-sizing: border-box;
+    border-width: var(--patient-menu-border);
+    padding: calc(var(--patient-menu-inset) - var(--patient-menu-border));
+}
+.menu > :is(a, button) { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: calc(var(--lume-radius-control) - var(--patient-menu-inset)); font: 0.875rem/1.5 var(--lume-font-sans); color: var(--lume-ink); width: 100%; min-height: 44px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
 .menu > :is(a, button):is(:hover, :focus-visible):not(:disabled) { background: var(--lume-surface-hover); box-shadow: none; }
-.menu > :is(a, button):focus-visible { outline: 2px solid var(--lume-accent); outline-offset: -2px; }
+.menu:global(.mf-popover) > :is(a, button)[role='menuitem']:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: -2px; }
 .menu > button:disabled { color: var(--lume-ink-muted); cursor: not-allowed; }
 .panels { position: relative; }
 .panelBackdrop { position: fixed; top: var(--patient-panel-top, 100dvh); left: 0; right: 0; bottom: 0; z-index: 40; border: 0; background: color-mix(in srgb, var(--lume-ink) 12%, transparent); cursor: default; }

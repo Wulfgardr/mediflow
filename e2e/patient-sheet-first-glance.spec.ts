@@ -96,8 +96,47 @@ test('Terapie: indicazione, periodo e codici si leggono nella riga, e le sezioni
   await page.keyboard.press('ArrowDown');
   const menu = page.getByRole('menu', { name: 'Azioni terapia Farmaco sintetico attivo', exact: true });
   await expect(menu.getByRole('menuitem', { name: 'Sospendi', exact: true })).toBeFocused();
-  expect(await menu.evaluate(element => parseFloat(getComputedStyle(element).borderTopLeftRadius))).toBeGreaterThan(0);
-  await expect(menu.getByRole('menuitem').last()).toHaveText('Elimina (inserita per errore)');
+  const items = menu.getByRole('menuitem');
+  const last = items.last();
+  await expect(last).toHaveText('Elimina (inserita per errore)');
+  const probeCorner = (item: Locator, end: 'top' | 'bottom') => item.evaluate((element, edge) => {
+    const panel = element.closest('[role=menu]')!;
+    const outer = panel.getBoundingClientRect();
+    const inner = element.getBoundingClientRect();
+    const frame = getComputedStyle(panel);
+    const row = getComputedStyle(element);
+    const left = outer.left;
+    const right = outer.right;
+    const verticalInset = edge === 'top' ? inner.top - outer.top : outer.bottom - inner.bottom;
+    const outline = Math.max(0, parseFloat(row.outlineWidth) + parseFloat(row.outlineOffset));
+    return {
+      panel: [frame.borderTopLeftRadius, frame.borderTopRightRadius, frame.borderBottomLeftRadius, frame.borderBottomRightRadius].map(parseFloat),
+      frameInsets: [parseFloat(frame.borderLeftWidth) + parseFloat(frame.paddingLeft),
+        parseFloat(frame.borderRightWidth) + parseFloat(frame.paddingRight),
+        parseFloat(edge === 'top' ? frame.borderTopWidth : frame.borderBottomWidth) + parseFloat(edge === 'top' ? frame.paddingTop : frame.paddingBottom)],
+      row: (edge === 'top' ? [row.borderTopLeftRadius, row.borderTopRightRadius] : [row.borderBottomLeftRadius, row.borderBottomRightRadius]).map(parseFloat),
+      actualInsets: [inner.left - left, right - inner.right, verticalInset],
+      outline,
+      focusVisible: element.matches(':focus-visible') && row.outlineStyle !== 'none' && parseFloat(row.outlineWidth) >= 2,
+    };
+  }, end);
+  const top = await probeCorner(items.first(), 'top');
+  await test.info().attach('menu-terapia-prima-voce', { body: await menu.screenshot(), contentType: 'image/png' });
+  await page.keyboard.press('End');
+  await expect(last).toBeFocused();
+  const bottom = await probeCorner(last, 'bottom');
+  await test.info().attach('menu-terapia-ultima-voce', { body: await menu.screenshot(), contentType: 'image/png' });
+  await test.info().attach('geometria-menu-terapia', { body: JSON.stringify({ top, bottom }), contentType: 'application/json' });
+  for (const corner of [top, bottom]) {
+    expect(corner.panel).toEqual([10, 10, 10, 10]);
+    expect(corner.focusVisible).toBe(true);
+    corner.actualInsets.forEach((inset, index) => expect(inset).toBeCloseTo(corner.frameInsets[index], 1));
+    corner.row.forEach((radius, index) => {
+      expect(radius).toBeCloseTo(10 - corner.actualInsets[index], 1);
+      expect(radius).toBeCloseTo(10 - corner.actualInsets[2], 1);
+    });
+    expect(corner.outline).toBe(0);
+  }
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
 
