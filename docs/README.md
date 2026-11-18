@@ -55,8 +55,8 @@ consumer nativi, scritture e specifica Punto d’inchiostro. Distingue i test
 di trasporto e dei servizi dalle prove d’uso del bundle installato.
 
 Nel censimento le esclusioni da X01 a X16 figurano come proposte. Il
-13 novembre 2026 le ho approvate per il client GPUI, come
-riporta la nota di rilascio Q-10. Il Web resta disponibile per le
+13 novembre 2026 le ho approvate per il client GPUI. La nota di rilascio
+della 0.9.1 le elencherà una per una. Il Web resta disponibile per le
 funzioni previste.
 
 Il [filone CU](./analysis/2026-10-23-computer-use-procedures.md), aggiunto in coda il 23 ottobre, propone procedure clinico-amministrative con identità locale: [contratti](./analysis/2026-10-23-computer-use-procedure-contracts.md), [fonti verificate e limiti](./analysis/2026-10-23-computer-use-sources.md), [ADR 0162 Proposed](./adr/0162-local-computer-use-executor.md). Il [nucleo CU-1a](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/local-operation-core.md) implementa il protocollo e il servizio locale con adapter simulato. CU-1b deve completare la verticale PRREG sintetica. CU-1 resta incompleta fino all'accettazione di entrambe e nessun servizio istituzionale è qualificato.
