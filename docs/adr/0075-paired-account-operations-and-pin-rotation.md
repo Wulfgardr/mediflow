@@ -1,4 +1,3 @@
-<!-- @Codex -->
 # ADR 0075: operazioni account paired e rotazione PIN
 
 Date: 2026-07-10

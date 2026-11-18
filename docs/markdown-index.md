@@ -81,7 +81,6 @@ distribuzione o sicurezza generale.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 
-<!-- @Codex -->
 ## Consegna 0.8.6
 
 La 0.8.6 è stata pubblicata come sorgente il 20 settembre 2026 per runtime
