@@ -16,7 +16,7 @@ import styles from './twin-synoptic-sheet.module.css';
 export type SheetSource = { kind: 'entry' | 'document'; id: string };
 export type SheetSourceSelection = { source: SheetSource | null; select: (source: SheetSource) => void; close: () => void };
 
-export function PatientSheetSources({ patientId, selection, entries, data, loading, error, onRefresh, onCloseSource, archiveLink, closeLabel, draftPreview }: {
+export function PatientSheetSources({ patientId, selection, entries, data, loading, error, onRefresh, onCloseSource, archiveLink, closeLabel, draftPreview, children }: {
     patientId: string;
     selection: SheetSourceSelection;
     entries?: ClinicalEntry[];
@@ -28,6 +28,7 @@ export function PatientSheetSources({ patientId, selection, entries, data, loadi
     archiveLink?: boolean;
     closeLabel?: string;
     draftPreview?: ReactNode;
+    children?: ReactNode;
 }) {
     const { isPrivacyMode } = usePrivacy();
     const { source, select, close } = selection;
@@ -65,5 +66,6 @@ export function PatientSheetSources({ patientId, selection, entries, data, loadi
                     </li>)}
                 </ul> : <p className={styles.readState}>Nessun documento registrato.</p>}
         {archiveLink && (data?.length ?? 0) > 0 ? <a className="mf-button-text" href="#documenti">Archivio documenti</a> : null}
+        {children}
     </section>;
 }
