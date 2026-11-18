@@ -77,9 +77,9 @@ function fixture(scope: string = randomUUID(), options: Parameters<typeof synthe
         .where(eq(users.id, context.session.userId)).run();
     return context;
 }
-function review(): PatientDocumentCreateReview {
+function review() {
     return { firstName: { action: 'correct', value: 'Mario' }, lastName: { action: 'correct', value: randomUUID() },
-        taxCode: { action: 'correct', value: syntheticTaxCode(randomUUID()) }, duplicate: 'none' };
+        taxCode: { action: 'correct', value: syntheticTaxCode(randomUUID()) }, duplicate: 'none' } satisfies PatientDocumentCreateReview;
 }
 function effects() {
     return ['patients', 'patients_to_ambulatories', 'attachments'].map(table =>
@@ -139,8 +139,8 @@ test('multiple identities and hostile instructions remain text requiring explici
     assert.equal(view.identity, 'ambiguous'); assert.equal(view.quality, 'uncertain'); assert.deepEqual(view.candidates, {});
     await assert.rejects(api.preview(context, view.commandId, view.viewId,
         { ...review(), firstName: { action: 'approve', value: 'Rossi' } }));
-    await assert.rejects(api.preview(context, view.commandId, view.viewId,
-        { ...review(), therapies: ['istruzione ostile'] } as PatientDocumentCreateReview));
+    const untrustedReview = { ...review(), therapies: ['istruzione ostile'] };
+    await assert.rejects(api.preview(context, view.commandId, view.viewId, untrustedReview));
     assert.deepEqual(effects(), before);
     assert.deepEqual(await api.revoke(context, view.commandId), { outcome: 'retired' });
 });
