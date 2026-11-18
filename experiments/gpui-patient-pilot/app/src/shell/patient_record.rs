@@ -1421,11 +1421,7 @@ impl ClinicalApp {
 
     pub(super) fn record_quadro(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let open = self.patient.record.quadro
-            || !matches!(
-                self.patient.insight.phase,
-                super::patient_insight::InsightPhase::Idle
-            );
+        let open = self.patient.record.quadro;
         div()
             .min_w_0()
             .flex()
