@@ -42,7 +42,7 @@ for (const count of [0, 1, 8]) test(`quattro tabelle e conteggi con ${count} rec
     }
     await closureGallery(page, 'quadro', `record-${count}`, quadro(page));
     if (count) {
-        for (const label of ['Codice', 'Descrizione', 'Da quando', 'Nome e dose', 'Posologia', 'ATC', 'Nome', 'Valore', 'Data', 'Variazione', 'Scadenza']) await expect(quadro(page).getByRole('columnheader', { name: label, exact: true }).first()).toBeVisible();
+        for (const label of ['Problema', 'Farmaco e posologia', 'Parametro', 'Valore', 'Controllo', 'Scadenza']) await expect(quadro(page).getByRole('columnheader', { name: label, exact: true, includeHidden: true })).toHaveCount(1);
         await expect(quadro(page).getByRole('cell', { name: '70 kg', exact: true })).toHaveCSS('text-align', 'right');
     }
 });
@@ -65,9 +65,9 @@ test('Parametri recenti conta i parametri e conserva lo storico completo in Para
     await expect(measures.locator('tbody tr')).toHaveCount(2);
     await expect(measures.getByRole('cell', { name: '81 kg', exact: true })).toBeVisible();
     await expect(measures.getByRole('cell', { name: '81000 g', exact: true })).toBeVisible();
-    await expect(measures.getByRole('cell', { name: /^12\/0?9\/2026$/, exact: true })).toHaveCount(2);
-    await expect(measures.getByRole('cell', { name: /^\+1 kg dal 11\/0?9\/2026$/, exact: true })).toBeVisible();
-    await expect(measures.getByRole('cell', { name: /^\+1000 g dal 11\/0?9\/2026$/, exact: true })).toBeVisible();
+    await expect(measures.getByText(/12\/0?9\/2026/)).toHaveCount(2);
+    await expect(measures.getByText(/\+1 kg dal 11\/0?9\/2026/)).toBeVisible();
+    await expect(measures.getByText(/\+1000 g dal 11\/0?9\/2026/)).toBeVisible();
     await closureGallery(page, 'quadro', 'aggregazione-unita-e-storico', quadro(page));
     await openPatientSection(page, 'parametri');
     const history = page.getByRole('complementary', { name: 'Andamento e storia delle misure' });
@@ -124,17 +124,17 @@ test('lettura paziente fallita non annuncia problemi assenti', async ({ page }) 
 for (const width of [1440, 768, 390]) test(`colonne leggibili a ${width} e Diario simultaneo in estesa`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
     await fixture(page, 1);
-    for (const name of ['Da quando', 'ATC', 'Variazione']) {
-        const column = quadro(page).getByRole('columnheader', { name, exact: true });
-        if (width > 1000) await expect(column).toBeVisible(); else await expect(column).toBeHidden();
-    }
+    for (const name of ['Da quando', 'ATC', 'Variazione']) await expect(quadro(page).getByRole('columnheader', { name, exact: true, includeHidden: true })).toHaveCount(0);
     await assertNoHorizontalOverflow(page, [{ label: 'Quadro', selector: '#quadro' }, { label: 'Pagina', selector: 'document' }]);
     await expect(quadro(page).getByRole('cell', { name: '1 compressa al mattino' })).toHaveCSS('font-size', '14px');
     if (width > 1000) {
-        const sheet = await quadro(page).boundingBox(); const diary = await page.locator('#diario').boundingBox();
-        expect(Math.abs(sheet!.y - diary!.y)).toBeLessThan(2);
-        expect(sheet!.x + sheet!.width).toBeLessThanOrEqual(diary!.x);
-        expect(sheet!.width).toBeGreaterThan(430);
+        const facts = await quadro(page).locator('[data-zone="facts"]').boundingBox(); const care = await quadro(page).locator('[data-zone="care"]').boundingBox();
+        const diary = await page.locator('#diario').boundingBox();
+        expect(Math.abs(facts!.y - diary!.y)).toBeLessThan(2);
+        expect(facts!.x + facts!.width).toBeLessThanOrEqual(diary!.x);
+        expect(diary!.x + diary!.width).toBeLessThanOrEqual(care!.x);
+        expect(facts!.width).toBeGreaterThanOrEqual(260);
+        expect(care!.width).toBeGreaterThanOrEqual(320);
         expect(diary!.width).toBeGreaterThan(380);
     }
 });
