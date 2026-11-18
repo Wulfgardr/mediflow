@@ -13,9 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         proof:
-          - verdict: base
-            revision: 8abbef40c
-          - verdict: diff
+          - verdict: full-diff
             revision: b357222d6
     env:
       MEDIFLOW_NEXT_DIST_DIR: .next-e2e
@@ -43,6 +41,37 @@ jobs:
           console.log(browser.version())
           await browser.close()
           NODE
+      - name: Provision pinned local OCR artifacts
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { createHash } from 'node:crypto';
+          const manifest = JSON.parse(fs.readFileSync('scripts/anydoc-tesseract-artifacts.json', 'utf8'));
+          const core = 'https://cdn.jsdelivr.net/npm/tesseract.js-core@6.0.0/';
+          const data = 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/87416418657359cb625c412a48b6e1d6d41c29bd/';
+          const sources = {
+            'tesseract-core-lstm.js': core + 'tesseract-core-lstm.js',
+            'tesseract-core-lstm.wasm': core + 'tesseract-core-lstm.wasm',
+            'LICENSE': core + 'LICENSE',
+            'ita.traineddata': data + 'ita.traineddata',
+            'tessdata-LICENSE': data + 'LICENSE',
+          };
+          const verified = [];
+          for (const file of manifest.files) {
+            if (!Object.hasOwn(sources, file.name)) throw new Error('Unknown OCR artifact');
+            const response = await fetch(sources[file.name], { signal: AbortSignal.timeout(60000) });
+            if (!response.ok) throw new Error(`OCR artifact ${file.name}: HTTP ${response.status}`);
+            const bytes = Buffer.from(await response.arrayBuffer());
+            if (bytes.length !== file.byteLength || createHash('sha256').update(bytes).digest('hex') !== file.sha256)
+              throw new Error(`OCR artifact ${file.name}: size or SHA-256 mismatch`);
+            verified.push([file.name, bytes]);
+          }
+          fs.mkdirSync(manifest.directory);
+          for (const [name, bytes] of verified) fs.writeFileSync(path.join(manifest.directory, name), bytes, { flag: 'wx' });
+          console.log(`Local OCR: ${verified.length} pinned artifacts verified.`);
+          NODE
+          npm run check:anydoc-desktop-ocr
       - name: Build synthetic isolated runtime
         run: |
           test -z "$(git status --porcelain)"
@@ -73,26 +102,32 @@ jobs:
             MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint,
           })) console.log(`${key}=${value}`);
           NODE
-      - name: Check the base fails at Prosegui
-        if: matrix.proof.verdict == 'base'
+      - name: Run the direct and Dossier gestures against isolated synthetic runtimes
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3123
+          E2E_PIN: "1234"
         run: |
-          set +e
-          CI= npm run test:e2e -- e2e/patient-document-create.spec.ts --grep 'data di nascita esatta' --reporter=list,html 2>&1 | tee red.log
-          playwright_exit=${PIPESTATUS[0]}
-          set -e
-          test "$playwright_exit" = 1
-          grep -E 'Expected:[[:space:]]+enabled' red.log
-          grep -E 'Received:[[:space:]]+disabled' red.log
-          grep -F 'Nome, cognome e nascita devono permettere di proseguire' red.log
-      - name: Run the corrected Web and Dossier gestures
-        if: matrix.proof.verdict == 'diff'
-        run: CI= npm run test:e2e -- e2e/patient-document-create.spec.ts e2e/dossier-import.spec.ts --grep 'nuova scheda da documento|nuova scheda senza identificativo|Dossier senza CF|risposta persa|annullamento' --reporter=list,html
+          MEDIFLOW_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-dossier-data.XXXXXX")"
+          export MEDIFLOW_DATA_DIR MEDIFLOW_E2E_DATA_DIR="$MEDIFLOW_DATA_DIR"
+          export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 E2E_DISABLE_LEGACY_COPY=1
+          printf 'Synthetic legacy Dossier E2E\n' > "$MEDIFLOW_DATA_DIR/SYNTHETIC_ONLY"
+          node scripts/prepare-e2e-db.mjs
+          (cd "$E2E_ISOLATED_STANDALONE_DIR" && NODE_ENV=production HOSTNAME=127.0.0.1 PORT=3123 exec node server.js) > "$RUNNER_TEMP/dossier-server.log" 2>&1 &
+          dossier_server_pid=$!
+          trap 'kill "$dossier_server_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..45}; do
+            if curl -fsS "$E2E_BASE_URL/api/auth/check" > /dev/null; then break; fi
+            kill -0 "$dossier_server_pid"
+            sleep 1
+          done
+          curl -fsS "$E2E_BASE_URL/api/auth/check" > /dev/null
+          CI= npm run test:e2e -- e2e/dossier-import.spec.ts e2e/patient-document-create.spec.ts --grep 'Dossier: cartella sintetica|Dossier senza CF|data di nascita esatta|nuova scheda da documento: revisione|nuova scheda senza identificativo|risposta persa|annullamento' --reporter=list,html
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: web-document-identity-${{ matrix.proof.verdict }}-chrome
           path: |
-            red.log
+            ${{ runner.temp }}/dossier-server.log
             playwright-report
             test-results
           if-no-files-found: ignore
