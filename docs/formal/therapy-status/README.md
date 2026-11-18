@@ -20,6 +20,11 @@ CAS e ricevute sono gli stessi. Il conflitto fra due sessioni è stato
 riprovato a mano prima e dopo, con lo stesso esito. Le transizioni della
 terapia restano quelle del modello esistente.
 
+Nel commit `5b5ca9321` la cella «Periodo» delle terapie concluse mostra
+anche la data di inizio, quando presente. La prova browser in
+`e2e/patient-sheet-first-glance.spec.ts` verifica che il medico possa
+leggere entrambe le date a 1440 e 768 px di larghezza.
+
 ## Raccordo schema 16 del 18 novembre 2026
 
 Le due tabelle di ADR 0190 registrano client e mandati emessi allo sblocco.
