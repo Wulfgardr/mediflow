@@ -37,6 +37,16 @@ test('invalid or incomplete agent provenance cannot produce a clinical write', (
     }
 });
 
+test('missing and non-string provenance references roll back the clinical writes', () => {
+    for (const invalid of [
+        { proposerRef: undefined }, { proposerRef: null }, { mandateRef: undefined }, { mandateRef: null }, { mandateRef: 42 },
+    ]) {
+        const claimed = { ...agentProvenance, ...invalid } as unknown as typeof agentProvenance;
+        assert.throws(() => composeAll('invalid-agent-reference', { agentProvenance: claimed }), /Invalid agent audit provenance/);
+        assert.deepEqual(compositionSnapshot(), before);
+    }
+});
+
 test('agent success requires user author and complete provenance on the agent surface', () => {
     const generation = bindSyntheticArchiveSessions('synthetic-agent-audit-negative');
     const base = { archiveGeneration: generation, actorType: 'user' as const, actorRef: session.userId,

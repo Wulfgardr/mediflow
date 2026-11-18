@@ -5,7 +5,7 @@ import { AGENT_OPERATIONS, type AgentOperation } from '../lib/agent-mandate-cont
 
 export const agentVisitPin = '24682468';
 export const agentVisitPassphrase = 'mandato sintetico visita novembre';
-export async function pairSyntheticVisitAgent(page: Page, agent: APIRequestContext, operations: AgentOperation[] = [...AGENT_OPERATIONS]) {
+export async function createSyntheticAgentMandate(page: Page) {
     const pin = agentVisitPin, passphrase = agentVisitPassphrase;
     await bootstrapUnlockedSession(page, pin);
     await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
@@ -33,6 +33,11 @@ export async function pairSyntheticVisitAgent(page: Page, agent: APIRequestConte
     const created = await creation; expect(created.status()).toBe(201);
     const mandate = created.request().postDataJSON().mandate;
     expect(mandate.durationMs).toBe(43200000);
+    return mandate;
+}
+
+export async function pairSyntheticVisitAgent(page: Page, agent: APIRequestContext, operations: AgentOperation[] = [...AGENT_OPERATIONS]) {
+    const mandate = await createSyntheticAgentMandate(page);
     const request = await agent.post('/api/agent/v1/pairings', { data: { name: 'Synthetic cassette client', operations } });
     expect(request.status()).toBe(201);
     const requested = await request.json();

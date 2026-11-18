@@ -730,12 +730,14 @@ export function validateDelegatedRouteAudit({ spec, routeSource, serviceSource }
 export function serviceAuditContract(handler, mode, operation, resource) {
     const suffix = resource === 'item' ? 'ServicePrescriptionItem' : 'ServicePrescription';
     const serviceExport = `${operation}${mode === 'host' ? 'Host' : 'NetworkScoped'}${suffix}`;
+    const sharedItemCreation = operation === 'create' && resource === 'item';
     const ownerName = operation === 'update' ? (resource === 'item' ? 'updateServicePrescriptionItem' : 'updateServicePrescription')
-        : operation === 'create' && resource === 'item' ? 'createServicePrescriptionItem' : serviceExport;
+        : sharedItemCreation && mode === 'network' ? 'createServicePrescriptionItem' : serviceExport;
     return {
-        handler, serviceModule: '@/lib/service-prescription-write', serviceExport,
+        handler, mode, serviceModule: '@/lib/service-prescription-write', serviceExport,
         ownerFile: 'lib/service-prescription-write.ts', ownerName,
-        ...(ownerName !== serviceExport ? { hop: { target: ownerName, argumentIndex: operation === 'create' ? 2 : 2, literal: mode } } : {}),
+        ...(ownerName !== serviceExport ? { hop: { target: ownerName, argumentIndex: 2, literal: mode } } : {}),
+        sharedItemCreation,
         target: `service-${resource}.${mode}.${operation}`, operation, resource, transactionalService: true,
         eventType: `service.${resource === 'item' ? 'prescription_item' : 'prescription'}.${operation}d`,
     };
@@ -764,8 +766,42 @@ export function normalizeSynchronousTransactionCore(coreSource, ownerName) {
         + coreSource.slice(wrapper.body.end);
 }
 
+function synchronousServiceItemCreation(core, callback, mode) {
+    const { sourceFile, checker } = core;
+    const writerName = 'createServicePrescriptionItemInTransaction';
+    const adapterName = 'createHostServicePrescriptionItemInTransaction';
+    const writer = namedFunction(sourceFile, writerName);
+    const adapter = mode === 'host' ? namedFunction(sourceFile, adapterName, true) : null;
+    if (!writer || (mode === 'host' && !adapter)) return null;
+    const delegates = adapter ? [adapter, writer] : [writer];
+    if (delegates.some(delegate => !delegate.body
+        || ts.getModifiers(delegate)?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+        || !delegate.parameters[0] || !ts.isIdentifier(delegate.parameters[0].name)
+        || bindingIsWritten(sourceFile, checker, checker.getSymbolAtLocation(delegate.name)))) return null;
+    const tx = callback.parameters[0].name;
+    const entry = unwrap(callback.body);
+    const tokens = node => sourceTokens(node.getText(sourceFile));
+    const expectedEntry = mode === 'host'
+        ? `${adapterName}(${tx.text}, context, rawBody)`
+        : `${writerName}(${tx.text}, context, body, surface, authorizeCommit)`;
+    if (!ts.isCallExpression(entry) || tokens(entry) !== sourceTokens(expectedEntry)
+        || !exactIdentifierBinding(checker, unwrap(entry.expression), checker.getSymbolAtLocation(delegates[0].name))
+        || !exactIdentifierBinding(checker, entry.arguments[0], checker.getSymbolAtLocation(tx))) return null;
+    if (adapter) {
+        const calls = bindingCalls(adapter, checker, checker.getSymbolAtLocation(writer.name));
+        const [call] = calls;
+        const adapterTx = adapter.parameters[0].name;
+        if (calls.length !== 1 || !ts.isReturnStatement(call.parent) || call.parent.parent !== adapter.body
+            || !isReachableCall(call, adapter)
+            || tokens(call) !== sourceTokens(`${writerName}(${adapterTx.text}, context, parsed.data, 'host', null)`)
+            || !exactIdentifierBinding(checker, call.arguments[0], checker.getSymbolAtLocation(adapterTx))
+            || bindingIsWritten(adapter.body, checker, checker.getSymbolAtLocation(adapterTx))) return null;
+    }
+    return delegates;
+}
+
 export function validateRequiredServiceAudit({ spec, routeSource, coreSource }) {
-    coreSource = normalizeSynchronousTransactionCore(coreSource, spec.ownerName);
+    if (!spec.sharedItemCreation) coreSource = normalizeSynchronousTransactionCore(coreSource, spec.ownerName);
     const problems = validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
     const core = checkedSource(spec.ownerFile, coreSource);
     const owner = namedFunction(core.sourceFile, spec.ownerName);
@@ -785,18 +821,25 @@ export function validateRequiredServiceAudit({ spec, routeSource, coreSource }) 
     const behavior = options && ts.isObjectLiteralExpression(options) ? exactPropertyAssignments(options, ['behavior'])?.get('behavior')?.initializer : null;
     if (!transaction || transaction.arguments.length !== 2 || !ts.isReturnStatement(transaction.parent)
         || transaction.parent.parent !== owner.body || !isReachableCall(transaction, owner)
-        || !callback || !ts.isArrowFunction(callback) || !ts.isBlock(callback.body)
+        || !callback || !ts.isArrowFunction(callback)
+        || ts.getModifiers(callback)?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)
         || callback.parameters.length !== 1 || !ts.isIdentifier(callback.parameters[0].name)
         || !behavior || !ts.isStringLiteral(behavior) || behavior.text !== 'immediate') {
         return [...problems, 'service owner must directly return one synchronous immediate transaction'];
     }
-    const txName = callback.parameters[0].name.text;
-    const auditCalls = bindingCalls(owner, core.checker, writer.symbol);
+    const delegates = spec.sharedItemCreation ? synchronousServiceItemCreation(core, callback, spec.mode) : [];
+    if (!delegates) return [...problems, 'service item creation must directly delegate on the same synchronous transaction and surface'];
+    const auditOwner = delegates.at(-1) ?? callback;
+    if (!ts.isBlock(auditOwner.body)) return [...problems, 'service mutation must have a synchronous transaction body'];
+    for (const delegate of delegates) visit(delegate);
+    const txBinding = core.checker.getSymbolAtLocation(auditOwner.parameters[0].name);
+    if (bindingIsWritten(auditOwner.body, core.checker, txBinding))
+        return [...problems, 'service transaction binding must not change'];
+    const auditCalls = [owner, ...delegates].flatMap(scope => bindingCalls(scope, core.checker, writer.symbol));
     const audit = auditCalls.length === 1 ? auditCalls[0] : null;
-    const statements = [...callback.body.statements]; const auditIndex = statements.indexOf(audit?.parent);
-    if (!audit || audit.arguments.length !== 2 || !ts.isIdentifier(unwrap(audit.arguments[0]))
-        || unwrap(audit.arguments[0]).text !== txName || auditIndex < 2
-        || !ts.isExpressionStatement(audit.parent) || !isReachableStandaloneCall(audit, callback)) {
+    const statements = [...auditOwner.body.statements]; const auditIndex = statements.indexOf(audit?.parent);
+    if (!audit || audit.arguments.length !== 2 || !exactIdentifierBinding(core.checker, unwrap(audit.arguments[0]), txBinding)
+        || auditIndex < 2 || !isReachableStandaloneCall(audit, auditOwner)) {
         return [...problems, 'service audit must be direct, exactly once, on the same transaction'];
     }
     const input = unwrap(audit.arguments[1]);
@@ -808,7 +851,7 @@ export function validateRequiredServiceAudit({ spec, routeSource, coreSource }) 
     const dml = calls.filter((node) => {
         const callee = unwrap(node.expression); const target = node.arguments[0] && unwrap(node.arguments[0]);
         return ts.isPropertyAccessExpression(callee) && ['insert', 'update', 'delete'].includes(callee.name.text)
-            && ts.isIdentifier(callee.expression) && callee.expression.text === txName
+            && exactIdentifierBinding(core.checker, callee.expression, txBinding)
             && target && ts.isIdentifier(target) && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(target), table.symbol);
     });
     const expected = spec.resource === 'parent' && spec.operation === 'delete' ? 2 : 1;
@@ -817,7 +860,7 @@ export function validateRequiredServiceAudit({ spec, routeSource, coreSource }) 
         return ts.isPropertyAccessExpression(callee) && ['insert', 'update', 'delete'].includes(callee.name.text)
             && target && ts.isIdentifier(target) && ['servicePrescriptions', 'servicePrescriptionItems'].includes(target.text);
     });
-    if (dml.length !== 1 || allDomainWrites.length !== expected || !allDomainWrites.every((node) => node.pos > callback.body.pos && node.end < audit.pos))
+    if (dml.length !== 1 || allDomainWrites.length !== expected || !allDomainWrites.every((node) => node.pos > auditOwner.body.pos && node.end < audit.pos))
         problems.push('service DML must run once inside the transaction before audit');
     const between = statements.slice(0, auditIndex).map((node) => node.getText(core.sourceFile)).join(' ');
     if (!/\.changes\s*!==\s*1/u.test(between) || (expected === 2 && !/children\.changes\s*!==\s*childCount/u.test(between)))

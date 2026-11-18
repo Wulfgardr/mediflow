@@ -5,6 +5,9 @@ import type { AgentOperation } from './agent-mandate-contract';
 import { createAgentMandateStore } from './agent-mandate-store';
 import { AGENT_ITEM_OPERATION, cassetteItems, validAgentCassetteItem, type AgentCassette } from './agent-cassette-contract';
 import { isAgentId, validAgentEnvelope } from './agent-cassette-crypto';
+import type { AgentCassetteIndexEntry, AgentCassetteIndexPage } from './agent-visit-application-contract';
+
+export const AGENT_CASSETTE_COMPLETE = 'cassette_complete';
 
 export class AgentCassetteDenied extends Error {
     constructor(readonly status: 400 | 403 | 404 | 409) { super('AGENT_CASSETTE_DENIED'); }
@@ -12,8 +15,28 @@ export class AgentCassetteDenied extends Error {
 const projection = `id,mandate_ref AS mandateRef,agent_ref AS agentRef,actor_ref AS actorRef,archive_generation AS archiveGeneration,
     public_key AS publicKey,wrapped_private_key AS wrappedPrivateKey,model_provider AS modelProvider,allows_clinical_egress AS allowsClinicalEgress,
     anchor_ciphertext AS anchorCiphertext,items_ciphertext AS itemsCiphertext,status,revision,deposited_at AS depositedAt,modified_at AS modifiedAt`;
-export function readAgentCassettes(database: Database.Database): AgentCassette[] {
-    return database.prepare(`SELECT ${projection} FROM agent_cassettes ORDER BY deposited_at,id`).all() as AgentCassette[];
+export function readAgentCassette(database: Database.Database, id: string, actorRef: string): AgentCassette | undefined {
+    return database.prepare(`SELECT ${projection} FROM agent_cassettes WHERE id=? AND actor_ref=?`).get(id, actorRef) as AgentCassette | undefined;
+}
+export function readAgentCassetteIndex(database: Database.Database, actorRef: string, after: string | null): AgentCassetteIndexPage {
+    const pageSize = 64;
+    const rows = database.prepare(`SELECT cassette.id, cassette.archive_generation AS archiveGeneration, cassette.status,
+        cassette.revision, cassette.deposited_at AS depositedAt
+        FROM agent_cassettes AS cassette WHERE cassette.actor_ref=?
+        AND (? IS NULL OR (cassette.deposited_at, cassette.id) >
+            (SELECT cursor.deposited_at, cursor.id FROM agent_cassettes AS cursor WHERE cursor.actor_ref=? AND cursor.id=?))
+        AND NOT EXISTS (
+            SELECT 1 FROM audit_events AS event
+            WHERE event.event_type='agent.visit.applied' AND event.actor_ref=cassette.actor_ref
+            AND event.subject_type='agent_operation' AND event.subject_ref=cassette.id
+            AND event.proposer_ref=cassette.agent_ref AND event.mandate_ref=cassette.mandate_ref
+            AND event.outcome='success' AND event.source_surface='agent'
+            AND EXISTS (SELECT 1 FROM json_each(
+                CASE WHEN json_valid(event.redacted_metadata) THEN event.redacted_metadata ELSE '{}' END, '$.flags'
+            ) WHERE value=?)
+        ) ORDER BY cassette.deposited_at, cassette.id LIMIT ?`).all(actorRef, after, actorRef, after, AGENT_CASSETTE_COMPLETE, pageSize + 1) as AgentCassetteIndexEntry[];
+    const visits = rows.slice(0, pageSize);
+    return { visits, next: rows.length > pageSize ? visits.at(-1)!.id : null };
 }
 export function createAgentCassetteStore(database: Database.Database, now = Date.now) {
     function admit(principal: AgentPrincipal, operation: AgentOperation) {
@@ -23,7 +46,7 @@ export function createAgentCassetteStore(database: Database.Database, now = Date
         return mandate;
     }
     function read(id: string, principal: AgentPrincipal): AgentCassette {
-        const value = database.prepare(`SELECT ${projection} FROM agent_cassettes WHERE id=?`).get(id) as AgentCassette | undefined;
+        const value = readAgentCassette(database, id, principal.actorRef);
         if (!value || value.agentRef !== principal.agentRef || value.mandateRef !== principal.mandateRef || value.archiveGeneration !== principal.archiveGeneration) throw new AgentCassetteDenied(404);
         return value;
     }
