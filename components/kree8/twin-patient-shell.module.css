@@ -98,3 +98,8 @@
 @media (min-width: 1280px) {
  :global(html[data-twin-composition='stream']) .patientCanvas .patientBody[data-folder-section='quadro'] { max-width: 1180px; }
 }
+
+@media (min-width: 1000px) {
+ .patientCanvas[data-folder-section='quadro'] .patientHeader { padding-block: 14px; }
+ .patientBody[data-folder-section='quadro'] { padding-block-start: 18px; }
+}

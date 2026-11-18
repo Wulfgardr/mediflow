@@ -32,9 +32,14 @@
 .sheet[data-overview] :global(.lume-section-heading > span) { font: var(--type-meta); }
 .sheet[data-overview] :is(.stable, .contextRows) :is(th, td):is(.secondaryColumn) { display: none; }
 .sheet[data-overview] .stable :is(th, td) { height: auto; }
-.sheet[data-overview] .stable td { padding-block: 7px; }
+.sheet[data-overview] .stable td { padding-block: 5px; }
 .sheet[data-overview] .problems th:first-child { width: 3.5rem; }
-.sheet[data-overview] .therapies th:first-child { width: 57%; }
+.sheet[data-overview] .therapies th:first-child { width: 54%; }
+.sheet[data-overview] .therapies td { vertical-align: top; overflow-wrap: anywhere; }
+.diaryTools { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.diaryTools button { padding: 3px 0; text-align: start; font: var(--type-meta); color: var(--lume-accent); font-weight: 600; }
+.diaryTools button:hover { text-decoration: underline; }
+@media (pointer: coarse) { .changeItems .changeDetails summary, .diaryTools button { min-height: 44px; } }
 .sheet[data-overview] .measures th:first-child { width: 36%; }
 .sheet[data-overview] .measures th:nth-child(2) { width: 29%; }
 .support > :global([data-testid='patient-proposals-summary']) { flex-wrap: wrap; gap: 6px; }
@@ -63,6 +68,27 @@
 .changeDetails[open] summary svg { transform: rotate(180deg); }
 .changeDetails summary > strong { color: var(--lume-ink); }
 .changeDetails[open] p { margin-block: 5px; }
+.changeDateGroup { padding-bottom: 4px; }
+.changeGroup { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
+.groupLabel, .changeGroup > .outOfRange { flex: 0 0 7.5rem; font: var(--type-meta); font-weight: 600; }
+.changeItems {
+    flex: 1 1 11rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 10px;
+}
+.changeItems > li { min-width: 0; max-width: 100%; }
+.changeItems > li:has(details[open]) { flex: 1 1 100%; }
+.changeItems .changeDetails summary { gap: 3px 5px; justify-content: flex-start; padding-block: 2px; }
+.changeItems .changeDetails[open] { padding-bottom: 5px; }
+.changeItems .changeDetails summary > span { flex: none; }
+.changeItems a, .changeItems button { overflow-wrap: anywhere; }
+.activityLink { display: inline-block; padding-block: 5px; color: var(--lume-accent); font: var(--type-meta); font-weight: 600; }
+.activityLink:hover { text-decoration: underline; }
 .outOfRange { color: var(--lume-signal-critical); }
 .activityToggle { display: flex; align-items: center; gap: 8px; padding-block: 6px; }
 .readState { margin-block: 6px; color: var(--lume-ink-muted); font: var(--type-meta); }
@@ -73,6 +99,12 @@
 .fullDiary { display: none; }
 :global([data-folder-section='quadro']) .middle :global(#diario > [data-section-header] > h3) { flex-basis: auto; }
 @media (min-width: 1000px) {
+    .diaryTools[data-reading='true'] {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--lume-surface-focal);
+    }
     :global([data-folder-section='quadro']) .sheet[data-overview] { grid-template-columns: minmax(0, 1fr) minmax(270px, 340px); }
     .side .context { display: contents; }
     .composer { order: -1; }
@@ -107,7 +139,7 @@
     .activity { order: -3; }
     .stable { order: -2; }
     .contextRows { order: 2; }
-    :global([data-folder-section='quadro']) .middle :global(#diario:not(:target) [role='feed'] > article:nth-of-type(n + 6)) { display: none; }
+    :global([data-folder-section='quadro']) .sheet:not([data-full-diary]) .middle :global(#diario:not(:target) [role='feed'] > article:nth-of-type(n + 6)) { display: none; }
     :global([data-folder-section='quadro']) .fullDiary { display: inline-flex; justify-self: start; order: 1; }
 }
 @media (min-width: 700px) and (max-width: 999px) {

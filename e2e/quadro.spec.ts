@@ -42,7 +42,9 @@ for (const count of [0, 1, 8]) test(`quattro tabelle e conteggi con ${count} rec
     }
     await closureGallery(page, 'quadro', `record-${count}`, quadro(page));
     if (count) {
-        for (const label of ['Codice', 'Descrizione', 'Da quando', 'Nome e dose', 'Posologia', 'ATC', 'Nome', 'Valore', 'Data', 'Variazione', 'Scadenza']) await expect(quadro(page).getByRole('columnheader', { name: label, exact: true }).first()).toBeVisible();
+        for (const label of ['Codice', 'Descrizione', 'Nome e dose', 'Posologia', 'Nome', 'Valore', 'Data', 'Scadenza']) await expect(quadro(page).getByRole('columnheader', { name: label, exact: true }).first()).toBeVisible();
+        await expect(quadro(page).getByRole('table', { name: 'Problemi' }).getByRole('cell', { name: /Problema sintetico 1.*01\/10\/2026/ })).toBeVisible();
+        await expect(quadro(page).getByRole('table', { name: 'Terapie attive' }).getByRole('cell', { name: /Farmaco sintetico 1.*SYN0/ })).toBeVisible();
         await expect(quadro(page).getByRole('cell', { name: '70 kg', exact: true })).toHaveCSS('text-align', 'right');
     }
 });
@@ -63,11 +65,9 @@ test('Parametri recenti conta i parametri e conserva lo storico completo in Para
     const measures = quadro(page).getByRole('region', { name: 'Parametri recenti', exact: true });
     await expect(measures.getByRole('heading')).toContainText('2 parametri');
     await expect(measures.locator('tbody tr')).toHaveCount(2);
-    await expect(measures.getByRole('cell', { name: '81 kg', exact: true })).toBeVisible();
-    await expect(measures.getByRole('cell', { name: '81000 g', exact: true })).toBeVisible();
+    await expect(measures.getByRole('cell', { name: /^81 kg \+1 kg dal 11\/0?9\/2026$/ })).toBeVisible();
+    await expect(measures.getByRole('cell', { name: /^81000 g \+1000 g dal 11\/0?9\/2026$/ })).toBeVisible();
     await expect(measures.getByRole('cell', { name: /^12\/0?9\/2026$/, exact: true })).toHaveCount(2);
-    await expect(measures.getByRole('cell', { name: /^\+1 kg dal 11\/0?9\/2026$/, exact: true })).toBeVisible();
-    await expect(measures.getByRole('cell', { name: /^\+1000 g dal 11\/0?9\/2026$/, exact: true })).toBeVisible();
     await closureGallery(page, 'quadro', 'aggregazione-unita-e-storico', quadro(page));
     await openPatientSection(page, 'parametri');
     const history = page.getByRole('complementary', { name: 'Andamento e storia delle misure' });
@@ -130,19 +130,22 @@ test('lettura paziente fallita non annuncia problemi assenti', async ({ page }) 
 for (const width of [1440, 768, 390]) test(`colonne leggibili a ${width} e Diario simultaneo in estesa`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
     await fixture(page, 1);
-    for (const name of ['Da quando', 'ATC', 'Variazione']) {
-        const column = quadro(page).getByRole('columnheader', { name, exact: true });
-        if (width > 1000) await expect(column).toBeVisible(); else await expect(column).toBeHidden();
-    }
+    const problems = quadro(page).getByRole('region', { name: 'Problemi', exact: true });
+    const therapies = quadro(page).getByRole('region', { name: 'Terapie attive', exact: true });
+    await expect(problems.getByRole('cell', { name: /Problema sintetico 1.*01\/10\/2026/ })).toBeVisible();
+    await expect(therapies.getByRole('cell', { name: /Farmaco sintetico 1.*SYN0/ })).toBeVisible();
     await assertNoHorizontalOverflow(page, [{ label: 'Quadro', selector: '#quadro' }, { label: 'Pagina', selector: 'document' }]);
     await expect(quadro(page).getByRole('cell', { name: '1 compressa al mattino' })).toHaveCSS('font-size', '14px');
-    if (width > 1000) {
-        const sheet = await quadro(page).boundingBox(); const diary = await page.locator('#diario').boundingBox();
-        expect(Math.abs(sheet!.y - diary!.y)).toBeLessThan(2);
-        expect(sheet!.x + sheet!.width).toBeLessThanOrEqual(diary!.x);
-        expect(sheet!.width).toBeGreaterThan(430);
-        expect(diary!.width).toBeGreaterThan(380);
-    }
+    const problemBox = (await problems.boundingBox())!;
+    const therapyBox = (await therapies.boundingBox())!;
+    if (width >= 1280) {
+        const diary = (await page.locator('#diario').boundingBox())!;
+        expect(problemBox.x + problemBox.width).toBeLessThanOrEqual(diary.x);
+        expect(diary.width).toBeGreaterThan(380);
+    } else if (width >= 700) {
+        expect(problemBox.y).toBeCloseTo(therapyBox.y, 0);
+        expect(problemBox.x + problemBox.width).toBeLessThanOrEqual(therapyBox.x);
+    } else expect(problemBox.y + problemBox.height).toBeLessThanOrEqual(therapyBox.y);
 });
 
 async function capture(page: Page, suffix: string) {

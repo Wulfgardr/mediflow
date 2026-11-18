@@ -41,14 +41,16 @@ async function seed(page: Page, { crowded = false, twin = false, withDocument = 
         const suspendedName = twin ? 'Terapia sospesa gemella' : 'Terapia sospesa sintetica';
         const active = await post('therapies', { patientId: patient.id, drugName: activeName, dosage: twin ? '2 alla sera' : '1 al mattino', status: 'active', startDate: '2026-01-12T12:00:00Z' });
         const changed = await post('therapies', { patientId: patient.id, drugName: suspendedName, dosage: '1 la sera', status: 'suspended', startDate: '2026-01-15T12:00:00Z' });
-        await post('entries', { patientId: patient.id, type: 'phone', date: '2026-02-24T10:00:00Z', title: 'Telefonata sintetica', content: twin ? 'Contatto sintetico su un orario.' : 'Telefonata di archivio.' });
+        await post('entries', { patientId: patient.id, type: 'phone', date: crowded && !twin ? '2026-02-19T18:00:00Z' : '2026-02-24T09:00:00Z',
+            title: 'Telefonata sintetica', content: twin ? 'Contatto sintetico su un orario.' : crowded ? 'Riferisce crampi e debolezza.' : 'Telefonata di archivio.' });
         let observationId: string | undefined;
         let previousObservationId: string | undefined;
         if (crowded) {
             for (let index = 9; index < 19; index++) {
                 await post('therapies', {
-                    patientId: patient.id, drugName: `Altra terapia sintetica ${index}`, dosage: '1 ogni sera', status: 'completed',
-                    startDate: '2026-01-15T12:00:00Z', endDate: `2026-02-${String(index).padStart(2, '0')}T12:00:00Z`,
+                    patientId: patient.id, drugName: `${twin ? 'Analogo' : 'Farmaco'} ${index}`, dosage: index === 9 ? 'Una compressa al mattino e mezza dopo il pasto della sera' : '1 ogni sera',
+                    status: index < 15 ? 'active' : 'completed', startDate: index < 15 ? '2026-02-13T12:00:00Z' : '2026-01-15T12:00:00Z',
+                    ...(index < 15 ? {} : { endDate: `2026-02-${String(index).padStart(2, '0')}T12:00:00Z` }),
                 });
             }
             for (let index = 17; index < 24; index++) {
@@ -81,7 +83,11 @@ async function seed(page: Page, { crowded = false, twin = false, withDocument = 
         database.prepare('UPDATE therapies SET updated_at = ? WHERE id = ?').run(at(22 + offset), fixture.changed.id);
         if (fixture.observationId) database.prepare('UPDATE observations SET created_at = ? WHERE id = ?').run(at(23 + offset), fixture.observationId);
         if (fixture.previousObservationId) database.prepare('UPDATE observations SET created_at = ? WHERE id = ?').run(at(1), fixture.previousObservationId);
-        if (crowded) database.prepare('UPDATE therapies SET updated_at = ?, version = 2 WHERE id = ?').run(at(22 + offset), fixture.active.id);
+        if (crowded) {
+            database.prepare("UPDATE therapies SET created_at = ?, updated_at = ? WHERE patient_id = ? AND id != ? AND status = 'active'")
+                .run(at(13 + offset), at(13 + offset), fixture.patient.id, fixture.active.id);
+            database.prepare('UPDATE therapies SET updated_at = ?, version = 2 WHERE id = ?').run(at(22 + offset), fixture.active.id);
+        }
     });
     return fixture;
 }
@@ -92,6 +98,19 @@ async function openFromPatients(page: Page, lastName: string, firstName: string,
     await page.getByRole('link', { name: 'Apri scheda paziente', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/patients/${id}/modules$`));
 }
+
+const geometry = async (target: Locator) => target.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    let workAreaBottom = innerHeight;
+    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+        if (['auto', 'scroll', 'clip', 'hidden'].includes(getComputedStyle(parent).overflowY)) {
+            workAreaBottom = Math.min(workAreaBottom, parent.getBoundingClientRect().bottom);
+        }
+    }
+    return { x: Math.round(box.x), y: Math.round(box.y), bottom: Math.round(box.bottom), workAreaBottom,
+        topBeyondBottomPx: Math.max(0, Math.round(box.y - workAreaBottom)),
+        bottomBeyondBottomPx: Math.max(0, Math.round(box.bottom - workAreaBottom)) };
+});
 
 async function themes(page: Page, suffix: string) {
     for (const width of [1440, 1280, 1180, 1000, 999, 768, 390, 320]) for (const theme of ['light', 'dark']) {
@@ -175,6 +194,8 @@ test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e r
     await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
     const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
     const note = page.locator('#diario article').filter({ hasText: 'Nota sintetica del diario.' });
+    const sixth = page.locator('#diario [role=feed] > article').nth(5);
+    await expect(sixth).toContainText('Riferisce crampi e debolezza.');
     const potassium = changes.getByText(/Potassio.*5,6/);
     const sourceButton = page.getByRole('button', { name: `Apri originale: ${sourceName}` });
     const newEntry = page.getByRole('link', { name: 'Nuova voce', exact: true });
@@ -184,27 +205,30 @@ test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e r
     await expect(sourceButton).toBeVisible();
     const openingMs = Math.round(performance.now() - openingStarted);
     const directory = process.env.MEDIFLOW_STABLE_CHANGED_SCREENSHOTS;
-    const geometry = async (target: Locator) => target.evaluate(element => {
-        const box = element.getBoundingClientRect();
-        let workAreaBottom = innerHeight;
-        for (let parent = element.parentElement; parent; parent = parent.parentElement) {
-            if (['auto', 'scroll', 'clip', 'hidden'].includes(getComputedStyle(parent).overflowY)) {
-                workAreaBottom = Math.min(workAreaBottom, parent.getBoundingClientRect().bottom);
-            }
-        }
-        return { x: Math.round(box.x), y: Math.round(box.y), bottom: Math.round(box.bottom), workAreaBottom,
-            topBeyondBottomPx: Math.max(0, Math.round(box.y - workAreaBottom)),
-            bottomBeyondBottomPx: Math.max(0, Math.round(box.bottom - workAreaBottom)) };
-    });
     const frame = await Promise.all([
         geometry(changes.getByText('Terapia sospesa sintetica', { exact: true })), geometry(note), geometry(potassium),
         geometry(sourceButton), geometry(newEntry),
     ]);
     if (directory) await page.screenshot({ path: `${directory}/affollata-1180.png`, animations: 'disabled' });
-    await expect(changes.locator('li:visible')).toHaveCount(13);
+    const changeItems = changes.locator('[data-change-item]');
+    await expect(changeItems).toHaveCount(13);
+    for (const label of ['Avviate', 'Sospesa', 'Concluse', 'Aggiornata', 'Fuori intervallo']) await expect(changes).toContainText(label);
+    for (const item of await changeItems.all()) await expect(item.locator('summary')).toBeVisible();
+    const visibleChanges = (await Promise.all((await changeItems.all()).map(geometry)))
+        .filter(item => item.y >= 0 && item.bottomBeyondBottomPx === 0).length;
+    expect(visibleChanges).toBe(13);
+    const activeRows = page.getByRole('table', { name: 'Terapie attive', exact: true }).locator('tbody tr');
+    await expect(activeRows).toHaveCount(7);
+    const visibleActiveTherapies = (await Promise.all((await activeRows.all()).map(geometry)))
+        .filter(item => item.y >= 0 && item.bottomBeyondBottomPx === 0).length;
     if (frame[2].bottomBeyondBottomPx > 0) await potassium.scrollIntoViewIfNeeded();
     const potassiumAfterScroll = await geometry(potassium);
     expect(potassiumAfterScroll.bottomBeyondBottomPx).toBe(0);
+    const named = changeItems.filter({ hasText: 'Farmaco 9' });
+    await named.locator('summary').click();
+    await expect(named).toContainText('Una compressa al mattino e mezza dopo il pasto della sera');
+    await expect(changeItems.filter({ hasText: 'Farmaco 10' }).locator('details')).not.toHaveAttribute('open', '');
+    await named.locator('summary').click();
     await newEntry.click();
     await expect(page.getByRole('combobox', { name: 'Tipo di voce', exact: true })).toBeFocused();
     const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
@@ -216,6 +240,27 @@ test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e r
     if (directory) await page.screenshot({ path: `${directory}/scrittura-1180.png`, animations: 'disabled' });
     const before = await selection();
     expect(before[0]).toBe(2);
+    const diaryMs: Record<number, number> = {};
+    for (const width of [1180, 768]) {
+        await page.setViewportSize({ width, height: 660 });
+        if (width === 768) await expect(sixth).toBeHidden();
+        const diaryStarted = performance.now();
+        await page.getByRole('button', { name: 'Tutto il diario', exact: true }).click();
+        await sixth.scrollIntoViewIfNeeded();
+        await expect(sixth).toBeInViewport();
+        diaryMs[width] = Math.round(performance.now() - diaryStarted);
+        const resumeFromDiary = page.getByRole('button', { name: 'Torna alla bozza dal diario', exact: true });
+        if (width === 1180) await expect(resumeFromDiary).toBeInViewport();
+        if (directory) await page.screenshot({ path: `${directory}/sesta-voce-con-bozza-${width}.png`, animations: 'disabled' });
+        await resumeFromDiary.click();
+        await expect(editor).toBeFocused();
+        expect(await selection()).toEqual(before);
+        await page.keyboard.type('X');
+        await expect(editor).toHaveText(draft.slice(0, 2) + 'X' + draft.slice(2));
+        await page.keyboard.press('Backspace');
+        await expect(editor).toHaveText(draft);
+    }
+    await page.setViewportSize({ width: 1180, height: 660 });
     const sourceStarted = performance.now();
     await sourceButton.click();
     await expect(page.getByTestId('document-preview-text')).toHaveText(original);
@@ -268,19 +313,19 @@ test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e r
     });
     expect(audit.filter(event => event.subjectRef === entryId)).toEqual([expect.objectContaining({ outcome: 'success' })]);
     await test.info().attach('ritorno-affollato', {
-        body: JSON.stringify({ viewport: [1180, 660], therapyUpdates: 12, outOfRange: 1,
+        body: JSON.stringify({ viewport: [1180, 660], therapyUpdates: 12, outOfRange: 1, visibleChanges, activeTherapies: 7, visibleActiveTherapies,
             geometry: { change: frame[0], latestNote: frame[1], potassium: frame[2], source: frame[3], write: frame[4], potassiumAfterScroll },
             actions: ['Pazienti', 'Seleziona paziente', 'Apri scheda paziente', 'Scorri le variazioni',
-                'Nuova voce', 'Scrivi il testo', 'Apri originale', 'Torna alla bozza', 'Rivedi', 'Torna alla bozza', 'Rivedi', 'Conferma e registra', 'Esito', 'Ricarica'],
+                'Nuova voce', 'Scrivi il testo', 'Tutto il diario', 'Sesta voce', 'Torna alla bozza dal diario', 'Inserisci X a metà frase', 'Apri originale', 'Torna alla bozza', 'Rivedi', 'Torna alla bozza', 'Rivedi', 'Conferma e registra', 'Esito', 'Ricarica'],
             cursor: { before, afterReview: before, restored: true },
-            browserMs: { openingMs, sourceMs, resumeMs, responseMs, readbackMs } }, null, 2),
+            browserMs: { openingMs, diaryMs, sourceMs, resumeMs, responseMs, readbackMs } }, null, 2),
         contentType: 'application/json',
     });
     await expect(page.locator('#diario article').filter({ hasText: draft })).toBeVisible();
 });
 
 test('D gemella: un contatto nello stesso giorno si legge come voce, e una lettura fallita resta esplicita', async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 780 });
+    await page.setViewportSize({ width: 1180, height: 660 });
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const { patient, returning, activeName, suspendedName } = await seed(page, { crowded: true, twin: true });
     await page.reload();
@@ -288,6 +333,22 @@ test('D gemella: un contatto nello stesso giorno si legge come voce, e una lettu
     const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
     const stable = page.getByRole('table', { name: 'Terapie attive', exact: true });
     await expect(changes).toContainText('08/02/2026');
+    const twinChanges = changes.locator('[data-change-item]');
+    await expect(twinChanges).toHaveCount(13);
+    const visibleChanges = (await Promise.all((await twinChanges.all()).map(geometry)))
+        .filter(item => item.y >= 0 && item.bottomBeyondBottomPx === 0).length;
+    expect(visibleChanges).toBe(13);
+    await test.info().attach('gemella-primo-sguardo', { body: JSON.stringify({ viewport: [1180, 660], visibleChanges }),
+        contentType: 'application/json' });
+    await expect(stable.getByRole('row').filter({ hasText: 'Analogo 9' })).toContainText('Una compressa al mattino e mezza dopo il pasto della sera');
+    const sideBySide = await stable.getByRole('row').filter({ hasText: 'Analogo 10' }).getByRole('cell').evaluateAll(cells => {
+        const [drug, dosage] = cells.map(cell => cell.getBoundingClientRect());
+        return drug.top === dosage.top && drug.right <= dosage.left;
+    });
+    expect(sideBySide).toBe(true);
+    await assertNoHorizontalOverflow(page, [{ label: 'Riepilogo gemello', selector: '#quadro' }]);
+    const directory = process.env.MEDIFLOW_STABLE_CHANGED_SCREENSHOTS;
+    if (directory) await page.screenshot({ path: `${directory}/gemella-1180.png`, animations: 'disabled' });
     await expect(stable.getByRole('row').filter({ hasText: activeName })).toContainText('2 alla sera');
     await expect(stable).not.toContainText(suspendedName);
     await changes.getByText(/Potassio.*5,8/).click();
@@ -365,15 +426,15 @@ test('D: il solo referto aggiunto dopo la visita è raggiungibile e apre l’ori
     await openPatientSection(page, 'quadro');
     const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
     await expect(changes).toContainText('06/02/2026');
-    await expect(changes.locator('li')).toHaveCount(0);
+    await expect(changes.locator('[data-change-item]')).toHaveCount(0);
     const disclosure = changes.getByRole('checkbox', { name: 'Mostra anche documenti e proposte' });
     await disclosure.check();
-    await expect(changes.locator('li')).toHaveCount(1);
+    await expect(changes.locator('[data-change-item]')).toHaveCount(1);
     const document = changes.getByRole('button', { name: `Documento aggiunto · ${sourceName}` });
     await document.click();
     await expect(page.getByTestId('document-preview-text')).toHaveText(original);
     await page.getByTestId('document-viewer').getByRole('button', { name: 'Chiudi', exact: true }).click();
     await expect(document).toBeFocused();
     await disclosure.uncheck();
-    await expect(changes.locator('li')).toHaveCount(0);
+    await expect(changes.locator('[data-change-item]')).toHaveCount(0);
 });
