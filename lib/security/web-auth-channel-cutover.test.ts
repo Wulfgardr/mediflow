@@ -29,6 +29,7 @@ const { dbServer } = await import('../db-server.ts');
 const { users } = await import('../schema.ts');
 const { listAuditEvents } = await import('./audit.ts');
 const { clearAllSessions, getSession } = await import('./server-session.ts');
+const { confirmAgentUnlock } = await import('./agent-unlock-session.ts');
 const { completeExactWebP3Logout } = await import('./web-auth-logout-server.ts');
 
 const USERNAME = 'synthetic-web-admin'; const PIN = '2468';
@@ -109,7 +110,7 @@ test('login delegates credentials, preserves its Web contract, and records Web a
     assert.equal(response.headers.get('cache-control'), 'no-store');
     const body = await response.json() as Record<string, unknown>;
     assert.deepEqual(Object.keys(body).sort(), [
-        'ambulatoryName', 'archiveGeneration', 'displayName', 'encryptedMasterKey', 'id', 'role', 'salt', 'success', 'username',
+        'agentUnlockTicket', 'ambulatoryName', 'archiveGeneration', 'displayName', 'encryptedMasterKey', 'id', 'role', 'salt', 'success', 'username',
     ]);
     assert.equal(body.success, true);
     assert.equal(body.username, USERNAME);
@@ -117,6 +118,14 @@ test('login delegates credentials, preserves its Web contract, and records Web a
     assert.equal(body.salt, SALT);
     const id = sessionId(response);
     assert.equal(getSession(id), null);
+    const ticket = String(body.agentUnlockTicket), actor = String(body.id);
+    assert.match(ticket, /^[A-Za-z0-9_-]{43}$/u);
+    let confirmations = 0;
+    const record = () => { confirmations++; };
+    assert.equal(confirmAgentUnlock(ticket, 'another-session', actor, record), false);
+    assert.equal(confirmAgentUnlock(ticket, id, actor, record), true);
+    assert.equal(confirmAgentUnlock(ticket, id, actor, record), true);
+    assert.equal(confirmations, 1);
     const audit = (await listAuditEvents({ eventType: 'auth.login.succeeded' }))
         .find((event) => event.subjectRef === id);
     assert.equal(audit?.sourceSurface, 'web');
@@ -127,6 +136,7 @@ test('login delegates credentials, preserves its Web contract, and records Web a
         localRequest('http://127.0.0.1/api/auth/logout', { method: 'POST' }),
     );
     assert.equal(logout.status, 204);
+    assert.equal(confirmAgentUnlock(ticket, id, actor, record), false);
 });
 test('routes make Web authority literal, do not read source-surface, and retain audit-failure containment', () => {
     const loginSource = fs.readFileSync(path.join(root, 'app/api/auth/login/route.ts'), 'utf8');
