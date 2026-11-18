@@ -88,6 +88,11 @@ test('Terapie: indicazione, periodo e codici si leggono nella riga, e le sezioni
   await expect(row.getByText('Scompenso cardiaco sintetico')).toBeVisible();
   await expect(row.getByText('ATC C03CA01 · AIC 023993019', { exact: true })).toBeVisible();
   await expect(row.getByText('Dal 10/03/2026', { exact: true })).toBeVisible();
+  const completed = pane.getByRole('row').filter({ hasText: 'Farmaco sintetico concluso' });
+  const start = completed.getByText('Dal 10/03/2026', { exact: true });
+  const end = completed.getByText('Conclusa il 20/09/2026', { exact: true });
+  await expect(start).toBeVisible();
+  await expect(end).toBeVisible();
   await expect(pane.getByText('Dettagli terapia', { exact: true })).toHaveCount(0);
 
   const sections = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
@@ -119,6 +124,8 @@ test('Terapie: indicazione, periodo e codici si leggono nella riga, e le sezioni
   });
   expect(boundary).toBeGreaterThanOrEqual(3);
   await page.setViewportSize({ width: 768, height: 900 });
+  await expect(start).toBeVisible();
+  await expect(end).toBeVisible();
   await expect(row.getByText('Nota sintetica di indicazione', { exact: true })).toBeVisible();
   await assertNoHorizontalOverflow(page, [{ label: 'therapy pane', selector: '#terapie' }]);
 });

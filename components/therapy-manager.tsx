@@ -678,7 +678,11 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                             </td>
                             <td className="lume-registro">{t.dosage}</td>
                             <td data-therapy-cell="indication" data-empty={!t.motivation && !t.diagnosisCode}>{t.motivation && <span>{t.motivation}</span>}{t.diagnosisCode && <small><span className="lume-code">{t.diagnosisCode}</span> {t.diagnosisName}</small>}{!t.motivation && !t.diagnosisCode && <span className={styles.muted}>—</span>}</td>
-                            <td data-therapy-cell="period" className={styles.muted}>{group.status === 'completed' ? <>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</> : t.startDate ? <>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</> : '—'}</td>
+                            <td data-therapy-cell="period" className={styles.muted}>
+                                {t.startDate && <div>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</div>}
+                                {group.status === 'completed' && <div>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</div>}
+                                {!t.startDate && group.status !== 'completed' && '—'}
+                            </td>
                             <td><div className={styles.therapyActions}>
                                 {group.status === 'active' ? <Button variant="text" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => startEditing(t)}>Modifica</Button>
                                     : <Button variant="text" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'active')}>Riattiva</Button>}
