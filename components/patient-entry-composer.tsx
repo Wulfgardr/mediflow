@@ -985,8 +985,9 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
             {patientAttachments.map(attachment => <details key={attachment.id} className={composerStyles.contextSource}>
                 <summary><PrivacyBlur>{attachment.name}</PrivacyBlur></summary>
                 <p>{formatEntryDate(attachment.createdAt)} · Allegato</p>
-                <p><PrivacyBlur>{isEncryptedFieldValue(attachment.summarySnapshot) ? LOCKED_DATA_PLACEHOLDER
-                    : attachment.summarySnapshot?.trim() ? attachment.summarySnapshot : 'Sintesi non disponibile.'}</PrivacyBlur></p>
+                <p><PrivacyBlur>{attachment.summarySnapshot?.trim()
+                    ? isEncryptedFieldValue(attachment.summarySnapshot) ? LOCKED_DATA_PLACEHOLDER : attachment.summarySnapshot
+                    : 'Sintesi non disponibile.'}</PrivacyBlur></p>
             </details>)}
         </div>
     ) : <p>Nessun documento disponibile.</p>;
