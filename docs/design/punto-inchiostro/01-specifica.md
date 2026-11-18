@@ -14,6 +14,12 @@ px sul web e nei punti equivalenti sulle piattaforme native.
 
 Per la composizione delle viste, vedi l'[addendum compositivo](./02-addendum-composizione.md).
 
+Per la 0.9.1 il documento [04](./04-primo-sguardo-e-controlli.md) modifica
+quattro punti di questa specifica: il titolo di sezione (D24), il contorno dei
+campi (D23), il posto della voce in scrittura e della sua soglia (D25, D30) e
+i comandi di scrittura nei [Testi](#testi). Dove i due documenti divergono
+vale il 04.
+
 ## Colore
 
 Due registri: Giorno (chiaro) e Grafite (scuro). Segue il sistema, salvo
