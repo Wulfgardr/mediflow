@@ -4,15 +4,15 @@
 
 La versione web distingue titoli e nomi dei pazienti dal testo dei comandi
 e dai codici. La dimensione dei caratteri segue quella scelta nelle
-preferenze del browser; puoi anche usare lo zoom del browser per ingrandire
+preferenze del browser, e puoi usare anche lo zoom per ingrandire
 la pagina. Newsreader e IBM Plex Mono sono inclusi nell'applicazione e non
 richiedono download durante l'uso. Le verifiche visuali e i loro limiti
 sono distinti dalla disponibilità di queste impostazioni.
 
-Per orientarti prima dell'avvio o approfondire una scelta:
-- [README.md](../README.md) presenta il progetto e il primo accesso;
-- [docs/COMPLIANCE.md](./COMPLIANCE.md) raccoglie il quadro privacy/GDPR/FHIR;
-- [docs/ROADMAP.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ROADMAP.md) descrive la direzione del prodotto.
+Se vuoi orientarti prima dell'avvio o approfondire una scelta, trovi qui i riferimenti:
+- [README.md](../README.md) presenta il progetto e il primo accesso
+- [docs/COMPLIANCE.md](./COMPLIANCE.md) raccoglie il quadro privacy/GDPR/FHIR
+- [docs/ROADMAP.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/ROADMAP.md) descrive la direzione del prodotto
 
 ---
 
@@ -20,7 +20,7 @@ Per orientarti prima dell'avvio o approfondire una scelta:
 
 ### Requisiti
 
-* Un computer recente (consigliato: Apple Silicon M1/M2/M3 o successivi).
+* Un computer recente. Consiglio Apple Silicon M1/M2/M3 o successivi.
 * Circa 15GB liberi se usi i modelli AI locali.
 
 ### Avvio rapido
@@ -41,27 +41,27 @@ su Mac, `%APPDATA%\MediFlow\launcher` su Windows,
 `$XDG_CONFIG_HOME/mediflow/launcher` o `~/.config/mediflow/launcher` su Linux.
 La cartella scelta con `MEDIFLOW_DATA_DIR` non riceve preferenze o lock del
 lanciatore. I vecchi file riconosciuti del lanciatore vengono spostati nella
-configurazione; se un vecchio avvio è ancora attivo occorre prima arrestarlo.
+configurazione. Se un vecchio avvio è ancora attivo, arrestalo prima.
 **Cambia** nella pagina di attesa torna alle scelte. Per riaprirle dal
 terminale usa `node scripts/mediflow.mjs --scegli`. **Arresta MediFlow** o
-Ctrl+C chiudono i processi di questo avvio. Un'altra istanza resta intatta.
+Ctrl+C chiudono i processi di questo avvio, lasciando intatta un'altra istanza.
 
-Senza display o browser si usa il menu numerato del terminale. Per un avvio
+Se non hai display o browser, usa il menu numerato del terminale. Per un avvio
 senza domande: `node scripts/mediflow.mjs --scelta web --senza-browser`.
 Su Linux il comando facoltativo
 `node scripts/mediflow.mjs install-desktop-entry` aggiunge MediFlow al menu.
 
-Una cartella con modifiche non committate offre **Apri per sviluppo**; non
-costruisce la produzione. **Accesso per agenti** avvia il collegamento locale
+Se la cartella contiene modifiche non committate, trovi **Apri per sviluppo**.
+Non viene costruita la produzione. **Accesso per agenti** avvia il collegamento locale
 per un client autorizzato e riserva il terminale al protocollo: non concede
-accesso clinico da solo. I servizi AI restano facoltativi.
+accesso clinico da solo, mentre i servizi AI restano facoltativi.
 
 ---
 
 ## 🔑 2. Sicurezza e PIN
 
-Una cartella senza database che contiene solo i file di servizio riconosciuti
-consente il primo avvio. Se contiene backup, residui SQLite o altre voci
+Puoi fare il primo avvio in una cartella senza database che contiene solo
+i file di servizio riconosciuti. Se contiene backup, residui SQLite o altre voci
 sconosciute, MediFlow segnala il database mancante: verifica il percorso o
 ripristina esplicitamente un backup. Non eliminare file per aggirare il controllo.
 
@@ -92,17 +92,17 @@ Puoi distinguere le sedi di lavoro creando più ambulatori, per esempio
 
 ### Scheda Paziente
 
-Dalla lista, **Apri scheda paziente** porta direttamente alla scheda;
-il **Quadro** mostra la stessa vista dentro il cockpit, senza ricaricarne
+Dalla lista, **Apri scheda paziente** ti porta direttamente alla scheda.
+Il **Quadro** mostra la stessa vista dentro il cockpit, senza ricaricarne
 la rotta.
 
 * **Anagrafica**: a sinistra, per mantenere riconoscibile il paziente.
 * **Diario Clinico**: al centro, dove scrivere le note visita per visita.
   Le voci eliminate restano recuperabili e possono essere ripristinate, con
-  motivo tracciato; lo stesso vale per terapie, checkup e osservazioni.
+  motivo tracciato. Lo stesso vale per terapie, checkup e osservazioni.
 * **Storia**: a destra, con i riassunti dei documenti precedenti.
 
-Quando usi l'AI locale, il pannello **Cosa rivedere adesso** raccoglie le
+Se usi l'AI locale, il pannello **Cosa rivedere adesso** raccoglie le
 proposte da approvare. Vederle qui non equivale ad averle registrate:
 nessuna voce viene scritta in cartella senza la tua conferma.
 
@@ -128,7 +128,7 @@ internet per l'elaborazione.
 
 1. **OCR**: estrae il testo da PDF o immagine. I documenti senza testo entrano
    nella **Coda OCR**, che ne mostra stato e motivo in italiano e permette di
-   riprovare; finché il testo non basta, l'AI non avanza proposte cliniche.
+   riprovare. Finché il testo non basta, l'AI non avanza proposte cliniche.
 2. **Sintesi clinica**: prepara un riassunto strutturato che devi rivedere
    prima di conservarlo. Gli eventuali errori restano visibili.
     * *Esempio*: Un referto ospedaliero di 10 pagine può dare luogo a una sintesi
@@ -157,7 +157,7 @@ opzionale. La selezione richiede revisione e salvataggio esplicito.
 
 * Inserisci una diagnosi e, quando utile, richiedi un suggerimento codificato
   (es. `5A10`).
-* Un codice strutturato può supportare riuso futuro; non garantisce da solo
+* Un codice strutturato può supportare il riuso futuro, ma da solo non garantisce
   validità clinica o interoperabilità.
 
 ---
@@ -180,13 +180,13 @@ il runtime locale attraverso il browser.
 
 ## 📚 FAQ
 
-**Posso usarlo su iPad?**
+**Posso usare MediFlow su iPad?**
 I client dedicati sono in sviluppo. Il computer principale resta la home-base:
 iPadOS e iPhone sono in definizione sul contratto locale `/api/v1`, senza
 accesso diretto al database remoto. Non sono app complete distribuite con
 la release sorgente.
 
-**Se mi si rompe il computer?**
+**Se si rompe il computer?**
 Per prepararti a un guasto, vai in **Impostazioni → Backup e ripristino** e
 crea regolarmente un **backup completo cifrato**. È una copia dell'archivio
 SQLite, con account, chiavi protette e storico. Per crearlo usa un account
@@ -203,7 +203,7 @@ Verificare il file cifrato non equivale a provare un ripristino.
 L'**esportazione portabile** `.mediflow` serve a ripristinare le collezioni
 esportabili in un archivio esistente. Non contiene account né involucri delle
 chiavi e non sostituisce il backup completo. Il ripristino sostituisce i dati
-del formato portabile; account e chiavi dell'archivio restano invariati.
+del formato portabile, mentre account e chiavi dell'archivio restano invariati.
 
 La verifica e il ripristino elaborano il file interamente in memoria, sia per il
 backup completo sia per il file portabile: per archivi grandi serve memoria
@@ -223,12 +223,12 @@ complessiva di conformità. La conformità legale dipende anche dalle misure
 organizzative e operative con cui usi il sistema.
 
 ---
-Per supporto, apri una issue o consulta la documentazione tecnica.
+Se ti serve supporto, apri una issue o consulta la documentazione tecnica.
 
 
 ## Fonti personali della protesica
 
-In Repertori, Protesica e ausili mostra il numero di fonti e voci locali.
+In Repertori, **Protesica e ausili** mostra il numero di fonti e voci locali.
 Apri Gestisci fonti per importare un listino o nomenclatore della tua ATS/ASL
 oppure un elenco aziendale. Non è un catalogo normativo completo e MediFlow
 non verifica eleggibilità, validità prescrittiva o attualità della fonte.
@@ -237,7 +237,7 @@ non verifica eleggibilità, validità prescrittiva o attualità della fonte.
 2. Scegli il file (massimo 2 MiB e 20.000 righe), indica virgola o punto e virgola
    e associa esplicitamente le otto colonne. Le colonne delle date possono
    contenere celle vuote. Codifica, codice, descrizione, versione, fonte e ambito
-   sono obbligatori; ogni file dichiara una sola fonte/versione/ambito/codifica.
+   sono obbligatori. Ogni file dichiara una sola fonte/versione/ambito/codifica.
 3. Indica ente, data e note se utili. Genera una nuova anteprima dopo qualsiasi
    modifica alla mappatura o ai metadati. Controlla campione, errori e conteggi,
    accetta la fonte e conferma. Duplicati o errori bloccano tutto il file.
@@ -247,7 +247,7 @@ non verifica eleggibilità, validità prescrittiva o attualità della fonte.
    Il collegamento scarica il documento per aprirlo con l’applicazione locale.
 
 Fonti diverse con lo stesso codice convivono. A parità di nome, versione e
-ambito l’import aggiorna la fonte esistente; una versione diversa crea una
+ambito l’import aggiorna la fonte esistente, mentre una versione diversa crea una
 fonte distinta. I codici assenti dal file restano. I dati precedenti sono
 migrati in fonti derivate dai campi già presenti, senza recuperare voci che
 fossero state sovrascritte prima dell’aggiornamento.
@@ -258,12 +258,12 @@ il campo ISO. Salva solo dopo la revisione clinica. Una revisione cambiata
 richiede una nuova scelta. Modificare manualmente la descrizione nella bozza
 annulla la selezione dal catalogo. La prescrizione conserva uno snapshot della
 voce, dei metadati del suo import e dei riferimenti agli originali allegati a
-quell’import al momento del salvataggio; gli import successivi non lo modificano. Le prescrizioni precedenti restano
+quell’import al momento del salvataggio. Gli import successivi non lo modificano. Le prescrizioni precedenti restano
 leggibili e non ricevono provenienze ricostruite automaticamente.
 
 Originali, catalogo e snapshot di provenienza sono in chiaro nel database
 locale; la descrizione clinica segue la cifratura dei campi esistenti. Il backup
-web e quello schedulato includono gli originali conservati come BLOB SQLite;
+web e quello schedulato includono gli originali conservati come BLOB SQLite e
 il ripristino è atomico. Se un originale referenziato manca o non corrisponde
 a fonte, import, hash o dimensione dichiarati, il backup e il ripristino sono
 rifiutati prima di modificare l’archivio di destinazione.
@@ -283,12 +283,12 @@ MMS 2026-01 inglese. Un catalogo pronto permette ricerca per codice o titolo
 senza Docker, credenziali o rete. Il bundle include l’archivio WHO originale:
 35.664 categorie con codice, importate e verificate al primo uso.
 Aggiorna dalla WHO scarica un’anteprima
-con conferma; Attiva catalogo verificato richiede una seconda conferma e conserva
+con conferma. Attiva catalogo verificato richiede una seconda conferma e conserva
 la versione precedente ripristinabile. Il download non invia dati della cartella.
 
 Il controllo codice verifica la presenza della categoria, non la diagnosi clinica.
 Niente sinonimi, traduzione italiana o postcoordinazione. Dati WHO CC BY-ND 3.0 IGO,
-non MIT. Sono accettati file tab-separated UTF-8, anche in ZIP; XLSX non supportato.
+non MIT. Sono accettati file tab-separated UTF-8, anche in ZIP. XLSX non è supportato.
 Le diagnosi cambiano solo dopo selezione e salvataggio espliciti del medico.
 Il servizio WHO Docker rimane opzionale. [Procedura e limiti](./icd-who-setup.md).
 
@@ -308,26 +308,26 @@ importati in precedenza può mancare una data AIFA confrontabile: aggiornarli
 esplicitamente permette di acquisirla.
 
 **Aggiorna ora** scarica e valida il CSV. La data AIFA indica la pubblicazione
-dichiarata dal server; la data di scarico indica l'acquisizione locale. Il
+dichiarata dal server, mentre la data di scarico indica l'acquisizione locale. Il
 catalogo cambia solo dopo il completamento dei controlli. Il progresso mostra
 i byte ricevuti, poi la validazione. Se AIFA risponde che il file non è cambiato,
 non viene sostituito. Annullare richiede comunque di rileggere lo stato, perché
 la richiesta potrebbe essere già stata completata.
 
 Una riduzione sotto il 90% delle confezioni locali richiede una conferma
-aggiuntiva. Il catalogo viene conservato finché non confermi; per aggiornamenti
+aggiuntiva. Il catalogo viene conservato finché non confermi. Per aggiornamenti
 via Internet il file viene scaricato nuovamente e deve essere identico a quello
 controllato e il catalogo locale deve essere rimasto invariato. La verifica
 vale anche se il secondo file non presenta più una riduzione sotto soglia.
 Se file o catalogo sono cambiati, rileggi lo stato e ripeti l'operazione.
 Gli altri errori di validazione non possono essere forzati.
 
-Durante una verifica o importazione, altri caricamenti e lo svuotamento del
-catalogo vengono rifiutati come operazione già in corso. Attendi il termine
+Durante una verifica o importazione, MediFlow rifiuta altri caricamenti e lo svuotamento del
+catalogo perché un'operazione è già in corso. Attendi il termine
 e ripeti l'azione.
 
 Il CSV deve contenere AIC, denominazione, ATC e principi attivi. La copertura
-è descrittiva e parziale: FORNITURA e STATO_AMMINISTRATIVO non sono conservati;
+è descrittiva e parziale: FORNITURA e STATO_AMMINISTRATIVO non sono conservati e
 fascia e prezzo non sono presenti nel feed corrente. I dati non certificano
 rimborsabilità, disponibilità o appropriatezza. Ogni sostituzione AIFA riuscita
 conserva provenienza e audit locale. Nessun dato clinico viene inviato ad AIFA.
