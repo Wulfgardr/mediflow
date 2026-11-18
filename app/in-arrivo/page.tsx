@@ -6,14 +6,7 @@ import { agentIncomingSnapshot, agentIncomingServerSnapshot, subscribeAgentIncom
 import { automaticAgentKind } from '@/lib/agent-visit-application-contract';
 import { SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import DocumentViewer from '@/components/document-viewer';
-
-const fieldLabels: Record<string, string> = { drugName: 'Farmaco', activePrinciple: 'Principio attivo', dosage: 'Posologia', status: 'Stato', startDate: 'Dal', endDate: 'Al', aic: 'AIC', atc: 'ATC', serviceName: 'Prestazione', items: 'Voci', category: 'Categoria', priority: 'Priorità', prescribedAt: 'Prescritta il', requestReference: 'Riferimento', clinicalQuestion: 'Quesito clinico', description: 'Descrizione', code: 'Codice', system: 'Sistema', date: 'Data', display: 'Esame', value: 'Valore', unit: 'Unità', unitCode: 'Codice unità', refText: 'Intervallo di riferimento', refLow: 'Limite inferiore', refHigh: 'Limite superiore', observedAt: 'Misurato il', subject: 'Soggetto', temporality: 'Periodo', certainty: 'Certezza' };
-
-const fieldValues: Record<string, Record<string, string>> = {
-    status: { active: 'In corso', suspended: 'Sospesa', completed: 'Conclusa', prescribed: 'Prescritta', booked: 'Prenotata', performed: 'Eseguita', report_received: 'Referto ricevuto', cancelled: 'Annullata' },
-    category: { lab: 'Laboratorio', imaging: 'Imaging', visit: 'Visita', rehab: 'Riabilitazione', screening: 'Screening', procedure: 'Procedura', other: 'Altro' },
-    priority: { routine: 'Routine', P: 'Programmata (P)', D: 'Differibile (D)', B: 'Breve (B)', U: 'Urgente (U)', unknown: 'Non indicata' },
-};
+import { agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues, agentReviewItemLabels } from '@/lib/agent-visit-review-labels';
 
 function UnlockedIncoming() {
     const { visits, busy, error } = useSyncExternalStore(subscribeAgentIncoming, agentIncomingSnapshot, agentIncomingServerSnapshot);
@@ -52,7 +45,7 @@ function UnlockedIncoming() {
                     typeof item.value.name === 'string' && <button key={item.id} className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={openingPdf}
                         onClick={() => { void showPdf(visit.cassette.id, visit.cassette.revision, item.id); }}>{item.value.name}</button>)}</div>
                 {pending.map(item => <article key={item.id} className="space-y-2 whitespace-pre-wrap border-t pt-3">
-                    <h3 className="font-semibold">{{ note: 'Nota', transcription: 'Trascrizione', pdf: 'PDF', therapy: 'Terapia proposta', service: 'Prestazione proposta', diagnosis: 'Diagnosi proposta', exemption: 'Esenzione proposta', observation: 'Osservazione proposta' }[item.kind]}</h3>
+                    <h3 className="font-semibold">{agentReviewItemLabels[item.kind]}</h3>
                     {typeof item.value.text === 'string' && <p>{item.value.text}</p>}
                     {review.currentSummary.has(item.id) && <p>In scheda: {review.currentSummary.get(item.id)}</p>}
                     {typeof item.value.values === 'object' && item.value.values !== null && <dl>{Object.entries(item.value.values).map(([field, value]) => <div key={field} className="grid grid-cols-[minmax(8rem,1fr)_3fr] gap-3"><dt>{fieldLabels[field] ?? 'Dato'}</dt><dd>{fieldValues[field]?.[String(value)] ?? String(value)}</dd></div>)}</dl>}

@@ -46,9 +46,10 @@ struct AgentVisitConfirmationHelper {
                 try await Task.sleep(for: .milliseconds(remaining))
                 panel.cancel()
             }
-            let watchParent = Task.detached {
-                _ = try? FileHandle.standardInput.read(upToCount: 1)
-                await panel.cancel()
+            let parent = Task.detached { try? FileHandle.standardInput.read(upToCount: 1) }
+            let watchParent = Task {
+                _ = await parent.value
+                panel.cancel()
             }
             defer { timeout.cancel(); watchParent.cancel() }
             guard let policy = await panel.present(), now() < review.challenge.expiresAt else {
@@ -56,6 +57,7 @@ struct AgentVisitConfirmationHelper {
             }
             let signature = try signing.signature(for: review.signedMessage(policy))
             try send(VisitConfirmationProof(signature: signature.rawRepresentation, policy: policy.rawValue))
+            guard await parent.value == Data([49]) else { throw VisitConfirmationFailure.denied }
         } catch {
             exit(1)
         }

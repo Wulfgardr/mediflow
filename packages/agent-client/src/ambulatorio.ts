@@ -12,7 +12,7 @@ import { agentCommandFailure } from './commands.ts';
 import { registerAgentMandateTool } from './mcp.ts';
 import {
     AgentClientError, agentOrigin, completeAgentPairing, loadAgentVisitContext,
-    prepareAndDepositAgentVisit, requestAgentPairing, resumeAgentReference, resumeAgentVisit, retrieveAgentMandate,
+    prepareAndDepositAgentVisit, requestAgentPairing, requestAgentVisitConfirmation, resumeAgentReference, resumeAgentVisit, retrieveAgentMandate,
 } from './visit-client.ts';
 
 const settingsSchema = z.object({
@@ -159,6 +159,20 @@ export function createAmbulatorioServer(home: string, value: unknown, plugin: st
         description: 'Ritenta le stesse buste cifrate dopo un’interruzione.',
         inputSchema: z.object(visit).strict(), outputSchema: depositResult, annotations,
     }, ({ visitId }, { mcpReq }) => deposit(visitId, mcpReq.signal, true));
+    const confirmation = (visitId: string, operation: { visitId: string } | { reference: string }, signal: AbortSignal) => run(async () => {
+        const agentRef = resumeAgentReference(credentials, visitId);
+        if (!agentRef) throw new AmbulatorioError('DEPOSITO_NON_AVVIATO');
+        await active(signal, agentRef);
+        return requestAgentVisitConfirmation(credentials, agentRef, operation, signal, config.origin);
+    });
+    server.registerTool('mediflow_apri_conferma_visita', {
+        description: 'Chiede di aprire il riquadro di conferma della visita depositata.',
+        inputSchema: z.object(visit).strict(), annotations,
+    }, ({ visitId }, { mcpReq }) => confirmation(visitId, { visitId }, mcpReq.signal));
+    server.registerTool('mediflow_esito_conferma_visita', {
+        description: 'Legge l’esito con il riferimento restituito da MediFlow.',
+        inputSchema: z.object({ ...visit, reference: z.string().uuid() }).strict(), annotations: { ...annotations, readOnlyHint: true },
+    }, ({ visitId, reference }, { mcpReq }) => confirmation(visitId, { reference }, mcpReq.signal));
     return server;
 }
 
