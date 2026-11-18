@@ -8,7 +8,14 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 14 ed i predecessori canonici 3, 4, 5, 6, 9, 10, 11, 12 e 13; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 16 e i predecessori canonici 3, 4, 5, 6, 9, 10, 11, 12, 13, 14 e 15; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+
+## Raccordo schema 16 del 18 novembre 2026
+
+Le due tabelle di ADR 0190 registrano client e mandati emessi allo sblocco.
+I predecessori escludono entrambe e il v15 conserva le cassette. Il raccordo
+aggiorna i digest di schema e recovery. Le transizioni della terapia
+restano quelle del modello esistente.
 
 ## Raccordo schema 12 del 17 novembre 2026
 

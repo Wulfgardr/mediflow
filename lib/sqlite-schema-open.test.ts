@@ -546,7 +546,7 @@ test('schema 12 preserves the v11 original, historical audit, recoverability and
         for (const field of ['proposer_ref', 'mandate_ref', 'model_provider']) {
             if ((old.pragma('table_info(audit_events)') as { name: string }[]).some(column => column.name === field)) old.exec(`ALTER TABLE audit_events DROP COLUMN ${field}`);
         }
-        old.exec('DROP TABLE IF EXISTS agent_cassettes; DROP TABLE IF EXISTS agent_clients; DROP TABLE IF EXISTS agent_pairing_requests; DROP TABLE IF EXISTS agent_mandates');
+        old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE IF EXISTS agent_cassettes; DROP TABLE IF EXISTS agent_clients; DROP TABLE IF EXISTS agent_pairing_requests; DROP TABLE IF EXISTS agent_mandates');
         old.pragma('user_version = 11');
         old.exec("INSERT INTO audit_events(event_id,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,source_surface) VALUES ('synthetic-v11','patient.updated',1,'success','user','synthetic-doctor','patient','web')");
         const historical = old.prepare('SELECT * FROM audit_events').all();
@@ -583,7 +583,7 @@ test('schema 12 migration failure rolls back all provenance columns and permits 
     try {
         const old = seed(w.file);
         for (const field of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${field}`);
-        old.exec('DROP TABLE IF EXISTS agent_cassettes; DROP TABLE IF EXISTS agent_clients; DROP TABLE IF EXISTS agent_pairing_requests; DROP TABLE IF EXISTS agent_mandates');
+        old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE IF EXISTS agent_cassettes; DROP TABLE IF EXISTS agent_clients; DROP TABLE IF EXISTS agent_pairing_requests; DROP TABLE IF EXISTS agent_mandates');
         old.pragma('user_version = 11');
         const schema = old.prepare('SELECT type,name,sql FROM sqlite_schema ORDER BY type,name').all();
         old.close();
