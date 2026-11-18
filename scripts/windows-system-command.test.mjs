@@ -19,8 +19,9 @@ const driver = code => {
 test('native regeneration provenance qualifies changed manifest metadata before admission pins are committed', t => {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-bootstrap-regeneration-')));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const files = ['lib/windows-bootstrap-provenance.test.ts', 'scripts/verify-windows-bootstrap-rebuild.mjs', 'scripts/windows-launcher-bootstrap/arm64-rebuilds.json', 'scripts/scheduled-backup-runtime-contract.mjs'];
+  const files = ['lib/windows-bootstrap-provenance.test.ts', 'scripts/verify-windows-bootstrap-rebuild.mjs', 'scripts/scheduled-backup-runtime-contract.mjs'];
   for (const arch of ['x64', 'arm64']) {
+    files.push(`scripts/windows-launcher-bootstrap/${arch}-rebuilds.json`);
     for (const name of ['system-directory.node', 'manifest.json']) files.push(`scripts/windows-launcher-bootstrap/prebuilds/win32-${arch}/${name}`);
   }
   for (const file of files) {
