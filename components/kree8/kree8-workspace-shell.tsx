@@ -220,6 +220,10 @@ export function Kree8WorkspaceShell({
        non scrivono piu lo stato. */
     let cancelled = false;
     const visible = new Set<HTMLElement>();
+    const followsChosenDestination = !isClinical;
+    let chosenHref: string | null = null;
+    let arrivedHash: string | null = null;
+    let holdsChosenPosition = false;
 
     /* Unico punto che muta lo stato posseduto: sposta il filo focale sul nodo
        vivo (mai un nodo staccato) e allinea la rail. */
@@ -264,6 +268,11 @@ export function Kree8WorkspaceShell({
     /* Sezione attiva = quella piu in alto tra le visibili, cosi l'evidenziazione
        segue l'ordine visivo anche con le due colonne (DOM e rail divergono). */
     const pickActive = () => {
+      const chosen = chosenHref ? targets.find((target) => target.href === chosenHref) : undefined;
+      if (chosen && isInWorkspaceViewport(chosen.el)) {
+        commit(chosen.href, chosen.el);
+        return;
+      }
       const observed = targets.filter((target) => visible.has(target.el) && isInWorkspaceViewport(target.el));
       /* The observer margin is intentionally narrower than the scrollable
          workspace. If a responsive rail moves every target outside that margin,
@@ -319,9 +328,49 @@ export function Kree8WorkspaceShell({
            replaces it through pickActive(). */
         commit(next[0].href, next[0].el);
       }
+      const hash = window.location.hash;
+      if (hash !== arrivedHash && next.some((entry) => entry.href === hash)) chooseDestination(hash);
+      const held = holdsChosenPosition ? next.find((entry) => entry.href === chosenHref) : undefined;
+      if (held) {
+        held.el.scrollIntoView({ block: 'start' });
+        pickActive();
+      }
+    };
+    const chooseDestination = (hash: string) => {
+      if (!followsChosenDestination || !hashHrefs.includes(hash)) return false;
+      arrivedHash = hash;
+      chosenHref = hash;
+      holdsChosenPosition = true;
+      return true;
+    };
+    const onHashChange = () => {
+      if (chooseDestination(window.location.hash)) pickActive();
+    };
+    const onDestinationClick = (event: MouseEvent) => {
+      const link = event.target instanceof Element ? event.target.closest('a') : null;
+      if (!link || event.defaultPrevented) return;
+      const url = new URL(link.href, window.location.href);
+      if (url.pathname !== window.location.pathname || url.search !== window.location.search) return;
+      if (chooseDestination(url.hash)) requestAnimationFrame(() => { if (!cancelled) pickActive(); });
+    };
+    const releaseChosenDestination = () => { chosenHref = null; holdsChosenPosition = false; };
+    const onKey = (event: KeyboardEvent) => {
+      holdsChosenPosition = false;
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) releaseChosenDestination();
+    };
+    const onPress = (event: PointerEvent) => {
+      holdsChosenPosition = false;
+      const target = event.target;
+      if (target instanceof HTMLElement && target.scrollHeight > target.clientHeight && event.offsetX >= target.clientWidth) releaseChosenDestination();
     };
 
     bind();
+    window.addEventListener('hashchange', onHashChange);
+    root.addEventListener('click', onDestinationClick);
+    window.addEventListener('wheel', releaseChosenDestination, { passive: true, capture: true });
+    window.addEventListener('touchmove', releaseChosenDestination, { passive: true, capture: true });
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('pointerdown', onPress, true);
     /* Scroll does not always cross the observer's reduced root margin. Capture
        the scroll phase so a section returned to the visible workspace can regain
        the focal locus without a timeout or layout-specific threshold. */
@@ -337,6 +386,12 @@ export function Kree8WorkspaceShell({
       cancelled = true;
       mo.disconnect();
       window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('hashchange', onHashChange);
+      root.removeEventListener('click', onDestinationClick);
+      window.removeEventListener('wheel', releaseChosenDestination, true);
+      window.removeEventListener('touchmove', releaseChosenDestination, true);
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('pointerdown', onPress, true);
       if (observer) observer.disconnect();
       if (focusEl) {
         focusEl.removeAttribute('data-lume-focus');
