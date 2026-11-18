@@ -540,14 +540,14 @@ come accettazione: quella si fa sul candidato installato.
 
 | Vista | Web | GPUI | A prima vista e gesto che la prova | Copertura |
 | --- | --- | --- | --- | --- |
-| Riepilogo | `#quadro`, W-9 | Riepilogo | D17, D26-D30: identità, zone per larghezza, fascia o riga di stato, bozza e fonte nel Contesto. Gesti: S1-S4 | Web: prima tranche aperta (PR 1044), tre zone in corso. GPUI: in corso |
-| Terapie | `#terapie`, W-7, W-8 | Terapie | Riga con farmaco, posologia, indicazione, periodo. «Modifica» e menu. Un conflitto lascia la bozza e dice che nulla è stato scritto | Web: aperta (PR 1044). GPUI: da fare |
+| Riepilogo | `#quadro`, W-9 | Riepilogo | D17, D26-D30: identità, zone per larghezza, fascia o riga di stato, bozza e fonte nel Contesto. Gesti: S1-S4 | Web: prima tranche integrata (PR 1044), tre zone in corso. GPUI: in corso |
+| Terapie | `#terapie`, W-7, W-8 | Terapie | Riga con farmaco, posologia, indicazione, periodo. «Modifica» e menu. Un conflitto lascia la bozza e dice che nulla è stato scritto | Web: integrata (PR 1044). GPUI: da fare |
 | Misure | `#parametri`, W-11 | Parametri. Andamento escluso (X05) | Nome, valore con unità, data. ▲ solo con riferimenti numerici. Creazione accanto al titolo | Da provare |
-| Documenti | `#documenti`, W-12 | Documenti | Nome, data e dimensione su una riga. L'originale aperto occupa l'altezza della finestra. Sintesi con provenienza | Web: aperta (PR 1044). GPUI: da provare |
+| Documenti | `#documenti`, W-12 | Documenti | Nome, data e dimensione su una riga. L'originale aperto occupa l'altezza della finestra. Sintesi con provenienza | Web: integrata (PR 1044). GPUI: da provare |
 | Diario | `#diario`, W-15a | Diario | Data, tipo, prosa, «Registrata da». Eventi tecnici solo con il filtro | Da provare |
 | Nuova voce | `?voce=nuova`, `/entries/new`, W-16 | Compositore. Testo ricco e allegati esclusi (X03) | D25 e D30 per intero: tre passi, fonte accanto, esito riletto | In corso |
 | Note della scheda | Note nel Riepilogo, `/notes-review` | Note nel Riepilogo | «Modifica» nella riga del titolo, tre passi, nota riletta al suo posto con l'ora. È il compito 1 di Q7 | In corso |
-| Quadro paziente | Area delle proposte, W-13a | Quadro | A matita, con modello, fonti e data. Aprire non genera | Web: ingresso aperto (PR 1044). GPUI: da fare |
+| Quadro paziente | Area delle proposte, W-13a | Quadro | A matita, con modello, fonti e data. Aprire non genera | Web: ingresso integrato (PR 1044). GPUI: da fare |
 | Importazione assistita | W-13b | Importazione assistita | Ogni elemento è una proposta finché non è accettato. La revisione si conserva | Da provare |
 | Controlli e follow-up | `#follow-up`, W-10 | Controlli, questioni aperte. Applicazione delle proposte esclusa (X04) | Nome e scadenza. Caricamento, vuoto ed errore distinti | Da provare |
 | Attenzione | `#attenzione` | Questioni aperte | Conteggio di elementi reali, ciascuno con il suo rimando | Da provare |
@@ -570,7 +570,7 @@ come accettazione: quella si fa sul candidato installato.
 | Nuova scheda | `/patients/new` | Modulo nuova scheda | Obbligatori riconoscibili prima dell'invio. Scheda senza identificativo ammessa (ADR 0179). Revisione prima della registrazione | Da provare |
 | Importazione di pazienti | `/patients/import` | Esclusa (X16) | Anteprima delle righe prima della scrittura, errori per riga | Da provare |
 | Importazione del dossier | `/patients/import/dossier` | Importazione del dossier | Ogni scheda proposta con le sue fonti, un gesto per scheda, esito riletto | Da provare |
-| In arrivo | `/in-arrivo`, aggiunta dopo U0 | Non presente | Ogni visita depositata è una proposta a matita. La conferma mostra paziente e contenuto, poi il testo riletto | Da provare. Da riconciliare con l'elenco W |
+| In arrivo | `/in-arrivo`, Giro 1 (WUL-868), successiva a U0 | Percorso Web | Mostrare quali elementi sono già registrati secondo il mandato e quali attendono il medico. Prima della conferma rendere riconoscibili paziente, differenze, fonti e dubbi | Da provare sul candidato con il canale visita ([ADR 0190](../../adr/0190-mandato-agenti-e-cassetta-della-visita.md)) |
 | Agenda | Area turno, W-20a | Agenda | Gruppi per urgenza con il conteggio che dice che cosa conta. Filtri fino a quattro segmenti | Da provare |
 | Diario | `/diary`, W-20b | Diario | Voci di tutti i pazienti con nome, tipo e autore. Ricerca con etichetta | Da provare |
 | Repertori | Area repertori, W-20c | Repertori | Panoramica esistente (D11). Un conteggio non letto non diventa zero | Da provare |
@@ -592,8 +592,8 @@ come accettazione: quella si fa sul candidato installato.
 | ChatGPT | `/settings/ai/chatgpt`, W-19j | ChatGPT | Account, quota e consenso su righe diverse. Titolo della shell (D15) | Da provare |
 | Fabric | `/settings/ai/fabric`, W-19k | Governo | Capacità leggibili, nessuna disponibilità sottintesa | Da provare |
 | Governo | `/settings/ai/governance`, W-19l | Governo | Regole e stati di controllo distinti dagli errori | Da provare |
-| Conservazione | `/settings/conservazione` | Conservazione | Termini e blocchi in parole. Lo scarto passa dalla soglia | Da provare. Da riconciliare con l'elenco W |
-| Agenti | `/settings/agenti`, aggiunta dopo U0 | Da verificare nel censimento | Agente abbinato con il suo mandato, revoca con conferma | Da provare. Da riconciliare con l'elenco W |
+| Conservazione | `/settings/conservazione`, R-1–R-6 dell’emendamento del 3 novembre | Vista Conservazione censita in G-0, prove O13/F26 | Termini e blocchi in parole. Lo scarto richiede la conferma del medico | Da provare sul candidato. [Contratto di rilascio](../../releases/0.9.1-contract.md#emendamento-del-3-novembre-2026-conservazione-nella-091) e [censimento GPUI](../../analysis/2026-10-23-gpui-census.md) |
+| Agenti | `/settings/agenti`, Giro 1 (WUL-866), successiva alle dodici sottoviste W-19 di U0 | Abbinamento e gestione dei mandati nel Web | Distinguere il client abbinato dal mandato attivo. Rendere riconoscibili perimetro, scadenza e revoca | Da provare sul candidato con il canale visita ([ADR 0190](../../adr/0190-mandato-agenti-e-cassetta-della-visita.md)) |
 | Attività della postazione | Registro delle operazioni | Da verificare nel censimento | Conteggio degli eventi e ultimo evento con ora. Si raggiunge dalla vista in cui si è scritto | Da provare |
 | Continua in MediFlow | `/plugin-local-ui` | Accesso da chat | Dice che cosa si sta per aprire e per quale paziente | Da provare |
 | Banchi | `/mockups/*`, `/review-pilot` | Non presenti | Solo sviluppo: fuori dal giro | Fuori |
@@ -604,13 +604,13 @@ Stato al 18 novembre 2026.
 
 | Criterio | Web locale | GPUI sul Mac |
 | --- | --- | --- |
-| D17 Primo sguardo | Aperta (PR 1044): identità senza codice, anno stimato | In corso |
-| D18 Stato ed eventi | Aperta (PR 1044): sezione nel Riepilogo. Da fare: posto secondo D18 | Da fare |
-| D19 Quadro paziente | Aperta (PR 1044): riga in cima e comando. Da fare: blocco nel Contesto | Da fare |
-| D20 Righe | Aperta (PR 1044) per Terapie e Documenti. Da fare: Prestazioni, Protesica, Misure | Da fare |
-| D21 Superfici flottanti | Aperta (PR 1044) per menu e ricerche. Da fare: avvisi temporanei, pannelli della testata | Da provare |
-| D22 Segmenti e indice | Unita: indice che segue la scelta e che si presenta come indice (PR 1042, 1047). Aperta: segmenti in vista (PR 1044) | Da fare: Analisi e Scale |
-| D23 Campi | Aperta (PR 1044) nella cartella. Da fare: Impostazioni, primo avvio, nuova scheda, scale, importazione | Da fare |
+| D17 Primo sguardo | Integrata (PR 1044): identità senza codice, anno stimato | In corso |
+| D18 Stato ed eventi | Integrata (PR 1044): sezione nel Riepilogo. Da fare: posto secondo D18 | Da fare |
+| D19 Quadro paziente | Integrata (PR 1044): riga in cima e comando. Da fare: blocco nel Contesto | Da fare |
+| D20 Righe | Integrata (PR 1044) per Terapie e Documenti. Da fare: Prestazioni, Protesica, Misure | Da fare |
+| D21 Superfici flottanti | Integrata (PR 1044) per menu e ricerche. Da fare: avvisi temporanei, pannelli della testata | Da provare |
+| D22 Segmenti e indice | Unita: indice che segue la scelta e che si presenta come indice (PR 1042, 1047). Integrati i segmenti in vista (PR 1044) | Da fare: Analisi e Scale |
+| D23 Campi | Integrata (PR 1044) nella cartella. Da fare: Impostazioni, primo avvio, nuova scheda, scale, importazione | Da fare |
 | D24 Titoli di sezione | Da fare, con token e guard | Da fare, con il ruolo tipografico |
 | D25 Scrittura ed esito | In corso | In corso: nota della scheda |
 | D26-D30 Zone, larghezze, fascia, fonte e bozza | In corso. La bozza a tre zone (PR 1048, chiusa) è servita da termine di confronto | In corso |
