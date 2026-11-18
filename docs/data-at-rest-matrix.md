@@ -124,7 +124,7 @@ locali salvano ciò che ricevono.
 
 - Altra protezione: `token_hash`, `unlock_ref`
 - In chiaro: `mandate_ref`, `agent_ref`
-- `unlock_ref` è l'hash della ricevuta di sblocco. Il legame con la sessione corrente resta nel processo Web.
+- `unlock_ref` è l'hash della ricevuta di sblocco. Per «Rinnova accesso» combina l’hash della sessione con l’identificativo casuale del gesto. Il legame con la sessione corrente resta nel processo Web.
 - Le due tabelle sono escluse dal backup portabile. La generazione dell'archivio e la sessione attiva limitano l'autorità dopo il recupero completo.
 
 ### `attachments`: documenti allegati e loro estratti
