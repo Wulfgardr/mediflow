@@ -7,12 +7,7 @@ import { openDbServer } from '@/lib/db-server';
 
 export const runtime = 'nodejs';
 const handlers = createAgentMandateHttp({
-    async session() {
-        const session = await readAuthenticatedWebSession();
-        if (!session) return null;
-        const account = openDbServer().prepare('SELECT unlock_verifier_hash FROM users WHERE id=?').get(session.userId) as { unlock_verifier_hash: string | null } | undefined;
-        return account?.unlock_verifier_hash ? session : null;
-    },
+    session: readAuthenticatedWebSession,
     async verifyPin(username, pin) {
         const result = await verifyHostCredentials({ username, pin });
         return result.kind === 'verified' ? result.account.id : null;

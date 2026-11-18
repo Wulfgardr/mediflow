@@ -1,29 +1,36 @@
 import type { Page, APIRequestContext } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 import { AGENT_OPERATIONS, type AgentOperation } from '../lib/agent-mandate-contract';
 
 export const agentVisitPin = '24682468';
 export const agentVisitPassphrase = 'mandato sintetico visita novembre';
-export async function createSyntheticAgentMandate(page: Page) {
+export async function createSyntheticAgentMandate(page: Page, credential: 'passphrase' | 'pin' = 'passphrase', captureRecovery = false) {
     const pin = agentVisitPin, passphrase = agentVisitPassphrase;
+    let recovery: { key: string; content: Buffer } | null = null;
     await bootstrapUnlockedSession(page, pin);
     await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
-    await page.getByRole('link', { name: 'Accesso', exact: true }).click();
-    await page.getByLabel('PIN attuale', { exact: true }).first().fill(pin);
-    await page.getByLabel('Nuova passphrase', { exact: true }).fill(passphrase);
-    await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(passphrase);
-    await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
-    const kit = page.getByTestId('recovery-kit');
-    const download = page.waitForEvent('download');
-    await kit.getByRole('button', { name: 'Scarica kit di recupero' }).click(); await download;
-    await kit.getByRole('checkbox').check();
-    await kit.getByRole('button', { name: 'Attiva la nuova passphrase' }).click();
-    await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
-    await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
-    await page.getByLabel('Passphrase', { exact: true }).fill(passphrase);
-    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
-    await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+    if (credential === 'passphrase') {
+        await page.getByRole('link', { name: 'Accesso', exact: true }).click();
+        await page.getByLabel('PIN attuale', { exact: true }).first().fill(pin);
+        await page.getByLabel('Nuova passphrase', { exact: true }).fill(passphrase);
+        await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(passphrase);
+        await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
+        const kit = page.getByTestId('recovery-kit');
+        const download = page.waitForEvent('download');
+        const key = captureRecovery ? await kit.getByLabel('Chiave di recupero', { exact: true }).innerText() : null;
+        await kit.getByRole('button', { name: 'Scarica kit di recupero' }).click();
+        const artifact = await download;
+        if (key !== null) recovery = { key, content: await readFile((await artifact.path())!) };
+        await kit.getByRole('checkbox').check();
+        await kit.getByRole('button', { name: 'Attiva la nuova passphrase' }).click();
+        await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+        await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+        await page.getByLabel('Passphrase', { exact: true }).fill(passphrase);
+        await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+        await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+    }
     await expect(page.getByRole('link', { name: 'Agenti', exact: true })).toBeVisible();
     await page.getByRole('link', { name: 'Agenti', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Nuovo mandato', exact: true })).toBeVisible();
@@ -33,7 +40,7 @@ export async function createSyntheticAgentMandate(page: Page) {
     const created = await creation; expect(created.status()).toBe(201);
     const mandate = created.request().postDataJSON().mandate;
     expect(mandate.durationMs).toBe(43200000);
-    return mandate;
+    return { ...mandate, recovery };
 }
 
 export async function pairSyntheticVisitAgent(page: Page, agent: APIRequestContext, operations: AgentOperation[] = [...AGENT_OPERATIONS]) {

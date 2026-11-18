@@ -12,7 +12,7 @@ si eseguono dalla radice della repository.
 
 ## Collegare il client
 
-In MediFlow, sbloccare con la passphrase, aprire Impostazioni, Agenti e creare
+In MediFlow, sbloccare con la credenziale dell’account, aprire Impostazioni, Agenti e creare
 un mandato di dodici ore. Il PIN conferma il mandato, che indica operazioni,
 fornitore del modello e autorizzazione ad inviare dati clinici al fornitore.
 
@@ -27,8 +27,8 @@ e `code`. Confrontare il codice nella pagina Agenti ed approvarlo, poi eseguire:
 npm run agent:visita -- completa --richiesta UUID-DELLA-RICHIESTA
 ```
 
-Conservare `agentRef` dalla ricevuta. Dal prossimo sblocco con passphrase il
-client registrato può ritirare il mandato di 12 ore. Il blocco, la scadenza
+Conservare `agentRef` dalla ricevuta. Dopo lo sblocco con PIN o passphrase, o dopo
+«Rinnova accesso» riuscito, il client registrato può ritirare il mandato di 12 ore. Il blocco, la scadenza
 della sessione o la revoca in Agenti interrompono l’accesso.
 
 ```sh
@@ -72,7 +72,7 @@ Cambiare file o identità richiede una nuova visita, anziché riusare il suo UUI
 Il client rifiuta file SQLite, link simbolici e PDF con hash diversi.
 
 La ricevuta `closed` conferma che la visita è stata depositata nella cassetta
-cifrata. Dopo lo sblocco con passphrase, MediFlow controlla le visite in attesa
+cifrata. Quando la scheda è sbloccata, MediFlow controlla le visite in attesa
 e inserisce nota, trascrizione e PDF con codice fiscale coincidente con la scheda.
 I CF discordanti, mancanti o ambigui bloccano l’applicazione automatica.
 
