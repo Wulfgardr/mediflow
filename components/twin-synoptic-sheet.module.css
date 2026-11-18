@@ -4,13 +4,16 @@
 .sheet th { height: 36px; }
 .sheet td { height: 40px; }
 .sheet .value { text-align: right; font-variant-numeric: tabular-nums; }
-.problems th:first-child { width: 24%; }
-.problems th:nth-child(2) { width: 46%; }
+.problems th:first-child { width: 5.5rem; }
+.problems th:nth-child(3) { width: 6.5rem; }
+.therapies th:first-child { width: 46%; }
+.therapies th:nth-child(3) { width: 5.5rem; }
+.changes th:first-child { width: 6.5rem; }
+.changes th:nth-child(3) { width: 6.5rem; }
 .notes { min-width: 0; }
 .notes h3 { font: var(--type-section); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
 .notes p { font: var(--type-prose); white-space: pre-line; }
 @media (max-width: 1000px) {
- .problems th:nth-child(2) { width: auto; }
  .measures th:first-child { width: 38%; }
  .measures th:nth-child(2) { width: 32%; }
 }

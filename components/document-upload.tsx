@@ -411,8 +411,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                 {currentAttachments?.map((file, index) => <tbody key={file.id} data-document-id={file.id}>
                     <tr className={viewingId === file.id ? styles.selected : undefined}><td>
                                 <h4 className={styles.documentName}><PrivacyBlur>{file.name}</PrivacyBlur></h4>
-                                <p id={`document-identity-${file.id}`} className={disclosure.hint}>Documento {index + 1}{currentAttachments.some(other => other.id !== file.id && other.name === file.name && other.size === file.size) ? ' · Possibile duplicato: stesso nome e dimensione' : ''}</p>
-                                <p className={disclosure.hint}>Caricato il {new Date(file.createdAt).toLocaleDateString('it-IT')} · {Math.max(1, Math.ceil(file.size / 1024))} KB</p>
+                                <p className={disclosure.hint}><span id={`document-identity-${file.id}`}>Documento {index + 1}{currentAttachments.some(other => other.id !== file.id && other.name === file.name && other.size === file.size) ? ' · Possibile duplicato: stesso nome e dimensione' : ''}</span> · Caricato il {new Date(file.createdAt).toLocaleDateString('it-IT')} · {Math.max(1, Math.ceil(file.size / 1024))} KB</p>
                                 <p className={disclosure.hint} data-testid="document-source-status">
                                     {extractingId === file.id ? 'Estrazione in corso' : localExtraction?.attachmentId === file.id
                                         ? localExtraction.status === 'available' ? 'Testo disponibile · da rivedere' : 'Revisione manuale necessaria'

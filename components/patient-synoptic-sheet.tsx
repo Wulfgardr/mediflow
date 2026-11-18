@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { Checkup, Diagnosis, Observation, Therapy } from '@/lib/db';
 import { formatCountLabel } from '@/lib/format-count';
 import { projectQuadroMeasures } from '@/lib/patient-quadro';
+import { projectLastRecordedTherapyChanges, THERAPY_CHANGE_LABELS } from '@/lib/patient-therapy-changes';
 import { InkSectionHeading } from '@/components/ui/ink-state';
 import register from './clinical-register.module.css';
 import reading from './twin-synoptic-sheet.module.css';
@@ -19,6 +20,7 @@ export interface PatientSynopticSheetProps {
     notesContent?: ReactNode;
     problems: QuadroRead<Diagnosis>;
     therapies: QuadroRead<Therapy>;
+    therapyRecords?: QuadroRead<Therapy>;
     measures: QuadroRead<Observation>;
     checkups: QuadroRead<Checkup>;
 }
@@ -44,9 +46,11 @@ function DateCell({ date }: { date?: Date }) {
     return <time dateTime={new Date(date).toISOString()}>{new Date(date).toLocaleDateString('it-IT')}</time>;
 }
 
-export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, measures, checkups }: PatientSynopticSheetProps) {
+export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, therapyRecords, measures, checkups }: PatientSynopticSheetProps) {
     const measureRows = projectQuadroMeasures(measures.data ?? []);
+    const therapyChanges = projectLastRecordedTherapyChanges(therapyRecords?.data ?? [], 3);
     return <section id="quadro" aria-label="Riepilogo clinico" className={`${register.register} ${reading.sheet}`}>
+        {clinicalSupport}
         <Section name="Problemi" read={problems} count={formatCountLabel(problems.data?.length ?? 0, 'problema', 'problemi')} empty="Nessun problema registrato.">
             <table className={`${register.table} ${reading.problems}`} aria-label="Problemi">
                 <thead><tr><th scope="col">Codice</th><th scope="col">Descrizione</th><th scope="col" className={register.secondaryColumn}>Da quando</th></tr></thead>
@@ -55,8 +59,16 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                 </tr>)}</tbody>
             </table>
         </Section>
+        {therapyRecords ? <Section name="Ultime modifiche di terapia" read={{ ...therapyRecords, data: therapyRecords.data === undefined ? undefined : therapyChanges }} count={formatCountLabel(therapyChanges.length, 'evento registrato', 'eventi registrati')} empty="Nessuna modifica di terapia registrata.">
+            <table className={`${register.table} ${reading.changes}`} aria-label="Ultime modifiche di terapia">
+                <thead><tr><th scope="col">Data</th><th scope="col">Farmaco</th><th scope="col">Evento</th></tr></thead>
+                <tbody>{therapyChanges.map(change => <tr key={change.id}>
+                    <td><DateCell date={change.date} /></td><td>{change.drugName}</td><td>{THERAPY_CHANGE_LABELS[change.kind]}</td>
+                </tr>)}</tbody>
+            </table>
+        </Section> : null}
         <Section name="Terapie attive" read={therapies} count={formatCountLabel(therapies.data?.length ?? 0, 'attiva', 'attive')} empty="Nessuna terapia attiva.">
-            <table className={register.table} aria-label="Terapie attive">
+            <table className={`${register.table} ${reading.therapies}`} aria-label="Terapie attive">
                 <thead><tr><th scope="col">Nome e dose</th><th scope="col">Posologia</th><th scope="col" className={register.secondaryColumn}>ATC</th></tr></thead>
                 <tbody>{therapies.data?.map(therapy => <tr key={therapy.id}>
                     <td>{therapy.drugName}</td><td>{therapy.dosage}</td><td className={`${register.secondaryColumn} lume-code`}>{therapy.atc}</td>
@@ -79,6 +91,5 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
             </table>
         </Section>
         {notesContent ? <div className={reading.notes}>{notesContent}</div> : null}
-        {clinicalSupport}
     </section>;
 }
