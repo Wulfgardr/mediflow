@@ -1,0 +1,88 @@
+name: WUL-842 Web document identity proof
+on:
+  push:
+    branches: [codex/WUL-842-web-document-proof]
+permissions:
+  contents: read
+jobs:
+  proof:
+    name: Web document identity ${{ matrix.verdict }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - verdict: base
+            revision: 8abbef40c
+          - verdict: diff
+            revision: bcb5f05c6
+    env:
+      MEDIFLOW_NEXT_DIST_DIR: .next-e2e
+      E2E_DOCUMENTS_SYNTHETIC_ONLY: '1'
+      FORCE_COLOR: '0'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+      - run: git switch --detach ${{ matrix.revision }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci && npm run prepare:dependencies
+      - run: npx --no-install playwright install --with-deps chromium
+      - name: Build synthetic isolated runtime
+        run: |
+          test -z "$(git status --porcelain)"
+          export MEDIFLOW_APP_REVISION="$(git rev-parse --short=12 HEAD)"
+          export MEDIFLOW_APP_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+          export MEDIFLOW_APP_WORKTREE_HASH=clean
+          unset MEDIFLOW_APP_SOURCE_FINGERPRINT MEDIFLOW_APP_FINGERPRINT
+          unset E2E_BASE_URL E2E_PIN MEDIFLOW_RUNTIME_TWIN NEXT_PUBLIC_MEDIFLOW_RUNTIME_TWIN
+          E2E_BUILD_DATA="$(mktemp -d "${RUNNER_TEMP}/mediflow-build-data.XXXXXX")"
+          export MEDIFLOW_DATA_DIR="${E2E_BUILD_DATA}"
+          export MEDIFLOW_E2E_DATA_DIR="${E2E_BUILD_DATA}"
+          export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 E2E_DISABLE_LEGACY_COPY=1
+          npm run build
+          node scripts/check-static-routes.mjs
+          E2E_AUTH_RUNTIME="$(mktemp -d "${RUNNER_TEMP}/mediflow-auth-runtime.XXXXXX")"
+          cp -R "${MEDIFLOW_NEXT_DIST_DIR}/standalone/." "${E2E_AUTH_RUNTIME}/"
+          mkdir -p "${E2E_AUTH_RUNTIME}/public" "${E2E_AUTH_RUNTIME}/${MEDIFLOW_NEXT_DIST_DIR}/static"
+          cp -R public/. "${E2E_AUTH_RUNTIME}/public/"
+          cp -R "${MEDIFLOW_NEXT_DIST_DIR}/static/." "${E2E_AUTH_RUNTIME}/${MEDIFLOW_NEXT_DIST_DIR}/static/"
+          printf 'E2E_ISOLATED_STANDALONE_DIR=%s\n' "${E2E_AUTH_RUNTIME}" >> "$GITHUB_ENV"
+          node --input-type=module - "${E2E_AUTH_RUNTIME}/mediflow-build-identity.json" >> "$GITHUB_ENV" <<'NODE'
+          import fs from 'node:fs';
+          const identity = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          for (const [key, value] of Object.entries({
+            MEDIFLOW_APP_REVISION: identity.revision.slice(0, 12),
+            MEDIFLOW_APP_BRANCH: identity.branch, MEDIFLOW_APP_WORKTREE_HASH: identity.worktreeHash,
+            MEDIFLOW_APP_SOURCE_FINGERPRINT: identity.sourceFingerprint,
+            MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint,
+          })) console.log(`${key}=${value}`);
+          NODE
+      - name: Check the base fails at Prosegui
+        if: matrix.verdict == 'base'
+        run: |
+          set +e
+          npm run test:e2e -- e2e/patient-document-create.spec.ts --grep 'data di nascita esatta' --reporter=list,html 2>&1 | tee red.log
+          playwright_exit=${PIPESTATUS[0]}
+          set -e
+          test "$playwright_exit" = 1
+          rg 'Expected:\s+enabled' red.log
+          rg 'Received:\s+disabled' red.log
+          rg -F 'Nome, cognome e nascita devono permettere di proseguire' red.log
+      - name: Run the corrected Web and Dossier gestures
+        if: matrix.verdict == 'diff'
+        run: npm run test:e2e -- e2e/patient-document-create.spec.ts e2e/dossier-import.spec.ts --grep 'nuova scheda da documento|nuova scheda senza identificativo|Dossier senza CF|risposta persa|annullamento' --reporter=list,html
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: web-document-identity-${{ matrix.verdict }}
+          path: |
+            red.log
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
