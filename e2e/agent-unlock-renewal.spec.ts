@@ -7,15 +7,17 @@ import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto'
 
 test.describe.configure({ retries: 0 });
 
-test('one PIN-approved registration receives a twelve-hour mandate on each unlock', async ({ page, isolatedRuntime, playwright }, testInfo) => {
+for (const credentialKind of ['passphrase', 'pin'] as const) test(`a registered agent receives a twelve-hour mandate on ${credentialKind} unlock and tab renewal`, async ({ page, context: browserContext, isolatedRuntime, playwright }, testInfo) => {
     test.setTimeout(150000);
     const agent = await playwright.request.newContext({ baseURL: isolatedRuntime.url });
+    const unlockLabel = credentialKind === 'pin' ? 'PIN operatore' : 'Passphrase';
+    let secret = credentialKind === 'pin' ? agentVisitPin : agentVisitPassphrase;
     const registrationName = 'Client sintetico rinnovabile';
     const operations = ['visita.apri', 'visita.nota', 'visita.chiudi'];
     const bearer = (token: string) => ({ Authorization: 'Bearer ' + token });
     try {
         await page.clock.install();
-        const template = await createSyntheticAgentMandate(page);
+        const template = await createSyntheticAgentMandate(page, credentialKind, true);
         const pending = await agent.post('/api/agent/v1/pairings', { data: { name: registrationName, operations } });
         expect(pending.status()).toBe(201);
         const { receipt, pairingCredential } = await pending.json();
@@ -23,7 +25,7 @@ test('one PIN-approved registration receives a twelve-hour mandate on each unloc
             { headers: { Authorization: 'Pairing ' + pairingCredential.claim } });
         const unlock = async () => {
             const confirmed = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates/unlock'));
-            await page.getByLabel('Passphrase', { exact: true }).fill(agentVisitPassphrase);
+            await page.getByLabel(unlockLabel, { exact: true }).fill(secret);
             await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
             const response = await confirmed;
             expect(response.status()).toBe(204);
@@ -34,7 +36,7 @@ test('one PIN-approved registration receives a twelve-hour mandate on each unloc
             const confirmation = page.waitForResponse(response => response.url().endsWith('/api/auth/lock'));
             await page.getByRole('button', { name: 'Blocca', exact: true }).first().click();
             expect((await confirmation).ok()).toBe(true);
-            await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+            await expect(page.getByLabel(unlockLabel, { exact: true })).toBeEnabled();
         };
         expect((await poll()).status()).toBe(202);
         await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
@@ -96,7 +98,7 @@ test('one PIN-approved registration receives a twelve-hour mandate on each unloc
         const idleLock = page.waitForResponse(response => response.url().endsWith('/api/auth/lock'));
         await page.clock.fastForward('15:01');
         expect((await idleLock).request().headers()['x-mediflow-lock-reason']).toBe('inactivity');
-        await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+        await expect(page.getByLabel(unlockLabel, { exact: true })).toBeEnabled();
         expect((await deposit(credential.token)).status()).toBe(401);
         expect((await retrieve()).status()).toBe(401);
         await unlock();
@@ -115,16 +117,77 @@ test('one PIN-approved registration receives a twelve-hour mandate on each unloc
         expect((await retrieve()).status()).toBe(401);
 
         await lock();
+        if (template.recovery) {
+            secret = 'passphrase sintetica recuperata';
+            const confirmations: string[] = [];
+            const countConfirmation = (request: { url(): string }) => {
+                if (request.url().endsWith('/api/agent-mandates/unlock')) confirmations.push(request.url());
+            };
+            page.on('request', countConfirmation);
+            try {
+                await page.getByRole('button', { name: 'Recupera con kit e chiave', exact: true }).click();
+                await page.getByLabel('Kit di recupero', { exact: true }).setInputFiles({
+                    name: 'synthetic-kit.json', mimeType: 'application/json', buffer: template.recovery.content,
+                });
+                await page.getByLabel('Chiave di recupero', { exact: true }).fill(template.recovery.key);
+                await page.getByLabel('Nuova passphrase', { exact: true }).fill(secret);
+                await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(secret);
+                await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
+                const kitPanel = page.getByTestId('recovery-kit');
+                await kitPanel.getByRole('button', { name: 'Scarica kit di recupero', exact: true }).click();
+                await kitPanel.getByRole('checkbox').check();
+                const recovery = page.waitForResponse(response => response.url().endsWith('/api/auth/passphrase/recover'));
+                await kitPanel.getByRole('button', { name: 'Attiva la nuova passphrase', exact: true }).click();
+                expect((await recovery).status()).toBe(200);
+                await expect(kitPanel).toBeHidden();
+                await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toHaveCount(0);
+                expect((await retrieve()).status()).toBe(401);
+                expect(confirmations).toHaveLength(0);
+            } finally { page.off('request', countConfirmation); }
+            await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+            await expect(page.getByLabel(unlockLabel, { exact: true })).toBeEnabled();
+            expect((await retrieve()).status()).toBe(401);
+        }
         await unlock();
         const third = await retrieve();
         expect(third.status()).toBe(200);
         const latest = await third.json();
         const latestContext = await agent.get('/api/agent/v1/context', { headers: bearer(latest.credential.token) });
         expect(latestContext.status()).toBe(200);
+        const secondTab = await browserContext.newPage();
+        let sharedToken: string;
+        try {
+            await secondTab.goto(isolatedRuntime.url);
+            const renew = secondTab.getByRole('button', { name: 'Rinnova accesso', exact: true });
+            await expect(renew).toBeVisible();
+            expect((await (await retrieve()).json()).receipt.mandateRef).toBe(latest.receipt.mandateRef);
+            const confirmation = secondTab.waitForResponse(response => response.url().endsWith('/api/agent-mandates/unlock'));
+            await renew.click();
+            const confirmed = await confirmation;
+            expect(confirmed.status()).toBe(204);
+            await expect(secondTab.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+            const afterShare = await retrieve();
+            expect(afterShare.status()).toBe(200);
+            const shared = await afterShare.json();
+            expect(shared.receipt.mandateRef).not.toBe(latest.receipt.mandateRef);
+            expect(shared.receipt.expiresAt - shared.receipt.issuedAt).toBe(43200000);
+            const replay = await secondTab.evaluate(async ({ body, etag }) => {
+                const confirm = (binding: string) => fetch('/api/agent-mandates/unlock', { method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'If-Match': binding }, body });
+                const repeated = await confirm(etag);
+                const stale = await confirm('"stale-abcdefghijklmnopqrstuvwxyz"');
+                return [repeated.status, stale.status];
+            }, { body: confirmed.request().postData()!, etag: confirmed.request().headers()['if-match'] });
+            expect(replay).toEqual([204, 403]);
+            expect((await (await retrieve()).json()).receipt.mandateRef).toBe(shared.receipt.mandateRef);
+            expect((await deposit(latest.credential.token)).status()).toBe(401);
+            expect((await (await page.request.get('/api/auth/check')).json()).hasSession).toBe(true);
+            sharedToken = shared.credential.token;
+        } finally { await secondTab.close(); }
         await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
         await page.getByRole('button', { name: 'Revoca ' + registrationName, exact: true }).click();
         await expect(page.getByRole('button', { name: 'Revoca ' + registrationName, exact: true })).toHaveCount(0);
-        expect((await deposit(latest.credential.token)).status()).toBe(401);
+        expect((await deposit(sharedToken)).status()).toBe(401);
         expect((await retrieve()).status()).toBe(401);
         await lock();
         await unlock();

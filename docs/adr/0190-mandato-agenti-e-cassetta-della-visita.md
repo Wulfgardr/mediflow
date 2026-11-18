@@ -16,8 +16,8 @@ visita confermata. L'orario non identifica il paziente.
 
 ## Mandato e credenziali
 
-Il medico crea un mandato nella UI fidata dopo lo sblocco con passphrase e
-la conferma con PIN. Sceglie durata, operazioni consentite e fornitore del
+Il medico crea un mandato nella UI fidata dopo lo sblocco con la credenziale
+dell’account e la conferma con PIN. Sceglie durata, operazioni consentite e fornitore del
 modello. La durata massima è 12 ore. Il fornitore attuale è OpenAI tramite
 Codex. Il mandato deve dichiarare l'eventuale passaggio di trascrizione e
 documenti a quel fornitore e le ricevute devono registrarlo. Un abbonamento
@@ -49,21 +49,23 @@ accesso diretto a SQLite, cookie, PIN o master key.
 
 Il medico può scegliere «Rinnova allo sblocco» quando approva il codice di
 un client, confermando col PIN il perimetro, il fornitore e l’eventuale
-passaggio di documenti e trascrizioni già scelti. Dal successivo sblocco
-con passphrase, la scheda che ha aperto la chiave conferma il gesto nella
-sessione Web che lo ha autorizzato. Per ogni registrazione attiva il
-server emette un mandato di 12 ore con le operazioni approvate per quel
-client. Riusa la chiave pubblica e l’involucro registrati. Alla conferma
-dello sblocco viaggia soltanto una ricevuta opaca legata alla sessione.
+passaggio di documenti e trascrizioni già scelti. Ogni sblocco riuscito
+con PIN o passphrase e ogni «Rinnova accesso» che ottiene la chiave da
+un’altra scheda confermano il gesto nella sessione Web corrente. Il server
+emette un mandato di 12 ore per ciascun client registrato, con il perimetro
+approvato. Riusa la chiave pubblica e l’involucro registrati. La conferma
+trasporta solo il ticket di login o l’identificativo del gesto, legato
+alla stessa sessione e alla stessa generazione di archivio.
 
 La credenziale di registrazione consente al client di ritirare il token
 di deposito del mandato corrente sul loopback. Blocco della sessione,
 scadenza, nuova emissione e revoca negano richieste con il token precedente.
 La revoca della registrazione in Agenti impedisce anche le emissioni
-successive. Il trasferimento della chiave fra schede e il ripristino
-di una sessione non prolungano il mandato. L’audit lega registrazione,
-medico, mandato e fornitore al rinnovo. Le regole di applicazione
-della cassetta descritte qui sotto valgono anche per questi mandati.
+successive. Il ripristino automatico della scheda e il recupero col kit
+non emettono mandati. Dopo il recupero, il rinnovo riparte al primo sblocco
+normale riuscito. L’audit lega registrazione, medico, mandato e fornitore
+al rinnovo. Le regole di applicazione della cassetta descritte qui sotto
+valgono anche per questi mandati.
 
 ## Deposito e identità
 

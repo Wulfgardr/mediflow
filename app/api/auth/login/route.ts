@@ -101,7 +101,7 @@ export async function POST(request: Request) {
         } catch (error) {
             console.error('Audit login success write failed:', error);
         }
-        const agentUnlockTicket = verifier ? beginAgentUnlock(session.sessionId, mutation.controlId) : null;
+        const agentUnlockTicket = beginAgentUnlock(session.sessionId, mutation.controlId);
         const response = NextResponse.json({
             success: true,
             ...(agentUnlockTicket ? { agentUnlockTicket } : {}),

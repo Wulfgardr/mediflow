@@ -1,7 +1,8 @@
 # Rinnovo dei mandati allo sblocco
 
 Il modello esplora un client e un medico per tre sessioni e tre avanzamenti
-del tempo. Un'unità rappresenta la durata del mandato. Il modello tratta la
+del tempo. Ogni sessione può ricevere un trasferimento di chiave, con retry
+dello stesso gesto. Un'unità rappresenta la durata del mandato. Il modello tratta la
 scadenza della sessione come un blocco. La durata esatta, gli scope e i dati
 della cassetta sono verificati dalle prove TypeScript e HTTP.
 
@@ -9,6 +10,7 @@ della cassetta sono verificati dalle prove TypeScript e HTTP.
 | --- | --- |
 | Registra e revoca | `approve` e `register`, `revoke` in agent-pairing-store e agent-registration-store |
 | Login, conferma tardiva, blocco | `beginAgentUnlock`, `confirmAgentUnlock` e il ritiro della risorsa dal proprietario della sessione |
+| Trasferimento e recupero | `confirmSharedAgentUnlock` con la generazione e il controllo Web della scheda. Il recupero ritira l’accesso prima che lo sblocco possa ripartire. |
 | Emissione | `renew` in agent-registration-store, una transazione IMMEDIATE per tutti i client |
 | Ritiro | `retrieve` verifica sessione, scadenza, corrente e revoca prima di consegnare il token |
 | Deposito | `principal` rilegge gli stessi vincoli dentro la transazione del deposito |
@@ -29,9 +31,9 @@ java -XX:+UseParallelGC -cp "$TLA_JAR" tlc2.TLC -deadlock -config MC.cfg AgentUn
 
 Con `IgnoreLock = TRUE`, ci si aspetta che fallisca
 `NoUnauthorizedDeposit` dopo ritiro, blocco e deposito. Sostituendo la riga
-`INVARIANTS` con `INVARIANT NoTokenWitness`, il controesempio deve
-raggiungere il ritiro di un token. La prova browser esercita lo stesso
+`INVARIANTS` con `INVARIANT NoSharedWitness`, il controesempio deve
+raggiungere il ritiro dopo «Rinnova accesso». La prova browser esercita lo stesso
 ordine di ritiro, blocco e rifiuto su route reali.
 
-Al 18 novembre 2026, 404 stati distinti senza violazioni. Il mutante viola
+Al 18 novembre 2026, 2.114 stati distinti senza violazioni. Il mutante viola
 `NoUnauthorizedDeposit`. Il testimone raggiunge il ritiro.
