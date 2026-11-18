@@ -3,7 +3,7 @@
 import { restoreEntryDraftDate, type EntryLocalDraft } from '@/lib/entry-local-draft';
 import { useEntryLocalDraft } from '@/hooks/use-entry-local-draft';
 import { formatCountLabel } from '@/lib/format-count';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
@@ -74,7 +74,7 @@ function formatEntryDate(value: Date | string | number | null | undefined): stri
 /* WUL-421 */
 type VisitSessionUiState = VisitSessionState | 'processing' | 'processed';
 
-export function PatientEntryComposer({ embedded = false, sheetSource }: { embedded?: boolean; sheetSource?: SheetSourceSelection }) {
+export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }: { embedded?: boolean; sheetSource?: SheetSourceSelection; focusRef?: Ref<ClinicalEditorFocus> }) {
     const params = useParams();
     const router = useRouter();
     const { showToast } = useToast();
@@ -109,6 +109,12 @@ export function PatientEntryComposer({ embedded = false, sheetSource }: { embedd
     const editorFocus = useRef<ClinicalEditorFocus>(null);
     const reviewHeading = useRef<HTMLHeadingElement>(null);
     const [reviewing, setReviewing] = useState(false);
+    useImperativeHandle(focusRef, () => ({
+        resume() {
+            if (reviewing) reviewHeading.current?.focus();
+            else editorFocus.current?.resume();
+        },
+    }), [reviewing]);
     const [savedId, setSavedId] = useState<string | null>(null);
     const [registered, setRegistered] = useState<ClinicalEntry | null>(null);
     const [readbackFailed, setReadbackFailed] = useState(false);

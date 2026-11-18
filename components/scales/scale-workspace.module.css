@@ -85,8 +85,8 @@
 .formColumns { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,.8fr); gap: 40px; align-items: start; }
 .formColumns > div { min-width: 0; }
 .formColumns .progress { padding-bottom: 16px; border-bottom: 1px solid var(--lume-rule); margin-bottom: 20px; font-size: 0.8125rem; }
-.answers { gap: 0; }
-.choice { border: 1px solid transparent; border-bottom-color: var(--lume-rule); padding: 14px 10px 13px; }
+.answers { gap: 4px; }
+.choice { border: 1px solid transparent; padding: 14px 11px 13px; }
 .draftSummary { min-width: 0; padding-left: 24px; border-left: 1px solid var(--lume-rule); font-size: 0.8125rem; }
 .draftSummary h3 { margin: 0; font: 600 0.875rem/1.5 var(--lume-font-sans); }
 .draftSummary > p { margin: 12px 0; }

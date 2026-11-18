@@ -17,6 +17,7 @@ import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/pa
 import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
 import { PatientEntryComposer } from '@/components/patient-entry-composer';
+import type { ClinicalEditorFocus } from '@/components/clinical-rich-text-editor';
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { PatientSheetSources, type SheetSource } from '@/components/patient-sheet-sources';
 import { projectVisitReference } from '@/lib/patient-therapy-changes';
@@ -93,6 +94,20 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
     const { proposal } = useRuntimeTwinDesign();
     const [draftOnOpen, setDraftOnOpen] = useEntryDraftOnOpen(id, proposal);
     const writing = requested || draftOnOpen;
+    const [fullDiary, setFullDiary] = useState(false);
+    const diaryControl = useRef<HTMLButtonElement>(null);
+    const composerFocus = useRef<ClinicalEditorFocus>(null);
+    const showFullDiary = () => {
+        setFullDiary(true);
+        requestAnimationFrame(() => {
+            diaryControl.current?.scrollIntoView({ block: 'nearest' });
+            diaryControl.current?.focus({ preventScroll: true });
+        });
+    };
+    const returnFromDiary = () => {
+        setFullDiary(false);
+        requestAnimationFrame(() => composerFocus.current?.resume());
+    };
     const [openSource, setOpenSource] = useState<SheetSource | null>(null);
     const sourceTrigger = useRef<HTMLElement | null>(null);
     const sourceSelection = {
@@ -639,7 +654,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
             primaryAction={writing ? undefined : { href: `/patients/${id}/modules?voce=nuova`, label: 'Nuova voce', icon: Plus }}
             headerActions={(
                 <>
-                {writing ? <Link href={`/patients/${id}/modules`} className="mf-button-secondary" onClick={() => { setDraftOnOpen(false); setOpenSource(null); }} aria-label="Chiudi la voce" title="Chiudi la voce"><ArrowLeft size={16} aria-hidden="true" /><span>Chiudi la voce</span></Link> : null}
+                {writing ? <Link href={`/patients/${id}/modules`} className="mf-button-secondary" onClick={() => { setDraftOnOpen(false); setOpenSource(null); setFullDiary(false); }} aria-label="Chiudi la voce" title="Chiudi la voce"><ArrowLeft size={16} aria-hidden="true" /><span>Chiudi la voce</span></Link> : null}
                 {!writing ? <PatientHeaderActions key={`${patient.id}:${patient.ambulatoryId ?? ''}`}
                     patientId={patient.id} ambulatoryId={patient.ambulatoryId ?? null} checkups={checkups ?? []}
                     editHref={`/patients/${id}/edit`}
@@ -727,7 +742,8 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                         surfaceClassName: workspaceStyles.clinicalSection,
                         keepMounted: true,
                     }} />}
-                    composer={writing ? <PatientEntryComposer key={id} embedded sheetSource={sourceSelection} /> : undefined}
+                    composer={writing ? <PatientEntryComposer key={id} embedded sheetSource={sourceSelection} focusRef={composerFocus} /> : undefined}
+                    diaryTools={writing ? { full: fullDiary, control: diaryControl, show: showFullDiary, resume: returnFromDiary } : undefined}
                     sources={<PatientSheetSources patientId={id} selection={sourceSelection} entries={entriesError ? undefined : entries} data={attachments} loading={attachmentsLoading} error={attachmentsError}
                         onRefresh={refreshAttachments} archiveLink />}
                     activity={<PatientSheetActivity patientId={id} reference={visitReference} now={comparisonReadAt}
@@ -735,6 +751,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                         measures={observationsError ? undefined : observations} attachments={attachmentsError ? undefined : attachments}
                         unavailable={Boolean(entriesError || therapiesError || observationsError || attachmentsError)}
                         loading={entries === undefined || therapies === undefined || observations === undefined || attachments === undefined}
+                        showFullDiary={writing ? showFullDiary : undefined}
                         openDiary={entryId => sourceSelection.select({ kind: 'entry', id: entryId })}
                         openDocument={attachmentId => sourceSelection.select({ kind: 'document', id: attachmentId })}
                         proposalDate={patient.aiSummary?.trim() ? patient.aiSummaryGeneratedAt : undefined} />}

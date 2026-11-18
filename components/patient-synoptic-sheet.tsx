@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import type { Checkup, Diagnosis, Observation, Therapy } from '@/lib/db';
 import { formatCountLabel } from '@/lib/format-count';
 import { projectQuadroMeasures } from '@/lib/patient-quadro';
@@ -21,6 +21,7 @@ export interface PatientSynopticSheetProps {
     problems: QuadroRead<Diagnosis>;
     therapies: QuadroRead<Therapy>;
     diary?: ReactNode;
+    diaryTools?: { full: boolean; control: Ref<HTMLButtonElement>; show: () => void; resume: () => void };
     composer?: ReactNode;
     sources?: ReactNode;
     activity?: ReactNode;
@@ -49,7 +50,7 @@ function DateCell({ date }: { date?: Date }) {
     return <time dateTime={new Date(date).toISOString()}>{new Date(date).toLocaleDateString('it-IT')}</time>;
 }
 
-export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, measures, checkups, diary, composer, sources, activity }: PatientSynopticSheetProps) {
+export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, measures, checkups, diary, diaryTools, composer, sources, activity }: PatientSynopticSheetProps) {
     const measureRows = projectQuadroMeasures(measures.data ?? []);
     const stable = <>
         <Section name="Problemi" read={problems} count={formatCountLabel(problems.data?.length ?? 0, 'problema', 'problemi')} empty="Nessun problema registrato.">
@@ -87,12 +88,19 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
         </Section>
     </>;
     const stableWithNotes = <>{stable}{notesContent ? <div className={reading.notes}>{notesContent}</div> : null}</>;
-    return <section id="quadro" aria-label="Riepilogo clinico" className={`${register.register} ${reading.sheet}`} data-overview={diary ? 'true' : undefined} data-writing={composer ? 'true' : undefined}>
+    return <section id="quadro" aria-label="Riepilogo clinico" className={`${register.register} ${reading.sheet}`} data-overview={diary ? 'true' : undefined} data-writing={composer ? 'true' : undefined} data-full-diary={diaryTools?.full ? 'true' : undefined}>
         {diary ? <>
             <div className={reading.middle}>
                 <div className={reading.activity}>{activity}</div>
+                {diaryTools ? <div className={reading.diaryTools} data-reading={diaryTools.full}>
+                    <button ref={diaryTools.control} type="button" aria-controls="diario"
+                        aria-label={diaryTools.full ? 'Torna alla bozza dal diario' : undefined}
+                        onClick={diaryTools.full ? diaryTools.resume : diaryTools.show}>
+                        {diaryTools.full ? 'Torna alla bozza' : 'Tutto il diario'}
+                    </button>
+                </div> : null}
                 {diary}
-                <a href="#diario" className={`mf-button-text ${reading.fullDiary}`}>Tutto il diario</a>
+                {diaryTools ? null : <a href="#diario" className={`mf-button-text ${reading.fullDiary}`}>Tutto il diario</a>}
             </div>
             <div className={reading.side}>
                 <div className={reading.stable}>{stableWithNotes}</div>

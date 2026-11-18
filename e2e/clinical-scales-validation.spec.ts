@@ -171,13 +171,14 @@ for (const theme of ['light', 'dark']) test(`Tinetti POMA-28: all 20 questions a
         return {
             radius: style.borderTopLeftRadius,
             height: label.getBoundingClientRect().height,
+            inset: label.querySelector('input')!.getBoundingClientRect().left - label.getBoundingClientRect().left,
             gap: label.getBoundingClientRect().top - label.previousElementSibling!.getBoundingClientRect().bottom,
             fillsSelection: style.backgroundColor === selection,
             outline: parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset),
         };
     });
     await testInfo.attach(`risposta-tinetti-${theme}`, { body: JSON.stringify(shape), contentType: 'application/json' });
-    expect(shape).toMatchObject({ radius: '10px', gap: 0, fillsSelection: true, outline: 0 });
+    expect(shape).toMatchObject({ radius: '10px', gap: 4, inset: 12, fillsSelection: true, outline: 0 });
     expect(shape.height).toBeGreaterThanOrEqual(44);
     await expect(unselected).toHaveCSS('border-top-left-radius', '10px');
     await page.keyboard.press('Enter');
