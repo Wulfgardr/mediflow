@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import type { AgentRegistration } from '@/lib/agent-registration-store';
 import type { AgentPairingRequest } from '@/lib/agent-pairing-store';
 import { AGENT_OPERATIONS, type AgentMandate, type AgentMandateInput } from '@/lib/agent-mandate-contract';
 import { generateMandateKeys } from '@/lib/agent-mandate-client';
@@ -11,6 +12,9 @@ export default function AgentSettingsPage() {
     const [mandates, setMandates] = useState<AgentMandate[]>([]);
     const [pairings, setPairings] = useState<AgentPairingRequest[]>([]);
     const [selectedMandates, setSelectedMandates] = useState<Record<string, string>>({});
+    const [registrations, setRegistrations] = useState<AgentRegistration[]>([]);
+    const [renewing, setRenewing] = useState<string | null>(null);
+    const [approvalPin, setApprovalPin] = useState('');
     const [readAt, setReadAt] = useState(0);
     const [pin, setPin] = useState('');
     const [hours, setHours] = useState('12');
@@ -23,13 +27,15 @@ export default function AgentSettingsPage() {
     async function run(action: () => Promise<void>) {
         setBusy(true); setError(null);
         try { await action(); } catch { setError('Operazione non riuscita. Riprova.'); }
-        finally { setBusy(false); setPin(''); }
+        finally { setBusy(false); setPin(''); setApprovalPin(''); }
     }
     async function refresh() {
-        const [response, requests] = await Promise.all([fetch('/api/agent-mandates', { cache: 'no-store' }), fetch('/api/agent-mandates/pairings', { cache: 'no-store' })]);
-        if (!response.ok || !requests.ok) throw new Error('denied');
+        const [response, requests, clients] = await Promise.all(['/api/agent-mandates', '/api/agent-mandates/pairings',
+            '/api/agent-mandates/registrations'].map(url => fetch(url, { cache: 'no-store' })));
+        if (!response.ok || !requests.ok || !clients.ok) throw new Error('denied');
         setMandates(await response.json());
         setPairings(await requests.json());
+        setRegistrations(await clients.json());
         setReadAt(Date.now());
     }
     return <main className="mx-auto max-w-3xl space-y-8 p-6">
@@ -63,7 +69,8 @@ export default function AgentSettingsPage() {
             <ul>{pairings.map(pairing => {
                 const compatible = mandates.filter(mandate => mandate.revokedAt === null && mandate.expiresAt > readAt
                     && pairing.operations.every(operation => mandate.operations.includes(operation)));
-                const selected = selectedMandates[pairing.id] ?? compatible[0]?.id ?? '';
+                const selected = compatible.find(mandate => mandate.id === selectedMandates[pairing.id])?.id ?? compatible[0]?.id ?? '';
+                const renewOnUnlock = renewing === pairing.id;
                 return <li className="space-y-3 border-b py-4" key={pairing.id}>
                     <h3>{pairing.name} <strong>{pairing.code}</strong></h3>
                     <p>{pairing.operations.map(operation => operationLabels[AGENT_OPERATIONS.indexOf(operation)]).join(', ')}</p>
@@ -72,14 +79,39 @@ export default function AgentSettingsPage() {
                         {!compatible.length && <option value="">Crea un mandato con queste operazioni</option>}
                         {compatible.map(mandate => <option key={mandate.id} value={mandate.id}>{mandate.provider} · {new Date(mandate.expiresAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</option>)}
                     </select></label>
-                    <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !selected} onClick={() => { void run(async () => {
+                    <label className="flex gap-2">
+                        <input type="checkbox" checked={renewOnUnlock} onChange={event => {
+                            setRenewing(event.target.checked ? pairing.id : null); setApprovalPin('');
+                        }} />Rinnova allo sblocco
+                    </label>
+                    {renewOnUnlock && <>
+                        <p>Dal prossimo sblocco il client riceve un mandato di 12 ore con queste operazioni, finché l’accesso resta attivo.</p>
+                        <label className="block">PIN per {pairing.name}<input className={SETTINGS_INPUT_CLASS} type="password"
+                            inputMode="numeric" autoComplete="off" value={approvalPin} onChange={event => setApprovalPin(event.target.value)} /></label>
+                    </>}
+                    <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !selected || (renewOnUnlock && !/^[0-9]{4,8}$/u.test(approvalPin))} onClick={() => { void run(async () => {
                         const response = await fetch('/api/agent-mandates/pairings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ requestId: pairing.id, code: pairing.code, mandateRef: selected }) });
+                            body: JSON.stringify({ requestId: pairing.id, code: pairing.code, mandateRef: selected, ...(renewOnUnlock ? { renewOnUnlock, pin: approvalPin } : {}) }) });
                         if (!response.ok) throw new Error('denied'); await refresh();
                     }); }}>Approva {pairing.code}</button>
                 </li>;
             })}</ul>
         </section>
+        {registrations.length > 0 && <section className="space-y-3"><h2 className="text-lg font-semibold">Client registrati</h2>
+            <ul>{registrations.map(registration => <li key={registration.id} className="flex items-center justify-between gap-4 py-2">
+                <div>
+                    <p>{registration.name}</p>
+                    <p>{registration.revokedAt !== null ? 'Revocato' : registration.lastRenewalAt === null ? 'In attesa del primo sblocco'
+                        : `Ultimo rinnovo · ${new Date(registration.lastRenewalAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}`}</p>
+                </div>
+                {registration.revokedAt === null && <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy}
+                    aria-label={`Revoca ${registration.name}`} onClick={() => { void run(async () => {
+                        const response = await fetch('/api/agent-mandates/registrations', { method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: registration.id }) });
+                        if (!response.ok) throw new Error('denied'); await refresh();
+                    }); }}>Revoca</button>}
+            </li>)}</ul>
+        </section>}
         <section className="space-y-3"><h2 className="text-lg font-semibold">Mandati</h2>
             <ul>{mandates.map(mandate => <li key={mandate.id} className="flex items-center justify-between gap-4 py-2">
                 <span>{mandate.provider} · {mandate.revokedAt !== null ? 'Revocato' : mandate.expiresAt <= readAt ? 'Scaduto' : `Fino alle ${new Date(mandate.expiresAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`}</span>

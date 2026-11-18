@@ -147,6 +147,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [requiresSetup, setRequiresSetup] = useState<boolean | null>(null); // null = loading
     const [isLocked, setIsLocked] = useState(true);
     const [user, setUser] = useState<User | null>(null);
+    const [agentRenewalFailed, setAgentRenewalFailed] = useState(false);
     const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
     const [pinResiduesPending, setPinResiduesPending] = useState(false);
     const [authRecoveryState, setAuthRecoveryState] = useState<AuthRecoveryState>('ready');
@@ -192,6 +193,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     const clearClientAuthority = () => {
         clearSecuritySession();
+        setAgentRenewalFailed(false);
         wrappingRef.current = null;
         preparedAccessRef.current = null;
         setPreparedKit(null);
@@ -539,6 +541,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 ambulatoryName?: string;
                 role: string;
                 earlierCopiesCleared?: boolean;
+                agentUnlockTicket?: string;
             } | null;
             if (!data
                 || typeof data.id !== 'string' || !data.id
@@ -582,9 +585,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             unacceptedServerAuthority = false;
 
             const wrapping = { encryptedMasterKey, salt: btoa(String.fromCharCode(...saltBytes)) };
+            const activeKey = material ? await residentKey(masterKey) : masterKey;
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
+            if (typeof data.agentUnlockTicket === 'string') {
+                const renewed = await fetch('/api/agent-mandates/unlock', { method: 'POST', cache: 'no-store',
+                    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket: data.agentUnlockTicket }),
+                    signal: AbortSignal.timeout(4000) }).then(response => response.ok, () => false);
+                if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
+                setAgentRenewalFailed(!renewed);
+            }
             wrappingRef.current = wrapping;
-            setActiveMasterKey(material ? await residentKey(masterKey) : masterKey);
-            if (authorityAttemptGenerationRef.current !== attemptGeneration) { clearClientAuthority(); return false; }
+            setActiveMasterKey(activeKey);
             setUser(userData);
             if (masterKeyRef.current) void tabKeyShareRef.current?.publish({ key: masterKeyRef.current, user: userData, wrapping: wrappingRef.current });
             setIsAuthenticated(true);
@@ -924,6 +935,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }}>
             <div className="relative min-h-screen">
                 {pinResidueNotice}
+                {agentRenewalFailed && <p role="alert" className="p-4">Rinnovo dei mandati non confermato. Blocca e sblocca MediFlow per riprovare.</p>}
                 {children}
             </div>
         </SecurityContext.Provider>

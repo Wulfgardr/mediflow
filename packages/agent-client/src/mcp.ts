@@ -20,6 +20,10 @@ export function createAgentVisitMcpServer(directory?: string) {
         title: 'Completa il collegamento', description: 'Conserva la credenziale privata dopo l’approvazione del codice nella pagina Agenti.',
         inputSchema: z.object({ requestId: z.string().uuid() }).strict(), annotations: { ...annotations, idempotentHint: true },
     }, (args, context) => run({ command: 'completa', ...args }, context.mcpReq.signal));
+    server.registerTool('mediflow_ritira_mandato', {
+        title: 'Ritira il mandato', description: 'Conserva il mandato emesso all’ultimo sblocco per un client già registrato.',
+        inputSchema: z.object({ agentRef: z.string().uuid() }).strict(), annotations: { ...annotations, idempotentHint: true },
+    }, (args, context) => run({ command: 'ritira', ...args }, context.mcpReq.signal));
     server.registerTool('mediflow_deposita_visita', {
         title: 'Deposita la visita', description: 'Riusa l’estrazione preparata e i PDF riconosciuti dagli hash. La ricevuta descrive il deposito; MediFlow applica gli elementi ammessi e presenta le proposte In arrivo.',
         inputSchema: z.object({ agentRef: z.string().uuid(), extraction: z.string().min(1), fiscalCode: z.string().length(16), visitId: z.string().uuid(), transcription: z.string().optional() }).strict(), annotations,

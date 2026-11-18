@@ -1,4 +1,5 @@
 import { ensureAgentCassetteSchema } from './agent-cassette-schema';
+import { ensureAgentRegistrationSchema } from './agent-registration-schema';
 import { ensureAgentPairingSchema } from './agent-pairing-schema';
 import { ensureAgentMandateSchema } from './agent-mandate-schema';
 import { ensurePortableImportOriginsSchema } from './backup-import-provenance';
@@ -787,6 +788,7 @@ export function initializeSqliteSchema(sqlite: Database.Database): void {
         ensureAgentMandateSchema(sqlite);
         ensureAgentPairingSchema(sqlite);
         ensureAgentCassetteSchema(sqlite);
+        ensureAgentRegistrationSchema(sqlite);
         ensurePortableImportOriginsSchema(sqlite);
         ensureAmbulatoryDestructiveCommandSchema(sqlite);
         upgradeLegacyAttachmentCurrentness(sqlite);

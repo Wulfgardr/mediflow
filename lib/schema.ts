@@ -1,5 +1,5 @@
 import type { ProstheticsSnapshot } from './reference-data/prosthetics-catalog-contract';
-import { sqliteTable, text, integer, blob, primaryKey, index, uniqueIndex, check } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, blob, primaryKey, index, uniqueIndex, unique, check } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // Local authority, deliberately excluded from portable backup collections.
@@ -72,6 +72,21 @@ export const agentClients = sqliteTable('agent_clients', {
     name: text('name').notNull(), operations: text('operations').notNull(), tokenHash: text('token_hash').notNull().unique(),
     expiresAt: integer('expires_at').notNull(), revokedAt: integer('revoked_at'),
 });
+
+export const agentRegistrations = sqliteTable('agent_registrations', {
+    id: text('id').primaryKey().notNull().references(() => agentPairingRequests.id, { onDelete: 'cascade' }),
+    templateRef: text('template_ref').notNull().references(() => agentMandates.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').unique(),
+    currentMandateRef: text('current_mandate_ref').references(() => agentMandates.id, { onDelete: 'set null' }),
+    revokedAt: integer('revoked_at'),
+});
+
+export const agentUnlockGrants = sqliteTable('agent_unlock_grants', {
+    mandateRef: text('mandate_ref').primaryKey().notNull().references(() => agentMandates.id, { onDelete: 'cascade' }),
+    agentRef: text('agent_ref').notNull().references(() => agentRegistrations.id, { onDelete: 'cascade' }),
+    unlockRef: text('unlock_ref').notNull(),
+    tokenHash: text('token_hash').unique(),
+}, table => [unique().on(table.agentRef, table.unlockRef)]);
 
 export const physicianReviewAttestations = sqliteTable('physician_review_attestations', {
     actorRef: text('actor_ref').primaryKey().references(() => users.id).notNull(),

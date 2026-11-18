@@ -18,6 +18,7 @@ import {
 } from '@/lib/security/web-auth-control-transport';
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 import { retirePendingPinEraResidues } from '@/lib/security/pin-era-residues';
+import { beginAgentUnlock } from '@/lib/security/agent-unlock-session';
 import { dbServer } from '@/lib/db-server';
 
 function authFailureResponse(payload: Record<string, unknown>, status: number, etag?: string) {
@@ -100,8 +101,10 @@ export async function POST(request: Request) {
         } catch (error) {
             console.error('Audit login success write failed:', error);
         }
+        const agentUnlockTicket = verifier ? beginAgentUnlock(session.sessionId, mutation.controlId) : null;
         const response = NextResponse.json({
             success: true,
+            ...(agentUnlockTicket ? { agentUnlockTicket } : {}),
             archiveGeneration: issuedArchiveGeneration,
             id: user.id,
             username: user.username,

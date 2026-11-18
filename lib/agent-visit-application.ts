@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
 import { patients, auditEvents } from './schema';
 import { activePatients } from './patient-lifecycle';
+import { createAgentRegistrationStore } from './agent-registration-store';
 import { createAgentMandateStore } from './agent-mandate-store';
 import { AGENT_CASSETTE_COMPLETE, readAgentCassette } from './agent-cassette-store';
 import { AGENT_ITEM_OPERATION, cassetteItems } from './agent-cassette-contract';
@@ -45,11 +46,14 @@ export function applyAgentVisit(request: Request, session: ServerSession, value:
         if (mandate.actorRef !== session.userId) throw new AgentApplicationDenied(403);
         const client = dbServer.$client.prepare('SELECT revoked_at,expires_at,operations FROM agent_clients WHERE id=? AND mandate_ref=?')
             .get(cassette.agentRef, cassette.mandateRef) as { revoked_at: number | null; expires_at: number; operations: string } | undefined;
-        if (!client || client.revoked_at !== null || client.expires_at <= Date.now()) throw new AgentApplicationDenied(403);
+        const clientOperations = client
+            ? (client.revoked_at === null && client.expires_at > Date.now() ? client.operations : undefined)
+            : createAgentRegistrationStore(dbServer.$client).operationsForCassette(cassette.agentRef, cassette.mandateRef);
+        if (!clientOperations) throw new AgentApplicationDenied(403);
         const deposited = cassetteItems(cassette);
         const selected = deposited.filter(item => automaticAgentKind(item.kind) === (input.phase === 'automatic'));
         if (selected.length !== input.items.length || selected.some(item => !input.items.some(prepared => prepared.id === item.id && prepared.kind === item.kind))) throw new AgentApplicationDenied(409);
-        const operations: unknown = JSON.parse(client.operations);
+        const operations: unknown = JSON.parse(clientOperations);
         for (const item of selected) {
             mandateStore.admit(cassette.mandateRef, AGENT_ITEM_OPERATION[item.kind]);
             if (!Array.isArray(operations) || !operations.includes(AGENT_ITEM_OPERATION[item.kind])) throw new AgentApplicationDenied(403);

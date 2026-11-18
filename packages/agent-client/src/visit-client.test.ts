@@ -7,11 +7,12 @@ import http from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { agentCassetteFixture } from '../../../lib/test-fixtures/agent-cassette';
-import { saveAgentCredential } from './credentials';
+import { readAgentRegistration, saveAgentCredential, saveAgentRegistration } from './credentials';
 import { agentRequest, prepareAgentVisit, prepareAndDepositAgentVisit, resumeAgentVisit, AgentClientError } from './visit-client';
 import { parseAgentCommand, agentCommandFailure } from './commands';
 import { agentBytes, openAgentItem } from '../../../lib/agent-cassette-crypto';
 import { decryptData } from '../../../lib/security/security';
+import { MANDATE_MAX_DURATION_MS } from '../../../lib/agent-mandate-contract';
 
 const cf = 'RSSMRA80A01H501U', sentinel = 'SYNTHETIC_CLI_VISIT_ONLY_6742';
 async function fixture() {
@@ -30,7 +31,8 @@ async function fixture() {
     const file = path.join(files, 'estrazione-preparata.json'); fs.writeFileSync(file, JSON.stringify(extraction));
     const bodies: string[] = [], events: string[] = [];
     let afterNote: (() => void) | undefined;
-    let drop = false, denied = false, operations = f.principal.operations;
+    let drop = false, denied = false, operations = f.principal.operations, pulls = 0;
+    const longToken = 'mfr_' + 'X'.repeat(43);
     const server = http.createServer(async (request, response) => {
         if (request.url?.startsWith('/api/agent/v1/pairings')) {
             try {
@@ -43,9 +45,18 @@ async function fixture() {
                     const id = new URL(request.url, 'http://127.0.0.1').searchParams.get('requestId')!;
                     const claim = request.headers.authorization?.slice('Pairing '.length) ?? '';
                     const result = f.pairings.poll(id, claim);
-                    response.writeHead(result.credential ? 200 : 202, { 'Content-Type': 'application/json' }).end(JSON.stringify(result));
+                    response.writeHead(result.receipt.status === 'pending' ? 202 : 200, { 'Content-Type': 'application/json' }).end(JSON.stringify(result));
                 }
             } catch { response.writeHead(401, { 'Content-Type': 'application/json' }).end('{}'); }
+            return;
+        }
+        if (request.url === '/api/agent/v1/mandate' && request.headers.authorization === 'Bearer ' + longToken) {
+            pulls++;
+            const issuedAt = Date.now();
+            response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({
+                receipt: { agentRef: f.principal.agentRef, mandateRef: f.mandate.id, issuedAt, expiresAt: issuedAt + MANDATE_MAX_DURATION_MS },
+                credential: { token: f.token },
+            }));
             return;
         }
         if (request.headers.authorization !== 'Bearer ' + f.token) { response.writeHead(401, { 'Content-Type': 'application/json' }).end(JSON.stringify({ secret: f.token })); return; }
@@ -66,7 +77,9 @@ async function fixture() {
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
     const origin = 'http://127.0.0.1:' + (server.address() as { port: number }).port;
     saveAgentCredential(credentials, { agentRef: f.principal.agentRef, mandateRef: f.mandate.id, token: f.token, expiresAt: f.mandate.expiresAt, origin });
-    return { ...f, root, files, credentials, file, transcription, extraction, bodies, events, origin, afterNote: (action: () => void) => { afterNote = action; }, drop: () => { drop = true; }, deny: () => { denied = true; }, scope: () => { operations = ['visita.apri', 'visita.nota', 'visita.chiudi']; },
+    return { ...f, longToken, pulls: () => pulls,
+        installRegistration: () => saveAgentRegistration(credentials, { agentRef: f.principal.agentRef, origin, token: longToken }),
+        root, files, credentials, file, transcription, extraction, bodies, events, origin, afterNote: (action: () => void) => { afterNote = action; }, drop: () => { drop = true; }, deny: () => { denied = true; }, scope: () => { operations = ['visita.apri', 'visita.nota', 'visita.chiudi']; },
         async cleanup() { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); f.database.close(); fs.rmSync(root, { recursive: true, force: true }); } };
 }
 async function cli(args: string[], data: string, environment: Partial<NodeJS.ProcessEnv> = {}, input?: string) {
@@ -208,10 +221,17 @@ test('MCP stdio uses the same deposit contract and opens no clinical database, m
         const listed = await send('tools/list');
         assert.ok(listed.result, JSON.stringify(listed));
         assert.deepEqual((listed.result as { tools: { name: string }[] }).tools.map(tool => tool.name).sort(),
-            ['mediflow_collega', 'mediflow_completa_collegamento', 'mediflow_deposita_visita', 'mediflow_riprendi_visita'].sort());
+            ['mediflow_collega', 'mediflow_completa_collegamento', 'mediflow_deposita_visita', 'mediflow_riprendi_visita', 'mediflow_ritira_mandato'].sort());
         assert.doesNotMatch(await descriptors(), /\.db(?:-wal|-shm)?(?:\n|$)/u);
         const cliResult = await cli(['deposita', '--credenziali', f.credentials, '--agente', f.principal.agentRef, '--estrazione', f.file, '--cf', cf, '--visita', randomUUID(), '--trascrizione', f.transcription], f.root);
         assert.equal(cliResult.code, 0, cliResult.stderr); const cliReceipt = JSON.parse(cliResult.stdout);
+        f.installRegistration();
+        const retrieved = await send('tools/call', { name: 'mediflow_ritira_mandato', arguments: { agentRef: f.principal.agentRef } });
+        const pull = retrieved.result as { isError?: boolean; structuredContent: { mandateRef: string } };
+        assert.notEqual(pull.isError, true, JSON.stringify(retrieved));
+        assert.equal(pull.structuredContent.mandateRef, f.mandate.id);
+        assert.equal(f.pulls(), 1);
+        assert.ok(!JSON.stringify(retrieved).includes(f.longToken));
         const visitId = randomUUID();
         const called = await send('tools/call', { name: 'mediflow_deposita_visita', arguments: { agentRef: f.principal.agentRef, extraction: f.file, fiscalCode: cf, visitId, transcription: f.transcription } });
         const result = called.result as { isError?: boolean; structuredContent: { visitId: string; status: string; itemCount: number } };
@@ -316,5 +336,43 @@ test('oversized or empty stdin is refused without depositing or echoing its cont
         }
         assert.equal(f.rows().length, 0);
         assert.deepEqual(f.events, []);
+    } finally { await f.cleanup(); }
+});
+
+test('the CLI saves a renewable registration privately and pulls the current mandate without printing its tokens', async () => {
+    const f = await fixture();
+    try {
+        const requested = await cli(['collega', '--credenziali', f.credentials, '--origine', f.origin, '--nome', 'Synthetic renewable CLI'], f.root);
+        assert.equal(requested.code, 0, requested.stderr);
+        const { requestId, code } = JSON.parse(requested.stdout);
+        f.pairings.approve(requestId, code, f.mandate.id, f.actorRef, f.generation, true);
+        const completed = await cli(['completa', '--credenziali', f.credentials, '--richiesta', requestId], f.root);
+        assert.equal(completed.code, 0, completed.stderr);
+        assert.deepEqual(JSON.parse(completed.stdout), { agentRef: requestId, status: 'registered' });
+        const stored = readAgentRegistration(f.credentials, requestId)!;
+        assert.match(stored.token, /^mfr_/u);
+        assert.ok(!JSON.stringify(completed).includes(stored.token));
+        if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(f.credentials, requestId + '.registration.json')).mode & 0o777, 0o600);
+
+        f.installRegistration();
+        const pulled = await cli(['ritira', '--credenziali', f.credentials, '--agente', f.principal.agentRef], f.root);
+        assert.equal(pulled.code, 0, pulled.stderr);
+        assert.equal(JSON.parse(pulled.stdout).mandateRef, f.mandate.id);
+        assert.ok(!JSON.stringify(pulled).includes(f.token));
+        assert.ok(!JSON.stringify(pulled).includes(f.longToken));
+    } finally { await f.cleanup(); }
+});
+
+for (const mode of ['expired', 'refused'] as const) test(`the CLI automatically pulls on a ${mode} mandate before encrypting a new visit`, async () => {
+    const f = await fixture();
+    try {
+        f.installRegistration();
+        saveAgentCredential(f.credentials, { agentRef: f.principal.agentRef, mandateRef: f.mandate.id, origin: f.origin,
+            token: 'mfa_' + 'Y'.repeat(43), expiresAt: Date.now() + (mode === 'expired' ? -1000 : 3600000) });
+        const result = await cli(['deposita', '--credenziali', f.credentials, '--agente', f.principal.agentRef, '--estrazione', f.file,
+            '--cf', cf, '--visita', randomUUID()], f.root);
+        assert.equal(result.code, 0, result.stderr);
+        assert.equal(JSON.parse(result.stdout).status, 'closed');
+        assert.equal(f.pulls(), 1);
     } finally { await f.cleanup(); }
 });

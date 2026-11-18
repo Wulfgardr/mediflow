@@ -2,6 +2,8 @@ import 'server-only';
 import type Database from 'better-sqlite3';
 import { hasAttestedLoopbackIngress } from './loopback-ingress.mjs';
 import { createAgentPairingStore, type AgentPrincipal } from '../agent-pairing-store';
+import { isAgentUnlockActive } from './agent-unlock-session';
+import { createAgentRegistrationStore } from '../agent-registration-store';
 import type { AgentOperation } from '../agent-mandate-contract';
 
 export class AgentChannelDenied extends Error {
@@ -16,7 +18,8 @@ export function withAuthenticatedAgentTransaction<T>(database: Database.Database
     const match = /^Bearer (mfa_[A-Za-z0-9_-]{43})$/u.exec(request.headers.get('authorization') ?? '');
     if (!match) throw new AgentChannelDenied(401);
     return database.transaction(() => {
-        const principal = createAgentPairingStore(database).principal(match[1]!);
+        const principal = createAgentPairingStore(database).principal(match[1]!)
+            ?? createAgentRegistrationStore(database).principal(match[1]!, isAgentUnlockActive);
         if (!principal) throw new AgentChannelDenied(401);
         if (operation && !principal.operations.includes(operation)) throw new AgentChannelDenied(403);
         return consume(principal);
