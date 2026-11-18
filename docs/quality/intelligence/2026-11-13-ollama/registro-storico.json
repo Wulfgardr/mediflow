@@ -2,7 +2,7 @@
   "schema": "mediflow.intelligence-release-register.v1",
   "release": "0.9.1",
   "sourceRevision": "3e8455fe40243a0c45e471529058442946afc451",
-  "contract": "docs/releases/0.9.1-contract.md",
+  "contract": "docs/quality/intelligence/2026-11-13-ollama/contratto-0.9.1-del-banco.txt",
   "contractSha256": "49cbf931356ea217f9446644a10b3b2ed7bd299e8d4070a1feccd7c7dd7ca4ba",
   "purpose": "coverage_only_no_runtime_admission",
   "capabilities": [
