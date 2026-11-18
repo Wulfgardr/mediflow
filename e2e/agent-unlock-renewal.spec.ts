@@ -23,14 +23,23 @@ for (const credentialKind of ['passphrase', 'pin'] as const) test(`a registered 
         const { receipt, pairingCredential } = await pending.json();
         const poll = () => agent.get('/api/agent/v1/pairings?requestId=' + receipt.id,
             { headers: { Authorization: 'Pairing ' + pairingCredential.claim } });
-        const unlock = async () => {
-            const confirmed = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates/unlock'));
-            await page.getByLabel(unlockLabel, { exact: true }).fill(secret);
-            await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
-            const response = await confirmed;
-            expect(response.status()).toBe(204);
-            expect(Object.keys(response.request().postDataJSON())).toEqual(['ticket']);
-            await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+        const opensRenewal = (url: string) => url.endsWith('/api/agent-mandates/unlock');
+        const unlock = async (renewalExpected = true) => {
+            const unexpected: string[] = [];
+            const observe = (request: { url(): string }) => { if (opensRenewal(request.url())) unexpected.push(request.url()); };
+            if (!renewalExpected) page.on('request', observe);
+            try {
+                const confirmed = renewalExpected ? page.waitForResponse(response => opensRenewal(response.url())) : null;
+                await page.getByLabel(unlockLabel, { exact: true }).fill(secret);
+                await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+                if (confirmed) {
+                    const response = await confirmed;
+                    expect(response.status()).toBe(204);
+                    expect(Object.keys(response.request().postDataJSON())).toEqual(['ticket']);
+                }
+                await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+                expect(unexpected).toEqual([]);
+            } finally { page.off('request', observe); }
         };
         const lock = async () => {
             const confirmation = page.waitForResponse(response => response.url().endsWith('/api/auth/lock'));
@@ -202,6 +211,8 @@ for (const credentialKind of ['passphrase', 'pin'] as const) test(`a registered 
                 })).status, { body: confirmed.request().postData()!, etag: confirmed.request().headers()['if-match'] });
                 expect(duplicate).toBe(204);
                 expect((await retrieve(futureToken)).status()).toBe(401);
+                await page.getByRole('button', { name: 'Revoca Client sintetico successivo', exact: true }).click();
+                await expect(page.getByRole('button', { name: 'Revoca Client sintetico successivo', exact: true })).toHaveCount(0);
             }
             expect((await (await retrieve()).json()).receipt.mandateRef).toBe(shared.receipt.mandateRef);
             expect((await deposit(latest.credential.token)).status()).toBe(401);
@@ -214,7 +225,16 @@ for (const credentialKind of ['passphrase', 'pin'] as const) test(`a registered 
         expect((await deposit(sharedToken)).status()).toBe(401);
         expect((await retrieve()).status()).toBe(401);
         await lock();
-        await unlock();
+        await unlock(false);
         expect((await retrieve()).status()).toBe(401);
+        const emptyTab = await browserContext.newPage();
+        try {
+            const unexpected: string[] = [];
+            emptyTab.on('request', request => { if (opensRenewal(request.url())) unexpected.push(request.url()); });
+            await emptyTab.goto(isolatedRuntime.url);
+            await emptyTab.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+            await expect(emptyTab.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+            expect(unexpected).toEqual([]);
+        } finally { await emptyTab.close(); }
     } finally { await agent.dispose(); }
 });

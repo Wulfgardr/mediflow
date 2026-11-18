@@ -381,7 +381,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             return;
         }
         const etag = health.response.headers.get('ETag');
-        if (shared.user.role === 'admin' && etag) {
+        if (shared.user.role === 'admin' && etag && health.response.headers.get('x-mediflow-agent-renewal') === '1') {
             const renewed = await confirmAgentUnlock({ sharedTab: crypto.randomUUID(), etag });
             if (authorityAttemptGenerationRef.current !== attempt) return;
             if (!currentAuthority()) { updateAuthRecoveryState('required'); return; }

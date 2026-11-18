@@ -26,6 +26,10 @@ const { POST: setup } = await import('../../app/api/auth/setup/route.ts');
 const { POST: login } = await import('../../app/api/auth/login/route.ts');
 const { GET: check } = await import('../../app/api/auth/check/route.ts');
 const { dbServer } = await import('../db-server.ts');
+const { createAgentMandateStore } = await import('../agent-mandate-store.ts');
+const { createAgentPairingStore } = await import('../agent-pairing-store.ts');
+const { readSqliteArchiveGeneration } = await import('../archive-generation.ts');
+const { createAgentRegistrationStore } = await import('../agent-registration-store.ts');
 const { users } = await import('../schema.ts');
 const { listAuditEvents } = await import('./audit.ts');
 const { clearAllSessions, getSession } = await import('./server-session.ts');
@@ -110,7 +114,7 @@ test('login delegates credentials, preserves its Web contract, and records Web a
     assert.equal(response.headers.get('cache-control'), 'no-store');
     const body = await response.json() as Record<string, unknown>;
     assert.deepEqual(Object.keys(body).sort(), [
-        'agentUnlockTicket', 'ambulatoryName', 'archiveGeneration', 'displayName', 'encryptedMasterKey', 'id', 'role', 'salt', 'success', 'username',
+        'ambulatoryName', 'archiveGeneration', 'displayName', 'encryptedMasterKey', 'id', 'role', 'salt', 'success', 'username',
     ]);
     assert.equal(body.success, true);
     assert.equal(body.username, USERNAME);
@@ -118,7 +122,36 @@ test('login delegates credentials, preserves its Web contract, and records Web a
     assert.equal(body.salt, SALT);
     const id = sessionId(response);
     assert.equal(getSession(id), null);
-    const ticket = String(body.agentUnlockTicket), actor = String(body.id);
+    const audit = (await listAuditEvents({ eventType: 'auth.login.succeeded' }))
+        .find((event) => event.subjectRef === id);
+    assert.equal(audit?.sourceSurface, 'web');
+    assert.deepEqual(audit?.redactedMetadata?.flags, ['auth:session']);
+    const logout = await completeExactWebP3Logout(
+        { name: 'mediflow_session', value: id },
+        { name: 'mediflow_auth_control', value: control.controlId },
+        localRequest('http://127.0.0.1/api/auth/logout', { method: 'POST' }),
+    );
+    assert.equal(logout.status, 204);
+});
+
+test('a renewable registration enables the PIN ticket and the existing auth check signal until revocation', async () => {
+    const control = await bootstrapControl();
+    const credentials = { username: USERNAME, password: PIN };
+    const db = dbServer.$client;
+    const { id: actor } = db.prepare('SELECT id FROM users WHERE username=?').get(USERNAME) as { id: string };
+    const archiveGeneration = readSqliteArchiveGeneration(db);
+    const operations = ['visita.apri'] as const;
+    const template = createAgentMandateStore(db).create({ id: randomUUID(), durationMs: 3600000, operations: [...operations],
+        provider: 'local', allowsClinicalEgress: false, publicKey: 'B' + 'A'.repeat(86) + '=',
+        wrappedPrivateKey: 'ENC:' + 'A'.repeat(16) + ':' + 'A'.repeat(64) }, actor, archiveGeneration);
+    const pairings = createAgentPairingStore(db);
+    const { request } = pairings.request('Synthetic renewable client', [...operations]);
+    pairings.approve(request.id, request.code, template.id, actor, archiveGeneration, true);
+    const response = await login(forgedRequest('/api/auth/login', credentials, control));
+    assert.equal(response.status, 200);
+    const body = await response.json() as Record<string, unknown>;
+    const id = sessionId(response);
+    const ticket = String(body.agentUnlockTicket);
     assert.match(ticket, /^[A-Za-z0-9_-]{43}$/u);
     let confirmations = 0;
     const record = () => { confirmations++; };
@@ -126,10 +159,12 @@ test('login delegates credentials, preserves its Web contract, and records Web a
     assert.equal(confirmAgentUnlock(ticket, id, actor, record), true);
     assert.equal(confirmAgentUnlock(ticket, id, actor, record), true);
     assert.equal(confirmations, 1);
-    const audit = (await listAuditEvents({ eventType: 'auth.login.succeeded' }))
-        .find((event) => event.subjectRef === id);
-    assert.equal(audit?.sourceSurface, 'web');
-    assert.deepEqual(audit?.redactedMetadata?.flags, ['auth:session']);
+    const health = () => check(localRequest('http://127.0.0.1/api/auth/check', { headers: {
+        cookie: `mediflow_session=${id}; mediflow_auth_control=${control.controlId}`,
+    } }));
+    assert.equal((await health()).headers.get('x-mediflow-agent-renewal'), '1');
+    createAgentRegistrationStore(db).revoke(request.id, actor, archiveGeneration);
+    assert.equal((await health()).headers.get('x-mediflow-agent-renewal'), null);
     const logout = await completeExactWebP3Logout(
         { name: 'mediflow_session', value: id },
         { name: 'mediflow_auth_control', value: control.controlId },
