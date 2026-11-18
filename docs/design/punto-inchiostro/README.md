@@ -28,10 +28,11 @@ visiva. La qualificazione clinica della 0.9.0 resta separata.
 | 3 | [01-specifica.md](./01-specifica.md) | Token, tipografia, forma, componenti con misure e stati, movimento, testi |
 | 4 | [02-piattaforme-e-schermate.md](./02-piattaforme-e-schermate.md) | Che cosa è uguale ovunque, che cosa segue la piattaforma, mappa di ogni schermata |
 | 5 | [03-ascolto-della-visita.md](./03-ascolto-della-visita.md) | Microfono, stati dell'ascolto, rapporto con ADR 0113 |
-| 6 | [tokens/punto-inchiostro.tokens.json](./tokens/punto-inchiostro.tokens.json) | I valori in formato DTCG, Giorno e Grafite |
-| 7 | [icona/](./icona/) | Icona candidata: Giorno, Grafite, livello senza sfondo, più un'alternativa, con anteprima a più dimensioni |
-| 8 | [anteprime/](./anteprime/) | Nove schermate del banco come immagini, per chi non può aprire il browser: web, macOS, Windows, Linux, iPad, iPhone, iPhone Duo |
-| 9 | [prototipi/](./prototipi/) | Il confronto da cui è nata la scelta: stato di partenza con schermate reali su dati sintetici, le tre direzioni iniziali e la prima sintesi. Materiale storico |
+| 6 | [04-primo-sguardo-e-controlli.md](./04-primo-sguardo-e-controlli.md) | Criteri del redesign 0.9.1: primo sguardo sulla scheda, righe, controlli riconoscibili, copertura di Web e GPUI |
+| 7 | [tokens/punto-inchiostro.tokens.json](./tokens/punto-inchiostro.tokens.json) | I valori in formato DTCG, Giorno e Grafite |
+| 8 | [icona/](./icona/) | Icona candidata: Giorno, Grafite, livello senza sfondo, più un'alternativa, con anteprima a più dimensioni |
+| 9 | [anteprime/](./anteprime/) | Nove schermate del banco come immagini, per chi non può aprire il browser: web, macOS, Windows, Linux, iPad, iPhone, iPhone Duo |
+| 10 | [prototipi/](./prototipi/) | Il confronto da cui è nata la scelta: stato di partenza con schermate reali su dati sintetici, le tre direzioni iniziali e la prima sintesi. Materiale storico |
 
 In Linear: documento
 [MediFlow, Direzione estetica](https://linear.app/wulfgardr/document/mediflow-direzione-estetica-8e713290463a)
