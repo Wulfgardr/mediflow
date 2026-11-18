@@ -208,8 +208,17 @@ async function guidedPreview(page: Page) {
     await expect(radio).not.toBeChecked();
     await expect(radio).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await focusVisible(page, radio);
-    await radio.check();
+    const profileBeforeChoice = await readProfile(page);
+    await page.keyboard.press('0');
+    await expect(radio).not.toBeChecked();
+    await expect(panel.getByRole('button', { name: 'Salva e continua', exact: true })).toBeDisabled();
+    await page.keyboard.press('Space');
     await expect(radio).toBeChecked();
+    await page.keyboard.press('ArrowDown');
+    await expect(panel.getByRole('radio', { name: 'Organizzare il lavoro della postazione', exact: true })).toBeChecked();
+    await page.keyboard.press('ArrowUp');
+    await expect(radio).toBeChecked();
+    expect(await readProfile(page)).toEqual(profileBeforeChoice);
     await expect.poll(() => radio.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
     await panel.getByRole('button', { name: 'Salva e continua', exact: true }).click();
     await expect(panel.getByRole('group', { name: 'Come preferisci lavorare?', exact: true })).toBeVisible();

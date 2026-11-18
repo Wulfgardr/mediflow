@@ -11,6 +11,7 @@ import { prepareScaleCreate, ScaleEntryWriteError, type PreparedScaleEntryCreate
 import { useParams, useRouter } from 'next/navigation';
 import ScaleEngine from '@/components/scale-engine';
 import { SCALES } from '@/lib/scale-definitions';
+import { scaleDisplayTitle } from '@/lib/scale-history';
 import { submitScale } from '@/lib/scale-submission';
 import { v4 as uuidv4 } from 'uuid';
 import styles from '@/components/scales/scale-workspace.module.css';
@@ -139,7 +140,7 @@ function ScaleRunner({ patientId, scaleId }: { patientId: string; scaleId: strin
                 {/* a retirement notice is clinical content, not optional header copy. */}
                 <div className={workspaceStyles.loadingCard} role="status">
                     {scaleId === 'tinetti'
-                        ? 'Versione Tinetti precedente ritirata. I risultati storici restano invariati; per una nuova valutazione scegliere POMA-28 v1.'
+                        ? 'Versione Tinetti precedente ritirata. I risultati storici restano invariati; per una nuova valutazione scegliere Tinetti POMA-28.'
                         : 'La scala richiesta non è presente nella libreria locale di MediFlow.'}
                 </div>
             </Kree8WorkspaceShell></div>
@@ -151,12 +152,11 @@ function ScaleRunner({ patientId, scaleId }: { patientId: string; scaleId: strin
     return (
         <div className={styles.screen}><Kree8WorkspaceShell
             eyebrow="Valutazione"
-            title={scaleDef.title}
-            subtitle="Compila la scala nel contesto della visita e salva il punteggio come voce del diario clinico."
+            title={scaleDisplayTitle(scaleDef)}
+            subtitle="Risposte e punteggio vengono registrati nello storico delle scale."
             backHref={`/patients/${patientId}/scales`}
             backLabel="Torna alle scale"
             patientLabel={patientLabel}
-            statusLabel={enabled ? 'Scrittura locale: il risultato resta nella cartella del paziente.' : undefined}
             navItems={[]}
         >
             {/* WUL-678: context stays selectable without secondary panels. */}
@@ -175,7 +175,6 @@ function ScaleRunner({ patientId, scaleId }: { patientId: string; scaleId: strin
                 <details className={styles.details}>
                     <summary>Informazioni sulla compilazione</summary>
                     <p>{scaleDef.description}</p>
-                    <p>Con Completa salvi punteggio, interpretazione e risposte nel diario del paziente.</p>
                 </details>
                 {draft && (
                     <ScaleEngine key={`${patientId}:${scaleDef.id}`} scale={scaleDef} showHeading={false} patientLabel={patientLabel}
